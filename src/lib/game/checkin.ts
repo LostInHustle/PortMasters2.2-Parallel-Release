@@ -1,5 +1,5 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: Daily Check-In
+// PortMasters 2.2 Parallel Release: Daily Check In
 // A position based weekly reward cycle tied to a captain's account, not
 // any single room. Pure functions only (no React, no Prisma), so both the
 // client (the lobby widget) and the server (the /api/check-in route) can

@@ -54,7 +54,7 @@ export async function GET() {
       }
     : DEFAULT_LEGACY_SUMMARY;
 
-  // The current user's Daily Check-In state rides along here so the lobby
+  // The current user's Daily Check In state rides along here so the lobby
   // renders the widget without a second request. Other players' legacy
   // routes (batch, [userId]) stay read only summaries with no check-in.
   const checkIn = checkInStatus(
