@@ -129,7 +129,7 @@ export function HowToPlayModal({
           <div className="pm-seigaiha absolute inset-0 opacity-30 pointer-events-none" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="pm-grad-indigo flex h-9 w-9 items-center justify-center rounded-xl text-white">
+              <div className="pm-grad-violet flex h-9 w-9 items-center justify-center rounded-xl text-white">
                 <BookOpen className="h-5 w-5" />
               </div>
               <div>

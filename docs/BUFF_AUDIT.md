@@ -18,18 +18,18 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 
 ## What was covered
 
-| Family               | Count                | Where it lives                       |
-| -------------------- | -------------------- | ------------------------------------ |
-| Boons                | 14, over three tiers | `src/lib/game/constants.ts`          |
-| Ship modules         | 14, over three tiers | `src/lib/game/constants.ts`          |
-| Modifier keys        | 15                   | `src/lib/game/types.ts`              |
-| House perks          | 4 fields, 3 Houses   | `src/lib/game/engine/houses.ts`      |
-| Ages                 | 3                    | `src/lib/game/engine/ages.ts`        |
-| Difficulty modifiers | 3 tiers              | `src/lib/game/difficulty.ts`         |
-| Captain's Merits     | 9                    | `src/lib/game/engine/merits.ts`      |
-| Renown titles        | 7                    | `src/lib/game/constants.ts`          |
-| Social economy       | 6 systems            | `src/lib/game/engine/` and realtime  |
-| Harbor systems       | Harbor Pulse and two | `src/lib/game/harborPulse.ts`        |
+| Family               | Count                | Where it lives                      |
+| -------------------- | -------------------- | ----------------------------------- |
+| Boons                | 14, over three tiers | `src/lib/game/constants.ts`         |
+| Ship modules         | 14, over three tiers | `src/lib/game/constants.ts`         |
+| Modifier keys        | 15                   | `src/lib/game/types.ts`             |
+| House perks          | 4 fields, 3 Houses   | `src/lib/game/engine/houses.ts`     |
+| Ages                 | 3                    | `src/lib/game/engine/ages.ts`       |
+| Difficulty modifiers | 3 tiers              | `src/lib/game/difficulty.ts`        |
+| Captain's Merits     | 9                    | `src/lib/game/engine/merits.ts`     |
+| Renown titles        | 7                    | `src/lib/game/constants.ts`         |
+| Social economy       | 6 systems            | `src/lib/game/engine/` and realtime |
+| Harbor systems       | Harbor Pulse and two | `src/lib/game/harborPulse.ts`       |
 
 ## Defects
 
@@ -78,8 +78,11 @@ The two boons do nothing for the two most valuable goods in the game.
 
 ```typescript
 const raidPct = Math.round(
-  Math.min(1,
-    pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) + leak) * 100);
+  Math.min(
+    1,
+    pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) + leak,
+  ) * 100,
+);
 ```
 
 The comment above it reads that this is "so what the captain reads is the real chance". It is not. The actual roll at `src/lib/game/engine/pirates.ts:23` applies three further modifiers after the base chance: `brokerCorruptionRisk`, `pirate_risk_discount`, and the Persian Dome Compass module at a factor of 0.7.
@@ -124,12 +127,12 @@ A network timeout should not demote a captain.
 
 These are display errors rather than rule errors. The rules are right and the text beside them is not.
 
-| Where                                          | What it says                                        | What is true                                     |
-| ---------------------------------------------- | --------------------------------------------------- | ------------------------------------------------ |
-| `Purchase.tsx:315` panel title                 | "Next Round Forecast"                               | It shows the pulse already applied to this board |
-| `Welcome.tsx:170`                              | Understates the stake                               | The tier's real numbers                          |
-| `constants.ts:765` tutorial                    | "Starting gold is **100**"                          | Monsoon starts at 90                             |
-| `DifficultyAdvisor.tsx:48`                     | "three difficulty scoped Merits await"              | Only two require Monsoon                         |
+| Where                                          | What it says                                                             | What is true                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------ |
+| `Purchase.tsx:315` panel title                 | "Next Round Forecast"                                                    | It shows the pulse already applied to this board |
+| `Welcome.tsx:170`                              | Understates the stake                                                    | The tier's real numbers                          |
+| `constants.ts:765` tutorial                    | "Starting gold is **100**"                                               | Monsoon starts at 90                             |
+| `DifficultyAdvisor.tsx:48`                     | "three difficulty scoped Merits await"                                   | Only two require Monsoon                         |
 | `partialSight.ts:12` and `docs/PROPOSAL.md:43` | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                     |
 
 The tutorial line hardcodes 100 in a sentence that templates every other number from the difficulty config.

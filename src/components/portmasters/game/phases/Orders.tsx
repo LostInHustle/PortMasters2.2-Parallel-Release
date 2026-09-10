@@ -95,7 +95,7 @@ export function Orders({
               </span>
               <Button
                 size="sm"
-                className="pm-grad-violet text-white font-semibold rounded-lg shrink-0 hover:opacity-95"
+                className="pm-grad-violet text-white font-semibold rounded-lg shrink-0"
                 onClick={() => setFavorOpen(true)}
               >
                 Call in a Favor
@@ -163,7 +163,7 @@ export function Orders({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="pm-grad-violet text-white font-semibold rounded-lg hover:opacity-95"
+                  className="pm-grad-violet text-white font-semibold rounded-lg"
                   onClick={() => {
                     act((g, l) => callBrokersFavor(g, favorItem, favorQty, l));
                     closeFavor();

@@ -72,11 +72,15 @@ export function LeaderboardModal({
           <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="pm-grad-gold flex h-10 w-10 items-center justify-center rounded-xl text-amber-950">
+              {/* The rose of the leaderboard chip in the top bar, so the
+                  dialog wears the colour of the control that opened it.
+                  The gold further down is left alone on purpose: there it
+                  is a medal, and a first place should look like one. */}
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-display text-lg font-bold pm-text-gold">
+                <h2 className="font-display text-lg font-bold pm-text-sea">
                   Harbor Leaderboard
                 </h2>
                 <p className="text-[11px] text-muted-foreground">

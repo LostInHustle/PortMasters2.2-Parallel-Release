@@ -221,7 +221,7 @@ export function AuthScreen({
               <Button
                 type="submit"
                 disabled={loading || !username || !password}
-                className="pm-grad-primary h-11 w-full rounded-xl font-semibold text-white shadow-lg shadow-teal-500/20 hover:opacity-95"
+                className="pm-grad-primary h-11 w-full rounded-xl font-semibold text-white shadow-lg shadow-teal-500/20"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
