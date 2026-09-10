@@ -6,6 +6,7 @@ import { Trophy, Crown, Star, Ship, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import type { LeaderboardEntry } from "@/types/realtime";
 import { Avatar, Pill } from "./shared";
+import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 
 type SortKey =
@@ -59,11 +60,7 @@ export function LeaderboardModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={() => onOpenChange(false)}
-      />
+    <ModalOverlay onClose={() => onOpenChange(false)}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -218,6 +215,6 @@ export function LeaderboardModal({
           )}
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
