@@ -123,19 +123,22 @@ A captain holding either module is quoted high on that panel and charged low at 
 
 A network timeout should not demote a captain.
 
-### Five numbers the interface states that the game does not
+### Six numbers the interface states that the game does not
 
 These are display errors rather than rule errors. The rules are right and the text beside them is not.
 
-| Where                                          | What it says                                                             | What is true                                     |
-| ---------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------ |
-| `Purchase.tsx:315` panel title                 | "Next Round Forecast"                                                    | It shows the pulse already applied to this board |
-| `Welcome.tsx:170`                              | Understates the stake                                                    | The tier's real numbers                          |
-| `constants.ts:765` tutorial                    | "Starting gold is **100**"                                               | Monsoon starts at 90                             |
-| `DifficultyAdvisor.tsx:48`                     | "three difficulty scoped Merits await"                                   | Only two require Monsoon                         |
-| `partialSight.ts:12` and `docs/PROPOSAL.md:43` | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                     |
+| Where                                          | What it says                                                             | What is true                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
+| `Purchase.tsx` panel title                     | "Next Round Forecast"                                                    | It showed the pulse already applied to this board |
+| `AgeBanner.tsx` full variant                   | "~2 weeks remaining"                                                     | A fixed string, in a branch nothing renders       |
+| `Welcome.tsx:170`                              | Understates the stake                                                    | The tier's real numbers                           |
+| `constants.ts:765` tutorial                    | "Starting gold is **100**"                                               | Monsoon starts at 90                              |
+| `DifficultyAdvisor.tsx:48`                     | "three difficulty scoped Merits await"                                   | Only two require Monsoon                          |
+| `partialSight.ts:12` and `docs/PROPOSAL.md:43` | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                      |
 
 The tutorial line hardcodes 100 in a sentence that templates every other number from the difficulty config.
+
+Two entries above have since been corrected. The Purchase panel now reads Harbor Pulse and says the lean is already priced into the board, which is what the pulse genuinely is: the server computes it as the room advances into Phase 1, and startPhase1 hands it straight to genResourceCard, so it describes the prices on the shelf rather than predicting the next round. The Age banner now reads its boundary off the Age's own clock through nextAgeChange, so it counts down instead of claiming a fortnight forever. That branch has no call site at present, so the correction is there for whoever renders it next.
 
 ### Three things that are written and read by nothing
 

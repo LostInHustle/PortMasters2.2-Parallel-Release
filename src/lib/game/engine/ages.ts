@@ -74,3 +74,14 @@ export function currentAge(now: Date = new Date()): Age {
   // returning undefined for a Date no real caller will ever pass.
   return AGES[idx] ?? AGES[0];
 }
+
+// The moment the Age in force gives way to the next one. The boundary is
+// the same epoch anchored one currentAge rounds down to, so a caller that
+// wants to say how long the current Age still holds works it out from the
+// same clock the Age itself came from rather than keeping a second idea of
+// when the fortnight ends. Pass the same Date to both and the two can
+// never disagree across a boundary.
+export function nextAgeChange(now: Date = new Date()): Date {
+  const nextIdx = Math.floor(now.getTime() / FORTNIGHT_MS) + 1;
+  return new Date(nextIdx * FORTNIGHT_MS);
+}
