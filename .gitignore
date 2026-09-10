@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+/.next/
+/out/
+
+# Test coverage output
+/coverage
+
+# The SQLite database. The running game creates and rewrites this file, so
+# it belongs to the machine that runs it rather than to the repository. The
+# pattern is deliberately not anchored to db/ so a database written anywhere
+# else in the tree is covered too.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment files. The example is checked in on purpose so a fresh
+# clone knows exactly which variables the server reads.
+.env*
+!.env.example
+
+# Editor and operating system clutter
+.DS_Store
+*.pem
+
+# Logs and caches
+*.log
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts

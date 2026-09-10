@@ -1,0 +1,243 @@
+// =====================================================================
+// PortMasters 2.2 Parallel Release: Lords of the Silk Road (Online Edition)
+// Prisma schema covering accounts, sessions, rooms, membership, per
+// player game state, chat, captain legacy, merits, convoy ventures,
+// loans, voyage chronicles, captain rivals, and house standings.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  avatarHue    Int      @default(180)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+  memberships  RoomMember[]
+  ownedRooms   Room[]         @relation("RoomHost")
+  gameStates   GameState[]
+  sentMessages Message[]      @relation("MessageSender")
+  recvMessages Message[]      @relation("MessageRecipient")
+  legacy       CaptainLegacy?
+  merits       CaptainMerit[]
+  chronicles   VoyageChronicle[]
+  rivalsA      CaptainRival[]  @relation("RivalA")
+  rivalsB      CaptainRival[]  @relation("RivalB")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  hostId    String
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  currentRound Int    @default(1)
+  currentPhase String @default("0")
+  voyageEpoch  Int    @default(0)
+  started      Boolean @default(false)
+  difficulty   String @default("fair_winds")
+
+  host           User            @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
+  members        RoomMember[]
+  messages       Message[]
+  gameStates     GameState[]
+  convoyVentures ConvoyVenture[]
+  loans          Loan[]
+  chronicles     VoyageChronicle[]
+
+  @@index([hostId])
+}
+
+model RoomMember {
+  id       String   @id @default(cuid())
+  userId   String
+  roomId   String
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([roomId])
+}
+
+model GameState {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  data      String
+  updatedAt DateTime @updatedAt
+
+  integritySeverity String?
+  integrityNote     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([userId])
+  @@index([roomId])
+}
+
+model CaptainLegacy {
+  id               String @id @default(cuid())
+  userId           String @unique
+  renownLevel      Int    @default(1)
+  renownXP         Int    @default(0)
+  voyagesCompleted Int    @default(0)
+  seaMasterCrowns  Int    @default(0)
+  bestScore        Int    @default(0)
+  consecutiveSolventVoyages Int @default(0)
+  statsByDifficulty String @default("{}")
+  checkInCount    Int     @default(0)
+  lastCheckInDate String?
+  houseId         String?
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CaptainMerit {
+  id       String   @id @default(cuid())
+  userId   String
+  meritId  String
+  earnedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, meritId])
+  @@index([userId])
+}
+
+model ConvoyVenture {
+  id               String @id @default(cuid())
+  roomId           String
+  voyageEpoch      Int
+  posterId         String
+  posterName       String
+  targetGold       Int
+  deadlineRound    Int
+  payoutMultiplier Float  @default(1.5)
+  contributions    String @default("{}")
+  status           String @default("open")
+  createdAt        DateTime  @default(now())
+  resolvedAt       DateTime?
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, voyageEpoch])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  roomId      String?
+  senderId    String
+  recipientId String?
+  content     String
+  createdAt   DateTime @default(now())
+
+  room      Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User  @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User? @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([senderId, recipientId, createdAt])
+}
+
+model Loan {
+  id           String @id
+  roomId       String
+  voyageEpoch  Int
+  borrowerId   String
+  borrowerName String
+  lenderId     String
+  lenderName   String
+  amount       Int
+  round        Int
+  backerId     String?
+  backerName   String?
+  backedAmount Int?
+  redirectToUserId String?
+  redirectToName   String?
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, voyageEpoch])
+}
+
+// =====================================================================
+// New tables for the seven un built manifest systems.
+// =====================================================================
+
+model VoyageChronicle {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  voyageEpoch Int
+  difficulty  String
+  rounds      Int
+  peakReputation Int
+  finalReputation Int
+  finalGold       Int
+  largestTrade    Int
+  lendCount       Int
+  borrowCount     Int
+  crowned         Boolean @default(false)
+  bankrupt        Boolean @default(false)
+  merchantRating  String
+  headline        String
+  body            String
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([roomId])
+}
+
+model CaptainRival {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  roomId    String
+  voyageEpoch Int
+  aScore    Int
+  bScore    Int
+  aWon      Boolean @default(false)
+  bWon      Boolean @default(false)
+  tie       Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  userA User @relation("RivalA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("RivalB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@index([userAId, userBId])
+  @@index([roomId])
+}

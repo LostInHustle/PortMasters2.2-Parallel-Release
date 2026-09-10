@@ -1,0 +1,680 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-gold: var(--gold);
+  --color-celadon: var(--celadon);
+  --color-jade: var(--jade);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* Rice paper canvas with morning sea warmth */
+  --background: oklch(0.985 0.008 95);
+  --foreground: oklch(0.22 0.02 260);
+
+  /* Celadon porcelain primary */
+  --primary: oklch(0.62 0.09 165);
+  --primary-foreground: oklch(0.98 0.01 95);
+
+  /* Soft mist surfaces */
+  --card: oklch(0.99 0.006 95);
+  --card-foreground: oklch(0.22 0.02 260);
+  --popover: oklch(0.99 0.006 95);
+  --popover-foreground: oklch(0.22 0.02 260);
+
+  /* Indigo scholar ink secondary */
+  --secondary: oklch(0.93 0.02 250);
+  --secondary-foreground: oklch(0.3 0.04 260);
+
+  /* Muted stone */
+  --muted: oklch(0.94 0.01 100);
+  --muted-foreground: oklch(0.5 0.02 260);
+
+  /* Vermilion seal accent */
+  --accent: oklch(0.68 0.16 32);
+  --accent-foreground: oklch(0.99 0.01 95);
+
+  /* Vermilion for destructive (the seal that cancels) */
+  --destructive: oklch(0.58 0.2 28);
+  --destructive-foreground: oklch(0.99 0.01 95);
+
+  /* Borders like ink lines on rice paper */
+  --border: oklch(0.88 0.015 95);
+  --input: oklch(0.9 0.012 95);
+  --ring: oklch(0.62 0.09 165);
+
+  /* Chart palette: celadon, vermilion, gold, indigo, jade */
+  --chart-1: oklch(0.62 0.09 165);
+  --chart-2: oklch(0.65 0.17 32);
+  --chart-3: oklch(0.8 0.13 85);
+  --chart-4: oklch(0.5 0.13 260);
+  --chart-5: oklch(0.58 0.11 150);
+
+  /* Sidebar warm parchment */
+  --sidebar: oklch(0.97 0.01 90);
+  --sidebar-foreground: oklch(0.25 0.02 260);
+  --sidebar-primary: oklch(0.62 0.09 165);
+  --sidebar-primary-foreground: oklch(0.98 0.01 95);
+  --sidebar-accent: oklch(0.92 0.02 95);
+  --sidebar-accent-foreground: oklch(0.25 0.02 260);
+  --sidebar-border: oklch(0.88 0.015 95);
+  --sidebar-ring: oklch(0.62 0.09 165);
+
+  /* Named East Asian palette tokens */
+  --gold: oklch(0.8 0.13 85);
+  --celadon: oklch(0.62 0.09 165);
+  --jade: oklch(0.58 0.11 150);
+}
+
+.dark {
+  --radius: 0.75rem;
+
+  /* Deep ink canvas with harbour glow */
+  --background: oklch(0.17 0.02 250);
+  --foreground: oklch(0.93 0.01 95);
+
+  /* Bright celadon primary */
+  --primary: oklch(0.72 0.1 165);
+  --primary-foreground: oklch(0.15 0.02 250);
+
+  --card: oklch(0.21 0.025 250);
+  --card-foreground: oklch(0.93 0.01 95);
+  --popover: oklch(0.21 0.025 250);
+  --popover-foreground: oklch(0.93 0.01 95);
+
+  --secondary: oklch(0.27 0.03 255);
+  --secondary-foreground: oklch(0.9 0.01 95);
+
+  --muted: oklch(0.25 0.02 255);
+  --muted-foreground: oklch(0.68 0.02 95);
+
+  --accent: oklch(0.7 0.18 32);
+  --accent-foreground: oklch(0.98 0.01 95);
+
+  --destructive: oklch(0.62 0.2 28);
+  --destructive-foreground: oklch(0.98 0.01 95);
+
+  --border: oklch(0.3 0.02 255);
+  --input: oklch(0.3 0.02 255);
+  --ring: oklch(0.72 0.1 165);
+
+  --chart-1: oklch(0.72 0.1 165);
+  --chart-2: oklch(0.7 0.18 32);
+  --chart-3: oklch(0.82 0.13 85);
+  --chart-4: oklch(0.62 0.13 260);
+  --chart-5: oklch(0.68 0.11 150);
+
+  --sidebar: oklch(0.2 0.025 250);
+  --sidebar-foreground: oklch(0.9 0.01 95);
+  --sidebar-primary: oklch(0.72 0.1 165);
+  --sidebar-primary-foreground: oklch(0.15 0.02 250);
+  --sidebar-accent: oklch(0.27 0.03 255);
+  --sidebar-accent-foreground: oklch(0.9 0.01 95);
+  --sidebar-border: oklch(0.3 0.02 255);
+  --sidebar-ring: oklch(0.72 0.1 165);
+
+  --gold: oklch(0.82 0.13 85);
+  --celadon: oklch(0.72 0.1 165);
+  --jade: oklch(0.68 0.11 150);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+  }
+}
+
+@layer utilities {
+  /* The morning sea canvas. Three radial glows over a dawn gradient. */
+  .pm-canvas {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        ellipse 80% 50% at 15% 0%,
+        oklch(0.9 0.05 85 / 0.55),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 70% 60% at 85% 20%,
+        oklch(0.88 0.07 165 / 0.45),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 90% 60% at 50% 100%,
+        oklch(0.85 0.06 260 / 0.35),
+        transparent 65%
+      ),
+      linear-gradient(
+        170deg,
+        oklch(0.97 0.012 95) 0%,
+        oklch(0.96 0.015 165) 45%,
+        oklch(0.95 0.018 250) 100%
+      );
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .dark .pm-canvas {
+    background-image:
+      radial-gradient(
+        ellipse 80% 50% at 15% 0%,
+        oklch(0.3 0.06 85 / 0.45),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 70% 60% at 85% 20%,
+        oklch(0.28 0.07 165 / 0.4),
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 90% 60% at 50% 100%,
+        oklch(0.26 0.06 260 / 0.35),
+        transparent 65%
+      ),
+      linear-gradient(
+        170deg,
+        oklch(0.18 0.022 95) 0%,
+        oklch(0.17 0.025 165) 45%,
+        oklch(0.16 0.028 250) 100%
+      );
+  }
+
+  /* Rice paper glass. Translucent porcelain over the sea. */
+  .pm-glass {
+    background-color: oklch(1 0 0 / 0.85);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+      0 1px 2px oklch(0.2 0.02 260 / 0.04),
+      0 8px 24px oklch(0.2 0.02 260 / 0.06),
+      inset 0 1px 0 oklch(1 0 0 / 0.5);
+    border: 1px solid oklch(1 0 0 / 0.4);
+  }
+  .dark .pm-glass {
+    background-color: oklch(0.24 0.025 250 / 0.8);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.2),
+      0 8px 24px oklch(0 0 0 / 0.3),
+      inset 0 1px 0 oklch(1 0 0 / 0.06);
+    border: 1px solid oklch(1 0 0 / 0.08);
+  }
+
+  /* Heavier glass for the auth card and notification toast. */
+  .pm-glass-strong {
+    background-color: oklch(1 0 0 / 0.92);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    box-shadow:
+      0 2px 4px oklch(0.2 0.02 260 / 0.05),
+      0 12px 40px oklch(0.2 0.02 260 / 0.08),
+      inset 0 1px 0 oklch(1 0 0 / 0.6);
+    border: 1px solid oklch(1 0 0 / 0.5);
+  }
+  .dark .pm-glass-strong {
+    background-color: oklch(0.26 0.03 250 / 0.88);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    box-shadow:
+      0 2px 4px oklch(0 0 0 / 0.25),
+      0 12px 40px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 oklch(1 0 0 / 0.08);
+    border: 1px solid oklch(1 0 0 / 0.1);
+  }
+
+  /* The prefix and the plain spelling have to live in separate rules. The CSS
+     minifier treats them as a single property and keeps only whichever is
+     written last, so declaring the pair together in one rule silently dropped
+     the plain form, and with it the blur, in every browser that no longer
+     honours the prefix. Keeping the prefix in the rules above and the plain
+     form here gives both families a working blur. */
+  @supports (backdrop-filter: blur(14px)) {
+    .pm-glass {
+      backdrop-filter: blur(14px) saturate(140%);
+    }
+    .dark .pm-glass {
+      backdrop-filter: blur(14px) saturate(140%);
+    }
+    .pm-glass-strong {
+      backdrop-filter: blur(18px) saturate(150%);
+    }
+    .dark .pm-glass-strong {
+      backdrop-filter: blur(18px) saturate(150%);
+    }
+  }
+
+  /* Gradient text for display headings. */
+  .pm-text-gold {
+    background: linear-gradient(
+      95deg,
+      oklch(0.72 0.13 85),
+      oklch(0.82 0.12 70)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .pm-text-sea {
+    background: linear-gradient(
+      95deg,
+      oklch(0.55 0.1 165),
+      oklch(0.5 0.12 200)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .dark .pm-text-sea {
+    background: linear-gradient(
+      95deg,
+      oklch(0.75 0.11 165),
+      oklch(0.7 0.12 200)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Wax seal gradients for buttons and tiles. */
+  .pm-grad-primary {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.62 0.1 165),
+      oklch(0.58 0.11 175)
+    );
+    color: oklch(0.99 0.01 95);
+  }
+  .pm-grad-gold {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.78 0.13 85),
+      oklch(0.72 0.14 65)
+    );
+    color: oklch(0.2 0.03 60);
+  }
+  .pm-grad-jade {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.6 0.11 150),
+      oklch(0.55 0.12 160)
+    );
+    color: oklch(0.99 0.01 95);
+  }
+  .pm-grad-vermilion {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.62 0.18 32),
+      oklch(0.58 0.2 22)
+    );
+    color: oklch(0.99 0.01 95);
+  }
+  .pm-grad-indigo {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.45 0.13 260),
+      oklch(0.4 0.14 270)
+    );
+    color: oklch(0.99 0.01 95);
+  }
+  .pm-grad-amber {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.8 0.13 85),
+      oklch(0.74 0.15 70)
+    );
+    color: oklch(0.2 0.03 60);
+  }
+  .pm-grad-violet {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.58 0.13 295),
+      oklch(0.52 0.14 310)
+    );
+    color: oklch(0.99 0.01 95);
+  }
+
+  /* Tactile feedback for non Button clickables. */
+  .pm-pressable {
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease,
+      color 150ms ease,
+      background-color 150ms ease,
+      filter 150ms ease;
+    will-change: transform;
+  }
+  .pm-pressable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px oklch(0.2 0.02 260 / 0.12);
+    filter: brightness(1.05);
+  }
+  .pm-pressable:active {
+    transform: scale(0.96);
+    transition-duration: 80ms;
+    box-shadow: 0 2px 8px oklch(0.2 0.02 260 / 0.08);
+  }
+  .pm-pressable:focus-visible {
+    outline: 3px solid oklch(0.62 0.09 165 / 0.5);
+    outline-offset: 2px;
+  }
+
+  /* Ghost button hover: all icon buttons in headers and control panels
+     get a visible background on hover so the user always knows where
+     their mouse is. */
+  button[class*="ghost"]:hover:not(:disabled),
+  button[variant="ghost"]:hover:not(:disabled) {
+    background-color: oklch(0 0 0 / 0.06);
+  }
+  .dark button[class*="ghost"]:hover:not(:disabled),
+  .dark button[variant="ghost"]:hover:not(:disabled) {
+    background-color: oklch(1 0 0 / 0.08);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pm-pressable,
+    .pm-pressable:hover,
+    .pm-pressable:active {
+      transform: none;
+      transition: none;
+    }
+  }
+
+  /* Caps a ScrollArea at a share of the viewport so a long list scrolls
+     inside its dialog instead of spilling over the dialog's footer.
+
+     The max height has to be repeated on the viewport, not just the root.
+     Radix sizes its viewport at height 100%, and a percentage height
+     against a parent whose own height is auto resolves back to auto, so
+     the viewport would size to its content and push straight past a cap
+     that only the root carries. Inheriting the root's max-height gives the
+     viewport a limit to scroll against. */
+  .pm-scroll-capped > [data-radix-scroll-area-viewport] {
+    max-height: inherit;
+  }
+
+  /* Thin custom scrollbar like a brush stroke. */
+  .pm-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.62 0.09 165 / 0.4) transparent;
+  }
+  .pm-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .pm-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .pm-scroll::-webkit-scrollbar-thumb {
+    background-color: oklch(0.62 0.09 165 / 0.35);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .pm-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.62 0.09 165 / 0.55);
+  }
+
+  /* The artisan identity palette. One hue per craft. */
+  .pm-artisan {
+    --pm-artisan: 0.52 0.16 265;
+  }
+  .pm-artisan-weaver {
+    --pm-artisan: 0.52 0.16 265;
+  }
+  .pm-artisan-master {
+    --pm-artisan: 0.5 0.18 305;
+  }
+  .pm-artisan-sachet_maker {
+    --pm-artisan: 0.62 0.18 10;
+  }
+  .pm-artisan-coppersmith {
+    --pm-artisan: 0.55 0.16 45;
+  }
+  .pm-artisan-potter {
+    --pm-artisan: 0.58 0.12 165;
+  }
+  .pm-artisan-perfumer {
+    --pm-artisan: 0.62 0.15 75;
+  }
+  .pm-artisan-jeweler {
+    --pm-artisan: 0.55 0.14 220;
+  }
+
+  .pm-artisan .pm-artisan-ink,
+  .pm-artisan.pm-artisan-ink {
+    color: oklch(var(--pm-artisan));
+  }
+  .pm-artisan .pm-artisan-wash {
+    background-color: oklch(var(--pm-artisan) / 0.06);
+  }
+  .pm-artisan .pm-artisan-edge,
+  .pm-artisan.pm-artisan-edge {
+    border-color: oklch(var(--pm-artisan) / 0.5);
+  }
+  .pm-artisan .pm-artisan-chip {
+    background-color: oklch(var(--pm-artisan) / 0.12);
+    border: 1px solid oklch(var(--pm-artisan) / 0.28);
+    color: oklch(var(--pm-artisan));
+  }
+  .pm-artisan .pm-artisan-chip:hover {
+    background-color: oklch(var(--pm-artisan) / 0.2);
+  }
+
+  /* Seigaiha wave pattern for header strips. */
+  .pm-seigaiha {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cg fill='none' stroke='%2362a89c' stroke-opacity='0.18' stroke-width='1'%3E%3Cpath d='M0 20 A10 10 0 0 1 20 20 A10 10 0 0 1 40 20'/%3E%3Cpath d='M0 20 A6 6 0 0 1 12 20 A6 6 0 0 1 24 20 A6 6 0 0 1 36 20 A6 6 0 0 1 40 20'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  /* Brush stroke underline for display headings. */
+  .pm-brush {
+    position: relative;
+    display: inline-block;
+  }
+  .pm-brush::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.35em;
+    height: 0.18em;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(0.65 0.17 32 / 0.6) 15%,
+      oklch(0.65 0.17 32 / 0.6) 85%,
+      transparent
+    );
+    border-radius: 9999px;
+    transform: scaleX(0.85);
+    transform-origin: center;
+  }
+
+  /* Floating lantern particle. A slow drifting glow that evokes paper
+     lanterns bobbing on a midnight harbor. Use on an absolutely
+     positioned div inside a relative container. */
+  .pm-lantern {
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+    filter: blur(1px);
+    animation: pm-lantern-drift 14s ease-in-out infinite;
+  }
+  @keyframes pm-lantern-drift {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 0.5;
+    }
+    25% {
+      transform: translate(20px, -30px) scale(1.1);
+      opacity: 0.7;
+    }
+    50% {
+      transform: translate(-15px, -50px) scale(0.95);
+      opacity: 0.4;
+    }
+    75% {
+      transform: translate(-25px, -20px) scale(1.05);
+      opacity: 0.6;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pm-lantern {
+      animation: none;
+    }
+  }
+
+  /* Porcelain crackle texture for premium surfaces. A subtle network
+     of fine lines like the glaze on ancient celadon ware.
+
+     isolation and a negative z-index on the pseudo element are load
+     bearing, not decoration. An absolutely positioned ::after paints
+     after its parent's in-flow children, so without them the crackle
+     network is drawn on top of the card's own text. isolation creates
+     the stacking context that keeps the negative index from dropping
+     the texture behind the card itself. Same idiom as .pm-ink-hover. */
+  .pm-crackle {
+    position: relative;
+    isolation: isolate;
+  }
+  .pm-crackle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%2362a89c' stroke-opacity='0.08' stroke-width='0.5'%3E%3Cpath d='M0 30 Q30 10 60 30 T120 30'/%3E%3Cpath d='M0 60 Q40 40 80 60 T120 60'/%3E%3Cpath d='M0 90 Q20 70 50 90 T120 90'/%3E%3Cpath d='M30 0 Q10 30 30 60 T30 120'/%3E%3Cpath d='M60 0 Q40 40 60 80 T60 120'/%3E%3Cpath d='M90 0 Q70 30 90 60 T90 120'/%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* Ink wash hover. A subtle darkening that spreads from center on
+     hover, like ink dropped onto wet rice paper. */
+  .pm-ink-hover {
+    position: relative;
+    isolation: isolate;
+  }
+  .pm-ink-hover::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      circle at center,
+      oklch(0.2 0.02 260 / 0.06),
+      transparent 70%
+    );
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .pm-ink-hover:hover::before {
+    opacity: 1;
+  }
+
+  /* Mist drift. A slow horizontal gradient shift for atmospheric
+     backgrounds, like morning mist rolling across the harbor. */
+  .pm-mist {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.95 0.02 180 / 0.15) 25%,
+      oklch(0.95 0.02 180 / 0.25) 50%,
+      oklch(0.95 0.02 180 / 0.15) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: pm-mist-drift 20s linear infinite;
+  }
+  @keyframes pm-mist-drift {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: 200% 0%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pm-mist {
+      animation: none;
+    }
+  }
+
+  /* The floating notification sits above every dialog in the app. Dialogs
+     render at 50, and a notification that appears behind a dialog is worse
+     than no notification at all: it is dimmed by the dialog's backdrop and
+     clicks land on the backdrop instead of the notification. Sonner, which
+     this app also uses for toasts, renders above dialogs for the same
+     reason. */
+  .pm-z-notification {
+    z-index: 60;
+  }
+
+  /* Truncate text to prevent overflow. Use on any text element
+     that might grow too long for its container. */
+  .pm-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Captain avatar sizing. The component writes two custom properties,
+     --pm-avatar-size and --pm-avatar-size-sm, because a diameter that
+     changes at a breakpoint cannot live in an inline style. The letter
+     inside is a share of the diameter rather than a fixed size, so it
+     stays centred at every step instead of overflowing a small circle or
+     floating in the middle of a large one. */
+  .pm-avatar {
+    width: var(--pm-avatar-size);
+    height: var(--pm-avatar-size);
+    font-size: calc(var(--pm-avatar-size) * 0.42);
+  }
+  @media (min-width: 640px) {
+    .pm-avatar-growth {
+      width: var(--pm-avatar-size-sm);
+      height: var(--pm-avatar-size-sm);
+      font-size: calc(var(--pm-avatar-size-sm) * 0.42);
+    }
+  }
+}
