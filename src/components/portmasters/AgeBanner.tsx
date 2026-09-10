@@ -4,6 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, TrendingUp, Handshake, Coins } from "lucide-react";
 import { useAges } from "@/lib/use-ages";
+import { ModalOverlay } from "@/components/ui/modal-overlay";
+import type { Age, AgeId } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,24 +21,23 @@ import { cn } from "@/lib/utils";
  * click. The pill uses a distinct gradient per Age so the active bonus
  * is readable at a glance.
  */
-const AGE_VISUALS: Record<
-  string,
-  { gradient: string; icon: typeof TrendingUp; accent: string }
-> = {
+type AgeVisual = {
+  gradient: string;
+  icon: typeof TrendingUp;
+};
+
+const AGE_VISUALS: Record<AgeId, AgeVisual> = {
   lender: {
     gradient: "pm-grad-jade",
     icon: Handshake,
-    accent: "text-emerald-700 dark:text-emerald-300",
   },
   trader: {
     gradient: "pm-grad-gold",
     icon: TrendingUp,
-    accent: "text-amber-700 dark:text-amber-300",
   },
   broker: {
     gradient: "pm-grad-violet",
     icon: Coins,
-    accent: "text-violet-700 dark:text-violet-300",
   },
 };
 
@@ -49,7 +50,7 @@ export function AgeBanner({
 }) {
   const { age } = useAges();
   const [expanded, setExpanded] = useState(false);
-  const visual = AGE_VISUALS[age.id] ?? AGE_VISUALS.lender;
+  const visual = AGE_VISUALS[age.id];
   const Icon = visual.icon;
 
   if (variant === "full") {
@@ -118,17 +119,13 @@ function AgeDetailDialog({
   visual,
   onClose,
 }: {
-  age: { id: string; name: string; description: string; modifier: number };
-  visual: { gradient: string; icon: typeof TrendingUp; accent: string };
+  age: Age;
+  visual: AgeVisual;
   onClose: () => void;
 }) {
   const Icon = visual.icon;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <ModalOverlay onClose={onClose}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -180,6 +177,6 @@ function AgeDetailDialog({
           </div>
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }

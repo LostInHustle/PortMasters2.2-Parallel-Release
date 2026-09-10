@@ -1,4 +1,4 @@
-// POST /api/check-in: claim today's Daily Check-In reward for the current
+// POST /api/check-in: claim today's Daily Check In reward for the current
 // user. One claim per UTC day; grants escalating Renown XP and advances the
 // 7-day cycle (see src/lib/game/checkin.ts). Together with the voyage
 // conclusion write in the realtime layer, this is the only place a

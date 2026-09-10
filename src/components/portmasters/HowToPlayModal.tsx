@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
+import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 
 /**
@@ -115,11 +116,7 @@ export function HowToPlayModal({
   const Icon = current.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={() => onOpenChange(false)}
-      />
+    <ModalOverlay onClose={() => onOpenChange(false)}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -252,6 +249,6 @@ export function HowToPlayModal({
           </div>
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }

@@ -143,7 +143,7 @@ export const api = {
     ),
 
   // Captain's Legacy (persistent Renown, across every voyage the account has
-  // played). The current user's own legacy also carries their Daily Check-In
+  // played). The current user's own legacy also carries their Daily Check In
   // status.
   getLegacy: () =>
     jfetch<{ legacy: CaptainLegacySummary; checkIn: CheckInStatus }>(
@@ -160,7 +160,7 @@ export const api = {
       },
     ),
 
-  // Daily Check-In: claim today's reward. Returns claimed:false (not an
+  // Daily Check In: claim today's reward. Returns claimed:false (not an
   // error) when today was already claimed, so the caller can just re render.
   checkIn: () =>
     jfetch<{
