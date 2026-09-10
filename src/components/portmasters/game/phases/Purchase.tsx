@@ -286,48 +286,53 @@ function TradeAdvisor({
 }
 
 /**
- * Market Forecast. Predicts next round's price trends based on the
- * harbor pulse data. The harbor pulse records which goods the room
- * leaned into this round; goods with a positive pulse are likely to
- * be pricier next round, while goods with a negative pulse are likely
- * to soften.
+ * Market Pulse. Explains why the board in front of the captain is priced
+ * the way it is.
  *
- * This is advisory, not prescriptive: the pulse is a lean, not a
- * shove, and the seeded random roll still dominates the final price.
- * But a captain who watches the forecast can anticipate which goods
- * to stockpile before they get expensive.
+ * The pulse is built from the round the room just finished: a good the
+ * crews leaned into harder than an even three way split comes out pricier,
+ * one nobody touched comes out softer. The server computes it the moment
+ * the room advances into Phase 1, and startPhase1 hands it straight to
+ * genResourceCard, so by the time this panel draws, the lean is already in
+ * the numbers on the cards. It is a reading of the board, not a prediction
+ * about the round to come, and saying so plainly matters: a captain who
+ * takes it for a forecast waits for a good to soften when it has already
+ * settled.
+ *
+ * The lean is deliberately small. PULSE_CAP holds it to twelve percent
+ * either way, so it tilts a decision without dictating one.
  */
-function MarketForecast({ game }: { game: GameState }) {
+function MarketPulse({ game }: { game: GameState }) {
   const pulse = game.harborPulse ?? {};
   const entries = Object.entries(pulse).filter(([, v]) => Math.abs(v) > 0.01);
 
   if (entries.length === 0) return null;
 
-  // Sort: most expensive trend first (positive pulse = pricier)
+  // Sort: the strongest lean first. A positive pulse means the price is up.
   const sorted = entries.sort(([, a], [, b]) => b - a);
-  const rising = sorted.filter(([, v]) => v > 0);
-  const falling = sorted.filter(([, v]) => v < 0);
+  const pricier = sorted.filter(([, v]) => v > 0);
+  const softer = sorted.filter(([, v]) => v < 0);
 
   return (
     <div className="rounded-xl border border-violet-500/15 bg-violet-500/[0.03] px-3.5 py-2.5 mb-3.5">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-violet-600 dark:text-violet-400/80 mb-1.5">
         <TrendingUp className="h-3.5 w-3.5" />
-        Next Round Forecast
+        Harbor Pulse
         <span className="font-normal text-muted-foreground/60 ml-1">
-          based on harbor activity
+          already priced into this board
         </span>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {rising.length > 0 && (
+        {pricier.length > 0 && (
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] text-rose-500 font-semibold">
-              Rising
+              Pricier
             </span>
-            {rising.map(([good, v]) => (
+            {pricier.map(([good, v]) => (
               <span
                 key={good}
                 className="inline-flex items-center gap-0.5 rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-600 dark:text-rose-300"
-                title={`${good} prices expected up about ${Math.round(v * 100)} percent next round`}
+                title={`${good} is about ${Math.round(v * 100)} percent above its usual price this round`}
               >
                 <ArrowUp className="h-2.5 w-2.5" />
                 {good}
@@ -335,16 +340,16 @@ function MarketForecast({ game }: { game: GameState }) {
             ))}
           </div>
         )}
-        {falling.length > 0 && (
+        {softer.length > 0 && (
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] text-emerald-500 font-semibold">
-              Falling
+              Softer
             </span>
-            {falling.map(([good, v]) => (
+            {softer.map(([good, v]) => (
               <span
                 key={good}
                 className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300"
-                title={`${good} prices expected down about ${Math.round(Math.abs(v) * 100)} percent next round`}
+                title={`${good} is about ${Math.round(Math.abs(v) * 100)} percent below its usual price this round`}
               >
                 <ArrowDown className="h-2.5 w-2.5" />
                 {good}
@@ -464,7 +469,7 @@ export function Purchase({
       )}
       <MarketPriceReference game={game} colorFor={resolveColor} />
       <TradeAdvisor game={game} colorFor={resolveColor} />
-      <MarketForecast game={game} />
+      <MarketPulse game={game} />
       <MarketDepth game={game} colorFor={resolveColor} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {

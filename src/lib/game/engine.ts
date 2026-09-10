@@ -181,7 +181,13 @@ export { merchantRatingForScore } from "./constants";
 // New engine modules layered on top of the faithful port, each owned by
 // its own file under ./engine/. Re-exported through the same barrel so
 // the public entry point stays the only place callers import from.
-export { AGES, currentAge, type Age, type AgeId } from "./engine/ages";
+export {
+  AGES,
+  currentAge,
+  nextAgeChange,
+  type Age,
+  type AgeId,
+} from "./engine/ages";
 export {
   HOUSES,
   applyHousePerkAtStart,

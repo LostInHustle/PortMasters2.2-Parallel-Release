@@ -41,6 +41,23 @@ const AGE_VISUALS: Record<AgeId, AgeVisual> = {
   },
 };
 
+// How long the Age still holds, in the plainest words that stay true.
+//
+// The figure is read once when the banner mounts and does not tick, which
+// is the same trade the Ages hook already makes for a fortnight long
+// cycle. The phrasing below is chosen so a stale figure still reads
+// honestly: below two days it shows exact hours, and above that the days
+// are rounded, so the coarseness never shows at the scale anyone reads it.
+function remainingLabel(until: Date): string {
+  const ms = until.getTime() - Date.now();
+  if (ms <= 0) return "handing over now";
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) return "under an hour remaining";
+  if (hours < 48) return `${hours} ${hours === 1 ? "hour" : "hours"} remaining`;
+  // Two days or more, so the plural is the only form this can take.
+  return `${Math.round(ms / 86_400_000)} days remaining`;
+}
+
 export function AgeBanner({
   variant = "pill",
   className,
@@ -48,7 +65,7 @@ export function AgeBanner({
   variant?: "pill" | "full";
   className?: string;
 }) {
-  const { age } = useAges();
+  const { age, nextChange } = useAges();
   const [expanded, setExpanded] = useState(false);
   const visual = AGE_VISUALS[age.id];
   const Icon = visual.icon;
@@ -71,7 +88,7 @@ export function AgeBanner({
                 {age.name}
               </h3>
               <span className="text-[10px] text-muted-foreground">
-                ~2 weeks remaining
+                {remainingLabel(nextChange)}
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">

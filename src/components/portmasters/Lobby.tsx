@@ -545,7 +545,7 @@ export function Lobby({
             </div>
             <button
               onClick={() => setCheckInOpen(true)}
-              className="pm-pressable relative rounded-full h-7 px-2 flex items-center gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-medium"
+              className="pm-chip pm-pressable relative h-7 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-300"
               title="Daily Check In"
               aria-label="Daily Check In"
             >
@@ -555,9 +555,12 @@ export function Lobby({
                 <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
               )}
             </button>
+            {/* Renown used to wear the same amber tint as Check In sitting
+                directly beside it, so the two read as one control. It wears
+                the open sea instead, which also suits a legacy of voyages. */}
             <button
               onClick={() => setLegacyOpen(true)}
-              className="pm-pressable rounded-full h-7 px-2 flex items-center gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-medium"
+              className="pm-chip pm-pressable h-7 px-2 bg-sky-500/15 text-sky-700 dark:text-sky-300"
               title="Captain Legacy"
               aria-label="View captain legacy"
             >
@@ -565,23 +568,24 @@ export function Lobby({
               <span className="hidden sm:inline">Renown </span>
               {renownProgress(legacy.renownXP).level}
             </button>
-            {/* Utility buttons: icon only on all screens */}
+            {/* Utility buttons: icon only on all screens, each on its own
+                tint so no two controls in the bar share a colour. */}
             <button
               onClick={() => setLeaderboardOpen(true)}
-              className="pm-pressable rounded-full h-7 w-7 flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+              className="pm-chip pm-pressable h-7 w-7 bg-rose-500/15 text-rose-700 dark:text-rose-300"
               title="Harbor Leaderboard"
               aria-label="Open harbor leaderboard"
             >
-              <Trophy className="h-3.5 w-3.5 text-amber-500" />
+              <Trophy className="h-3.5 w-3.5" />
             </button>
             <HarborActivityFeed />
             <button
               onClick={() => setSettingsOpen(true)}
-              className="pm-pressable rounded-full h-7 w-7 flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+              className="pm-chip pm-pressable h-7 w-7 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
               title="Settings"
               aria-label="Open settings"
             >
-              <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+              <Settings className="h-3.5 w-3.5" />
             </button>
             <div className="flex items-center gap-1.5 pl-1.5 sm:pl-2 sm:gap-2 border-l border-black/5 dark:border-white/10">
               <button
@@ -612,6 +616,7 @@ export function Lobby({
                 className="h-9 w-9 rounded-full"
                 onClick={onLogout}
                 title="Sign out"
+                aria-label="Sign out"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -674,27 +679,41 @@ export function Lobby({
                     Create a room or join one to set sail together.
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full pm-grad-indigo text-white hover:opacity-90"
-                  onClick={() => setHowToPlayOpen(true)}
-                  title="How to Play"
-                >
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">How to Play</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={refreshRooms}
-                  disabled={loadingRooms}
-                >
-                  <RefreshCw
-                    className={cn("h-4 w-4", loadingRooms && "animate-spin")}
-                  />
-                </Button>
+                {/* The two controls share one wrapper so the heading keeps
+                    the left edge and this pair keeps the right. Loose in a
+                    three child row they drifted apart instead, which is
+                    what left the guide floating in the middle of the bar.
+
+                    How to Play is a plain button rather than the Button
+                    primitive. It was dressed as a ghost, a variant that
+                    exists to be transparent, and then painted over with a
+                    solid gradient, so the variant contributed nothing but
+                    a hover tint that could not be seen through the paint.
+                    It now matches the pill buttons in the top bar. */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setHowToPlayOpen(true)}
+                    className="pm-pressable pm-grad-violet h-8 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium text-white"
+                    title="How to Play"
+                    aria-label="How to Play"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">How to Play</span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={refreshRooms}
+                    disabled={loadingRooms}
+                    title="Refresh harbors"
+                    aria-label="Refresh the harbor list"
+                  >
+                    <RefreshCw
+                      className={cn("h-4 w-4", loadingRooms && "animate-spin")}
+                    />
+                  </Button>
+                </div>
               </div>
 
               {/* [MANIFEST: Quick Start Match] One tap joins the queue and
@@ -702,7 +721,7 @@ export function Lobby({
                   above the create form as a distinct alternative to
                   charting a harbor yourself. */}
               <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3.5 mb-3.5 flex items-center gap-3">
-                <div className="pm-grad-gold h-10 w-10 rounded-lg flex items-center justify-center shrink-0">
+                <div className="pm-grad-vermilion h-10 w-10 rounded-lg flex items-center justify-center shrink-0">
                   <Zap className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -713,10 +732,14 @@ export function Lobby({
                     Match instantly with the next captain who hits Quick Start.
                   </p>
                 </div>
+                {/* The vermilion seal, the same colour the harbor uses for
+                    a thing that must not be missed. Quick Start used to
+                    wear the Houses gold, which left two unrelated
+                    controls in the same skin. */}
                 <Button
                   onClick={handleQuickStart}
                   disabled={quickStarting || busy}
-                  className="h-10 pm-grad-gold rounded-lg font-semibold"
+                  className="h-10 pm-grad-vermilion text-white rounded-lg font-semibold"
                 >
                   {quickStarting ? (
                     <>
@@ -1145,7 +1168,7 @@ export function Lobby({
             })}
           </div>
           <Button
-            className="pm-grad-violet text-white font-semibold rounded-lg w-full hover:opacity-95"
+            className="pm-grad-amber font-semibold rounded-lg w-full"
             disabled={!checkIn.canClaimToday || claiming}
             onClick={claimCheckIn}
           >

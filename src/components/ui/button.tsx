@@ -50,6 +50,12 @@ function Button({
   return (
     <Comp
       data-slot="button"
+      // The resolved variant, published as an attribute so a stylesheet has
+      // something stable to key on. It sits beside data-slot for the same
+      // reason: the class string a variant generates is an implementation
+      // detail that changes whenever the theme is retuned, and matching on
+      // it from outside is how a stylesheet quietly stops applying.
+      data-variant={variant ?? "default"}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

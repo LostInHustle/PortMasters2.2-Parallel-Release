@@ -60,7 +60,7 @@ export function HarborActivityFeed({ className }: { className?: string }) {
     <div className={cn("relative", className)}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="pm-pressable inline-flex items-center gap-1 rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground dark:bg-white/10"
+        className="pm-chip pm-pressable h-7 px-2.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
         title="Harbor activity feed"
         aria-label="Harbor activity feed"
       >
