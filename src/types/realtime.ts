@@ -58,6 +58,14 @@ export type GameStatusUpdate = {
 // An open barter offer, identical to the server side type. The optional
 // targetUserId fields are set only on a direct offer aimed at one
 // specific captain; an ordinary open offer leaves them unset.
+//
+// createdAt is the moment the server accepted the post, as an ISO
+// string. It exists so an offer can be placed at the right point in a
+// chat timeline: the offer is live server state rather than a stored
+// message, so when it is rendered beside the conversation the only thing
+// that says where it belongs is when it was posted. ISO 8601 strings in
+// one format sort chronologically as plain strings, which is the same
+// property the message list already relies on.
 export type BarterOffer = {
   id: string;
   fromUserId: string;
@@ -68,6 +76,7 @@ export type BarterOffer = {
   requestAmount: number;
   targetUserId?: string;
   targetName?: string;
+  createdAt: string;
 };
 
 // An open aid request: a captain short on Gold asking the harbor for a

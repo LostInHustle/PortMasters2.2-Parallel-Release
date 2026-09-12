@@ -87,6 +87,28 @@ export function roomMembers(
   return Array.from(byUser.values());
 }
 
+// The room one captain is currently seated in, or null when they are in
+// the lobby or holding no socket at all. A captain with two tabs open
+// holds one seat rather than two, so whichever socket claims a room
+// speaks for them.
+export function seatedRoomOf(userId: string): string | null {
+  for (const s of sockets.values()) {
+    if (s.userId === userId && s.authed && s.roomId) return s.roomId;
+  }
+  return null;
+}
+
+// The public identity of one captain, taken from whichever socket is
+// carrying them, or null when they hold no socket at all. Used where a
+// session conversation has to be addressed to someone without going to
+// the database for a row that is not being written there anyway.
+export function publicUserOf(userId: string): PublicUser | null {
+  for (const s of sockets.values()) {
+    if (s.userId === userId && s.authed) return s.user;
+  }
+  return null;
+}
+
 // Returns whether a pending departure was actually found and canceled.
 // room:join uses this to tell a genuine first join apart from a captain
 // whose connection merely blipped and is rejoining moments later.

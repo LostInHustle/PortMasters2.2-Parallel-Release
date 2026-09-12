@@ -61,7 +61,10 @@ export type Checkpoint = {
 
 // An open barter offer. The optional targetUserId fields are set only
 // on a direct offer aimed at one specific captain; an ordinary open
-// offer leaves them unset.
+// offer leaves them unset. createdAt is set once, by the barter:post
+// handler, so a client rendering the offer inside a chat can place it
+// where it belongs in the conversation. Mirrors the same field on
+// BarterOffer in src/types/realtime.ts.
 export type BarterOffer = {
   id: string;
   fromUserId: string;
@@ -72,6 +75,7 @@ export type BarterOffer = {
   requestAmount: number;
   targetUserId?: string;
   targetName?: string;
+  createdAt: string;
 };
 
 // An open aid request: a captain short on Gold asking the harbor for

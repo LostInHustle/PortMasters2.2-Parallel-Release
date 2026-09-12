@@ -49,6 +49,38 @@ type Captain = {
   username: string;
 };
 
+// Just enough of each wire payload to make a claim about it. A message is
+// named only by the fields the checks read, so an assertion here cannot
+// quietly depend on something the server never promised.
+type WireMessage = {
+  id: string;
+  content: string;
+  createdAt: string;
+  mine?: boolean;
+  sender: { id: string };
+  recipient?: { id: string };
+};
+
+// What a joiner is handed on `chat:history`: the harbor's conversation and
+// only those private threads this captain is part of.
+type WireHistory = {
+  roomId: string;
+  harbor: WireMessage[];
+  direct: WireMessage[];
+};
+
+type WireOffer = {
+  id: string;
+  fromUserId: string;
+  fromName: string;
+  offerItem: string;
+  offerAmount: number;
+  requestItem: string;
+  requestAmount: number;
+  targetUserId?: string;
+  createdAt: string;
+};
+
 const failures: string[] = [];
 
 function check(condition: boolean, description: string): void {
@@ -205,6 +237,11 @@ async function main(): Promise<void> {
 
   let host: Captain | null = null;
   let guest: Captain | null = null;
+  let third: Captain | null = null;
+  // Accounts this run creates that belong to no harbor, so there is
+  // nothing to tear down for them but the accounts themselves. The
+  // messages they send each other cascade away with them.
+  const extraAccounts: Captain[] = [];
   let roomId: string | null = null;
   let quickStartRoomId: string | null = null;
   const sockets: Socket[] = [];
@@ -259,6 +296,65 @@ async function main(): Promise<void> {
     check(
       anonymous.body?.user === null,
       "an anonymous visitor is not signed in",
+    );
+
+    console.log("\nThe Lobby keeps its messages");
+    // The one conversation the app is meant to write down, and the reason
+    // the rule about a voyage is specific rather than absolute. Two
+    // captains who are both ashore have no voyage for their thread to
+    // belong to, so it goes to the database and is meant to still be there
+    // tomorrow. These two are signed up here and never take a seat
+    // anywhere, which is the branch that reaches it.
+    const ashore = await signUp("ashore");
+    const quay = await signUp("quay");
+    extraAccounts.push(ashore, quay);
+    const ashoreSocket = await openAuthedSocket(ashore);
+    const quaySocket = await openAuthedSocket(quay);
+    sockets.push(ashoreSocket, quaySocket);
+
+    const quayLine = "meet me at the quay before the tide turns";
+    const heardAtQuay = waitForEvent<WireMessage>(
+      quaySocket,
+      "chat:dm",
+      (payload) => payload?.content === quayLine,
+    );
+    const heardAtAshore = waitForEvent<WireMessage>(
+      ashoreSocket,
+      "chat:dm",
+      (payload) => payload?.content === quayLine,
+    );
+    ashoreSocket.emit("chat:dm", { recipientId: quay.id, content: quayLine });
+    const quayGot = await heardAtQuay;
+    const ashoreGot = await heardAtAshore;
+    check(quayGot?.content === quayLine, "an ashore captain reaches another");
+    check(quayGot?.mine === false, "who does not read it as their own");
+    check(ashoreGot?.mine === true, "and the sender is given their own copy");
+
+    const writtenDown = await db.message.findMany({
+      where: { senderId: ashore.id, recipientId: quay.id },
+      select: { roomId: true, content: true },
+    });
+    check(
+      writtenDown.length === 1,
+      "a message between two captains ashore is written down",
+    );
+    check(
+      writtenDown[0]?.roomId === null,
+      "against no harbor, because it belongs to none",
+    );
+    check(
+      writtenDown[0]?.content === quayLine,
+      "and what was written is what was sent",
+    );
+
+    const lobbyHistory = await call<{ messages: Array<{ content: string }> }>(
+      `/api/messages/dm/${quay.id}`,
+      { cookie: ashore.cookie },
+    );
+    check(lobbyHistory.status === 200, "the history route answers");
+    check(
+      (lobbyHistory.body?.messages ?? []).some((m) => m.content === quayLine),
+      "and hands the conversation back, which is what the Lobby shows",
     );
 
     console.log("\nOpening and joining a harbor");
@@ -467,6 +563,266 @@ async function main(): Promise<void> {
       "the harbor opens in the tier the first captain picked",
     );
 
+    console.log("\nA conversation the voyage keeps to itself");
+    // The third captain exists for one reason: a private thread is only
+    // private if a captain who is not in it cannot be handed it.
+    third = await signUp("third");
+    const thirdJoined = await call<{ room: { id: string } }>(
+      "/api/rooms/join",
+      {
+        method: "POST",
+        cookie: third.cookie,
+        body: JSON.stringify({ code }),
+      },
+    );
+    check(thirdJoined.status === 200, "a third captain can join the harbor");
+
+    const harborLine = "the tide is running high tonight";
+    const dmLine = "two crates of hemp, and not a word to the others";
+    const heardHarbor = waitForEvent<{ roomId: string; message: WireMessage }>(
+      guestSocket,
+      "chat:room",
+      (payload) => payload?.message?.content === harborLine,
+    );
+    hostSocket.emit("chat:room", { roomId, content: harborLine });
+    const heard = await heardHarbor;
+    check(heard !== null, "a line in the harbor chat reaches the room");
+    check(
+      heard?.message?.sender?.id === hostId,
+      "and is labelled with who said it",
+    );
+
+    const heardDm = waitForEvent<WireMessage>(
+      guestSocket,
+      "chat:dm",
+      (payload) => payload?.sender?.id === hostId,
+    );
+    const heardOwnDm = waitForEvent<WireMessage>(
+      hostSocket,
+      "chat:dm",
+      (payload) => payload?.sender?.id === hostId,
+    );
+    hostSocket.emit("chat:dm", { recipientId: guest.id, content: dmLine });
+    const dmAtGuest = await heardDm;
+    const dmAtHost = await heardOwnDm;
+    check(
+      dmAtGuest?.content === dmLine,
+      "a direct message reaches its recipient",
+    );
+    check(dmAtGuest?.mine === false, "who does not read it as their own");
+    check(
+      dmAtHost?.content === dmLine,
+      "and the sender is given their own copy",
+    );
+    check(dmAtHost?.mine === true, "marked as theirs");
+
+    // The claim under test: a session conversation is held in the server's
+    // memory and nowhere else. Anything written down for this room, or
+    // between these two captains, would be a trace of the voyage.
+    const storedForRoom = await db.message.count({ where: { roomId } });
+    check(
+      storedForRoom === 0,
+      "nothing said in the session was written against the room",
+    );
+    const storedBetween = await db.message.count({
+      where: {
+        OR: [
+          { senderId: host.id, recipientId: guest.id },
+          { senderId: guest.id, recipientId: host.id },
+        ],
+      },
+    });
+    check(
+      storedBetween === 0,
+      "and the private thread between the two was not written either",
+    );
+
+    const reloaded = await openAuthedSocket(guest);
+    sockets.push(reloaded);
+    const reloadedHistory = waitForEvent<WireHistory>(
+      reloaded,
+      "chat:history",
+      (payload) => payload?.roomId === roomId,
+    );
+    reloaded.emit("room:join", { roomId });
+    const seeded = await reloadedHistory;
+    check(seeded !== null, "a captain who reloads is handed the conversation");
+    check(
+      (seeded?.harbor ?? []).some((m) => m.content === harborLine),
+      "the harbor chat comes back from the server's memory",
+    );
+    check(
+      (seeded?.direct ?? []).some(
+        (m) => m.content === dmLine && m.mine === false,
+      ),
+      "so does the private thread, keeping whose message it was",
+    );
+
+    const thirdSocket = await openAuthedSocket(third);
+    sockets.push(thirdSocket);
+    const thirdHistory = waitForEvent<WireHistory>(
+      thirdSocket,
+      "chat:history",
+      (payload) => payload?.roomId === roomId,
+    );
+    thirdSocket.emit("room:join", { roomId });
+    const thirdSeen = await thirdHistory;
+    check(thirdSeen !== null, "the third captain joined the harbor channel");
+    check(
+      (thirdSeen?.harbor ?? []).some((m) => m.content === harborLine),
+      "the harbor chat belongs to the room, so they see it",
+    );
+    check(
+      (thirdSeen?.direct ?? []).length === 0,
+      "a thread between two other captains is not handed to them",
+    );
+
+    console.log("\nBartering from anywhere");
+    // The board is not limited to the Bartering phase any more, so neither
+    // is this: no phase is started, and the offer still posts, shows and
+    // closes exactly as it would mid voyage.
+    const boardAfterPost = waitForEvent<{ offers: WireOffer[] }>(
+      hostSocket,
+      "barter:update",
+      (payload) => (payload?.offers ?? []).some((o) => o.fromUserId === hostId),
+    );
+    hostSocket.emit("barter:post", {
+      roomId,
+      offerItem: "Hemp",
+      offerAmount: 3,
+      requestItem: "Gold",
+      requestAmount: 2,
+    });
+    const postedBoard = await boardAfterPost;
+    const posted = postedBoard?.offers.find((o) => o.fromUserId === hostId);
+    check(Boolean(posted), "an offer posts with no phase asked for");
+    check(
+      typeof posted?.createdAt === "string" && posted.createdAt.length > 0,
+      "it carries the moment it was posted, so a chat can place it",
+    );
+
+    const seenBoard = waitForEvent<{ offers: WireOffer[] }>(
+      guestSocket,
+      "barter:update",
+      (payload) => (payload?.offers ?? []).some((o) => o.id === posted?.id),
+    );
+    guestSocket.emit("barter:state:request", { roomId });
+    check((await seenBoard) !== null, "the rest of the harbor sees it");
+
+    const fulfilledToTaker = waitForEvent<{ offer: WireOffer }>(
+      guestSocket,
+      "barter:fulfilled",
+      (payload) => payload?.offer?.id === posted?.id,
+    );
+    const fulfilledToPoster = waitForEvent<{ offer: WireOffer }>(
+      hostSocket,
+      "barter:fulfilled",
+      (payload) => payload?.offer?.id === posted?.id,
+    );
+    const offerLeftBoard = waitForEvent<{ offers: WireOffer[] }>(
+      guestSocket,
+      "barter:update",
+      (payload) => !(payload?.offers ?? []).some((o) => o.id === posted?.id),
+    );
+    guestSocket.emit("barter:accept", { roomId, offerId: posted?.id });
+    check(
+      (await fulfilledToTaker) !== null,
+      "the captain who takes it is told the trade completed",
+    );
+    check(
+      (await fulfilledToPoster) !== null,
+      "and so is the captain who posted it",
+    );
+    check(
+      (await offerLeftBoard) !== null,
+      "the settled offer leaves the board",
+    );
+
+    // A trade the poster can never be told about is refused rather than
+    // completed, because their side of it releases escrow when it sees the
+    // offer go and would hand the goods back as well as to the taker.
+    const thirdBoard = waitForEvent<{ offers: WireOffer[] }>(
+      thirdSocket,
+      "barter:update",
+      (payload) =>
+        (payload?.offers ?? []).some((o) => o.fromUserId === third!.id),
+    );
+    thirdSocket.emit("barter:post", {
+      roomId,
+      offerItem: "Hemp",
+      offerAmount: 1,
+      requestItem: "Gold",
+      requestAmount: 1,
+    });
+    const strandedBoard = await thirdBoard;
+    const stranded = strandedBoard?.offers.find(
+      (o) => o.fromUserId === third!.id,
+    );
+    check(Boolean(stranded), "a third captain can post an offer of their own");
+
+    thirdSocket.close();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const refused = waitForEvent<{ offerId?: string; reason?: string }>(
+      guestSocket,
+      "barter:accept:fail",
+      (payload) => payload?.offerId === stranded?.id,
+    );
+    guestSocket.emit("barter:accept", { roomId, offerId: stranded?.id });
+    const refusal = await refused;
+    check(
+      refusal !== null,
+      "an offer whose owner has gone quiet cannot be taken",
+    );
+    check(
+      Boolean(refusal?.reason?.includes("not here")),
+      "and the refusal says so rather than failing silently",
+    );
+    const thirdLeft = await call<{ ok: boolean }>(
+      `/api/rooms/${roomId}/leave`,
+      { method: "POST", cookie: third.cookie },
+    );
+    check(thirdLeft.status === 200, "the third captain can leave the harbor");
+
+    console.log("\nWiping the voyage");
+    const clearedAtHost = waitForEvent<{ roomId: string }>(
+      hostSocket,
+      "chat:cleared",
+      (payload) => payload?.roomId === roomId,
+    );
+    const clearedAtGuest = waitForEvent<{ roomId: string }>(
+      guestSocket,
+      "chat:cleared",
+      (payload) => payload?.roomId === roomId,
+    );
+    hostSocket.emit("room:restart", { roomId });
+    check(
+      (await clearedAtHost) !== null,
+      "restarting the voyage tells the room its conversation is gone",
+    );
+    check(
+      (await clearedAtGuest) !== null,
+      "and tells every captain in it the same",
+    );
+
+    const afterTheWipe = await openAuthedSocket(guest);
+    sockets.push(afterTheWipe);
+    const wipedHistory = waitForEvent<WireHistory>(
+      afterTheWipe,
+      "chat:history",
+      (payload) => payload?.roomId === roomId,
+    );
+    afterTheWipe.emit("room:join", { roomId });
+    const wiped = await wipedHistory;
+    check(wiped !== null, "a captain who reloads still gets an answer");
+    check(
+      (wiped?.harbor ?? []).length === 0,
+      "the harbor chat is gone with the voyage it belonged to",
+    );
+    check(
+      (wiped?.direct ?? []).length === 0,
+      "and so is every direct thread in it",
+    );
+
     console.log("\nSigning out");
     const out = await call<{ ok: boolean }>("/api/auth/logout", {
       method: "POST",
@@ -486,10 +842,18 @@ async function main(): Promise<void> {
       socket.close();
     }
 
-    const ids = [host?.id, guest?.id].filter((id): id is string => Boolean(id));
-    const usernames = [host?.username, guest?.username].filter(
-      (name): name is string => Boolean(name),
-    );
+    const ids = [
+      host?.id,
+      guest?.id,
+      third?.id,
+      ...extraAccounts.map((c) => c.id),
+    ].filter((id): id is string => Boolean(id));
+    const usernames = [
+      host?.username,
+      guest?.username,
+      third?.username,
+      ...extraAccounts.map((c) => c.username),
+    ].filter((name): name is string => Boolean(name));
 
     if (cleanupIsSafe) {
       try {

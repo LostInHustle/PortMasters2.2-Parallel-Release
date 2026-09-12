@@ -69,6 +69,7 @@ model Room {
   convoyVentures ConvoyVenture[]
   loans          Loan[]
   chronicles     VoyageChronicle[]
+  rivals         CaptainRival[]
 
   @@index([hostId])
 }
@@ -237,6 +238,10 @@ model CaptainRival {
 
   userA User @relation("RivalA", fields: [userAId], references: [id], onDelete: Cascade)
   userB User @relation("RivalB", fields: [userBId], references: [id], onDelete: Cascade)
+  // roomId used to be a bare column, so a rivalry outlived the harbor it was
+  // fought in: destroying the room left the row behind, pointing at nothing.
+  // A voyage's records are the room's, so it goes when the room goes.
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([userAId, userBId])
   @@index([roomId])

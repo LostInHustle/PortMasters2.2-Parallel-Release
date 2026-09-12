@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   api,
@@ -59,7 +59,7 @@ import { AgeBanner } from "./AgeBanner";
 import { ActionSuggester } from "./ActionSuggester";
 import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 import { SettingsModal } from "./SettingsModal";
-import { ChatPanel } from "./ChatPanel";
+import { ChatPanel, type ChatTrade } from "./ChatPanel";
 import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,7 @@ import {
   receiveLoan,
   receiveRepayment,
   receiveVentureSettlement,
+  refundBarterOffer,
   repayLoan,
   settleBarterTrade,
 } from "@/lib/game/engine";
@@ -180,7 +181,43 @@ export function GameRoom({
     },
     [act, me.id],
   );
-  const barter = useBarter(socket, room.id, me.id, onBarterFulfilled);
+  // Refunds that arrived before this captain's voyage was loaded. The board
+  // hydrates over the socket, which can be quicker than the save arriving
+  // over REST, and anything applied while state.game is still the placeholder
+  // is thrown away the moment the real save lands. They wait here instead and
+  // are applied together once it has. The trade this makes is deliberate:
+  // holding them costs a gift of goods in the one case where the room is
+  // restarted inside that same moment, while dropping them loses a captain's
+  // escrow silently, which is the worse of the two.
+  const pendingRefunds = useRef<BarterOffer[]>([]);
+  const onBarterRefund = useCallback(
+    (offer: BarterOffer) => {
+      if (!state.loaded) {
+        pendingRefunds.current.push(offer);
+        return;
+      }
+      act((g, l) =>
+        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l),
+      );
+    },
+    [act, state.loaded],
+  );
+  const barter = useBarter(
+    socket,
+    room.id,
+    me.id,
+    onBarterFulfilled,
+    onBarterRefund,
+  );
+  useEffect(() => {
+    if (!state.loaded || pendingRefunds.current.length === 0) return;
+    const held = pendingRefunds.current;
+    pendingRefunds.current = [];
+    act((g, l) => {
+      for (const offer of held)
+        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l);
+    });
+  }, [state.loaded, act]);
 
   const onAidGranted = useCallback(
     (loan: GrantedLoan, role: "borrower" | "helper") => {
@@ -557,19 +594,74 @@ export function GameRoom({
   // DM state
   const [dmTarget, setDmTarget] = useState<PublicUser | null>(null);
   const [dmHistory, setDmHistory] = useState<ChatMessage[]>([]);
+  // Every direct thread this captain is part of in this harbor, as the
+  // server hydrated them on join and as they arrive live. Session only, so
+  // it dies with the room like the harbor log beside it.
+  const [dmSession, setDmSession] = useState<ChatMessage[]>([]);
+
+  // The session conversation, sent by the server when this captain joined.
+  // It is the room's own memory, so this is the only place it can come from:
+  // nothing about a voyage is written down.
+  useEffect(() => {
+    if (!socket) return;
+    const onHistory = (data: {
+      roomId: string;
+      harbor: ChatMessage[];
+      direct: ChatMessage[];
+    }) => {
+      if (data.roomId !== room.id) return;
+      setRoomMessages(data.harbor);
+      setDmSession(data.direct);
+    };
+    // The host wiped the voyage. The words that belonged to it go with it,
+    // and these seeds follow, so switching threads afterwards cannot bring
+    // any of them back.
+    const onCleared = (data: { roomId: string }) => {
+      if (data.roomId !== room.id) return;
+      setRoomMessages([]);
+      setDmSession([]);
+    };
+    socket.on("chat:history", onHistory);
+    socket.on("chat:cleared", onCleared);
+    return () => {
+      socket.off("chat:history", onHistory);
+      socket.off("chat:cleared", onCleared);
+    };
+  }, [socket, room.id]);
+
+  // Who is in this harbor right now. It decides which of the two places a
+  // private thread is read from.
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
+
+  // The thread the DM tab is showing: the session lines this captain
+  // exchanged with that one, plus the stored thread when the other captain
+  // is outside the harbor. Memoised because the panel reseeds from this
+  // array's identity, so handing it a fresh array every render would wipe
+  // the conversation and seed it again endlessly.
+  const dmThread = useMemo(() => {
+    if (!dmTarget) return [];
+    const session = dmSession.filter(
+      (m) => m.sender.id === dmTarget.id || m.recipient?.id === dmTarget.id,
+    );
+    return [...dmHistory, ...session].sort((a, b) =>
+      a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0,
+    );
+  }, [dmSession, dmHistory, dmTarget]);
 
   // Which chat tab is showing, lifted out of the Tabs component itself so
   // a notification click can jump the user straight to the right one.
   const [chatTab, setChatTab] = useState<"room" | "dm">("room");
 
-  // Load room detail (members + chat history) on mount.
+  // Load the room's members on mount. The conversation is deliberately not
+  // fetched with them: a session's chat is held in the server's memory and
+  // arrives over the socket on join, because there is no stored history to
+  // ask for.
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const { room: detail, messages } = await api.getRoom(room.id);
+        const { room: detail } = await api.getRoom(room.id);
         if (!alive) return;
-        setRoomMessages(messages);
         setMembers(detail.members);
       } catch {
         /* ignore */
@@ -597,6 +689,14 @@ export function GameRoom({
     async (user: PublicUser) => {
       if (user.id === me.id) return;
       setDmTarget(user);
+      // A captain in this harbor is talked to through the session's own in
+      // memory thread, which arrives over the socket and cannot be fetched.
+      // Only a captain outside it, in the Lobby, has a stored thread, and
+      // that one is fetched exactly as it always was.
+      if (memberIds.has(user.id)) {
+        setDmHistory([]);
+        return;
+      }
       try {
         const { messages } = await api.getDmHistory(user.id);
         setDmHistory(messages);
@@ -604,7 +704,7 @@ export function GameRoom({
         setDmHistory([]);
       }
     },
-    [me.id],
+    [me.id, memberIds],
   );
   // Reference the openDm declared above so the chat notification effect
   // keeps the stable identity; this alias keeps the existing call sites
@@ -644,7 +744,7 @@ export function GameRoom({
       socket.off("chat:room", onRoomMsg);
       socket.off("chat:dm", onDm);
     };
-  }, [socket, room.id, me.id, notifications.push]);
+  }, [socket, room.id, me.id, notifications.push, openDm]);
 
   // First time tutorial hint.
   const autoTutorialFired = useRef(false);
@@ -686,14 +786,11 @@ export function GameRoom({
   }, [room.id, state.game]);
 
   const handleNext = useCallback(() => {
-    // The refund list is read inside the callback, not here, because
-    // markReady only runs it once every captain has readied up. Reading it
-    // now would cancel offers that could still be accepted while the room
-    // is still voting.
-    phaseSync.markReady((g, l) =>
-      nextPhase(g, ctx, l, barter.takeMyOpenRefunds()),
-    );
-  }, [phaseSync, ctx, barter]);
+    // Leaving a phase settles nothing about the barter board any more: an
+    // offer outlives the phase it was posted in and is returned to its owner
+    // when the board itself drops it, wherever the voyage has got to by then.
+    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
+  }, [phaseSync, ctx]);
 
   const handleSetSail = useCallback(() => {
     phaseSync.startGame();
@@ -800,6 +897,23 @@ export function GameRoom({
       </div>
     );
   }
+
+  // What both chats in this room need to carry the shared offer board. The
+  // harbor thread offers to the harbor; a private thread with a captain in
+  // the room offers to that captain alone, and one with a captain outside it
+  // carries no trade surface, since an offer can only be aimed at a captain
+  // the board can reach.
+  const chatTrade: ChatTrade = {
+    barter,
+    game: state.game,
+    act,
+    members,
+    colorFor,
+  };
+  const dmTrade =
+    dmTarget && memberIds.has(dmTarget.id)
+      ? { ...chatTrade, defaultTarget: dmTarget }
+      : undefined;
 
   return (
     <div className="pm-canvas min-h-screen w-full flex flex-col">
@@ -1055,6 +1169,7 @@ export function GameRoom({
                     roomId={room.id}
                     initialMessages={roomMessages}
                     disabled={amIMuted}
+                    trade={chatTrade}
                   />
                 </TabsContent>
                 <TabsContent
@@ -1065,7 +1180,8 @@ export function GameRoom({
                     socket={socket}
                     me={me}
                     target={dmTarget}
-                    history={dmHistory}
+                    history={dmThread}
+                    trade={dmTrade}
                     candidates={[
                       ...members.map((m) => ({ ...m, roomId: room.id })),
                       ...onlineInLobby,
@@ -1178,6 +1294,7 @@ function DmTab({
   me,
   target,
   history,
+  trade,
   candidates,
   onPick,
   onClear,
@@ -1186,6 +1303,7 @@ function DmTab({
   me: PublicUser;
   target: PublicUser | null;
   history: ChatMessage[];
+  trade?: ChatTrade;
   candidates: Array<PublicUser & { roomId?: string | null }>;
   onPick: (u: PublicUser) => void;
   onClear: () => void;
@@ -1220,6 +1338,7 @@ function DmTab({
             mode="dm"
             other={target}
             initialMessages={history}
+            trade={trade}
           />
         </div>
       </div>

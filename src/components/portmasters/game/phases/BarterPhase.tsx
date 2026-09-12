@@ -1,21 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { BARTER_ITEMS, ICONS } from "@/lib/game/constants";
-import {
-  completeBarterPhase,
-  getOwnedAmount,
-  postBarterOffer,
-  refundBarterOffer,
-} from "@/lib/game/engine";
+import { ICONS } from "@/lib/game/constants";
+import { completeBarterPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
-import { itemColorResolver } from "@/lib/use-color-preference";
 import { Handshake, X } from "lucide-react";
-import type { BarterOffer } from "@/lib/use-barter";
 import { Term } from "../../Term";
-import { ItemIcon } from "../../shared";
+import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 export function BarterPhase({
@@ -30,55 +22,13 @@ export function BarterPhase({
   PhasePanelProps,
   "game" | "act" | "barter" | "phaseSync" | "members" | "colorFor" | "me"
 >) {
-  // myUserId is derived from the authenticated captain (PhasePanelProps.me)
-  // rather than threaded as its own prop, so the dispatcher only has to
-  // forward the shared props shape.
-  const myUserId = me.id;
-  const resolveColor = itemColorResolver(colorFor);
-  const items = BARTER_ITEMS as readonly string[];
-  const [offerItem, setOfferItem] = useState<string>("Hemp");
-  const [offerAmount, setOfferAmount] = useState(1);
-  const [requestItem, setRequestItem] = useState<string>("Gold");
-  const [requestAmount, setRequestAmount] = useState(1);
-  // "" means an ordinary open offer, anyone in the harbor can see and
-  // accept it. Any other value is another captain's user id: a direct
-  // offer, visible only to the two of us, a safeguard against a third
-  // captain accepting a trade someone else already agreed to first.
-  const [targetUserId, setTargetUserId] = useState("");
-
-  const owned = getOwnedAmount(game, offerItem);
-  const sameItem = offerItem === requestItem;
-  const validAmounts =
-    Number.isInteger(offerAmount) &&
-    offerAmount >= 1 &&
-    Number.isInteger(requestAmount) &&
-    requestAmount >= 1;
-  const canPost = !sameItem && validAmounts && offerAmount <= owned;
-  const otherMembers = members.filter((m) => m.id !== myUserId);
-
-  function submitOffer() {
-    if (!canPost) return;
-    act((g, l) => {
-      postBarterOffer(g, offerItem, offerAmount, requestItem, requestAmount, l);
-    });
-    barter.post(
-      offerItem,
-      offerAmount,
-      requestItem,
-      requestAmount,
-      targetUserId || undefined,
-    );
-    setOfferAmount(1);
-    setRequestAmount(1);
-    setTargetUserId("");
-  }
-
-  function cancelOffer(o: BarterOffer) {
-    act((g, l) => {
-      refundBarterOffer(g, o.offerItem, o.offerAmount, l);
-    });
-    barter.cancel(o.id);
-  }
+  // The board's own composer. It shares useOfferDraft with the one a chat
+  // opens, so both surfaces agree on what counts as postable, and it draws
+  // each open offer with the same OfferCard a chat shows. Only the layout
+  // around them differs, which is why this file is markup and very little
+  // else.
+  const draft = useOfferDraft(game, barter, act);
+  const otherMembers = members.filter((m) => m.id !== me.id);
 
   const selectClass =
     "h-9 rounded-md border border-input bg-transparent px-2 text-sm";
@@ -91,7 +41,9 @@ export function BarterPhase({
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
         Short on one good and sitting on too much of another? Post a swap for
-        the rest of the harbor to see, or take someone else's.
+        the rest of the harbor to see, or take someone else's. The board stays
+        open for the rest of the voyage, and you can post to it from either chat
+        as well as from here.
       </p>
 
       <div className="rounded-xl border border-barter/15 bg-barter/[0.03] p-4 mb-4">
@@ -101,18 +53,19 @@ export function BarterPhase({
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
           <span className="text-muted-foreground">I'll give</span>
           <QuantityInput
-            value={offerAmount}
-            onCommit={setOfferAmount}
+            value={draft.offerAmount}
+            onCommit={draft.setOfferAmount}
             min={1}
             aria-label="Amount to offer"
             className="w-16 h-9"
           />
           <select
-            value={offerItem}
-            onChange={(e) => setOfferItem(e.target.value)}
+            value={draft.offerItem}
+            onChange={(e) => draft.setOfferItem(e.target.value)}
             className={selectClass}
+            aria-label="Item to offer"
           >
-            {items.map((it) => (
+            {draft.items.map((it) => (
               <option key={it} value={it}>
                 {ICONS[it]} {it}
               </option>
@@ -120,28 +73,29 @@ export function BarterPhase({
           </select>
           <span className="text-muted-foreground">for</span>
           <QuantityInput
-            value={requestAmount}
-            onCommit={setRequestAmount}
+            value={draft.requestAmount}
+            onCommit={draft.setRequestAmount}
             min={1}
             aria-label="Amount to request"
             className="w-16 h-9"
           />
           <select
-            value={requestItem}
-            onChange={(e) => setRequestItem(e.target.value)}
+            value={draft.requestItem}
+            onChange={(e) => draft.setRequestItem(e.target.value)}
             className={selectClass}
+            aria-label="Item to request"
           >
-            {items.map((it) => (
+            {draft.items.map((it) => (
               <option key={it} value={it}>
                 {ICONS[it]} {it}
               </option>
             ))}
           </select>
           <Button
-            className={cn("rounded-lg", canPost && "pm-grad-barter")}
-            variant={canPost ? "default" : "secondary"}
-            disabled={!canPost}
-            onClick={submitOffer}
+            className={cn("rounded-lg", draft.canPost && "pm-grad-barter")}
+            variant={draft.canPost ? "default" : "secondary"}
+            disabled={!draft.canPost}
+            onClick={() => draft.submit()}
           >
             🤝 Post Offer
           </Button>
@@ -149,8 +103,8 @@ export function BarterPhase({
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm mt-2">
           <span className="text-muted-foreground">With</span>
           <select
-            value={targetUserId}
-            onChange={(e) => setTargetUserId(e.target.value)}
+            value={draft.targetUserId}
+            onChange={(e) => draft.setChosenTargetId(e.target.value)}
             className={selectClass}
             aria-label="Direct this offer to a specific captain"
           >
@@ -162,20 +116,21 @@ export function BarterPhase({
             ))}
           </select>
         </div>
-        {targetUserId && (
+        {draft.targetUserId && (
           <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-            Only {otherMembers.find((m) => m.id === targetUserId)?.displayName}{" "}
+            Only{" "}
+            {otherMembers.find((m) => m.id === draft.targetUserId)?.displayName}{" "}
             will see this offer. A safeguard so nobody else can take it first.
           </p>
         )}
-        {sameItem && (
+        {draft.sameItem && (
           <p className="text-center text-[11px] text-alarm mt-2">
             Pick two different items to barter.
           </p>
         )}
-        {!sameItem && offerAmount > owned && (
+        {!draft.sameItem && draft.offerAmount > draft.owned && (
           <p className="text-center text-[11px] text-alarm mt-2">
-            You only have {owned} {offerItem}.
+            You only have {draft.owned} {draft.offerItem}.
           </p>
         )}
       </div>
@@ -199,69 +154,16 @@ export function BarterPhase({
           </p>
         ) : (
           <div className="space-y-1.5">
-            {barter.offers.map((o) => {
-              const mine = o.fromUserId === myUserId;
-              const canAfford =
-                getOwnedAmount(game, o.requestItem) >= o.requestAmount;
-              const isDirect = Boolean(o.targetUserId);
-              return (
-                <div
-                  key={o.id}
-                  className={cn(
-                    "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
-                    mine
-                      ? "bg-due/[0.06] border-due/20"
-                      : isDirect
-                        ? "bg-sea/[0.06] border-sea/25"
-                        : "bg-background/60 border-black/5 dark:border-white/10",
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium">
-                      {mine ? "You" : o.fromName}
-                    </span>
-                    <span className="text-muted-foreground">offer</span>
-                    <span style={{ color: resolveColor(o.offerItem) }}>
-                      <ItemIcon item={o.offerItem} className="h-3.5 w-3.5" />{" "}
-                      {o.offerAmount} {o.offerItem}
-                    </span>
-                    <span className="text-muted-foreground">for</span>
-                    <span style={{ color: resolveColor(o.requestItem) }}>
-                      <ItemIcon item={o.requestItem} className="h-3.5 w-3.5" />{" "}
-                      {o.requestAmount} {o.requestItem}
-                    </span>
-                    {isDirect && (
-                      <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
-                        🔒 {mine ? `Just for ${o.targetName}` : "Just for you"}
-                      </span>
-                    )}
-                  </div>
-                  {mine ? (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="h-7 px-2.5 text-[10px] rounded shrink-0"
-                      onClick={() => cancelOffer(o)}
-                    >
-                      Cancel
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className={cn(
-                        "h-7 px-2.5 text-[10px] rounded shrink-0",
-                        canAfford && "pm-grad-barter",
-                      )}
-                      variant={canAfford ? "default" : "secondary"}
-                      disabled={!canAfford}
-                      onClick={() => barter.accept(o.id)}
-                    >
-                      🤝 Trade
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+            {barter.offers.map((o) => (
+              <OfferCard
+                key={o.id}
+                offer={o}
+                me={me}
+                game={game}
+                barter={barter}
+                colorFor={colorFor}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -271,9 +173,7 @@ export function BarterPhase({
         members={members}
         idleLabel="✅ Done Bartering, Continue"
         onConfirm={() =>
-          phaseSync.markReady((g, l) =>
-            completeBarterPhase(g, barter.takeMyOpenRefunds(), l),
-          )
+          phaseSync.markReady((g, l) => completeBarterPhase(g, l))
         }
       />
     </div>
