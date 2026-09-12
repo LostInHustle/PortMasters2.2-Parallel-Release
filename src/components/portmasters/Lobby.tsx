@@ -67,6 +67,8 @@ import {
   Landmark,
   Settings,
   Trophy,
+  Info,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -165,12 +167,26 @@ export function Lobby({
   me,
   onEnterRoom,
   onLogout,
+  onSessionLost,
+  notice,
+  onDismissNotice,
 }: {
   me: PublicUser;
   onEnterRoom: (room: RoomSummary) => void;
   onLogout: () => void;
+  // Handed straight to the realtime hook, which calls it when the server
+  // refuses this connection's credentials.
+  onSessionLost?: (message: string) => void;
+  // Something that happened elsewhere and belongs on this screen: a harbor
+  // this captain was sitting in was closed underneath them, say. Owned by
+  // the page, which is where the event was heard.
+  notice?: string | null;
+  onDismissNotice?: () => void;
 }) {
-  const { socket, connected, authed, onlineUsers } = useRealtime(me);
+  const { socket, connected, authed, onlineUsers } = useRealtime(
+    me,
+    onSessionLost,
+  );
   const { colorblindSafe, setColorblindSafe } = useColorPreference();
   const {
     enabled: soundOn,
@@ -765,6 +781,26 @@ export function Lobby({
 
       {/* Body */}
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-3 px-4 pb-10 pt-3 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        {/* News that arrived without this captain asking for it, on the
+            screen they landed on afterwards. Neutral rather than alarming:
+            nothing is wrong with this account, something simply happened
+            out in the harbor. */}
+        {notice && (
+          <div className="pm-glass flex items-start gap-2.5 rounded-2xl px-4 py-3 lg:col-span-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <p className="flex-1 text-xs leading-relaxed">{notice}</p>
+            {onDismissNotice && (
+              <button
+                onClick={onDismissNotice}
+                className="-mr-1 -mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                title="Dismiss"
+                aria-label="Dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
         <section className="space-y-3">
           {/* [MANIFEST: Quick Start Match] One tap joins the queue and
               routes the captain into the first available room. Sits above

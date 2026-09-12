@@ -88,7 +88,7 @@ export function completePhase2(state: GameState, logs: string[]) {
   startPhase3(state, logs);
 }
 
-export function startPhase3(state: GameState, logs: string[]) {
+function startPhase3(state: GameState, logs: string[]) {
   state.phase = 3;
   logs.push("\n👥=== Processing Worker Production ===");
   processProduction(state, logs);
@@ -124,7 +124,7 @@ export function finishSettlement(state: GameState, logs: string[]) {
   startPhase4(state, logs);
 }
 
-export function startPhase4(state: GameState, logs: string[]) {
+function startPhase4(state: GameState, logs: string[]) {
   state.phase = 4;
   logs.push(
     `\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`,
@@ -178,27 +178,14 @@ export function showWelcome(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
-export function nextPhase(
-  state: GameState,
-  ctx: GameContext,
-  logs: string[],
-  barterRefunds: { item: string; amount: number }[] = [],
-) {
+export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
   if (state.phase === 1) completePhase1(state, logs);
-  // The refund list arrives as an argument rather than being read here.
-  // The live barter board lives on the server (see src/server/realtime),
-  // never on the per captain GameState, so only the interface can see
-  // which offers this captain still has open. Both ways of leaving the
-  // Bartering phase supply the same list: the phase panel's "Done
-  // Bartering" button, and the control bar's next phase, which forwards
-  // barter.takeMyOpenRefunds() through here.
-  //
-  // This used to pass an empty list, which meant a captain who advanced
-  // from the control bar instead of the panel silently abandoned every
-  // offer they had posted, along with whatever Gold or goods they had
-  // put up as escrow.
+  // Leaving the Bartering phase no longer settles anything: the offer
+  // board outlives the phase now, and an offer still open on it is
+  // released when the board itself drops it, wherever the voyage happens
+  // to be by then. See the onRefund contract in src/lib/use-barter.ts.
   else if (state.phase === "barter") {
-    completeBarterPhase(state, barterRefunds, logs);
+    completeBarterPhase(state, logs);
   } else if (state.phase === "worker_mgmt") startPhase2(state, ctx, logs);
   else if (state.phase === 2) completePhase2(state, logs);
   else if (state.phase === 3) {

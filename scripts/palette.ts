@@ -242,6 +242,14 @@ const WIDGETS: Widget[] = [
     what: "Keyboard Shortcuts",
   },
   { name: "rumors", hue: 218, screens: ["phase:2"], what: "Rumor Board" },
+
+  /* The operator console sits at /admin, which is a route of its own
+     rather than a panel inside a voyage, so nothing shares its screen
+     and its hue answers to no neighbour. It is kept 151 degrees clear
+     of the red that means danger all the same: a seal in that family
+     would read as a warning about the operator rather than about an
+     account. */
+  { name: "admin", hue: 226, screens: ["admin"], what: "Operator Console" },
 ];
 
 /* A room's host crown is not in the table on purpose. A crown is gold,

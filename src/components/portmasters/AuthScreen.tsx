@@ -5,15 +5,23 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api, type PublicUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Field, Notice } from "@/components/portmasters/shared";
 import { Loader2, Anchor, Ship, Waves } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants";
 
 export function AuthScreen({
   onAuthed,
+  notice,
+  onDismissNotice,
 }: {
   onAuthed: (u: PublicUser, token: string) => void;
+  // Why this captain is looking at the sign in screen rather than at the
+  // harbor they were in a moment ago: a session that ran out, a ban, or an
+  // account an operator deleted. Owned by the page, which is where the
+  // realtime layer's refusal was heard.
+  notice?: string | null;
+  onDismissNotice?: () => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
@@ -137,6 +145,14 @@ export function AuthScreen({
             </p>
           </div>
 
+          {notice && (
+            <Notice
+              message={notice}
+              onDismiss={onDismissNotice}
+              className="mb-5"
+            />
+          )}
+
           <Tabs
             value={mode}
             onValueChange={(v) => {
@@ -247,28 +263,6 @@ export function AuthScreen({
           </p>
         </motion.div>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between">
-        <Label className="text-sm font-medium">{label}</Label>
-        {hint && (
-          <span className="text-[10px] text-muted-foreground">{hint}</span>
-        )}
-      </div>
-      {children}
     </div>
   );
 }

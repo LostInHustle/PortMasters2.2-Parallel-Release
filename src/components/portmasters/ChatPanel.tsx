@@ -7,20 +7,104 @@ import type { Socket } from "socket.io-client";
 import { Avatar } from "./shared";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { SendHorizontal, Loader2, Search, X } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SendHorizontal, Loader2, Search, X, Handshake } from "lucide-react";
+import type { GameState } from "@/lib/game/types";
+import type { BarterOffer } from "@/lib/use-barter";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { OfferCard, TradeComposer } from "./game/BarterTrade";
+import type { Barter } from "./game/phases/PhaseShared";
+
+// What a chat needs to be able to trade, handed over as one object so a
+// surface with no voyage behind it simply passes nothing and gets none of
+// it. That is how the Lobby stays exactly as it was: it renders this
+// component with no trade, so no offer card, no composer and no handshake
+// button exist in its tree at all.
+export type ChatTrade = {
+  barter: Barter;
+  game: GameState;
+  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  members: PublicUser[];
+  colorFor?: (item: string) => string | undefined;
+  // Set on a private thread: the captain this conversation is with, who the
+  // composer addresses its offers to. The caller leaves it off when that
+  // captain is not in the room, since a board offer naming an outsider is
+  // one the server would refuse.
+  defaultTarget?: PublicUser;
+};
+
+type StreamItem =
+  | { kind: "message"; at: string; message: ChatMessage }
+  | { kind: "offer"; at: string; offer: BarterOffer };
+
+function timeLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// The handshake button and the composer it opens. Mounted only where there
+// is a shared board to post to, which is what keeps the draft's state out
+// of a conversation that could never use it.
+function TradeButton({
+  trade,
+  me,
+  fixedTarget,
+}: {
+  trade: ChatTrade;
+  me: PublicUser;
+  fixedTarget?: PublicUser;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/5 text-muted-foreground dark:bg-white/10"
+          title="Offer a trade"
+          aria-label="Offer a trade"
+        >
+          <Handshake className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-0">
+        <TradeComposer
+          game={trade.game}
+          act={trade.act}
+          barter={trade.barter}
+          me={me}
+          members={trade.members}
+          fixedTarget={fixedTarget}
+          onPosted={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /**
  * A self contained chat surface. Two modes: room, messages broadcast to a
  * room channel (socket `chat:room`); dm, 1 to 1 messages with another user
  * (socket `chat:dm`).
  *
- * The socket is passed in (shared singleton). Initial history is fetched
- * via REST; live messages arrive over the socket. Mine uses the celadon
- * pm-grad-chat, others get a soft black tint so the conversation reads
- * as two sides of a brush without leaning on the rose tint the old build
- * used for the same distinction.
+ * The socket is passed in (shared singleton). The seed history comes from
+ * the parent: the Lobby fetches it over REST, a session hands over what the
+ * server hydrated on join, because a session conversation is never written
+ * down and so has nowhere to be fetched from later. Live messages arrive
+ * over the socket. Mine uses the celadon pm-grad-chat, others get a soft
+ * black tint so the conversation reads as two sides of a brush without
+ * leaning on the rose tint the old build used for the same distinction.
+ *
+ * Given a `trade`, the panel also carries the shared offer board: open
+ * offers that belong to this conversation appear in the stream where they
+ * were posted and the handshake button composes a new one. Without it the
+ * panel is a plain chat.
  */
 export function ChatPanel({
   socket,
@@ -29,6 +113,7 @@ export function ChatPanel({
   roomId,
   other,
   initialMessages,
+  trade,
   className,
   disabled,
 }: {
@@ -38,6 +123,7 @@ export function ChatPanel({
   roomId?: string;
   other?: PublicUser;
   initialMessages?: ChatMessage[];
+  trade?: ChatTrade;
   className?: string;
   // [MANIFEST 14: Harbor Watch] Set only for the room mode instance, only
   // while the host has muted this captain. A muted captain keeps reading
@@ -58,7 +144,8 @@ export function ChatPanel({
   // Filter messages when searching. Case insensitive match on content or
   // sender name. When search is open but the query is empty, all messages
   // show (so the captain can scroll the full history in the search view).
-  const filteredMessages = searchQuery.trim()
+  const searching = searchQuery.trim().length > 0;
+  const filteredMessages = searching
     ? messages.filter(
         (m) =>
           m.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -67,6 +154,39 @@ export function ChatPanel({
             .includes(searchQuery.toLowerCase()),
       )
     : messages;
+
+  // Which open offers belong to the conversation being read. The board a
+  // socket receives is already scoped to what that captain may see, so the
+  // harbor thread shows it whole, while a private thread shows only the
+  // offers aimed at the two captains in it. A search hides them: it looks
+  // through what was said, and an offer is taken or left on the board.
+  const offers: BarterOffer[] =
+    trade && !searching
+      ? mode === "dm"
+        ? trade.barter.offers.filter((o) => o.targetUserId === other?.id)
+        : trade.barter.offers
+      : [];
+  const offerCount = offers.length;
+
+  // Messages and offers share one timeline. Both timestamps are ISO 8601 in
+  // the same format, so they are positioned by a plain string comparison
+  // with no parsing and no locale to disagree about.
+  const stream: StreamItem[] = [
+    ...filteredMessages.map((m): StreamItem => ({
+      kind: "message",
+      at: m.createdAt,
+      message: m,
+    })),
+    ...offers.map((o): StreamItem => ({
+      kind: "offer",
+      at: o.createdAt,
+      offer: o,
+    })),
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+
+  // An offer is reason enough to drop the welcome text: the conversation
+  // has something in it, just not a message this captain posted.
+  const hasContent = messages.length > 0 || offerCount > 0;
 
   // Seed with initial messages if they change (e.g. switching DM target, or
   // the parent's history fetch resolving after this already mounted). Done as
@@ -121,6 +241,14 @@ export function ChatPanel({
           : [...prev, { ...message, mine: message.sender.id === me.id }],
       );
     };
+    // A room whose conversation the host has just wiped. The messages on
+    // screen belong to the voyage that was just thrown away, so they go with
+    // it. Offers are board state and are untouched by a restart, so they are
+    // left to the barter board's own update.
+    const onCleared = (data: { roomId: string }) => {
+      if (data.roomId !== roomId) return;
+      setMessages([]);
+    };
     // [MANIFEST 14: Harbor Watch] Defensive: the disabled prop (driven by
     // GameRoom.tsx's own room:members tracking) already hides the input
     // the moment a mute takes effect, so this should be unreachable in
@@ -136,19 +264,25 @@ export function ChatPanel({
     };
     socket.on("chat:room", onRoom);
     socket.on("chat:dm", onDm);
+    socket.on("chat:cleared", onCleared);
     socket.on("chat:muted", onMuted);
     return () => {
       socket.off("chat:room", onRoom);
       socket.off("chat:dm", onDm);
+      socket.off("chat:cleared", onCleared);
       socket.off("chat:muted", onMuted);
     };
   }, [socket, mode, roomId, other?.id, me.id]);
 
-  // Auto scroll to bottom on new messages.
+  // Auto scroll to bottom on new messages and on a change in how many
+  // offers the board holds. The count is tracked rather than the array so
+  // that this only runs when the stream actually grew: depending on the
+  // board's own identity would re scroll on every broadcast and yank a
+  // captain back down while they were reading further up.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, offerCount]);
 
   async function send() {
     const content = input.trim();
@@ -171,6 +305,10 @@ export function ChatPanel({
     mode === "room"
       ? "No messages yet. Break the ice with your fellow captains."
       : "No messages yet between you two.";
+
+  // A private thread trades with the captain it is with, so the composer
+  // has no target to pick.
+  const tradeTarget = mode === "dm" ? trade?.defaultTarget : undefined;
 
   return (
     <div className={cn("flex h-full flex-col min-h-0", className)}>
@@ -206,20 +344,53 @@ export function ChatPanel({
         ref={scrollRef}
         className="pm-scroll flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5"
       >
-        {messages.length === 0 ? (
+        {!hasContent ? (
           <div className="h-full flex items-center justify-center text-center px-6">
             <p className="text-xs text-muted-foreground leading-relaxed">
               {emptyText}
             </p>
           </div>
-        ) : filteredMessages.length === 0 ? (
+        ) : stream.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
             <p className="text-xs text-muted-foreground leading-relaxed">
               No messages match &ldquo;{searchQuery}&rdquo;.
             </p>
           </div>
         ) : (
-          filteredMessages.map((m) => {
+          stream.map((item) => {
+            if (item.kind === "offer") {
+              const { offer } = item;
+              // Drawn as a card of its own rather than as a bubble. An offer
+              // is board state passing through the conversation, not
+              // something a captain said, and it reads better as a thing
+              // that can be taken than as a remark that can be replied to.
+              // The card already names who posted it and what they want, so
+              // there is nothing here to caption it with.
+              return (
+                <motion.div
+                  key={offer.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex flex-col items-stretch"
+                >
+                  {trade && (
+                    <OfferCard
+                      offer={offer}
+                      me={me}
+                      game={trade.game}
+                      barter={trade.barter}
+                      colorFor={trade.colorFor}
+                      className="rounded-2xl"
+                    />
+                  )}
+                  <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
+                    {timeLabel(offer.createdAt)}
+                  </span>
+                </motion.div>
+              );
+            }
+            const m = item.message;
             const mine = m.mine ?? m.sender.id === me.id;
             return (
               <motion.div
@@ -259,10 +430,7 @@ export function ChatPanel({
                     {m.content}
                   </div>
                   <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {timeLabel(m.createdAt)}
                   </span>
                 </div>
               </motion.div>
@@ -271,11 +439,20 @@ export function ChatPanel({
         )}
       </div>
       {disabled ? (
-        <div className="p-2.5 border-t border-black/5 dark:border-white/10 text-center text-xs text-muted-foreground">
-          The host has muted you in room chat for the rest of this voyage.
+        <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center justify-center gap-2">
+          <p className="text-center text-xs text-muted-foreground">
+            The host has muted you in room chat for the rest of this voyage.
+          </p>
+          {/* Trading is not talking, so a mute does not take the board away. */}
+          {trade && (
+            <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />
+          )}
         </div>
       ) : (
         <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center gap-2">
+          {trade && (
+            <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />
+          )}
           <button
             onClick={() => setSearchOpen((v) => !v)}
             className={cn(

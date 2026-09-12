@@ -44,7 +44,7 @@ import { getCardFinalCost } from "./pricing";
 // unlocked by now (see ./pools). Passed in rather than read from module scope
 // so these generators stay pure functions of (rng, pools) and a captain's
 // seeded draw depends only on the seed and the charter, never on mutable state.
-export type MarketPools = {
+type MarketPools = {
   resources: string[];
   products: string[];
   ports: string[];

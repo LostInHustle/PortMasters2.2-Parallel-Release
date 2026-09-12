@@ -49,6 +49,7 @@ import {
   broadcastLoans,
 } from "./loans";
 import { resolveExpiredVentures } from "./ventures";
+import { clearBarter } from "./barter";
 import { userSockets } from "./presence";
 import { recordRivalOutcomes, type RivalStanding } from "./rival";
 
@@ -134,6 +135,16 @@ export async function maybeConcludeVoyage(
   // so a second game:status arriving while the first captain's legacy
   // write is still in flight can't slip through.
   concludedRooms.add(roomId);
+
+  // The voyage is over, so the trade board goes with it. Nothing else
+  // would ever sweep it: the board is cleared when the room's checkpoint
+  // moves on, and a voyage that has finished stops moving its checkpoint
+  // entirely, because endgame and bankruptcy are personal phases that
+  // never become a room checkpoint. Without this, an offer still standing
+  // when the last captain finishes would leave its poster escrowed in the
+  // save they end the voyage with. Each client returns its own escrow as
+  // the board empties.
+  clearBarter(io, roomId);
 
   const roomForDifficulty = await db.room.findUnique({
     where: { id: roomId },

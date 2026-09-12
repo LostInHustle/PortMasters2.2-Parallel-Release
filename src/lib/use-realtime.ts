@@ -8,16 +8,33 @@ import type { OnlineUser, PublicUser } from "@/types/realtime";
  * App wide realtime connection + presence. The socket is a singleton; this
  * hook attaches listeners for presence/auth and returns the live socket so
  * components can subscribe to room / chat / game status events.
+ *
+ * `onSessionLost` is called with the reason when the server refuses this
+ * connection's credentials. That happens when a session runs out with the
+ * tab still open, and when an operator bans or deletes the account. The
+ * caller owns the response, because it is the caller that knows how to
+ * take the session down and where the reason belongs on screen.
+ *
+ * The callback is held in a ref so a caller passing an inline arrow does
+ * not make the effect below tear its listeners down and put them back on
+ * every render.
  */
-export function useRealtime(user: PublicUser | null) {
+export function useRealtime(
+  user: PublicUser | null,
+  onSessionLost?: (message: string) => void,
+) {
   // Lazily obtain the shared socket (singleton). Recomputed only when the
   // authenticated user changes.
   const socket = useMemo(() => (user ? getSocket() : null), [user]);
   const [connected, setConnected] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [authError, setAuthError] = useState<string | null>(null);
   const alive = useRef(true);
+  const sessionLost = useRef(onSessionLost);
+
+  useEffect(() => {
+    sessionLost.current = onSessionLost;
+  }, [onSessionLost]);
 
   useEffect(() => {
     if (!socket) {
@@ -46,13 +63,15 @@ export function useRealtime(user: PublicUser | null) {
       setAuthed(false);
     };
     const onAuthOk = () => {
-      if (alive.current) {
-        setAuthed(true);
-        setAuthError(null);
-      }
+      if (alive.current) setAuthed(true);
     };
     const onAuthFail = (data: { error: string }) => {
-      if (alive.current) setAuthError(data.error);
+      // This connection is not an authenticated captain and will not
+      // become one: the answer was no, so the session behind it is over.
+      // Recording the message here and leaving the rest of the interface
+      // standing is what this hook used to do, and it left a captain
+      // sitting in a harbor that had already written them off.
+      if (alive.current) sessionLost.current?.(data.error);
     };
     const onPresence = (data: { users: OnlineUser[] }) => {
       if (alive.current) setOnlineUsers(data.users ?? []);
@@ -87,5 +106,5 @@ export function useRealtime(user: PublicUser | null) {
     getSocket().emit("presence:request");
   }, []);
 
-  return { socket, connected, authed, onlineUsers, authError, requestPresence };
+  return { socket, connected, authed, onlineUsers, requestPresence };
 }

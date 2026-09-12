@@ -55,6 +55,8 @@ import {
   cancelDeparture,
   scheduleDeparture,
   reconcileMembershipAfterBoot,
+  seatedRoomOf,
+  publicUserOf,
   startingRooms,
   restartingRooms,
   type DepartureCleanup,
@@ -117,12 +119,30 @@ import {
   unmuteUser,
   isMuted,
   clearMutedUsers,
+  buildSessionMessage,
+  recordHarborMessage,
+  recordDirectMessage,
+  harborLog,
+  directLogFor,
+  clearSessionChat,
 } from "./chat";
 import { concludedRooms, maybeConcludeVoyage } from "./conclusion";
 import { addPulseReport, clearPulseTallies } from "./pulse";
 import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
+import {
+  banAccount,
+  grantAdmin,
+  listAccounts,
+  purgeAccount,
+  requireAdmin,
+  revokeAdmin,
+  unbanAccount,
+  type AdminActor,
+  type AdminPayload,
+  type AdminResult,
+} from "./admin";
 
 // ========== Cross module room teardown ==========
 // Called when a room is deleted after its last member departs. Tears
@@ -142,6 +162,7 @@ function clearRoomAllMaps(roomId: string): void {
   clearSurge(roomId);
   concludedRooms.delete(roomId);
   clearMutedUsers(roomId);
+  clearSessionChat(roomId);
 }
 
 // Builds the cleanup callbacks scheduleDeparture needs. Defined once
@@ -155,6 +176,39 @@ function buildDepartureCleanup(): DepartureCleanup {
     maybeConcludeVoyage,
     clearRoomAllMaps,
   };
+}
+
+// The REST leave and logout routes drop a room row from inside the
+// Next.js bundle, which cannot reach the maps above: a route handler
+// gets a different copy of this module (see the note on quickstart:join).
+// A socket that then disconnects is repaired later by the departure
+// grace timer, which is the other place clearRoomAllMaps is called from.
+// A captain who leaves through the button and stays on the page is not:
+// their socket never drops, so no timer is ever armed, and the room they
+// just destroyed would leave its board and its conversation sitting in
+// memory until the process restarted. The client's leave always sends
+// room:leave straight after that route call, so this is where the check
+// can be made.
+async function tearDownIfRoomGone(roomId: string): Promise<void> {
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { id: true },
+  });
+  if (!room) clearRoomAllMaps(roomId);
+}
+
+// One event, every socket a captain is holding. A captain may have two
+// tabs open on the same room, and a direct message addressed to them has
+// to arrive on both.
+function emitToUser(
+  io: Server,
+  userId: string,
+  event: string,
+  payload: unknown,
+): void {
+  for (const sid of userSockets.get(userId) ?? []) {
+    io.to(sid).emit(event, payload);
+  }
 }
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -215,6 +269,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         socket.leave(`room:${previousRoomId}`);
         s.roomId = null;
         forgetStatusIfLastSocket(previousRoomId, s.userId, userSockets);
+        // The seat in the old harbor is gone, so any offer left standing
+        // there has to go with it. Leaving one up would let a captain who
+        // has sailed on watch a trade close against goods they can no
+        // longer be told about, which credits the taker and never credits
+        // them.
+        removeUserBarterOffers(io, previousRoomId, s.userId);
         io.to(`room:${previousRoomId}`).emit("room:system", {
           roomId: previousRoomId,
           content: `${s.user.displayName} set sail for another port`,
@@ -251,6 +311,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomId,
         requests: aidList(roomId),
       });
+      // The session conversation. It lives only in this process, so a
+      // reload mid voyage has to get it back from here: there is no REST
+      // history for a room any more, by design. The direct half is
+      // filtered to the threads this captain is part of, so joining can
+      // never surface someone else's private conversation.
+      io.to(socket.id).emit("chat:history", {
+        roomId,
+        harbor: [...harborLog(roomId)],
+        direct: directLogFor(roomId, s.userId),
+      });
       broadcastPresence(io);
     });
 
@@ -269,6 +339,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         content: `${s.user.displayName} left the harbor`,
       });
       void emitRoomMembers(io, roomId);
+      void tearDownIfRoomGone(roomId);
       broadcastPresence(io);
     });
 
@@ -759,6 +830,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
           requestItem,
           requestAmount: requestAmount as number,
           ...(targetUserId ? { targetUserId, targetName } : {}),
+          // Stamped once, here, so a client rendering the offer inside a
+          // chat can place it at the point in the conversation where it
+          // was actually posted. The offer itself is live server state
+          // rather than a stored line, so this is the only thing that
+          // says where it belongs.
+          createdAt: new Date().toISOString(),
         };
         roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
         broadcastBarter(io, roomId);
@@ -816,10 +893,31 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        // The poster has to be reachable, because a trade the poster is
+        // never told about cannot be settled honestly on their side. Their
+        // client holds the escrow and releases it when it sees the offer
+        // leave the board, so an offer that vanished into a completed trade
+        // they never heard about would hand the goods back to them as well
+        // as to whoever accepted it. Refusing leaves the offer standing for
+        // the next attempt, which costs a moment rather than a duplicate.
+        if (!userSockets.get(offer.fromUserId)?.size) {
+          socket.emit("barter:accept:fail", {
+            roomId,
+            offerId: payload.offerId,
+            reason:
+              "That captain is not here right now. Try again when they are back.",
+          });
+          return;
+        }
         const next = list.filter((o) => o.id !== offer.id);
         if (next.length) roomBarterOffers.set(roomId, next);
         else roomBarterOffers.delete(roomId);
-        broadcastBarter(io, roomId);
+        // Deliberately before the board broadcast, and both are emitted
+        // from this one synchronous handler so a socket can never see
+        // them out of order. A client returns the escrow of its own offer
+        // when that offer leaves the board, so a poster told the offer
+        // left before being told the trade completed would be paid for
+        // the sale and handed its collateral back as well.
         const fulfilled = {
           roomId,
           offer,
@@ -832,6 +930,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           for (const sid of posterSockets)
             io.to(sid).emit("barter:fulfilled", fulfilled);
         }
+        broadcastBarter(io, roomId);
       },
     );
 
@@ -1142,42 +1241,34 @@ export function attachRealtime(httpServer: HttpServer): Server {
     );
 
     // ========== Chat ==========
-    socket.on(
-      "chat:room",
-      async (payload: { roomId?: string; content?: string }) => {
-        const s = requireAuth(socket);
-        if (!s) return;
-        const roomId = payload?.roomId ?? s.roomId;
-        const content = (payload?.content ?? "").trim();
-        if (!roomId || !content) return;
-        if (content.length > 1000) return;
-        if (isMuted(roomId, s.userId)) {
-          socket.emit("chat:muted", { roomId });
-          return;
-        }
-        const msg = await db.message.create({
-          data: { roomId, senderId: s.userId, recipientId: null, content },
-          include: {
-            sender: { select: PUBLIC_USER_SELECT },
-          },
-        });
-        io.to(`room:${roomId}`).emit("chat:room", {
-          roomId,
-          message: {
-            id: msg.id,
-            content: msg.content,
-            createdAt: msg.createdAt,
-            sender: {
-              id: msg.sender.id,
-              username: msg.sender.username,
-              displayName: msg.sender.displayName,
-              avatarHue: msg.sender.avatarHue,
-            },
-          },
-        });
-      },
-    );
+    // Harbor chat is a session conversation, so it lives in the room's
+    // own log in this process and is never written to the database. The
+    // log dies with the room, which is the whole guarantee: nothing said
+    // during a voyage outlives the voyage.
+    socket.on("chat:room", (payload: { roomId?: string; content?: string }) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      const content = (payload?.content ?? "").trim();
+      if (!content) return;
+      if (content.length > 1000) return;
+      if (isMuted(roomId, s.userId)) {
+        socket.emit("chat:muted", { roomId });
+        return;
+      }
+      const message = buildSessionMessage(content, s.user);
+      recordHarborMessage(roomId, message);
+      io.to(`room:${roomId}`).emit("chat:room", { roomId, message });
+    });
 
+    // A direct message is a session conversation the moment either
+    // captain is at sea, and it is held against whichever harbor is
+    // involved, the sender's own when they are the one at sea. That log
+    // dies with the room, so nothing said during a voyage outlives the
+    // voyage. Only two captains who are both in the lobby reach the
+    // database, which is the lobby's own Direct Messages thread, and that
+    // one is meant to still be there tomorrow.
     socket.on(
       "chat:dm",
       async (payload: { recipientId?: string; content?: string }) => {
@@ -1187,6 +1278,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const content = (payload?.content ?? "").trim();
         if (!recipientId || !content || recipientId === s.userId) return;
         if (content.length > 1000) return;
+
+        const ownerRoomId = s.roomId ?? seatedRoomOf(recipientId);
+        if (ownerRoomId) {
+          const recipient = publicUserOf(recipientId);
+          if (!recipient) return;
+          const message = buildSessionMessage(content, s.user, recipient);
+          recordDirectMessage(ownerRoomId, message);
+          emitToUser(io, s.userId, "chat:dm", { ...message, mine: true });
+          emitToUser(io, recipientId, "chat:dm", { ...message, mine: false });
+          return;
+        }
+
         const msg = await db.message.create({
           data: { roomId: null, senderId: s.userId, recipientId, content },
           include: {
@@ -1370,6 +1473,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         clearDocksWinner(roomId);
         clearSurge(roomId);
         concludedRooms.delete(roomId);
+        // A restarted voyage is a new voyage, so the conversation that
+        // belonged to the old one goes with it. Clients drop their local
+        // copy on this signal rather than showing talk from a voyage
+        // that no longer exists.
+        if (clearSessionChat(roomId))
+          io.to(`room:${roomId}`).emit("chat:cleared", { roomId });
         if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
         io.to(`room:${roomId}`).emit("room:restarted", {
           roomId,
@@ -1420,6 +1529,50 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s) return;
       leaveQueue(s.userId);
     });
+
+    // ========== Operator console ==========
+    // The console runs on the socket for the reason admin.ts sets out at
+    // its top: a route handler gets a different copy of this module, so a
+    // ban written from a route would flag the row in the database and
+    // leave the captain's live connection exactly as it was. Every handler
+    // below asks requireAdmin first, which reads the acting account's role
+    // out of the database again, and every one answers with the roster as
+    // it stands after the change, so a console never has to guess what its
+    // own click did.
+    socket.on("admin:list", async () => {
+      if (!(await requireAdmin(socket))) return;
+      socket.emit("admin:accounts", await listAccounts());
+    });
+
+    // The five that change something share a shape: ask, act, answer with
+    // the roster, or answer with the reason it was refused. Only the two
+    // that cannot be undone need to know who is asking.
+    const adminAction = (
+      event: string,
+      run: (actor: AdminActor, payload: AdminPayload) => Promise<AdminResult>,
+    ) =>
+      socket.on(event, async (payload: AdminPayload | undefined) => {
+        const actor = await requireAdmin(socket);
+        if (!actor) return;
+        const result = await run(actor, payload ?? {});
+        if (!result.ok) {
+          socket.emit("admin:error", { error: result.error });
+          return;
+        }
+        socket.emit("admin:accounts", await listAccounts());
+      });
+
+    adminAction("admin:ban", (actor, payload) =>
+      banAccount(io, departureCleanup, actor, payload),
+    );
+    adminAction("admin:unban", (_actor, payload) => unbanAccount(payload));
+    adminAction("admin:grant", (_actor, payload) => grantAdmin(payload));
+    adminAction("admin:revoke", (actor, payload) =>
+      revokeAdmin(io, actor, payload),
+    );
+    adminAction("admin:purge", (actor, payload) =>
+      purgeAccount(io, departureCleanup, actor, payload),
+    );
 
     // ========== Disconnect ==========
     socket.on("disconnect", () => {

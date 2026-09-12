@@ -5,15 +5,19 @@
 // The escrow on post design is the important part. Posting an offer takes
 // the offered goods out of the hold immediately rather than at accept
 // time, which is what stops a captain from posting the same stock in two
-// offers and having both accepted. Everything that follows (cancel,
-// expiry at the end of the phase, and the accepting side) is built around
-// that: goods are always in exactly one place, never promised twice.
+// offers and having both accepted. Everything that follows (withdrawal,
+// the sweep when the voyage moves on, and the accepting side) is built
+// around that: goods are always in exactly one place, never promised
+// twice.
 //
 // The offer board itself is shared room state and lives on the server
-// (see the barter:* handlers in src/server/realtime.ts). These functions
-// are only the local half, moving goods on whichever client they run on.
-// Covered by scripts/tests/unit.barter.ts, including the conservation
-// invariant across both sides of a completed trade.
+// (see the barter:* handlers in src/server/realtime/index.ts), and the
+// board outlives any single phase now that a captain can post from a chat
+// at any point in the voyage. So the release of escrow cannot be decided
+// here either: it happens on the one client owned by the captain whose
+// offer left the board, reported through useBarter's onRefund the moment
+// the board stops listing it. These functions are only the local half,
+// moving goods on whichever client they run on.
 // =====================================================================
 import type { GameState } from "../types";
 import { ageBarterReputation } from "./ages";
@@ -70,8 +74,9 @@ export function postBarterOffer(
   return true;
 }
 
-// Returns an escrowed offer to its owner: a canceled offer, or one swept
-// up unaccepted when the bartering phase ends.
+// Returns an escrowed offer to its owner. Called for a withdrawal the
+// captain made, and for an offer the server swept off the board when the
+// voyage moved on without anyone taking it.
 export function refundBarterOffer(
   state: GameState,
   offerItem: string,
@@ -126,16 +131,7 @@ export function settleBarterTrade(
   awardBarterReputation(state, logs);
 }
 
-export function completeBarterPhase(
-  state: GameState,
-  refunds: { item: string; amount: number }[],
-  logs: string[],
-) {
-  for (const r of refunds) refundBarterOffer(state, r.item, r.amount, logs);
-  logs.push(
-    refunds.length
-      ? "✅ Bartering ended, unmatched offers returned"
-      : "⏭️ Bartering ended",
-  );
+export function completeBarterPhase(state: GameState, logs: string[]) {
+  logs.push("⏭️ Bartering ended");
   state.phase = "worker_mgmt";
 }
