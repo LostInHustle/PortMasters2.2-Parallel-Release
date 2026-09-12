@@ -10,10 +10,12 @@ import {
   Waves,
   CloudLightning,
   Eye,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type { MeritId } from "@/lib/game/merits";
 import { ICONS } from "@/lib/game/constants";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 export function Avatar({
@@ -185,5 +187,73 @@ export function ItemIcon({
     <span className={className} aria-hidden>
       {ICONS[item] ?? ""}
     </span>
+  );
+}
+
+/**
+ * A labelled form row: the label, an optional hint on the far side of it,
+ * and the control underneath. Shared by the two cards that take a captain
+ * name and a password, so both ask for them the same way.
+ */
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <Label className="text-sm font-medium">{label}</Label>
+        {hint && (
+          <span className="text-[10px] text-muted-foreground">{hint}</span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The banner a screen shows when it has something to explain about the
+ * session rather than about what was just typed: a ban, a deletion, a
+ * demotion, a refusal. Alarmed rather than neutral because that is what it
+ * always is, and dismissible when the screen has somewhere to put it away.
+ *
+ * No outer spacing of its own: the call site knows what it is sitting in,
+ * so it passes whatever margin its own layout wants.
+ */
+export function Notice({
+  message,
+  onDismiss,
+  className,
+}: {
+  message: string;
+  onDismiss?: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl border border-alarm/20 bg-alarm/5 px-3.5 py-2.5 text-sm text-alarm",
+        className,
+      )}
+    >
+      <p className="flex-1 leading-relaxed">{message}</p>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="-mr-1 -mt-0.5 shrink-0 rounded-full p-1 transition-colors hover:bg-alarm/10"
+          title="Dismiss"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }

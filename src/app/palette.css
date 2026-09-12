@@ -135,6 +135,8 @@
   --color-age-lender-fill: var(--w-age-lender-fill);
   --color-age-trader-fill: var(--w-age-trader-fill);
   --color-age-broker-fill: var(--w-age-broker-fill);
+  --color-admin: var(--w-admin);
+  --color-admin-fill: var(--w-admin-fill);
 }
 
 :root {
@@ -301,6 +303,19 @@
   --w-shortcuts-fill: oklch(0.55 0.15 218);
   --w-rumors-fill: oklch(0.55 0.15 218);
 
+  /* === The operator console === */
+
+  /*
+     Its own route rather than a panel in a voyage, so nothing is ever
+     on screen beside it and its hue answers to no neighbour. It was
+     still kept clear of the red that means danger: a seal in that
+     family would read as a warning about the operator.
+  */
+  /* Operator Console: the accounts, and what may be done to them. */
+  --w-admin: oklch(0.53 0.13 226);
+
+  --w-admin-fill: oklch(0.55 0.15 226);
+
   /* === Gold, and the three medals === */
   /*
      Gold is bright enough to carry dark ink rather than white, so
@@ -428,6 +443,7 @@
   --w-brand: oklch(0.76 0.12 49.4);
   --w-shortcuts: oklch(0.76 0.12 218);
   --w-rumors: oklch(0.76 0.12 218);
+  --w-admin: oklch(0.76 0.12 226);
 
   --gain: oklch(0.76 0.15 163);
   --alarm: oklch(0.72 0.17 17);

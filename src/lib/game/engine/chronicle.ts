@@ -15,7 +15,7 @@
 // =====================================================================
 import type { Difficulty } from "../difficulty";
 
-export type ChronicleInput = {
+type ChronicleInput = {
   displayName: string;
   difficulty: Difficulty;
   rounds: number;

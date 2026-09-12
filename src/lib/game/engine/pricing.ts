@@ -28,7 +28,7 @@ import type { GameState, ResourceCard } from "../types";
 import { brokersFavorPayoutCap } from "./ages";
 import { hasModule } from "./core";
 
-export type PriceStep = { label: string; delta: number };
+type PriceStep = { label: string; delta: number };
 export type PriceBreakdown = {
   base: number;
   steps: PriceStep[];

@@ -36,7 +36,7 @@ const roomMutedUsers = new Map<string, Set<string>>();
 // chat:dm events carry, minus the per recipient `mine` flag, which
 // belongs to the reader rather than to the line and is added on the way
 // out to a specific socket.
-export type SessionMessage = {
+type SessionMessage = {
   id: string;
   content: string;
   createdAt: string;
@@ -44,7 +44,7 @@ export type SessionMessage = {
   recipient?: PublicUser;
 };
 
-export type HydratedMessage = SessionMessage & { mine: boolean };
+type HydratedMessage = SessionMessage & { mine: boolean };
 
 const SESSION_LOG_LIMIT = 200;
 

@@ -68,8 +68,15 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
+  // The signed in account plus the role the operator console gates on. The
+  // role is a convenience for the client only: every admin action is
+  // checked again on the server, against the account row, when it is asked
+  // for, so a stale or edited copy here buys nothing.
   me: () =>
-    jfetch<{ user: PublicUser | null; token: string | null }>("/api/auth/me"),
+    jfetch<{
+      user: (PublicUser & { role: string }) | null;
+      token: string | null;
+    }>("/api/auth/me"),
   register: (body: {
     username: string;
     password: string;
@@ -77,6 +84,21 @@ export const api = {
   }) =>
     jfetch<{ user: PublicUser; expiresAt: string; token: string }>(
       "/api/auth/register",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
+  // Admits an operator account. This is the only admin call on REST; the
+  // rest are socket events (see use-realtime.ts and the operator console).
+  adminRegister: (body: {
+    username: string;
+    password: string;
+    displayName?: string;
+    setupCode: string;
+  }) =>
+    jfetch<{ user: PublicUser; expiresAt: string; token: string }>(
+      "/api/admin/register",
       {
         method: "POST",
         body: JSON.stringify(body),

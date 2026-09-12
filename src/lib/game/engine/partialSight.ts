@@ -22,11 +22,11 @@
 // =====================================================================
 
 // The minimum Renown a viewer needs to see another captain's detail.
-export const DETAIL_VIEWER_MIN_LEVEL = 5;
+const DETAIL_VIEWER_MIN_LEVEL = 5;
 // The minimum Renown the viewed captain needs before their detail is
 // shown at all. Below this, the viewer sees only the headline regardless
 // of their own level.
-export const DETAIL_SUBJECT_MIN_LEVEL = 3;
+const DETAIL_SUBJECT_MIN_LEVEL = 3;
 
 // A plain language band for a count, used wherever a captain is shown a
 // quantity about another captain they aren't allowed to see exactly.

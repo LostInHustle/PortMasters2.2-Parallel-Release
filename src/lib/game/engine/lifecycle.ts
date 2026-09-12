@@ -88,7 +88,7 @@ export function completePhase2(state: GameState, logs: string[]) {
   startPhase3(state, logs);
 }
 
-export function startPhase3(state: GameState, logs: string[]) {
+function startPhase3(state: GameState, logs: string[]) {
   state.phase = 3;
   logs.push("\n👥=== Processing Worker Production ===");
   processProduction(state, logs);
@@ -124,7 +124,7 @@ export function finishSettlement(state: GameState, logs: string[]) {
   startPhase4(state, logs);
 }
 
-export function startPhase4(state: GameState, logs: string[]) {
+function startPhase4(state: GameState, logs: string[]) {
   state.phase = 4;
   logs.push(
     `\n🚢=== Round ${state.currentRound} · Phase 4: Shipyard & Modules ===`,

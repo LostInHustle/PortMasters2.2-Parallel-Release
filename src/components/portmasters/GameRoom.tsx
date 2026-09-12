@@ -112,6 +112,7 @@ export function GameRoom({
   me,
   room,
   onLeave,
+  onSessionLost,
 }: {
   me: PublicUser;
   room:
@@ -125,9 +126,18 @@ export function GameRoom({
         memberCount: number;
         members: Array<PublicUser & { joinedAt: string }>;
       });
-  onLeave: () => void;
+  // The optional message is why the captain is leaving, for the times the
+  // harbor was taken away rather than walked out of. The page owns the
+  // screen that comes next, so it owns the telling.
+  onLeave: (notice?: string) => void;
+  // Handed straight to the realtime hook, which calls it when the server
+  // refuses this connection's credentials.
+  onSessionLost?: (message: string) => void;
 }) {
-  const { socket, connected, authed, onlineUsers } = useRealtime(me);
+  const { socket, connected, authed, onlineUsers } = useRealtime(
+    me,
+    onSessionLost,
+  );
   const {
     enabled: soundOn,
     toggle: toggleSound,
@@ -413,6 +423,31 @@ export function GameRoom({
       socket.off("room:restarted", onRestarted);
     };
   }, [socket, room.id, me.id]);
+
+  // Held in a ref so a fresh inline arrow from the page does not resubscribe
+  // the handler below on every render of a screen that renders often.
+  const leaveRef = useRef(onLeave);
+  useEffect(() => {
+    leaveRef.current = onLeave;
+  }, [onLeave]);
+
+  // The harbor stopped existing underneath its crew, which today means an
+  // operator deleted the account hosting it. Every action from here would
+  // be aimed at a room row that is already gone, so this captain is handed
+  // back to the Lobby rather than left in the wreck. The reason goes up to
+  // the page, which owns that Lobby and has somewhere to print it; a
+  // notification raised here would leave with this component.
+  useEffect(() => {
+    if (!socket) return;
+    const onClosed = (data: { roomId: string; reason?: string }) => {
+      if (data.roomId !== room.id) return;
+      leaveRef.current(data.reason);
+    };
+    socket.on("room:closed", onClosed);
+    return () => {
+      socket.off("room:closed", onClosed);
+    };
+  }, [socket, room.id]);
 
   // settleOutstandingDebts runs deep inside the endRound mutation, with no
   // way to call socket.emit itself, so it leaves the settlements it made on

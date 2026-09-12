@@ -15,13 +15,22 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
+  id           String    @id @default(cuid())
+  username     String    @unique
   passwordHash String
   displayName  String
-  avatarHue    Int      @default(180)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  avatarHue    Int       @default(180)
+  // "captain" for everyone who signs up, "admin" for an account admitted
+  // through the operator console. Read at each admin event straight from
+  // this row rather than trusted from a socket, so revoking it lands on
+  // the operator's next click instead of their next reconnect.
+  role         String    @default("captain")
+  // Set by a ban, cleared by an unban. A banned account keeps its row and
+  // loses everything else: its sessions go, its seats are reaped, and each
+  // of the gates that decides whether an account may act refuses it.
+  bannedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   sessions     Session[]
   memberships  RoomMember[]

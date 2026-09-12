@@ -102,8 +102,6 @@ export function useOfferDraft(
   };
 }
 
-export type OfferDraft = ReturnType<typeof useOfferDraft>;
-
 // One open offer, as the Bartering board lists it and as a chat shows it.
 // The caller supplies only the container, so the board keeps the compact
 // row it has always drawn while a chat can wrap the same content in a

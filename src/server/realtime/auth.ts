@@ -9,7 +9,11 @@
 // socket's state with the user and triggers a presence broadcast.
 // =====================================================================
 import type { Server, Socket } from "socket.io";
-import { getUserFromToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+  BANNED_ACCOUNT_ERROR,
+  getUserFromToken,
+  SESSION_COOKIE_NAME,
+} from "@/lib/auth";
 import type { PublicUser } from "@/types/realtime";
 import type { SocketState } from "./types";
 import {
@@ -33,17 +37,6 @@ function publicUser(u: {
     displayName: u.displayName,
     avatarHue: u.avatarHue,
   };
-}
-
-// Looks up a session token and narrows the result to the public
-// projection this layer hands around, or null for an unknown or expired
-// token. The lookup itself is getUserFromToken's, shared with the REST
-// API's getCurrentUser, so the two entry points cannot drift on when a
-// session counts as expired. This function used to carry a second copy of
-// the same query and expiry sweep, which is exactly how they would have.
-async function validateToken(token: string): Promise<PublicUser | null> {
-  const user = await getUserFromToken(token);
-  return user ? publicUser(user) : null;
 }
 
 // Parse the pm_session cookie from a raw cookie header. The cookie is
@@ -72,11 +65,23 @@ export async function authenticate(
     socket.emit("auth:fail", { error: "Missing session" });
     return null;
   }
-  const user = await validateToken(token);
-  if (!user) {
+  // The lookup is getUserFromToken's, shared with the REST API's
+  // getCurrentUser, so the two entry points cannot drift on when a session
+  // counts as expired. It hands back the whole row rather than the public
+  // projection because this layer has one more question to ask of it: a
+  // banned account is refused in its own words, which is the answer a
+  // banned captain meets when their client reconnects to a console that
+  // has just closed the door on them.
+  const account = await getUserFromToken(token);
+  if (!account) {
     socket.emit("auth:fail", { error: "Invalid or expired session" });
     return null;
   }
+  if (account.bannedAt) {
+    socket.emit("auth:fail", { error: BANNED_ACCOUNT_ERROR });
+    return null;
+  }
+  const user = publicUser(account);
   const state = sockets.get(socket.id);
   if (!state) return null;
 

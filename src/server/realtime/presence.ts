@@ -30,6 +30,7 @@ import { db } from "@/lib/db";
 import { leaveRoomForUser } from "@/lib/rooms";
 import type { PublicUser } from "@/types/realtime";
 import type { SocketState } from "./types";
+import { forgetStatusIfLastSocket } from "./status";
 
 export const sockets = new Map<string, SocketState>();
 export const userSockets = new Map<string, Set<string>>();
@@ -150,48 +151,110 @@ type DeparturePlan = {
   keepEmptyRoom: boolean;
 };
 
-// Arms the 30s grace timer. When it fires, if the captain hasn't
-// reconnected to any socket at all, their seat is reaped: barter and
-// aid offers pulled, membership deleted, host reassigned, and, unless
-// the plan says to keep it, the room removed once it empties out.
-function armDeparture(io: Server, plan: DeparturePlan): void {
+// Everything one seat loses when it is given up: barter and aid offers
+// pulled, membership deleted, host reassigned, and, unless the plan says
+// to keep it, the room removed once it empties out.
+//
+// Exported so there is one definition of this and not two. The grace
+// timer calls it when its window closes, and the operator console calls
+// it the moment a ban or a purge has to take a seat away, which is a case
+// that cannot wait 30 seconds: the flagged captain would still be holding
+// a chair, and the room's other captains would still be counting them.
+export async function reapDeparture(
+  io: Server,
+  plan: DeparturePlan,
+): Promise<void> {
   const { roomId, userId, displayName, cleanup, keepEmptyRoom } = plan;
+
+  cleanup.removeUserBarterOffers(io, roomId, userId);
+  cleanup.removeUserAidRequest(io, roomId, userId);
+
+  const result = await leaveRoomForUser(userId, roomId, {
+    keepEmptyRoom,
+  }).catch(() => null);
+  if (!result) return;
+
+  if (result.roomDeleted) {
+    // The room was deleted because this was its last member. Tear
+    // down every in memory structure for it so a future room (with a
+    // different id) doesn't inherit stale data from a room that no
+    // longer exists.
+    cleanup.clearRoomAllMaps(roomId);
+  } else {
+    io.to(`room:${roomId}`).emit("room:system", {
+      roomId,
+      content: `${displayName}'s voyage has ended`,
+    });
+    await cleanup.emitRoomMembers(io, roomId);
+    // The captain who just left might have been the only one still
+    // out at sea; everyone else could already be sitting at their
+    // endgame screen waiting on exactly this.
+    await cleanup.maybeConcludeVoyage(io, roomId);
+  }
+}
+
+// Arms the 30s grace timer. When it fires, if the captain hasn't
+// reconnected to any socket at all, their seat is reaped.
+function armDeparture(io: Server, plan: DeparturePlan): void {
+  const { roomId, userId } = plan;
   const key = `${roomId}:${userId}`;
   cancelDeparture(roomId, userId);
   const t = setTimeout(async () => {
     departureTimers.delete(key);
     // They may have reconnected to a different room, or signed back in,
     // in the time it took the timer to fire, so only act if they're
-    // still gone from this one.
+    // still gone from this one. This check belongs to the timer alone:
+    // it is the whole reason the timer waits, and the immediate reap the
+    // console takes has already decided the captain is not coming back.
     if (userSockets.get(userId)?.size) return;
-
-    cleanup.removeUserBarterOffers(io, roomId, userId);
-    cleanup.removeUserAidRequest(io, roomId, userId);
-
-    const result = await leaveRoomForUser(userId, roomId, {
-      keepEmptyRoom,
-    }).catch(() => null);
-    if (!result) return;
-
-    if (result.roomDeleted) {
-      // The room was deleted because this was its last member. Tear
-      // down every in memory structure for it so a future room (with a
-      // different id) doesn't inherit stale data from a room that no
-      // longer exists.
-      cleanup.clearRoomAllMaps(roomId);
-    } else {
-      io.to(`room:${roomId}`).emit("room:system", {
-        roomId,
-        content: `${displayName}'s voyage has ended`,
-      });
-      await cleanup.emitRoomMembers(io, roomId);
-      // The captain who just left might have been the only one still
-      // out at sea; everyone else could already be sitting at their
-      // endgame screen waiting on exactly this.
-      await cleanup.maybeConcludeVoyage(io, roomId);
-    }
+    await reapDeparture(io, plan);
   }, DEPARTURE_GRACE_MS);
   departureTimers.set(key, t);
+}
+
+// Takes an account out of the presence bookkeeping outright: the account
+// leaves userSockets, and every socket it holds gives up its claim on a
+// room and leaves that room's channel. The socket ids come back so the
+// caller can close them.
+//
+// A ban or a purge uses this before reaping, because the ordinary
+// disconnect path is the wrong shape for it: that path announces a
+// departure nobody chose and arms a 30 second timer for a seat that is
+// already gone.
+export function detachUser(io: Server, userId: string): string[] {
+  const ids = Array.from(userSockets.get(userId) ?? []);
+  userSockets.delete(userId);
+  for (const socketId of ids) {
+    const state = sockets.get(socketId);
+    if (!state?.roomId) continue;
+    io.sockets.sockets.get(socketId)?.leave(`room:${state.roomId}`);
+    state.roomId = null;
+  }
+  return ids;
+}
+
+// Takes every socket out of one room, without touching any other room
+// those accounts may be holding, and without closing anything: the
+// captains emptied out this way stay signed in and land in the Lobby.
+//
+// Used when a room stops existing underneath its crew, which today means
+// a purge deleting the account that hosted it. detachUser is the wrong
+// tool there: it ends an account, while this ends a room, and a captain
+// with a second tab somewhere else must keep that tab's standing.
+export function emptyRoom(io: Server, roomId: string): void {
+  for (const [socketId, state] of sockets) {
+    if (state.roomId !== roomId) continue;
+    io.sockets.sockets.get(socketId)?.leave(`room:${roomId}`);
+    state.roomId = null;
+    const set = userSockets.get(state.userId);
+    if (set) {
+      set.delete(socketId);
+      if (set.size === 0) userSockets.delete(state.userId);
+    }
+    // Only forgets the status if no other socket of theirs is still in
+    // this room, which is the same rule the disconnect path applies.
+    forgetStatusIfLastSocket(roomId, state.userId, userSockets);
+  }
 }
 
 // A live departure: the captain's last socket has gone away. If they

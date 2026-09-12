@@ -16,6 +16,11 @@ export default function Home() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [room, setRoom] = useState<RoomDetail | null>(null);
+  // Something that happened to this captain from outside, kept for the
+  // screen they landed on afterwards: the reason the server refused their
+  // session, or the reason a harbor they were sitting in stopped existing.
+  // Nothing else writes here, and signing in clears it.
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +57,21 @@ export default function Home() {
     setAuthToken(null);
     setUser(null);
     setRoom(null);
+    setNotice(null);
+    setStatus("auth");
+  };
+
+  // The realtime layer refused this connection's credentials, so the
+  // session behind it is over: it ran out, or an operator banned the
+  // account or deleted it. This is the same teardown signing out does,
+  // with the reason kept for the sign in screen, because there is nothing
+  // left to go back to either way.
+  const handleSessionLost = (message: string) => {
+    disconnectSocket();
+    setAuthToken(null);
+    setUser(null);
+    setRoom(null);
+    setNotice(message);
     setStatus("auth");
   };
 
@@ -76,8 +96,11 @@ export default function Home() {
         onAuthed={(u, token) => {
           if (token) setAuthToken(token);
           setUser(u);
+          setNotice(null);
           setStatus("lobby");
         }}
+        notice={notice}
+        onDismissNotice={() => setNotice(null)}
       />
     );
   }
@@ -97,6 +120,9 @@ export default function Home() {
           }
         }}
         onLogout={handleLogout}
+        onSessionLost={handleSessionLost}
+        notice={notice}
+        onDismissNotice={() => setNotice(null)}
       />
     );
   }
@@ -106,10 +132,14 @@ export default function Home() {
       <GameRoom
         me={user}
         room={room}
-        onLeave={() => {
+        onLeave={(message) => {
           setRoom(null);
+          // A walk out carries no message and clears whatever was here; a
+          // harbor closed underneath this captain carries the reason.
+          setNotice(message ?? null);
           setStatus("lobby");
         }}
+        onSessionLost={handleSessionLost}
       />
     );
   }
@@ -121,6 +151,9 @@ export default function Home() {
         setStatus("lobby");
       }}
       onLogout={handleLogout}
+      onSessionLost={handleSessionLost}
+      notice={notice}
+      onDismissNotice={() => setNotice(null)}
     />
   );
 }

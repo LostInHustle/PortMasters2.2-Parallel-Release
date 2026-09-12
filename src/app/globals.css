@@ -418,6 +418,9 @@
   .pm-grad-rumors {
     --pm-fill: var(--w-rumors-fill);
   }
+  .pm-grad-admin {
+    --pm-fill: var(--w-admin-fill);
+  }
 
   /* Gold is bright enough that white ink would not read on it, so
      these four name their own. Everything else gets white, which is

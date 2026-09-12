@@ -131,6 +131,18 @@ import { addPulseReport, clearPulseTallies } from "./pulse";
 import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
+import {
+  banAccount,
+  grantAdmin,
+  listAccounts,
+  purgeAccount,
+  requireAdmin,
+  revokeAdmin,
+  unbanAccount,
+  type AdminActor,
+  type AdminPayload,
+  type AdminResult,
+} from "./admin";
 
 // ========== Cross module room teardown ==========
 // Called when a room is deleted after its last member departs. Tears
@@ -1517,6 +1529,50 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s) return;
       leaveQueue(s.userId);
     });
+
+    // ========== Operator console ==========
+    // The console runs on the socket for the reason admin.ts sets out at
+    // its top: a route handler gets a different copy of this module, so a
+    // ban written from a route would flag the row in the database and
+    // leave the captain's live connection exactly as it was. Every handler
+    // below asks requireAdmin first, which reads the acting account's role
+    // out of the database again, and every one answers with the roster as
+    // it stands after the change, so a console never has to guess what its
+    // own click did.
+    socket.on("admin:list", async () => {
+      if (!(await requireAdmin(socket))) return;
+      socket.emit("admin:accounts", await listAccounts());
+    });
+
+    // The five that change something share a shape: ask, act, answer with
+    // the roster, or answer with the reason it was refused. Only the two
+    // that cannot be undone need to know who is asking.
+    const adminAction = (
+      event: string,
+      run: (actor: AdminActor, payload: AdminPayload) => Promise<AdminResult>,
+    ) =>
+      socket.on(event, async (payload: AdminPayload | undefined) => {
+        const actor = await requireAdmin(socket);
+        if (!actor) return;
+        const result = await run(actor, payload ?? {});
+        if (!result.ok) {
+          socket.emit("admin:error", { error: result.error });
+          return;
+        }
+        socket.emit("admin:accounts", await listAccounts());
+      });
+
+    adminAction("admin:ban", (actor, payload) =>
+      banAccount(io, departureCleanup, actor, payload),
+    );
+    adminAction("admin:unban", (_actor, payload) => unbanAccount(payload));
+    adminAction("admin:grant", (_actor, payload) => grantAdmin(payload));
+    adminAction("admin:revoke", (actor, payload) =>
+      revokeAdmin(io, actor, payload),
+    );
+    adminAction("admin:purge", (actor, payload) =>
+      purgeAccount(io, departureCleanup, actor, payload),
+    );
 
     // ========== Disconnect ==========
     socket.on("disconnect", () => {
