@@ -150,12 +150,12 @@ export function GameStatusPanel({
           <Stat
             label="Funds"
             value={`${game.money}`}
-            className="text-emerald-600 dark:text-emerald-400"
+            className="text-gold-ink"
           />
           <Stat
             label="Reputation"
             value={`${game.score}`}
-            className="text-amber-600 dark:text-amber-400"
+            className="text-favor"
           />
           {showObligations ? (
             <Stat
@@ -164,14 +164,14 @@ export function GameStatusPanel({
               className={cn(
                 safe
                   ? "text-foreground/80"
-                  : "text-rose-600 dark:text-rose-400",
+                  : "text-alarm",
               )}
             />
           ) : (
             <Stat
               label="Ship"
               value={`Lv ${game.shipLevel}`}
-              className="text-teal-600 dark:text-teal-400"
+              className="text-sea"
             />
           )}
         </div>
@@ -198,7 +198,7 @@ export function GameStatusPanel({
             Dues
             {duesAlert && (
               <span
-                className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-rose-500"
+                className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-alarm"
                 aria-label="attention needed"
               />
             )}
@@ -230,16 +230,16 @@ export function GameStatusPanel({
             totalValue = Math.round(totalValue);
             if (totalItems === 0) return null;
             return (
-              <div className="mb-2 rounded-lg border border-teal-500/15 bg-teal-500/[0.04] px-3 py-2 flex items-center justify-between">
+              <div className="mb-2 rounded-lg border border-ship/15 bg-ship/[0.04] px-3 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <Coins className="h-3 w-3 text-amber-500" />
+                  <Coins className="h-3 w-3 text-gold-ink" />
                   Hold Value
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">
                     {totalItems} items
                   </span>
-                  <span className="font-display text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <span className="font-display text-sm font-bold text-gold-ink tabular-nums">
                     ~{totalValue}g
                   </span>
                 </div>
@@ -314,19 +314,19 @@ export function GameStatusPanel({
                 </div>
                 <div className="flex h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                   <div
-                    className="bg-teal-500 transition-all duration-300"
+                    className="bg-sea transition-all duration-300"
                     style={{ width: `${rawPct}%` }}
                     title={`Raw Materials: ${rawCount} (${rawPct}%)`}
                   />
                   <div
-                    className="bg-amber-500 transition-all duration-300"
+                    className="bg-warn transition-all duration-300"
                     style={{ width: `${productPct}%` }}
                     title={`Finished Goods: ${productCount} (${productPct}%)`}
                   />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[9px]">
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-2 w-2 rounded-full bg-teal-500" />
+                    <span className="inline-block h-2 w-2 rounded-full bg-sea" />
                     <span className="text-muted-foreground">
                       Raw {rawCount}
                     </span>
@@ -335,7 +335,7 @@ export function GameStatusPanel({
                     <span className="text-muted-foreground">
                       Products {productCount}
                     </span>
-                    <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+                    <span className="inline-block h-2 w-2 rounded-full bg-warn" />
                   </span>
                 </div>
               </div>
@@ -408,7 +408,7 @@ export function GameStatusPanel({
               <div
                 className={cn(
                   "mt-1 flex items-center justify-between border-t pt-2",
-                  safe ? "border-teal-500/20" : "border-rose-500/30",
+                  safe ? "border-gain/20" : "border-alarm/30",
                 )}
               >
                 <span className="text-xs font-semibold">💸 Total Due</span>
@@ -416,19 +416,19 @@ export function GameStatusPanel({
                   className={cn(
                     "font-bold",
                     safe
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-rose-600 dark:text-rose-400",
+                      ? "text-gain"
+                      : "text-alarm",
                   )}
                 >
                   {pendTotal} Gold
                 </span>
               </div>
               {safe ? (
-                <div className="mt-1.5 text-center text-[10px] text-emerald-600 dark:text-emerald-400">
+                <div className="mt-1.5 text-center text-[10px] text-gain">
                   ✅ Funds sufficient for round end
                 </div>
               ) : (
-                <div className="mt-1.5 rounded-md bg-rose-500/15 py-1 text-center text-[10px] text-rose-600 dark:text-rose-300">
+                <div className="mt-1.5 rounded-md bg-alarm/15 py-1 text-center text-[10px] text-alarm">
                   🚨 Risk: Funds may fall short at round end!
                 </div>
               )}
@@ -454,7 +454,7 @@ export function GameStatusPanel({
                     <b className="text-foreground/90">{d.counterpartyName}</b>
                   </span>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-[12px] font-bold text-rose-600 dark:text-rose-400">
+                    <span className="text-[12px] font-bold text-alarm">
                       {d.amount}g
                     </span>
                     {onRepayLoan && (
@@ -480,7 +480,7 @@ export function GameStatusPanel({
                     </span>
                   }
                 >
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="font-bold text-gain">
                     {l.amount}g
                   </span>
                 </Row>
@@ -609,7 +609,7 @@ function ConvoyVenturesSection({
       </div>
 
       {convoy.error && (
-        <div className="mb-1.5 rounded bg-rose-500/10 px-2 py-1 text-[10px] text-rose-600 dark:text-rose-300">
+        <div className="mb-1.5 rounded bg-alarm/10 px-2 py-1 text-[10px] text-alarm">
           {convoy.error}
         </div>
       )}
@@ -708,7 +708,7 @@ function ConvoyVenturesSection({
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                   <div
-                    className="h-full rounded-full bg-teal-500"
+                    className="h-full rounded-full bg-sea"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -787,7 +787,7 @@ function InvItem({
       </span>
       {skilled !== undefined && skilled > 0 && (
         <span
-          className="mr-1.5 text-[10px] text-amber-600 dark:text-amber-400"
+          className="mr-1.5 text-[10px] text-warn"
           title={`${skilled} of ${count} trained: each produces 2 per round`}
         >
           ⭐{skilled}

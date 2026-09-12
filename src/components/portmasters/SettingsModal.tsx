@@ -121,10 +121,10 @@ export function SettingsModal({
               <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="pm-grad-primary flex h-10 w-10 items-center justify-center rounded-xl text-white">
+                  <div className="pm-grad-settings flex h-10 w-10 items-center justify-center rounded-xl">
                     <Settings className="h-5 w-5" />
                   </div>
-                  <h2 className="font-display text-lg font-bold pm-text-sea">
+                  <h2 className="font-display text-lg font-bold text-settings">
                     Settings
                   </h2>
                 </div>

@@ -1,0 +1,434 @@
+/* The PortMasters palette.
+
+   Every widget has a colour of its own, so that two panels side by side
+   never read as the same panel twice.
+
+   Identity colour dresses chrome: a heading, an icon, a seal, a border,
+   a soft wash. Meaning colour dresses data: a number, a status, a chip.
+   The two never trade places. That separation is what lets forty odd
+   hues share one wheel with the handful a captain has to read, and it
+   is the rule to hold to when adding anything new.
+
+   Every identity hue sits at one lightness and one chroma and differs
+   only in hue angle, so no colour is louder than its neighbour and the
+   whole set reads as one family. Light mode is a deep version for a
+   near white canvas, dark mode a bright one for a near black canvas.
+   The fill is the exception: it stays put in both, because white ink
+   has to read on it in either.
+
+   Because both values live in the token, a component never writes a
+   dark: variant. Write text-houses and the token already knows.
+
+   The hue for each widget, and the reason it sits where it does, lives
+   in scripts/palette.ts, which also checks this file against the code. */
+
+@theme inline {
+
+  --color-charter:             var(--w-charter);
+  --color-harbors:             var(--w-harbors);
+  --color-captains:            var(--w-captains);
+  --color-messages:            var(--w-messages);
+  --color-houses:              var(--w-houses);
+  --color-leaderboard:         var(--w-leaderboard);
+  --color-chronicles:          var(--w-chronicles);
+  --color-activity:            var(--w-activity);
+  --color-settings:            var(--w-settings);
+  --color-guide:               var(--w-guide);
+  --color-profile:             var(--w-profile);
+  --color-legacy:              var(--w-legacy);
+  --color-notifications:       var(--w-notifications);
+  --color-renown:              var(--w-renown);
+  --color-checkin:             var(--w-checkin);
+  --color-quickstart:          var(--w-quickstart);
+  --color-quickstart-fill:     var(--w-quickstart-fill);
+  --color-checkin-fill:        var(--w-checkin-fill);
+  --color-sailing-fill:        var(--w-sailing-fill);
+  --color-sailing:             var(--w-sailing);
+  --color-voyage:              var(--w-voyage);
+  --color-ship:                var(--w-ship);
+  --color-members:             var(--w-members);
+  --color-chat:                var(--w-chat);
+  --color-ledger:              var(--w-ledger);
+  --color-welcome:             var(--w-welcome);
+  --color-purchase:            var(--w-purchase);
+  --color-orders:              var(--w-orders);
+  --color-barter:              var(--w-barter);
+  --color-workers:             var(--w-workers);
+  --color-shipyard:            var(--w-shipyard);
+  --color-settlement:          var(--w-settlement);
+  --color-endgame:             var(--w-endgame);
+  --color-bankruptcy:          var(--w-bankruptcy);
+  --color-module-draft:        var(--w-module-draft);
+  --color-module-swap:         var(--w-module-swap);
+  --color-advisor:             var(--w-advisor);
+  --color-depth:               var(--w-depth);
+  --color-pulse:               var(--w-pulse);
+  --color-planner:             var(--w-planner);
+  --color-boon:                var(--w-boon);
+  --color-modules:             var(--w-modules);
+  --color-brand:               var(--w-brand);
+  --color-shortcuts:           var(--w-shortcuts);
+  --color-rumors:              var(--w-rumors);
+  --color-charter-fill:        var(--w-charter-fill);
+  --color-harbors-fill:        var(--w-harbors-fill);
+  --color-captains-fill:       var(--w-captains-fill);
+  --color-messages-fill:       var(--w-messages-fill);
+  --color-houses-fill:         var(--w-houses-fill);
+  --color-leaderboard-fill:    var(--w-leaderboard-fill);
+  --color-chronicles-fill:     var(--w-chronicles-fill);
+  --color-activity-fill:       var(--w-activity-fill);
+  --color-settings-fill:       var(--w-settings-fill);
+  --color-guide-fill:          var(--w-guide-fill);
+  --color-profile-fill:        var(--w-profile-fill);
+  --color-legacy-fill:         var(--w-legacy-fill);
+  --color-notifications-fill:  var(--w-notifications-fill);
+  --color-renown-fill:         var(--w-renown-fill);
+  --color-voyage-fill:         var(--w-voyage-fill);
+  --color-ship-fill:           var(--w-ship-fill);
+  --color-members-fill:        var(--w-members-fill);
+  --color-chat-fill:           var(--w-chat-fill);
+  --color-ledger-fill:         var(--w-ledger-fill);
+  --color-welcome-fill:        var(--w-welcome-fill);
+  --color-purchase-fill:       var(--w-purchase-fill);
+  --color-orders-fill:         var(--w-orders-fill);
+  --color-barter-fill:         var(--w-barter-fill);
+  --color-workers-fill:        var(--w-workers-fill);
+  --color-shipyard-fill:       var(--w-shipyard-fill);
+  --color-settlement-fill:     var(--w-settlement-fill);
+  --color-endgame-fill:        var(--w-endgame-fill);
+  --color-bankruptcy-fill:     var(--w-bankruptcy-fill);
+  --color-module-draft-fill:   var(--w-module-draft-fill);
+  --color-module-swap-fill:    var(--w-module-swap-fill);
+  --color-advisor-fill:        var(--w-advisor-fill);
+  --color-depth-fill:          var(--w-depth-fill);
+  --color-pulse-fill:          var(--w-pulse-fill);
+  --color-planner-fill:        var(--w-planner-fill);
+  --color-boon-fill:           var(--w-boon-fill);
+  --color-modules-fill:        var(--w-modules-fill);
+  --color-brand-fill:          var(--w-brand-fill);
+  --color-shortcuts-fill:      var(--w-shortcuts-fill);
+  --color-rumors-fill:         var(--w-rumors-fill);
+  --color-gain:                var(--gain);
+  --color-alarm:               var(--alarm);
+  --color-warn:                var(--warn);
+  --color-due:                 var(--due);
+  --color-favor:               var(--favor);
+  --color-intel:               var(--intel);
+  --color-sea:                 var(--sea);
+  --color-gold:                var(--gold);
+  --color-gold-ink:            var(--gold-ink);
+  --color-medal-gold:          var(--medal-gold);
+  --color-medal-silver:        var(--medal-silver);
+  --color-medal-bronze:        var(--medal-bronze);
+  --color-gold-fill:           var(--w-gold-fill);
+  --color-medal-gold-fill:     var(--w-medal-gold-fill);
+  --color-medal-silver-fill:   var(--w-medal-silver-fill);
+  --color-medal-bronze-fill:   var(--w-medal-bronze-fill);
+  --color-house-jade:          var(--house-jade);
+  --color-house-vermilion:     var(--house-vermilion);
+  --color-house-lotus:         var(--house-lotus);
+  --color-house-jade-fill:     var(--w-house-jade-fill);
+  --color-house-vermilion-fill: var(--w-house-vermilion-fill);
+  --color-house-lotus-fill:    var(--w-house-lotus-fill);
+  --color-age-lender:          var(--age-lender);
+  --color-age-trader:          var(--age-trader);
+  --color-age-broker:          var(--age-broker);
+  --color-age-lender-fill:     var(--w-age-lender-fill);
+  --color-age-trader-fill:     var(--w-age-trader-fill);
+  --color-age-broker-fill:     var(--w-age-broker-fill);
+}
+
+:root {
+  /* === The Lobby === */
+
+  /*
+     The densest screen, so these seventeen are spread widest, which is
+     what sets the floor for the whole palette: seventeen surfaces
+     across the 322 degrees clear of the meaning red is 18.9 degrees
+     each, and no screen anywhere gets tighter than that. A room's
+     host crown is not among them: a crown is gold, and the shared
+     --gold token already carries that.
+
+     Check In sits in the spread with everything else rather than
+     taking the red end of the wheel. The red end belongs to cost and
+     error, and a reward dressed in the colour of a loss would misread
+     however loudly it was meant. It calls for attention by being the
+     only filled, moving control on the masthead instead.
+  */
+  /* Chart a new harbor: the first thing a captain is asked to do. */
+  --w-charter:                 oklch(0.53 0.13 210.4);
+  /* Open Harbors: the list of rooms waiting. */
+  --w-harbors:                 oklch(0.53 0.13 129.9);
+  /* Captains Online: who else is afloat. */
+  --w-captains:                oklch(0.53 0.13 317.8);
+  /* Direct Messages: a private word. */
+  --w-messages:                oklch(0.53 0.13 156.8);
+  /* Great Houses: the four allegiances. */
+  --w-houses:                  oklch(0.53 0.13 253.8);
+  /* Leaderboard: the standing of every captain. */
+  --w-leaderboard:             oklch(0.53 0.13 64.4);
+  /* Chronicles: the record of voyages past. */
+  --w-chronicles:              oklch(0.53 0.13 197.0);
+  /* Harbor Activity: what the harbor has been doing. */
+  --w-activity:                oklch(0.53 0.13 290.9);
+  /* Settings: the captain's own preferences. */
+  --w-settings:                oklch(0.53 0.13 140.2);
+  /* How to Play: the guide for a new hand. */
+  --w-guide:                   oklch(0.53 0.13 103.1);
+  /* Captain Profile: one captain in full. */
+  --w-profile:                 oklch(0.53 0.13 83.3);
+  /* Captain's Legacy: what carries between voyages. */
+  --w-legacy:                  oklch(0.53 0.13 215.9);
+  /* Notifications: word that arrived while away. */
+  --w-notifications:           oklch(0.53 0.13 237.3);
+  /* Your Renown: standing earned and kept. */
+  --w-renown:                  oklch(0.53 0.13 76.3);
+  --w-checkin:                 oklch(0.53 0.13 183.6);
+  --w-quickstart:              oklch(0.53 0.13 344.6);
+  --w-sailing:                 oklch(0.53 0.13 264.1);
+
+  --w-charter-fill:            oklch(0.55 0.15 210.4);
+  --w-harbors-fill:            oklch(0.55 0.15 129.9);
+  --w-captains-fill:           oklch(0.55 0.15 317.8);
+  --w-messages-fill:           oklch(0.55 0.15 156.8);
+  --w-houses-fill:             oklch(0.55 0.15 253.8);
+  --w-leaderboard-fill:        oklch(0.55 0.15 64.4);
+  --w-chronicles-fill:         oklch(0.55 0.15 197.0);
+  --w-activity-fill:           oklch(0.55 0.15 290.9);
+  --w-settings-fill:           oklch(0.55 0.15 140.2);
+  --w-guide-fill:              oklch(0.55 0.15 103.1);
+  --w-profile-fill:            oklch(0.55 0.15 83.3);
+  --w-legacy-fill:             oklch(0.55 0.15 215.9);
+  --w-notifications-fill:      oklch(0.55 0.15 237.3);
+  --w-renown-fill:             oklch(0.55 0.15 76.3);
+  --w-checkin-fill:            oklch(0.55 0.15 183.6);
+  --w-quickstart-fill:         oklch(0.55 0.15 344.6);
+  --w-sailing-fill:            oklch(0.55 0.15 264.1);
+
+  /* === The game session === */
+
+  /*
+     On screen through every phase, so each has to hold its own against
+     whatever the phase brings with it.
+  */
+  /* Voyage Timeline: where the voyage has reached. */
+  --w-voyage:                  oklch(0.53 0.13 47);
+  /* Ship and Funds: the captain's own holdings. */
+  --w-ship:                    oklch(0.53 0.13 111);
+  /* Members: who is at this table. */
+  --w-members:                 oklch(0.53 0.13 175);
+  /* Chat: the table talking. */
+  --w-chat:                    oklch(0.53 0.13 240);
+  /* Ledger: what has happened so far. */
+  --w-ledger:                  oklch(0.53 0.13 304);
+
+  --w-voyage-fill:             oklch(0.55 0.15 47);
+  --w-ship-fill:               oklch(0.55 0.15 111);
+  --w-members-fill:            oklch(0.55 0.15 175);
+  --w-chat-fill:               oklch(0.55 0.15 240);
+  --w-ledger-fill:             oklch(0.55 0.15 304);
+
+  /* === The phases === */
+
+  /*
+     Twelve keys, twelve hues. That many can never run at once, which is
+     why a pair here may share a hue and never be seen together.
+  */
+  /* Welcome: the voyage opens. */
+  --w-welcome:                 oklch(0.53 0.13 68);
+  /* Purchase: buying at port. */
+  --w-purchase:                oklch(0.53 0.13 154);
+  /* Orders: filling what was asked for. */
+  --w-orders:                  oklch(0.53 0.13 282);
+  /* Barter: captain to captain trade. */
+  --w-barter:                  oklch(0.53 0.13 218);
+  /* Worker Management: artisans and their wages. */
+  --w-workers:                 oklch(0.53 0.13 347);
+  /* Shipyard: the ship itself. */
+  --w-shipyard:                oklch(0.53 0.13 90);
+  /* Settlement: bills, risk and the reckoning. */
+  --w-settlement:              oklch(0.53 0.13 261);
+  /* Endgame: the voyage closes. */
+  --w-endgame:                 oklch(0.53 0.13 132);
+  /* Bankruptcy: a fleet lost. */
+  --w-bankruptcy:              oklch(0.53 0.13 325);
+  /* Module Draft: choosing what to bolt on. */
+  --w-module-draft:            oklch(0.53 0.13 132);
+  /* Module Swap: changing what is already there. */
+  --w-module-swap:             oklch(0.53 0.13 347);
+
+  --w-welcome-fill:            oklch(0.55 0.15 68);
+  --w-purchase-fill:           oklch(0.55 0.15 154);
+  --w-orders-fill:             oklch(0.55 0.15 282);
+  --w-barter-fill:             oklch(0.55 0.15 218);
+  --w-workers-fill:            oklch(0.55 0.15 347);
+  --w-shipyard-fill:           oklch(0.55 0.15 90);
+  --w-settlement-fill:         oklch(0.55 0.15 261);
+  --w-endgame-fill:            oklch(0.55 0.15 132);
+  --w-bankruptcy-fill:         oklch(0.55 0.15 325);
+  --w-module-draft-fill:       oklch(0.55 0.15 132);
+  --w-module-swap-fill:        oklch(0.55 0.15 347);
+
+  /* === The panels === */
+
+  /*
+     Open inside a phase, or stand on a screen of their own.
+  */
+  /* Trade Advisor: what the broker thinks of a price. */
+  --w-advisor:                 oklch(0.53 0.13 197);
+  /* Market Depth: how much of a good is about. */
+  --w-depth:                   oklch(0.53 0.13 347);
+  /* Market Pulse: which way prices have moved. */
+  --w-pulse:                   oklch(0.53 0.13 90);
+  /* Fulfillment Planner: which orders are worth filling. */
+  --w-planner:                 oklch(0.53 0.13 132);
+  /* Boon Draft: the boon chosen for the voyage. */
+  --w-boon:                    oklch(0.53 0.13 325);
+  /* Module list: what the ship already carries. */
+  --w-modules:                 oklch(0.53 0.13 261);
+  --w-brand:                   oklch(0.53 0.13 49.4);
+  /* Keyboard Shortcuts: the keys that do things. */
+  --w-shortcuts:               oklch(0.53 0.13 218);
+  /* Rumor Board: what is being whispered. */
+  --w-rumors:                  oklch(0.53 0.13 218);
+
+  --w-advisor-fill:            oklch(0.55 0.15 197);
+  --w-depth-fill:              oklch(0.55 0.15 347);
+  --w-pulse-fill:              oklch(0.55 0.15 90);
+  --w-planner-fill:            oklch(0.55 0.15 132);
+  --w-boon-fill:               oklch(0.55 0.15 325);
+  --w-modules-fill:            oklch(0.55 0.15 261);
+  --w-brand-fill:              oklch(0.55 0.15 49.4);
+  --w-shortcuts-fill:          oklch(0.55 0.15 218);
+  --w-rumors-fill:             oklch(0.55 0.15 218);
+
+  /* === Gold, and the three medals === */
+  /*
+     Gold is bright enough to carry dark ink rather than white, so
+     these are the exception to the fill lightness above.
+  */
+  --gold:                      oklch(0.80 0.13 85);
+  --gold-ink:                  oklch(0.52 0.11 75);
+  --medal-gold:                oklch(0.80 0.14 85);
+  --medal-silver:              oklch(0.82 0.02 265);
+  --medal-bronze:              oklch(0.70 0.13 55);
+  --w-gold-fill:               oklch(0.78 0.14 85);
+  --w-medal-gold-fill:         oklch(0.78 0.15 85);
+  --w-medal-silver-fill:       oklch(0.74 0.03 265);
+  --w-medal-bronze-fill:       oklch(0.66 0.13 55);
+
+  /* === The three Houses === */
+  /*
+     A House is named for its colour, so these three are named tokens
+     like gold rather than widget hues, and they are exempt from the
+     distance rules that keep forty two widgets apart. Faction colour is
+     data: it says which House a captain sails for, and it is the same in
+     every panel that mentions one.
+  */
+  --house-jade:                oklch(0.53 0.12 160);
+  --house-vermilion:           oklch(0.53 0.17 28);
+  --house-lotus:               oklch(0.54 0.13 78);
+  --w-house-jade-fill:         oklch(0.55 0.15 160);
+  --w-house-vermilion-fill:    oklch(0.55 0.15 28);
+  --w-house-lotus-fill:        oklch(0.72 0.14 88);
+
+  /* === The three Ages === */
+  /*
+     The Ages of the Ledger rotate on a fortnight, three of them, and
+     every harbor is in the same one. An Age is named for what it is
+     rather than for a panel, so these are named tokens like the Houses
+     and they carry the same exemption. The pill is drawn in the Lobby
+     and again in the session, which between them is every screen there
+     is, so no hue on this wheel holds twenty degrees clear of both. The
+     three keep the colours they already wore, a jade green for the
+     Lender, a trader's gold and a violet for the Broker, placed at 130,
+     62 and 300 so that an Age and a House crest are never the same
+     colour.
+  */
+  --age-lender:                oklch(0.52 0.12 130);
+  --age-trader:                oklch(0.52 0.11 62);
+  --age-broker:                oklch(0.52 0.15 300);
+  --w-age-lender-fill:         oklch(0.55 0.15 130);
+  --w-age-trader-fill:         oklch(0.72 0.14 62);
+  --w-age-broker-fill:         oklch(0.55 0.16 300);
+
+  /* === Meaning === */
+  /*
+     The colours a captain reads rather than merely sees. The hues
+     are what the front end already carries, so nothing anyone has
+     learned to read shifts under them.
+  */
+  /* Money in. Profit, revenue, a settled debt, a worker who has earned their keep. */
+  --gain:                      oklch(0.6 0.13 163);
+  /* Money out at its worst. A cost, a loss, an error, a bankruptcy, a raid. */
+  --alarm:                     oklch(0.59 0.2 17);
+  /* Caution. A risk worth weighing, a price running high, something still undecided. */
+  --warn:                      oklch(0.62 0.14 75);
+  /* Money owed. Wages, bills, payroll, maintenance. */
+  --due:                       oklch(0.62 0.16 45);
+  /* The Broker's Favor, and anything that spends it. */
+  --favor:                     oklch(0.54 0.16 295);
+  /* Information. Advice, a hint, a comparison. */
+  --intel:                     oklch(0.51 0.15 265);
+  /* The harbor's own teal, kept for the few places it still means something. */
+  --sea:                       oklch(0.6 0.1 183);
+}
+
+.dark {
+  --w-charter:                 oklch(0.76 0.12 210.4);
+  --w-harbors:                 oklch(0.76 0.12 129.9);
+  --w-captains:                oklch(0.76 0.12 317.8);
+  --w-messages:                oklch(0.76 0.12 156.8);
+  --w-houses:                  oklch(0.76 0.12 253.8);
+  --w-leaderboard:             oklch(0.76 0.12 64.4);
+  --w-chronicles:              oklch(0.76 0.12 197.0);
+  --w-activity:                oklch(0.76 0.12 290.9);
+  --w-settings:                oklch(0.76 0.12 140.2);
+  --w-guide:                   oklch(0.76 0.12 103.1);
+  --w-profile:                 oklch(0.76 0.12 83.3);
+  --w-legacy:                  oklch(0.76 0.12 215.9);
+  --w-notifications:           oklch(0.76 0.12 237.3);
+  --w-renown:                  oklch(0.76 0.12 76.3);
+  --w-checkin:                 oklch(0.76 0.12 183.6);
+  --w-quickstart:              oklch(0.76 0.12 344.6);
+  --w-sailing:                 oklch(0.76 0.12 264.1);
+  --w-voyage:                  oklch(0.76 0.12 47);
+  --w-ship:                    oklch(0.76 0.12 111);
+  --w-members:                 oklch(0.76 0.12 175);
+  --w-chat:                    oklch(0.76 0.12 240);
+  --w-ledger:                  oklch(0.76 0.12 304);
+  --w-welcome:                 oklch(0.76 0.12 68);
+  --w-purchase:                oklch(0.76 0.12 154);
+  --w-orders:                  oklch(0.76 0.12 282);
+  --w-barter:                  oklch(0.76 0.12 218);
+  --w-workers:                 oklch(0.76 0.12 347);
+  --w-shipyard:                oklch(0.76 0.12 90);
+  --w-settlement:              oklch(0.76 0.12 261);
+  --w-endgame:                 oklch(0.76 0.12 132);
+  --w-bankruptcy:              oklch(0.76 0.12 325);
+  --w-module-draft:            oklch(0.76 0.12 132);
+  --w-module-swap:             oklch(0.76 0.12 347);
+  --w-advisor:                 oklch(0.76 0.12 197);
+  --w-depth:                   oklch(0.76 0.12 347);
+  --w-pulse:                   oklch(0.76 0.12 90);
+  --w-planner:                 oklch(0.76 0.12 132);
+  --w-boon:                    oklch(0.76 0.12 325);
+  --w-modules:                 oklch(0.76 0.12 261);
+  --w-shortcuts:               oklch(0.76 0.12 218);
+  --w-rumors:                  oklch(0.76 0.12 218);
+
+  --gain:                      oklch(0.76 0.15 163);
+  --alarm:                     oklch(0.72 0.17 17);
+  --warn:                      oklch(0.8 0.14 75);
+  --due:                       oklch(0.78 0.14 45);
+  --favor:                     oklch(0.72 0.14 295);
+  --intel:                     oklch(0.72 0.12 265);
+  --sea:                       oklch(0.76 0.1 183);
+  --gold-ink:                  oklch(0.84 0.12 85);
+  --house-jade:                oklch(0.78 0.11 160);
+  --house-vermilion:           oklch(0.74 0.15 28);
+  --house-lotus:               oklch(0.82 0.13 85);
+  --age-lender:                oklch(0.78 0.11 130);
+  --age-trader:                oklch(0.82 0.12 62);
+  --age-broker:                oklch(0.78 0.13 300);
+}

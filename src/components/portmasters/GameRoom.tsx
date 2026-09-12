@@ -795,7 +795,7 @@ export function GameRoom({
     return (
       <div className="pm-canvas min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground flex items-center gap-2">
-          <Ship className="h-5 w-5 animate-pulse text-teal-500" /> Weighing
+          <Ship className="h-5 w-5 animate-pulse text-brand" /> Weighing
           anchor…
         </div>
       </div>
@@ -808,8 +808,8 @@ export function GameRoom({
       <header className="sticky top-0 z-30 px-3 sm:px-5 py-3">
         <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="pm-grad-primary h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-5 w-5 text-white" />
+            <div className="pm-grad-brand h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+              <Anchor className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -834,7 +834,7 @@ export function GameRoom({
             <div className="relative hidden sm:block">
               <ActionSuggester game={state.game} />
             </div>
-            <Pill tone="jade" className="hidden sm:inline-flex">
+            <Pill tone="gain" className="hidden sm:inline-flex">
               <OnlineDot online={connected && authed} size={8} />{" "}
               {connected && authed ? "Live" : "Linking…"}
             </Pill>
@@ -843,7 +843,7 @@ export function GameRoom({
               size="sm"
               className={cn(
                 "rounded-lg",
-                colorblindSafe && "text-teal-600 dark:text-teal-400",
+                colorblindSafe && "text-gain",
               )}
               onClick={() => setColorblindSafe(!colorblindSafe)}
               title={
@@ -859,7 +859,7 @@ export function GameRoom({
               size="sm"
               className={cn(
                 "rounded-lg",
-                soundOn && "text-amber-600 dark:text-amber-300",
+                soundOn && "text-gain",
               )}
               onClick={toggleSound}
               title={
@@ -900,7 +900,7 @@ export function GameRoom({
               <Bell className="h-4 w-4" />
               {notifications.unreadCount > 0 && (
                 <Pill
-                  tone="rose"
+                  tone="alarm"
                   className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]"
                 >
                   {notifications.unreadCount > 9
@@ -1170,7 +1170,7 @@ export function GameRoom({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           onClick={() => setTipsOpen(true)}
-          className="fixed bottom-5 right-5 pm-grad-amber text-white rounded-full h-12 w-12 flex items-center justify-center shadow-lg z-40"
+          className="fixed bottom-5 right-5 pm-grad-advisor rounded-full h-12 w-12 flex items-center justify-center shadow-lg z-40"
           title="Strategy tips"
         >
           <LifeBuoy className="h-5 w-5" />

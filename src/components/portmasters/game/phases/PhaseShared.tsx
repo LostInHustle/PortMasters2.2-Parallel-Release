@@ -55,7 +55,7 @@ export function ReadyFooter({
   if (phaseSync.waiting) {
     return (
       <div className="mt-5 space-y-3 text-center">
-        <div className="text-sm font-medium text-amber-700 dark:text-amber-300">
+        <div className="text-sm font-medium text-warn">
           Waiting for the rest of the crew
         </div>
         <ReadyBar

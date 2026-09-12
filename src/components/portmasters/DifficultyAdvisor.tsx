@@ -127,19 +127,19 @@ export function DifficultyAdvisor({
         className={cn(
           "mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed",
           advice.match
-            ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+            ? "border-gain/20 bg-gain/[0.04]"
             : advice.caution
-              ? "border-amber-500/20 bg-amber-500/[0.04]"
-              : "border-indigo-500/15 bg-indigo-500/[0.03]",
+              ? "border-warn/20 bg-warn/[0.04]"
+              : "border-intel/15 bg-intel/[0.03]",
         )}
       >
         <div className="flex items-start gap-1.5">
           {advice.match ? (
-            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-gain" />
           ) : advice.caution ? (
-            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
           ) : (
-            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" />
+            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-intel" />
           )}
           <div className="flex-1 min-w-0">
             {!advice.match && (

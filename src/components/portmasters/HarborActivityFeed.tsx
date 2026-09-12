@@ -34,11 +34,11 @@ const EVENT_ICONS: Record<ActivityEvent["type"], string> = {
 };
 
 const EVENT_TONES: Record<ActivityEvent["type"], string> = {
-  voyage_start: "text-teal-600 dark:text-teal-400",
-  voyage_end: "text-indigo-600 dark:text-indigo-400",
-  crown: "text-amber-600 dark:text-amber-400",
-  bankruptcy: "text-rose-600 dark:text-rose-400",
-  join: "text-emerald-600 dark:text-emerald-400",
+  voyage_start: "text-sea",
+  voyage_end: "text-intel",
+  crown: "text-gold-ink",
+  bankruptcy: "text-alarm",
+  join: "text-gain",
   leave: "text-muted-foreground",
 };
 
@@ -79,8 +79,8 @@ export function HarborActivityFeed({ className }: { className?: string }) {
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-teal-500" />
-                <span className="pm-text-sea text-xs font-bold">
+                <Activity className="h-3.5 w-3.5 text-activity" />
+                <span className="text-activity text-xs font-bold">
                   Harbor Activity
                 </span>
               </div>

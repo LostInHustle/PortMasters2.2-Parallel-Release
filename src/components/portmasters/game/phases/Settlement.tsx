@@ -43,7 +43,7 @@ function PirateAttack({
   return (
     <div className="max-w-xl mx-auto text-center py-4">
       <div className="text-5xl mb-2">🏴‍☠️</div>
-      <div className="text-2xl font-bold mb-1 font-display pm-text-sea pm-brush">
+      <div className="text-2xl font-bold mb-1 font-display text-settlement pm-brush">
         Pirate Waters Ahead
       </div>
       <div className="mb-5 space-y-2">
@@ -54,7 +54,7 @@ function PirateAttack({
           and save the Gold.
         </p>
         {leak > 0 && (
-          <p className="text-sm text-amber-600 dark:text-amber-400">
+          <p className="text-sm text-warn">
             🕵️ A corrupt broker leaked your position this round, so the odds
             above are already raised.
           </p>
@@ -64,7 +64,7 @@ function PirateAttack({
       {/* Risk Assessment */}
       <div className="max-w-md mx-auto mb-4 rounded-xl border border-border/40 bg-background/40 p-3.5">
         <div className="text-[10px] font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          <AlertTriangle className="h-3.5 w-3.5 text-warn" />
           Risk Assessment
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -74,10 +74,10 @@ function PirateAttack({
               className={cn(
                 "font-display text-lg font-bold tabular-nums",
                 raidPct >= 30
-                  ? "text-rose-600 dark:text-rose-400"
+                  ? "text-alarm"
                   : raidPct >= 20
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-emerald-600 dark:text-emerald-400",
+                    ? "text-warn"
+                    : "text-gain",
               )}
             >
               {raidPct}%
@@ -86,14 +86,14 @@ function PirateAttack({
           </div>
           {/* Gold at risk */}
           <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-            <div className="font-display text-lg font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+            <div className="font-display text-lg font-bold text-alarm tabular-nums">
               {game.money}
             </div>
             <div className="text-[9px] text-muted-foreground">Gold at Risk</div>
           </div>
           {/* Expected loss */}
           <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-            <div className="font-display text-lg font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+            <div className="font-display text-lg font-bold text-warn tabular-nums">
               {Math.round((game.money * raidPct) / 100)}
             </div>
             <div className="text-[9px] text-muted-foreground">
@@ -107,7 +107,7 @@ function PirateAttack({
           const recommend = escortFee < expectedLoss && game.money > 0;
           if (!recommend) return null;
           return (
-            <div className="mt-2 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[10px] text-emerald-700 dark:text-emerald-300">
+            <div className="mt-2 rounded-lg bg-gain/10 px-2.5 py-1.5 text-[10px] text-gain">
               Escort costs {escortFee}g but expected loss is{" "}
               {Math.round(expectedLoss)}g. Hiring the escort saves Gold on
               average.
@@ -119,7 +119,7 @@ function PirateAttack({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
         <Button
           size="lg"
-          className="pm-grad-primary text-white rounded-xl h-14"
+          className="pm-grad-settlement rounded-xl h-14"
           onClick={() => act((g, l) => hireEscort(g, l))}
         >
           <ShieldCheck className="h-5 w-5 mr-2" /> Hire Escort ({escortFee}{" "}
@@ -186,26 +186,26 @@ function SettlementBills({
   );
   const [backAmounts, setBackAmounts] = useState<Record<string, number>>({});
 
-  // The two Settle Bills variants. Calm (canAfford) is the jade "pay the
+  // The two Settle Bills variants. Calm (canAfford) is the "pay the
   // bills" button a captain reaches for at the end of a normal round. The
   // force pay variant is the destructive call: the captain cannot cover
   // wages plus maintenance, has either no open aid request or no captain
   // willing to back them in time, and is about to go bankrupt the moment
-  // they confirm. A vermilion gradient plus an AlertTriangle icon and a
-  // "Force Payment and Risk Bankruptcy" label front loads the consequence
-  // so it cannot be mistaken for the calm variant, which used to share the
-  // same amber stripe and could be tapped by reflex.
+  // they confirm. The two wear different colours so the consequence shows
+  // before the label is read: the settlement fill for the calm one, and
+  // the alarm red for the one that cannot be taken back and must not be
+  // tapped by reflex.
   const settleLabel = canAfford
     ? `💸 Settle Bills: ${totalDue} Gold`
     : `Force Payment and Risk Bankruptcy (${game.money}/${totalDue} Gold)`;
   const settleClassName = canAfford
-    ? "pm-grad-jade text-white h-12 px-8"
-    : "pm-grad-vermilion text-white h-12 px-8 font-semibold";
+    ? "pm-grad-settlement h-12 px-8"
+    : "bg-alarm text-background h-12 px-8 font-semibold";
   const settleIcon = canAfford ? null : <AlertTriangle className="h-4 w-4" />;
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-2xl font-bold text-center mb-4 font-display pm-text-sea pm-brush">
+      <div className="text-2xl font-bold text-center mb-4 font-display text-settlement pm-brush">
         🔧 Phase 3: Round Settlement
       </div>
 
@@ -214,7 +214,7 @@ function SettlementBills({
           className={cn(
             "rounded-xl border p-3 my-3.5 text-center text-sm",
             game.escortHired
-              ? "border-teal-500/20 bg-teal-500/[0.04]"
+              ? "border-gain/20 bg-gain/[0.04]"
               : "border-black/10 dark:border-white/10 bg-background/40",
           )}
         >
@@ -224,8 +224,8 @@ function SettlementBills({
         </div>
       )}
 
-      <div className="rounded-xl bg-amber-500/[0.06] border border-amber-500/20 p-3.5 my-3.5">
-        <h3 className="font-semibold text-orange-700 dark:text-orange-300 mb-2">
+      <div className="rounded-xl bg-due/[0.06] border border-due/20 p-3.5 my-3.5">
+        <h3 className="font-semibold text-due mb-2">
           ⏳ Bills Due This Round
         </h3>
         <div className="flex justify-between text-[13px] py-0.5">
@@ -244,19 +244,19 @@ function SettlementBills({
             {game.maintenancePenalty}g
           </div>
         )}
-        <div className="flex justify-between text-sm py-0.5 border-t border-orange-500/20 pt-1.5 mt-1.5 font-bold">
+        <div className="flex justify-between text-sm py-0.5 border-t border-due/20 pt-1.5 mt-1.5 font-bold">
           <span>💸 Total Due</span>
-          <span className="text-orange-600 dark:text-orange-400">
+          <span className="text-due">
             {totalDue} Gold
           </span>
         </div>
       </div>
 
-      <div className="rounded-xl bg-teal-500/[0.04] border border-teal-500/15 p-3.5 my-3.5">
+      <div className="rounded-xl bg-settlement/[0.03] border border-settlement/15 p-3.5 my-3.5">
         <h3 className="font-semibold mb-2">💹 Balance Summary</h3>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Current Funds</span>
-          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+          <span className="text-gain font-bold">
             {game.money} Gold
           </span>
         </div>
@@ -265,9 +265,7 @@ function SettlementBills({
           <span
             className={cn(
               "font-bold",
-              balanceAfter >= 0
-                ? "text-teal-700 dark:text-teal-300"
-                : "text-rose-600 dark:text-rose-400",
+              balanceAfter >= 0 ? "text-gain" : "text-alarm",
             )}
           >
             {balanceAfter} Gold
@@ -275,15 +273,15 @@ function SettlementBills({
         </div>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Round Revenue</span>
-          <span className="text-emerald-600 dark:text-emerald-400">
+          <span className="text-gain">
             +{game.roundRevenue} Gold
           </span>
         </div>
       </div>
 
       {!canAfford && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.04] p-3.5 my-3.5">
-          <h3 className="font-semibold text-rose-700 dark:text-rose-300 mb-2 flex items-center gap-1.5">
+        <div className="rounded-xl border border-alarm/30 bg-alarm/[0.04] p-3.5 my-3.5">
+          <h3 className="font-semibold text-alarm mb-2 flex items-center gap-1.5">
             <HandCoins className="h-4 w-4" /> Short on Gold? Ask the Harbor for
             Help
           </h3>
@@ -317,7 +315,7 @@ function SettlementBills({
               </span>
               <Button
                 size="sm"
-                className="pm-grad-primary text-white rounded-lg"
+                className="pm-grad-settlement rounded-lg"
                 onClick={() => aid.post(requestAmount)}
               >
                 🆘 Request Help
@@ -347,7 +345,7 @@ function SettlementBills({
                 >
                   <span>
                     <b>{r.fromName}</b> needs{" "}
-                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                    <span className="text-alarm font-semibold">
                       {r.amount} Gold
                     </span>
                   </span>
@@ -355,7 +353,7 @@ function SettlementBills({
                     size="sm"
                     className={cn(
                       "h-7 px-2.5 text-[10px] rounded shrink-0",
-                      canHelp && "pm-grad-jade text-white",
+                      canHelp && "pm-grad-settlement",
                     )}
                     variant={canHelp ? "default" : "secondary"}
                     disabled={!canHelp}
@@ -389,7 +387,7 @@ function SettlementBills({
                 >
                   <span>
                     <b>{l.lenderName}</b> lent <b>{l.borrowerName}</b>{" "}
-                    <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                    <span className="text-alarm font-semibold">
                       {l.amount} Gold
                     </span>
                   </span>
@@ -411,7 +409,7 @@ function SettlementBills({
                       size="sm"
                       className={cn(
                         "h-7 px-2.5 text-[10px] rounded shrink-0",
-                        canBack && "pm-grad-jade text-white",
+                        canBack && "pm-grad-settlement",
                       )}
                       variant={canBack ? "default" : "secondary"}
                       disabled={!canBack}
@@ -433,7 +431,7 @@ function SettlementBills({
       )}
 
       {backing.error && (
-        <div className="rounded-lg bg-rose-500/10 border border-rose-500/25 px-3.5 py-2 mb-3.5 text-xs text-rose-600 dark:text-rose-300 flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/10 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {backing.error}</span>
           <button onClick={backing.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -442,7 +440,7 @@ function SettlementBills({
       )}
 
       {aid.error && (
-        <div className="rounded-lg bg-rose-500/10 border border-rose-500/25 px-3.5 py-2 mb-3.5 text-xs text-rose-600 dark:text-rose-300 flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/10 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {aid.error}</span>
           <button onClick={aid.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -453,12 +451,12 @@ function SettlementBills({
       {/* The destructive Force Pay variant needs an inline icon, which the
           shared ReadyFooter does not accept (its idleLabel is a plain
           string). Rather than widen the shared footer's API for one screen,
-          we inline the same waiting/idle structure here so the vermilion
-          AlertTriangle button stays visually distinct from the jade Settle
-          Bills button on the calm path. */}
+          we inline the same waiting/idle structure here so the AlertTriangle
+          button stays visually distinct from the Settle Bills button on the
+          calm path. */}
       {phaseSync.waiting ? (
         <div className="mt-5 space-y-3 text-center">
-          <div className="text-sm font-medium text-amber-700 dark:text-amber-300">
+          <div className="text-sm font-medium text-warn">
             Waiting for the rest of the crew
           </div>
           <ReadyBar

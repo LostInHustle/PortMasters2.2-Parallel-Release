@@ -18,7 +18,7 @@ import { toast } from "sonner";
  *
  * The socket is passed in (shared singleton). Initial history is fetched
  * via REST; live messages arrive over the socket. Mine uses the celadon
- * pm-grad-primary, others get a soft black tint so the conversation reads
+ * pm-grad-chat, others get a soft black tint so the conversation reads
  * as two sides of a brush without leaning on the rose tint the old build
  * used for the same distinction.
  */
@@ -252,7 +252,7 @@ export function ChatPanel({
                     className={cn(
                       "px-3 py-1.5 rounded-2xl text-[13px] leading-snug break-words",
                       mine
-                        ? "pm-grad-primary text-white rounded-br-md"
+                        ? "pm-grad-chat rounded-br-md"
                         : "bg-black/5 dark:bg-white/10 rounded-bl-md",
                     )}
                   >
@@ -310,7 +310,7 @@ export function ChatPanel({
             size="icon"
             onClick={send}
             disabled={!input.trim() || sending}
-            className="h-9 w-9 rounded-full pm-grad-primary text-white shrink-0"
+            className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

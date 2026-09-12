@@ -33,15 +33,15 @@ export function Shipyard({
     game.equippedModules.length >= game.shipLevel && game.shipLevel > 0;
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-2xl font-bold text-center mb-4 font-display pm-text-sea pm-brush">
+      <div className="text-2xl font-bold text-center mb-4 font-display text-shipyard pm-brush">
         🚢 Shipyard &amp; Module Rigging
       </div>
-      <div className="rounded-xl border-2 border-teal-500/20 bg-teal-500/[0.04] p-5 my-4">
-        <div className="text-base font-bold text-teal-700 dark:text-teal-300">
+      <div className="rounded-xl border-2 border-shipyard/20 bg-shipyard/[0.04] p-5 my-4">
+        <div className="text-base font-bold text-shipyard">
           🚢 Ship Level: {game.shipLevel} | ⚓ Discount: {game.shipLevel * 5}{" "}
           Gold
         </div>
-        <div className="text-sm text-teal-600 dark:text-teal-400 mt-1.5">
+        <div className="text-sm text-shipyard mt-1.5">
           🔌 Module Slots: {game.equippedModules.length} / {game.shipLevel}
         </div>
         {game.equippedModules.length ? (
@@ -68,7 +68,7 @@ export function Shipyard({
       )}
       {phaseSync.waiting ? (
         <div className="text-center space-y-3">
-          <div className="text-sm font-medium text-amber-700 dark:text-amber-300">
+          <div className="text-sm font-medium text-warn">
             ⏳ Waiting for the rest of the crew…
           </div>
           <ReadyBar
@@ -92,7 +92,7 @@ export function Shipyard({
               variant={affordable ? "default" : "secondary"}
               className={cn(
                 "rounded-xl",
-                affordable && "pm-grad-primary text-white",
+                affordable && "pm-grad-shipyard",
               )}
               disabled={!affordable}
               onClick={() => act((g, l) => upgradeShip(g, l))}
@@ -106,7 +106,7 @@ export function Shipyard({
             variant={canDraft ? "default" : "secondary"}
             className={cn(
               "rounded-xl",
-              canDraft && "pm-grad-gold text-amber-950",
+              canDraft && "pm-grad-module-draft",
             )}
             disabled={!canDraft}
             onClick={() =>
@@ -121,7 +121,7 @@ export function Shipyard({
           </Button>
           <Button
             size="lg"
-            className="pm-grad-jade text-white rounded-xl"
+            className="pm-grad-voyage rounded-xl"
             onClick={() => phaseSync.markReady((g, l) => skipUpgrade(g, l))}
           >
             ⏭️ Continue Voyage
@@ -140,7 +140,7 @@ export function ModuleDraft({
   const canSwap = !game.moduleSwapUsed && picks.length > 0;
   return (
     <div className="max-w-4xl mx-auto text-center">
-      <div className="text-2xl font-bold mb-1 font-display pm-text-gold pm-brush">
+      <div className="text-2xl font-bold mb-1 font-display text-module-draft pm-brush">
         🔧 Module Drafting
       </div>
       <p className="text-sm text-muted-foreground mb-4">
@@ -187,7 +187,7 @@ export function ModuleDraft({
                   },
                 }}
                 whileHover={{ y: -6 }}
-                className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-teal-500/20"
+                className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-module-draft/20"
               >
                 <div className="text-5xl mb-2">{m.icon}</div>
                 <div className="font-semibold mb-2">
@@ -197,7 +197,7 @@ export function ModuleDraft({
                   {m.desc}
                 </div>
                 <Button
-                  className="pm-grad-gold text-amber-950 font-semibold rounded-xl w-full"
+                  className="pm-grad-module-draft font-semibold rounded-xl w-full"
                   onClick={() => act((g, l) => handleModuleSelect(g, i, l))}
                 >
                   {game.equippedModules.length < game.shipLevel
@@ -229,7 +229,7 @@ export function ModuleSwap({
   const newMod = game._newModule;
   return (
     <div className="max-w-2xl mx-auto text-center">
-      <div className="text-2xl font-bold mb-1 font-display pm-text-gold pm-brush">
+      <div className="text-2xl font-bold mb-1 font-display text-module-swap pm-brush">
         🔄 Select Module to Replace
       </div>
       {newMod && (
@@ -237,7 +237,7 @@ export function ModuleSwap({
           New: {newMod.icon} {newMod.name}: {newMod.desc}
         </p>
       )}
-      <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 my-4 space-y-2 text-left">
+      <div className="rounded-xl border border-module-swap/15 bg-module-swap/[0.03] p-4 my-4 space-y-2 text-left">
         {game.equippedModules.map((m, i) => (
           <div
             key={m.id}
@@ -299,55 +299,55 @@ export function ModuleSwap({
 const MODULE_SYNERGY_RULES: {
   ids: string[];
   label: string;
-  tone: "emerald" | "indigo" | "amber";
+  tone: "gain" | "intel" | "warn";
 }[] = [
   {
     ids: ["smugglers_hold", "tax_evasion"],
     label:
       "Double Tax Strategy: Smuggler's Hold reduces purchase costs and Tax Evasion halves both VAT and income tax. A powerful financial combo.",
-    tone: "emerald",
+    tone: "gain",
   },
   {
     ids: ["bulk_hauler", "silk_monopoly"],
     label:
       "Freight Mastery: Bulk Hauler reduces transport per item and Silk Road Monopoly can zero it out for Silk routes. Shipping costs almost nothing.",
-    tone: "emerald",
+    tone: "gain",
   },
   {
     ids: ["artisans_workshop", "salvage_crane"],
     label:
       "Production Engine: Artisan's Workshop boosts worker output and Salvage Crane refunds on every order. More goods, more Gold back.",
-    tone: "emerald",
+    tone: "gain",
   },
   {
     ids: ["brokers_network", "ocean_relay"],
     label:
       "Intel Network: Broker's Network halves rumor cost and Ocean Relay adds a free rumor per purchase. Maximum market intelligence.",
-    tone: "indigo",
+    tone: "intel",
   },
   {
     ids: ["overdrive_engine", "bulk_hauler"],
     label:
       "Penalty Stack: Overdrive Engine adds maintenance and Bulk Hauler raises upgrade cost. Consider swapping one if funds are tight.",
-    tone: "amber",
+    tone: "warn",
   },
   {
     ids: ["kiln_cellar", "bureau_token"],
     label:
       "Charter Combo: Kiln Cellar discounts Porcelain Clay and Copper Ore, and Bureau Token adds 10% to their order rewards. Buy cheap, sell high.",
-    tone: "emerald",
+    tone: "gain",
   },
   {
     ids: ["foreign_quarter_pass", "fleet_of_treasures"],
     label:
       "Exotic Trade: Foreign Quarter Pass discounts Spices and Pearls, and Fleet of Treasures discounts their transport. Tier 2 goods at tier 0 prices.",
-    tone: "emerald",
+    tone: "gain",
   },
   {
     ids: ["persian_dome_compass", "deep_sea_escort_pact"],
     label:
       "Safe Passage: Persian Dome Compass reduces pirate risk by 30% and the Deep Sea Escort Pact boon halves it further. Stack for near immunity.",
-    tone: "indigo",
+    tone: "intel",
   },
 ];
 
@@ -419,16 +419,16 @@ function ModuleSynergyAnalyzer({
   const activeBonuses = MODULE_BONUS_RULES.filter((rule) => ids.has(rule.id));
 
   const toneClasses: Record<string, string> = {
-    emerald:
-      "border-emerald-500/20 bg-emerald-500/[0.04] text-emerald-700 dark:text-emerald-300",
-    indigo:
-      "border-indigo-500/20 bg-indigo-500/[0.04] text-indigo-700 dark:text-indigo-300",
-    amber:
-      "border-amber-500/20 bg-amber-500/[0.04] text-amber-700 dark:text-amber-300",
+    gain:
+      "border-gain/20 bg-gain/[0.04] text-gain",
+    intel:
+      "border-intel/20 bg-intel/[0.04] text-intel",
+    warn:
+      "border-warn/20 bg-warn/[0.04] text-warn",
   };
 
   return (
-    <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.02] p-3.5 mb-4">
+    <div className="rounded-xl border border-modules/15 bg-modules/[0.02] p-3.5 mb-4">
       <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-2">
         Module Synergy Analysis
       </div>
@@ -442,7 +442,7 @@ function ModuleSynergyAnalyzer({
             {activeBonuses.map((b, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300"
+                className="inline-flex items-center gap-1 rounded-full bg-gain/10 px-2 py-0.5 text-[10px] text-gain"
               >
                 {b.icon} {b.text}
               </span>
@@ -461,7 +461,7 @@ function ModuleSynergyAnalyzer({
               key={i}
               className={cn(
                 "rounded-lg border px-2.5 py-1.5 text-[10px] leading-relaxed",
-                toneClasses[s.tone] ?? toneClasses.emerald,
+                toneClasses[s.tone] ?? toneClasses.gain,
               )}
             >
               {s.label}

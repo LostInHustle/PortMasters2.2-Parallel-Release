@@ -97,7 +97,7 @@ export function GameControlPanel({
       <Button
         className={cn(
           "rounded-lg",
-          !startDisabled && "pm-grad-primary text-white",
+          !startDisabled && "pm-grad-brand",
         )}
         variant={startDisabled ? "secondary" : "default"}
         disabled={startDisabled}
@@ -108,7 +108,7 @@ export function GameControlPanel({
       <Button
         className={cn(
           "rounded-lg",
-          !nextDisabled && !waiting && "pm-grad-jade text-white",
+          !nextDisabled && !waiting && "pm-grad-voyage",
         )}
         variant={nextDisabled ? "secondary" : waiting ? "secondary" : "default"}
         disabled={nextDisabled}
@@ -126,7 +126,7 @@ export function GameControlPanel({
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Cloud className="h-3.5 w-3.5 text-emerald-500" />
+            <Cloud className="h-3.5 w-3.5 text-gain" />
           )}
           {saving ? "Saving…" : "Saved"}
           <span className="text-muted-foreground/60">· {phaseLabel(game)}</span>

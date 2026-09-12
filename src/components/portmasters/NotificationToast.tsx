@@ -49,9 +49,9 @@ export function NotificationToast({
           : undefined
       }
       className={cn(
-        "relative w-full text-left pm-glass-strong rounded-xl px-4 py-3 pr-8 shadow-xl border border-teal-500/25",
+        "relative w-full text-left pm-glass-strong rounded-xl px-4 py-3 pr-8 shadow-xl border border-notifications/25",
         clickable &&
-          "cursor-pointer hover:border-teal-500/50 transition-colors",
+          "cursor-pointer hover:border-notifications/50 transition-colors",
       )}
     >
       <button

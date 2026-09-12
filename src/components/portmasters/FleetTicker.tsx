@@ -55,7 +55,7 @@ export function FleetTicker({
               className={cn(
                 "flex items-center gap-1.5 rounded-xl px-2 py-1 border shrink-0",
                 isMe
-                  ? "border-teal-500/30 bg-teal-500/[0.06]"
+                  ? "border-members/30 bg-members/[0.06]"
                   : "border-black/5 dark:border-white/10 bg-background/40",
               )}
             >
@@ -64,7 +64,7 @@ export function FleetTicker({
                 {isMe ? "You" : m.displayName}
               </span>
               {isBankrupt ? (
-                <span className="flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-400">
+                <span className="flex items-center gap-1 text-[10px] text-alarm">
                   <SkullIcon className="h-3 w-3" /> Bankrupt
                 </span>
               ) : (
@@ -72,10 +72,10 @@ export function FleetTicker({
                   <span className="text-[10px] text-muted-foreground truncate max-w-[96px]">
                     {st ? st.phaseLabel : "loading…"}
                   </span>
-                  <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                  <span className="flex items-center gap-0.5 text-[10px] text-gold-ink">
                     <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
                   </span>
-                  <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                  <span className="flex items-center gap-0.5 text-[10px] text-favor">
                     <Trophy className="h-3 w-3" /> {st ? st.reputation : "…"}
                   </span>
                 </>

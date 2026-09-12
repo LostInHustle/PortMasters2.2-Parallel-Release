@@ -54,12 +54,12 @@ export function Orders({
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <Coins className="h-5 w-5 text-orders" />
         Trade Manifest
       </h2>
       <OrderFulfillmentPlanner game={game} />
       {game.revealedIntel.length > 0 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+        <div className="rounded-lg border border-intel/25 bg-intel/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
           <strong>🗣️ Broker&apos;s Whispers active this round:</strong>{" "}
           {game.revealedIntel.map((i, idx) => (
             <span key={idx}>
@@ -75,7 +75,7 @@ export function Orders({
         </div>
       )}
       {!favorUnlocked && (
-        <div className="rounded-lg border border-dashed border-violet-500/25 bg-violet-500/[0.04] px-3.5 py-2.5 mb-3.5 text-xs text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-favor/25 bg-favor/[0.04] px-3.5 py-2.5 mb-3.5 text-xs text-muted-foreground">
           🔒 <strong className="text-foreground">Broker&apos;s Favor</strong>{" "}
           unlocks at Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL}: call one in once
           per voyage to summon a guaranteed buyer for a good already in your
@@ -84,7 +84,7 @@ export function Orders({
         </div>
       )}
       {favorUnlocked && !game.brokersFavorUsed && (
-        <div className="rounded-lg border border-violet-500/30 bg-violet-500/[0.07] px-3.5 py-2.5 mb-3.5 text-xs">
+        <div className="rounded-lg border border-favor/30 bg-favor/[0.07] px-3.5 py-2.5 mb-3.5 text-xs">
           {!favorOpen ? (
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span>
@@ -95,7 +95,7 @@ export function Orders({
               </span>
               <Button
                 size="sm"
-                className="pm-grad-violet text-white font-semibold rounded-lg shrink-0"
+                className="pm-grad-orders font-semibold rounded-lg shrink-0"
                 onClick={() => setFavorOpen(true)}
               >
                 Call in a Favor
@@ -163,7 +163,7 @@ export function Orders({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="pm-grad-violet text-white font-semibold rounded-lg"
+                  className="pm-grad-orders font-semibold rounded-lg"
                   onClick={() => {
                     act((g, l) => callBrokersFavor(g, favorItem, favorQty, l));
                     closeFavor();
@@ -227,15 +227,15 @@ export function Orders({
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
                 // Harbour gold, filled rather than outlined. The intel
-                // "Guaranteed" highlight already owns amber as a thin outline,
+                // "Guaranteed" highlight wears the same hue as a thin outline,
                 // so filled versus outlined keeps the two distinguishable
                 // without relying on hue alone.
                 o.isMandate
-                  ? "border-amber-400/70 bg-gradient-to-br from-amber-400/[0.18] to-amber-500/[0.06] shadow-[0_0_0_1px_rgba(245,190,80,0.25)]"
+                  ? "border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25"
                   : o.isBrokerFavor
-                    ? "border-violet-500/45 bg-violet-500/[0.05]"
+                    ? "border-favor/45 bg-favor/[0.05]"
                     : matchesIntel
-                      ? "border-amber-500/40 bg-amber-500/[0.04]"
+                      ? "border-intel/40 bg-intel/[0.04]"
                       : "border-black/10 dark:border-white/10 bg-background/50",
               )}
             >
@@ -251,16 +251,16 @@ export function Orders({
                   </span>
                 </span>
                 {o.isMandate ? (
-                  <span className="pm-text-gold shrink-0 font-bold">
+                  <span className="text-orders shrink-0 font-bold">
                     📜 Imperial Mandate
                   </span>
                 ) : o.isBrokerFavor ? (
-                  <span className="text-violet-600 dark:text-violet-400 shrink-0">
+                  <span className="text-favor shrink-0">
                     🤝 Broker&apos;s Favor
                   </span>
                 ) : (
                   matchesIntel && (
-                    <span className="text-amber-600 dark:text-amber-400 shrink-0">
+                    <span className="text-intel shrink-0">
                       🔮 Guaranteed
                     </span>
                   )
@@ -284,14 +284,14 @@ export function Orders({
                       <span className="mx-1.5">×{r.required}</span>
                       <span
                         className="ml-auto text-[10px]"
-                        style={{ color: has ? "#10b981" : "#f43f5e" }}
+                        style={{ color: has ? "var(--gain)" : "var(--alarm)" }}
                       >
                         Inv: {game.inventory[r.type] || 0}
                       </span>
                     </div>
                   );
                 })}
-                <div className="text-[11px] text-rose-600 dark:text-rose-400 mt-1.5">
+                <div className="text-[11px] text-due mt-1.5">
                   <Term
                     content={
                       <PriceBreakdownTooltip breakdown={transportBreakdown} />
@@ -303,9 +303,7 @@ export function Orders({
                 <div
                   className={cn(
                     "text-[13px] font-semibold mt-0.5",
-                    netProfit >= 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-rose-600 dark:text-rose-400",
+                    netProfit >= 0 ? "text-gain" : "text-alarm",
                   )}
                 >
                   💰 Reward: {o.reward} Gold 📊 Net: {netProfit} Gold
@@ -317,12 +315,12 @@ export function Orders({
                     return (
                       <span
                         className={cn(
-                          "ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white",
+                          "ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold text-background",
                           margin >= 70
-                            ? "bg-emerald-500"
+                            ? "bg-gain"
                             : margin >= 50
-                              ? "bg-amber-500"
-                              : "bg-rose-400",
+                              ? "bg-warn"
+                              : "bg-alarm",
                         )}
                         title={`Profit margin: ${margin}% of reward is net profit after transport, VAT, and commission`}
                       >
@@ -332,7 +330,7 @@ export function Orders({
                   })()}
                 </div>
                 {o.isBrokerFavor && (
-                  <div className="text-[10px] text-violet-700 dark:text-violet-300">
+                  <div className="text-[10px] text-favor">
                     🤝 Broker&apos;s cut ({brokerCommissionPct}%):{" "}
                     {brokerCommission} Gold
                   </div>
@@ -354,7 +352,7 @@ export function Orders({
                   className={cn(
                     "w-full rounded-lg",
                     canComplete && !completed
-                      ? "pm-grad-primary text-white"
+                      ? "pm-grad-orders"
                       : "",
                   )}
                   variant={canComplete && !completed ? "default" : "secondary"}
@@ -443,26 +441,26 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
   if (plans.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] px-3.5 py-2.5 mb-3.5">
+    <div className="rounded-xl border border-planner/15 bg-planner/[0.03] px-3.5 py-2.5 mb-3.5">
       <div className="flex items-center gap-3 flex-wrap text-[11px]">
-        <span className="flex items-center gap-1 font-semibold text-teal-600 dark:text-teal-400">
+        <span className="flex items-center gap-1 font-semibold text-planner">
           <ClipboardList className="h-3.5 w-3.5" />
           Fulfillment Plan
         </span>
         {readyCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gain/15 px-2 py-0.5 font-medium text-gain">
             <CheckCircle2 className="h-3 w-3" />
             {readyCount} ready
           </span>
         )}
         {closeCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 font-medium text-warn">
             <Clock className="h-3 w-3" />
             {closeCount} close
           </span>
         )}
         {totalPotential > 0 && (
-          <span className="ml-auto inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+          <span className="ml-auto inline-flex items-center gap-1 font-bold text-gain">
             <Coins className="h-3 w-3" />+{totalPotential} Gold
             <span className="font-normal text-muted-foreground">
               if all ready filled
@@ -473,12 +471,12 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
       {/* Missing goods for close orders */}
       {plans.filter((p) => !p.ready && p.missingGoods.length <= 2).length >
         0 && (
-        <div className="mt-2 border-t border-teal-500/10 pt-2 space-y-1">
+        <div className="mt-2 border-t border-planner/10 pt-2 space-y-1">
           {plans
             .filter((p) => !p.ready && p.missingGoods.length <= 2)
             .map((p) => (
               <div key={p.id} className="flex items-center gap-2 text-[10px]">
-                <Clock className="h-3 w-3 text-amber-500" />
+                <Clock className="h-3 w-3 text-warn" />
                 <span className="text-muted-foreground">
                   Order #{p.id} needs:
                 </span>
@@ -486,7 +484,7 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
                   <span key={i} className="inline-flex items-center gap-0.5">
                     <ItemIcon item={m.item} className="h-3 w-3" />
                     <span className="font-medium">{m.item}</span>
-                    <span className="text-rose-500">
+                    <span className="text-alarm">
                       {m.have}/{m.need}
                     </span>
                     {i < p.missingGoods.length - 1 && (
@@ -494,7 +492,7 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
                     )}
                   </span>
                 ))}
-                <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="ml-auto text-gain font-medium">
                   +{p.netProfit}g
                 </span>
               </div>

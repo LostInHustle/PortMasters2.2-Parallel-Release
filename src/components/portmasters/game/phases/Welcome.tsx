@@ -59,10 +59,10 @@ function InfoCard({
   rows: string[];
 }) {
   const tones: Record<string, string> = {
-    emerald: "bg-emerald-500/[0.06] border-emerald-500/20",
-    amber: "bg-amber-500/[0.06] border-amber-500/20",
-    sea: "bg-teal-500/[0.06] border-teal-500/20",
-    rose: "bg-rose-500/[0.06] border-rose-500/20",
+    emerald: "bg-gain/[0.06] border-gain/20",
+    amber: "bg-warn/[0.06] border-warn/20",
+    sea: "bg-sea/[0.06] border-sea/20",
+    rose: "bg-alarm/[0.06] border-alarm/20",
   };
   return (
     <div className={cn("rounded-lg border p-3", tones[tone])}>
@@ -118,7 +118,7 @@ export function Welcome({
   return (
     <div className="max-w-3xl mx-auto text-center py-4">
       <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1">
-        <span className="pm-text-sea">⚓ {APP_NAME} 🚢</span>
+        <span className="text-welcome">⚓ {APP_NAME} 🚢</span>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         🌊 {cfg.rounds} Voyages await, become the Sea Master!
@@ -131,7 +131,7 @@ export function Welcome({
               size="lg"
               className={cn(
                 "rounded-xl h-12 px-8 text-base",
-                canStart && "pm-grad-primary text-white",
+                canStart && "pm-grad-welcome",
               )}
               variant={canStart ? "default" : "secondary"}
               disabled={!canStart}
@@ -145,7 +145,7 @@ export function Welcome({
                 : `Need at least one captain in the harbor`}
             </Button>
             {phaseSync.startError && (
-              <p className="text-xs text-rose-600 dark:text-rose-400">
+              <p className="text-xs text-alarm">
                 {phaseSync.startError}
               </p>
             )}
@@ -204,12 +204,12 @@ export function Welcome({
         />
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
-        <div className="rounded-lg bg-teal-500/[0.06] border border-teal-500/15 px-3.5 py-2.5 text-xs">
+        <div className="rounded-lg bg-sea/[0.06] border border-sea/15 px-3.5 py-2.5 text-xs">
           <strong>🔄 4 Phases per Voyage:</strong> 1️⃣ Buy at Ports (+ 🤝 Barter)
           → 2️⃣ Fill Trade Orders → 3️⃣ Pirates, Wages &amp; Maintenance → 4️⃣
           Upgrade Ship
         </div>
-        <div className="rounded-lg bg-amber-500/[0.06] border border-amber-500/15 px-3.5 py-2.5 text-xs">
+        <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
           <strong>💡 New Player Tip:</strong> Rely on raw material orders early.
           Hire artisans only when you can sustain at least 2 rounds of wages.
           Always keep funds &gt; Maintenance + All Wages.

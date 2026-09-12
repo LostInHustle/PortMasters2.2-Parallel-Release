@@ -72,15 +72,16 @@ export function LeaderboardModal({
           <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* The rose of the leaderboard chip in the top bar, so the
-                  dialog wears the colour of the control that opened it.
-                  The gold further down is left alone on purpose: there it
-                  is a medal, and a first place should look like one. */}
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 text-white">
+              {/* The colour of the leaderboard chip in the top bar, so
+                  the dialog wears the colour of the control that opened
+                  it. The medals further down are left alone on purpose:
+                  there they are ranks, and a first place should look like
+                  one. */}
+              <div className="pm-grad-leaderboard flex h-10 w-10 items-center justify-center rounded-xl">
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-display text-lg font-bold pm-text-sea">
+                <h2 className="font-display text-lg font-bold text-leaderboard">
                   Harbor Leaderboard
                 </h2>
                 <p className="text-[11px] text-muted-foreground">
@@ -107,7 +108,7 @@ export function LeaderboardModal({
               className={cn(
                 "pm-pressable flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
                 sortKey === opt.key
-                  ? "pm-grad-gold text-amber-950"
+                  ? "pm-grad-medal-gold"
                   : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5",
               )}
             >
@@ -144,9 +145,9 @@ export function LeaderboardModal({
                     className={cn(
                       "flex items-center gap-2.5 rounded-xl px-3 py-2",
                       isMe
-                        ? "bg-teal-500/[0.08] ring-1 ring-teal-500/20"
+                        ? "bg-leaderboard/[0.08] ring-1 ring-leaderboard/20"
                         : i < 3
-                          ? "bg-amber-500/[0.04]"
+                          ? "bg-gold/[0.04]"
                           : "hover:bg-black/5 dark:hover:bg-white/5",
                     )}
                   >
@@ -155,11 +156,11 @@ export function LeaderboardModal({
                       className={cn(
                         "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                         i === 0
-                          ? "pm-grad-gold text-amber-950"
+                          ? "pm-grad-medal-gold"
                           : i === 1
-                            ? "bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-200"
+                            ? "pm-grad-medal-silver"
                             : i === 2
-                              ? "bg-orange-400/80 text-orange-950"
+                              ? "pm-grad-medal-bronze"
                               : "bg-black/8 text-muted-foreground dark:bg-white/10",
                       )}
                     >
@@ -177,7 +178,7 @@ export function LeaderboardModal({
                           {entry.displayName}
                         </span>
                         {isMe && (
-                          <Pill tone="sea" className="shrink-0">
+                          <Pill tone="default" className="shrink-0">
                             you
                           </Pill>
                         )}
@@ -197,7 +198,7 @@ export function LeaderboardModal({
                     </div>
                     {/* Sort metric value */}
                     <div className="shrink-0 text-right">
-                      <div className="font-display text-sm font-bold tabular-nums pm-text-sea">
+                      <div className="font-display text-sm font-bold tabular-nums text-leaderboard">
                         {sortKey === "renownXP" && `${entry.renownXP} XP`}
                         {sortKey === "seaMasterCrowns" &&
                           `${entry.seaMasterCrowns}`}

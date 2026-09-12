@@ -63,8 +63,8 @@ export function GuideModal({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="pm-grad-indigo inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <BookOpen className="h-4 w-4 text-white" />
+            <span className="pm-grad-guide inline-flex h-7 w-7 items-center justify-center rounded-lg">
+              <BookOpen className="h-4 w-4" />
             </span>
             Navigation Guide
           </DialogTitle>
@@ -99,7 +99,7 @@ export function TipsModal({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <Lightbulb className="h-5 w-5 text-advisor" />
             Trade Strategy Advice
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -142,7 +142,7 @@ export function NotificationHistoryModal({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+            <Bell className="h-5 w-5 text-notifications" />
             Notifications
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -165,7 +165,7 @@ export function NotificationHistoryModal({
                   }}
                   className={cn(
                     "w-full text-left rounded-xl px-3.5 py-2.5 border border-black/5 dark:border-white/10 bg-background/50 transition-colors",
-                    n.onActivate && "hover:border-teal-500/40 cursor-pointer",
+                    n.onActivate && "hover:border-notifications/40 cursor-pointer",
                   )}
                 >
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
@@ -222,8 +222,8 @@ export function RumorBoardModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="pm-grad-gold inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <Sparkles className="h-4 w-4 text-amber-950" />
+            <span className="pm-grad-rumors inline-flex h-7 w-7 items-center justify-center rounded-lg">
+              <Sparkles className="h-4 w-4" />
             </span>
             Broker's Rumor Board
           </DialogTitle>
@@ -233,16 +233,16 @@ export function RumorBoardModal({
         </DialogHeader>
         <div className="flex justify-center my-2">
           <Button
-            className="pm-grad-gold text-amber-950 rounded-xl"
+            className="pm-grad-rumors rounded-xl"
             onClick={onBuy}
           >
             🔮 Buy Rumor ({intelCost}💰)
           </Button>
         </div>
-        <div className="rounded-lg border border-teal-500/15 bg-teal-500/[0.04] p-3.5 min-h-[110px]">
+        <div className="rounded-lg border border-rumors/15 bg-rumors/[0.04] p-3.5 min-h-[110px]">
           {game.revealedIntel.length ? (
             <>
-              <div className="font-semibold text-teal-700 dark:text-teal-300 text-sm mb-1.5">
+              <div className="font-semibold text-rumors text-sm mb-1.5">
                 📜 Revealed Intel:
               </div>
               {game.revealedIntel.map((i, idx) => (
@@ -292,8 +292,11 @@ export function RestartConfirmModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="pm-grad-vermilion inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <RotateCcw className="h-4 w-4 text-white" />
+            {/* The one dialog in the session that takes rather than gives:
+                restarting sends every captain back to round one and cannot
+                be undone, so it wears the colour that means a loss. */}
+            <span className="bg-alarm/15 inline-flex h-7 w-7 items-center justify-center rounded-lg">
+              <RotateCcw className="h-4 w-4 text-alarm" />
             </span>
             Restart the voyage?
           </DialogTitle>
@@ -308,7 +311,7 @@ export function RestartConfirmModal({
             Cancel
           </Button>
           <Button
-            className="pm-grad-vermilion text-white"
+            className="bg-alarm text-background"
             onClick={() => {
               onOpenChange(false);
               onConfirm();
@@ -381,7 +384,7 @@ export function TutorialModal({
           {isLast ? (
             <Button
               size="sm"
-              className="justify-self-end pm-grad-primary text-white"
+              className="justify-self-end pm-grad-guide"
               onClick={close}
             >
               🚢 Set Sail!
@@ -389,7 +392,7 @@ export function TutorialModal({
           ) : (
             <Button
               size="sm"
-              className="justify-self-end pm-grad-primary text-white"
+              className="justify-self-end pm-grad-guide"
               onClick={() => setStep((s) => s + 1)}
             >
               Continue <ChevronRight className="h-3.5 w-3.5" />
@@ -535,12 +538,12 @@ export function PlayerDetailModal({
               </div>
             </div>
             {detail?.phase === "bankruptcy" && (
-              <Pill tone="rose" className="shrink-0">
+              <Pill tone="alarm" className="shrink-0">
                 💥 Bankrupt, spectating
               </Pill>
             )}
             {detail?.phase === "endgame" && (
-              <Pill tone="amber" className="shrink-0">
+              <Pill tone="gain" className="shrink-0">
                 🏁 Voyage complete
               </Pill>
             )}
@@ -568,19 +571,19 @@ export function PlayerDetailModal({
                 icon={<Coins className="h-3.5 w-3.5" />}
                 value={detail.money}
                 label="Gold"
-                toneClassName="text-emerald-600 dark:text-emerald-400"
+                toneClassName="text-gold-ink"
               />
               <ProfileStatTile
                 icon={<Trophy className="h-3.5 w-3.5" />}
                 value={detail.score}
                 label="Reputation"
-                toneClassName="text-amber-600 dark:text-amber-400"
+                toneClassName="text-favor"
               />
               <ProfileStatTile
                 icon={<Ship className="h-3.5 w-3.5" />}
                 value={detail.shipLevel}
                 label="Ship Level"
-                toneClassName="text-teal-600 dark:text-teal-400"
+                toneClassName="text-sea"
               />
             </div>
 
@@ -598,7 +601,7 @@ export function PlayerDetailModal({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
               <div className="space-y-3.5">
-                <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-3.5">
+                <div className="rounded-xl border border-profile/15 bg-profile/[0.03] p-3.5">
                   <h4 className="text-xs font-semibold text-muted-foreground mb-2">
                     📦 Cargo
                   </h4>
@@ -780,33 +783,33 @@ function ComparisonBar({
       label: "Gold",
       mine: myDetail.money,
       theirs: theirDetail.money,
-      myTone: "text-emerald-600 dark:text-emerald-400",
-      theirTone: "text-emerald-600 dark:text-emerald-400",
-      barClass: "bg-emerald-500",
+      myTone: "text-gold-ink",
+      theirTone: "text-gold-ink",
+      barClass: "bg-gold",
     },
     {
       label: "Reputation",
       mine: myDetail.score,
       theirs: theirDetail.score,
-      myTone: "text-amber-600 dark:text-amber-400",
-      theirTone: "text-amber-600 dark:text-amber-400",
-      barClass: "bg-amber-500",
+      myTone: "text-favor",
+      theirTone: "text-favor",
+      barClass: "bg-favor",
     },
     {
       label: "Ship Lv",
       mine: myDetail.shipLevel,
       theirs: theirDetail.shipLevel,
-      myTone: "text-teal-600 dark:text-teal-400",
-      theirTone: "text-teal-600 dark:text-teal-400",
-      barClass: "bg-teal-500",
+      myTone: "text-sea",
+      theirTone: "text-sea",
+      barClass: "bg-sea",
     },
     {
       label: "Cargo",
       mine: myCargoValue,
       theirs: theirCargoValue,
-      myTone: "text-indigo-600 dark:text-indigo-400",
-      theirTone: "text-indigo-600 dark:text-indigo-400",
-      barClass: "bg-indigo-500",
+      myTone: "text-intel",
+      theirTone: "text-intel",
+      barClass: "bg-intel",
     },
   ];
 

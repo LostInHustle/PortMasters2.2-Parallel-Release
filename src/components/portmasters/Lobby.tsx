@@ -32,6 +32,7 @@ import { CaptainProfileModal } from "./CaptainProfileModal";
 import { AgeBanner } from "./AgeBanner";
 import { HowToPlayModal } from "./HowToPlayModal";
 import { HouseLeaderboard } from "./HouseLeaderboard";
+import { HOUSE_CREST, HOUSE_FALLBACK } from "./house-colours";
 import { SettingsModal } from "./SettingsModal";
 import { DifficultyAdvisor } from "./DifficultyAdvisor";
 import { HarborActivityFeed } from "./HarborActivityFeed";
@@ -604,7 +605,7 @@ export function Lobby({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-background/85 to-transparent" />
         <div className="pm-glass pm-panel-bar relative mx-auto max-w-7xl">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="pm-seal pm-grad-primary">
+            <div className="pm-seal pm-grad-brand">
               <Anchor className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">
@@ -613,7 +614,7 @@ export function Lobby({
                   itself an older title, so the header read as three
                   different names stacked on top of one another. */}
               <h1 className="font-display text-sm font-bold leading-tight tracking-tight">
-                <span className="pm-text-sea pm-truncate">{APP_NAME}</span>
+                <span className="text-brand pm-truncate">{APP_NAME}</span>
               </h1>
               <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
                 Maritime trade on the ancient Silk Road
@@ -666,7 +667,7 @@ export function Lobby({
                 className={cn(
                   "pm-tool pm-pressable relative",
                   checkIn.canClaimToday
-                    ? "pm-grad-vermilion text-white"
+                    ? "pm-grad-checkin text-white"
                     : "bg-black/[0.05] text-foreground/75 dark:bg-white/10",
                 )}
                 title="Daily Check In"
@@ -675,7 +676,7 @@ export function Lobby({
                 <Gift className="h-3.5 w-3.5" />
                 <span className="hidden xl:inline">Check In</span>
                 {checkIn.canClaimToday && (
-                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-alarm ring-2 ring-background" />
                 )}
               </button>
             </div>
@@ -713,21 +714,21 @@ export function Lobby({
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 dark:border-white/[0.08]">
             <Gauge
               icon={Users}
-              tone="text-teal-600 dark:text-teal-400"
+              tone="text-captains"
               label="Captains"
               value={totalOnline}
             />
             <GaugeRule />
             <Gauge
               icon={Ship}
-              tone="text-amber-600 dark:text-amber-400"
+              tone="text-harbors"
               label="Open Harbors"
               value={rooms.length}
             />
             <GaugeRule />
             <Gauge
               icon={Anchor}
-              tone="text-emerald-600 dark:text-emerald-400"
+              tone="text-sailing"
               label="Sailing"
               value={rooms.filter((r) => r.started).length}
             />
@@ -738,7 +739,7 @@ export function Lobby({
               title="Captain Legacy"
               aria-label="View captain legacy"
             >
-              <Star className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              <Star className="h-3.5 w-3.5 text-renown" />
               <span className="text-[11px] text-muted-foreground">
                 Your Renown
               </span>
@@ -770,7 +771,7 @@ export function Lobby({
               the create form as a distinct alternative to charting a harbor
               yourself. */}
           <div className="pm-glass pm-tile flex items-center gap-3">
-            <div className="pm-seal pm-grad-vermilion">
+            <div className="pm-seal pm-grad-quickstart">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">
@@ -788,7 +789,7 @@ export function Lobby({
             <Button
               onClick={handleQuickStart}
               disabled={quickStarting || busy}
-              className="pm-grad-vermilion h-10 shrink-0 rounded-xl font-semibold text-white"
+              className="pm-grad-quickstart h-10 shrink-0 rounded-xl font-semibold text-white"
             >
               {quickStarting ? (
                 <>
@@ -808,7 +809,7 @@ export function Lobby({
           <div className="pm-glass pm-panel">
             <CardHead
               icon={Plus}
-              tone="text-teal-600 dark:text-teal-400"
+              tone="text-charter"
               title="Chart a new harbor"
               hint="Name a room, pick its waters, and open it to the fleet."
             />
@@ -839,7 +840,7 @@ export function Lobby({
               <Button
                 onClick={createRoom}
                 disabled={busy || !newName.trim()}
-                className="pm-grad-primary pm-field text-white"
+                className="pm-grad-charter pm-field text-white"
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -868,7 +869,7 @@ export function Lobby({
                       {active && (
                         <motion.span
                           layoutId="difficultyThumb"
-                          className="pm-grad-primary absolute inset-0 rounded-full"
+                          className="pm-grad-charter absolute inset-0 rounded-full"
                           transition={{
                             type: "spring",
                             stiffness: 380,
@@ -938,7 +939,7 @@ export function Lobby({
           <div className="pm-glass pm-panel">
             <CardHead
               icon={Ship}
-              tone="text-teal-600 dark:text-teal-400"
+              tone="text-harbors"
               title="Open Harbors"
               hint="Create a room or join one to set sail together."
             >
@@ -950,7 +951,7 @@ export function Lobby({
                   is a tool now, the same as everything else on a shelf. */}
               <button
                 onClick={() => setHowToPlayOpen(true)}
-                className="pm-tool pm-pressable pm-grad-violet text-white"
+                className="pm-tool pm-pressable pm-grad-guide text-white"
                 title="How to Play"
                 aria-label="How to Play"
               >
@@ -978,7 +979,7 @@ export function Lobby({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mb-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-600 dark:text-rose-300"
+                  className="mb-3 rounded-xl bg-alarm/10 px-3 py-2 text-xs text-alarm"
                 >
                   {error}
                 </motion.div>
@@ -1005,7 +1006,7 @@ export function Lobby({
                       layout
                       className="pm-row pm-glass"
                     >
-                      <div className="pm-seal pm-grad-primary">
+                      <div className="pm-seal pm-grad-harbors">
                         <Ship className="h-5 w-5 text-white" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1026,8 +1027,15 @@ export function Lobby({
                           {room.host.id === me.id && (
                             <Pill tone="gold">Host</Pill>
                           )}
-                          {!room.isPublic && <Pill tone="amber">Private</Pill>}
-                          {room.started && <Pill tone="sea">⛵ Sailing</Pill>}
+                          {!room.isPublic && <Pill tone="default">Private</Pill>}
+                          {room.started && (
+                            <Pill
+                              tone="none"
+                              className="bg-sailing/15 text-sailing"
+                            >
+                              ⛵ Sailing
+                            </Pill>
+                          )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                           <span>Hosted by {room.host.displayName}</span>
@@ -1048,7 +1056,7 @@ export function Lobby({
                             ? "This voyage has already set sail"
                             : undefined
                         }
-                        className="pm-grad-primary h-10 shrink-0 rounded-xl text-white"
+                        className="pm-grad-harbors h-10 shrink-0 rounded-xl text-white"
                       >
                         {joining === room.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -1074,10 +1082,10 @@ export function Lobby({
           <div className="pm-glass pm-panel">
             <CardHead
               icon={Users}
-              tone="text-teal-600 dark:text-teal-400"
+              tone="text-captains"
               title="Captains Online"
             >
-              <Pill tone="jade">
+              <Pill tone="gain">
                 <OnlineDot online size={8} /> {totalOnline}
               </Pill>
             </CardHead>
@@ -1149,7 +1157,7 @@ export function Lobby({
               the panel's corners without its padding. */}
           <div className="pm-glass pm-panel-flush flex h-[22.5rem] flex-col">
             <div className="flex items-center gap-2 border-b border-black/5 px-4 py-3 dark:border-white/10">
-              <MessageCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <MessageCircle className="h-4 w-4 text-messages" />
               <span className="text-sm font-medium">
                 {dmTarget
                   ? `Direct · ${dmTarget.displayName}`
@@ -1186,7 +1194,7 @@ export function Lobby({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
-              <Star className="h-5 w-5 text-amber-500" />
+              <Star className="h-5 w-5 text-legacy" />
               Captain's Legacy
             </DialogTitle>
             <DialogDescription>
@@ -1208,7 +1216,7 @@ export function Lobby({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
-              <Gift className="h-5 w-5 text-violet-500" />
+              <Gift className="h-5 w-5 text-checkin" />
               Daily Check In
             </DialogTitle>
             <DialogDescription>
@@ -1228,9 +1236,9 @@ export function Lobby({
                   className={cn(
                     "rounded-lg border px-1 py-2 text-center",
                     claimed
-                      ? "border-emerald-500/40 bg-emerald-500/[0.07] opacity-70"
+                      ? "border-gain/40 bg-gain/[0.07] opacity-70"
                       : isCurrent
-                        ? "border-violet-500/50 bg-violet-500/[0.09]"
+                        ? "border-checkin/50 bg-checkin/[0.09]"
                         : "border-black/10 dark:border-white/10 bg-background/40",
                   )}
                 >
@@ -1246,7 +1254,7 @@ export function Lobby({
             })}
           </div>
           <Button
-            className="pm-grad-amber font-semibold rounded-lg w-full"
+            className="pm-grad-checkin font-semibold rounded-lg w-full"
             disabled={!checkIn.canClaimToday || claiming}
             onClick={claimCheckIn}
           >
@@ -1265,7 +1273,7 @@ export function Lobby({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
-              <BookOpen className="h-5 w-5 text-indigo-500" />
+              <BookOpen className="h-5 w-5 text-chronicles" />
               Voyage Chronicles
             </DialogTitle>
             <DialogDescription>
@@ -1318,7 +1326,7 @@ export function Lobby({
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto pm-scroll">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
-              <Landmark className="h-5 w-5 text-amber-500" />
+              <Landmark className="h-5 w-5 text-houses" />
               Great Houses
             </DialogTitle>
             <DialogDescription>
@@ -1344,11 +1352,16 @@ export function Lobby({
                     className={cn(
                       "rounded-xl border p-3 flex items-start gap-3",
                       isMine
-                        ? "border-amber-500/50 bg-amber-500/[0.07]"
+                        ? "border-houses/50 bg-houses/[0.07]"
                         : "border-black/10 dark:border-white/10 bg-background/40",
                     )}
                   >
-                    <div className="pm-grad-gold h-10 w-10 rounded-lg flex items-center justify-center shrink-0 text-lg">
+                    <div
+                      className={cn(
+                        "h-10 w-10 rounded-lg flex items-center justify-center shrink-0 text-lg",
+                        HOUSE_CREST[house.id] ?? HOUSE_FALLBACK,
+                      )}
+                    >
                       <span aria-hidden>{house.icon}</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1356,7 +1369,11 @@ export function Lobby({
                         <span className="text-sm font-semibold font-display">
                           {house.name}
                         </span>
-                        {isMine && <Pill tone="gold">Pledged</Pill>}
+                        {isMine && (
+                          <Pill tone="none" className="bg-houses/15 text-houses">
+                            Pledged
+                          </Pill>
+                        )}
                       </div>
                       <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
                         {house.perk}
@@ -1375,7 +1392,7 @@ export function Lobby({
                       size="sm"
                       disabled={isMine || pledgingHouse !== null}
                       onClick={() => pledge(house.id)}
-                      className="rounded-lg pm-grad-gold font-semibold shrink-0"
+                      className="rounded-lg pm-grad-houses font-semibold shrink-0"
                     >
                       {pledgingHouse === house.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

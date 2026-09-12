@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./palette.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -23,11 +24,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -36,7 +32,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-gold: var(--gold);
   --color-celadon: var(--celadon);
   --color-jade: var(--jade);
   --radius-sm: calc(var(--radius) - 4px);
@@ -83,13 +78,6 @@
   --input: oklch(0.9 0.012 95);
   --ring: oklch(0.62 0.09 165);
 
-  /* Chart palette: celadon, vermilion, gold, indigo, jade */
-  --chart-1: oklch(0.62 0.09 165);
-  --chart-2: oklch(0.65 0.17 32);
-  --chart-3: oklch(0.8 0.13 85);
-  --chart-4: oklch(0.5 0.13 260);
-  --chart-5: oklch(0.58 0.11 150);
-
   /* Sidebar warm parchment */
   --sidebar: oklch(0.97 0.01 90);
   --sidebar-foreground: oklch(0.25 0.02 260);
@@ -100,8 +88,9 @@
   --sidebar-border: oklch(0.88 0.015 95);
   --sidebar-ring: oklch(0.62 0.09 165);
 
-  /* Named East Asian palette tokens */
-  --gold: oklch(0.8 0.13 85);
+  /* Celadon and jade are on their way out. Both have call sites left to
+     sweep, so they stay until the last of them moves to a widget token.
+     Everything else that used to live here now lives in palette.css. */
   --celadon: oklch(0.62 0.09 165);
   --jade: oklch(0.58 0.11 150);
 }
@@ -138,12 +127,6 @@
   --input: oklch(0.3 0.02 255);
   --ring: oklch(0.72 0.1 165);
 
-  --chart-1: oklch(0.72 0.1 165);
-  --chart-2: oklch(0.7 0.18 32);
-  --chart-3: oklch(0.82 0.13 85);
-  --chart-4: oklch(0.62 0.13 260);
-  --chart-5: oklch(0.68 0.11 150);
-
   --sidebar: oklch(0.2 0.025 250);
   --sidebar-foreground: oklch(0.9 0.01 95);
   --sidebar-primary: oklch(0.72 0.1 165);
@@ -153,9 +136,14 @@
   --sidebar-border: oklch(0.3 0.02 255);
   --sidebar-ring: oklch(0.72 0.1 165);
 
-  --gold: oklch(0.82 0.13 85);
   --celadon: oklch(0.72 0.1 165);
   --jade: oklch(0.68 0.11 150);
+}
+
+@property --pm-fill {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: oklch(0.55 0.15 207);
 }
 
 @layer base {
@@ -283,94 +271,121 @@
     }
   }
 
-  /* Gradient text for display headings. */
-  .pm-text-gold {
-    background: linear-gradient(
-      95deg,
-      oklch(0.72 0.13 85),
-      oklch(0.82 0.12 70)
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  /* === Fills === */
+  /*
+
+     Every filled surface reads from one custom property, --pm-fill, which
+     each widget sets below. The gradient itself is written once, so the
+     shape of a seal is a single decision rather than forty.
+
+     These rules name the raw --w- tokens on purpose. A name declared in
+     @theme inline is an input to class generation only; Tailwind inlines
+     its value into the utility it generates and never emits a runtime
+     property called --color-something. So var(--color-houses-fill) here
+     would resolve to nothing, and the whole background-image declaration
+     would be dropped. Always reach for --w- in hand written CSS.
+
+     The rule lives inside @layer utilities, after the Tailwind import,
+     which is where the gradient rules it replaces live too. That place
+     is load bearing. At equal specificity a later rule wins, which is
+     how a fill sets its own ink instead of losing to the text colour
+     written at the call site.
+  */
+
+  .pm-grad-charter { --pm-fill: var(--w-charter-fill); }
+  .pm-grad-harbors { --pm-fill: var(--w-harbors-fill); }
+  .pm-grad-captains { --pm-fill: var(--w-captains-fill); }
+  .pm-grad-messages { --pm-fill: var(--w-messages-fill); }
+  .pm-grad-houses { --pm-fill: var(--w-houses-fill); }
+  .pm-grad-leaderboard { --pm-fill: var(--w-leaderboard-fill); }
+  .pm-grad-chronicles { --pm-fill: var(--w-chronicles-fill); }
+  .pm-grad-activity { --pm-fill: var(--w-activity-fill); }
+  .pm-grad-settings { --pm-fill: var(--w-settings-fill); }
+  .pm-grad-guide { --pm-fill: var(--w-guide-fill); }
+  .pm-grad-profile { --pm-fill: var(--w-profile-fill); }
+  .pm-grad-legacy { --pm-fill: var(--w-legacy-fill); }
+  .pm-grad-notifications { --pm-fill: var(--w-notifications-fill); }
+  .pm-grad-renown { --pm-fill: var(--w-renown-fill); }
+  .pm-grad-checkin { --pm-fill: var(--w-checkin-fill); }
+  .pm-grad-sailing { --pm-fill: var(--w-sailing-fill); }
+  .pm-grad-quickstart { --pm-fill: var(--w-quickstart-fill); }
+  .pm-grad-voyage { --pm-fill: var(--w-voyage-fill); }
+  .pm-grad-ship { --pm-fill: var(--w-ship-fill); }
+  .pm-grad-members { --pm-fill: var(--w-members-fill); }
+  .pm-grad-chat { --pm-fill: var(--w-chat-fill); }
+  .pm-grad-ledger { --pm-fill: var(--w-ledger-fill); }
+  .pm-grad-welcome { --pm-fill: var(--w-welcome-fill); }
+  .pm-grad-purchase { --pm-fill: var(--w-purchase-fill); }
+  .pm-grad-orders { --pm-fill: var(--w-orders-fill); }
+  .pm-grad-barter { --pm-fill: var(--w-barter-fill); }
+  .pm-grad-workers { --pm-fill: var(--w-workers-fill); }
+  .pm-grad-shipyard { --pm-fill: var(--w-shipyard-fill); }
+  .pm-grad-settlement { --pm-fill: var(--w-settlement-fill); }
+  .pm-grad-endgame { --pm-fill: var(--w-endgame-fill); }
+  .pm-grad-bankruptcy { --pm-fill: var(--w-bankruptcy-fill); }
+  .pm-grad-module-draft { --pm-fill: var(--w-module-draft-fill); }
+  .pm-grad-module-swap { --pm-fill: var(--w-module-swap-fill); }
+  .pm-grad-advisor { --pm-fill: var(--w-advisor-fill); }
+  .pm-grad-depth { --pm-fill: var(--w-depth-fill); }
+  .pm-grad-pulse { --pm-fill: var(--w-pulse-fill); }
+  .pm-grad-planner { --pm-fill: var(--w-planner-fill); }
+  .pm-grad-boon { --pm-fill: var(--w-boon-fill); }
+  .pm-grad-modules { --pm-fill: var(--w-modules-fill); }
+  .pm-grad-brand { --pm-fill: var(--w-brand-fill); }
+  .pm-grad-shortcuts { --pm-fill: var(--w-shortcuts-fill); }
+  .pm-grad-rumors { --pm-fill: var(--w-rumors-fill); }
+
+  /* Gold is bright enough that white ink would not read on it, so
+     these four name their own. Everything else gets white, which is
+     the fallback on the shared rule. */
+  .pm-grad-gold {
+    --pm-fill: var(--w-gold-fill);
+    --pm-ink: oklch(0.28 0.05 70);
   }
-  .pm-text-sea {
-    background: linear-gradient(
-      95deg,
-      oklch(0.55 0.1 165),
-      oklch(0.5 0.12 200)
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .pm-grad-medal-gold {
+    --pm-fill: var(--w-medal-gold-fill);
+    --pm-ink: oklch(0.28 0.05 70);
   }
-  .dark .pm-text-sea {
-    background: linear-gradient(
-      95deg,
-      oklch(0.75 0.11 165),
-      oklch(0.7 0.12 200)
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .pm-grad-medal-bronze {
+    --pm-fill: var(--w-medal-bronze-fill);
+    --pm-ink: oklch(0.26 0.05 50);
+  }
+  /* The three Houses. A crown of lotus gold, a gate of vermilion, a
+     pavilion of jade: the colour is the name, so the ink is dark on the
+     two bright ones and white on the deep one. */
+  .pm-grad-house-lotus {
+    --pm-fill: var(--w-house-lotus-fill);
+    --pm-ink: oklch(0.28 0.05 70);
+  }
+  .pm-grad-house-vermilion {
+    --pm-fill: var(--w-house-vermilion-fill);
+    --pm-ink: oklch(0.28 0.04 30);
+  }
+  .pm-grad-house-jade { --pm-fill: var(--w-house-jade-fill); }
+
+  /* The three Ages. The trader's gold is bright enough to want dark ink;
+     the other two are deep enough that white reads on them. */
+  .pm-grad-age-lender { --pm-fill: var(--w-age-lender-fill); }
+  .pm-grad-age-broker { --pm-fill: var(--w-age-broker-fill); }
+  .pm-grad-age-trader {
+    --pm-fill: var(--w-age-trader-fill);
+    --pm-ink: oklch(0.28 0.05 70);
   }
 
-  /* Wax seal gradients for buttons and tiles. */
-  .pm-grad-primary {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.62 0.1 165),
-      oklch(0.58 0.11 175)
-    );
-    color: oklch(0.99 0.01 95);
+  /* Silver is the one cool surface in the set, so it takes a cool ink
+     rather than the warm one the other three share. */
+  .pm-grad-medal-silver {
+    --pm-fill: var(--w-medal-silver-fill);
+    --pm-ink: oklch(0.26 0.02 265);
   }
-  .pm-grad-gold {
+
+  [class*="pm-grad-"] {
     background-image: linear-gradient(
       135deg,
-      oklch(0.78 0.13 85),
-      oklch(0.72 0.14 65)
+      var(--pm-fill),
+      color-mix(in oklch, var(--pm-fill) 76%, black)
     );
-    color: oklch(0.2 0.03 60);
-  }
-  .pm-grad-jade {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.6 0.11 150),
-      oklch(0.55 0.12 160)
-    );
-    color: oklch(0.99 0.01 95);
-  }
-  .pm-grad-vermilion {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.62 0.18 32),
-      oklch(0.58 0.2 22)
-    );
-    color: oklch(0.99 0.01 95);
-  }
-  .pm-grad-indigo {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.45 0.13 260),
-      oklch(0.4 0.14 270)
-    );
-    color: oklch(0.99 0.01 95);
-  }
-  .pm-grad-amber {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.8 0.13 85),
-      oklch(0.74 0.15 70)
-    );
-    color: oklch(0.2 0.03 60);
-  }
-  .pm-grad-violet {
-    background-image: linear-gradient(
-      135deg,
-      oklch(0.58 0.13 295),
-      oklch(0.52 0.14 310)
-    );
-    color: oklch(0.99 0.01 95);
+    color: var(--pm-ink, white);
   }
 
   /* The lift shared by every interactive surface in the game.
