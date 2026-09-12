@@ -34,9 +34,11 @@ export function HouseLeaderboard({
     return b.bestScore - a.bestScore;
   });
 
+  // Only the crown bar is drawn to scale, so only the crown maximum is
+  // computed. Two more were worked out beside it for bars that were never
+  // added, which meant every render walked the whole standings list three
+  // times to answer two questions nobody asks.
   const maxCrowns = Math.max(1, ...ranked.map((s) => s.crowns));
-  const maxVoyages = Math.max(1, ...ranked.map((s) => s.voyages));
-  const maxBest = Math.max(1, ...ranked.map((s) => s.bestScore));
 
   return (
     <div className="space-y-3">
@@ -124,7 +126,7 @@ export function HouseLeaderboard({
                       {s.name}
                     </span>
                     {isMine && (
-                      <span className="rounded-full bg-houses/20 px-1.5 py-0.5 text-[9px] font-semibold text-houses">
+                      <span className="rounded-full bg-houses/5 px-1.5 py-0.5 text-[9px] font-semibold text-houses">
                         Yours
                       </span>
                     )}
@@ -144,7 +146,7 @@ export function HouseLeaderboard({
               </div>
               {/* Crown progress bar */}
               <div className="mt-2">
-                <div className="h-1.5 overflow-hidden rounded-full bg-black/8 dark:bg-white/8">
+                <div className="h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
                   <motion.div
                     className={cn(
                       "h-full rounded-full bg-gradient-to-r",

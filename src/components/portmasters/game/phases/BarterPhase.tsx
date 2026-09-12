@@ -181,7 +181,7 @@ export function BarterPhase({
       </div>
 
       {barter.error && (
-        <div className="rounded-lg bg-alarm/10 border border-alarm/25 px-3.5 py-2 mb-4 text-xs text-alarm flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-4 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {barter.error}</span>
           <button onClick={barter.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -231,7 +231,7 @@ export function BarterPhase({
                       {o.requestAmount} {o.requestItem}
                     </span>
                     {isDirect && (
-                      <span className="rounded-full bg-sea/15 px-1.5 py-0.5 text-[9px] font-medium text-sea">
+                      <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
                         🔒 {mine ? `Just for ${o.targetName}` : "Just for you"}
                       </span>
                     )}

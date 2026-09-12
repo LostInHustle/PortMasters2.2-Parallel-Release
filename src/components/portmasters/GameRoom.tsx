@@ -795,8 +795,7 @@ export function GameRoom({
     return (
       <div className="pm-canvas min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground flex items-center gap-2">
-          <Ship className="h-5 w-5 animate-pulse text-brand" /> Weighing
-          anchor…
+          <Ship className="h-5 w-5 animate-pulse text-brand" /> Weighing anchor…
         </div>
       </div>
     );
@@ -841,10 +840,7 @@ export function GameRoom({
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "rounded-lg",
-                colorblindSafe && "text-gain",
-              )}
+              className={cn("rounded-lg", colorblindSafe && "text-gain")}
               onClick={() => setColorblindSafe(!colorblindSafe)}
               title={
                 colorblindSafe
@@ -857,10 +853,7 @@ export function GameRoom({
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "rounded-lg",
-                soundOn && "text-gain",
-              )}
+              className={cn("rounded-lg", soundOn && "text-gain")}
               onClick={toggleSound}
               title={
                 soundOn
@@ -993,7 +986,7 @@ export function GameRoom({
                 with no wrap spills off both edges at once, which both
                 hides the first hint and gives the whole page a sideways
                 scrollbar. */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground/70">
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
               <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
                 Ctrl+S
               </kbd>{" "}
@@ -1261,7 +1254,7 @@ function DmTab({
                     @{u.username}
                   </div>
                 </div>
-                <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </button>
             ))
           )}

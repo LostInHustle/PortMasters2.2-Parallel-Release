@@ -165,7 +165,8 @@ export function NotificationHistoryModal({
                   }}
                   className={cn(
                     "w-full text-left rounded-xl px-3.5 py-2.5 border border-black/5 dark:border-white/10 bg-background/50 transition-colors",
-                    n.onActivate && "hover:border-notifications/40 cursor-pointer",
+                    n.onActivate &&
+                      "hover:border-notifications/40 cursor-pointer",
                   )}
                 >
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
@@ -181,7 +182,7 @@ export function NotificationHistoryModal({
                     {n.lines.map((line, i) => (
                       <div
                         key={i}
-                        className="text-[12.5px] text-foreground/80 leading-snug break-words"
+                        className="text-[12.5px] text-foreground leading-snug break-words"
                       >
                         {line}
                       </div>
@@ -232,10 +233,7 @@ export function RumorBoardModal({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center my-2">
-          <Button
-            className="pm-grad-rumors rounded-xl"
-            onClick={onBuy}
-          >
+          <Button className="pm-grad-rumors rounded-xl" onClick={onBuy}>
             🔮 Buy Rumor ({intelCost}💰)
           </Button>
         </div>
@@ -295,7 +293,7 @@ export function RestartConfirmModal({
             {/* The one dialog in the session that takes rather than gives:
                 restarting sends every captain back to round one and cannot
                 be undone, so it wears the colour that means a loss. */}
-            <span className="bg-alarm/15 inline-flex h-7 w-7 items-center justify-center rounded-lg">
+            <span className="bg-alarm/5 inline-flex h-7 w-7 items-center justify-center rounded-lg">
               <RotateCcw className="h-4 w-4 text-alarm" />
             </span>
             Restart the voyage?
@@ -365,7 +363,7 @@ export function TutorialModal({
         </DialogHeader>
         <Progress value={pct} className="h-1.5 mb-4" />
         <div
-          className="text-[13.5px] leading-relaxed text-foreground/90 min-h-[160px] [&_p]:mb-2 [&_div]:mb-1"
+          className="text-[13.5px] leading-relaxed text-foreground min-h-[160px] [&_p]:mb-2 [&_div]:mb-1"
           dangerouslySetInnerHTML={{ __html: s.content }}
         />
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mt-3 pt-3 border-t">
@@ -402,7 +400,7 @@ export function TutorialModal({
         <div className="text-center mt-2">
           <button
             onClick={close}
-            className="text-[11px] text-muted-foreground/70 hover:text-muted-foreground underline underline-offset-2"
+            className="text-[11px] text-muted-foreground hover:text-muted-foreground underline underline-offset-2"
           >
             Skip tutorial
           </button>
@@ -591,7 +589,6 @@ export function PlayerDetailModal({
             {myDetail && !isMe && myPlayer && (
               <ComparisonBar
                 myDetail={myDetail}
-                myPlayer={myPlayer}
                 theirDetail={detail}
                 theirPlayer={player}
               />
@@ -713,7 +710,7 @@ export function PlayerDetailModal({
                   </h4>
                   <ScrollArea className="h-40 pr-2">
                     {detail.logs.length === 0 ? (
-                      <p className="text-xs text-muted-foreground/70 italic">
+                      <p className="text-xs text-muted-foreground italic">
                         Nothing logged yet.
                       </p>
                     ) : (
@@ -753,7 +750,6 @@ export function PlayerDetailModal({
  */
 function ComparisonBar({
   myDetail,
-  myPlayer,
   theirDetail,
   theirPlayer,
 }: {
@@ -763,7 +759,6 @@ function ComparisonBar({
     shipLevel: number;
     inventory: Record<string, number>;
   };
-  myPlayer: PublicUser;
   theirDetail: PlayerDetailData | null | undefined;
   theirPlayer: PublicUser | null;
 }) {

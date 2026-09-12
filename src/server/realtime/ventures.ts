@@ -97,7 +97,6 @@ export async function hasRoomClaimedVenture(
 // gets a personal payout figure.
 export async function settleVenture(
   io: Server,
-  roomId: string,
   venture: { id: string; roomId: string; contributions: string },
   outcome: VentureOutcome,
 ): Promise<void> {
@@ -139,7 +138,7 @@ export async function destroyOtherOpenVentures(
       id: { not: exceptVentureId },
     },
   });
-  for (const v of others) await settleVenture(io, roomId, v, "destroyed");
+  for (const v of others) await settleVenture(io, v, "destroyed");
 }
 
 // Checked whenever a room's round advances and once more,
@@ -160,7 +159,7 @@ export async function resolveExpiredVentures(
   let anyResolved = false;
   for (const v of open) {
     if (forceAll || currentRound > v.deadlineRound) {
-      await settleVenture(io, roomId, v, "failed");
+      await settleVenture(io, v, "failed");
       anyResolved = true;
     }
   }

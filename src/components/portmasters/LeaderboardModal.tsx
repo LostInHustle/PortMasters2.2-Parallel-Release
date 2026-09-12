@@ -161,7 +161,7 @@ export function LeaderboardModal({
                             ? "pm-grad-medal-silver"
                             : i === 2
                               ? "pm-grad-medal-bronze"
-                              : "bg-black/8 text-muted-foreground dark:bg-white/10",
+                              : "bg-black/5 text-muted-foreground dark:bg-white/10",
                       )}
                     >
                       {i + 1}

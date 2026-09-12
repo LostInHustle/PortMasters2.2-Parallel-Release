@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
+import { serializeRoom } from "@/lib/rooms";
 
 export async function POST(
   _req: NextRequest,
@@ -60,20 +61,6 @@ export async function POST(
   });
 
   return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      createdAt: room.createdAt.toISOString(),
-      started: room.started,
-      difficulty: room.difficulty,
-      host: room.host,
-      memberCount: members.length,
-      members: members.map((m) => ({
-        ...m.user,
-        joinedAt: m.joinedAt.toISOString(),
-      })),
-    },
+    room: serializeRoom(room, members),
   });
 }

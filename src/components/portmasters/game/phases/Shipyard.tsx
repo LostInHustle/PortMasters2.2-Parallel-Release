@@ -64,7 +64,7 @@ export function Shipyard({
       </div>
       {/* Module Synergy Analyzer */}
       {game.equippedModules.length >= 2 && (
-        <ModuleSynergyAnalyzer modules={game.equippedModules} game={game} />
+        <ModuleSynergyAnalyzer modules={game.equippedModules} />
       )}
       {phaseSync.waiting ? (
         <div className="text-center space-y-3">
@@ -90,10 +90,7 @@ export function Shipyard({
             <Button
               size="lg"
               variant={affordable ? "default" : "secondary"}
-              className={cn(
-                "rounded-xl",
-                affordable && "pm-grad-shipyard",
-              )}
+              className={cn("rounded-xl", affordable && "pm-grad-shipyard")}
               disabled={!affordable}
               onClick={() => act((g, l) => upgradeShip(g, l))}
             >
@@ -104,10 +101,7 @@ export function Shipyard({
           <Button
             size="lg"
             variant={canDraft ? "default" : "secondary"}
-            className={cn(
-              "rounded-xl",
-              canDraft && "pm-grad-module-draft",
-            )}
+            className={cn("rounded-xl", canDraft && "pm-grad-module-draft")}
             disabled={!canDraft}
             onClick={() =>
               act((g) => {
@@ -403,10 +397,8 @@ const MODULE_BONUS_RULES: { id: string; icon: string; text: string }[] = [
 
 function ModuleSynergyAnalyzer({
   modules,
-  game,
 }: {
   modules: GameState["equippedModules"];
-  game: GameState;
 }) {
   const ids = new Set(modules.map((m) => m.id));
 
@@ -419,30 +411,27 @@ function ModuleSynergyAnalyzer({
   const activeBonuses = MODULE_BONUS_RULES.filter((rule) => ids.has(rule.id));
 
   const toneClasses: Record<string, string> = {
-    gain:
-      "border-gain/20 bg-gain/[0.04] text-gain",
-    intel:
-      "border-intel/20 bg-intel/[0.04] text-intel",
-    warn:
-      "border-warn/20 bg-warn/[0.04] text-warn",
+    gain: "border-gain/20 bg-gain/[0.04] text-gain",
+    intel: "border-intel/20 bg-intel/[0.04] text-intel",
+    warn: "border-warn/20 bg-warn/[0.04] text-warn",
   };
 
   return (
     <div className="rounded-xl border border-modules/15 bg-modules/[0.02] p-3.5 mb-4">
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-2">
+      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-2">
         Module Synergy Analysis
       </div>
       {/* Active bonuses */}
       {activeBonuses.length > 0 && (
         <div className="mb-2">
-          <div className="text-[9px] text-muted-foreground/60 mb-1">
+          <div className="text-[9px] text-muted-foreground mb-1">
             Active Bonuses
           </div>
           <div className="flex flex-wrap gap-1.5">
             {activeBonuses.map((b, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 rounded-full bg-gain/10 px-2 py-0.5 text-[10px] text-gain"
+                className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
               >
                 {b.icon} {b.text}
               </span>
@@ -453,7 +442,7 @@ function ModuleSynergyAnalyzer({
       {/* Synergy combos */}
       {synergies.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-[9px] text-muted-foreground/60">
+          <div className="text-[9px] text-muted-foreground">
             Module Interactions
           </div>
           {synergies.map((s, i) => (
@@ -470,7 +459,7 @@ function ModuleSynergyAnalyzer({
         </div>
       )}
       {synergies.length === 0 && activeBonuses.length > 0 && (
-        <div className="text-[10px] text-muted-foreground/50">
+        <div className="text-[10px] text-muted-foreground">
           No special interactions detected between equipped modules.
         </div>
       )}

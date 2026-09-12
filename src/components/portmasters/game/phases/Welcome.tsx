@@ -145,9 +145,7 @@ export function Welcome({
                 : `Need at least one captain in the harbor`}
             </Button>
             {phaseSync.startError && (
-              <p className="text-xs text-alarm">
-                {phaseSync.startError}
-              </p>
+              <p className="text-xs text-alarm">{phaseSync.startError}</p>
             )}
           </>
         ) : (

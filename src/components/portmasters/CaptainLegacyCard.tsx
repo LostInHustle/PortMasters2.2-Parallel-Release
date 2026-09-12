@@ -104,9 +104,7 @@ export function CaptainLegacyCard({
       <div
         className={cn(
           "text-[10px] mb-2.5",
-          favorUnlocked
-            ? "text-favor font-medium"
-            : "text-muted-foreground",
+          favorUnlocked ? "text-favor font-medium" : "text-muted-foreground",
         )}
       >
         {favorUnlocked
@@ -123,7 +121,7 @@ export function CaptainLegacyCard({
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border cursor-default",
                     earned
-                      ? "bg-legacy/15 border-legacy/40"
+                      ? "bg-legacy/5 border-legacy/40"
                       : "bg-background/60 border-black/10 dark:border-white/10 opacity-35 grayscale",
                   )}
                 >
@@ -131,9 +129,7 @@ export function CaptainLegacyCard({
                     id={m.id}
                     className={cn(
                       "h-3.5 w-3.5",
-                      earned
-                        ? "text-legacy"
-                        : "text-muted-foreground",
+                      earned ? "text-legacy" : "text-muted-foreground",
                     )}
                   />
                 </span>
@@ -173,8 +169,7 @@ export function CaptainLegacyCard({
             </div>
             <div className="rounded-lg bg-background/60 py-1.5">
               <div className="text-sm font-bold flex items-center justify-center gap-1">
-                <Trophy className="h-3.5 w-3.5 text-gain" />{" "}
-                {legacy.bestScore}
+                <Trophy className="h-3.5 w-3.5 text-gain" /> {legacy.bestScore}
               </div>
               <div className="text-[9px] text-muted-foreground">Best Rep.</div>
             </div>
@@ -219,7 +214,7 @@ export function CaptainLegacyCard({
           surface from the cards above without giving a rival a colour of
           its own. */}
       {rival && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-legacy/12 text-legacy px-2.5 py-2">
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-legacy/5 text-legacy px-2.5 py-2">
           <Swords className="h-3.5 w-3.5 shrink-0" />
           <span className="text-[11px] leading-snug">
             Head to head with <b>{rival.displayName}</b>: {rival.myWins} wins,{" "}

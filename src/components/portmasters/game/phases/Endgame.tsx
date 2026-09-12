@@ -145,7 +145,7 @@ export function Endgame({
             </div>
           )}
           {mine?.brokersFavorUnlocked && (
-            <div className="rounded-xl border-2 border-favor/40 bg-favor/10 px-4 py-3 text-center">
+            <div className="rounded-xl border-2 border-favor/40 bg-favor/5 px-4 py-3 text-center">
               <div className="text-lg font-bold text-favor flex items-center justify-center gap-2">
                 🤝 Broker&apos;s Favor Unlocked!
               </div>
@@ -168,9 +168,7 @@ export function Endgame({
                   <MeritIcon id={merit.id} className="h-5 w-5" /> Captain&apos;s
                   Merit: {merit.name}
                 </div>
-                <div className="text-xs opacity-80 mt-0.5">
-                  {merit.desc}
-                </div>
+                <div className="text-xs opacity-80 mt-0.5">{merit.desc}</div>
               </div>
             );
           })}
@@ -335,9 +333,7 @@ function FinancialSummary({ game }: { game: GameState }) {
       <div className="grid grid-cols-2 gap-3">
         {/* Income column */}
         <div>
-          <div className="text-[10px] font-medium text-gain mb-1">
-            Income
-          </div>
+          <div className="text-[10px] font-medium text-gain mb-1">Income</div>
           <div className="space-y-0.5">
             {income.map((r) => (
               <div
@@ -353,7 +349,7 @@ function FinancialSummary({ game }: { game: GameState }) {
               </div>
             ))}
             {income.length === 0 && (
-              <div className="text-[10px] text-muted-foreground/50">
+              <div className="text-[10px] text-muted-foreground">
                 No income recorded
               </div>
             )}
@@ -379,7 +375,7 @@ function FinancialSummary({ game }: { game: GameState }) {
               </div>
             ))}
             {expenses.length === 0 && (
-              <div className="text-[10px] text-muted-foreground/50">
+              <div className="text-[10px] text-muted-foreground">
                 No expenses recorded
               </div>
             )}
@@ -392,9 +388,7 @@ function FinancialSummary({ game }: { game: GameState }) {
         <span
           className={cn(
             "font-display text-sm font-bold tabular-nums",
-            net >= 0
-              ? "text-gain"
-              : "text-alarm",
+            net >= 0 ? "text-gain" : "text-alarm",
           )}
         >
           {net >= 0 ? "+" : ""}
@@ -433,9 +427,7 @@ function PeerEconomySummary({ game }: { game: GameState }) {
       <div className="grid grid-cols-2 gap-3">
         {/* Lending */}
         <div className="rounded-lg bg-gain/5 border border-gain/10 p-2.5">
-          <div className="text-[10px] font-medium text-gain mb-1">
-            Lending
-          </div>
+          <div className="text-[10px] font-medium text-gain mb-1">Lending</div>
           <div className="font-display text-lg font-bold text-gain">
             {totalLent}
             <span className="text-[10px] font-normal text-muted-foreground ml-0.5">
@@ -450,9 +442,7 @@ function PeerEconomySummary({ game }: { game: GameState }) {
         </div>
         {/* Borrowing */}
         <div className="rounded-lg bg-due/5 border border-due/10 p-2.5">
-          <div className="text-[10px] font-medium text-due mb-1">
-            Borrowing
-          </div>
+          <div className="text-[10px] font-medium text-due mb-1">Borrowing</div>
           <div className="font-display text-lg font-bold text-due">
             {totalBorrowed}
             <span className="text-[10px] font-normal text-muted-foreground ml-0.5">
@@ -534,9 +524,7 @@ function CrewSummary({ game }: { game: GameState }) {
       </div>
       <div className="mt-2 pt-2 border-t border-due/10 flex items-center justify-between text-[11px]">
         <span className="text-muted-foreground">Total Wages Paid</span>
-        <span className="font-bold text-due">
-          {totalWages} Gold
-        </span>
+        <span className="font-bold text-due">{totalWages} Gold</span>
       </div>
     </div>
   );

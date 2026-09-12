@@ -1,66 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Harbor Activity Feed. Shows a stream of recent harbor events:
- * voyages starting, concluding, captains joining, crowns awarded.
+ * Harbor Activity. A shelf control that opens a panel on the masthead.
  *
- * This is a client side polling feed that reads from a simple API
- * endpoint. The feed updates every 30 seconds and shows the 10 most
- * recent events across all rooms.
+ * The panel has nothing to show yet, and this file says so plainly rather
+ * than pretending otherwise. It used to open with a comment describing a
+ * client side feed that polls /api/activity every 30 seconds for the ten
+ * most recent events across all rooms. No such route exists, and none ever
+ * has. Nothing called the state setter either, so the event list could
+ * never hold anything, which left the rows that rendered it, the icon
+ * table, the tone table and the event type they were all keyed on
+ * unreachable from the first line of the component onward.
+ *
+ * All of that is gone. What is left is what the captain has always actually
+ * seen. Wiring a real feed means adding the route, fetching it here and
+ * drawing a row per event, and doing that from scratch is no more work than
+ * repairing scaffolding that never carried anything.
  */
-
-type ActivityEvent = {
-  id: string;
-  type:
-    "voyage_start" | "voyage_end" | "crown" | "bankruptcy" | "join" | "leave";
-  displayName: string;
-  roomName: string;
-  detail: string;
-  at: number;
-};
-
-const EVENT_ICONS: Record<ActivityEvent["type"], string> = {
-  voyage_start: "⛵",
-  voyage_end: "🏁",
-  crown: "👑",
-  bankruptcy: "💥",
-  join: "⚓",
-  leave: "🚶",
-};
-
-const EVENT_TONES: Record<ActivityEvent["type"], string> = {
-  voyage_start: "text-sea",
-  voyage_end: "text-intel",
-  crown: "text-gold-ink",
-  bankruptcy: "text-alarm",
-  join: "text-gain",
-  leave: "text-muted-foreground",
-};
-
 export function HarborActivityFeed({ className }: { className?: string }) {
-  const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [open, setOpen] = useState(false);
-
-  // Generate mock events from the current time. In a production system
-  // these would come from a server endpoint, but since we do not have
-  // one yet, we show a static "no recent activity" state with a
-  // hint that the feed will populate as the harbor gets busy.
-  useEffect(() => {
-    // The feed would poll /api/activity every 30s in a full
-    // implementation. For now, we show the empty state which is
-    // honest about the current state.
-  }, []);
 
   return (
     <div className={cn("relative", className)}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+        className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
         title="Harbor activity feed"
         aria-label="Harbor activity feed"
       >
@@ -75,7 +44,13 @@ export function HarborActivityFeed({ className }: { className?: string }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="pm-glass-strong pm-panel absolute right-0 top-full z-30 mt-1.5 w-72 border border-border/40 shadow-lg"
+            /* The panel already brings its own border and its own three layer
+               shadow. A second border and a `shadow-lg` were stacked on top
+               of both, which doubled every edge this popover has and was part
+               of why it read as murky rather than as a card. It is opaque
+               now, so the feed no longer shows the masthead through itself
+               either. */
+            className="pm-glass-strong pm-panel absolute right-0 top-full z-30 mt-1.5 w-72"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
@@ -93,40 +68,15 @@ export function HarborActivityFeed({ className }: { className?: string }) {
               </button>
             </div>
 
-            {events.length === 0 ? (
-              <div className="py-6 text-center">
-                <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                  No recent harbor activity.
-                  <br />
-                  Events will appear here as captains
-                  <br />
-                  start and complete voyages.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1 max-h-64 overflow-y-auto pm-scroll">
-                {events.map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-start gap-1.5 rounded-lg px-1.5 py-1 text-[11px] hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    <span className="text-sm shrink-0">
-                      {EVENT_ICONS[e.type]}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className={cn("font-medium", EVENT_TONES[e.type])}>
-                        {e.displayName}
-                      </span>
-                      <span className="text-muted-foreground"> {e.detail}</span>
-                      <span className="text-muted-foreground/60">
-                        {" "}
-                        in {e.roomName}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="py-6 text-center">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                No recent harbor activity.
+                <br />
+                Events will appear here as captains
+                <br />
+                start and complete voyages.
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -17,11 +17,15 @@ import {
  * and solvent streak. The advisor is advisory only, the captain can
  * still pick any tier.
  *
- * The recommendation logic:
- * - Renown 1 to 2, fewer than 3 voyages: Fair Winds
- * - Renown 3 to 4, 3+ voyages, best score 50+: Fair Winds or Open Waters
- * - Renown 5+, 5+ voyages, best score 100+, solvent streak 2+: Open Waters
- * - Renown 8+, 10+ voyages, best score 200+, solvent streak 3+: Monsoon
+ * The recommendation reads four bands, each one wider than the last:
+ *
+ * Renown 1 to 2 with fewer than 3 voyages is pointed at Fair Winds.
+ * Renown 3 to 4 with 3 voyages or more and a best score of 50 or more is
+ * pointed at Fair Winds or Open Waters.
+ * Renown 5 or more with 5 voyages or more, a best score of 100 or more and
+ * a solvent streak of 2 or more is pointed at Open Waters.
+ * Renown 8 or more with 10 voyages or more, a best score of 200 or more and
+ * a solvent streak of 3 or more is pointed at Monsoon.
  */
 
 // The three tiers, read off the one table that defines them rather than
@@ -143,7 +147,7 @@ export function DifficultyAdvisor({
           )}
           <div className="flex-1 min-w-0">
             {!advice.match && (
-              <p className="font-medium text-foreground/80">
+              <p className="font-medium text-foreground">
                 {advice.caution
                   ? "Heads up"
                   : `Consider ${advice.recommended.replace(/_/g, " ")}`}

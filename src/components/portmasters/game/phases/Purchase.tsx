@@ -47,7 +47,7 @@ function MarketPriceReference({
 }) {
   return (
     <div className="rounded-xl border border-purchase/15 bg-purchase/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-1.5">
+      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-1.5">
         ━━ MARKET PRICE REFERENCE (hover for details) ━━
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -97,20 +97,20 @@ function MarketPriceReference({
         );
         return (
           <div className="mt-2 border-t border-purchase/10 pt-2">
-            <div className="text-[9px] text-muted-foreground/70 mb-1">
+            <div className="text-[9px] text-muted-foreground mb-1">
               Price History Heatmap
             </div>
             <div className="overflow-x-auto pm-scroll">
               <table className="text-[9px]">
                 <thead>
                   <tr>
-                    <th className="pr-1.5 text-left font-normal text-muted-foreground/60">
+                    <th className="pr-1.5 text-left font-normal text-muted-foreground">
                       Good
                     </th>
                     {Array.from({ length: maxRound }, (_, i) => (
                       <th
                         key={i}
-                        className="px-0.5 text-center font-normal text-muted-foreground/50"
+                        className="px-0.5 text-center font-normal text-muted-foreground"
                       >
                         R{i + 1}
                       </th>
@@ -247,19 +247,15 @@ function TradeAdvisor({
               key={i}
               className="flex items-center gap-1.5 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
             >
-              <span className="font-bold text-intel">
-                {i + 1}.
-              </span>
+              <span className="font-bold text-intel">{i + 1}.</span>
               <ItemIcon item={s.goodName} className="h-3.5 w-3.5" />
               <span style={{ color: colorFor(s.goodName) }}>{s.goodName}</span>
               <span className="text-muted-foreground">x{s.qty}</span>
-              <span className="font-bold text-gain">
-                {s.unitPrice}
-              </span>
+              <span className="font-bold text-gain">{s.unitPrice}</span>
               <span className="text-[9px] text-muted-foreground">g</span>
               {matchesIntel && (
                 <span
-                  className="rounded-full bg-intel/20 px-1 py-0.5 text-[7px] font-bold text-intel"
+                  className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
                   title="Matches a Broker's Whisper, guaranteed order in Phase 2"
                 >
                   Intel
@@ -318,20 +314,18 @@ function MarketPulse({ game }: { game: GameState }) {
       <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-pulse mb-1.5">
         <TrendingUp className="h-3.5 w-3.5" />
         Harbor Pulse
-        <span className="font-normal text-muted-foreground/60 ml-1">
+        <span className="font-normal text-muted-foreground ml-1">
           already priced into this board
         </span>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
         {pricier.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] text-alarm font-semibold">
-              Pricier
-            </span>
+            <span className="text-[9px] text-alarm font-semibold">Pricier</span>
             {pricier.map(([good, v]) => (
               <span
                 key={good}
-                className="inline-flex items-center gap-0.5 rounded-full bg-alarm/10 px-1.5 py-0.5 text-[10px] font-medium text-alarm"
+                className="inline-flex items-center gap-0.5 rounded-full bg-alarm/5 px-1.5 py-0.5 text-[10px] font-medium text-alarm"
                 title={`${good} is about ${Math.round(v * 100)} percent above its usual price this round`}
               >
                 <ArrowUp className="h-2.5 w-2.5" />
@@ -342,13 +336,11 @@ function MarketPulse({ game }: { game: GameState }) {
         )}
         {softer.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] text-gain font-semibold">
-              Softer
-            </span>
+            <span className="text-[9px] text-gain font-semibold">Softer</span>
             {softer.map(([good, v]) => (
               <span
                 key={good}
-                className="inline-flex items-center gap-0.5 rounded-full bg-gain/10 px-1.5 py-0.5 text-[10px] font-medium text-gain"
+                className="inline-flex items-center gap-0.5 rounded-full bg-gain/5 px-1.5 py-0.5 text-[10px] font-medium text-gain"
                 title={`${good} is about ${Math.round(Math.abs(v) * 100)} percent below its usual price this round`}
               >
                 <ArrowDown className="h-2.5 w-2.5" />
@@ -392,7 +384,7 @@ function MarketDepth({
 
   return (
     <div className="rounded-xl border border-depth/15 bg-depth/[0.03] px-3.5 py-2 mb-3.5">
-      <div className="text-[9px] font-semibold tracking-wide text-muted-foreground/70 mb-1">
+      <div className="text-[9px] font-semibold tracking-wide text-muted-foreground mb-1">
         Market Depth
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -407,11 +399,7 @@ function MarketDepth({
             <span
               className={cn(
                 "rounded px-1 text-[8px] font-bold text-white",
-                count >= 3
-                  ? "bg-gain"
-                  : count === 2
-                    ? "bg-warn"
-                    : "bg-alarm",
+                count >= 3 ? "bg-gain" : count === 2 ? "bg-warn" : "bg-alarm",
               )}
             >
               {count}
@@ -541,8 +529,8 @@ export function Purchase({
                             className={cn(
                               "ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                               isDeal
-                                ? "bg-gain/15 text-gain"
-                                : "bg-alarm/15 text-alarm",
+                                ? "bg-gain/5 text-gain"
+                                : "bg-alarm/5 text-alarm",
                             )}
                             title={
                               isDeal
@@ -559,8 +547,8 @@ export function Purchase({
                           className={cn(
                             "ml-1.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                             pulse > 0
-                              ? "bg-alarm/15 text-alarm"
-                              : "bg-gain/15 text-gain",
+                              ? "bg-alarm/5 text-alarm"
+                              : "bg-gain/5 text-gain",
                           )}
                           title={
                             pulse > 0

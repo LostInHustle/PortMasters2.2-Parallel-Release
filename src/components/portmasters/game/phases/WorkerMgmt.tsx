@@ -75,7 +75,7 @@ function WorkerList({
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 px-2 text-[10px] rounded border border-alarm/25 bg-alarm/5 text-alarm/90 hover:border-alarm/40 hover:bg-alarm/15 hover:text-alarm"
+              className="h-6 px-2 text-[10px] rounded border border-alarm/25 bg-alarm/5 text-alarm hover:border-alarm/40 hover:bg-alarm/5 hover:text-alarm"
               onClick={() => act((g, l) => fireWorker(g, type, i, l))}
             >
               Dismiss ({WAGES[type]}💰)
@@ -193,9 +193,7 @@ export function WorkerMgmt({
         <h3 className="text-center font-semibold mb-2">📦 Current Inventory</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <strong className="text-xs text-ship">
-              Raw Materials:
-            </strong>
+            <strong className="text-xs text-ship">Raw Materials:</strong>
             {unlockedResources(game.difficulty, game.currentRound).map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
@@ -209,9 +207,7 @@ export function WorkerMgmt({
             ))}
           </div>
           <div>
-            <strong className="text-xs text-ship">
-              Finished Goods:
-            </strong>
+            <strong className="text-xs text-ship">Finished Goods:</strong>
             {openProducts.map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
@@ -255,9 +251,7 @@ export function WorkerMgmt({
               ))}
             <div className="flex justify-between border-t border-due/20 pt-1 mt-1 font-bold">
               <span>💸 Total Wages Due</span>
-              <span className="text-alarm">
-                {totalWages} Gold
-              </span>
+              <span className="text-alarm">{totalWages} Gold</span>
             </div>
           </div>
           {/* Wage Efficiency Indicator */}
@@ -326,14 +320,11 @@ export function WorkerMgmt({
                   return `${t}(${mats})`;
                 })
                 .join(" or ")}
-              ,{" "}
-              <span className="text-due">
-                {WAGES[r.id]} Gold/round
-              </span>
+              , <span className="text-due">{WAGES[r.id]} Gold/round</span>
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue. The old three-colour
+        {/* Each hire button wears its own craft's hue. The old three colour
             cycle put the same saturated green on the first, fourth and
             seventh artisan, so a row of seven read as one repeating stripe
             and the colour told you nothing about which artisan you were

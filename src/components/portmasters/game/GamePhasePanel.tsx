@@ -212,7 +212,6 @@ function ActivePhase(props: Props) {
         <Orders
           game={game}
           act={act}
-          ctx={ctx}
           phaseSync={phaseSync}
           members={members}
           colorFor={colorFor}
@@ -250,7 +249,6 @@ function ActivePhase(props: Props) {
           members={members}
           backing={backing}
           me={me}
-          room={room}
           roster={roster}
         />
       );

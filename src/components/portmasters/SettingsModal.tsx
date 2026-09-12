@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Settings,
@@ -81,11 +81,11 @@ export function SettingsModal({
     }
   });
 
-  // No load effect needed: lazy initializers read localStorage on mount.
-  useEffect(() => {
-    if (!open) return;
-    // no op: preferences are already loaded via lazy initializers
-  }, [open]);
+  // There is deliberately no load effect here. Every preference on this
+  // screen is read from localStorage by its own lazy initializer when the
+  // state is created, so there is nothing left for an effect to do on open.
+  // One used to sit here anyway, with a body that was a single comment
+  // saying so, which cost a render pass on every open to accomplish nothing.
 
   const saveVolume = (v: number) => {
     onVolumeChange(v);
@@ -331,7 +331,7 @@ function ThemeButton({
       className={cn(
         "flex flex-col items-center gap-1 rounded-lg border py-2.5 text-xs font-medium transition-all",
         active
-          ? "border-celadon bg-celadon/10 text-celadon dark:text-celadon/90"
+          ? "border-celadon bg-celadon/5 text-celadon dark:text-celadon"
           : "border-black/10 text-muted-foreground hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5",
       )}
     >

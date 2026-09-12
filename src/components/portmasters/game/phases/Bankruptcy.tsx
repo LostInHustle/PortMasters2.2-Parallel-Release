@@ -22,12 +22,8 @@ export function Bankruptcy({
   members,
   backing,
   me,
-  room,
   roster,
-}: Pick<
-  PhasePanelProps,
-  "game" | "members" | "backing" | "me" | "room" | "roster"
->) {
+}: Pick<PhasePanelProps, "game" | "members" | "backing" | "me" | "roster">) {
   const myUserId = me.id;
   const statuses = roster?.statuses ?? {};
   const activeCaptains = members
@@ -92,7 +88,7 @@ export function Bankruptcy({
       {/* Bequest Routing: Silent Partner */}
       {game.loansGiven.length > 0 && (
         <div className="mt-4 rounded-xl border border-gain/20 bg-gain/[0.04] px-4 py-3 text-left">
-          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             🤝 Silent Partner
           </div>
           <p className="mb-2.5 text-xs text-muted-foreground">
@@ -110,11 +106,9 @@ export function Bankruptcy({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
                       Owed by{" "}
-                      <b className="text-foreground/90">{l.counterpartyName}</b>
+                      <b className="text-foreground">{l.counterpartyName}</b>
                     </span>
-                    <span className="font-bold text-gain">
-                      {l.amount}g
-                    </span>
+                    <span className="font-bold text-gain">{l.amount}g</span>
                   </div>
                   {backing && candidates.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -148,7 +142,7 @@ export function Bankruptcy({
           transition={{ delay: 0.2 }}
           className="mt-4 rounded-xl border border-sea/20 bg-sea/[0.04] px-4 py-3 text-left"
         >
-          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <Eye className="h-4 w-4 text-sea" />
             Spectator Mode: Live Harbor Standings
           </div>

@@ -629,7 +629,7 @@ export function Lobby({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={openChronicle}
-                className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
                 title="Voyage Chronicles"
                 aria-label="Voyage Chronicles"
               >
@@ -638,7 +638,7 @@ export function Lobby({
               </button>
               <button
                 onClick={openHouse}
-                className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
                 title="Great Houses"
                 aria-label="Great Houses"
               >
@@ -647,7 +647,7 @@ export function Lobby({
               </button>
               <button
                 onClick={() => setLeaderboardOpen(true)}
-                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
                 title="Harbor Leaderboard"
                 aria-label="Open harbor leaderboard"
               >
@@ -656,7 +656,7 @@ export function Lobby({
               <HarborActivityFeed />
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
                 title="Settings"
                 aria-label="Open settings"
               >
@@ -668,7 +668,7 @@ export function Lobby({
                   "pm-tool pm-pressable relative",
                   checkIn.canClaimToday
                     ? "pm-grad-checkin text-white"
-                    : "bg-black/[0.05] text-foreground/75 dark:bg-white/10",
+                    : "bg-black/[0.05] text-foreground dark:bg-white/10",
                 )}
                 title="Daily Check In"
                 aria-label="Daily Check In"
@@ -892,7 +892,7 @@ export function Lobby({
               </div>
               <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                 {DIFFICULTIES[difficulty].tagline}{" "}
-                <span className="text-foreground/70">
+                <span className="text-foreground">
                   {DIFFICULTIES[difficulty].rounds} rounds.
                 </span>
               </p>
@@ -979,7 +979,7 @@ export function Lobby({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mb-3 rounded-xl bg-alarm/10 px-3 py-2 text-xs text-alarm"
+                  className="mb-3 rounded-xl bg-alarm/5 px-3 py-2 text-xs text-alarm"
                 >
                   {error}
                 </motion.div>
@@ -1027,11 +1027,13 @@ export function Lobby({
                           {room.host.id === me.id && (
                             <Pill tone="gold">Host</Pill>
                           )}
-                          {!room.isPublic && <Pill tone="default">Private</Pill>}
+                          {!room.isPublic && (
+                            <Pill tone="default">Private</Pill>
+                          )}
                           {room.started && (
                             <Pill
                               tone="none"
-                              className="bg-sailing/15 text-sailing"
+                              className="bg-sailing/5 text-sailing"
                             >
                               ⛵ Sailing
                             </Pill>
@@ -1080,11 +1082,7 @@ export function Lobby({
             captain picked from that list. */}
         <aside className="space-y-3">
           <div className="pm-glass pm-panel">
-            <CardHead
-              icon={Users}
-              tone="text-captains"
-              title="Captains Online"
-            >
+            <CardHead icon={Users} tone="text-captains" title="Captains Online">
               <Pill tone="gain">
                 <OnlineDot online size={8} /> {totalOnline}
               </Pill>
@@ -1143,7 +1141,7 @@ export function Lobby({
                           </Pill>
                         )}
                         {!isMe && (
-                          <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
                         )}
                       </button>
                     );
@@ -1180,7 +1178,7 @@ export function Lobby({
               )
             ) : (
               <div className="flex flex-1 items-center justify-center px-6 text-center">
-                <p className="text-xs leading-relaxed text-muted-foreground/80">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   Pick a captain from the list above to start a private
                   conversation.
                 </p>
@@ -1370,7 +1368,7 @@ export function Lobby({
                           {house.name}
                         </span>
                         {isMine && (
-                          <Pill tone="none" className="bg-houses/15 text-houses">
+                          <Pill tone="none" className="bg-houses/5 text-houses">
                             Pledged
                           </Pill>
                         )}

@@ -69,7 +69,6 @@ import {
 import {
   roomCheckpoints,
   getCheckpoint,
-  activeRosterSet,
   readyStatePayload,
   broadcastReadyState,
   maybeAdvance,
@@ -148,7 +147,7 @@ function clearRoomAllMaps(roomId: string): void {
 // Builds the cleanup callbacks scheduleDeparture needs. Defined once
 // per attachRealtime call so every scheduleDeparture invocation shares
 // the same object.
-function buildDepartureCleanup(io: Server): DepartureCleanup {
+function buildDepartureCleanup(): DepartureCleanup {
   return {
     removeUserBarterOffers,
     removeUserAidRequest,
@@ -173,7 +172,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     allowEIO3: false,
   });
 
-  const departureCleanup = buildDepartureCleanup(io);
+  const departureCleanup = buildDepartureCleanup();
 
   // ========== Connection handling ==========
   io.on("connection", (socket: Socket) => {
@@ -668,7 +667,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
         socket.emit("venture:contributed", { roomId, ventureId, accepted });
         if (newTotal >= venture.targetGold) {
-          await settleVenture(io, roomId, updated, "filled");
+          await settleVenture(io, updated, "filled");
           await destroyOtherOpenVentures(
             io,
             roomId,

@@ -30,13 +30,12 @@ import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 export function Orders({
   game,
   act,
-  ctx,
   phaseSync,
   members,
   colorFor,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "ctx" | "phaseSync" | "members" | "colorFor"
+  "game" | "act" | "phaseSync" | "members" | "colorFor"
 >) {
   const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
@@ -260,9 +259,7 @@ export function Orders({
                   </span>
                 ) : (
                   matchesIntel && (
-                    <span className="text-intel shrink-0">
-                      🔮 Guaranteed
-                    </span>
+                    <span className="text-intel shrink-0">🔮 Guaranteed</span>
                   )
                 )}
               </div>
@@ -351,9 +348,7 @@ export function Orders({
                 <Button
                   className={cn(
                     "w-full rounded-lg",
-                    canComplete && !completed
-                      ? "pm-grad-orders"
-                      : "",
+                    canComplete && !completed ? "pm-grad-orders" : "",
                   )}
                   variant={canComplete && !completed ? "default" : "secondary"}
                   disabled={!canComplete || completed}
@@ -448,13 +443,13 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
           Fulfillment Plan
         </span>
         {readyCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-gain/15 px-2 py-0.5 font-medium text-gain">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 font-medium text-gain">
             <CheckCircle2 className="h-3 w-3" />
             {readyCount} ready
           </span>
         )}
         {closeCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 font-medium text-warn">
+          <span className="inline-flex items-center gap-1 rounded-full bg-warn/5 px-2 py-0.5 font-medium text-warn">
             <Clock className="h-3 w-3" />
             {closeCount} close
           </span>

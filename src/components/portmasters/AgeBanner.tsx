@@ -169,7 +169,9 @@ function AgeDetailDialog({
                 <Icon className="h-6 w-6" />
               </div>
               <div>
-                <h2 className={cn("font-display text-lg font-bold", visual.ink)}>
+                <h2
+                  className={cn("font-display text-lg font-bold", visual.ink)}
+                >
                   {age.name}
                 </h2>
                 <p className="text-[11px] text-muted-foreground">
@@ -185,7 +187,7 @@ function AgeDetailDialog({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-sm leading-relaxed text-foreground/90">
+          <p className="text-sm leading-relaxed text-foreground">
             {age.description}
           </p>
           <div className="mt-4 rounded-xl bg-black/5 p-3 dark:bg-white/5">

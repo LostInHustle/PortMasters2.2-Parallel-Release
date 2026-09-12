@@ -58,15 +58,15 @@ const TONE_CLASSES: Record<Suggestion["tone"], string> = {
 function toneFill(tone: Suggestion["tone"]): string {
   switch (tone) {
     case "jade":
-      return "bg-gain/15 text-gain";
+      return "bg-gain/5 text-gain";
     case "amber":
-      return "bg-warn/15 text-warn";
+      return "bg-warn/5 text-warn";
     case "rose":
-      return "bg-alarm/15 text-alarm";
+      return "bg-alarm/5 text-alarm";
     case "indigo":
-      return "bg-intel/15 text-intel";
+      return "bg-intel/5 text-intel";
     case "gold":
-      return "bg-gold/25 text-gold-ink";
+      return "bg-gold/5 text-gold-ink";
   }
 }
 
@@ -121,7 +121,7 @@ export function ActionSuggester({ game }: { game: GameState }) {
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </div>
-            <p className="text-[11px] leading-relaxed text-foreground/80">
+            <p className="text-[11px] leading-relaxed text-foreground">
               {suggestion.body}
             </p>
             <button
@@ -144,10 +144,6 @@ export function ActionSuggester({ game }: { game: GameState }) {
  */
 function analyzePhase(game: GameState): Suggestion | null {
   const phase = game.phase;
-  const money = game.money;
-  const score = game.score;
-  const round = game.currentRound;
-  const maxRounds = game.maxRounds;
 
   switch (phase) {
     case 5: // Boon Draft

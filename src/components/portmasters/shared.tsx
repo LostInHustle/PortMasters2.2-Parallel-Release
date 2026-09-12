@@ -107,27 +107,36 @@ export function Pill({
    * Widget colour is never put on a status and a meaning is never put
    * on a panel heading.
    */
-  tone?: "default" | "none" | "gold" | "sea" | "gain" | "alarm" | "due" | "favor" | "intel";
+  tone?:
+    | "default"
+    | "none"
+    | "gold"
+    | "sea"
+    | "gain"
+    | "alarm"
+    | "due"
+    | "favor"
+    | "intel";
   className?: string;
 }) {
   /* Every one of these is a soft wash of its own token, so a Pill and
      the number inside it are the same colour in both modes and neither
      needs a dark variant. */
   const tones: Record<string, string> = {
-    default: "bg-black/5 dark:bg-white/10 text-foreground/70",
+    default: "bg-black/5 dark:bg-white/10 text-foreground",
     /* A Pill that names a thing rather than a status brings its own
        colour through className. Leaving the tone map out entirely is
        what keeps the two from fighting over background-color, which
        would otherwise be settled by Tailwind's own rule order rather
        than by anything visible in the markup. */
     none: "",
-    gold: "bg-gold/25 text-gold-ink",
-    sea: "bg-sea/15 text-sea",
-    gain: "bg-gain/15 text-gain",
-    alarm: "bg-alarm/15 text-alarm",
-    due: "bg-due/15 text-due",
-    favor: "bg-favor/15 text-favor",
-    intel: "bg-intel/15 text-intel",
+    gold: "bg-gold/5 text-gold-ink",
+    sea: "bg-sea/5 text-sea",
+    gain: "bg-gain/5 text-gain",
+    alarm: "bg-alarm/5 text-alarm",
+    due: "bg-due/5 text-due",
+    favor: "bg-favor/5 text-favor",
+    intel: "bg-intel/5 text-intel",
   };
   return (
     <span

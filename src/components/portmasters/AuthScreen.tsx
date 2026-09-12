@@ -214,7 +214,7 @@ export function AuthScreen({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="rounded-xl border border-alarm/20 bg-alarm/10 px-3.5 py-2.5 text-sm text-alarm"
+                    className="rounded-xl border border-alarm/20 bg-alarm/5 px-3.5 py-2.5 text-sm text-alarm"
                   >
                     {error}
                   </motion.div>
@@ -241,7 +241,7 @@ export function AuthScreen({
             </form>
           </Tabs>
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground/80">
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
             Open this page in another browser to register a second captain and
             see them appear online in real time.
           </p>

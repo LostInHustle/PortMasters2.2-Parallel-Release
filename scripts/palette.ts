@@ -68,18 +68,58 @@ const WIDGETS: Widget[] = [
      degrees each, which is the roomiest any dense screen gets. The hues
      are handed out on a stride rather than in page order, so two panels
      stacked next to each other are rarely two steps apart on the wheel. */
-  { name: "brand", hue: 49.4, screens: [LOBBY, "auth"], what: "The app mark, on the masthead and the sign in card" },
-  { name: "checkin", hue: 183.6, screens: [LOBBY], what: "Check In, when a reward is ready" },
-  { name: "captains", hue: 317.8, screens: [LOBBY], what: "Captains Online, and the gauge that counts them" },
-  { name: "harbors", hue: 129.9, screens: [LOBBY], what: "Open Harbors, its room rows, and the gauge" },
-  { name: "sailing", hue: 264.1, screens: [LOBBY], what: "Sailing, the harbors already under way" },
+  {
+    name: "brand",
+    hue: 49.4,
+    screens: [LOBBY, "auth"],
+    what: "The app mark, on the masthead and the sign in card",
+  },
+  {
+    name: "checkin",
+    hue: 183.6,
+    screens: [LOBBY],
+    what: "Check In, when a reward is ready",
+  },
+  {
+    name: "captains",
+    hue: 317.8,
+    screens: [LOBBY],
+    what: "Captains Online, and the gauge that counts them",
+  },
+  {
+    name: "harbors",
+    hue: 129.9,
+    screens: [LOBBY],
+    what: "Open Harbors, its room rows, and the gauge",
+  },
+  {
+    name: "sailing",
+    hue: 264.1,
+    screens: [LOBBY],
+    what: "Sailing, the harbors already under way",
+  },
   { name: "renown", hue: 76.3, screens: [LOBBY], what: "Your Renown" },
-  { name: "charter", hue: 210.4, screens: [LOBBY], what: "Chart a new harbor, and the Waters selector" },
+  {
+    name: "charter",
+    hue: 210.4,
+    screens: [LOBBY],
+    what: "Chart a new harbor, and the Waters selector",
+  },
   { name: "quickstart", hue: 344.6, screens: [LOBBY], what: "Quick Start" },
   { name: "messages", hue: 156.8, screens: [LOBBY], what: "Direct Messages" },
   { name: "activity", hue: 290.9, screens: [LOBBY], what: "Harbor Activity" },
-  { name: "guide", hue: 103.1, screens: [LOBBY, "dlg:guide"], what: "How to Play, the tool and the dialog" },
-  { name: "notifications", hue: 237.3, screens: [LOBBY], what: "Notifications" },
+  {
+    name: "guide",
+    hue: 103.1,
+    screens: [LOBBY, "dlg:guide"],
+    what: "How to Play, the tool and the dialog",
+  },
+  {
+    name: "notifications",
+    hue: 237.3,
+    screens: [LOBBY],
+    what: "Notifications",
+  },
 
   /* The dialogs. Only one opens at a time and each dims the board behind
      it, so a dialog answers to its own screen rather than to the Lobby.
@@ -106,11 +146,31 @@ const WIDGETS: Widget[] = [
      the middle of the window it has left. A dialog therefore shares its
      screen with a dimmed board and with nothing else, and the overlay is
      what keeps that arrangement readable. */
-  { name: "leaderboard", hue: 64.4, screens: ["dlg:leaderboard"], what: "Leaderboard" },
+  {
+    name: "leaderboard",
+    hue: 64.4,
+    screens: ["dlg:leaderboard"],
+    what: "Leaderboard",
+  },
   { name: "houses", hue: 253.8, screens: ["dlg:houses"], what: "Great Houses" },
-  { name: "chronicles", hue: 197.0, screens: ["dlg:chronicles"], what: "Voyage Chronicles" },
-  { name: "profile", hue: 83.3, screens: ["dlg:profile"], what: "Captain Profile" },
-  { name: "legacy", hue: 215.9, screens: ["dlg:legacy"], what: "Captain's Legacy" },
+  {
+    name: "chronicles",
+    hue: 197.0,
+    screens: ["dlg:chronicles"],
+    what: "Voyage Chronicles",
+  },
+  {
+    name: "profile",
+    hue: 83.3,
+    screens: ["dlg:profile"],
+    what: "Captain Profile",
+  },
+  {
+    name: "legacy",
+    hue: 215.9,
+    screens: ["dlg:legacy"],
+    what: "Captain's Legacy",
+  },
   { name: "settings", hue: 140.2, screens: ["dlg:settings"], what: "Settings" },
 
   /* Game session chrome, on screen through every phase. */
@@ -130,10 +190,30 @@ const WIDGETS: Widget[] = [
   { name: "shipyard", hue: 90, screens: ["phase:4"], what: "Shipyard" },
   { name: "boon", hue: 325, screens: ["phase:5"], what: "Boon Draft" },
   { name: "barter", hue: 218, screens: ["phase:barter"], what: "Barter" },
-  { name: "workers", hue: 347, screens: ["phase:workers"], what: "Worker Management" },
-  { name: "module-draft", hue: 132, screens: ["phase:modules"], what: "Module Draft" },
-  { name: "module-swap", hue: 347, screens: ["phase:modules"], what: "Module Swap" },
-  { name: "bankruptcy", hue: 325, screens: ["phase:bankruptcy"], what: "Bankruptcy" },
+  {
+    name: "workers",
+    hue: 347,
+    screens: ["phase:workers"],
+    what: "Worker Management",
+  },
+  {
+    name: "module-draft",
+    hue: 132,
+    screens: ["phase:modules"],
+    what: "Module Draft",
+  },
+  {
+    name: "module-swap",
+    hue: 347,
+    screens: ["phase:modules"],
+    what: "Module Swap",
+  },
+  {
+    name: "bankruptcy",
+    hue: 325,
+    screens: ["phase:bankruptcy"],
+    what: "Bankruptcy",
+  },
   { name: "endgame", hue: 132, screens: ["phase:endgame"], what: "Endgame" },
 
   /* Panels that open inside a phase, and the screens that stand alone.
@@ -143,9 +223,24 @@ const WIDGETS: Widget[] = [
   { name: "advisor", hue: 197, screens: ["phase:1"], what: "Trade Advisor" },
   { name: "depth", hue: 347, screens: ["phase:1"], what: "Market Depth" },
   { name: "pulse", hue: 90, screens: ["phase:1"], what: "Market Pulse" },
-  { name: "planner", hue: 132, screens: ["phase:2"], what: "Fulfillment Planner" },
-  { name: "modules", hue: 261, screens: ["phase:4"], what: "Module list on the Shipyard" },
-  { name: "shortcuts", hue: 218, screens: ["shortcuts"], what: "Keyboard Shortcuts" },
+  {
+    name: "planner",
+    hue: 132,
+    screens: ["phase:2"],
+    what: "Fulfillment Planner",
+  },
+  {
+    name: "modules",
+    hue: 261,
+    screens: ["phase:4"],
+    what: "Module list on the Shipyard",
+  },
+  {
+    name: "shortcuts",
+    hue: 218,
+    screens: ["shortcuts"],
+    what: "Keyboard Shortcuts",
+  },
   { name: "rumors", hue: 218, screens: ["phase:2"], what: "Rumor Board" },
 ];
 
@@ -212,9 +307,9 @@ function checkDistances() {
 /* Every property palette.css declares, by its full name, so that a
    fill rule naming one can be checked against it. Built once at load. */
 const declaredTokens: Set<string> = new Set(
-  [...readFileSync(PALETTE, "utf8").matchAll(/--w-[a-z-]+(?=\s*:\s*oklch)/g)].map(
-    (m) => m[0],
-  ),
+  [
+    ...readFileSync(PALETTE, "utf8").matchAll(/--w-[a-z-]+(?=\s*:\s*oklch)/g),
+  ].map((m) => m[0]),
 );
 
 /* The bare widget names, with the -fill suffix and the prefix stripped. */
@@ -231,7 +326,9 @@ function checkTokens() {
 
   for (const w of ALL_WIDGETS) {
     if (!declared.has(w.name)) {
-      fail(`The table lists ${w.name}, but palette.css declares no --w-${w.name}.`);
+      fail(
+        `The table lists ${w.name}, but palette.css declares no --w-${w.name}.`,
+      );
     }
   }
 
@@ -242,7 +339,12 @@ function checkTokens() {
   const css = readFileSync(PALETTE, "utf8");
   for (const w of ALL_WIDGETS) {
     const decl = [
-      ...css.matchAll(new RegExp(`--w-${w.name}:\\s*oklch\\([0-9.]+ [0-9.]+ ([0-9.]+)\\)`, "g")),
+      ...css.matchAll(
+        new RegExp(
+          `--w-${w.name}:\\s*oklch\\([0-9.]+ [0-9.]+ ([0-9.]+)\\)`,
+          "g",
+        ),
+      ),
     ].map((m) => Number(m[1]));
     if (decl.length === 0) continue;
     for (const hue of decl) {
@@ -264,14 +366,29 @@ function checkTokens() {
      harbor is in the same one and it is drawn in the Lobby and in the
      session alike. */
   const notWidgets = new Set([
-    "gain", "alarm", "warn", "due", "favor", "intel", "sea",
-    "gold", "medal-gold", "medal-silver", "medal-bronze",
-    "house-jade", "house-vermilion", "house-lotus",
-    "age-lender", "age-trader", "age-broker",
+    "gain",
+    "alarm",
+    "warn",
+    "due",
+    "favor",
+    "intel",
+    "sea",
+    "gold",
+    "medal-gold",
+    "medal-silver",
+    "medal-bronze",
+    "house-jade",
+    "house-vermilion",
+    "house-lotus",
+    "age-lender",
+    "age-trader",
+    "age-broker",
   ]);
   for (const name of declared) {
     if (!tableNames.has(name) && !notWidgets.has(name)) {
-      fail(`palette.css declares --w-${name}, but no widget in the table claims it.`);
+      fail(
+        `palette.css declares --w-${name}, but no widget in the table claims it.`,
+      );
     }
   }
 }
@@ -298,9 +415,7 @@ function checkGradients(files: string[]) {
      gone now. A rule that painted its own gradient would be a second way
      to make a seal, so the check no longer accepts one. */
   const filled = new Set<string>();
-  for (const m of globals.matchAll(
-    /\.pm-grad-([a-z-]+)\s*\{([^}]*)\}/g,
-  )) {
+  for (const m of globals.matchAll(/\.pm-grad-([a-z-]+)\s*\{([^}]*)\}/g)) {
     const [, name, body] = m;
     if (body.includes("--pm-fill:")) {
       filled.add(name);
@@ -355,7 +470,9 @@ function checkInk() {
     const [, name, body] = m;
     const fill = body.match(/--pm-fill:\s*var\((--w-[a-z-]+)\)/);
     if (!fill) continue;
-    const value = lightness.get(fill[1].replace(/^--w-/, "").replace(/-fill$/, ""));
+    const value = lightness.get(
+      fill[1].replace(/^--w-/, "").replace(/-fill$/, ""),
+    );
     if (value === undefined) continue;
     if (value >= BRIGHT && !body.includes("--pm-ink")) {
       fail(
@@ -411,7 +528,9 @@ if (problems.length === 0) {
   process.exit(0);
 }
 
-console.log(`The palette check found ${problems.length} thing${problems.length === 1 ? "" : "s"}:\n`);
+console.log(
+  `The palette check found ${problems.length} thing${problems.length === 1 ? "" : "s"}:\n`,
+);
 for (const p of problems) console.log(`  ${p}`);
 console.log(`\nThe hues themselves are sound. ${geometry}`);
 process.exit(1);
@@ -421,7 +540,10 @@ function closestPair(): number {
   for (let i = 0; i < ALL_WIDGETS.length; i++) {
     for (let j = i + 1; j < ALL_WIDGETS.length; j++) {
       if (!sharesScreen(ALL_WIDGETS[i], ALL_WIDGETS[j])) continue;
-      best = Math.min(best, circularGap(ALL_WIDGETS[i].hue, ALL_WIDGETS[j].hue));
+      best = Math.min(
+        best,
+        circularGap(ALL_WIDGETS[i].hue, ALL_WIDGETS[j].hue),
+      );
     }
   }
   return best;

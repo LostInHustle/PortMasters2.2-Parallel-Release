@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { generateRoomCode, normalizeRoomName } from "@/lib/rooms";
+import {
+  generateRoomCode,
+  normalizeRoomName,
+  serializeRoom,
+} from "@/lib/rooms";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 
 export async function GET() {
@@ -31,21 +35,7 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    rooms: rooms.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      isPublic: r.isPublic,
-      started: r.started,
-      difficulty: r.difficulty,
-      createdAt: r.createdAt.toISOString(),
-      host: r.host,
-      memberCount: r.members.length,
-      members: r.members.map((m) => ({
-        ...m.user,
-        joinedAt: m.joinedAt.toISOString(),
-      })),
-    })),
+    rooms: rooms.map((r) => serializeRoom(r, r.members)),
   });
 }
 
@@ -102,20 +92,6 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      started: room.started,
-      difficulty: room.difficulty,
-      createdAt: room.createdAt.toISOString(),
-      host: room.host,
-      memberCount: room.members.length,
-      members: room.members.map((m) => ({
-        ...m.user,
-        joinedAt: m.joinedAt.toISOString(),
-      })),
-    },
+    room: serializeRoom(room, room.members),
   });
 }

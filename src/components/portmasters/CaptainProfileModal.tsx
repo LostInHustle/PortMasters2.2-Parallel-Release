@@ -23,13 +23,14 @@ import { api, type PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { VoyageChronicle, RivalEntry } from "@/types/realtime";
 import { Avatar, Pill, MeritIcon } from "./shared";
-import {
-  HOUSE_TINT,
-  HOUSE_TINT_FALLBACK,
-} from "./house-colours";
+import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colours";
 import { Sparkline } from "./Sparkline";
 import { meritById } from "@/lib/game/merits";
-import { RENOWN_TITLES, renownTitleForLevel } from "@/lib/game/legacy";
+import {
+  RENOWN_MAX_LEVEL,
+  RENOWN_TITLES,
+  renownTitleForLevel,
+} from "@/lib/game/legacy";
 import {
   Tooltip,
   TooltipContent,
@@ -374,7 +375,7 @@ function StatsTab({
         </div>
       </div>
 
-      {/* Recent Voyage Trends - sparklines from chronicle data */}
+      {/* Recent voyage trends, drawn as sparklines from chronicle data. */}
       {chronicles.length > 0 && (
         <div>
           <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -385,28 +386,28 @@ function StatsTab({
               label="Final Reputation"
               data={chronicles.map((c) => c.finalReputation).reverse()}
               icon={Trophy}
-              gradient="bg-profile/15"
+              gradient="bg-profile/5"
               textTone="text-profile"
             />
             <TrendCard
               label="Final Gold"
               data={chronicles.map((c) => c.finalGold).reverse()}
               icon={Coins}
-              gradient="bg-gold/25"
+              gradient="bg-gold/5"
               textTone="text-gold-ink"
             />
             <TrendCard
               label="Peak Reputation"
               data={chronicles.map((c) => c.peakReputation).reverse()}
               icon={TrendingUp}
-              gradient="bg-sea/15"
+              gradient="bg-sea/5"
               textTone="text-sea"
             />
             <TrendCard
               label="Largest Trade"
               data={chronicles.map((c) => c.largestTrade).reverse()}
               icon={Star}
-              gradient="bg-gain/15"
+              gradient="bg-gain/5"
               textTone="text-gain"
             />
           </div>
@@ -435,7 +436,7 @@ function StatsTab({
             <div
               className="h-full rounded-full bg-gradient-to-r from-celadon to-jade transition-all duration-500"
               style={{
-                width: `${Math.min(100, (legacy.renownLevel / 21) * 100)}%`,
+                width: `${Math.min(100, (legacy.renownLevel / RENOWN_MAX_LEVEL) * 100)}%`,
               }}
             />
           </div>
@@ -535,7 +536,7 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
               >
                 <div className="p-4 space-y-4">
                   {/* Full body text */}
-                  <p className="text-sm text-foreground/90 leading-relaxed">
+                  <p className="text-sm text-foreground leading-relaxed">
                     {c.body}
                   </p>
 
@@ -632,10 +633,10 @@ function ChronicleStat({
   /* One map rather than two: the wash and the ink sit on the same
      element, and the icon inside inherits the ink from it. */
   const tones: Record<string, string> = {
-    sea: "bg-sea/15 text-sea",
-    gold: "bg-gold/25 text-gold-ink",
-    due: "bg-due/15 text-due",
-    gain: "bg-gain/15 text-gain",
+    sea: "bg-sea/5 text-sea",
+    gold: "bg-gold/5 text-gold-ink",
+    due: "bg-due/5 text-due",
+    gain: "bg-gain/5 text-gain",
   };
   return (
     <div className="rounded-xl bg-black/5 dark:bg-white/5 p-3 text-center">
@@ -644,8 +645,7 @@ function ChronicleStat({
       >
         <Icon className="h-3.5 w-3.5" />
       </div>
-      <div className="font-display text-lg font-bold">{value}
-      </div>
+      <div className="font-display text-lg font-bold">{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
   );
@@ -742,18 +742,17 @@ function StatTile({
   tone: "sea" | "gold" | "due" | "intel";
 }) {
   const tones: Record<string, string> = {
-    sea: "bg-sea/15 text-sea",
-    gold: "bg-gold/25 text-gold-ink",
-    due: "bg-due/15 text-due",
-    intel: "bg-intel/15 text-intel",
+    sea: "bg-sea/5 text-sea",
+    gold: "bg-gold/5 text-gold-ink",
+    due: "bg-due/5 text-due",
+    intel: "bg-intel/5 text-intel",
   };
   return (
     <div className="pm-glass pm-ink-hover rounded-2xl p-3">
       <div className={cn("mb-2 inline-flex rounded-lg p-1.5", tones[tone])}>
         <Icon className="h-4 w-4" />
       </div>
-      <div className="font-display text-2xl font-bold">{value}
-      </div>
+      <div className="font-display text-2xl font-bold">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );

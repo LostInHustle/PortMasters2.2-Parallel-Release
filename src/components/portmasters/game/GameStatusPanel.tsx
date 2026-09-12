@@ -142,7 +142,7 @@ export function GameStatusPanel({
               {game.currentRound}/{game.maxRounds}
             </b>
           </span>
-          <span className="pm-truncate text-foreground/80" title={cfg.name}>
+          <span className="pm-truncate text-foreground" title={cfg.name}>
             {cfg.icon} {cfg.name}
           </span>
         </div>
@@ -161,11 +161,7 @@ export function GameStatusPanel({
             <Stat
               label="Due"
               value={`${pendTotal}`}
-              className={cn(
-                safe
-                  ? "text-foreground/80"
-                  : "text-alarm",
-              )}
+              className={cn(safe ? "text-foreground" : "text-alarm")}
             />
           ) : (
             <Stat
@@ -246,7 +242,7 @@ export function GameStatusPanel({
               </div>
             );
           })()}
-          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-0.5">
+          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-0.5">
             ━━ Raw Materials ━━
           </div>
           {unlockedResources(game.difficulty, game.currentRound).map((r) => (
@@ -259,7 +255,7 @@ export function GameStatusPanel({
               priceContent={priceAwareTermContent(game, r)}
             />
           ))}
-          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-2 mb-0.5">
+          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">
             ━━ Finished Goods ━━
           </div>
           {unlockedProducts(game.difficulty, game.currentRound).map((r) => (
@@ -274,7 +270,7 @@ export function GameStatusPanel({
           ))}
           {nW > 0 ? (
             <>
-              <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mt-2 mb-0.5">
+              <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">
                 ━━ Artisans ━━
               </div>
               {roster
@@ -361,7 +357,7 @@ export function GameStatusPanel({
             </b>
           </Row>
           {game.equippedModules.length === 0 ? (
-            <p className="pt-1 text-[10px] text-muted-foreground/80">
+            <p className="pt-1 text-[10px] text-muted-foreground">
               No modules installed. Upgrade the ship in the Shipyard to unlock
               slots.
             </p>
@@ -369,7 +365,7 @@ export function GameStatusPanel({
             game.equippedModules.map((m) => (
               <div key={m.id} className="py-0.5 text-[11px]">
                 <span className="mr-1">{m.icon}</span>
-                <span className="text-foreground/90">{m.name}</span>
+                <span className="text-foreground">{m.name}</span>
                 <div className="pl-5 text-[10px] text-muted-foreground">
                   {m.desc}
                 </div>
@@ -413,12 +409,7 @@ export function GameStatusPanel({
               >
                 <span className="text-xs font-semibold">💸 Total Due</span>
                 <span
-                  className={cn(
-                    "font-bold",
-                    safe
-                      ? "text-gain"
-                      : "text-alarm",
-                  )}
+                  className={cn("font-bold", safe ? "text-gain" : "text-alarm")}
                 >
                   {pendTotal} Gold
                 </span>
@@ -428,20 +419,20 @@ export function GameStatusPanel({
                   ✅ Funds sufficient for round end
                 </div>
               ) : (
-                <div className="mt-1.5 rounded-md bg-alarm/15 py-1 text-center text-[10px] text-alarm">
+                <div className="mt-1.5 rounded-md bg-alarm/5 py-1 text-center text-[10px] text-alarm">
                   🚨 Risk: Funds may fall short at round end!
                 </div>
               )}
             </>
           ) : (
-            <p className="py-2 text-[11px] text-muted-foreground/80">
+            <p className="py-2 text-[11px] text-muted-foreground">
               Nothing is owed until the voyage is under way.
             </p>
           )}
 
           {hasLoans && (
             <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
-              <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground/80">
+              <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
                 ━━ Outstanding Loans ━━
               </div>
               {game.debts.map((d) => (
@@ -451,7 +442,7 @@ export function GameStatusPanel({
                 >
                   <span className="text-[12px] text-muted-foreground">
                     You owe{" "}
-                    <b className="text-foreground/90">{d.counterpartyName}</b>
+                    <b className="text-foreground">{d.counterpartyName}</b>
                   </span>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <span className="text-[12px] font-bold text-alarm">
@@ -480,12 +471,10 @@ export function GameStatusPanel({
                     </span>
                   }
                 >
-                  <span className="font-bold text-gain">
-                    {l.amount}g
-                  </span>
+                  <span className="font-bold text-gain">{l.amount}g</span>
                 </Row>
               ))}
-              <p className="pt-1 text-[10px] text-muted-foreground/80">
+              <p className="pt-1 text-[10px] text-muted-foreground">
                 Unpaid loans settle automatically at the end of Round{" "}
                 {game.maxRounds}.
               </p>
@@ -538,7 +527,7 @@ function Row({
   return (
     <div className="flex items-center justify-between py-0.5 text-[12px]">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-foreground/90">{children}</span>
+      <span className="text-foreground">{children}</span>
     </div>
   );
 }
@@ -604,23 +593,23 @@ function ConvoyVenturesSection({
 
   return (
     <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
-      <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground/80">
+      <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
         ━━ Convoy Ventures ━━
       </div>
 
       {convoy.error && (
-        <div className="mb-1.5 rounded bg-alarm/10 px-2 py-1 text-[10px] text-alarm">
+        <div className="mb-1.5 rounded bg-alarm/5 px-2 py-1 text-[10px] text-alarm">
           {convoy.error}
         </div>
       )}
 
       {convoy.locked ? (
-        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
           This harbor has already used its one Convoy Venture for this voyage.
           It opens again on a fresh voyage or a restart.
         </p>
       ) : tooLateToPost ? (
-        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground/80 dark:bg-white/[0.04]">
+        <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
           Too late in this voyage to post a new Convoy Venture: there is no
           round left that would leave time to spend the reward.
         </p>
@@ -628,7 +617,7 @@ function ConvoyVenturesSection({
         <>
           <div className="mb-2 flex items-end gap-1.5">
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground">
                 Target Gold
               </label>
               <Input
@@ -642,7 +631,7 @@ function ConvoyVenturesSection({
               />
             </div>
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground/80">
+              <label className="mb-0.5 block text-[9px] text-muted-foreground">
                 Rounds to fill
               </label>
               <Input
@@ -664,7 +653,7 @@ function ConvoyVenturesSection({
           </div>
 
           {game.currentRound + Number(roundsAhead || 0) > 0 && (
-            <p className="mb-2 text-[9px] text-muted-foreground/70">
+            <p className="mb-2 text-[9px] text-muted-foreground">
               Fills by Round{" "}
               {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}. Miss
               it and every contributor only gets back a partial refund. This
@@ -675,7 +664,7 @@ function ConvoyVenturesSection({
       )}
 
       {convoy.ventures.length === 0 ? (
-        <p className="py-1 text-[11px] text-muted-foreground/80">
+        <p className="py-1 text-[11px] text-muted-foreground">
           {convoy.locked
             ? "No ventures open. This voyage's one chance has already been used."
             : "No ventures open right now. Post one, or wait for another captain to."}
@@ -712,12 +701,12 @@ function ConvoyVenturesSection({
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground/80">
+                <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground">
                   <span>By Round {v.deadlineRound}</span>
                   {mine && <span>You have backed {mine.amount}g</span>}
                 </div>
                 {atMyShareCap ? (
-                  <p className="mt-1.5 text-[9px] text-muted-foreground/70">
+                  <p className="mt-1.5 text-[9px] text-muted-foreground">
                     You have backed this as much as any single captain can. It
                     needs another captain to fund the rest.
                   </p>

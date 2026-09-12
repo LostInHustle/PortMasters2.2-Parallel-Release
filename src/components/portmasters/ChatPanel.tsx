@@ -182,7 +182,7 @@ export function ChatPanel({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search messages…"
-            className="h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+            className="h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             autoFocus
           />
           {searchQuery && (
@@ -208,13 +208,13 @@ export function ChatPanel({
       >
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {emptyText}
             </p>
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               No messages match &ldquo;{searchQuery}&rdquo;.
             </p>
           </div>
@@ -258,7 +258,7 @@ export function ChatPanel({
                   >
                     {m.content}
                   </div>
-                  <span className="text-[9px] text-muted-foreground/70 mt-0.5 px-1">
+                  <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
                     {new Date(m.createdAt).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -281,7 +281,7 @@ export function ChatPanel({
             className={cn(
               "pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
               searchOpen
-                ? "bg-celadon/20 text-celadon"
+                ? "bg-celadon/5 text-celadon"
                 : "bg-black/5 text-muted-foreground dark:bg-white/10",
             )}
             title="Search messages"

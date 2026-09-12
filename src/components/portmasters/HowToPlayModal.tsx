@@ -183,7 +183,7 @@ export function HowToPlayModal({
                 {current.title}
               </h3>
             </div>
-            <p className="text-sm leading-relaxed text-foreground/90">
+            <p className="text-sm leading-relaxed text-foreground">
               {current.body}
             </p>
             <div className="rounded-xl bg-warn/[0.07] border border-warn/20 p-3">

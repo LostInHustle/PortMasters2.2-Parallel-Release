@@ -14,11 +14,9 @@ import { cn } from "@/lib/utils";
  * baseline so a captain can see at a glance whether the current value
  * is above or below average.
  *
- * Used by:
- * - The Purchase phase market price reference, showing each good's
- *   price trend across rounds.
- * - The Captain Profile dashboard, showing reputation and gold flow
- *   across a voyage's rounds.
+ * Two screens draw one of these. The Purchase phase market price reference
+ * shows each good's price trend across rounds, and the Captain Profile
+ * dashboard shows reputation and gold flow across a voyage's rounds.
  */
 
 export function Sparkline({
@@ -86,7 +84,7 @@ export function Sparkline({
     return (
       <div
         className={cn(
-          "inline-flex items-center text-[9px] text-muted-foreground/40",
+          "inline-flex items-center text-[9px] text-muted-foreground",
           className,
         )}
         style={{ width, height }}

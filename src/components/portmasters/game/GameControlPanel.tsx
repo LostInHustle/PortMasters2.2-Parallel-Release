@@ -95,10 +95,7 @@ export function GameControlPanel({
   return (
     <div className="pm-glass rounded-2xl px-3 py-2.5 flex items-center gap-2 flex-wrap">
       <Button
-        className={cn(
-          "rounded-lg",
-          !startDisabled && "pm-grad-brand",
-        )}
+        className={cn("rounded-lg", !startDisabled && "pm-grad-brand")}
         variant={startDisabled ? "secondary" : "default"}
         disabled={startDisabled}
         onClick={onSetSail}
@@ -129,7 +126,7 @@ export function GameControlPanel({
             <Cloud className="h-3.5 w-3.5 text-gain" />
           )}
           {saving ? "Saving…" : "Saved"}
-          <span className="text-muted-foreground/60">· {phaseLabel(game)}</span>
+          <span className="text-muted-foreground">· {phaseLabel(game)}</span>
         </span>
         <Button
           variant="ghost"

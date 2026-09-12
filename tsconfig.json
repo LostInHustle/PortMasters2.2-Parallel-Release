@@ -4,9 +4,18 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    // `strict` already turns on noImplicitAny. A line switching it back off
+    // sat directly under this one, which quietly cancelled part of the very
+    // setting above it. Turning it back on produced zero errors, so the check
+    // had been suppressing nothing but itself.
     "strict": true,
     "noEmit": true,
-    "noImplicitAny": false,
+    // The tree is at zero unused locals and zero unused parameters. These two
+    // keep it there, because every one of the fifteen that were found had been
+    // invisible: the lint config disables no-unused-vars, so nothing in the
+    // normal check would ever have reported them.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

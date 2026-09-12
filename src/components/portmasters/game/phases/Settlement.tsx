@@ -107,7 +107,7 @@ function PirateAttack({
           const recommend = escortFee < expectedLoss && game.money > 0;
           if (!recommend) return null;
           return (
-            <div className="mt-2 rounded-lg bg-gain/10 px-2.5 py-1.5 text-[10px] text-gain">
+            <div className="mt-2 rounded-lg bg-gain/5 px-2.5 py-1.5 text-[10px] text-gain">
               Escort costs {escortFee}g but expected loss is{" "}
               {Math.round(expectedLoss)}g. Hiring the escort saves Gold on
               average.
@@ -144,7 +144,6 @@ function PirateAttack({
 
 function SettlementBills({
   game,
-  act,
   aid,
   backing,
   me,
@@ -152,7 +151,7 @@ function SettlementBills({
   members,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "aid" | "backing" | "me" | "phaseSync" | "members"
+  "game" | "aid" | "backing" | "me" | "phaseSync" | "members"
 >) {
   const myUserId = me.id;
   // One pass over the whole roster, deliberately mirroring payWages in
@@ -225,9 +224,7 @@ function SettlementBills({
       )}
 
       <div className="rounded-xl bg-due/[0.06] border border-due/20 p-3.5 my-3.5">
-        <h3 className="font-semibold text-due mb-2">
-          ⏳ Bills Due This Round
-        </h3>
+        <h3 className="font-semibold text-due mb-2">⏳ Bills Due This Round</h3>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>
             👥 Worker Wages ({nWorkers} worker{nWorkers !== 1 ? "s" : ""})
@@ -246,9 +243,7 @@ function SettlementBills({
         )}
         <div className="flex justify-between text-sm py-0.5 border-t border-due/20 pt-1.5 mt-1.5 font-bold">
           <span>💸 Total Due</span>
-          <span className="text-due">
-            {totalDue} Gold
-          </span>
+          <span className="text-due">{totalDue} Gold</span>
         </div>
       </div>
 
@@ -256,9 +251,7 @@ function SettlementBills({
         <h3 className="font-semibold mb-2">💹 Balance Summary</h3>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Current Funds</span>
-          <span className="text-gain font-bold">
-            {game.money} Gold
-          </span>
+          <span className="text-gain font-bold">{game.money} Gold</span>
         </div>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>After Settlement</span>
@@ -273,9 +266,7 @@ function SettlementBills({
         </div>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Round Revenue</span>
-          <span className="text-gain">
-            +{game.roundRevenue} Gold
-          </span>
+          <span className="text-gain">+{game.roundRevenue} Gold</span>
         </div>
       </div>
 
@@ -431,7 +422,7 @@ function SettlementBills({
       )}
 
       {backing.error && (
-        <div className="rounded-lg bg-alarm/10 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {backing.error}</span>
           <button onClick={backing.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -440,7 +431,7 @@ function SettlementBills({
       )}
 
       {aid.error && (
-        <div className="rounded-lg bg-alarm/10 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {aid.error}</span>
           <button onClick={aid.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -505,7 +496,6 @@ export function Settlement({
   return (
     <SettlementBills
       game={game}
-      act={act}
       aid={aid}
       backing={backing}
       me={me}

@@ -121,8 +121,7 @@ export function MembersPanel({
     <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
       <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Ship className="h-4 w-4 text-members" /> Harbor
-          Roster
+          <Ship className="h-4 w-4 text-members" /> Harbor Roster
         </h3>
         <Pill tone="sea">
           {members.length} captain{members.length !== 1 ? "s" : ""}
@@ -362,7 +361,7 @@ function PeekButton({
             </div>
           </div>
         )}
-        <p className="mt-1.5 text-[10px] text-muted-foreground/70">
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
           Bands are read from {targetName}'s live snapshot. The harbor master
           only shares what your standing allows.
         </p>
@@ -370,7 +369,3 @@ function PeekButton({
     </Popover>
   );
 }
-
-// Forwarded so any caller that wants the band label alone can compute it
-// without reaching into the engine module directly.
-export { bandFor };
