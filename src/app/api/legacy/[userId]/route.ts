@@ -5,7 +5,7 @@
 // room stat, and none of these fields are sensitive, so any signed in
 // captain can look up any other captain's standing, the same way a
 // public game profile works. Still requires being signed in, just not
-// shared membership. The check-in state stays private to the owner.
+// shared membership. The check in state stays private to the owner.
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";

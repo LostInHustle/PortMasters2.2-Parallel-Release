@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { Eye, Trophy, Coins, Anchor } from "lucide-react";
 import type { PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
-import { cn } from "@/lib/utils";
 
 /**
  * [MANIFEST 07: Bequest Routing] Extends the already shipped Silent
@@ -23,12 +22,8 @@ export function Bankruptcy({
   members,
   backing,
   me,
-  room,
   roster,
-}: Pick<
-  PhasePanelProps,
-  "game" | "members" | "backing" | "me" | "room" | "roster"
->) {
+}: Pick<PhasePanelProps, "game" | "members" | "backing" | "me" | "roster">) {
   const myUserId = me.id;
   const statuses = roster?.statuses ?? {};
   const activeCaptains = members
@@ -55,7 +50,7 @@ export function Bankruptcy({
       >
         💥
       </motion.div>
-      <div className="font-display pm-brush mb-1 text-2xl font-bold text-rose-600 dark:text-rose-400">
+      <div className="font-display pm-brush mb-1 text-2xl font-bold text-alarm">
         Ship Fleet Bankrupt!
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
@@ -92,8 +87,8 @@ export function Bankruptcy({
 
       {/* Bequest Routing: Silent Partner */}
       {game.loansGiven.length > 0 && (
-        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3 text-left">
-          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+        <div className="mt-4 rounded-xl border border-gain/20 bg-gain/[0.04] px-4 py-3 text-left">
+          <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
             🤝 Silent Partner
           </div>
           <p className="mb-2.5 text-xs text-muted-foreground">
@@ -111,11 +106,9 @@ export function Bankruptcy({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
                       Owed by{" "}
-                      <b className="text-foreground/90">{l.counterpartyName}</b>
+                      <b className="text-foreground">{l.counterpartyName}</b>
                     </span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      {l.amount}g
-                    </span>
+                    <span className="font-bold text-gain">{l.amount}g</span>
                   </div>
                   {backing && candidates.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -147,10 +140,10 @@ export function Bankruptcy({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mt-4 rounded-xl border border-teal-500/20 bg-teal-500/[0.04] px-4 py-3 text-left"
+          className="mt-4 rounded-xl border border-sea/20 bg-sea/[0.04] px-4 py-3 text-left"
         >
-          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
-            <Eye className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <Eye className="h-4 w-4 text-sea" />
             Spectator Mode: Live Harbor Standings
           </div>
           <p className="mb-3 text-xs text-muted-foreground">
@@ -180,11 +173,11 @@ export function Bankruptcy({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <Pill tone="amber" className="font-mono">
+                  <Pill tone="gold" className="font-mono">
                     <Coins className="h-3 w-3" />
                     {status?.gold ?? 0}
                   </Pill>
-                  <Pill tone="sea" className="font-mono">
+                  <Pill tone="favor" className="font-mono">
                     <Trophy className="h-3 w-3" />
                     {status?.reputation ?? 0}
                   </Pill>
@@ -196,7 +189,7 @@ export function Bankruptcy({
       )}
 
       {activeCaptains.length === 0 && (
-        <div className="mt-4 rounded-xl border border-teal-500/15 bg-teal-500/[0.04] px-4 py-3 text-sm text-muted-foreground">
+        <div className="mt-4 rounded-xl border border-sea/15 bg-sea/[0.04] px-4 py-3 text-sm text-muted-foreground">
           Your voyage has ended, and the rest of the harbor has finished too.
           Wait for the host to restart the voyage.
         </div>

@@ -1,4 +1,4 @@
-# PortMasters 2: Project Proposal
+# PortMasters 2.2 Parallel Release: Project Proposal
 
 ## Vision
 
@@ -40,7 +40,7 @@ The seven un built manifest systems, in dependency order:
 
 3. **Captain's Rival** (Manifest 11). The friend you keep sailing against gets a scoreboard of their own. A per pair counter of how many times two specific captains finished a voyage in the same room and who out scored whom. A head to head line on the Captain's Legacy card, shown only when both are in the same room. Needs a `CaptainRival` table keyed on the sorted pair of user ids.
 
-4. **Partial Sight** (Manifest 06). A trusted partner sees a blur, not a wall and not a full ledger. A trusted partner (same trust threshold as Backing) gets a banded range read of another captain's cargo during active play. Pure client side rounding. No new server trust boundary. Needs a trust threshold constant and a banding helper.
+4. **Partial Sight** (Manifest 06). A trusted partner sees a blur, not a wall and not a full ledger. A captain at Renown Level 5 or above gets a banded range read of another captain's cargo during active play. Pure client side rounding. No new server trust boundary. Needs a trust threshold constant and a banding helper.
 
 5. **Trading Houses** (Manifest 08). A second identity to argue about, separate from the Renown grind. Pledge to one of three houses, each with one small passive perk (free first artisan, extra cargo capacity, more pirate risk for cheaper wages) plus a separate House Standing counter. Needs a `houseId` field on `CaptainLegacy`, a `HouseStanding` aggregate, and a balance pass.
 
@@ -50,7 +50,7 @@ The seven un built manifest systems, in dependency order:
 
 The Bilingual Harbor (Manifest 15) stays dropped. It was built in full and then removed at the owner's request. It does not come back without a fresh owner decision.
 
-**Status in the 2.2 build.** Six of the seven are in the game. Voyage Chronicle, Captain's Rival, Partial Sight and Quick Start Match shipped in full. Trading Houses and Ages of the Ledger shipped as identity, standings and display, with the per House perks and the per Age effects written into the engine but not yet read at voyage start, so neither currently changes what a captain can do. House Rally did not ship and is the one system still on the roadmap. The Bilingual Harbor stayed dropped.
+**Status in the 2.2 build.** Six of the seven are in the game. Voyage Chronicle, Captain's Rival, Partial Sight and Quick Start Match shipped in full. Trading Houses and Ages of the Ledger shipped in full as well, identity, standings, display and effect: a pledge grants its House perk from the first fresh voyage after it is taken, and each Age leans the harbor it holds. House Rally did not ship and is the one system still on the roadmap. The Bilingual Harbor stayed dropped.
 
 ## Database and boot behaviour
 
@@ -64,4 +64,4 @@ The Prisma schema drops the custom `output = "../generated/prisma"` path and the
 
 The application loads at the sandbox preview URL. A captain can register, log in, create a room, and (in a second browser) join it. The host can start the voyage. Both captains play through a full round in lockstep. The ready check protocol advances the room. The deterministic engine produces identical markets for both captains. The barter board, the aid system, the backing system, and the convoy ventures all work end to end. The voyage concludes with Renown XP, Merits, and a Sea Master crown. The Captain's Legacy card persists across voyages. The daily check in works. The Ledger Integrity Pass flags a forged save. The aesthetic reads as natural, modern, colourful, and East Asian. No en dashes, em dashes, hyphens, or double hyphens appear in any user facing text. The seven new manifest systems are all reachable from the UI.
 
-**Outcome in the 2.2 build.** Six of the seven are reachable from the interface. House Rally did not ship. The per House perks and the per Age effects are visible in the interface without being applied to play, which `docs/RELEASE_NOTES.md` names plainly.
+**Outcome in the 2.2 build.** Six of the seven are reachable from the interface. House Rally did not ship. The per House perks and the per Age effects are applied to play as well as shown in the interface, and `docs/RELEASE_NOTES.md` sets out what each one does.

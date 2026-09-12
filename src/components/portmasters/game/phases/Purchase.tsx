@@ -46,8 +46,8 @@ function MarketPriceReference({
   colorFor: (item: string) => string | undefined;
 }) {
   return (
-    <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground/80 mb-1.5">
+    <div className="rounded-xl border border-purchase/15 bg-purchase/[0.03] px-3.5 py-2.5 mb-3.5">
+      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-1.5">
         ━━ MARKET PRICE REFERENCE (hover for details) ━━
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -96,21 +96,21 @@ function MarketPriceReference({
           ...goodsWithHistory.map((g) => game.priceHistory[g].length),
         );
         return (
-          <div className="mt-2 border-t border-teal-500/10 pt-2">
-            <div className="text-[9px] text-muted-foreground/70 mb-1">
+          <div className="mt-2 border-t border-purchase/10 pt-2">
+            <div className="text-[9px] text-muted-foreground mb-1">
               Price History Heatmap
             </div>
             <div className="overflow-x-auto pm-scroll">
               <table className="text-[9px]">
                 <thead>
                   <tr>
-                    <th className="pr-1.5 text-left font-normal text-muted-foreground/60">
+                    <th className="pr-1.5 text-left font-normal text-muted-foreground">
                       Good
                     </th>
                     {Array.from({ length: maxRound }, (_, i) => (
                       <th
                         key={i}
-                        className="px-0.5 text-center font-normal text-muted-foreground/50"
+                        className="px-0.5 text-center font-normal text-muted-foreground"
                       >
                         R{i + 1}
                       </th>
@@ -233,8 +233,8 @@ function TradeAdvisor({
   if (scored.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-indigo-600 dark:text-indigo-400/80 mb-1.5">
+    <div className="rounded-xl border border-advisor/15 bg-advisor/[0.03] px-3.5 py-2.5 mb-3.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-advisor mb-1.5">
         <Lightbulb className="h-3.5 w-3.5" /> Best Deals This Round
       </div>
       <div className="flex flex-wrap gap-2">
@@ -247,19 +247,15 @@ function TradeAdvisor({
               key={i}
               className="flex items-center gap-1.5 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
             >
-              <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                {i + 1}.
-              </span>
+              <span className="font-bold text-intel">{i + 1}.</span>
               <ItemIcon item={s.goodName} className="h-3.5 w-3.5" />
               <span style={{ color: colorFor(s.goodName) }}>{s.goodName}</span>
               <span className="text-muted-foreground">x{s.qty}</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                {s.unitPrice}
-              </span>
+              <span className="font-bold text-gain">{s.unitPrice}</span>
               <span className="text-[9px] text-muted-foreground">g</span>
               {matchesIntel && (
                 <span
-                  className="rounded-full bg-amber-500/20 px-1 py-0.5 text-[7px] font-bold text-amber-700 dark:text-amber-300"
+                  className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
                   title="Matches a Broker's Whisper, guaranteed order in Phase 2"
                 >
                   Intel
@@ -269,10 +265,10 @@ function TradeAdvisor({
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white",
                   s.score > 0.6
-                    ? "bg-emerald-500"
+                    ? "bg-gain"
                     : s.score > 0.3
-                      ? "bg-amber-500"
-                      : "bg-rose-400",
+                      ? "bg-warn"
+                      : "bg-alarm",
                 )}
               >
                 {Math.round(s.score * 100)}%
@@ -314,24 +310,22 @@ function MarketPulse({ game }: { game: GameState }) {
   const softer = sorted.filter(([, v]) => v < 0);
 
   return (
-    <div className="rounded-xl border border-violet-500/15 bg-violet-500/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-violet-600 dark:text-violet-400/80 mb-1.5">
+    <div className="rounded-xl border border-pulse/15 bg-pulse/[0.03] px-3.5 py-2.5 mb-3.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-pulse mb-1.5">
         <TrendingUp className="h-3.5 w-3.5" />
         Harbor Pulse
-        <span className="font-normal text-muted-foreground/60 ml-1">
+        <span className="font-normal text-muted-foreground ml-1">
           already priced into this board
         </span>
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
         {pricier.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] text-rose-500 font-semibold">
-              Pricier
-            </span>
+            <span className="text-[9px] text-alarm font-semibold">Pricier</span>
             {pricier.map(([good, v]) => (
               <span
                 key={good}
-                className="inline-flex items-center gap-0.5 rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-600 dark:text-rose-300"
+                className="inline-flex items-center gap-0.5 rounded-full bg-alarm/5 px-1.5 py-0.5 text-[10px] font-medium text-alarm"
                 title={`${good} is about ${Math.round(v * 100)} percent above its usual price this round`}
               >
                 <ArrowUp className="h-2.5 w-2.5" />
@@ -342,13 +336,11 @@ function MarketPulse({ game }: { game: GameState }) {
         )}
         {softer.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] text-emerald-500 font-semibold">
-              Softer
-            </span>
+            <span className="text-[9px] text-gain font-semibold">Softer</span>
             {softer.map(([good, v]) => (
               <span
                 key={good}
-                className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300"
+                className="inline-flex items-center gap-0.5 rounded-full bg-gain/5 px-1.5 py-0.5 text-[10px] font-medium text-gain"
                 title={`${good} is about ${Math.round(Math.abs(v) * 100)} percent below its usual price this round`}
               >
                 <ArrowDown className="h-2.5 w-2.5" />
@@ -391,8 +383,8 @@ function MarketDepth({
   entries.sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="rounded-xl border border-teal-500/10 bg-teal-500/[0.02] px-3.5 py-2 mb-3.5">
-      <div className="text-[9px] font-semibold tracking-wide text-muted-foreground/70 mb-1">
+    <div className="rounded-xl border border-depth/15 bg-depth/[0.03] px-3.5 py-2 mb-3.5">
+      <div className="text-[9px] font-semibold tracking-wide text-muted-foreground mb-1">
         Market Depth
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -407,11 +399,7 @@ function MarketDepth({
             <span
               className={cn(
                 "rounded px-1 text-[8px] font-bold text-white",
-                count >= 3
-                  ? "bg-emerald-500"
-                  : count === 2
-                    ? "bg-amber-500"
-                    : "bg-rose-400",
+                count >= 3 ? "bg-gain" : count === 2 ? "bg-warn" : "bg-alarm",
               )}
             >
               {count}
@@ -439,7 +427,7 @@ export function Purchase({
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Anchor className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+          <Anchor className="h-5 w-5 text-purchase" />
           Port Merchant Exchange
         </h2>
         <Button
@@ -452,7 +440,7 @@ export function Purchase({
         </Button>
       </div>
       {game.revealedIntel.length > 0 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
+        <div className="rounded-lg border border-warn/25 bg-warn/[0.06] px-3.5 py-2.5 mb-3.5 text-xs">
           <strong>🗣️ Broker's Whispers active this round:</strong>{" "}
           {game.revealedIntel.map((i, idx) => (
             <span key={idx}>
@@ -467,6 +455,10 @@ export function Purchase({
           </span>
         </div>
       )}
+      {/* The sub panels no longer share one shell. The price reference,
+          the trade advisor, the pulse and the depth each wear the hue of
+          their own widget, so a captain can tell at a glance which one is
+          speaking. */}
       <MarketPriceReference game={game} colorFor={resolveColor} />
       <TradeAdvisor game={game} colorFor={resolveColor} />
       <MarketPulse game={game} />
@@ -483,7 +475,7 @@ export function Purchase({
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
                 purchased
-                  ? "border-emerald-500/30 bg-emerald-500/[0.04]"
+                  ? "border-gain/30 bg-gain/[0.04]"
                   : "border-black/10 dark:border-white/10 bg-background/50",
               )}
             >
@@ -537,8 +529,8 @@ export function Purchase({
                             className={cn(
                               "ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                               isDeal
-                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-                                : "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+                                ? "bg-gain/5 text-gain"
+                                : "bg-alarm/5 text-alarm",
                             )}
                             title={
                               isDeal
@@ -555,8 +547,8 @@ export function Purchase({
                           className={cn(
                             "ml-1.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                             pulse > 0
-                              ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
-                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+                              ? "bg-alarm/5 text-alarm"
+                              : "bg-gain/5 text-gain",
                           )}
                           title={
                             pulse > 0
@@ -581,7 +573,7 @@ export function Purchase({
                   <Term
                     content={<PriceBreakdownTooltip breakdown={breakdown} />}
                   >
-                    <span className="text-rose-600 dark:text-rose-400 font-bold text-sm">
+                    <span className="text-alarm font-bold text-sm">
                       💰 Total: {finalCost} Gold
                     </span>
                   </Term>
@@ -596,7 +588,7 @@ export function Purchase({
                 <Button
                   className={cn(
                     "w-full rounded-lg",
-                    canAfford ? "pm-grad-jade text-white" : "",
+                    canAfford ? "pm-grad-purchase" : "",
                   )}
                   variant={canAfford ? "default" : "secondary"}
                   disabled={!canAfford}

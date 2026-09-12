@@ -55,18 +55,6 @@ export type GameStatusUpdate = {
   renownLevel?: number;
 };
 
-// The room's synchronized checkpoint: the round and phase every active
-// captain is expected to be at, plus the set of captain ids who have
-// already said "ready" for it. Mirrors the server's Checkpoint type
-// minus the advancing flag, which is purely an in process guard and
-// never crosses the wire.
-export type Checkpoint = {
-  round: number;
-  phase: string;
-  readyUserIds: string[];
-  requiredUserIds: string[];
-};
-
 // An open barter offer, identical to the server side type. The optional
 // targetUserId fields are set only on a direct offer aimed at one
 // specific captain; an ordinary open offer leaves them unset.
@@ -144,11 +132,8 @@ type StandingsEntry = {
   displayName: string;
   avatarHue: number;
   reputation: number;
-  gold: number;
   crowned: boolean;
   bankrupt: boolean;
-  renownLevel: number;
-  renownTitle: string;
   xpGained: number;
   leveledUp: boolean;
   brokersFavorUnlocked: boolean;

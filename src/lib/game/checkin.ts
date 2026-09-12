@@ -20,9 +20,10 @@
 const CHECK_IN_XP_REWARDS = [20, 30, 40, 50, 60, 80, 150] as const;
 const CHECK_IN_CYCLE_LENGTH = CHECK_IN_XP_REWARDS.length; // 7
 
-// Renown XP granted for a given 1-based day of the cycle. Days outside
-// 1..7 clamp into range rather than returning undefined, so a corrupt or
-// out of range stored count can never hand out an undefined reward.
+// Renown XP granted for a given day of the cycle, counting the days from
+// one. Days outside 1..7 clamp into range rather than returning undefined,
+// so a corrupt or out of range stored count can never hand out an
+// undefined reward.
 function checkInRewardForDay(day: number): number {
   const idx = Math.min(CHECK_IN_CYCLE_LENGTH, Math.max(1, Math.floor(day))) - 1;
   return CHECK_IN_XP_REWARDS[idx];
@@ -36,7 +37,7 @@ export function utcDayKey(date: Date = new Date()): string {
   return date.toISOString().slice(0, 10);
 }
 
-// The persisted half of a captain's check-in: how many days of the current
+// The persisted half of a captain's check in: how many days of the current
 // cycle they have already claimed (0..6, wrapping to 0 the instant Day 7 is
 // claimed) and the UTC date key of their most recent claim. Mirrors the two
 // columns added to the CaptainLegacy table.
@@ -48,8 +49,8 @@ export type CheckInState = {
 // Everything the lobby widget needs to render the seven tiles and the claim
 // button, derived from the persisted state plus today's date.
 export type CheckInStatus = {
-  // 1-based day the captain is currently on: the tile to highlight and the
-  // reward the next claim will grant.
+  // The day of the cycle the captain is currently on, counting from one:
+  // the tile to highlight and the reward the next claim will grant.
   currentDay: number;
   // How many tiles at the start of the cycle are already claimed (0..6).
   claimedThisCycle: number;

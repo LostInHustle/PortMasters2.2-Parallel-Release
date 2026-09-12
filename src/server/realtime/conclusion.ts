@@ -158,9 +158,24 @@ export async function maybeConcludeVoyage(
   // is one whose report may simply not have arrived yet; sweeping that
   // loan would race their genuine settlement. An absent borrower paid
   // nothing by definition, so 0 is the honest repaid amount.
+  //
+  // That reasoning holds for a captain who finished the voyage solvent
+  // and may still be settling up. It does not hold for a bankrupt one.
+  // Insolvency is final, there is nothing left to settle with, and a
+  // bankrupt captain keeps their socket open to watch the standings
+  // rather than to pay anybody, so treating them as present stranded
+  // their loans for good: this sweep is the only thing that ever closes
+  // a loan its borrower never reports, and with it skipped the pledge
+  // riding on the loan never resolved either.
+  const bankrupt = new Set(
+    finished.filter((f) => f.phase === "bankruptcy").map((f) => f.userId),
+  );
   let sweptAny = false;
   for (const loan of [...loanList(roomId)]) {
-    if ((userSockets.get(loan.borrowerId)?.size ?? 0) > 0) continue;
+    const stillPresent =
+      !bankrupt.has(loan.borrowerId) &&
+      (userSockets.get(loan.borrowerId)?.size ?? 0) > 0;
+    if (stillPresent) continue;
     removeLoan(roomId, loan.debtId);
     sweptAny = true;
     resolveBackingFor(io, roomId, loan, 0);
@@ -214,11 +229,8 @@ export async function maybeConcludeVoyage(
     displayName: string;
     avatarHue: number;
     reputation: number;
-    gold: number;
     crowned: boolean;
     bankrupt: boolean;
-    renownLevel: number;
-    renownTitle: string;
     xpGained: number;
     leveledUp: boolean;
     brokersFavorUnlocked: boolean;
@@ -376,16 +388,18 @@ export async function maybeConcludeVoyage(
         console.error(`[chronicle] failed to write for ${f.userId}:`, err);
       });
 
+    // Every field here is read by a screen. A row used to carry `gold`,
+    // `renownLevel` and `renownTitle` as well, and nothing ever read any
+    // of the three: the Endgame panel draws final funds from the captain's
+    // own game state, and the Renown level and title from the legacy
+    // record it fetches alongside this payload.
     standings.push({
       userId: f.userId,
       displayName: f.user.displayName,
       avatarHue: f.user.avatarHue,
       reputation: f.reputation,
-      gold: f.gold,
       crowned,
       bankrupt,
-      renownLevel: newLevel,
-      renownTitle: renownTitleForLevel(newLevel),
       xpGained,
       leveledUp,
       brokersFavorUnlocked,

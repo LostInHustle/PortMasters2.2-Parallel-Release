@@ -23,9 +23,14 @@ import { api, type PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { VoyageChronicle, RivalEntry } from "@/types/realtime";
 import { Avatar, Pill, MeritIcon } from "./shared";
+import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colours";
 import { Sparkline } from "./Sparkline";
 import { meritById } from "@/lib/game/merits";
-import { RENOWN_TITLES, renownTitleForLevel } from "@/lib/game/legacy";
+import {
+  RENOWN_MAX_LEVEL,
+  RENOWN_TITLES,
+  renownTitleForLevel,
+} from "@/lib/game/legacy";
 import {
   Tooltip,
   TooltipContent,
@@ -114,7 +119,7 @@ export function CaptainProfileModal({
               className="shrink-0"
             />
             <div className="flex-1 min-w-0">
-              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight pm-text-sea pm-truncate">
+              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-profile pm-truncate">
                 {me.displayName}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground pm-truncate">
@@ -130,7 +135,12 @@ export function CaptainProfileModal({
                     {renownTitleForLevel(data.legacy.renownLevel)}
                   </Pill>
                   {data.legacy.houseId && (
-                    <Pill tone="indigo">
+                    <Pill
+                      tone="none"
+                      className={
+                        HOUSE_TINT[data.legacy.houseId] ?? HOUSE_TINT_FALLBACK
+                      }
+                    >
                       <Anchor className="h-3 w-3" />{" "}
                       {data.legacy.houseId.replace(/_/g, " ")}
                     </Pill>
@@ -256,13 +266,13 @@ function StatsTab({
           icon={Trophy}
           label="Best Rep"
           value={legacy.bestScore}
-          tone="amber"
+          tone="due"
         />
         <StatTile
           icon={Gem}
           label="Renown XP"
           value={legacy.renownXP}
-          tone="indigo"
+          tone="intel"
         />
       </div>
 
@@ -272,7 +282,7 @@ function StatsTab({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Waves className="h-4 w-4" /> Solvent Streak
           </div>
-          <div className="mt-1 font-display text-3xl font-bold pm-text-sea">
+          <div className="mt-1 font-display text-3xl font-bold text-profile">
             {stats.solventStreak}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -283,7 +293,7 @@ function StatsTab({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Crown className="h-4 w-4" /> Crown Rate
           </div>
-          <div className="mt-1 font-display text-3xl font-bold pm-text-gold">
+          <div className="mt-1 font-display text-3xl font-bold text-gold-ink">
             {Math.round(stats.crownRate * 100)}%
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -347,7 +357,7 @@ function StatsTab({
               <Tooltip key={id}>
                 <TooltipTrigger asChild>
                   <div className="pm-glass pm-ink-hover flex w-32 flex-col items-center gap-1.5 rounded-2xl p-3 text-center">
-                    <div className="pm-grad-gold flex h-10 w-10 items-center justify-center rounded-full text-white">
+                    <div className="pm-grad-profile flex h-10 w-10 items-center justify-center rounded-full">
                       <MeritIcon id={merit.id} className="h-5 w-5" />
                     </div>
                     <span className="text-[11px] font-medium leading-tight">
@@ -365,7 +375,7 @@ function StatsTab({
         </div>
       </div>
 
-      {/* Recent Voyage Trends - sparklines from chronicle data */}
+      {/* Recent voyage trends, drawn as sparklines from chronicle data. */}
       {chronicles.length > 0 && (
         <div>
           <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -376,29 +386,29 @@ function StatsTab({
               label="Final Reputation"
               data={chronicles.map((c) => c.finalReputation).reverse()}
               icon={Trophy}
-              gradient="pm-grad-primary"
-              textTone="text-teal-600 dark:text-teal-300"
+              gradient="bg-profile/5"
+              textTone="text-profile"
             />
             <TrendCard
               label="Final Gold"
               data={chronicles.map((c) => c.finalGold).reverse()}
               icon={Coins}
-              gradient="pm-grad-gold"
-              textTone="text-amber-600 dark:text-amber-300"
+              gradient="bg-gold/5"
+              textTone="text-gold-ink"
             />
             <TrendCard
               label="Peak Reputation"
               data={chronicles.map((c) => c.peakReputation).reverse()}
               icon={TrendingUp}
-              gradient="pm-grad-jade"
-              textTone="text-emerald-600 dark:text-emerald-300"
+              gradient="bg-sea/5"
+              textTone="text-sea"
             />
             <TrendCard
               label="Largest Trade"
               data={chronicles.map((c) => c.largestTrade).reverse()}
               icon={Star}
-              gradient="pm-grad-amber"
-              textTone="text-orange-600 dark:text-orange-300"
+              gradient="bg-gain/5"
+              textTone="text-gain"
             />
           </div>
           <p className="mt-2 text-center text-[10px] text-muted-foreground">
@@ -426,7 +436,7 @@ function StatsTab({
             <div
               className="h-full rounded-full bg-gradient-to-r from-celadon to-jade transition-all duration-500"
               style={{
-                width: `${Math.min(100, (legacy.renownLevel / 21) * 100)}%`,
+                width: `${Math.min(100, (legacy.renownLevel / RENOWN_MAX_LEVEL) * 100)}%`,
               }}
             />
           </div>
@@ -437,7 +447,7 @@ function StatsTab({
                 className={cn(
                   "rounded-full px-2.5 py-0.5 text-[10px] font-medium",
                   legacy.renownLevel >= title.minLevel
-                    ? "pm-grad-gold text-amber-950"
+                    ? "pm-grad-medal-gold"
                     : "bg-black/5 text-muted-foreground dark:bg-white/10",
                 )}
               >
@@ -485,14 +495,14 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
             >
               <div className="mb-2 flex items-center gap-2">
                 <Pill tone="sea">{c.difficulty.replace(/_/g, " ")}</Pill>
-                <Pill tone="amber">{c.rounds} rounds</Pill>
+                <Pill tone="due">{c.rounds} rounds</Pill>
                 {c.crowned && (
                   <Pill tone="gold">
                     <Crown className="h-3 w-3" /> Crowned
                   </Pill>
                 )}
                 {c.bankrupt && (
-                  <Pill tone="rose">
+                  <Pill tone="alarm">
                     <Skull className="h-3 w-3" /> Bankrupt
                   </Pill>
                 )}
@@ -506,7 +516,7 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </motion.span>
               </div>
-              <p className="font-display text-sm font-semibold pm-text-sea">
+              <p className="font-display text-sm font-semibold text-profile">
                 {c.headline}
               </p>
               {!isExpanded && (
@@ -526,7 +536,7 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
               >
                 <div className="p-4 space-y-4">
                   {/* Full body text */}
-                  <p className="text-sm text-foreground/90 leading-relaxed">
+                  <p className="text-sm text-foreground leading-relaxed">
                     {c.body}
                   </p>
 
@@ -536,7 +546,7 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
                       icon={Trophy}
                       label="Peak Rep"
                       value={c.peakReputation}
-                      tone="amber"
+                      tone="due"
                     />
                     <ChronicleStat
                       icon={TrendingUp}
@@ -548,7 +558,7 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
                       icon={Coins}
                       label="Final Gold"
                       value={c.finalGold}
-                      tone="jade"
+                      tone="gain"
                     />
                     <ChronicleStat
                       icon={Star}
@@ -560,12 +570,12 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
 
                   {/* Barter and loan stats */}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/15 p-3">
+                    <div className="rounded-xl bg-intel/5 border border-intel/15 p-3">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Handshake className="h-3.5 w-3.5" /> Lending
                       </div>
                       <div className="mt-1 text-sm">
-                        <span className="font-bold text-indigo-600 dark:text-indigo-300">
+                        <span className="font-bold text-intel">
                           {c.lendCount}
                         </span>
                         <span className="text-muted-foreground">
@@ -574,12 +584,12 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
                         </span>
                       </div>
                     </div>
-                    <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 p-3">
+                    <div className="rounded-xl bg-warn/5 border border-warn/15 p-3">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Coins className="h-3.5 w-3.5" /> Borrowing
                       </div>
                       <div className="mt-1 text-sm">
-                        <span className="font-bold text-amber-600 dark:text-amber-300">
+                        <span className="font-bold text-warn">
                           {c.borrowCount}
                         </span>
                         <span className="text-muted-foreground">
@@ -618,30 +628,24 @@ function ChronicleStat({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  tone: "sea" | "gold" | "amber" | "jade";
+  tone: "sea" | "gold" | "due" | "gain";
 }) {
+  /* One map rather than two: the wash and the ink sit on the same
+     element, and the icon inside inherits the ink from it. */
   const tones: Record<string, string> = {
-    sea: "pm-grad-primary",
-    gold: "pm-grad-gold",
-    amber: "pm-grad-amber",
-    jade: "pm-grad-jade",
-  };
-  const textTones: Record<string, string> = {
-    sea: "text-teal-600 dark:text-teal-300",
-    gold: "text-amber-600 dark:text-amber-300",
-    amber: "text-orange-600 dark:text-orange-300",
-    jade: "text-emerald-600 dark:text-emerald-300",
+    sea: "bg-sea/5 text-sea",
+    gold: "bg-gold/5 text-gold-ink",
+    due: "bg-due/5 text-due",
+    gain: "bg-gain/5 text-gain",
   };
   return (
     <div className="rounded-xl bg-black/5 dark:bg-white/5 p-3 text-center">
       <div
         className={cn("mx-auto mb-1 inline-flex rounded-lg p-1.5", tones[tone])}
       >
-        <Icon className="h-3.5 w-3.5 text-white" />
+        <Icon className="h-3.5 w-3.5" />
       </div>
-      <div className={cn("font-display text-lg font-bold", textTones[tone])}>
-        {value}
-      </div>
+      <div className="font-display text-lg font-bold">{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
   );
@@ -694,12 +698,12 @@ function RivalsTab({ rivals }: { rivals: RivalEntry[] }) {
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="font-bold pm-text-sea">{myWins}</span>
+                  <span className="font-bold text-profile">{myWins}</span>
                   <span className="text-muted-foreground">vs</span>
-                  <span className="font-bold text-rose-500">{theirWins}</span>
+                  <span className="font-bold text-alarm">{theirWins}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {ties} ties {myRate > 50 && <Pill tone="jade">Leading</Pill>}
+                  {ties} ties {myRate > 50 && <Pill tone="gain">Leading</Pill>}
                 </div>
               </div>
             </div>
@@ -714,7 +718,7 @@ function RivalsTab({ rivals }: { rivals: RivalEntry[] }) {
                   style={{ width: `${(ties / total) * 100}%` }}
                 />
                 <div
-                  className="bg-rose-400"
+                  className="bg-alarm"
                   style={{ width: `${(theirWins / total) * 100}%` }}
                 />
               </div>
@@ -735,28 +739,20 @@ function StatTile({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  tone: "sea" | "gold" | "amber" | "indigo";
+  tone: "sea" | "gold" | "due" | "intel";
 }) {
   const tones: Record<string, string> = {
-    sea: "pm-grad-primary",
-    gold: "pm-grad-gold",
-    amber: "pm-grad-amber",
-    indigo: "pm-grad-indigo",
-  };
-  const textTones: Record<string, string> = {
-    sea: "text-celadon",
-    gold: "text-amber-600 dark:text-amber-300",
-    amber: "text-orange-600 dark:text-orange-300",
-    indigo: "text-indigo-600 dark:text-indigo-300",
+    sea: "bg-sea/5 text-sea",
+    gold: "bg-gold/5 text-gold-ink",
+    due: "bg-due/5 text-due",
+    intel: "bg-intel/5 text-intel",
   };
   return (
     <div className="pm-glass pm-ink-hover rounded-2xl p-3">
       <div className={cn("mb-2 inline-flex rounded-lg p-1.5", tones[tone])}>
-        <Icon className="h-4 w-4 text-white" />
+        <Icon className="h-4 w-4" />
       </div>
-      <div className={cn("font-display text-2xl font-bold", textTones[tone])}>
-        {value}
-      </div>
+      <div className="font-display text-2xl font-bold">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
@@ -783,7 +779,7 @@ function TrendCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={cn("inline-flex rounded-lg p-1.5", gradient)}>
-            <Icon className="h-3.5 w-3.5 text-white" />
+            <Icon className="h-3.5 w-3.5" />
           </div>
           <span className="text-xs font-medium text-muted-foreground">
             {label}
@@ -793,7 +789,7 @@ function TrendCard({
           <span
             className={cn(
               "text-[10px] font-semibold",
-              trend > 0 ? "text-emerald-500" : "text-rose-500",
+              trend > 0 ? "text-gain" : "text-alarm",
             )}
           >
             {trend > 0 ? "▲" : "▼"} {Math.abs(trend)}

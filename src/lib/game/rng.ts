@@ -6,7 +6,7 @@
 // captain still earns their own gold and reputation independently.
 // =====================================================================
 
-// Hash an arbitrary string into a 32-bit unsigned integer (xfnv1a).
+// Hash an arbitrary string into a 32 bit unsigned integer (xfnv1a).
 function hashSeed(str: string): number {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < str.length; i++) {

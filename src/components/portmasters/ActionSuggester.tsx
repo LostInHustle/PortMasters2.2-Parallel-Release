@@ -11,13 +11,7 @@ import {
   getIntelCost,
   brokersFavorCommission,
 } from "@/lib/game/engine";
-import {
-  COMMODITIES,
-  PRODUCT_PRICES,
-  RECIPES,
-  STARTING_STOCK,
-} from "@/lib/game/constants";
-import { unlockedResources, unlockedProducts } from "@/lib/game/pools";
+import { COMMODITIES, PRODUCT_PRICES, RECIPES } from "@/lib/game/constants";
 
 /**
  * Autopilot Action Suggester. Analyzes the current game state and
@@ -38,13 +32,43 @@ type Suggestion = {
   tone: "jade" | "amber" | "rose" | "indigo" | "gold";
 };
 
+/* One wash per tone. A tone names a meaning rather than a panel, so it
+   draws from the meaning half of the palette: a good turn of events
+   wears gain, a caution wears warn, a loss wears alarm, and plain
+   advice wears intel. Gold is the coin itself, and its wash pairs with
+   the gold ink, which is what keeps the words on it legible in either
+   mode. */
 const TONE_CLASSES: Record<Suggestion["tone"], string> = {
-  jade: "border-emerald-500/20 bg-emerald-500/[0.04]",
-  amber: "border-amber-500/20 bg-amber-500/[0.04]",
-  rose: "border-rose-500/20 bg-rose-500/[0.04]",
-  indigo: "border-indigo-500/20 bg-indigo-500/[0.04]",
-  gold: "border-amber-400/20 bg-amber-400/[0.04]",
+  jade: "border-gain/20 bg-gain/[0.04]",
+  amber: "border-warn/20 bg-warn/[0.04]",
+  rose: "border-alarm/20 bg-alarm/[0.04]",
+  indigo: "border-intel/20 bg-intel/[0.04]",
+  gold: "border-gold/20 bg-gold/[0.04]",
 };
+
+/* The fill the toggle wears, read off the tone by name.
+
+   This is deliberately a switch on the tone and not a match against the
+   class string it produces. The old version asked whether the shell
+   class contained the word emerald, amber or rose, which worked only
+   while those classes were raw palette names. The moment the shell
+   became a token every one of those questions answered no, every
+   suggestion took the last branch, and the toggle stopped agreeing with
+   the panel it opens. A tone read by name cannot drift like that. */
+function toneFill(tone: Suggestion["tone"]): string {
+  switch (tone) {
+    case "jade":
+      return "bg-gain/5 text-gain";
+    case "amber":
+      return "bg-warn/5 text-warn";
+    case "rose":
+      return "bg-alarm/5 text-alarm";
+    case "indigo":
+      return "bg-intel/5 text-intel";
+    case "gold":
+      return "bg-gold/5 text-gold-ink";
+  }
+}
 
 export function ActionSuggester({ game }: { game: GameState }) {
   const [open, setOpen] = useState(false);
@@ -58,16 +82,8 @@ export function ActionSuggester({ game }: { game: GameState }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "pm-pressable inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium text-white",
-          TONE_CLASSES[suggestion.tone].includes("emerald")
-            ? "pm-grad-jade"
-            : TONE_CLASSES[suggestion.tone].includes("amber")
-              ? "pm-grad-amber"
-              : TONE_CLASSES[suggestion.tone].includes("rose")
-                ? "pm-grad-vermilion"
-                : TONE_CLASSES[suggestion.tone].includes("indigo")
-                  ? "pm-grad-indigo"
-                  : "pm-grad-gold",
+          "pm-pressable inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium",
+          toneFill(suggestion.tone),
         )}
         title="Show the recommended action for this phase"
         aria-label="Show action suggestion"
@@ -93,7 +109,7 @@ export function ActionSuggester({ game }: { game: GameState }) {
             <div className="mb-1.5 flex items-start justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-base">{suggestion.icon}</span>
-                <span className="text-xs font-bold pm-text-sea">
+                <span className="text-xs font-bold text-advisor">
                   {suggestion.title}
                 </span>
               </div>
@@ -105,7 +121,7 @@ export function ActionSuggester({ game }: { game: GameState }) {
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </div>
-            <p className="text-[11px] leading-relaxed text-foreground/80">
+            <p className="text-[11px] leading-relaxed text-foreground">
               {suggestion.body}
             </p>
             <button
@@ -128,10 +144,6 @@ export function ActionSuggester({ game }: { game: GameState }) {
  */
 function analyzePhase(game: GameState): Suggestion | null {
   const phase = game.phase;
-  const money = game.money;
-  const score = game.score;
-  const round = game.currentRound;
-  const maxRounds = game.maxRounds;
 
   switch (phase) {
     case 5: // Boon Draft

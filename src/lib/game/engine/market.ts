@@ -30,7 +30,7 @@ import {
   unlockedResourceDraw,
   unlockedResources,
 } from "../pools";
-import { createRng, pick, randInt, weightedPick, type Rng } from "../rng";
+import { createRng, pick, randInt, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard, ResourceCard } from "../types";
 import { addOwnedAmount } from "./core";
 import { getCardFinalCost } from "./pricing";
@@ -378,7 +378,14 @@ export function startPhase1(
   // announced once, the moment the surge itself triggered (see
   // applyTidewatchSurge), so this stays a quiet +1 every round after that
   // rather than repeating the announcement.
-  const purchaseCount = tierPurchaseCount + (state.tidewatchSurge ? 1 : 0);
+  // [MANIFEST: Great Houses] Vermilion Gate's pledge adds one more cargo lot
+  // to this captain's board every round, on top of the tier's own count and
+  // the room's Tidewatch surge. Read straight off the per voyage flags
+  // rather than folded into the tier count above, so the charter banner goes
+  // on reporting what the room earned and never takes credit for the House.
+  const houseLot = state.housePerks.vermilionExtraCard ? 1 : 0;
+  const purchaseCount =
+    tierPurchaseCount + (state.tidewatchSurge ? 1 : 0) + houseLot;
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,

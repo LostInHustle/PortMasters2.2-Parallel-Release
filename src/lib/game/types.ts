@@ -15,6 +15,12 @@ import {
   type Difficulty,
 } from "./difficulty";
 import type { HouseId } from "./legacy";
+// The two runtime imports this module takes from the engine, and
+// deliberately narrow ones: ./engine/houses.ts imports nothing but types, so
+// the two cannot form a cycle. Both live at the one place a voyage is born,
+// so a caller cannot create one and forget the captain's House, and the
+// empty perk set has a single definition rather than a copy per call site.
+import { applyHousePerkAtStart, noHousePerks } from "./engine/houses";
 
 export type Phase =
   | 0 // welcome
@@ -105,6 +111,30 @@ export type Worker = {
   task: Product | null;
   producedCount: number;
   isSkilled: boolean;
+  // Set on the one artisan a Jade Pavilion captain takes aboard under their
+  // pledge, and spent by payWages on the first payroll run that sees them.
+  // Optional rather than required so every save written before the pledge
+  // existed still loads: a missing flag reads as false, which is exactly
+  // what an artisan hired without a pledge is.
+  freeFirstWage?: boolean;
+};
+
+// The per voyage flags a Great House lights up, one entry per effect rather
+// than one per House, so a reader never has to know which House owns which.
+// Every flag is read somewhere in the engine, and the list of readers is
+// worth keeping straight:
+//
+//   jadeFreeHireAvailable  hireWorker (waives the first wage), payWages
+//                          (spends the waiver on the first payroll run)
+//   vermilionExtraCard     startPhase1 (one more cargo lot on the board)
+//   goldenWageDiscount     getHireCost (a fifth off every wage, which
+//                          reaches hiring, payroll and severance alike)
+//   goldenPirateBump       resolvePirateAttack (five percent more raids)
+export type HousePerks = {
+  jadeFreeHireAvailable: boolean;
+  vermilionExtraCard: boolean;
+  goldenWageDiscount: boolean;
+  goldenPirateBump: boolean;
 };
 
 // A loan between two captains. The same shape is used on both sides: the
@@ -268,19 +298,13 @@ export type GameState = {
   // perk simply doesn't apply until they do. Personal to each captain,
   // exactly like renownLevel, so it never touches the shared room seed.
   houseId: HouseId | null;
-  // [MANIFEST: Great Houses] Per voyage flags the House perks flip on,
-  // read by hireWorker (Jade Pavilion's free first artisan), startPhase1
-  // (Vermilion Gate's extra purchase card), and resolvePirateAttack
-  // (Golden Lotus's extra raid chance). Kept separate from modifierFlags
-  // so the ModifierKey union stays pinned to the Boon/module set, and so
-  // endRound's wholesale reset of modifierFlags doesn't sweep these away
-  // mid voyage. Reset only by a fresh voyage (createInitialGameState).
-  housePerks: {
-    jadeFreeHireAvailable: boolean;
-    vermilionExtraCard: boolean;
-    goldenWageDiscount: boolean;
-    goldenPirateBump: boolean;
-  };
+  // [MANIFEST: Great Houses] The per voyage flags the House perks flip on.
+  // Kept separate from modifierFlags so the ModifierKey union stays pinned
+  // to the Boon and module set, and so endRound's wholesale reset of
+  // modifierFlags doesn't sweep these away mid voyage. Reset only by a
+  // fresh voyage (createInitialGameState). See HousePerks above for what
+  // reads each flag.
+  housePerks: HousePerks;
 };
 
 // The hold every voyage starts with: a key for every good in the catalogue,
@@ -372,30 +396,48 @@ export type GameContext = {
   seedBase: string;
 };
 
-// startingGoldBonus comes from the captain's persistent Renown level (see
-// src/lib/game/legacy.ts and use-game-session.ts's START_FRESH handling)
-// so a captain with a long track record starts every fresh voyage a
-// little ahead, never behind. Defaults to 0 for any caller that doesn't
-// know the captain's Renown yet, so every existing call site keeps
-// working unchanged.
-// renownLevel defaults to 1 (Broker's Favor locked) for any caller that
-// doesn't know the captain's Renown yet, mirroring startingGoldBonus above,
-// so every existing call site keeps working unchanged.
-// voyageEpoch defaults to 0 (the room's first voyage) for the same reason;
-// callers that know the room's current epoch pass it so a fresh voyage is
-// seeded distinctly from the ones before it.
-// difficulty defaults to the entry tier (see DEFAULT_DIFFICULTY) so any caller
-// that doesn't yet know the room's tier still produces a valid state; callers
-// that know it pass it so maxRounds, starting Gold, and maintenance all follow
-// the room's chosen tier.
-export function createInitialGameState(
-  startingGoldBonus: number = 0,
-  renownLevel: number = 1,
-  voyageEpoch: number = 0,
-  difficulty: Difficulty = DEFAULT_DIFFICULTY,
-): GameState {
+// Everything a fresh voyage needs beyond its own defaults. An options
+// object rather than the positional list this used to take: that list had
+// already reached five entries a caller had to supply in the right order
+// and could only skip by counting commas, and the House would have made six.
+export type VoyageSetup = {
+  // The captain's persistent Renown level (see src/lib/game/legacy.ts and
+  // use-game-session.ts's START_FRESH handling) translates to a small
+  // starting Gold bonus, so a captain with a long track record starts every
+  // fresh voyage a little ahead, never behind. Omitted, the captain starts
+  // on the tier's plain stake.
+  startingGoldBonus?: number;
+  // Defaults to 1, which leaves Broker's Favor locked, for any caller that
+  // does not yet know the captain's Renown.
+  renownLevel?: number;
+  // Defaults to 0, the room's first voyage. Callers that know the room's
+  // current epoch pass it so a fresh voyage is seeded distinctly from the
+  // ones before it.
+  voyageEpoch?: number;
+  // Defaults to the entry tier (see DEFAULT_DIFFICULTY) so any caller that
+  // does not yet know the room's tier still produces a valid state. Callers
+  // that know it pass it so maxRounds, starting Gold, and maintenance all
+  // follow the room's chosen tier.
+  difficulty?: Difficulty;
+  // The captain's pledged Great House, read from their CaptainLegacy row.
+  // Defaults to null, which is the honest answer for a captain who has not
+  // pledged yet: no House, and no perk flags lit. The House is applied
+  // inside the one function that creates a voyage rather than by each
+  // caller, because a caller that forgets is a pledge that silently does
+  // nothing.
+  houseId?: HouseId | null;
+};
+
+export function createInitialGameState(setup: VoyageSetup = {}): GameState {
+  const {
+    startingGoldBonus = 0,
+    renownLevel = 1,
+    voyageEpoch = 0,
+    difficulty = DEFAULT_DIFFICULTY,
+    houseId = null,
+  } = setup;
   const cfg = difficultyConfig(difficulty);
-  return {
+  const state: GameState = {
     inventory: initialInventory(),
     money: cfg.startingGold + startingGoldBonus,
     difficulty,
@@ -454,12 +496,7 @@ export function createInitialGameState(
     // captain switching Houses between voyages can't keep the old House's
     // perks by accident.
     houseId: null,
-    housePerks: {
-      jadeFreeHireAvailable: false,
-      vermilionExtraCard: false,
-      goldenWageDiscount: false,
-      goldenPirateBump: false,
-    },
+    housePerks: noHousePerks(),
     // Explicitly undefined, not simply omitted: restartGame resets a voyage
     // via Object.assign(state, fresh), which only overwrites keys fresh
     // actually has. An omitted key isn't one of those, so a transient
@@ -472,4 +509,9 @@ export function createInitialGameState(
     _newModule: undefined,
     _pendingDebtSettlements: undefined,
   };
+  // A captain's Great House is stamped on here, at the one place a voyage is
+  // born. Passing null (the default) leaves the literal's own values
+  // standing: no House chosen, and every perk flag off.
+  if (houseId) applyHousePerkAtStart(state, houseId);
+  return state;
 }

@@ -15,11 +15,11 @@
 // rather than back at round 1.
 // =====================================================================
 import { APP_NAME, merchantRatingForScore } from "../constants";
-import { DEFAULT_DIFFICULTY, type Difficulty } from "../difficulty";
 import {
   createInitialGameState,
   type GameContext,
   type GameState,
+  type VoyageSetup,
 } from "../types";
 import { settleOutstandingDebts } from "./aid";
 import { completeBarterPhase } from "./barter";
@@ -94,7 +94,7 @@ export function startPhase3(state: GameState, logs: string[]) {
   processProduction(state, logs);
 }
 
-// Moved to ./engine/pirates and re-exported so existing imports of
+// Moved to ./engine/pirates and forwarded so existing imports of
 // `@/lib/game/engine` keep working. Imported below as well, since
 // nextPhase and snapToCheckpoint still dispatch to resolvePirateAttack.
 
@@ -155,21 +155,16 @@ export function endGame(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
+// A voyage restarted by the host, or by the room rolling into a new one.
+// Everything the new voyage is seeded with, including the captain's pledged
+// House, arrives as one VoyageSetup; see createInitialGameState for what
+// each field means and what it falls back to.
 export function restartGame(
   state: GameState,
   logs: string[],
-  startingGoldBonus: number = 0,
-  renownLevel: number = 1,
-  voyageEpoch: number = 0,
-  difficulty: Difficulty = DEFAULT_DIFFICULTY,
+  setup: VoyageSetup = {},
 ) {
-  const fresh = createInitialGameState(
-    startingGoldBonus,
-    renownLevel,
-    voyageEpoch,
-    difficulty,
-  );
-  Object.assign(state, fresh);
+  Object.assign(state, createInitialGameState(setup));
   logs.length = 0;
   showWelcome(state, logs);
 }

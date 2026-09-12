@@ -120,3 +120,21 @@ export function isCharterGood(item: string): boolean {
     (PRODUCTS_TIER2 as readonly string[]).includes(item)
   );
 }
+
+// The finished goods of each charter wave, told apart.
+//
+// The two boons that pay on a wave name its goods exactly: Kiln and Forge
+// Guild names Celadon Ware and Bronze Mirror, Exotic Treasures names
+// Foreign Balm and Pearl String. isCharterGood above answers whether a good
+// arrived with a charter at all, which is the right question for the
+// Maritime Bureau Token (its text names no wave) and the wrong one here:
+// gating both boons on it made them the same boon, since a captain holds
+// only one at a time (applyBoon replaces modifierFlags wholesale) and
+// whichever they held paid out on either wave.
+export function isTier1CharterProduct(item: string): boolean {
+  return (PRODUCTS_TIER1 as readonly string[]).includes(item);
+}
+
+export function isTier2CharterProduct(item: string): boolean {
+  return (PRODUCTS_TIER2 as readonly string[]).includes(item);
+}

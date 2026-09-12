@@ -32,14 +32,13 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  * phase change reads as one cross fade rather than a stack of
  * overlapping panels.
  *
- * The dispatcher takes the shared `PhasePanelProps` shape, plus three
+ * The dispatcher takes the shared `PhasePanelProps` shape, plus two
  * optional extras that not every caller wires up: `onTutorialOpen`
- * (used by the Welcome screen's New Player Tutorial button),
- * `onSaveChronicle` (used by the Endgame screen's chronicle opt in
- * checkbox), and `voyageResult` (the harbor wide standings payload the
- * server emits on voyage:complete, also consumed by Endgame). Each is
- * optional so a caller that hasn't wired them in still compiles and
- * renders a sensible default.
+ * (used by the Welcome screen's New Player Tutorial button) and
+ * `voyageResult` (the harbor wide standings payload the server emits on
+ * voyage:complete, also consumed by Endgame). Each is optional so a
+ * caller that hasn't wired them in still compiles and renders a
+ * sensible default.
  */
 
 // The shared props every phase panel takes, re exported so any caller
@@ -50,14 +49,13 @@ export type { PhasePanelProps } from "./phases/PhaseShared";
 
 type Props = PhasePanelProps & {
   onTutorialOpen?: () => void;
-  onSaveChronicle?: () => void;
   voyageResult?: VoyageResult | null;
   // Endgame also accepts myLegacy and onRestart as optional, but the
   // dispatcher deliberately does not take them as its own props; if a
   // caller needs them wired through, the Endgame panel can be rendered
   // directly with those props. Keeping the dispatcher's surface narrow
-  // matches the original spec: only onTutorialOpen, onSaveChronicle,
-  // and voyageResult are added on top of PhasePanelProps here.
+  // matches the original spec: only onTutorialOpen and voyageResult are
+  // added on top of PhasePanelProps here.
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
@@ -68,7 +66,7 @@ export function GamePhasePanel(props: Props) {
   // A phase specific accent gradient strip at the top of the panel.
   // Each phase gets its own colour so the transition between phases is
   // visually distinct even before the content swaps in.
-  const accentGradient = PHASE_ACCENTS[phaseKey] ?? "pm-grad-primary";
+  const accentGradient = PHASE_ACCENTS[phaseKey] ?? "pm-grad-welcome";
   return (
     <div className="pm-glass relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[520px]">
       {/* Phase accent strip */}
@@ -92,25 +90,33 @@ export function GamePhasePanel(props: Props) {
   );
 }
 
-// The accent gradient for each phase. Chosen to match the phase's mood:
-// welcome is celadon (calm harbor), boon draft is gold (opportunity),
-// purchase is jade (growth), barter is indigo (exchange), worker
-// management is amber (craft), orders is primary (commerce),
-// settlement is vermilion (danger), shipyard is gold (upgrade),
-// bankruptcy is vermilion (loss), endgame is violet (legacy).
+/* The accent strip along the top of the panel, one colour per phase.
+   Twelve keys, twelve colours, where there used to be seven between
+   them: welcome and orders both wore the same blue, so did boon draft,
+   shipyard and module draft, and settlement and bankruptcy, and a
+   captain crossing from one phase into its twin had no accent to tell
+   them the panel had changed.
+
+   The key is the phase value as the engine sends it, which is why two of
+   them are spelled with an underscore and the rest are numbers.
+
+   Two pairs do share a hue, and neither pair can ever be on screen
+   together: bankruptcy wears the Boon Draft colour because a voyage that
+   ends there never reaches another boon, and endgame wears the Module
+   Draft colour because a crowned voyage has drafted its last module. */
 const PHASE_ACCENTS: Record<string, string> = {
-  "0": "pm-grad-primary",
-  "5": "pm-grad-gold",
-  "1": "pm-grad-jade",
-  barter: "pm-grad-indigo",
-  worker_mgmt: "pm-grad-amber",
-  "2": "pm-grad-primary",
-  "3": "pm-grad-vermilion",
-  "4": "pm-grad-gold",
-  module_draft: "pm-grad-gold",
-  module_swap: "pm-grad-amber",
-  bankruptcy: "pm-grad-vermilion",
-  endgame: "pm-grad-violet",
+  "0": "pm-grad-welcome",
+  "1": "pm-grad-purchase",
+  "2": "pm-grad-orders",
+  "3": "pm-grad-settlement",
+  "4": "pm-grad-shipyard",
+  "5": "pm-grad-boon",
+  barter: "pm-grad-barter",
+  worker_mgmt: "pm-grad-workers",
+  module_draft: "pm-grad-module-draft",
+  module_swap: "pm-grad-module-swap",
+  bankruptcy: "pm-grad-bankruptcy",
+  endgame: "pm-grad-endgame",
 };
 
 // The single switch that maps a phase value to its panel. Pulled out of
@@ -138,7 +144,6 @@ function ActivePhase(props: Props) {
     colorFor,
     onRumorBoardOpen,
     onTutorialOpen,
-    onSaveChronicle,
     voyageResult,
     myLegacy,
     onRestart,
@@ -207,7 +212,6 @@ function ActivePhase(props: Props) {
         <Orders
           game={game}
           act={act}
-          ctx={ctx}
           phaseSync={phaseSync}
           members={members}
           colorFor={colorFor}
@@ -245,7 +249,6 @@ function ActivePhase(props: Props) {
           members={members}
           backing={backing}
           me={me}
-          room={room}
           roster={roster}
         />
       );
@@ -259,7 +262,6 @@ function ActivePhase(props: Props) {
           voyageResult={voyageResult}
           myLegacy={myLegacy}
           onRestart={onRestart}
-          onSaveChronicle={onSaveChronicle}
         />
       );
     default:
@@ -270,10 +272,10 @@ function ActivePhase(props: Props) {
       // rather than a blank pane.
       return (
         <div className="flex min-h-[480px] flex-col items-center justify-center text-center px-6">
-          <div className="pm-grad-primary mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
-            <span className="font-display text-xl text-white">水</span>
+          <div className="pm-grad-brand mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
+            <span className="font-display text-xl">水</span>
           </div>
-          <h2 className="font-display text-2xl pm-text-sea mb-1.5 pm-brush">
+          <h2 className="font-display text-2xl text-brand mb-1.5 pm-brush">
             Round {game.currentRound}
           </h2>
           <p className="text-sm text-muted-foreground max-w-md leading-relaxed">

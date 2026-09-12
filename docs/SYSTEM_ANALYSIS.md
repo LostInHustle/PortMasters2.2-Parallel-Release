@@ -1,4 +1,4 @@
-# PortMasters 2: System Analysis
+# PortMasters 2.2 Parallel Release: System Analysis
 
 ## Origin and Lineage
 
@@ -79,8 +79,8 @@ Eighteen designed harbor systems covering market rhythm, peer economy, identity 
 Six of the seven systems that were still on the roadmap have shipped:
 
 1. **Partial Sight.** A trusted partner sees a banded range read of another captain's cargo during active play. Pure client side rounding, so it adds no new trust boundary.
-2. **Trading Houses.** A second identity to argue about, separate from the Renown grind. Pledge to one of three Houses, and a harbor wide standings board ranks them on crowns, voyages and best Reputation. The three passive perks are written into the engine and shown on the House picker, but they are not applied at voyage start yet.
-3. **Ages of the Ledger.** The three peer economy tools take turns in the spotlight. The two week rotation and the banner that announces it are live; the three effects are computed and displayed, and no part of the voyage reads them yet.
+2. **Trading Houses.** A second identity to argue about, separate from the Renown grind. Pledge to one of three Houses, and a harbor wide standings board ranks them on crowns, voyages and best Reputation. Each House grants one small passive perk from the start of every fresh voyage: a free first artisan, one more cargo lot on the purchase board, or cheaper wages against a higher raid chance.
+3. **Ages of the Ledger.** The three peer economy tools take turns in the spotlight. The two week rotation, the banner that announces it, and all three effects are live: a backing pledge pays extra Renown, a completed barter trade lands one extra Reputation, and the Broker's Favor payout cap is raised.
 4. **Captain's Rival.** The friend you keep sailing against gets a scoreboard of their own.
 5. **Voyage Chronicle.** A voyage becomes a short story a captain can read again later.
 6. **Quick Start Match.** A solo captain gets dropped into an open harbor instead of having to go find one.
@@ -93,7 +93,7 @@ The **Bilingual Harbor** was built in full and then removed at the owner's reque
 
 The engineering and platform are state of the art. Modern stack, deterministic multiplayer, persistent progression, social economy, ledger integrity, designed harbor systems.
 
-The gameplay content is the deliberately preserved verbatim Easy tier of an older single player game. The two richer difficulties reproduce the Standard and Hard essence through the new platform's own levers rather than porting the original's content library. Difficulty balance is still untuned. One of the eighteen designed harbor systems, House Rally, has not been built, and three smaller pieces are visible without being live: the three House perks, the three Age effects, and the Harbor activity feed, which would read from an endpoint that does not exist yet.
+The gameplay content is the deliberately preserved verbatim Easy tier of an older single player game. The two richer difficulties reproduce the Standard and Hard essence through the new platform's own levers rather than porting the original's content library. Difficulty balance is still untuned. One of the eighteen designed harbor systems, House Rally, has not been built, and one smaller piece is visible without being live: the Harbor activity feed, which would read from an endpoint that does not exist yet.
 
 ## Architectural Strengths to Conserve
 
@@ -118,6 +118,12 @@ The realtime layer was one 3,097 line function. It is now a composition root ove
 `merchantRatingForScore` moved to `constants.ts`. `Worker.task` is a branded `Product` type instead of a bare string. The always zero `Worker.progress` field is gone. The dead `names` map in `hireWorker` is gone. `modifierFlags` is a `Partial<Record<ModifierKey, number>>` with the legal keys pinned in one place. The `api/route.ts` Hello World stub is deleted. The Welcome screen's numbers derive from the room's difficulty instead of hardcoding the founding trade. The Settlement Force Pay button has its own destructive styling. The Shipyard back buttons call engine functions instead of writing `g.phase` directly.
 
 `escortHired` looked like a write only flag. It is read, by the Settlement screen, which is what it is for: it is a signal from the engine to the interface. That is now stated where the field is declared.
+
+`docs/BUFF_AUDIT.md` produced a second pass over every declared effect, and all of its findings are closed. The two charter boons read one tier agnostic gate between them, and each reads its own tier now. The Silk goods list omitted the two goods whose recipe uses Silk at the same ratio as one it already included. The Settlement panel rebuilt the pirate roll and the escort quote by hand, which drifted from the functions that roll and charge; it calls those functions now. Harbor Pulse divided by a fixed three goods while the harbor trades up to seven, and now divides by the goods actually in the tally. The Purchase reference price skipped two module discounts the counter applies. A failed save load reset the Renown level to 1, and now leaves the captain where they were. Six numbers the interface stated that the game did not are corrected. The three House perks and the three Age effects were written and read by nothing; they are wired in now rather than deleted, because the design was sound and only the connection was missing.
+
+A pledge was stranded when its borrower went bankrupt. The conclusion sweep skipped any loan whose borrower still had a live socket, on the reasoning that a connected borrower might be about to report. A bankrupt captain keeps their socket open to watch the standings, so their loan was never swept and never repaid, and the escrow behind the pledge riding on it was dropped at the next boot. The sweep treats a bankrupt borrower as absent now.
+
+`partialSight.ts` carried a comment asserting a Backing trust gate at Renown level 5 that no code anywhere enforced. The comment states plainly that no such gate has ever existed, and what the module actually reads, which is a captain's Renown and nothing else.
 
 **Kept, deliberately.**
 

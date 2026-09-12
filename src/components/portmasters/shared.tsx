@@ -80,13 +80,13 @@ export function OnlineDot({
     <span
       className={cn(
         "inline-block rounded-full",
-        online ? "bg-emerald-400" : "bg-zinc-400/60",
+        online ? "bg-gain" : "bg-muted-foreground/40",
         className,
       )}
       style={{
         width: size,
         height: size,
-        boxShadow: online ? "0 0 8px 1px oklch(0.75 0.18 150 / 0.7)" : "none",
+        boxShadow: online ? "0 0 8px 1px var(--gain)" : "none",
       }}
       aria-hidden
     />
@@ -99,17 +99,44 @@ export function Pill({
   className,
 }: {
   children: React.ReactNode;
-  tone?: "default" | "gold" | "sea" | "jade" | "rose" | "amber" | "indigo";
+  /**
+   * A meaning, not a panel. A Pill says something about a number or a
+   * status, so it draws from the meaning half of the palette and reads
+   * the same wherever it appears. A Pill that names a thing rather than
+   * a status takes its colour through className instead, so that a
+   * Widget colour is never put on a status and a meaning is never put
+   * on a panel heading.
+   */
+  tone?:
+    | "default"
+    | "none"
+    | "gold"
+    | "sea"
+    | "gain"
+    | "alarm"
+    | "due"
+    | "favor"
+    | "intel";
   className?: string;
 }) {
+  /* Every one of these is a soft wash of its own token, so a Pill and
+     the number inside it are the same colour in both modes and neither
+     needs a dark variant. */
   const tones: Record<string, string> = {
-    default: "bg-black/5 dark:bg-white/10 text-foreground/70",
-    gold: "bg-amber-400/15 text-amber-700 dark:text-amber-300",
-    sea: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
-    jade: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    rose: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-    amber: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-    indigo: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+    default: "bg-black/5 dark:bg-white/10 text-foreground",
+    /* A Pill that names a thing rather than a status brings its own
+       colour through className. Leaving the tone map out entirely is
+       what keeps the two from fighting over background-color, which
+       would otherwise be settled by Tailwind's own rule order rather
+       than by anything visible in the markup. */
+    none: "",
+    gold: "bg-gold/5 text-gold-ink",
+    sea: "bg-sea/5 text-sea",
+    gain: "bg-gain/5 text-gain",
+    alarm: "bg-alarm/5 text-alarm",
+    due: "bg-due/5 text-due",
+    favor: "bg-favor/5 text-favor",
+    intel: "bg-intel/5 text-intel",
   };
   return (
     <span

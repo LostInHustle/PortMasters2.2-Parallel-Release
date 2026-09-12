@@ -4,7 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Lightbulb, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Difficulty } from "@/lib/game/difficulty";
+import {
+  DIFFICULTIES,
+  mandateRounds,
+  type Difficulty,
+  type DifficultyConfig,
+} from "@/lib/game/difficulty";
 
 /**
  * Voyage Difficulty Advisor. Suggests which difficulty tier to pick
@@ -12,12 +17,32 @@ import type { Difficulty } from "@/lib/game/difficulty";
  * and solvent streak. The advisor is advisory only, the captain can
  * still pick any tier.
  *
- * The recommendation logic:
- * - Renown 1 to 2, fewer than 3 voyages: Fair Winds
- * - Renown 3 to 4, 3+ voyages, best score 50+: Fair Winds or Open Waters
- * - Renown 5+, 5+ voyages, best score 100+, solvent streak 2+: Open Waters
- * - Renown 8+, 10+ voyages, best score 200+, solvent streak 3+: Monsoon
+ * The recommendation reads four bands, each one wider than the last:
+ *
+ * Renown 1 to 2 with fewer than 3 voyages is pointed at Fair Winds.
+ * Renown 3 to 4 with 3 voyages or more and a best score of 50 or more is
+ * pointed at Fair Winds or Open Waters.
+ * Renown 5 or more with 5 voyages or more, a best score of 100 or more and
+ * a solvent streak of 2 or more is pointed at Open Waters.
+ * Renown 8 or more with 10 voyages or more, a best score of 200 or more and
+ * a solvent streak of 3 or more is pointed at Monsoon.
  */
+
+// The three tiers, read off the one table that defines them rather than
+// repeated in the advice below. Every name and number in those sentences
+// comes from here, so a balance pass can never leave the advisor pitching
+// a voyage the game no longer runs.
+const fairWinds = DIFFICULTIES.fair_winds;
+const openWaters = DIFFICULTIES.open_waters;
+const monsoon = DIFFICULTIES.monsoon;
+
+// A tier's mandate rounds as prose: "4, 8, and 12".
+function listRounds(cfg: DifficultyConfig): string {
+  const rounds = mandateRounds(cfg);
+  if (rounds.length === 0) return "none";
+  if (rounds.length === 1) return String(rounds[0]);
+  return `${rounds.slice(0, -1).join(", ")}, and ${rounds[rounds.length - 1]}`;
+}
 
 type Advice = {
   recommended: Difficulty;
@@ -44,16 +69,13 @@ function getAdvice(
     solventStreak >= 3
   ) {
     recommended = "monsoon";
-    reason =
-      "You have the experience and the streak for the Monsoon Season. 16 rounds, 1.6x Renown, and three difficulty scoped Merits await.";
+    reason = `You have the experience and the streak for the ${monsoon.name}. ${monsoon.rounds} rounds, ${monsoon.renownXpMultiplier}x Renown, and two difficulty scoped Merits await: Storm Sovereign and Eye of the Storm.`;
   } else if (renownLevel >= 5 && voyagesCompleted >= 5 && bestScore >= 100) {
     recommended = "open_waters";
-    reason =
-      "Your Renown and voyage count suggest you are ready for Open Waters. 12 rounds, 1.25x Renown, and Imperial Mandates on rounds 4, 8, and 12.";
+    reason = `Your Renown and voyage count suggest you are ready for ${openWaters.name}. ${openWaters.rounds} rounds, ${openWaters.renownXpMultiplier}x Renown, and Imperial Mandates on rounds ${listRounds(openWaters)}.`;
   } else {
     recommended = "fair_winds";
-    reason =
-      "Fair Winds is the right starting point. 8 rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.";
+    reason = `${fairWinds.name} is the right starting point. ${fairWinds.rounds} rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.`;
   }
 
   // Cautions for overreaching
@@ -109,23 +131,23 @@ export function DifficultyAdvisor({
         className={cn(
           "mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed",
           advice.match
-            ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+            ? "border-gain/20 bg-gain/[0.04]"
             : advice.caution
-              ? "border-amber-500/20 bg-amber-500/[0.04]"
-              : "border-indigo-500/15 bg-indigo-500/[0.03]",
+              ? "border-warn/20 bg-warn/[0.04]"
+              : "border-intel/15 bg-intel/[0.03]",
         )}
       >
         <div className="flex items-start gap-1.5">
           {advice.match ? (
-            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-gain" />
           ) : advice.caution ? (
-            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
           ) : (
-            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" />
+            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-intel" />
           )}
           <div className="flex-1 min-w-0">
             {!advice.match && (
-              <p className="font-medium text-foreground/80">
+              <p className="font-medium text-foreground">
                 {advice.caution
                   ? "Heads up"
                   : `Consider ${advice.recommended.replace(/_/g, " ")}`}

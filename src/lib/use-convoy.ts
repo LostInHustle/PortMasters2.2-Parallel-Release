@@ -3,27 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { VentureContributor, VentureSummary } from "@/types/realtime";
+import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
 
 // The wire shape for a venture lives in @/types/realtime as VentureSummary.
 // The hook keeps the original ConvoyVenture alias and the VentureContributor
 // re export for back compat with the Settlement phase component's imports.
-export type { VentureContributor };
+//
+// VentureOutcome and VentureSettlement are re exported here rather than
+// declared a second time. Their one home is the pure module that computes
+// them, src/lib/game/convoy.ts, and a duplicate pair of declarations in
+// this file was only ever a way for the two to drift apart unnoticed.
+export type { VentureContributor, VentureOutcome, VentureSettlement };
 export type ConvoyVenture = VentureSummary;
-
-export type VentureSettlement = {
-  userId: string;
-  name: string;
-  amount: number;
-};
-
-// "filled" pays CONVOY_VENTURE_PAYOUT_MULTIPLIER times a contributor's own
-// stake, and is the one outcome that can ever happen once per voyage, room
-// wide. "failed" refunds only CONVOY_VENTURE_FAILURE_REFUND_RATE after a
-// venture's own deadline round passes short of target. "destroyed" refunds
-// every contributor in full: a different venture in the same room's voyage
-// reached "filled" first and claimed the one shared chance before this one
-// got the chance to.
-export type VentureOutcome = "filled" | "failed" | "destroyed";
 
 /**
  * Convoy Ventures: the shared, multi round board of open ventures: a thin

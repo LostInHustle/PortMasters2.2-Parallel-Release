@@ -1,13 +1,14 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: Lords of the Silk Road
-// Game constants. Balance, descriptions, and overall wording are carried
-// over verbatim from the original PortMasters build this project branches
-// from; only the project's own name has been updated where it appears in
-// this text, to match the rebrand (see README.md).
+// PortMasters 2.2 Parallel Release: game constants
+// Balance, descriptions, and overall wording are carried over verbatim
+// from the original PortMasters build this project branches from; only
+// the project's own name has been updated where it appears in this text,
+// to match the rebrand (see README.md).
 // =====================================================================
 
 import {
   difficultyConfig,
+  mandateRounds,
   type Difficulty,
   type DifficultyConfig,
 } from "./difficulty";
@@ -190,6 +191,19 @@ export const RECIPES: Record<
     worker_type: "jeweler",
   },
 };
+
+// Silk itself, and every finished good a captain makes from it. Derived
+// from RECIPES rather than listed by hand: the hand written list this
+// replaces named one good at a given Silk ratio and missed two others at
+// the identical ratio, so the Silk Winds boon and the Silk Road Monopoly
+// module quietly did nothing for the two most valuable goods in the game.
+// A good added tomorrow is covered the moment its recipe is written.
+export const SILK_GOODS: readonly string[] = [
+  "Silk",
+  ...Object.entries(RECIPES)
+    .filter(([, recipe]) => (recipe.materials.Silk ?? 0) > 0)
+    .map(([good]) => good),
+];
 
 export const COMMODITIES: Record<
   string,
@@ -739,12 +753,6 @@ function escortPct(cfg: DifficultyConfig): string {
   return `${Math.round(cfg.escortCostRate * 100)}%`;
 }
 
-function mandateRounds(cfg: DifficultyConfig): number[] {
-  return Object.keys(cfg.mandates)
-    .map(Number)
-    .sort((a, b) => a - b);
-}
-
 export function tutorialSteps(
   difficulty: Difficulty,
 ): { title: string; content: string }[] {
@@ -756,31 +764,31 @@ export function tutorialSteps(
       content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${cfg.rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
 <p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the four things that catch new players out most.</p>
-<p style="color:#777;font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
+<p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
     },
     {
       title: "🏆 What you're playing for",
       content: `<p>After ${cfg.rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
 <p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
-<p>Starting gold is <strong>100</strong>. That is enough to get going, but not enough to be careless with.</p>`,
+<p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
       title: "🔄 How a voyage works",
       content: `<p>Each of the ${cfg.rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0">
-  <div style="background:#E8F5E9;border-radius:6px;padding:10px;border-left:3px solid #4CAF50"><strong>1️⃣ Buy</strong><br><span style="font-size:12px;color:#444">Stock up at port markets</span></div>
-  <div style="background:#FFF8E1;border-radius:6px;padding:10px;border-left:3px solid #FFA000"><strong>🤝 Barter</strong><br><span style="font-size:12px;color:#444">Swap goods with other captains</span></div>
-  <div style="background:#E3F2FD;border-radius:6px;padding:10px;border-left:3px solid #2196F3"><strong>2️⃣ Trade</strong><br><span style="font-size:12px;color:#444">Sell to waiting buyers</span></div>
-  <div style="background:#FFF3CD;border-radius:6px;padding:10px;border-left:3px solid #FFC107"><strong>3️⃣ Settle</strong><br><span style="font-size:12px;color:#444">Production lands, bills come due</span></div>
-  <div style="background:#FCE4EC;border-radius:6px;padding:10px;border-left:3px solid #E91E63"><strong>4️⃣ Upgrade</strong><br><span style="font-size:12px;color:#444">Improve your ship</span></div>
+  <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--gain);color:var(--foreground)"><strong>1️⃣ Buy</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Stock up at port markets</span></div>
+  <div style="background:color-mix(in oklch, var(--w-barter) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-barter);color:var(--foreground)"><strong>🤝 Barter</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Swap goods with other captains</span></div>
+  <div style="background:color-mix(in oklch, var(--w-orders) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-orders);color:var(--foreground)"><strong>2️⃣ Trade</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Sell to waiting buyers</span></div>
+  <div style="background:color-mix(in oklch, var(--w-settlement) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-settlement);color:var(--foreground)"><strong>3️⃣ Settle</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Production lands, bills come due</span></div>
+  <div style="background:color-mix(in oklch, var(--w-shipyard) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-shipyard);color:var(--foreground)"><strong>4️⃣ Upgrade</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Improve your ship</span></div>
 </div>
-<p style="font-size:12px;color:#666;margin:4px 0 0"><kbd style="background:#eee;border:1px solid #ccc;padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking.</p>`,
+<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking.</p>`,
     },
     {
       title: "🏪 Phase 1: Buying",
       content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every voyage. Buy now, barter if you need to, then sell in Phase 2. That is the core loop.</p>
 <p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Phase 2 opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>
-<div style="background:#FFF8DC;border:1px solid #FFA000;border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
+<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   💡 For the first two or three voyages, stick to raw materials. They sell the same voyage you buy them. No waiting and no risk.
 </div>`,
     },
@@ -788,16 +796,16 @@ export function tutorialSteps(
       title: "🤝 Bartering",
       content: `<p>Right after buying, there's a short window where captains can trade directly with each other instead of through the market. Post an offer, like Hemp you don't need for Silk you do, and any other captain in the harbor can take it with one click.</p>
 <p>It is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
-<div style="background:#FFF8DC;border:1px solid #FFA000;border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
+<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   A few ground rules: you can't offer an item for itself, both amounts have to be whole numbers of at least one, and you can never offer more than you currently have. The moment you post an offer, that amount is set aside until someone takes it or you cancel it.
 </div>
-<p style="font-size:13px;color:#333;margin-top:8px">Nobody has to barter. If nothing on the board interests you, or nobody is offering anything, just move on to the next phase.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground);margin-top:8px">Nobody has to barter. If nothing on the board interests you, or nobody is offering anything, just move on to the next phase.</p>`,
     },
     {
       title: "📋 Phase 2: Filling orders",
       content: `<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the shipping fee. Your take is whatever is left after fees and tax.</p>
 <p>You can fill as many orders as your cargo allows in a single phase.</p>
-<div style="background:#E3F2FD;border:1px solid #2196F3;border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
+<div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   📌 <strong>Finished goods</strong> (Fabric, Silk Garment, Sachet) pay two to three times more than raw materials. The catch is they need artisans, and artisans take a full voyage to deliver. That is covered next.
 </div>
 ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions a <strong>mandate</strong>: one large order at a fixed reward, and the only order exempt from VAT. It often asks for more than a single hold carries, so plan to barter or borrow to fill it.</p>` : ""}`,
@@ -805,17 +813,17 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
     {
       title: "⚠️ The artisan trap",
       content: `<p>Artisans turn raw materials into high value finished goods and collect wages at each Phase 3. That part is simple. What catches most new players is this:</p>
-<div style="background:#C62828;color:#fff;border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
+<div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
-<p style="font-size:13px;color:#333;line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Phase 3",
       content: `<p>Before the bills below come due each voyage, ${raidCopy(cfg).toLowerCase()} Pirates find your ship and take every coin you're carrying.</p>
 <p>You get one choice before that roll happens: hire an escort for ${escortPct(cfg)} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>
 ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.</p>` : ""}
-<div style="background:#FFF8DC;border:1px solid #FFA000;border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
+<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   💡 The escort costs a share of whatever you're carrying that round, so it's cheapest exactly when you have the least to protect. Often worth it once your funds are already thin.
 </div>`,
     },
@@ -823,19 +831,19 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
       title: "💸 Phase 3: Settlement",
       content: `<p>Once the pirates are dealt with, two bills come due:</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">
-  <div style="background:#E3F2FD;border-radius:6px;padding:10px;text-align:center">
+  <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">🔧</div>
     <strong>Ship Maintenance</strong><br>
-    <span style="font-size:12px;color:#444">15 Gold, every voyage, fixed</span>
+    <span style="font-size:12px;color:var(--muted-foreground)">15 Gold, every voyage, fixed</span>
   </div>
-  <div style="background:#FCE4EC;border-radius:6px;padding:10px;text-align:center">
+  <div style="background:color-mix(in oklch, var(--w-workers) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">👥</div>
     <strong>Artisan Wages</strong><br>
-    <span style="font-size:12px;color:#444">8 to 20 Gold per person per voyage</span>
+    <span style="font-size:12px;color:var(--muted-foreground)">8 to 20 Gold per person per voyage</span>
   </div>
 </div>
-<p style="font-size:13px;color:#333">The <strong>Round End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
-<p style="font-size:13px;color:#333">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your funds automatically and goes straight to them.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Round End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
+<p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your funds automatically and goes straight to them.</p>`,
     },
     {
       title: "🚢 You are ready",
@@ -847,9 +855,9 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   <li>Phase 4 ship upgrades compound quickly. Do not skip them.</li>
   <li>Caught short by pirates or a bad round? Ask the harbor for a loan before you assume the voyage is over.</li>
   <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>
-  <li><kbd style="background:#eee;border:1px solid #ccc;padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your run &nbsp;·&nbsp; <kbd style="background:#eee;border:1px solid #ccc;padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
+  <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your run &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
 </ul>
-<div style="background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;padding:12px;text-align:center;margin-top:14px">
+<div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border:2px solid var(--gain);color:var(--foreground);border-radius:8px;padding:12px;text-align:center;margin-top:14px">
   <strong style="font-size:15px">Good winds and good margins, Captain. ⚓</strong>
 </div>`,
     },

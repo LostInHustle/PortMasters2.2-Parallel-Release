@@ -4,6 +4,12 @@ import { motion } from "framer-motion";
 import { Crown, Ship, Star, TrendingUp } from "lucide-react";
 import type { HouseStanding } from "@/types/realtime";
 import { cn } from "@/lib/utils";
+import {
+  HOUSE_BAR,
+  HOUSE_BAR_FALLBACK,
+  HOUSE_CREST,
+  HOUSE_FALLBACK,
+} from "./house-colours";
 
 /**
  * Great Houses Leaderboard. A richer view of the harbor wide house
@@ -13,18 +19,6 @@ import { cn } from "@/lib/utils";
  * The house with the most crowns leads. Ties are broken by total
  * voyages, then by best score.
  */
-
-const HOUSE_GRADIENTS: Record<string, string> = {
-  jade_pavilion: "pm-grad-jade",
-  vermilion_gate: "pm-grad-vermilion",
-  golden_lotus: "pm-grad-gold",
-};
-
-const HOUSE_BARS: Record<string, string> = {
-  jade_pavilion: "from-emerald-400 to-teal-500",
-  vermilion_gate: "from-rose-400 to-red-500",
-  golden_lotus: "from-amber-400 to-yellow-500",
-};
 
 export function HouseLeaderboard({
   standings,
@@ -40,9 +34,11 @@ export function HouseLeaderboard({
     return b.bestScore - a.bestScore;
   });
 
+  // Only the crown bar is drawn to scale, so only the crown maximum is
+  // computed. Two more were worked out beside it for bars that were never
+  // added, which meant every render walked the whole standings list three
+  // times to answer two questions nobody asks.
   const maxCrowns = Math.max(1, ...ranked.map((s) => s.crowns));
-  const maxVoyages = Math.max(1, ...ranked.map((s) => s.voyages));
-  const maxBest = Math.max(1, ...ranked.map((s) => s.bestScore));
 
   return (
     <div className="space-y-3">
@@ -86,8 +82,8 @@ export function HouseLeaderboard({
       <div className="space-y-2">
         {ranked.map((s, i) => {
           const isMine = s.houseId === myHouseId;
-          const gradient = HOUSE_GRADIENTS[s.houseId] ?? "pm-grad-primary";
-          const barGradient = HOUSE_BARS[s.houseId] ?? "from-celadon to-jade";
+          const gradient = HOUSE_CREST[s.houseId] ?? HOUSE_FALLBACK;
+          const barGradient = HOUSE_BAR[s.houseId] ?? HOUSE_BAR_FALLBACK;
           return (
             <motion.div
               key={s.houseId}
@@ -97,7 +93,7 @@ export function HouseLeaderboard({
               className={cn(
                 "rounded-xl border p-3",
                 isMine
-                  ? "border-amber-500/40 bg-amber-500/[0.05]"
+                  ? "border-houses/40 bg-houses/[0.05]"
                   : "border-black/8 dark:border-white/8 bg-background/30",
               )}
             >
@@ -106,11 +102,11 @@ export function HouseLeaderboard({
                   className={cn(
                     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                     i === 0
-                      ? "pm-grad-gold text-amber-950"
+                      ? "pm-grad-medal-gold"
                       : i === 1
-                        ? "bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-200"
+                        ? "pm-grad-medal-silver"
                         : i === 2
-                          ? "bg-orange-400/80 text-orange-950"
+                          ? "pm-grad-medal-bronze"
                           : "bg-black/10 text-muted-foreground dark:bg-white/10",
                   )}
                 >
@@ -118,7 +114,7 @@ export function HouseLeaderboard({
                 </span>
                 <div
                   className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white",
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                     gradient,
                   )}
                 >
@@ -130,7 +126,7 @@ export function HouseLeaderboard({
                       {s.name}
                     </span>
                     {isMine && (
-                      <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:text-amber-300">
+                      <span className="rounded-full bg-houses/5 px-1.5 py-0.5 text-[9px] font-semibold text-houses">
                         Yours
                       </span>
                     )}
@@ -150,7 +146,7 @@ export function HouseLeaderboard({
               </div>
               {/* Crown progress bar */}
               <div className="mt-2">
-                <div className="h-1.5 overflow-hidden rounded-full bg-black/8 dark:bg-white/8">
+                <div className="h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
                   <motion.div
                     className={cn(
                       "h-full rounded-full bg-gradient-to-r",
@@ -207,18 +203,19 @@ function PodiumCard({
   height: string;
 }) {
   const isMine = standing.houseId === myHouseId;
-  const gradient = HOUSE_GRADIENTS[standing.houseId] ?? "pm-grad-primary";
+  const gradient = HOUSE_CREST[standing.houseId] ?? HOUSE_FALLBACK;
+  /* The podium wears the same three medals as the rows below it, so a
+     first place looks like a first place in both places. */
   const rankColors: Record<number, string> = {
-    1: "from-amber-300 to-yellow-500",
-    2: "from-zinc-300 to-zinc-400",
-    3: "from-orange-300 to-orange-500",
+    1: "pm-grad-medal-gold",
+    2: "pm-grad-medal-silver",
+    3: "pm-grad-medal-bronze",
   };
   return (
     <div className="flex w-1/4 flex-col items-center">
       <div
         className={cn(
-          "mb-1 flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md",
-          "bg-gradient-to-br",
+          "mb-1 flex h-8 w-8 items-center justify-center rounded-full shadow-md",
           rankColors[rank],
         )}
       >
@@ -229,11 +226,11 @@ function PodiumCard({
           "flex w-full flex-col items-center justify-end rounded-t-lg p-2 text-center",
           height,
           gradient,
-          isMine && "ring-2 ring-amber-400/50",
+          isMine && "ring-2 ring-houses/50",
         )}
       >
         <span className="text-lg">{standing.icon}</span>
-        <span className="mt-0.5 text-[9px] font-bold leading-tight text-white">
+        <span className="mt-0.5 text-[9px] font-bold leading-tight">
           {standing.name}
         </span>
         <span className="text-[8px] text-white/80">
@@ -256,7 +253,7 @@ function SummaryStat({
   return (
     <div className="rounded-lg bg-black/5 p-2 text-center dark:bg-white/5">
       <Icon className="mx-auto mb-0.5 h-3 w-3 text-muted-foreground" />
-      <div className="font-display text-base font-bold pm-text-sea">
+      <div className="font-display text-base font-bold text-houses">
         {value}
       </div>
       <div className="text-[9px] text-muted-foreground">{label}</div>

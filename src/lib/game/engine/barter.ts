@@ -16,7 +16,21 @@
 // invariant across both sides of a completed trade.
 // =====================================================================
 import type { GameState } from "../types";
+import { ageBarterReputation } from "./ages";
 import { addOwnedAmount, getOwnedAmount } from "./core";
+
+// [MANIFEST 10: Ages of the Ledger] The Trader's Age lands Reputation on
+// every completed trade, and a trade has two completing sides. Both call
+// this so the Age pays them the same: it is the trade that earns it, not
+// whichever captain happened to be the one posting the offer.
+function awardBarterReputation(state: GameState, logs: string[]) {
+  const gain = ageBarterReputation();
+  if (gain <= 0) return;
+  state.score += gain;
+  logs.push(
+    `⚖️ Age of the Trader: +${gain} Reputation for the completed trade.`,
+  );
+}
 
 // Posting an offer escrows the offered amount immediately (deducted on the
 // spot, the same way buying a card spends gold right away), so a captain
@@ -92,6 +106,7 @@ export function acceptBarterOffer(
   logs.push(
     `🤝 Traded ${requestAmount} ${requestItem} for ${offerAmount} ${offerItem}`,
   );
+  awardBarterReputation(state, logs);
   return true;
 }
 
@@ -108,6 +123,7 @@ export function settleBarterTrade(
   logs.push(
     `🤝 Barter offer accepted, received ${requestAmount} ${requestItem}`,
   );
+  awardBarterReputation(state, logs);
 }
 
 export function completeBarterPhase(

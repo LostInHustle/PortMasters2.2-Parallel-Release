@@ -23,6 +23,7 @@ import {
   ICONS,
   PRODUCTS,
   RESOURCES,
+  SILK_GOODS,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "../constants";
@@ -32,7 +33,12 @@ import {
   mandateIndexFor,
   marketCountsFor,
 } from "../difficulty";
-import { isCharterGood, unlockedPorts } from "../pools";
+import {
+  isCharterGood,
+  isTier1CharterProduct,
+  isTier2CharterProduct,
+  unlockedPorts,
+} from "../pools";
 import { createRng, type Rng } from "../rng";
 import type { GameContext, GameState } from "../types";
 import { hasModule } from "./core";
@@ -63,9 +69,11 @@ export function completeOrder(
       return;
     }
   }
-  const hasSilk = order.resources.some((r) =>
-    ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type),
-  );
+  // Silk, and everything made from it, read off SILK_GOODS rather than a
+  // list written out here. The list this replaces had gone stale against
+  // the recipe table: it named Cotton Clothes, which uses one Silk, and
+  // missed Foreign Balm and Pearl String, which use one Silk each too.
+  const hasSilk = order.resources.some((r) => SILK_GOODS.includes(r.type));
   let transport = calcTransportCost(state, order.totalItems, hasSilk);
   for (const r of order.resources) state.inventory[r.type] -= r.required!;
   let reward = order.reward;
@@ -109,10 +117,19 @@ export function completeOrder(
   // Bureau Token both reward trading the goods a charter opened, so they only
   // look at orders that actually involve them (see isCharterGood).
   const hasCharterGood = order.resources.some((r) => isCharterGood(r.type));
+  // Each charter boon asks about its own wave, not the charter as a whole.
+  // The Bureau Token above keeps the any wave test, which is what its text
+  // promises: it names charter goods without naming a tier.
+  const hasTier1Good = order.resources.some((r) =>
+    isTier1CharterProduct(r.type),
+  );
+  const hasTier2Good = order.resources.some((r) =>
+    isTier2CharterProduct(r.type),
+  );
   // Added as `reward + floor(reward * pct)` rather than `floor(reward * (1 +
   // pct))`: the latter loses a coin to floating point on common rates (100 *
   // 1.15 is 114.999... in binary), so a stated 15% quietly paid 14%.
-  if (hasCharterGood && state.modifierFlags.charter_order_bonus) {
+  if (hasTier1Good && state.modifierFlags.charter_order_bonus) {
     const pct = state.modifierFlags.charter_order_bonus;
     reward += Math.floor(reward * pct);
     logs.push(`🏮 Kiln and Forge Guild: +${Math.round(pct * 100)}% Reward!`);
@@ -121,7 +138,7 @@ export function completeOrder(
     reward += Math.floor(reward * 0.1);
     logs.push("🎫 Maritime Bureau Token: +10% Reward!");
   }
-  if (hasCharterGood && state.modifierFlags.exotic_order_bonus) {
+  if (hasTier2Good && state.modifierFlags.exotic_order_bonus) {
     const pct = state.modifierFlags.exotic_order_bonus;
     reward += Math.floor(reward * pct);
     logs.push(`💎 Exotic Treasures: +${Math.round(pct * 100)}% Reward!`);
@@ -199,7 +216,8 @@ export function claimWordOnTheDocksReward(state: GameState, logs: string[]) {
 // this captain's own Math.random and only appends to their own
 // customerCards, so it can never shift the shared, room wide market anyone
 // else sees. Quantity is capped at the captain's own hold rather than the
-// usual 1-3/2-5 order range, since brokersFavorCommission (see
+// usual one to three or two to five order range, since
+// brokersFavorCommission (see
 // completeOrder) is what keeps an oversized ask from paying out too much,
 // not a quantity limit.
 export function callBrokersFavor(

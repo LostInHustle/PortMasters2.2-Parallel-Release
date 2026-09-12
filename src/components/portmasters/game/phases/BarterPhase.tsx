@@ -10,7 +10,6 @@ import {
   postBarterOffer,
   refundBarterOffer,
 } from "@/lib/game/engine";
-import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Handshake, X } from "lucide-react";
@@ -87,7 +86,7 @@ export function BarterPhase({
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-        <Handshake className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <Handshake className="h-5 w-5 text-barter" />
         <Term term="Barter">Captain's Exchange</Term>
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
@@ -95,7 +94,7 @@ export function BarterPhase({
         the rest of the harbor to see, or take someone else's.
       </p>
 
-      <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 mb-4">
+      <div className="rounded-xl border border-barter/15 bg-barter/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-3 text-sm">
           📤 Post an Offer
         </h3>
@@ -139,7 +138,7 @@ export function BarterPhase({
             ))}
           </select>
           <Button
-            className={cn("rounded-lg", canPost && "pm-grad-jade text-white")}
+            className={cn("rounded-lg", canPost && "pm-grad-barter")}
             variant={canPost ? "default" : "secondary"}
             disabled={!canPost}
             onClick={submitOffer}
@@ -170,19 +169,19 @@ export function BarterPhase({
           </p>
         )}
         {sameItem && (
-          <p className="text-center text-[11px] text-rose-600 dark:text-rose-400 mt-2">
+          <p className="text-center text-[11px] text-alarm mt-2">
             Pick two different items to barter.
           </p>
         )}
         {!sameItem && offerAmount > owned && (
-          <p className="text-center text-[11px] text-rose-600 dark:text-rose-400 mt-2">
+          <p className="text-center text-[11px] text-alarm mt-2">
             You only have {owned} {offerItem}.
           </p>
         )}
       </div>
 
       {barter.error && (
-        <div className="rounded-lg bg-rose-500/10 border border-rose-500/25 px-3.5 py-2 mb-4 text-xs text-rose-600 dark:text-rose-300 flex items-center justify-between">
+        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-4 text-xs text-alarm flex items-center justify-between">
           <span>⚠️ {barter.error}</span>
           <button onClick={barter.clearError} aria-label="Dismiss error">
             <X className="h-3.5 w-3.5" />
@@ -190,7 +189,7 @@ export function BarterPhase({
         </div>
       )}
 
-      <div className="rounded-xl border border-black/10 dark:border-white/10 bg-background/50 p-4 mb-4">
+      <div className="rounded-xl border border-ship/15 bg-ship/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-3 text-sm">
           📋 Open Offers
         </h3>
@@ -211,9 +210,9 @@ export function BarterPhase({
                   className={cn(
                     "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
                     mine
-                      ? "bg-amber-500/[0.06] border-amber-500/20"
+                      ? "bg-due/[0.06] border-due/20"
                       : isDirect
-                        ? "bg-teal-500/[0.06] border-teal-500/25"
+                        ? "bg-sea/[0.06] border-sea/25"
                         : "bg-background/60 border-black/5 dark:border-white/10",
                   )}
                 >
@@ -232,7 +231,7 @@ export function BarterPhase({
                       {o.requestAmount} {o.requestItem}
                     </span>
                     {isDirect && (
-                      <span className="rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-medium text-teal-700 dark:text-teal-300">
+                      <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
                         🔒 {mine ? `Just for ${o.targetName}` : "Just for you"}
                       </span>
                     )}
@@ -251,7 +250,7 @@ export function BarterPhase({
                       size="sm"
                       className={cn(
                         "h-7 px-2.5 text-[10px] rounded shrink-0",
-                        canAfford && "pm-grad-primary text-white",
+                        canAfford && "pm-grad-barter",
                       )}
                       variant={canAfford ? "default" : "secondary"}
                       disabled={!canAfford}

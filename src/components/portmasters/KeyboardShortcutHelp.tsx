@@ -68,10 +68,10 @@ export function KeyboardShortcutHelp({
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="pm-grad-indigo flex h-10 w-10 items-center justify-center rounded-xl text-white">
+                  <div className="pm-grad-shortcuts flex h-10 w-10 items-center justify-center rounded-xl">
                     <Keyboard className="h-5 w-5" />
                   </div>
-                  <h2 className="font-display text-lg font-bold pm-text-sea">
+                  <h2 className="font-display text-lg font-bold text-shortcuts">
                     Keyboard Shortcuts
                   </h2>
                 </div>
@@ -100,7 +100,7 @@ export function KeyboardShortcutHelp({
                             key={s.label}
                             className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5"
                           >
-                            <span className="text-sm text-foreground/90">
+                            <span className="text-sm text-foreground">
                               {s.label}
                             </span>
                             <div className="flex items-center gap-1">

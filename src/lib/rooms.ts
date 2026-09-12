@@ -9,13 +9,57 @@
 // it to be kept), plus the room code generator and the room name
 // normalizer that the API routes and the Lobby's create form both call.
 // =====================================================================
-import { db } from "./db";
+import { db, type PublicUser } from "./db";
+import type { Difficulty } from "./game/difficulty";
 import type { RoomDetail, RoomSummary } from "./api";
 
-// Re-exported so callers that work with rooms (the realtime mini
+// Forwarded so callers that work with rooms (the realtime mini
 // service, the API routes) can import everything room related from one
 // module instead of piecing it together from ./db, ./api, and ./utils.
 export type { RoomSummary, RoomDetail };
+
+// The one place a room row becomes the shape the client reads.
+//
+// This object literal was typed out by hand in five different route handlers,
+// in three different key orders, with nothing holding them to the same shape.
+// A route returns through NextResponse.json, which type checks nothing against
+// RoomSummary, so the first copy to lose a field would have shipped a response
+// the client believed had it, and no check anywhere would have said a word.
+//
+// The parameters are structural rather than Prisma types on purpose. Three of
+// the five callers hand over a room whose members came back on the row, and
+// the other two have already re read the seats into a separate list after
+// writing one, so the members are passed in beside the room rather than dug
+// out of it.
+export function serializeRoom(
+  room: {
+    id: string;
+    code: string;
+    name: string;
+    isPublic: boolean;
+    started: boolean;
+    difficulty: string;
+    createdAt: Date;
+    host: PublicUser;
+  },
+  members: Array<{ user: PublicUser; joinedAt: Date }>,
+): RoomSummary {
+  return {
+    id: room.id,
+    code: room.code,
+    name: room.name,
+    isPublic: room.isPublic,
+    started: room.started,
+    difficulty: room.difficulty as Difficulty,
+    createdAt: room.createdAt.toISOString(),
+    host: room.host,
+    memberCount: members.length,
+    members: members.map((m) => ({
+      ...m.user,
+      joinedAt: m.joinedAt.toISOString(),
+    })),
+  };
+}
 
 type LeaveRoomResult =
   { roomDeleted: true } | { roomDeleted: false; newHostId: string | null };
@@ -85,7 +129,7 @@ export async function roomMemberIds(roomId: string): Promise<string[]> {
   return members.map((m) => m.userId);
 }
 
-// 6-char human friendly room join code (no ambiguous chars). Used by the
+// Six characters, human friendly, no ambiguous ones. Used by the
 // create room API route and surfaced in the Lobby so a captain can hand
 // the code to a friend. Generated server side so a malicious client can't
 // pre pick a code that collides with another room's.

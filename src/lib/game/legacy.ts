@@ -57,6 +57,14 @@ export const RENOWN_TITLES: RenownTitle[] = [
   { minLevel: 21, title: "Silk Road Sovereign" },
 ];
 
+// The level at which the final title is earned, which is also the top of the
+// Renown bar the Captain Profile draws. Derived from the table rather than
+// written out beside it: the profile carried its own literal 21, so adding a
+// title above Silk Road Sovereign would have moved the table and left the bar
+// still filling to the old ceiling, with nothing to say the two disagreed.
+export const RENOWN_MAX_LEVEL =
+  RENOWN_TITLES[RENOWN_TITLES.length - 1].minLevel;
+
 export function renownTitleForLevel(level: number): string {
   let title = RENOWN_TITLES[0].title;
   for (const t of RENOWN_TITLES) {
@@ -84,7 +92,7 @@ export function renownStartingGoldBonus(level: number): number {
   );
 }
 
-// ---------- Per difficulty breakdown ----------
+// ========== Per difficulty breakdown ==========
 // Sea Master crowns and best score split by the tier they were earned on (see
 // Room.difficulty and src/lib/game/difficulty.ts). The account level
 // seaMasterCrowns and bestScore stay the all tier totals; this is the breakdown

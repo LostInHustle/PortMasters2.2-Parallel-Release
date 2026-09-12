@@ -9,7 +9,7 @@ import {
   tallyPurchasesByResource,
   applyHarborPulse,
 } from "@/lib/game/engine";
-import { renownStartingGoldBonus } from "@/lib/game/legacy";
+import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import {
   CHECKPOINT_PHASE_ORDER,
@@ -27,7 +27,7 @@ export type ReadyState = {
 
 // CHECKPOINT_PHASE_ORDER, checkpointRank, and parsePhase are imported from
 // the shared @/lib/game/checkpoint module so the client and the realtime
-// layer never drift on the synchronized phase order. Re-exported
+// layer never drift on the synchronized phase order. Forwarded
 // here so any caller that used to read them off this hook still can.
 export { CHECKPOINT_PHASE_ORDER, checkpointRank, parsePhase };
 
@@ -214,10 +214,12 @@ export function usePhaseSync(
       setStartError(null);
       let bonus = goldBonusRef.current;
       let level: number | null = null;
+      let house: HouseId | null = null;
       try {
         const { legacy } = await api.getLegacy();
         bonus = renownStartingGoldBonus(legacy.renownLevel);
         level = legacy.renownLevel;
+        house = legacy.houseId;
         goldBonusRef.current = bonus;
       } catch {
         // If the fetch fails (network blip, server restart), fall back to
@@ -229,16 +231,18 @@ export function usePhaseSync(
       // changes. Preserve the captain's current Renown level when the legacy
       // refetch failed, so restartGame never silently relocks a Renown skill.
       act((state, logs) =>
-        restartGame(
-          state,
-          logs,
-          bonus,
-          level ?? state.renownLevel,
-          data.voyageEpoch ?? state.voyageEpoch + 1,
+        restartGame(state, logs, {
+          startingGoldBonus: bonus,
+          renownLevel: level ?? state.renownLevel,
+          voyageEpoch: data.voyageEpoch ?? state.voyageEpoch + 1,
           // The room's tier is the source of truth; if the payload lacks it,
           // keep the captain's current tier rather than silently resetting it.
-          normalizeDifficulty(data.difficulty ?? state.difficulty),
-        ),
+          difficulty: normalizeDifficulty(data.difficulty ?? state.difficulty),
+          // A refetch that failed leaves this null, and the new voyage keeps
+          // the House the captain was already sailing under rather than
+          // dropping a pledge because of one bad request.
+          houseId: house ?? state.houseId,
+        }),
       );
     };
 

@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 // A captain's head to head record against a single rival. meetings is the
 // total voyages they have shared; myWins/theirWins/ties split those
 // meetings by outcome. The line is only rendered when this is non null,
-// so callers without a rival (the Endgame screen, the Lobby's own card)
-// simply leave the prop unset.
+// so a caller with nobody to name (the Lobby's own card, and an Endgame
+// whose voyage had no rival in it) simply leaves the prop unset.
 type CaptainRival = {
   displayName: string;
   meetings: number;
@@ -31,38 +31,31 @@ type CaptainRival = {
   ties: number;
 };
 
-// A captain's standing with a single Great House, surfaced as a chip
-// beside the Renown line. standing is the engine's numeric standing
-// value, so a caller can pass through whatever houseStandingFor returns.
-type CaptainHouse = {
-  id: string;
-  name: string;
-  standing: number;
-};
-
 // Shown both in the Lobby (a captain's standing account of who they are
 // across every voyage they've ever sailed) and on the Endgame screen
 // right after a voyage concludes (see GamePhasePanel.tsx), where it
 // reflects the account *after* this voyage's Renown XP was applied.
 //
-// [MANIFEST] Two new lines surface here, both optional so the compact
-// Endgame variant stays untouched when no live data is available:
-//   - the Captain's Rival head to head line, only when the caller names
-//     a rival and the record is non null,
-//   - the House Standing chip, only when the caller has pledged to one
-//     of the Great Houses and passes its standing through.
+// [MANIFEST] One extra line surfaces here: the Captain's Rival head to
+// head record, drawn only when the caller names a rival and the record is
+// non null. The Endgame screen names whoever else sailed the voyage just
+// finished (see Endgame.tsx); the Lobby's card has nobody in particular to
+// name, so it leaves the prop unset and the card renders without it.
+//
+// A House Standing chip used to sit here too, fed by a houseStandingFor
+// helper. Neither survived: there is no per captain House standing
+// anywhere in the game, no schema field and no engine value, so the chip
+// had no number it could honestly print and nothing ever passed it one.
 export function CaptainLegacyCard({
   legacy,
   className,
   compact,
   rival = null,
-  house = null,
 }: {
   legacy: CaptainLegacySummary;
   className?: string;
   compact?: boolean;
   rival?: CaptainRival | null;
-  house?: CaptainHouse | null;
 }) {
   const { level, xpIntoLevel, xpForNextLevel } = renownProgress(
     legacy.renownXP,
@@ -87,12 +80,12 @@ export function CaptainLegacyCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3.5",
+        "rounded-xl border border-legacy/20 bg-legacy/[0.04] p-3.5",
         className,
       )}
     >
       <div className="flex items-center gap-2 mb-2">
-        <div className="pm-grad-amber h-8 w-8 rounded-lg flex items-center justify-center shrink-0">
+        <div className="pm-grad-legacy h-8 w-8 rounded-lg flex items-center justify-center shrink-0">
           <Star className="h-4 w-4 text-white" />
         </div>
         <div className="min-w-0">
@@ -111,9 +104,7 @@ export function CaptainLegacyCard({
       <div
         className={cn(
           "text-[10px] mb-2.5",
-          favorUnlocked
-            ? "text-violet-600 dark:text-violet-400 font-medium"
-            : "text-muted-foreground",
+          favorUnlocked ? "text-favor font-medium" : "text-muted-foreground",
         )}
       >
         {favorUnlocked
@@ -130,7 +121,7 @@ export function CaptainLegacyCard({
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border cursor-default",
                     earned
-                      ? "bg-amber-500/15 border-amber-500/40"
+                      ? "bg-legacy/5 border-legacy/40"
                       : "bg-background/60 border-black/10 dark:border-white/10 opacity-35 grayscale",
                   )}
                 >
@@ -138,9 +129,7 @@ export function CaptainLegacyCard({
                     id={m.id}
                     className={cn(
                       "h-3.5 w-3.5",
-                      earned
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-muted-foreground",
+                      earned ? "text-legacy" : "text-muted-foreground",
                     )}
                   />
                 </span>
@@ -161,40 +150,26 @@ export function CaptainLegacyCard({
         })}
       </div>
 
-      {/* [MANIFEST] House Standing chip, only when the caller has pledged
-          to one of the Great Houses and passes its standing through. The
-          chip wears the gold wax seal gradient so a glance is enough to
-          place the captain's affiliation. */}
-      {house && (
-        <div className="mb-2.5 flex items-center gap-2">
-          <span className="pm-grad-gold inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold">
-            <span className="text-sm leading-none">⛵</span>
-            {house.name} · Standing {house.standing}
-          </span>
-        </div>
-      )}
-
       {!compact && (
         <>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg bg-background/60 py-1.5">
               <div className="text-sm font-bold flex items-center justify-center gap-1">
-                <Ship className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />{" "}
+                <Ship className="h-3.5 w-3.5 text-sea" />{" "}
                 {legacy.voyagesCompleted}
               </div>
               <div className="text-[9px] text-muted-foreground">Voyages</div>
             </div>
             <div className="rounded-lg bg-background/60 py-1.5">
               <div className="text-sm font-bold flex items-center justify-center gap-1">
-                <Crown className="h-3.5 w-3.5 text-amber-500" />{" "}
+                <Crown className="h-3.5 w-3.5 text-gold-ink" />{" "}
                 {legacy.seaMasterCrowns}
               </div>
               <div className="text-[9px] text-muted-foreground">Sea Master</div>
             </div>
             <div className="rounded-lg bg-background/60 py-1.5">
               <div className="text-sm font-bold flex items-center justify-center gap-1">
-                <Trophy className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />{" "}
-                {legacy.bestScore}
+                <Trophy className="h-3.5 w-3.5 text-gain" /> {legacy.bestScore}
               </div>
               <div className="text-[9px] text-muted-foreground">Best Rep.</div>
             </div>
@@ -209,11 +184,11 @@ export function CaptainLegacyCard({
                       <span className="text-muted-foreground">{cfg.badge}</span>
                       {stats!.crowns > 0 && (
                         <span className="inline-flex items-center gap-0.5 font-semibold">
-                          <Crown className="h-2.5 w-2.5 text-amber-500" />
+                          <Crown className="h-2.5 w-2.5 text-gold-ink" />
                           {stats!.crowns}
                         </span>
                       )}
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="font-semibold text-gain">
                         {stats!.bestScore}
                       </span>
                     </span>
@@ -234,11 +209,12 @@ export function CaptainLegacyCard({
       )}
 
       {/* [MANIFEST] Captain's Rival: head to head line at the bottom,
-          only when the caller names a rival. The section wears the indigo
-          wax seal gradient to mark it as a peer rivalry line, distinct
-          from the Renown and House surfaces above. */}
+          only when the caller names a rival. The line is a filled band in
+          the panel's own colour, which is what marks it as a different
+          surface from the cards above without giving a rival a colour of
+          its own. */}
       {rival && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg pm-grad-indigo px-2.5 py-2">
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-legacy/5 text-legacy px-2.5 py-2">
           <Swords className="h-3.5 w-3.5 shrink-0" />
           <span className="text-[11px] leading-snug">
             Head to head with <b>{rival.displayName}</b>: {rival.myWins} wins,{" "}

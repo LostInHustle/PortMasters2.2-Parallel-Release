@@ -22,21 +22,27 @@ import { cn } from "@/lib/utils";
  * is readable at a glance.
  */
 type AgeVisual = {
+  /** The filled form, for the pill and the seal. */
   gradient: string;
+  /** The same colour as text, for the headings in the banner and dialog. */
+  ink: string;
   icon: typeof TrendingUp;
 };
 
 const AGE_VISUALS: Record<AgeId, AgeVisual> = {
   lender: {
-    gradient: "pm-grad-jade",
+    gradient: "pm-grad-age-lender",
+    ink: "text-age-lender",
     icon: Handshake,
   },
   trader: {
-    gradient: "pm-grad-gold",
+    gradient: "pm-grad-age-trader",
+    ink: "text-age-trader",
     icon: TrendingUp,
   },
   broker: {
-    gradient: "pm-grad-violet",
+    gradient: "pm-grad-age-broker",
+    ink: "text-age-broker",
     icon: Coins,
   },
 };
@@ -72,19 +78,19 @@ export function AgeBanner({
 
   if (variant === "full") {
     return (
-      <div className={cn("pm-glass pm-crackle rounded-2xl p-4", className)}>
+      <div className={cn("pm-glass pm-crackle pm-panel", className)}>
         <div className="flex items-start gap-3">
           <div
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white",
+              "pm-seal flex items-center justify-center",
               visual.gradient,
             )}
           >
             <Icon className="h-5 w-5" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold pm-text-sea">
+              <h3 className={cn("font-display text-sm font-bold", visual.ink)}>
                 {age.name}
               </h3>
               <span className="text-[10px] text-muted-foreground">
@@ -105,7 +111,7 @@ export function AgeBanner({
       <button
         onClick={() => setExpanded(true)}
         className={cn(
-          "pm-pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium text-white",
+          "pm-pressable inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium",
           visual.gradient,
           className,
         )}
@@ -156,14 +162,16 @@ function AgeDetailDialog({
             <div className="flex items-center gap-3">
               <div
                 className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-2xl text-white",
+                  "flex h-12 w-12 items-center justify-center rounded-2xl",
                   visual.gradient,
                 )}
               >
                 <Icon className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="font-display text-lg font-bold pm-text-sea">
+                <h2
+                  className={cn("font-display text-lg font-bold", visual.ink)}
+                >
                   {age.name}
                 </h2>
                 <p className="text-[11px] text-muted-foreground">
@@ -179,7 +187,7 @@ function AgeDetailDialog({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-sm leading-relaxed text-foreground/90">
+          <p className="text-sm leading-relaxed text-foreground">
             {age.description}
           </p>
           <div className="mt-4 rounded-xl bg-black/5 p-3 dark:bg-white/5">

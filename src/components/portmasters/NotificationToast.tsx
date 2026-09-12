@@ -49,9 +49,9 @@ export function NotificationToast({
           : undefined
       }
       className={cn(
-        "relative w-full text-left pm-glass-strong rounded-xl px-4 py-3 pr-8 shadow-xl border border-teal-500/25",
+        "relative w-full text-left pm-glass-strong rounded-xl px-4 py-3 pr-8 shadow-xl border border-notifications/25",
         clickable &&
-          "cursor-pointer hover:border-teal-500/50 transition-colors",
+          "cursor-pointer hover:border-notifications/50 transition-colors",
       )}
     >
       <button
@@ -61,7 +61,7 @@ export function NotificationToast({
           e.stopPropagation();
           dismiss(toastId);
         }}
-        className="absolute top-2.5 right-2.5 rounded-md p-0.5 text-muted-foreground/70 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+        className="absolute top-2.5 right-2.5 rounded-md p-0.5 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -72,7 +72,7 @@ export function NotificationToast({
         {lines.map((line, i) => (
           <div
             key={i}
-            className="text-[13px] text-foreground/85 leading-snug break-words"
+            className="text-[13px] text-foreground leading-snug break-words"
           >
             {line}
           </div>

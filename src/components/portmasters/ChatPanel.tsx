@@ -18,7 +18,7 @@ import { toast } from "sonner";
  *
  * The socket is passed in (shared singleton). Initial history is fetched
  * via REST; live messages arrive over the socket. Mine uses the celadon
- * pm-grad-primary, others get a soft black tint so the conversation reads
+ * pm-grad-chat, others get a soft black tint so the conversation reads
  * as two sides of a brush without leaning on the rose tint the old build
  * used for the same distinction.
  */
@@ -182,7 +182,7 @@ export function ChatPanel({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search messages…"
-            className="h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+            className="h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             autoFocus
           />
           {searchQuery && (
@@ -208,13 +208,13 @@ export function ChatPanel({
       >
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {emptyText}
             </p>
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center px-6">
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               No messages match &ldquo;{searchQuery}&rdquo;.
             </p>
           </div>
@@ -252,13 +252,13 @@ export function ChatPanel({
                     className={cn(
                       "px-3 py-1.5 rounded-2xl text-[13px] leading-snug break-words",
                       mine
-                        ? "pm-grad-primary text-white rounded-br-md"
+                        ? "pm-grad-chat rounded-br-md"
                         : "bg-black/5 dark:bg-white/10 rounded-bl-md",
                     )}
                   >
                     {m.content}
                   </div>
-                  <span className="text-[9px] text-muted-foreground/70 mt-0.5 px-1">
+                  <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
                     {new Date(m.createdAt).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -281,7 +281,7 @@ export function ChatPanel({
             className={cn(
               "pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
               searchOpen
-                ? "bg-celadon/20 text-celadon"
+                ? "bg-celadon/5 text-celadon"
                 : "bg-black/5 text-muted-foreground dark:bg-white/10",
             )}
             title="Search messages"
@@ -310,7 +310,7 @@ export function ChatPanel({
             size="icon"
             onClick={send}
             disabled={!input.trim() || sending}
-            className="h-9 w-9 rounded-full pm-grad-primary text-white shrink-0"
+            className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

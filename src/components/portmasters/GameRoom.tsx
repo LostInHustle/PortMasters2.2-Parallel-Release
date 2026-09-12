@@ -795,8 +795,7 @@ export function GameRoom({
     return (
       <div className="pm-canvas min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground flex items-center gap-2">
-          <Ship className="h-5 w-5 animate-pulse text-teal-500" /> Weighing
-          anchor…
+          <Ship className="h-5 w-5 animate-pulse text-brand" /> Weighing anchor…
         </div>
       </div>
     );
@@ -808,8 +807,8 @@ export function GameRoom({
       <header className="sticky top-0 z-30 px-3 sm:px-5 py-3">
         <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="pm-grad-primary h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-5 w-5 text-white" />
+            <div className="pm-grad-brand h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
+              <Anchor className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -834,17 +833,14 @@ export function GameRoom({
             <div className="relative hidden sm:block">
               <ActionSuggester game={state.game} />
             </div>
-            <Pill tone="jade" className="hidden sm:inline-flex">
+            <Pill tone="gain" className="hidden sm:inline-flex">
               <OnlineDot online={connected && authed} size={8} />{" "}
               {connected && authed ? "Live" : "Linking…"}
             </Pill>
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "rounded-lg",
-                colorblindSafe && "text-teal-600 dark:text-teal-400",
-              )}
+              className={cn("rounded-lg", colorblindSafe && "text-gain")}
               onClick={() => setColorblindSafe(!colorblindSafe)}
               title={
                 colorblindSafe
@@ -857,10 +853,7 @@ export function GameRoom({
             <Button
               variant="ghost"
               size="sm"
-              className={cn(
-                "rounded-lg",
-                soundOn && "text-amber-600 dark:text-amber-300",
-              )}
+              className={cn("rounded-lg", soundOn && "text-gain")}
               onClick={toggleSound}
               title={
                 soundOn
@@ -900,7 +893,7 @@ export function GameRoom({
               <Bell className="h-4 w-4" />
               {notifications.unreadCount > 0 && (
                 <Pill
-                  tone="rose"
+                  tone="alarm"
                   className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]"
                 >
                   {notifications.unreadCount > 9
@@ -993,7 +986,7 @@ export function GameRoom({
                 with no wrap spills off both edges at once, which both
                 hides the first hint and gives the whole page a sideways
                 scrollbar. */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground/70">
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
               <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
                 Ctrl+S
               </kbd>{" "}
@@ -1170,7 +1163,7 @@ export function GameRoom({
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           onClick={() => setTipsOpen(true)}
-          className="fixed bottom-5 right-5 pm-grad-amber text-white rounded-full h-12 w-12 flex items-center justify-center shadow-lg z-40"
+          className="fixed bottom-5 right-5 pm-grad-advisor rounded-full h-12 w-12 flex items-center justify-center shadow-lg z-40"
           title="Strategy tips"
         >
           <LifeBuoy className="h-5 w-5" />
@@ -1261,7 +1254,7 @@ function DmTab({
                     @{u.username}
                   </div>
                 </div>
-                <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </button>
             ))
           )}

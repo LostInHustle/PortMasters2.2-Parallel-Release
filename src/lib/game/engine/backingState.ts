@@ -10,6 +10,7 @@
 // =====================================================================
 import { BACKING_REPUTATION_PER_GOLD } from "../constants";
 import type { GameState } from "../types";
+import { ageBackingReputationMultiplier } from "./ages";
 import { grantHelperReputation } from "./aid";
 
 // [MANIFEST 05: Backing] Escrows a pledge immediately, the same escrow on
@@ -48,11 +49,22 @@ export function receiveBackingOutcome(
 ) {
   if (refundAmount > 0) state.money += refundAmount;
   if (calledAmount <= 0) {
+    // [MANIFEST 10: Ages of the Ledger] The Lender's Age pays half again
+    // for a pledge that came home whole. The multiplier is applied to the
+    // raw figure, before the shared helper ceiling inside
+    // grantHelperReputation, which is what stops an Age from lifting a
+    // captain past the one ceiling lending and backing answer to together.
+    const base = Math.floor(refundAmount * BACKING_REPUTATION_PER_GOLD);
+    const multiplier = ageBackingReputationMultiplier();
     const repGain = grantHelperReputation(
       state,
-      Math.floor(refundAmount * BACKING_REPUTATION_PER_GOLD),
+      Math.floor(base * multiplier),
       logs,
     );
+    if (multiplier > 1 && base > 0)
+      logs.push(
+        `⚖️ Age of the Lender: a pledge that comes home whole pays ${Math.round((multiplier - 1) * 100)}% more while it holds the harbor.`,
+      );
     logs.push(
       repGain > 0
         ? `🛡️ Your backing was never called on. Pledge returned in full: ${refundAmount} Gold. Reputation +${repGain} for the risk paying off.`

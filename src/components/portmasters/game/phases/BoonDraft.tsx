@@ -22,7 +22,7 @@ export function BoonDraft({
   if (phaseSync.waiting) {
     return (
       <div className="max-w-md mx-auto text-center py-10">
-        <div className="text-2xl font-bold mb-1 pm-text-gold">
+        <div className="text-2xl font-bold mb-1 text-boon">
           🧭 Boon Locked In
         </div>
         <p className="text-sm text-muted-foreground mb-5">
@@ -46,7 +46,7 @@ export function BoonDraft({
   const canSwap = !game.boonSwapUsed && game.money >= 10;
   return (
     <div className="max-w-4xl mx-auto text-center py-2">
-      <div className="text-2xl font-bold mb-1 pm-text-gold">
+      <div className="text-2xl font-bold mb-1 text-boon">
         🧭 The Navigator's Compass
       </div>
       <p className="text-sm text-muted-foreground mb-2">
@@ -91,7 +91,7 @@ export function BoonDraft({
               },
             }}
             whileHover={{ y: -6 }}
-            className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-amber-500/20"
+            className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-boon/15"
           >
             <div className="text-5xl mb-2">{b.icon}</div>
             <div className="font-semibold text-foreground mb-2">
@@ -101,7 +101,7 @@ export function BoonDraft({
               {b.desc}
             </div>
             <Button
-              className="pm-grad-gold text-amber-950 font-semibold rounded-xl w-full"
+              className="pm-grad-boon font-semibold rounded-xl w-full"
               onClick={() =>
                 phaseSync.markReady((g, l) => selectBoon(g, ctx, b.id, l))
               }

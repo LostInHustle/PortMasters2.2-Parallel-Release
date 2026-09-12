@@ -2,9 +2,9 @@
 // PortMasters 2.2 Parallel Release: difficulty modes
 //
 // One data record defines every difficulty tier, and a thin layer of pure
-// selectors derives each in game dial from it. This mirrors the original
-// PortMasters 2 design (a single DIFFICULTIES record plus difficultyRules
-// helpers), rebuilt around the Parallel Release's own systems.
+// selectors derives each in game dial from it. This mirrors the earlier
+// build's own design (a single DIFFICULTIES record plus difficultyRules
+// helpers), rebuilt around this release's own systems.
 //
 // Difficulty is a ROOM property (see Room.difficulty in prisma/schema.prisma):
 // the host picks it once, and every captain in the harbor resolves the same
@@ -208,7 +208,7 @@ export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
   },
 ];
 
-// ---------- Selectors (pure) ----------
+// ========== Selectors (pure) ==========
 
 // Any unknown value (a stale save, a malformed request) falls back to the
 // default tier rather than throwing, the same defensive shape the original's
@@ -325,4 +325,13 @@ export function mandateIndexFor(
   roundNo: number,
 ): number | undefined {
   return difficultyConfig(value).mandates[roundNo];
+}
+
+// Every round this tier schedules a mandate on, in ascending order. Read off
+// the tier's own config wherever a sentence needs to name them, so adding a
+// mandate to a tier can never leave the copy describing the old schedule.
+export function mandateRounds(cfg: DifficultyConfig): number[] {
+  return Object.keys(cfg.mandates)
+    .map(Number)
+    .sort((a, b) => a - b);
 }

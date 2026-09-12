@@ -121,8 +121,7 @@ export function MembersPanel({
     <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
       <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Ship className="h-4 w-4 text-teal-600 dark:text-teal-400" /> Harbor
-          Roster
+          <Ship className="h-4 w-4 text-members" /> Harbor Roster
         </h3>
         <Pill tone="sea">
           {members.length} captain{members.length !== 1 ? "s" : ""}
@@ -161,7 +160,7 @@ export function MembersPanel({
               className={cn(
                 "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
                 isMe
-                  ? "border-teal-500/30 bg-teal-500/[0.06]"
+                  ? "border-members/30 bg-members/[0.06]"
                   : "border-black/5 dark:border-white/10 bg-background/40",
               )}
             >
@@ -179,15 +178,15 @@ export function MembersPanel({
                     {m.displayName}
                   </span>
                   {isHost && (
-                    <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <Crown className="h-3.5 w-3.5 text-gold-ink shrink-0" />
                   )}
                   {isMe && (
-                    <Pill tone="sea" className="!py-0">
+                    <Pill tone="default" className="!py-0">
                       you
                     </Pill>
                   )}
                   {isMuted && (
-                    <Pill tone="rose" className="!py-0">
+                    <Pill tone="alarm" className="!py-0">
                       <VolumeX className="h-2.5 w-2.5" /> muted
                     </Pill>
                   )}
@@ -198,15 +197,15 @@ export function MembersPanel({
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {isBankrupt ? (
-                  <Pill tone="rose">
+                  <Pill tone="alarm">
                     <SkullIcon className="h-3 w-3" /> Bankrupt
                   </Pill>
                 ) : (
                   <>
-                    <Pill tone="jade">
+                    <Pill tone="gold">
                       <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
                     </Pill>
-                    <Pill tone="gold">
+                    <Pill tone="favor">
                       <Trophy className="h-3 w-3" /> {st ? st.reputation : "…"}
                     </Pill>
                   </>
@@ -322,7 +321,7 @@ function PeekButton({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1.5 flex items-center gap-1.5">
-          <Eye className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+          <Eye className="h-3.5 w-3.5 text-members" />
           <span className="font-semibold">{targetName}</span>
           <span className="ml-auto text-[10px] text-muted-foreground">
             partial sight
@@ -362,7 +361,7 @@ function PeekButton({
             </div>
           </div>
         )}
-        <p className="mt-1.5 text-[10px] text-muted-foreground/70">
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
           Bands are read from {targetName}'s live snapshot. The harbor master
           only shares what your standing allows.
         </p>
@@ -370,7 +369,3 @@ function PeekButton({
     </Popover>
   );
 }
-
-// Re-exported so any caller that wants the band label alone can compute it
-// without reaching into the engine module directly.
-export { bandFor };

@@ -48,8 +48,8 @@ export function ReadyBar({
                 className={cn(
                   "absolute -bottom-1 -right-1 rounded-full p-[3px] ring-2 ring-background",
                   isReady
-                    ? "bg-emerald-500 text-white"
-                    : "bg-amber-400 text-amber-950",
+                    ? "bg-gain text-background"
+                    : "bg-warn text-background",
                 )}
               >
                 {isReady ? (

@@ -75,7 +75,7 @@ function WorkerList({
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 px-2 text-[10px] rounded border border-rose-500/25 bg-rose-500/5 text-rose-600/90 hover:border-rose-500/40 hover:bg-rose-500/15 hover:text-rose-600 dark:text-rose-400/90 dark:hover:text-rose-300"
+              className="h-6 px-2 text-[10px] rounded border border-alarm/25 bg-alarm/5 text-alarm hover:border-alarm/40 hover:bg-alarm/5 hover:text-alarm"
               onClick={() => act((g, l) => fireWorker(g, type, i, l))}
             >
               Dismiss ({WAGES[type]}💰)
@@ -152,10 +152,14 @@ export function WorkerMgmt({
         💰 Current Funds: {game.money} Gold | 📦 See Inventory on the left
       </p>
 
-      <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20 p-3.5 mb-4 text-xs">
+      <div className="rounded-xl bg-workers/[0.06] border border-workers/20 p-3.5 mb-4 text-xs">
         <strong>⏱️ Production Cycle: What Happens When</strong>
+        {/* Four steps of the round, each wearing the colour of the phase
+            it names, so the tiles are a map of the round rather than four
+            unrelated swatches. They used to share three paints between
+            them, none of which said which phase it stood for. */}
         <div className="grid grid-cols-4 gap-1.5 mt-2 text-center">
-          <div className="pm-grad-jade text-white rounded-md py-1.5">
+          <div className="pm-grad-workers rounded-md py-1.5">
             <div>📋 Now</div>
             <div className="text-[9px] opacity-90">
               Assign task
@@ -163,35 +167,33 @@ export function WorkerMgmt({
               consume materials
             </div>
           </div>
-          <div className="pm-grad-primary text-white rounded-md py-1.5">
+          <div className="pm-grad-orders rounded-md py-1.5">
             <div>🤝 Phase 2</div>
             <div className="text-[9px] opacity-90">Trade orders</div>
           </div>
-          <div className="pm-grad-amber text-white rounded-md py-1.5">
+          <div className="pm-grad-settlement rounded-md py-1.5">
             <div>✅ Phase 3</div>
             <div className="text-[9px] opacity-90">
               Items produced
               <br />+ wages paid
             </div>
           </div>
-          <div className="bg-fuchsia-600 text-white rounded-md py-1.5">
+          <div className="pm-grad-shipyard rounded-md py-1.5">
             <div>🚢 Phase 4</div>
             <div className="text-[9px] opacity-90">Shipyard</div>
           </div>
         </div>
-        <div className="mt-2 text-emerald-700 dark:text-emerald-300">
+        <div className="mt-2 text-gain">
           💡 Materials consumed <strong>now</strong>. Finished goods and wage
           deductions happen at <strong>Phase 3</strong>, not instantly.
         </div>
       </div>
 
-      <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 mb-4">
+      <div className="rounded-xl border border-ship/15 bg-ship/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-2">📦 Current Inventory</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <strong className="text-xs text-teal-700 dark:text-teal-300">
-              Raw Materials:
-            </strong>
+            <strong className="text-xs text-ship">Raw Materials:</strong>
             {unlockedResources(game.difficulty, game.currentRound).map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
@@ -205,9 +207,7 @@ export function WorkerMgmt({
             ))}
           </div>
           <div>
-            <strong className="text-xs text-teal-700 dark:text-teal-300">
-              Finished Goods:
-            </strong>
+            <strong className="text-xs text-ship">Finished Goods:</strong>
             {openProducts.map((r) => (
               <div key={r} className="flex items-center text-[11px] py-0.5">
                 <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
@@ -223,9 +223,12 @@ export function WorkerMgmt({
         </div>
       </div>
 
+      {/* Payroll is money leaving the purse, so this box keeps the colour
+          that means a cost rather than wearing the Worker Management
+          colour the rest of the screen wears. */}
       {nW > 0 && (
-        <div className="rounded-xl bg-orange-500/[0.06] border border-orange-500/20 p-3.5 mb-4">
-          <h3 className="text-center font-semibold mb-2 text-orange-700 dark:text-orange-300">
+        <div className="rounded-xl bg-due/[0.06] border border-due/20 p-3.5 mb-4">
+          <h3 className="text-center font-semibold mb-2 text-due">
             💰 Pending Payroll: Deducted at Phase 3
           </h3>
           <div className="text-xs space-y-0.5">
@@ -246,11 +249,9 @@ export function WorkerMgmt({
                   <b>{r.due} Gold</b>
                 </div>
               ))}
-            <div className="flex justify-between border-t border-orange-500/20 pt-1 mt-1 font-bold">
+            <div className="flex justify-between border-t border-due/20 pt-1 mt-1 font-bold">
               <span>💸 Total Wages Due</span>
-              <span className="text-rose-600 dark:text-rose-400">
-                {totalWages} Gold
-              </span>
+              <span className="text-alarm">{totalWages} Gold</span>
             </div>
           </div>
           {/* Wage Efficiency Indicator */}
@@ -276,19 +277,19 @@ export function WorkerMgmt({
                 ? Math.round((totalProducedValue / totalWagesPaid) * 10) / 10
                 : 0;
             return (
-              <div className="mt-2 border-t border-orange-500/15 pt-2 flex items-center justify-between text-[11px]">
+              <div className="mt-2 border-t border-due/15 pt-2 flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-teal-500" />
+                  <TrendingUp className="h-3 w-3 text-sea" />
                   Wage Efficiency
                 </span>
                 <span
                   className={cn(
                     "font-bold tabular-nums",
                     efficiency >= 3
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-gain"
                       : efficiency >= 1.5
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-rose-600 dark:text-rose-400",
+                        ? "text-warn"
+                        : "text-alarm",
                   )}
                 >
                   {efficiency}x return
@@ -302,7 +303,7 @@ export function WorkerMgmt({
         </div>
       )}
 
-      <div className="rounded-xl bg-amber-500/[0.05] border border-teal-500/15 p-4 mb-4">
+      <div className="rounded-xl border border-workers/15 bg-workers/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-2">🔨 Hire Workers</h3>
         <div className="text-xs space-y-1 mb-3">
           {roster.map((r) => (
@@ -319,14 +320,11 @@ export function WorkerMgmt({
                   return `${t}(${mats})`;
                 })
                 .join(" or ")}
-              ,{" "}
-              <span className="text-orange-600 dark:text-orange-400">
-                {WAGES[r.id]} Gold/round
-              </span>
+              , <span className="text-due">{WAGES[r.id]} Gold/round</span>
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue. The old three-colour
+        {/* Each hire button wears its own craft's hue. The old three colour
             cycle put the same saturated green on the first, fourth and
             seventh artisan, so a row of seven read as one repeating stripe
             and the colour told you nothing about which artisan you were
@@ -350,7 +348,7 @@ export function WorkerMgmt({
       </div>
 
       {nW > 0 ? (
-        <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 mb-4">
+        <div className="rounded-xl border border-workers/15 bg-workers/[0.03] p-4 mb-4">
           <h3 className="text-center font-semibold mb-2">
             👥 Worker Status & Tasks
           </h3>

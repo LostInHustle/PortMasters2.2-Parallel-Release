@@ -49,16 +49,12 @@ const eslintConfig = [
   },
   {
     ignores: [
+      // The two generated trees, plus the one file Next writes into the
+      // project root. Every other entry that used to sit here named a
+      // directory this repo has never had.
       "node_modules/**",
       ".next/**",
-      "out/**",
-      "build/**",
       "next-env.d.ts",
-      "examples/**",
-      "skills",
-      "download/**",
-      "tests/**",
-      "tool-results/**",
     ],
   },
 ];

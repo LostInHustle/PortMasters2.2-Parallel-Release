@@ -18,6 +18,7 @@ import { db } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
 import { CHECKPOINT_PHASE_ORDER, checkpointRank } from "@/lib/game/checkpoint";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
+import { unlockedResources } from "@/lib/game/pools";
 import type { Checkpoint } from "./types";
 import { roomStatuses } from "./status";
 import { roomPulseTallies } from "./pulse";
@@ -111,10 +112,21 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
     if (!cp.readyUserIds.has(id)) return;
   }
   cp.advancing = true;
-  const harborPulse =
-    cp.phase === "5"
-      ? computeHarborPulse(roomPulseTallies.get(roomId)?.get(cp.round - 1))
-      : undefined;
+  // Leaving phase 5 means the room is about to draw round cp.round's port
+  // market, so the pulse is measured against the raw goods that round has
+  // unlocked rather than against a fixed number (see computeHarborPulse).
+  // Read only on this one branch, once per round per room.
+  let harborPulse: Record<string, number> | undefined;
+  if (cp.phase === "5") {
+    const room = await db.room.findUnique({
+      where: { id: roomId },
+      select: { difficulty: true },
+    });
+    harborPulse = computeHarborPulse(
+      roomPulseTallies.get(roomId)?.get(cp.round - 1),
+      unlockedResources(room?.difficulty, cp.round),
+    );
+  }
   io.to(`room:${roomId}`).emit("phase:advance", {
     roomId,
     round: cp.round,

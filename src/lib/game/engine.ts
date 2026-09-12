@@ -1,5 +1,5 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: Lords of the Silk Road game engine
+// PortMasters 2.2 Parallel Release: game engine
 //
 // Ported faithfully from the original single player build. All wording,
 // log messages, balance, and phase flow are preserved verbatim.
@@ -20,17 +20,25 @@
 // callBrokersFavor). It draws with a captain's own live randomness, so it
 // stays personal and never perturbs their seeded market.
 //
-// ---------------------------------------------------------------------
+// =====================================================================
 // This file is now a barrel. The engine itself lives in ./engine/*, one
 // module per subsystem, matching how ./backing.ts, ./convoy.ts and the
 // rest of this directory were already organised. Nothing moved between
 // subsystems and no behaviour changed; the split is purely about where
 // the code sits.
 //
-// The barrel exists so that the twenty five files importing
-// `@/lib/game/engine` never had to change, and so that this stays the one
-// public entry point to the engine. Import from here, not from the
-// individual modules, unless you are inside ./engine/ yourself.
+// The barrel exists so that the files importing `@/lib/game/engine` never
+// had to change, and so that this stays the one public entry point to the
+// engine. Import from here, not from the individual modules, unless you
+// are inside ./engine/ yourself.
+//
+// What the barrel carries is the surface an outside caller actually
+// reads: everything a panel, a hook or a route needs. A subsystem's own
+// internals are deliberately left out, since the only code that calls
+// them lives beside them under ./engine/. Both of those rules are load
+// bearing. An export nothing imports is the same dead weight as a dead
+// function, and it is harder to spot, because it looks like a deliberate
+// offering rather than an oversight.
 //
 // The dependency flow is one way and worth preserving:
 //
@@ -53,17 +61,22 @@
 // first cycle in the engine, so please don't.
 // =====================================================================
 
-// ---------- Primitives ----------
+// ========== Primitives ==========
 // addOwnedAmount is intentionally absent: it was private to the engine
-// before the split and stays private to it now.
-export { getOwnedAmount, hasModule } from "./engine/core";
+// before the split and stays private to it now. hasModule is absent for
+// the same reason, every caller sits under ./engine/ and asks it directly.
+export { getOwnedAmount } from "./engine/core";
 
-// ---------- Pricing, taxes and wages ----------
+// ========== Pricing, taxes and wages ==========
+// The explain* breakdowns are here because the tooltips are: Purchase,
+// Orders and PriceTooltips all show a captain where a price came from, so
+// they read the breakdown directly rather than rebuilding it.
+// calcVAT and calcIncomeTax are not here. A sale and a payroll run are
+// settled inside ./engine/, which is also where the only readers of those
+// two sit.
 export {
   brokersFavorCommission,
-  calcIncomeTax,
   calcTransportCost,
-  calcVAT,
   explainCardPrice,
   explainExpectedPrice,
   explainTransportCost,
@@ -73,22 +86,18 @@ export {
   getIntelCost,
   type ExpectedPrice,
   type PriceBreakdown,
-  type PriceStep,
 } from "./engine/pricing";
 
-// ---------- Phase 1: the port market ----------
+// ========== Phase 1: the port market ==========
 export {
   applyHarborPulse,
   applyTidewatchSurge,
   completePhase1,
-  poolsFor,
   purchaseCard,
-  startPhase1,
   tallyPurchasesByResource,
-  type MarketPools,
 } from "./engine/market";
 
-// ---------- Phase 2: the trade manifest ----------
+// ========== Phase 2: the trade manifest ==========
 export {
   callBrokersFavor,
   claimWordOnTheDocksReward,
@@ -97,7 +106,7 @@ export {
   startPhase2,
 } from "./engine/orders";
 
-// ---------- Bartering ----------
+// ========== Bartering ==========
 export {
   acceptBarterOffer,
   completeBarterPhase,
@@ -106,22 +115,12 @@ export {
   settleBarterTrade,
 } from "./engine/barter";
 
-// ---------- Artisans ----------
-export {
-  assignTask,
-  fireWorker,
-  hireWorker,
-  payMaintenance,
-  payWages,
-  processProduction,
-} from "./engine/workers";
+// ========== Artisans ==========
+export { assignTask, fireWorker, hireWorker } from "./engine/workers";
 
-// ---------- Boons and ship modules ----------
+// ========== Boons and ship modules ==========
 export {
-  applyBoon,
   cancelModuleDraft,
-  draftBoons,
-  equipModule,
   finalizeModuleSwap,
   handleModuleSelect,
   selectBoon,
@@ -132,17 +131,24 @@ export {
   upgradeShip,
 } from "./engine/boons";
 
-// ---------- Pirates and escorts ----------
-export { hireEscort, resolvePirateAttack } from "./engine/pirates";
+// ========== Pirates and escorts ==========
+// pirateChance and escortCost are the two numbers the Settlement panel
+// prints, exported so it prints the ones the roll and the charge use rather
+// than rebuilding either by hand.
+export {
+  escortCost,
+  hireEscort,
+  pirateChance,
+  resolvePirateAttack,
+} from "./engine/pirates";
 
-// ---------- Cross captain Gold: loans, backing, convoy ventures ----------
+// ========== Cross captain Gold: loans, backing, convoy ventures ==========
 export {
   clearRedirectedLoan,
   grantLoan,
   receiveLoan,
   receiveRepayment,
   repayLoan,
-  settleOutstandingDebts,
 } from "./engine/aid";
 export {
   pledgeBacking,
@@ -154,11 +160,9 @@ export {
   receiveVentureSettlement,
 } from "./engine/convoyState";
 
-// ---------- Voyage lifecycle and phase orchestration ----------
+// ========== Voyage lifecycle and phase orchestration ==========
 export {
   completePhase2,
-  endGame,
-  endRound,
   finishSettlement,
   nextPhase,
   phaseLabel,
@@ -166,49 +170,32 @@ export {
   showWelcome,
   skipUpgrade,
   snapToCheckpoint,
-  startPhase3,
-  startPhase4,
 } from "./engine/lifecycle";
 
-// ---------- Cross file lookups hosted in constants.ts for backwards
+// ========== Cross file lookups hosted in constants.ts for backwards
 // compatibility. merchantRatingForScore used to live in
 // ./engine/lifecycle.ts; the table it scans (MERCHANT_RATINGS) lives here
-// too, so the lookup moved beside it. Re-exported through the same barrel
-// so the twenty five files importing `@/lib/game/engine` keep working. ----------
+// too, so the lookup moved beside it. Forwarded through the same barrel
+// so the files importing `@/lib/game/engine` keep working. ==========
 export { merchantRatingForScore } from "./constants";
 
-// ---------- Manifest feature modules ----------
+// ========== Manifest feature modules ==========
 // New engine modules layered on top of the faithful port, each owned by
-// its own file under ./engine/. Re-exported through the same barrel so
+// its own file under ./engine/. Forwarded through the same barrel so
 // the public entry point stays the only place callers import from.
+// WIDEST_BROKERS_FAVOR_PAYOUT_CAP is the one Age value an outside caller
+// needs: the plausibility bound in ./integrity.ts has to allow for the
+// widest cap any Age offers. The three effect accessors are deliberately
+// not forwarded, since their only callers sit inside ./engine/.
 export {
-  AGES,
+  WIDEST_BROKERS_FAVOR_PAYOUT_CAP,
   currentAge,
   nextAgeChange,
   type Age,
   type AgeId,
 } from "./engine/ages";
-export {
-  HOUSES,
-  applyHousePerkAtStart,
-  housePerkFor,
-  houseStandingFor,
-  type House,
-} from "./engine/houses";
-export {
-  buildChronicle,
-  type ChronicleInput,
-  type ChronicleOutput,
-} from "./engine/chronicle";
-export {
-  DETAIL_SUBJECT_MIN_LEVEL,
-  DETAIL_VIEWER_MIN_LEVEL,
-  bandFor,
-  canSeeDetail,
-} from "./engine/partialSight";
-export {
-  rivalKey,
-  rivalSummary,
-  type RivalOutcome,
-  type RivalSummary,
-} from "./engine/rival";
+export { HOUSES, noHousePerks, type House } from "./engine/houses";
+// The two sight thresholds stay inside ./engine/: both are read by
+// canSeeDetail and bandFor, which are what every caller actually asks for.
+export { bandFor, canSeeDetail } from "./engine/partialSight";
+export { rivalSummary, type RivalOutcome } from "./engine/rival";

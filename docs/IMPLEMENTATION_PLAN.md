@@ -1,4 +1,4 @@
-# PortMasters 2: Development Guide
+# PortMasters 2.2 Parallel Release: Development Guide
 
 This file began as the step by step build plan for the project, and that plan has been carried out. Rather than leave a completed checklist behind, it is kept as the guide to changing the code now that it exists: where each kind of change belongs, and which rules are load bearing enough that breaking them will cost you a voyage rather than a build.
 

@@ -94,10 +94,10 @@ export function VoyageTimeline({
                 <motion.div
                   className={cn(
                     "flex h-7 w-full items-center justify-center rounded-md text-[10px] font-medium transition-all",
-                    isCurrent && "pm-grad-primary text-white shadow-sm",
-                    isPast && "bg-celadon/20 text-celadon dark:text-celadon/80",
+                    isCurrent && "pm-grad-voyage shadow-sm",
+                    isPast && "bg-celadon/5 text-celadon dark:text-celadon",
                     isUpcoming &&
-                      "bg-black/5 text-muted-foreground/50 dark:bg-white/5",
+                      "bg-black/5 text-muted-foreground dark:bg-white/5",
                   )}
                   animate={isCurrent ? { scale: [1, 1.05, 1] } : { scale: 1 }}
                   transition={{
@@ -114,7 +114,7 @@ export function VoyageTimeline({
                     "text-[8px] leading-none transition-colors",
                     isCurrent
                       ? "font-bold text-foreground"
-                      : "text-muted-foreground/60",
+                      : "text-muted-foreground",
                   )}
                 >
                   {p.short}
@@ -130,9 +130,7 @@ export function VoyageTimeline({
         <div
           className={cn(
             "flex items-center justify-center rounded-lg py-1.5 text-xs font-semibold",
-            phase === "bankruptcy"
-              ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
-              : "pm-grad-violet text-white",
+            phase === "bankruptcy" ? "bg-alarm/5 text-alarm" : "pm-grad-voyage",
           )}
         >
           {phase === "bankruptcy" ? "💥 Bankrupt" : "🏆 Voyage Complete"}

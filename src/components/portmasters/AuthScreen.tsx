@@ -120,17 +120,20 @@ export function AuthScreen({
         >
           <div className="mb-7 flex flex-col items-center text-center">
             <div className="relative mb-4">
-              <div className="pm-grad-primary absolute inset-0 rounded-2xl opacity-60 blur-md" />
-              <div className="pm-grad-primary relative flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
+              <div className="pm-grad-brand absolute inset-0 rounded-2xl opacity-60 blur-md" />
+              <div className="pm-grad-brand relative flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
                 <Anchor className="h-8 w-8 text-white" strokeWidth={2.2} />
               </div>
             </div>
             <h1 className="font-display text-xl font-bold tracking-tight">
-              <span className="pm-text-sea">{APP_NAME}</span>
+              <span className="text-brand">{APP_NAME}</span>
             </h1>
+            {/* A tagline, not a second title. This line used to carry the
+                game's old subtitle, which left the screen showing two
+                different names for one game. */}
             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Waves className="h-3.5 w-3.5" /> Lords of the Silk Road, Online
-              Edition
+              <Waves className="h-3.5 w-3.5" /> Maritime trade on the ancient
+              Silk Road
             </p>
           </div>
 
@@ -211,7 +214,7 @@ export function AuthScreen({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-600 dark:text-rose-300"
+                    className="rounded-xl border border-alarm/20 bg-alarm/5 px-3.5 py-2.5 text-sm text-alarm"
                   >
                     {error}
                   </motion.div>
@@ -221,7 +224,7 @@ export function AuthScreen({
               <Button
                 type="submit"
                 disabled={loading || !username || !password}
-                className="pm-grad-primary h-11 w-full rounded-xl font-semibold text-white shadow-lg shadow-teal-500/20"
+                className="pm-grad-brand h-11 w-full rounded-xl font-semibold shadow-lg shadow-brand/20"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -238,7 +241,7 @@ export function AuthScreen({
             </form>
           </Tabs>
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground/80">
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
             Open this page in another browser to register a second captain and
             see them appear online in real time.
           </p>
