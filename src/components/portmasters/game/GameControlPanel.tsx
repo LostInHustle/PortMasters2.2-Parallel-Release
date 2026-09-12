@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Loader2,
   Cloud,
-  Sparkles,
 } from "lucide-react";
 import { ActionSuggester } from "../ActionSuggester";
 

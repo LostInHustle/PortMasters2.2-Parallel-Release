@@ -12,16 +12,16 @@ The 2.2 build branches from it rather than patching it. Every game system that b
 
 ## At a glance
 
-|                                 | PortMasters 2          | PortMasters 2.2                 |
-| ------------------------------- | ---------------------- | ------------------------------- |
-| Harbor Manifest systems shipped | 10 of 18               | 16 of 18                        |
-| Realtime layer                  | one file, 3,097 lines  | 17 modules, 3,586 lines         |
-| Engine modules                  | 12, across 2,493 lines | 17, across 2,993 lines          |
-| API routes                      | 16, plus a stub        | 24                              |
-| Interface components            | 29                     | 41                              |
-| Database models                 | 10                     | 12                              |
-| The port the game answers on    | 2232                   | 8080                            |
-| The bind address                | not configurable       | `HOST`, defaulting to `0.0.0.0` |
+|                                 | The earlier build      | PortMasters 2.2 Parallel Release |
+| ------------------------------- | ---------------------- | -------------------------------- |
+| Harbor Manifest systems shipped | 10 of 18               | 16 of 18                         |
+| Realtime layer                  | one file, 3,097 lines  | 17 modules, 3,605 lines          |
+| Engine modules                  | 12, across 2,493 lines | 17, across 3,235 lines           |
+| API routes                      | 16, plus a stub        | 22                               |
+| Interface components            | 29                     | 41                               |
+| Database models                 | 10                     | 12                               |
+| The port the game answers on    | 2232                   | 8080                             |
+| The bind address                | not configurable       | `HOST`, defaulting to `0.0.0.0`  |
 
 ## The six systems 2.2 adds
 
@@ -45,7 +45,7 @@ A captain may pledge to one House. The pledge is account level, so it carries ac
 
 A pledge is a second identity alongside Renown, and it is deliberately kept separate from it. Renown measures how long you have sailed. A House says what kind of captain you are while you do it. Every pledge also feeds a harbor wide House standing, so the three Houses compete on total crowns, voyages and best Reputation rather than on any one captain's numbers.
 
-Each House was designed with one small passive perk: a free first artisan, an extra cargo lot, and cheaper wages against a higher pirate risk. Those three perks are written into the engine and described on the House picker, but they are not yet applied when a voyage starts, so a pledge currently changes who you sail as rather than what you can do. The design is kept exactly where it is, so wiring the perks in later is a small change rather than a rewrite.
+Each House carries one small passive perk, applied at the start of every fresh voyage and never partway through one. Jade Pavilion's first artisan joins at no cost, with the first wage on the House. Vermilion Gate adds one more cargo lot to the Port Purchase board, every round. Golden Lotus pays 20 percent less in wages against a raid chance 5 percent higher. None of the three touches a number that compounds, which is what keeps a pledge a flavour rather than a power pick. A captain can change House between voyages, and the new perk takes effect on the next start.
 
 ### Ages of the Ledger (Manifest 10)
 
@@ -59,7 +59,7 @@ The three peer economy tools take turns in the spotlight. Each Age holds for two
 
 Every captain in every harbor is under the same Age at the same moment, so an Age changes what the harbor rewards, never who is in it. The cycle is anchored on the Unix epoch rather than on any server's clock, which means two captains in different time zones work out the same Age from the same timestamp.
 
-The rotation is live and the banner that announces it is live. The three rewards in the table above are not yet applied: the Age is computed and displayed, and no part of the voyage reads it when it prices a loan, a trade or a favor. So a captain sees which Age holds the harbor, and sails the same voyage either way. The design keeps each effect deliberately small, a lean rather than a dial, so that wiring them in later cannot unbalance a voyage that began under a different Age.
+The rotation is live, the banner that announces it is live, and each of the three rewards is applied where it lands. A backing pledge pays its extra Renown when the pledge resolves. A completed barter trade lands its extra Reputation on both captains, so it is the trade that earns it rather than whichever captain happened to post the offer. The Broker's Favor commission cap is read from the Age in force, so every quote and the payout itself move together. Each effect stays deliberately small, a lean rather than a dial, so an Age cannot unbalance a voyage that began under a different one.
 
 ### Captain's Rival (Manifest 11)
 
@@ -133,7 +133,7 @@ Nothing in that list was retuned to make room for the new systems. That is the p
 
 ## Repairs alongside the new systems
 
-Four things that were wrong or fragile are fixed.
+Several things that were wrong or fragile are fixed.
 
 **Open barter offers are refunded however the phase ends.** A captain who leaves the Bartering phase through the control bar used to walk away from their own posted offers, and the Gold held behind them went with it, because that path never told the engine what was still open. Both ways out of the phase now hand the engine the same list of live offers, so the refund lands whether a captain presses Done Bartering in the panel or moves the round along from the bar.
 
@@ -142,6 +142,10 @@ Four things that were wrong or fragile are fixed.
 **The market remembers what things cost.** Each round records the average price paid for every good, and the Purchase phase draws that as a small trend line beside the shelf. A captain can now see whether Silk has been climbing all voyage before deciding whether to buy, which is the kind of read the market was always supposed to reward.
 
 **A module draft can be abandoned.** A captain partway through choosing a shipyard module can back out and return to the picker rather than being held to the first pick they touched.
+
+**A stranded pledge is swept.** A pledge rides on a loan: one captain backs another's borrowing, and the backer is paid when the borrower repays. A borrower who goes bankrupt keeps their socket open to watch the standings, and the voyage end sweep read that open socket as a captain who might still be about to pay. Bankruptcy is final, so the loan was never swept, the pledge riding on it never resolved, and the backer's escrowed Gold sat out the voyage. The sweep treats a bankrupt borrower as absent now, which is what they are.
+
+**A pass over every buff, so the promise and the payout agree.** `docs/BUFF_AUDIT.md` traces every boon, every ship module, every House perk, every Age, every difficulty modifier, every Merit and every Renown rule from where it is declared to where it is read, and compares each promise to the result. The repairs it produced are all in. The two charter boons no longer share one gate, so each covers its own tier. The Silk goods list covers both goods made with Silk. The Settlement panel builds its pirate risk and its escort quote from the same functions that roll and charge them. Harbor Pulse is calibrated to the number of goods the harbor actually trades. The Purchase reference price applies the same module discounts as the counter. A failed save load no longer costs a captain their Renown level. The few numbers the interface stated that the game did not are corrected.
 
 A worker field that was written to zero and read by nothing was removed at the same time. It changed no behaviour, and the point of removing it is that the next person reading the worker code will not spend an afternoon working out what it was for.
 
@@ -153,9 +157,9 @@ Two of the eighteen Manifest systems are not in the game.
 
 **Bilingual Harbor** (Manifest 15) was built in full and then removed at the owner's request. It does not come back without a fresh owner decision.
 
-Three smaller items are written and visible but not yet doing anything, and this document would rather name them than let a table imply otherwise.
+One smaller item is written and visible without yet doing anything, and this document would rather name it than let a table imply otherwise.
 
-The three House perks are described on the House picker and applied nowhere, so a pledge changes who you sail as rather than what you can do. The three Age effects are described by the Age banner and read by no part of the voyage, so the Age tells you what the harbor favours without tilting it. The Harbor activity feed opens onto a panel that says there has been no recent activity, and it will keep saying that until the endpoint it would read from exists. Each one is a small piece of work rather than a rewrite, and none of the three is broken: they are simply not switched on.
+The Harbor activity feed opens onto a panel that says there has been no recent activity, and it will keep saying that until the endpoint it would read from exists. It is a small piece of work rather than a rewrite, and it is not broken: it is simply not switched on. The three House perks and the three Age effects used to sit on this list beside it. Both are wired in now, so they have left it.
 
 ## Where the two repositories differ outside the game
 

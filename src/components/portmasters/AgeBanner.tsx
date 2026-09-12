@@ -72,19 +72,19 @@ export function AgeBanner({
 
   if (variant === "full") {
     return (
-      <div className={cn("pm-glass pm-crackle rounded-2xl p-4", className)}>
+      <div className={cn("pm-glass pm-crackle pm-panel", className)}>
         <div className="flex items-start gap-3">
           <div
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white",
+              "pm-seal flex items-center justify-center text-white",
               visual.gradient,
             )}
           >
             <Icon className="h-5 w-5" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold pm-text-sea">
+              <h3 className="pm-text-sea font-display text-sm font-bold">
                 {age.name}
               </h3>
               <span className="text-[10px] text-muted-foreground">

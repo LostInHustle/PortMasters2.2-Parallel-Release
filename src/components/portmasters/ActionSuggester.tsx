@@ -11,13 +11,7 @@ import {
   getIntelCost,
   brokersFavorCommission,
 } from "@/lib/game/engine";
-import {
-  COMMODITIES,
-  PRODUCT_PRICES,
-  RECIPES,
-  STARTING_STOCK,
-} from "@/lib/game/constants";
-import { unlockedResources, unlockedProducts } from "@/lib/game/pools";
+import { COMMODITIES, PRODUCT_PRICES, RECIPES } from "@/lib/game/constants";
 
 /**
  * Autopilot Action Suggester. Analyzes the current game state and

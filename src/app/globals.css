@@ -455,6 +455,113 @@
     font-weight: 500;
   }
 
+  /* ========== The Lobby's instrument panel ==========
+
+     The Lobby is the one screen every captain passes through, and its
+     controls had each picked their own height, their own corner radius and
+     their own tint. A row of them read as a pile of unrelated widgets
+     rather than one shelf, which is the scattering these rules exist to
+     end.
+
+     Three control sizes, and no others:
+
+       pm-tool       2rem    a control in the masthead, bare icon or icon
+                             with a word beside it
+       pm-field      2.5rem  an input, and the button that commits it
+       pm-seal       2.5rem  the square medallion that opens a card
+
+     Radius follows the same discipline at two levels, and the level a card
+     sits on is decided by one question: does it lead with a heading. A card
+     with a head is pm-panel. A card without one, a single row or a short
+     banner, is pm-tile and sits a size down, so the eye reads the headed
+     cards as the structure and the rest as what fills them. Padding travels
+     with the radius, so nothing ends up wearing one level's corners with
+     another level's spacing.
+
+     None of these carries a colour. Tint stays at the call site, which is
+     what lets a tool wear the vermilion reserved for a live call to action
+     and still line up to the pixel with the quiet ones beside it. */
+  .pm-tool,
+  .pm-tool-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2rem;
+    padding-inline: 0.625rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  /* The bare icon case. Same height and same corners, one word narrower. */
+  .pm-tool-icon {
+    width: 2rem;
+    padding-inline: 0;
+  }
+
+  .pm-field {
+    height: 2.5rem;
+    border-radius: 0.75rem;
+  }
+
+  .pm-seal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.5rem;
+    width: 2.5rem;
+    border-radius: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .pm-panel {
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+  }
+
+  /* The masthead and the board header: the same card as pm-panel, wearing a
+     bar's proportions rather than a page's. */
+  .pm-panel-bar {
+    border-radius: 1.25rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .pm-tile {
+    border-radius: 0.875rem;
+    padding: 0.875rem;
+  }
+
+  /* A panel whose interior is drawn by its own rows rather than by the card:
+     a chat with its own header and its own scroller, hidden so the header
+     meets the corner instead of floating inside it. Same corners as
+     pm-panel, no padding of its own to fight. */
+  .pm-panel-flush {
+    border-radius: 1.25rem;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* One list row, wherever the list is: a harbor on the board, a captain on
+     the roster, a chronicle in the ledger. The same padding, the same
+     corners and the same hover everywhere, so two lists sharing a screen
+     read as one list rather than two. */
+  .pm-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.875rem;
+    transition: background-color 160ms ease;
+  }
+  .pm-row:hover {
+    background-color: oklch(0 0 0 / 0.04);
+  }
+  .dark .pm-row:hover {
+    background-color: oklch(1 0 0 / 0.05);
+  }
+
   /* The quiet buttons settle a neutral tint behind themselves on hover, so
      the pointer always has somewhere visible to be. Left to itself the
      ghost variant falls back on the theme accent, which in this palette is

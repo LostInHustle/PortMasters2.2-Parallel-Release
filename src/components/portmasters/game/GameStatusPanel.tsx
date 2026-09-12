@@ -352,7 +352,7 @@ export function GameStatusPanel({
           </Row>
           <Row label={<Term term="Freight">Freight</Term>}>
             <span className="text-[10px] text-muted-foreground">
-              max(5, n×2 − {discount})
+              max(5, n×2 minus {discount})
             </span>
           </Row>
           <Row label="Modules">

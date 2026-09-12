@@ -4,7 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Lightbulb, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Difficulty } from "@/lib/game/difficulty";
+import {
+  DIFFICULTIES,
+  mandateRounds,
+  type Difficulty,
+  type DifficultyConfig,
+} from "@/lib/game/difficulty";
 
 /**
  * Voyage Difficulty Advisor. Suggests which difficulty tier to pick
@@ -18,6 +23,22 @@ import type { Difficulty } from "@/lib/game/difficulty";
  * - Renown 5+, 5+ voyages, best score 100+, solvent streak 2+: Open Waters
  * - Renown 8+, 10+ voyages, best score 200+, solvent streak 3+: Monsoon
  */
+
+// The three tiers, read off the one table that defines them rather than
+// repeated in the advice below. Every name and number in those sentences
+// comes from here, so a balance pass can never leave the advisor pitching
+// a voyage the game no longer runs.
+const fairWinds = DIFFICULTIES.fair_winds;
+const openWaters = DIFFICULTIES.open_waters;
+const monsoon = DIFFICULTIES.monsoon;
+
+// A tier's mandate rounds as prose: "4, 8, and 12".
+function listRounds(cfg: DifficultyConfig): string {
+  const rounds = mandateRounds(cfg);
+  if (rounds.length === 0) return "none";
+  if (rounds.length === 1) return String(rounds[0]);
+  return `${rounds.slice(0, -1).join(", ")}, and ${rounds[rounds.length - 1]}`;
+}
 
 type Advice = {
   recommended: Difficulty;
@@ -44,16 +65,13 @@ function getAdvice(
     solventStreak >= 3
   ) {
     recommended = "monsoon";
-    reason =
-      "You have the experience and the streak for the Monsoon Season. 16 rounds, 1.6x Renown, and three difficulty scoped Merits await.";
+    reason = `You have the experience and the streak for the ${monsoon.name}. ${monsoon.rounds} rounds, ${monsoon.renownXpMultiplier}x Renown, and two difficulty scoped Merits await: Storm Sovereign and Eye of the Storm.`;
   } else if (renownLevel >= 5 && voyagesCompleted >= 5 && bestScore >= 100) {
     recommended = "open_waters";
-    reason =
-      "Your Renown and voyage count suggest you are ready for Open Waters. 12 rounds, 1.25x Renown, and Imperial Mandates on rounds 4, 8, and 12.";
+    reason = `Your Renown and voyage count suggest you are ready for ${openWaters.name}. ${openWaters.rounds} rounds, ${openWaters.renownXpMultiplier}x Renown, and Imperial Mandates on rounds ${listRounds(openWaters)}.`;
   } else {
     recommended = "fair_winds";
-    reason =
-      "Fair Winds is the right starting point. 8 rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.";
+    reason = `${fairWinds.name} is the right starting point. ${fairWinds.rounds} rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.`;
   }
 
   // Cautions for overreaching

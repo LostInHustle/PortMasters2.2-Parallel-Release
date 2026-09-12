@@ -10,7 +10,6 @@ import {
   postBarterOffer,
   refundBarterOffer,
 } from "@/lib/game/engine";
-import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Handshake, X } from "lucide-react";

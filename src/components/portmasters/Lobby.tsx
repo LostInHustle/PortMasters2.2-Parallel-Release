@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   api,
@@ -59,6 +66,7 @@ import {
   Landmark,
   Settings,
   Trophy,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, normalizeRoomName } from "@/lib/utils";
@@ -72,6 +80,85 @@ import {
 import { checkInStatus, type CheckInStatus } from "@/lib/game/checkin";
 import { HOUSES, type House } from "@/lib/game/engine";
 import type { HouseStanding, VoyageChronicle } from "@/types/realtime";
+
+// =====================================================================
+// The two shapes every card in the Lobby is built from.
+//
+// They exist because each heading and each figure here used to be grown by
+// hand, and no two of them agreed. One card led with its icon at five and
+// the next at four, one figure was bold and its neighbour was not, and a
+// heading nudged to fit its own card drifted out of line the moment the
+// text beside it changed length. A heading written once cannot drift away
+// from itself.
+// =====================================================================
+
+// A card's head: one icon, one title, one line of explanation under it, and
+// whatever controls belong to that card on the right. The icon takes its
+// colour from the call site, because colour is how a card says which part
+// of the harbor it is.
+function CardHead({
+  icon: Icon,
+  tone,
+  title,
+  hint,
+  children,
+}: {
+  icon: LucideIcon;
+  tone: string;
+  title: string;
+  hint?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} />
+        <div className="min-w-0">
+          <h2 className="font-display text-sm font-semibold leading-tight">
+            {title}
+          </h2>
+          {hint && (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              {hint}
+            </p>
+          )}
+        </div>
+      </div>
+      {children && (
+        <div className="flex shrink-0 items-center gap-1.5">{children}</div>
+      )}
+    </div>
+  );
+}
+
+// One cell of the masthead's gauge row. Three of these sit side by side under
+// a hairline, so the shape lives here rather than three times over in the
+// markup: one icon at one size, one quiet label, one tabular figure. A call
+// site picks the icon and its colour and nothing else.
+function Gauge({
+  icon: Icon,
+  tone,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  tone: string;
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <Icon className={cn("h-3.5 w-3.5", tone)} />
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <b className="text-[11px] tabular-nums">{value}</b>
+    </span>
+  );
+}
+
+// The hairline the gauge row divides itself with.
+function GaugeRule() {
+  return <span className="h-4 w-px shrink-0 bg-black/10 dark:bg-white/15" />;
+}
 
 export function Lobby({
   me,
@@ -493,615 +580,606 @@ export function Lobby({
 
   return (
     <div className="pm-canvas min-h-screen w-full">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3">
-        <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="pm-grad-primary h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+      {/* ===============================================================
+          The masthead.
+
+          This used to be two stacked bars, one of tools and one of
+          numbers, and between them they stated the harbor's population and
+          this captain's Renown twice. Every tool had also picked its own
+          height, its own corners and its own tint, so eight controls doing
+          the same kind of job read as eight unrelated widgets that merely
+          happened to share a line.
+
+          It is one card now, answering one question in two rows: what can
+          I reach from here, and what is the harbor doing. The tools sit on
+          a single shelf, all of them the same height and the same shape,
+          quiet by default, with colour spent on the one thing actually
+          waiting for the captain. The harbor's numbers sit under a hairline
+          as a gauge row, and the figure that also opens a panel is the
+          control that opens it, so nothing has to be printed twice.
+         =============================================================== */}
+      <header className="sticky top-0 z-30 px-4 pb-2 pt-3 sm:px-6">
+        {/* A scrim, so the board fades out as it slides under the masthead
+            rather than showing through the strip above it. */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-background/85 to-transparent" />
+        <div className="pm-glass pm-panel-bar relative mx-auto max-w-7xl">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="pm-seal pm-grad-primary">
+              <Anchor className="h-5 w-5 text-white" />
             </div>
-            <div className="min-w-0">
-              <h1 className="font-bold leading-tight tracking-tight text-xs sm:text-sm font-display">
+            <div className="min-w-0 flex-1">
+              {/* The name, then a tagline. The name used to be followed on
+                  the same line by a trailing word and a subtitle that was
+                  itself an older title, so the header read as three
+                  different names stacked on top of one another. */}
+              <h1 className="font-display text-sm font-bold leading-tight tracking-tight">
                 <span className="pm-text-sea pm-truncate">{APP_NAME}</span>
-                <span className="text-muted-foreground font-normal text-[10px] sm:text-xs ml-1.5 sm:ml-2">
-                  Online
-                </span>
               </h1>
-              <p className="text-[10px] sm:text-[11px] text-muted-foreground leading-tight pm-truncate">
-                Lords of the Silk Road
+              <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
+                Maritime trade on the ancient Silk Road
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-            {/* Status pills: hidden on mobile to reduce clustering */}
-            <Pill tone="jade" className="hidden lg:inline-flex">
-              <OnlineDot online={connected && authed} />{" "}
-              {connected && authed ? "Online" : "Connecting"}
-            </Pill>
-            <Pill tone="sea" className="hidden lg:inline-flex">
-              <Users className="h-3 w-3" /> {totalOnline} sailing
-            </Pill>
-            {/* Feature buttons: icon only on mobile, label on larger screens */}
-            <button
-              onClick={openChronicle}
-              className="pm-pressable pm-grad-indigo rounded-full h-7 w-7 sm:px-2.5 sm:w-auto flex items-center justify-center gap-1 text-[11px] font-medium text-white"
-              title="Voyage Chronicles"
-              aria-label="Voyage Chronicles"
-            >
-              <BookOpen className="h-3 w-3" />
-              <span className="hidden sm:inline">Chronicles</span>
-            </button>
-            <button
-              onClick={openHouse}
-              className="pm-pressable pm-grad-gold rounded-full h-7 w-7 sm:px-2.5 sm:w-auto flex items-center justify-center gap-1 text-[11px] font-medium text-amber-950"
-              title="Great Houses"
-              aria-label="Great Houses"
-            >
-              <Landmark className="h-3 w-3" />
-              <span className="hidden sm:inline">Houses</span>
-            </button>
-            <div className="hidden md:block">
-              <AgeBanner variant="pill" />
+
+            {/* The shelf. One height, one shape, one quiet skin for every
+                tool on it. The tints this replaces were nine different
+                colours across one bar, which is a lot of signal for a row
+                of things that all do the same kind of job; colour is kept
+                for Check In, the only tool that is ever waiting. */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={openChronicle}
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                title="Voyage Chronicles"
+                aria-label="Voyage Chronicles"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Chronicles</span>
+              </button>
+              <button
+                onClick={openHouse}
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                title="Great Houses"
+                aria-label="Great Houses"
+              >
+                <Landmark className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Houses</span>
+              </button>
+              <button
+                onClick={() => setLeaderboardOpen(true)}
+                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                title="Harbor Leaderboard"
+                aria-label="Open harbor leaderboard"
+              >
+                <Trophy className="h-3.5 w-3.5" />
+              </button>
+              <HarborActivityFeed />
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
+                title="Settings"
+                aria-label="Open settings"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setCheckInOpen(true)}
+                className={cn(
+                  "pm-tool pm-pressable relative",
+                  checkIn.canClaimToday
+                    ? "pm-grad-vermilion text-white"
+                    : "bg-black/[0.05] text-foreground/75 dark:bg-white/10",
+                )}
+                title="Daily Check In"
+                aria-label="Daily Check In"
+              >
+                <Gift className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Check In</span>
+                {checkIn.canClaimToday && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
+                )}
+              </button>
             </div>
+
+            <div className="h-6 w-px shrink-0 bg-black/10 dark:bg-white/15" />
+
             <button
-              onClick={() => setCheckInOpen(true)}
-              className="pm-chip pm-pressable relative h-7 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-300"
-              title="Daily Check In"
-              aria-label="Daily Check In"
+              onClick={() => setProfileOpen(true)}
+              className="pm-tool pm-pressable gap-1.5 bg-black/[0.05] pl-0.5 pr-2.5 dark:bg-white/10"
+              title="View captain profile"
+              aria-label="View captain profile"
             >
-              <Gift className="h-3 w-3" />
-              <span className="hidden sm:inline">Check In</span>
-              {checkIn.canClaimToday && (
-                <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
-              )}
+              <Avatar hue={me.avatarHue} name={me.displayName} size={24} ring />
+              <span className="hidden max-w-32 truncate md:inline">
+                {me.displayName}
+              </span>
             </button>
-            {/* Renown used to wear the same amber tint as Check In sitting
-                directly beside it, so the two read as one control. It wears
-                the open sea instead, which also suits a legacy of voyages. */}
+            <button
+              onClick={onLogout}
+              className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-muted-foreground dark:bg-white/10"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* The gauge row. Four facts about the harbor, each with the same
+              icon size, the same quiet label and the same tabular figure,
+              divided by hairlines rather than scattered, so they read as
+              one instrument instead of four loose labels. Your Renown is a
+              button because the panel behind it is the rest of the story;
+              it used to be a tool on the shelf as well, which meant the
+              same number sat in two places on the same screen. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 dark:border-white/[0.08]">
+            <Gauge
+              icon={Users}
+              tone="text-teal-600 dark:text-teal-400"
+              label="Captains"
+              value={totalOnline}
+            />
+            <GaugeRule />
+            <Gauge
+              icon={Ship}
+              tone="text-amber-600 dark:text-amber-400"
+              label="Open Harbors"
+              value={rooms.length}
+            />
+            <GaugeRule />
+            <Gauge
+              icon={Anchor}
+              tone="text-emerald-600 dark:text-emerald-400"
+              label="Sailing"
+              value={rooms.filter((r) => r.started).length}
+            />
+            <GaugeRule />
             <button
               onClick={() => setLegacyOpen(true)}
-              className="pm-chip pm-pressable h-7 px-2 bg-sky-500/15 text-sky-700 dark:text-sky-300"
+              className="-mx-1.5 flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
               title="Captain Legacy"
               aria-label="View captain legacy"
             >
-              <Star className="h-3 w-3" />
-              <span className="hidden sm:inline">Renown </span>
-              {renownProgress(legacy.renownXP).level}
+              <Star className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="text-[11px] text-muted-foreground">
+                Your Renown
+              </span>
+              <b className="text-[11px] tabular-nums">
+                Lv {renownProgress(legacy.renownXP).level}
+              </b>
             </button>
-            {/* Utility buttons: icon only on all screens, each on its own
-                tint so no two controls in the bar share a colour. */}
-            <button
-              onClick={() => setLeaderboardOpen(true)}
-              className="pm-chip pm-pressable h-7 w-7 bg-rose-500/15 text-rose-700 dark:text-rose-300"
-              title="Harbor Leaderboard"
-              aria-label="Open harbor leaderboard"
-            >
-              <Trophy className="h-3.5 w-3.5" />
-            </button>
-            <HarborActivityFeed />
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="pm-chip pm-pressable h-7 w-7 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
-              title="Settings"
-              aria-label="Open settings"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
-            <div className="flex items-center gap-1.5 pl-1.5 sm:pl-2 sm:gap-2 border-l border-black/5 dark:border-white/10">
-              <button
-                onClick={() => setProfileOpen(true)}
-                className="pm-pressable flex items-center gap-1.5 sm:gap-2 rounded-full p-0.5 sm:pr-2 hover:bg-black/5 dark:hover:bg-white/10"
-                title="View captain profile"
-                aria-label="View captain profile"
-              >
-                <Avatar
-                  hue={me.avatarHue}
-                  name={me.displayName}
-                  size={28}
-                  sm={32}
-                  ring
-                />
-                <div className="hidden md:block leading-tight text-left min-w-0">
-                  <div className="text-xs sm:text-sm font-medium pm-truncate">
-                    {me.displayName}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground pm-truncate">
-                    @{me.username}
-                  </div>
-                </div>
-              </button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={onLogout}
-                title="Sign out"
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+
+            <div className="ml-auto flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <OnlineDot online={connected && authed} size={8} />
+                <span className="text-[11px] text-muted-foreground">
+                  {connected && authed ? "Online" : "Connecting"}
+                </span>
+              </span>
+              <div className="hidden md:block">
+                <AgeBanner variant="pill" className="pm-tool" />
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Quick stats banner */}
-      <div className="px-4 sm:px-6 max-w-7xl mx-auto mt-2">
-        <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center gap-4 flex-wrap text-[11px]">
-          <span className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 text-teal-500" />
-            <span className="text-muted-foreground">Captains</span>
-            <b className="text-foreground tabular-nums">{totalOnline}</b>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Ship className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-muted-foreground">Open Harbors</span>
-            <b className="text-foreground tabular-nums">{rooms.length}</b>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Anchor className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="text-muted-foreground">Sailing</span>
-            <b className="text-foreground tabular-nums">
-              {rooms.filter((r) => r.started).length}
-            </b>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Star className="h-3.5 w-3.5 text-violet-500" />
-            <span className="text-muted-foreground">Your Renown</span>
-            <b className="text-foreground tabular-nums">
-              Lv {renownProgress(legacy.renownXP).level}
-            </b>
-          </span>
-          {checkIn.canClaimToday && (
-            <span className="flex items-center gap-1.5 ml-auto">
-              <span className="inline-block h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-              <span className="text-rose-600 dark:text-rose-400 font-medium">
-                Check In available
-              </span>
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Body */}
-      <main className="px-4 sm:px-6 pb-10 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mt-2">
-          {/* Rooms */}
-          <section className="space-y-4">
-            <div className="pm-glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold flex items-center gap-2 font-display">
-                    <Ship className="h-5 w-5 text-teal-600 dark:text-teal-400" />{" "}
-                    Open Harbors
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Create a room or join one to set sail together.
-                  </p>
-                </div>
-                {/* The two controls share one wrapper so the heading keeps
-                    the left edge and this pair keeps the right. Loose in a
-                    three child row they drifted apart instead, which is
-                    what left the guide floating in the middle of the bar.
-
-                    How to Play is a plain button rather than the Button
-                    primitive. It was dressed as a ghost, a variant that
-                    exists to be transparent, and then painted over with a
-                    solid gradient, so the variant contributed nothing but
-                    a hover tint that could not be seen through the paint.
-                    It now matches the pill buttons in the top bar. */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setHowToPlayOpen(true)}
-                    className="pm-pressable pm-grad-violet h-8 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium text-white"
-                    title="How to Play"
-                    aria-label="How to Play"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">How to Play</span>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full"
-                    onClick={refreshRooms}
-                    disabled={loadingRooms}
-                    title="Refresh harbors"
-                    aria-label="Refresh the harbor list"
-                  >
-                    <RefreshCw
-                      className={cn("h-4 w-4", loadingRooms && "animate-spin")}
-                    />
-                  </Button>
-                </div>
-              </div>
-
-              {/* [MANIFEST: Quick Start Match] One tap joins the queue and
-                  routes the captain into the first available room. Sits
-                  above the create form as a distinct alternative to
-                  charting a harbor yourself. */}
-              <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3.5 mb-3.5 flex items-center gap-3">
-                <div className="pm-grad-vermilion h-10 w-10 rounded-lg flex items-center justify-center shrink-0">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium font-display">
-                    Quick Start
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-tight">
-                    Match instantly with the next captain who hits Quick Start.
-                  </p>
-                </div>
-                {/* The vermilion seal, the same colour the harbor uses for
-                    a thing that must not be missed. Quick Start used to
-                    wear the Houses gold, which left two unrelated
-                    controls in the same skin. */}
-                <Button
-                  onClick={handleQuickStart}
-                  disabled={quickStarting || busy}
-                  className="h-10 pm-grad-vermilion text-white rounded-lg font-semibold"
-                >
-                  {quickStarting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" /> Waiting
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-1" /> Quick Start
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Create */}
-              <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3.5 mb-3.5">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Plus className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-                  <span className="text-sm font-medium">
-                    Chart a new harbor
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">
-                      Room name
-                    </Label>
-                    <Input
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Silk Run · Voyage 1"
-                      maxLength={40}
-                      className="h-10"
-                      onKeyDown={(e) => e.key === "Enter" && createRoom()}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 h-10 px-3 rounded-lg bg-background/60">
-                    <Switch
-                      checked={isPublic}
-                      onCheckedChange={setIsPublic}
-                      id="pub"
-                    />
-                    <Label htmlFor="pub" className="text-xs cursor-pointer">
-                      Public
-                    </Label>
-                  </div>
-                  <Button
-                    onClick={createRoom}
-                    disabled={busy || !newName.trim()}
-                    className="h-10 pm-grad-primary text-white rounded-lg"
-                  >
-                    {busy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-1" /> Create
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="mt-3">
-                  <Label className="text-xs text-muted-foreground">
-                    Waters
-                  </Label>
-                  <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
-                    {DIFFICULTY_ORDER.map((key) => {
-                      const cfg = DIFFICULTIES[key];
-                      const active = difficulty === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setDifficulty(key)}
-                          aria-pressed={active}
-                          className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
-                        >
-                          {active && (
-                            <motion.span
-                              layoutId="difficultyThumb"
-                              className="pm-grad-primary absolute inset-0 rounded-full"
-                              transition={{
-                                type: "spring",
-                                stiffness: 380,
-                                damping: 32,
-                              }}
-                            />
-                          )}
-                          <span
-                            className={cn(
-                              "relative z-10 flex items-center justify-center gap-1.5",
-                              active ? "text-white" : "text-muted-foreground",
-                            )}
-                          >
-                            <span>{cfg.icon}</span>
-                            <span className="truncate">{cfg.badge}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                    {DIFFICULTIES[difficulty].tagline}{" "}
-                    <span className="text-foreground/70">
-                      {DIFFICULTIES[difficulty].rounds} rounds.
-                    </span>
-                  </p>
-                  {/* Difficulty Advisor */}
-                  <DifficultyAdvisor
-                    selectedDifficulty={difficulty}
-                    renownLevel={renownProgress(legacy.renownXP).level}
-                    voyagesCompleted={legacy.voyagesCompleted}
-                    bestScore={legacy.bestScore}
-                    solventStreak={legacy.consecutiveSolventVoyages}
-                  />
-                </div>
-              </div>
-
-              {/* Join by code */}
-              <div className="flex items-end gap-2 mb-4">
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    Join by code
-                  </Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={joinCode}
-                      onChange={(e) =>
-                        setJoinCode(e.target.value.toUpperCase().slice(0, 6))
-                      }
-                      placeholder="ABCDEF"
-                      className="h-10 pl-9 tracking-[0.3em] font-mono uppercase"
-                      onKeyDown={(e) => e.key === "Enter" && joinByCode()}
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={joinByCode}
-                  disabled={busy || joinCode.trim().length !== 6}
-                  variant="secondary"
-                  className="h-10 rounded-lg"
-                >
-                  Join
-                </Button>
-              </div>
-
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-300 text-xs px-3 py-2 mb-3"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Room list */}
-              <div className="space-y-2">
-                {loadingRooms && rooms.length === 0 ? (
-                  <div className="py-10 flex items-center justify-center text-muted-foreground text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Scanning
-                    the horizon…
-                  </div>
-                ) : rooms.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-muted-foreground">
-                    No harbors open yet. Be the first to chart one above.
-                  </div>
-                ) : (
-                  rooms.map((room) => {
-                    const isMember = room.members.some((m) => m.id === me.id);
-                    const locked = room.started && !isMember;
-                    return (
-                      <motion.div
-                        key={room.id}
-                        layout
-                        className="group pm-glass rounded-xl p-3.5 flex items-center gap-3 hover:shadow-md transition-shadow"
-                      >
-                        <div className="pm-grad-primary h-10 w-10 rounded-lg flex items-center justify-center shrink-0">
-                          <Ship className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          {/* Wraps rather than overflows. On a narrow
-                              phone this column is about 165px wide, and
-                              the difficulty, Host and Sailing pills
-                              together need roughly 280px. Without the
-                              wrap the row spilled out of the column and
-                              the pills landed on top of the Enter
-                              button beside it. */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium truncate">
-                              {normalizeRoomName(room.name)}
-                            </span>
-                            <Pill tone="sea">
-                              {difficultyConfig(room.difficulty).icon}{" "}
-                              {difficultyConfig(room.difficulty).badge}
-                            </Pill>
-                            {room.host.id === me.id && (
-                              <Pill tone="gold">Host</Pill>
-                            )}
-                            {!room.isPublic && (
-                              <Pill tone="amber">Private</Pill>
-                            )}
-                            {room.started && <Pill tone="sea">⛵ Sailing</Pill>}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span>Hosted by {room.host.displayName}</span>
-                            <span>·</span>
-                            <span className="font-mono">{room.code}</span>
-                            <span>·</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" /> {room.memberCount}
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={() => enterRoom(room)}
-                          disabled={joining === room.id || locked}
-                          title={
-                            locked
-                              ? "This voyage has already set sail"
-                              : undefined
-                          }
-                          className="rounded-lg pm-grad-primary text-white"
-                        >
-                          {joining === room.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : locked ? (
-                            "Locked"
-                          ) : (
-                            <>
-                              Enter <ArrowRight className="h-4 w-4 ml-1" />
-                            </>
-                          )}
-                        </Button>
-                      </motion.div>
-                    );
-                  })
-                )}
-              </div>
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-3 px-4 pb-10 pt-3 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="space-y-3">
+          {/* [MANIFEST: Quick Start Match] One tap joins the queue and
+              routes the captain into the first available room. Sits above
+              the create form as a distinct alternative to charting a harbor
+              yourself. */}
+          <div className="pm-glass pm-tile flex items-center gap-3">
+            <div className="pm-seal pm-grad-vermilion">
+              <Zap className="h-5 w-5 text-white" />
             </div>
-          </section>
-
-          {/* Online + DMs */}
-          <aside className="space-y-4">
-            <div className="pm-glass rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold flex items-center gap-2 font-display">
-                  <Users className="h-4 w-4 text-teal-600 dark:text-teal-400" />{" "}
-                  Captains Online
-                </h3>
-                <Pill tone="jade">
-                  <OnlineDot online size={8} /> {totalOnline}
-                </Pill>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-sm font-medium">
+                Quick Start
               </div>
-              <ScrollArea className="h-56 pr-2">
-                {onlineUsers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-6 text-center">
-                    {connected
-                      ? "No other captains online yet."
-                      : "Connecting to the harbor…"}
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {onlineUsers.map((u) => {
-                      const isMe = u.id === me.id;
-                      const otherLegacy = otherLegacies[u.id];
-                      return (
-                        <button
-                          key={u.id}
-                          onClick={() => !isMe && openDm(u)}
-                          disabled={isMe}
-                          className={cn(
-                            "w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors",
-                            isMe
-                              ? "opacity-60 cursor-default"
-                              : "hover:bg-black/5 dark:hover:bg-white/5",
-                          )}
-                        >
-                          <div className="relative">
-                            <Avatar
-                              hue={u.avatarHue}
-                              name={u.displayName}
-                              size={30}
-                            />
-                            <OnlineDot
-                              online
-                              size={8}
-                              className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
-                              {u.displayName}{" "}
-                              {isMe && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  (you)
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground truncate">
-                              {u.roomId ? "In a harbor" : "In the lobby"}
-                            </div>
-                          </div>
-                          {otherLegacy && (
-                            <Pill tone="gold" className="shrink-0">
-                              <Star className="h-3 w-3" />{" "}
-                              {renownProgress(otherLegacy.renownXP).level}
-                            </Pill>
-                          )}
-                          {!isMe && (
-                            <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Match instantly with the next captain who hits Quick Start.
+              </p>
             </div>
-
-            {/* DM panel */}
-            <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
-              style={{ height: 360 }}
+            {/* The vermilion seal, the same colour the harbor uses for a
+                thing that must not be missed. Quick Start used to wear the
+                Houses gold, which left two unrelated controls in the same
+                skin. */}
+            <Button
+              onClick={handleQuickStart}
+              disabled={quickStarting || busy}
+              className="pm-grad-vermilion h-10 shrink-0 rounded-xl font-semibold text-white"
             >
-              <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span className="text-sm font-medium">
-                  {dmTarget
-                    ? `Direct · ${dmTarget.displayName}`
-                    : "Direct Messages"}
-                </span>
-              </div>
-              {dmTarget ? (
-                dmLoading ? (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
-                  </div>
-                ) : (
-                  <ChatPanel
-                    socket={socket}
-                    me={me}
-                    mode="dm"
-                    other={dmTarget}
-                    initialMessages={dmHistory}
-                  />
-                )
+              {quickStarting ? (
+                <>
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Waiting
+                </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-center px-6">
-                  <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                    Pick a captain from the list above to start a private
-                    conversation.
-                  </p>
+                <>
+                  <Zap className="mr-1 h-4 w-4" /> Quick Start
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Charting a harbor and joining one by code are the two ways to
+              name the room you want, so they share a card and a hairline
+              rather than floating as two unrelated blocks. */}
+          <div className="pm-glass pm-panel">
+            <CardHead
+              icon={Plus}
+              tone="text-teal-600 dark:text-teal-400"
+              title="Chart a new harbor"
+              hint="Name a room, pick its waters, and open it to the fleet."
+            />
+            <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Room name
+                </Label>
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. Silk Run · Voyage 1"
+                  maxLength={40}
+                  className="pm-field"
+                  onKeyDown={(e) => e.key === "Enter" && createRoom()}
+                />
+              </div>
+              <div className="pm-field flex items-center gap-2 bg-background/60 px-3">
+                <Switch
+                  checked={isPublic}
+                  onCheckedChange={setIsPublic}
+                  id="pub"
+                />
+                <Label htmlFor="pub" className="cursor-pointer text-xs">
+                  Public
+                </Label>
+              </div>
+              <Button
+                onClick={createRoom}
+                disabled={busy || !newName.trim()}
+                className="pm-grad-primary pm-field text-white"
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="mr-1 h-4 w-4" /> Create
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="mt-3">
+              <Label className="text-xs text-muted-foreground">Waters</Label>
+              <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
+                {DIFFICULTY_ORDER.map((key) => {
+                  const cfg = DIFFICULTIES[key];
+                  const active = difficulty === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setDifficulty(key)}
+                      aria-pressed={active}
+                      className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="difficultyThumb"
+                          className="pm-grad-primary absolute inset-0 rounded-full"
+                          transition={{
+                            type: "spring",
+                            stiffness: 380,
+                            damping: 32,
+                          }}
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "relative z-10 flex items-center justify-center gap-1.5",
+                          active ? "text-white" : "text-muted-foreground",
+                        )}
+                      >
+                        <span>{cfg.icon}</span>
+                        <span className="truncate">{cfg.badge}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                {DIFFICULTIES[difficulty].tagline}{" "}
+                <span className="text-foreground/70">
+                  {DIFFICULTIES[difficulty].rounds} rounds.
+                </span>
+              </p>
+              {/* Difficulty Advisor */}
+              <DifficultyAdvisor
+                selectedDifficulty={difficulty}
+                renownLevel={renownProgress(legacy.renownXP).level}
+                voyagesCompleted={legacy.voyagesCompleted}
+                bestScore={legacy.bestScore}
+                solventStreak={legacy.consecutiveSolventVoyages}
+              />
+            </div>
+
+            <div className="mt-4 flex items-end gap-2 border-t border-black/[0.06] pt-4 dark:border-white/[0.08]">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Join by code
+                </Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={joinCode}
+                    onChange={(e) =>
+                      setJoinCode(e.target.value.toUpperCase().slice(0, 6))
+                    }
+                    placeholder="ABCDEF"
+                    className="pm-field pl-9 font-mono uppercase tracking-[0.3em]"
+                    onKeyDown={(e) => e.key === "Enter" && joinByCode()}
+                  />
                 </div>
+              </div>
+              <Button
+                onClick={joinByCode}
+                disabled={busy || joinCode.trim().length !== 6}
+                variant="secondary"
+                className="pm-field"
+              >
+                Join
+              </Button>
+            </div>
+          </div>
+
+          {/* The board of harbors already open. */}
+          <div className="pm-glass pm-panel">
+            <CardHead
+              icon={Ship}
+              tone="text-teal-600 dark:text-teal-400"
+              title="Open Harbors"
+              hint="Create a room or join one to set sail together."
+            >
+              {/* How to Play is a plain button rather than the Button
+                  primitive. It was dressed as a ghost, a variant that
+                  exists to be transparent, and then painted over with a
+                  solid gradient, so the variant contributed nothing but a
+                  hover tint that could not be seen through the paint. It
+                  is a tool now, the same as everything else on a shelf. */}
+              <button
+                onClick={() => setHowToPlayOpen(true)}
+                className="pm-tool pm-pressable pm-grad-violet text-white"
+                title="How to Play"
+                aria-label="How to Play"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">How to Play</span>
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="pm-tool pm-tool-icon rounded-full"
+                onClick={refreshRooms}
+                disabled={loadingRooms}
+                title="Refresh harbors"
+                aria-label="Refresh the harbor list"
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", loadingRooms && "animate-spin")}
+                />
+              </Button>
+            </CardHead>
+
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-600 dark:text-rose-300"
+                >
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="space-y-2">
+              {loadingRooms && rooms.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning the
+                  horizon…
+                </div>
+              ) : rooms.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  No harbors open yet. Be the first to chart one above.
+                </div>
+              ) : (
+                rooms.map((room) => {
+                  const isMember = room.members.some((m) => m.id === me.id);
+                  const locked = room.started && !isMember;
+                  return (
+                    <motion.div
+                      key={room.id}
+                      layout
+                      className="pm-row pm-glass"
+                    >
+                      <div className="pm-seal pm-grad-primary">
+                        <Ship className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {/* Wraps rather than overflows. On a narrow phone
+                            this column is about 165px wide, and the
+                            difficulty, Host and Sailing pills together
+                            need roughly 280px. Without the wrap the row
+                            spilled out of the column and the pills landed
+                            on top of the Enter button beside it. */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">
+                            {normalizeRoomName(room.name)}
+                          </span>
+                          <Pill tone="sea">
+                            {difficultyConfig(room.difficulty).icon}{" "}
+                            {difficultyConfig(room.difficulty).badge}
+                          </Pill>
+                          {room.host.id === me.id && (
+                            <Pill tone="gold">Host</Pill>
+                          )}
+                          {!room.isPublic && <Pill tone="amber">Private</Pill>}
+                          {room.started && <Pill tone="sea">⛵ Sailing</Pill>}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>Hosted by {room.host.displayName}</span>
+                          <span>·</span>
+                          <span className="font-mono">{room.code}</span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" /> {room.memberCount}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => enterRoom(room)}
+                        disabled={joining === room.id || locked}
+                        title={
+                          locked
+                            ? "This voyage has already set sail"
+                            : undefined
+                        }
+                        className="pm-grad-primary h-10 shrink-0 rounded-xl text-white"
+                      >
+                        {joining === room.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : locked ? (
+                          "Locked"
+                        ) : (
+                          <>
+                            Enter <ArrowRight className="ml-1 h-4 w-4" />
+                          </>
+                        )}
+                      </Button>
+                    </motion.div>
+                  );
+                })
               )}
             </div>
-          </aside>
-        </div>
+          </div>
+        </section>
+
+        {/* The rail: who is about, and the conversation with whoever the
+            captain picked from that list. */}
+        <aside className="space-y-3">
+          <div className="pm-glass pm-panel">
+            <CardHead
+              icon={Users}
+              tone="text-teal-600 dark:text-teal-400"
+              title="Captains Online"
+            >
+              <Pill tone="jade">
+                <OnlineDot online size={8} /> {totalOnline}
+              </Pill>
+            </CardHead>
+            <ScrollArea className="h-56 pr-2">
+              {onlineUsers.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                  {connected
+                    ? "No other captains online yet."
+                    : "Connecting to the harbor…"}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {onlineUsers.map((u) => {
+                    const isMe = u.id === me.id;
+                    const otherLegacy = otherLegacies[u.id];
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => !isMe && openDm(u)}
+                        disabled={isMe}
+                        className={cn(
+                          "pm-row w-full text-left",
+                          isMe ? "cursor-default opacity-60" : "cursor-pointer",
+                        )}
+                      >
+                        <div className="relative">
+                          <Avatar
+                            hue={u.avatarHue}
+                            name={u.displayName}
+                            size={30}
+                          />
+                          <OnlineDot
+                            online
+                            size={8}
+                            className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">
+                            {u.displayName}{" "}
+                            {isMe && (
+                              <span className="text-[10px] text-muted-foreground">
+                                (you)
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate text-[10px] text-muted-foreground">
+                            {u.roomId ? "In a harbor" : "In the lobby"}
+                          </div>
+                        </div>
+                        {otherLegacy && (
+                          <Pill tone="gold" className="shrink-0">
+                            <Star className="h-3 w-3" />{" "}
+                            {renownProgress(otherLegacy.renownXP).level}
+                          </Pill>
+                        )}
+                        {!isMe && (
+                          <MessageCircle className="h-4 w-4 text-muted-foreground/60" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* The chat draws its own header and its own scroller, so it takes
+              the panel's corners without its padding. */}
+          <div className="pm-glass pm-panel-flush flex h-[22.5rem] flex-col">
+            <div className="flex items-center gap-2 border-b border-black/5 px-4 py-3 dark:border-white/10">
+              <MessageCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium">
+                {dmTarget
+                  ? `Direct · ${dmTarget.displayName}`
+                  : "Direct Messages"}
+              </span>
+            </div>
+            {dmTarget ? (
+              dmLoading ? (
+                <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                </div>
+              ) : (
+                <ChatPanel
+                  socket={socket}
+                  me={me}
+                  mode="dm"
+                  other={dmTarget}
+                  initialMessages={dmHistory}
+                />
+              )
+            ) : (
+              <div className="flex flex-1 items-center justify-center px-6 text-center">
+                <p className="text-xs leading-relaxed text-muted-foreground/80">
+                  Pick a captain from the list above to start a private
+                  conversation.
+                </p>
+              </div>
+            )}
+          </div>
+        </aside>
       </main>
 
       <Dialog open={legacyOpen} onOpenChange={setLegacyOpen}>
@@ -1233,7 +1311,7 @@ export function Lobby({
       </Dialog>
 
       {/* [MANIFEST: Great Houses] Pick or switch your House allegiance.
-          House definitions come from @/lib/game/engine (re-exported from
+          House definitions come from @/lib/game/engine (forwarded from
           engine/houses); standings and the current pledge come from
           /api/houses/standings; pledging writes through /api/house. */}
       <Dialog open={houseOpen} onOpenChange={setHouseOpen}>
@@ -1313,7 +1391,7 @@ export function Lobby({
             )}
           </div>
 
-          {/* Harbor-wide leaderboard */}
+          {/* Harbor wide leaderboard */}
           {!houseLoading && houseStandings.length > 0 && (
             <div className="mt-4 border-t border-border/30 pt-4">
               <HouseLeaderboard

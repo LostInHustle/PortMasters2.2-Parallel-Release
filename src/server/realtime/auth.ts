@@ -9,7 +9,7 @@
 // socket's state with the user and triggers a presence broadcast.
 // =====================================================================
 import type { Server, Socket } from "socket.io";
-import { db } from "@/lib/db";
+import { getUserFromToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 import type { PublicUser } from "@/types/realtime";
 import type { SocketState } from "./types";
 import {
@@ -20,8 +20,6 @@ import {
 } from "./presence";
 import { forgetStatusIfLastSocket } from "./status";
 import { emitRoomMembers } from "./chat";
-
-export const SESSION_COOKIE = "pm_session";
 
 function publicUser(u: {
   id: string;
@@ -37,21 +35,15 @@ function publicUser(u: {
   };
 }
 
-// Looks up a session token in the database, deleting it if expired.
-// Returns the safe public projection of the user, or null for an
-// unknown or expired token. The same logic the REST API's
-// getCurrentUser uses, read straight from the Session table.
+// Looks up a session token and narrows the result to the public
+// projection this layer hands around, or null for an unknown or expired
+// token. The lookup itself is getUserFromToken's, shared with the REST
+// API's getCurrentUser, so the two entry points cannot drift on when a
+// session counts as expired. This function used to carry a second copy of
+// the same query and expiry sweep, which is exactly how they would have.
 async function validateToken(token: string): Promise<PublicUser | null> {
-  const session = await db.session.findUnique({
-    where: { token },
-    include: { user: true },
-  });
-  if (!session) return null;
-  if (session.expiresAt.getTime() < Date.now()) {
-    await db.session.delete({ where: { id: session.id } }).catch(() => {});
-    return null;
-  }
-  return publicUser(session.user);
+  const user = await getUserFromToken(token);
+  return user ? publicUser(user) : null;
 }
 
 // Parse the pm_session cookie from a raw cookie header. The cookie is
@@ -61,7 +53,7 @@ function readSessionCookie(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(";")) {
     const [k, ...rest] = part.trim().split("=");
-    if (k === SESSION_COOKIE) return decodeURIComponent(rest.join("="));
+    if (k === SESSION_COOKIE_NAME) return decodeURIComponent(rest.join("="));
   }
   return null;
 }

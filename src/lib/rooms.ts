@@ -12,7 +12,7 @@
 import { db } from "./db";
 import type { RoomDetail, RoomSummary } from "./api";
 
-// Re-exported so callers that work with rooms (the realtime mini
+// Forwarded so callers that work with rooms (the realtime mini
 // service, the API routes) can import everything room related from one
 // module instead of piecing it together from ./db, ./api, and ./utils.
 export type { RoomSummary, RoomDetail };
@@ -85,7 +85,7 @@ export async function roomMemberIds(roomId: string): Promise<string[]> {
   return members.map((m) => m.userId);
 }
 
-// 6-char human friendly room join code (no ambiguous chars). Used by the
+// Six characters, human friendly, no ambiguous ones. Used by the
 // create room API route and surfaced in the Lobby so a captain can hand
 // the code to a friend. Generated server side so a malicious client can't
 // pre pick a code that collides with another room's.

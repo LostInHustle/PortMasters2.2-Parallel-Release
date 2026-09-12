@@ -1,7 +1,7 @@
 // GET /api/legacy: the current user's persistent Captain's Legacy summary
 // (Renown level and XP, lifetime voyages, Sea Master crowns, best score,
 // Great House pledge). The only place this data is ever written is the
-// voyage conclusion check in the realtime layer and the check-in
+// voyage conclusion check in the realtime layer and the check in
 // route; this route is read only.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -56,7 +56,7 @@ export async function GET() {
 
   // The current user's Daily Check In state rides along here so the lobby
   // renders the widget without a second request. Other players' legacy
-  // routes (batch, [userId]) stay read only summaries with no check-in.
+  // routes (batch, [userId]) stay read only summaries with no check in.
   const checkIn = checkInStatus(
     {
       checkInCount: legacy?.checkInCount ?? 0,

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { APP_NAME } from "@/lib/game/constants";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,19 +20,16 @@ const notoSerif = Noto_Serif_SC({
   weight: ["500", "700"],
 });
 
+// Read from the one constant rather than written out again here, the same
+// rule every other screen follows. The title used to spell out an older,
+// longer name, so the browser tab and the game's own masthead disagreed
+// about what this build is called. The authors field went with it: it
+// named a studio that does not exist, and nothing in the app reads it.
 export const metadata: Metadata = {
-  title: "PortMasters 2: Lords of the Silk Road Online",
+  title: APP_NAME,
   description:
     "A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
-  keywords: [
-    "PortMasters",
-    "Silk Road",
-    "trading game",
-    "multiplayer",
-    "maritime",
-    "Next.js",
-  ],
-  authors: [{ name: "PortMasters Studio" }],
+  keywords: [APP_NAME, "Silk Road", "trading game", "multiplayer", "maritime"],
 };
 
 export default function RootLayout({

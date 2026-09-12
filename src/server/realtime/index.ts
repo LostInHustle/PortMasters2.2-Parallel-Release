@@ -125,7 +125,7 @@ import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
 
-// ---------- Cross module room teardown ----------
+// ========== Cross module room teardown ==========
 // Called when a room is deleted after its last member departs. Tears
 // down every per room structure so a future room (with a different id)
 // doesn't inherit stale data from a room that no longer exists.
@@ -175,7 +175,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
   const departureCleanup = buildDepartureCleanup(io);
 
-  // ---------- Connection handling ----------
+  // ========== Connection handling ==========
   io.on("connection", (socket: Socket) => {
     rememberSocket(socket.id, {
       userId: "",
@@ -191,7 +191,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       await authenticate(socket, io, payload?.token);
     });
 
-    // ---------- Room join / leave ----------
+    // ========== Room join / leave ==========
     socket.on("room:join", async (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -273,7 +273,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       broadcastPresence(io);
     });
 
-    // ---------- Game status heartbeat ----------
+    // ========== Game status heartbeat ==========
     socket.on(
       "game:status",
       async (payload: {
@@ -386,7 +386,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Phase / round ready check ----------
+    // ========== Phase / round ready check ==========
     socket.on(
       "phase:ready",
       async (payload: {
@@ -438,7 +438,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       socket.emit("phase:ready_update", await readyStatePayload(roomId, cp));
     });
 
-    // ---------- Harbor Pulse ----------
+    // ========== Harbor Pulse ==========
     socket.on(
       "harbor:pulse:report",
       (payload: {
@@ -455,7 +455,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Word on the Docks ----------
+    // ========== Word on the Docks ==========
     socket.on("docks:claim", (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -475,7 +475,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       });
     });
 
-    // ---------- Convoy Ventures ----------
+    // ========== Convoy Ventures ==========
     socket.on("venture:state:request", async (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -680,7 +680,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Bartering ----------
+    // ========== Bartering ==========
     socket.on("barter:state:request", (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -836,7 +836,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Financial aid ----------
+    // ========== Financial aid ==========
     socket.on("aid:state:request", (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -1088,7 +1088,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- On demand player detail ----------
+    // ========== On demand player detail ==========
     socket.on(
       "player:detail:request",
       (payload: { roomId?: string; targetUserId?: string }) => {
@@ -1142,7 +1142,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Chat ----------
+    // ========== Chat ==========
     socket.on(
       "chat:room",
       async (payload: { roomId?: string; content?: string }) => {
@@ -1266,14 +1266,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
-    // ---------- Presence ----------
+    // ========== Presence ==========
     socket.on("presence:request", () => {
       const s = requireAuth(socket);
       if (!s) return;
       socket.emit("presence:update", { users: onlineUsers() });
     });
 
-    // ---------- Starting the voyage ----------
+    // ========== Starting the voyage ==========
     socket.on("room:start", async (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -1330,7 +1330,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
     });
 
-    // ---------- Restarting the voyage ----------
+    // ========== Restarting the voyage ==========
     socket.on("room:restart", async (payload: { roomId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
@@ -1384,7 +1384,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
     });
 
-    // ---------- Quick Start ----------
+    // ========== Quick Start ==========
     // The queue lives in this process's memory, so the browser has to ask
     // for a seat over the socket. The REST route only checks the caller is
     // signed in; it cannot enqueue, because a route handler runs in the
@@ -1422,7 +1422,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       leaveQueue(s.userId);
     });
 
-    // ---------- Disconnect ----------
+    // ========== Disconnect ==========
     socket.on("disconnect", () => {
       const s = sockets.get(socket.id);
       forgetSocket(socket.id);
@@ -1461,7 +1461,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     });
   });
 
-  // ---------- Boot time setup ----------
+  // ========== Boot time setup ==========
   void hydrateLoans();
   void reconcileMembershipAfterBoot(io, departureCleanup).catch((err) => {
     console.error("[realtime] boot reconciliation failed", err);
@@ -1470,7 +1470,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
   return io;
 }
 
-// ---------- Ordered shutdown ----------
+// ========== Ordered shutdown ==========
 // Called from server.ts on SIGINT and SIGTERM, before the HTTP server is
 // closed. Every live socket is dropped first so no handler can run
 // against a half torn down process, then the engine releases its

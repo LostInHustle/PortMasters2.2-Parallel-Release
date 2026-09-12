@@ -24,7 +24,20 @@ import {
 
 type VentureContribution = { name: string; amount: number };
 type VentureContributions = Record<string, VentureContribution>;
+
+// "filled" pays CONVOY_VENTURE_PAYOUT_MULTIPLIER times a contributor's own
+// stake, and is the one outcome that can ever happen once per voyage, room
+// wide. "failed" refunds only CONVOY_VENTURE_FAILURE_REFUND_RATE after a
+// venture's own deadline round passes short of target. "destroyed" refunds
+// every contributor in full: a different venture in the same room's voyage
+// reached "filled" first and claimed the one shared chance before this one
+// got the chance to.
 export type VentureOutcome = "filled" | "failed" | "destroyed";
+
+// One contributor's share of however a venture ended, as the settlement
+// event carries it. The hook that relays that event re exports this rather
+// than declaring its own copy: two identical declarations in two files
+// drift the moment either one is edited, and nothing would catch it.
 export type VentureSettlement = {
   userId: string;
   name: string;

@@ -39,7 +39,7 @@ export function getAuthToken(): string | null {
   return authToken;
 }
 
-// Re-exported so the client hooks can import everything realtime from one
+// Forwarded so the client hooks can import everything realtime from one
 // module. The shapes themselves live in @/types/realtime so the server
 // side can share them without pulling this browser file in.
 export type { OnlineUser, RoomMemberLive, GameStatusUpdate };

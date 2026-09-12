@@ -9,12 +9,20 @@
 // in it.
 //
 // The modifier on each Age is intentionally small and intentionally
-// cosmetic leaning rather than a power dial: a 50% Renown bonus on
-// backing, a flat 1 Reputation per completed barter trade, a raised
-// commission cap on Broker's Favor. None of these change the rules,
-// only the weight of one already legal action, which is what keeps an
-// Age from unbalancing a voyage that began under a different Age.
+// leaning rather than a power dial: a 50% Reputation bonus on a backing
+// pledge that was never called on, a flat 1 Reputation per completed
+// barter trade, a raised payout cap on the Broker's Favor. None of these
+// change the rules, only the weight of one already legal action, which is
+// what keeps an Age from unbalancing a voyage that began under a different
+// Age.
+//
+// Each modifier has exactly one reader, and the readers are the three
+// accessors at the foot of this file. That is worth stating plainly
+// because it is the whole of a bug these three carried: nothing read a
+// modifier, so the banner announced an Age in the present tense and no
+// part of the voyage acted on it.
 // =====================================================================
+import { BROKERS_FAVOR_PAYOUT_CAP } from "../constants";
 
 export type AgeId = "lender" | "trader" | "broker";
 
@@ -22,9 +30,11 @@ export type Age = {
   id: AgeId;
   name: string;
   description: string;
-  // The numeric weight of the Age's effect. See the per Age notes below
-  // for what each one means and where it is read. Pure scalar so the
-  // engine can multiply or compare without branching on the id.
+  // The numeric weight of the Age's effect, read by exactly one accessor
+  // below: ageBackingReputationMultiplier for the Lender's 0.5,
+  // ageBarterReputation for the Trader's 1, brokersFavorPayoutCap for the
+  // Broker's 250. Pure scalar so an accessor can return it without the
+  // engine branching on the id at the point the effect lands.
   modifier: number;
 };
 
@@ -85,3 +95,47 @@ export function nextAgeChange(now: Date = new Date()): Date {
   const nextIdx = Math.floor(now.getTime() / FORTNIGHT_MS) + 1;
   return new Date(nextIdx * FORTNIGHT_MS);
 }
+
+// ========== What each Age actually does ==========
+// One accessor per Age, each the single reader of that Age's modifier. The
+// engine calls these where the effect lands rather than testing an id
+// itself, so the map from "which Age is it" to "what it changes" stays in
+// this one file. Each takes a Date for the same reason currentAge does: a
+// caller holding a fixed clock can reproduce a chosen Age exactly.
+
+// What the Age in force multiplies a backing pledge's Reputation by, 1
+// when no Age favours backing. Read by receiveBackingOutcome in
+// ./backingState.ts. Applied to the raw figure before the shared per
+// voyage helper ceiling, never after it, so no Age can lift a captain past
+// the one cap lending and backing both answer to.
+export function ageBackingReputationMultiplier(now: Date = new Date()): number {
+  const age = currentAge(now);
+  return age.id === "lender" ? 1 + age.modifier : 1;
+}
+
+// The Reputation a completed barter trade lands under the Age in force, 0
+// when none does. Read by both sides of a trade, acceptBarterOffer and
+// settleBarterTrade in ./barter.ts, so a trade pays the same whichever
+// captain happened to post the offer and whichever accepted it.
+export function ageBarterReputation(now: Date = new Date()): number {
+  const age = currentAge(now);
+  return age.id === "trader" ? age.modifier : 0;
+}
+
+// The Broker's Favor payout cap under the Age in force. Read by
+// brokersFavorCommission in ./pricing.ts, the one place the commission
+// curve is computed, so every quote and the payout itself move together.
+export function brokersFavorPayoutCap(now: Date = new Date()): number {
+  const age = currentAge(now);
+  return age.id === "broker" ? age.modifier : BROKERS_FAVOR_PAYOUT_CAP;
+}
+
+// The highest payout cap any Age can put in force. The plausibility bound
+// in ../../integrity.ts reads this rather than the live cap, because a
+// save is judged whenever it is next loaded rather than when it was
+// written: a captain who collected a Broker's Age payout last fortnight
+// must not read as impossible today.
+export const WIDEST_BROKERS_FAVOR_PAYOUT_CAP = Math.max(
+  BROKERS_FAVOR_PAYOUT_CAP,
+  AGES.find((a) => a.id === "broker")?.modifier ?? BROKERS_FAVOR_PAYOUT_CAP,
+);

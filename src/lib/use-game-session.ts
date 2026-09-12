@@ -10,7 +10,12 @@ import {
 } from "react";
 import { api } from "@/lib/api";
 import type { Socket } from "socket.io-client";
-import { phaseLabel, showWelcome, snapToCheckpoint } from "@/lib/game/engine";
+import {
+  noHousePerks,
+  phaseLabel,
+  showWelcome,
+  snapToCheckpoint,
+} from "@/lib/game/engine";
 import {
   createInitialGameState,
   normalizeInventory,
@@ -18,7 +23,7 @@ import {
   type GameContext,
   type GameState,
 } from "@/lib/game/types";
-import { renownStartingGoldBonus } from "@/lib/game/legacy";
+import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 
 // The most log lines a session keeps around at once (see the APPLY case
@@ -61,6 +66,7 @@ type Action =
       renownLevel?: number;
       voyageEpoch?: number;
       difficulty?: Difficulty;
+      houseId?: HouseId | null;
     }
   | { type: "SET_SAVING"; saving: boolean; at: number };
 
@@ -75,12 +81,13 @@ function reducer(state: SessionState, action: Action): SessionState {
         loaded: true,
       };
     case "START_FRESH": {
-      const g = createInitialGameState(
-        action.startingGoldBonus ?? 0,
-        action.renownLevel ?? 1,
-        action.voyageEpoch ?? 0,
-        action.difficulty,
-      );
+      const g = createInitialGameState({
+        startingGoldBonus: action.startingGoldBonus ?? 0,
+        renownLevel: action.renownLevel ?? 1,
+        voyageEpoch: action.voyageEpoch ?? 0,
+        difficulty: action.difficulty,
+        houseId: action.houseId ?? null,
+      });
       const logs: string[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
@@ -135,6 +142,22 @@ export function useGameSession(
   // takes this as a parameter so its own reset stays consistent with
   // whatever a fresh join would grant).
   const [startingGoldBonus, setStartingGoldBonus] = useState(0);
+  // The captain's pledged Great House, remembered across loads. The two
+  // fallback paths below fire precisely when the captain's own data could
+  // not be read, and a voyage seeded Houseless would quietly cost them a
+  // perk they had already chosen, so they fall back to this rather than to
+  // null. It starts null, which is correct for a captain who has not
+  // pledged yet and for a first load that never reached the server.
+  const houseIdRef = useRef<HouseId | null>(null);
+  // The captain's Renown, remembered across loads for the same reason and
+  // on the same two paths as the House above. A fallback load that seeded
+  // Renown at the base level would quietly demote the captain: Renown gates
+  // the Broker's Favor, the harbor peek, and the starting Gold a new voyage
+  // opens with, so losing it costs unlocks they had already earned rather
+  // than merely looking wrong on a screen. It starts at the base level,
+  // which is the correct reading for a first load that never reached the
+  // server and for a captain who has not earned any Renown yet.
+  const renownRef = useRef(1);
 
   // Load saved state on mount / room change.
   useEffect(() => {
@@ -150,7 +173,14 @@ export function useGameSession(
     const timeoutId = setTimeout(() => {
       if (!alive) return;
       loadTimedOut = true;
-      dispatch({ type: "START_FRESH", checkpoint: null, ctx });
+      dispatch({
+        type: "START_FRESH",
+        checkpoint: null,
+        ctx,
+        houseId: houseIdRef.current,
+        renownLevel: renownRef.current,
+        startingGoldBonus: renownStartingGoldBonus(renownRef.current),
+      });
     }, LOAD_TIMEOUT_MS);
 
     (async () => {
@@ -171,6 +201,13 @@ export function useGameSession(
           ? renownStartingGoldBonus(legacyResult.legacy.renownLevel)
           : 0;
         const renownLevel = legacyResult ? legacyResult.legacy.renownLevel : 1;
+        // A legacy row we could not read is not evidence of a captain with
+        // no House, so it leaves the remembered one standing.
+        const houseId = legacyResult
+          ? legacyResult.legacy.houseId
+          : houseIdRef.current;
+        if (legacyResult) houseIdRef.current = legacyResult.legacy.houseId;
+        if (legacyResult) renownRef.current = legacyResult.legacy.renownLevel;
         setStartingGoldBonus(goldBonus);
         if (raw) {
           const game = JSON.parse(raw) as GameState;
@@ -194,6 +231,16 @@ export function useGameSession(
           game.revealedIntel = game.revealedIntel ?? [];
           game.phase2DemandTags = game.phase2DemandTags ?? [];
           game.modifierFlags = game.modifierFlags ?? {};
+          // A voyage saved before Great Houses existed carries no perk set
+          // at all, and every wage, market and pirate path now reads one.
+          // Healing it here keeps an old save loadable rather than turning
+          // a missing field into a crash the first time a wage is paid.
+          //
+          // houseId is deliberately left as the save recorded it, not
+          // refreshed from the legacy row above: a pledge made after this
+          // voyage began applies to the next one, never mid voyage.
+          game.housePerks = game.housePerks ?? noHousePerks();
+          game.houseId = game.houseId ?? null;
           game.priceHistory = game.priceHistory ?? {};
           // Guarantees a key for every catalogued good and scrubs any value a
           // pre catalogue save poisoned with NaN (stored as null by JSON), so
@@ -247,6 +294,7 @@ export function useGameSession(
             renownLevel,
             voyageEpoch: checkpoint?.voyageEpoch ?? 0,
             difficulty: roomDifficulty,
+            houseId,
           });
         }
       } catch {
@@ -255,8 +303,18 @@ export function useGameSession(
           // Include ctx so a fresh game is still seeded with the room's
           // deterministic economy, and include the room's last known
           // checkpoint so a captain who had a network error doesn't land
-          // back at round 1 while everyone else is mid voyage.
-          dispatch({ type: "START_FRESH", checkpoint: null, ctx });
+          // back at round 1 while everyone else is mid voyage. The
+          // remembered House and Renown ride along too, so a failed fetch
+          // never turns a pledge into no pledge or a captain into a
+          // first voyage beginner.
+          dispatch({
+            type: "START_FRESH",
+            checkpoint: null,
+            ctx,
+            houseId: houseIdRef.current,
+            renownLevel: renownRef.current,
+            startingGoldBonus: renownStartingGoldBonus(renownRef.current),
+          });
         }
       }
     })();

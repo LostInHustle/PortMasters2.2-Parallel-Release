@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 // A captain's head to head record against a single rival. meetings is the
 // total voyages they have shared; myWins/theirWins/ties split those
 // meetings by outcome. The line is only rendered when this is non null,
-// so callers without a rival (the Endgame screen, the Lobby's own card)
-// simply leave the prop unset.
+// so a caller with nobody to name (the Lobby's own card, and an Endgame
+// whose voyage had no rival in it) simply leaves the prop unset.
 type CaptainRival = {
   displayName: string;
   meetings: number;
@@ -31,38 +31,31 @@ type CaptainRival = {
   ties: number;
 };
 
-// A captain's standing with a single Great House, surfaced as a chip
-// beside the Renown line. standing is the engine's numeric standing
-// value, so a caller can pass through whatever houseStandingFor returns.
-type CaptainHouse = {
-  id: string;
-  name: string;
-  standing: number;
-};
-
 // Shown both in the Lobby (a captain's standing account of who they are
 // across every voyage they've ever sailed) and on the Endgame screen
 // right after a voyage concludes (see GamePhasePanel.tsx), where it
 // reflects the account *after* this voyage's Renown XP was applied.
 //
-// [MANIFEST] Two new lines surface here, both optional so the compact
-// Endgame variant stays untouched when no live data is available:
-//   - the Captain's Rival head to head line, only when the caller names
-//     a rival and the record is non null,
-//   - the House Standing chip, only when the caller has pledged to one
-//     of the Great Houses and passes its standing through.
+// [MANIFEST] One extra line surfaces here: the Captain's Rival head to
+// head record, drawn only when the caller names a rival and the record is
+// non null. The Endgame screen names whoever else sailed the voyage just
+// finished (see Endgame.tsx); the Lobby's card has nobody in particular to
+// name, so it leaves the prop unset and the card renders without it.
+//
+// A House Standing chip used to sit here too, fed by a houseStandingFor
+// helper. Neither survived: there is no per captain House standing
+// anywhere in the game, no schema field and no engine value, so the chip
+// had no number it could honestly print and nothing ever passed it one.
 export function CaptainLegacyCard({
   legacy,
   className,
   compact,
   rival = null,
-  house = null,
 }: {
   legacy: CaptainLegacySummary;
   className?: string;
   compact?: boolean;
   rival?: CaptainRival | null;
-  house?: CaptainHouse | null;
 }) {
   const { level, xpIntoLevel, xpForNextLevel } = renownProgress(
     legacy.renownXP,
@@ -160,19 +153,6 @@ export function CaptainLegacyCard({
           );
         })}
       </div>
-
-      {/* [MANIFEST] House Standing chip, only when the caller has pledged
-          to one of the Great Houses and passes its standing through. The
-          chip wears the gold wax seal gradient so a glance is enough to
-          place the captain's affiliation. */}
-      {house && (
-        <div className="mb-2.5 flex items-center gap-2">
-          <span className="pm-grad-gold inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold">
-            <span className="text-sm leading-none">⛵</span>
-            {house.name} · Standing {house.standing}
-          </span>
-        </div>
-      )}
 
       {!compact && (
         <>

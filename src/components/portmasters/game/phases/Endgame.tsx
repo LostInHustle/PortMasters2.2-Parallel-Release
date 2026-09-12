@@ -1,28 +1,72 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import {
   Trophy,
   Coins,
   Crown,
   Skull,
-  BookOpen,
   Receipt,
   Handshake,
   Heart,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { api } from "@/lib/api";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
 import { merchantRatingForScore } from "@/lib/game/engine";
 import { meritById } from "@/lib/game/merits";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import type { VoyageResult } from "@/types/realtime";
+import type { RivalEntry, VoyageResult } from "@/types/realtime";
 import { cn } from "@/lib/utils";
 import { Avatar, MeritIcon } from "../../shared";
 import { CaptainLegacyCard } from "../../CaptainLegacyCard";
 import type { PhasePanelProps } from "./PhaseShared";
+
+// The head to head line the Legacy card draws when both captains are in
+// the room. The account has one rivalry list (see /api/rivals), so this
+// picks out the partners who sailed this voyage rather than asking for a
+// named one. A rivalry with someone who is elsewhere is real, but it says
+// nothing about the voyage just finished, so it stays off the card.
+function useRivalHere(
+  myUserId: string,
+  voyageResult: VoyageResult | null | undefined,
+): RivalEntry | null {
+  const [rivals, setRivals] = useState<RivalEntry[]>([]);
+
+  // The other captains in this voyage, as a set, so the match below is one
+  // lookup per rival rather than one scan per rival.
+  const partnerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of voyageResult?.standings ?? [])
+      if (s.userId !== myUserId) ids.add(s.userId);
+    return ids;
+  }, [voyageResult, myUserId]);
+
+  useEffect(() => {
+    // Nothing to look up until the standings land, so the request waits
+    // for them rather than firing an unanswerable one on first paint.
+    if (partnerIds.size === 0) return;
+    let cancelled = false;
+    api
+      .listRivals()
+      .then((res) => {
+        if (!cancelled) setRivals(res.rivals ?? []);
+      })
+      // A failed read just leaves the line off the card. This is a record
+      // of the voyage just sailed, and a rivalry line is a nice extra on
+      // it, never something worth showing an error state over.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [partnerIds]);
+
+  // The list arrives newest meeting first, so a captain who has sailed
+  // against two of the same partners gets the one they met most recently.
+  return rivals.find((r) => partnerIds.has(r.partner.id)) ?? null;
+}
 
 type EndgameProps = Pick<
   PhasePanelProps,
@@ -38,10 +82,6 @@ type EndgameProps = Pick<
   voyageResult?: VoyageResult | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
-  // The Voyage Chronicle opt-in. The parent (GameRoom) wires this to the
-  // chronicle API. Kept as a single fire and forget callback so this panel
-  // stays free of any save/chronicle state of its own.
-  onSaveChronicle?: () => void;
 };
 
 export function Endgame({
@@ -51,7 +91,6 @@ export function Endgame({
   voyageResult,
   myLegacy,
   onRestart,
-  onSaveChronicle,
 }: EndgameProps) {
   const myUserId = me.id;
   const isHost = me.id === room.hostId;
@@ -66,6 +105,7 @@ export function Endgame({
     rating = `${r.icon} ${r.label}`;
   }
   const mine = voyageResult?.standings.find((s) => s.userId === myUserId);
+  const rival = useRivalHere(myUserId, voyageResult);
   return (
     <div className="max-w-md mx-auto text-center py-4">
       <div className="text-2xl font-bold mb-4 font-display pm-text-sea pm-brush">
@@ -168,39 +208,6 @@ export function Endgame({
             </div>
           </div>
 
-          {/* Voyage Chronicle opt-in. Pinned to the Endgame so a captain
-              can preserve a prose recap of this voyage alongside the
-              ledger numbers above. The checkbox fires the parent's
-              onSaveChronicle callback once when ticked; the parent
-              (GameRoom) is responsible for the actual chronicle API
-              call, so this panel carries no chronicle state of its own. */}
-          {onSaveChronicle && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3 text-left">
-              <label
-                htmlFor="chronicle-opt-in"
-                className="flex items-start gap-2.5 text-sm cursor-pointer"
-              >
-                <Checkbox
-                  id="chronicle-opt-in"
-                  onCheckedChange={(checked) => {
-                    if (checked === true) onSaveChronicle();
-                  }}
-                  className="mt-0.5"
-                />
-                <span className="flex-1">
-                  <span className="font-medium flex items-center gap-1.5">
-                    <BookOpen className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    Save a short chronicle of this voyage
-                  </span>
-                  <span className="text-[11px] text-muted-foreground block mt-0.5">
-                    Pins a one sentence headline and a short recap to your
-                    Captain&apos;s Legacy so you can quote it later.
-                  </span>
-                </span>
-              </label>
-            </div>
-          )}
-
           {myLegacy && (
             <div>
               {mine && (
@@ -209,7 +216,23 @@ export function Endgame({
                   {mine.leveledUp ? " · Renown level up!" : ""}
                 </div>
               )}
-              <CaptainLegacyCard legacy={myLegacy} />
+              <CaptainLegacyCard
+                legacy={myLegacy}
+                rival={
+                  rival
+                    ? {
+                        displayName: rival.partner.displayName,
+                        meetings: rival.meetings,
+                        // The route projects the viewer as position "a", so
+                        // its wins are this captain's and its losses are the
+                        // partner's (see /api/rivals).
+                        myWins: rival.wins,
+                        theirWins: rival.losses,
+                        ties: rival.ties,
+                      }
+                    : null
+                }
+              />
             </div>
           )}
         </div>

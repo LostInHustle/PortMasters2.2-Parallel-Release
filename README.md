@@ -1,4 +1,4 @@
-# PortMasters 2: Lords of the Silk Road (2.2 Parallel Release)
+# PortMasters 2.2 Parallel Release
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
@@ -139,13 +139,13 @@ This is PortMasters 2.2 Parallel Release, a build of its own rather than a patch
 
 Every system of the earlier build is still here and still working the same way, and six more are built on top of it.
 
-|                        | PortMasters 2 | PortMasters 2.2 |
-| ---------------------- | ------------- | --------------- |
-| Harbor systems shipped | 10 of 18      | 16 of 18        |
-| Realtime layer         | one long file | 17 modules      |
-| Interface components   | 29            | 41              |
-| Database models        | 10            | 12              |
-| The port it answers on | 2232          | 8080            |
+|                        | The earlier build | PortMasters 2.2 Parallel Release |
+| ---------------------- | ----------------- | -------------------------------- |
+| Harbor systems shipped | 10 of 18          | 16 of 18                         |
+| Realtime layer         | one long file     | 17 modules                       |
+| Interface components   | 29                | 41                               |
+| Database models        | 10                | 12                               |
+| The port it answers on | 2232              | 8080                             |
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
 

@@ -23,7 +23,7 @@ export function getOwnedAmount(state: GameState, item: string): number {
 }
 
 // Exported here because the modules split out of engine.ts need it, but
-// deliberately NOT re-exported from the engine barrel: it was private to
+// deliberately NOT forwarded from the engine barrel: it was private to
 // engine.ts before the split and stays private to the engine from the
 // outside, so the public surface is unchanged.
 export function addOwnedAmount(state: GameState, item: string, delta: number) {

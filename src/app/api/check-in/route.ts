@@ -1,6 +1,6 @@
 // POST /api/check-in: claim today's Daily Check In reward for the current
 // user. One claim per UTC day; grants escalating Renown XP and advances the
-// 7-day cycle (see src/lib/game/checkin.ts). Together with the voyage
+// seven day cycle (see src/lib/game/checkin.ts). Together with the voyage
 // conclusion write in the realtime layer, this is the only place a
 // CaptainLegacy row is ever written.
 import { NextResponse } from "next/server";
@@ -48,8 +48,8 @@ function normalizeHouseId(raw: string | null): HouseId | null {
 }
 
 // meritIds is threaded in rather than queried here, since every call in
-// this file is for the one signed in user and a check-in claim never
-// changes their merits, so one query up front in POST covers all of them.
+// this file is for the one signed in user and a claim never changes their
+// merits, so one query up front in POST covers all of them.
 function toSummary(
   row: LegacyRow | null,
   meritIds: string[],

@@ -371,6 +371,6 @@ function PeekButton({
   );
 }
 
-// Re-exported so any caller that wants the band label alone can compute it
+// Forwarded so any caller that wants the band label alone can compute it
 // without reaching into the engine module directly.
 export { bandFor };

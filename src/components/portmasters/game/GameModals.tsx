@@ -24,11 +24,10 @@ import {
   unlockedWorkerTypes,
 } from "@/lib/game/pools";
 import type { GameState } from "@/lib/game/types";
-import { getIntelCost, phaseLabel, HOUSES } from "@/lib/game/engine";
+import { getIntelCost, phaseLabel } from "@/lib/game/engine";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
 import type { PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import type { HouseId } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Avatar, Pill, ItemIcon } from "../shared";
@@ -42,16 +41,11 @@ import {
   Coins,
   Trophy,
   Ship,
-  Package,
   Loader2,
   Eye,
   RotateCcw,
   Bell,
   BellOff,
-  ScrollText,
-  Landmark,
-  AlertTriangle,
-  Skull,
 } from "lucide-react";
 import type { NotificationItem } from "@/lib/use-notifications";
 

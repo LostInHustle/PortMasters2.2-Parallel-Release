@@ -4,16 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { WORKER_TYPES } from "@/lib/game/constants";
+import { difficultyConfig, roundsFor } from "@/lib/game/difficulty";
 import {
-  difficultyConfig,
-  escortRateFor,
-  pirateChanceFor,
-  roundsFor,
-} from "@/lib/game/difficulty";
-import {
+  escortCost,
   finishSettlement,
   getHireCost,
   hireEscort,
+  pirateChance,
   resolvePirateAttack,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -29,20 +26,20 @@ function PirateAttack({
   game: GameState;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
 }) {
-  const escortCost = Math.floor(game.money * escortRateFor(game.difficulty));
-  // Both the odds and the escort fee follow the room's tier, and a corrupt
-  // broker's leak (see purchaseIntel) is folded into the number shown rather
-  // than hidden, so what the captain reads is the real chance.
+  // Both figures come straight from the engine, off the same two functions
+  // the charge itself goes through (see hireEscort and resolvePirateAttack).
+  // The panel used to rebuild each one by hand and had drifted away from
+  // them: the odds left out the Escort Pact and the Persian Dome Compass,
+  // and the fee left out the Pact, so a captain was quoted a risk and a
+  // price that were not the ones on offer.
+  const escortFee = escortCost(game);
+  const raidPct = Math.round(pirateChance(game) * 100);
+  // Read only to explain the note below. The leak is already inside the
+  // figure above, so this tells the captain why the odds look as high as
+  // they do rather than showing a second, separate number.
   const leak = game.brokerTippedPirates
     ? difficultyConfig(game.difficulty).brokerCorruptionRisk
     : 0;
-  const raidPct = Math.round(
-    Math.min(
-      1,
-      pirateChanceFor(game.difficulty, game.currentRound, game.maxRounds) +
-        leak,
-    ) * 100,
-  );
   return (
     <div className="max-w-xl mx-auto text-center py-4">
       <div className="text-5xl mb-2">🏴‍☠️</div>
@@ -107,11 +104,11 @@ function PirateAttack({
         {/* Recommendation */}
         {(() => {
           const expectedLoss = (game.money * raidPct) / 100;
-          const recommend = escortCost < expectedLoss && game.money > 0;
+          const recommend = escortFee < expectedLoss && game.money > 0;
           if (!recommend) return null;
           return (
             <div className="mt-2 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[10px] text-emerald-700 dark:text-emerald-300">
-              Escort costs {escortCost}g but expected loss is{" "}
+              Escort costs {escortFee}g but expected loss is{" "}
               {Math.round(expectedLoss)}g. Hiring the escort saves Gold on
               average.
             </div>
@@ -125,7 +122,7 @@ function PirateAttack({
           className="pm-grad-primary text-white rounded-xl h-14"
           onClick={() => act((g, l) => hireEscort(g, l))}
         >
-          <ShieldCheck className="h-5 w-5 mr-2" /> Hire Escort ({escortCost}{" "}
+          <ShieldCheck className="h-5 w-5 mr-2" /> Hire Escort ({escortFee}{" "}
           Gold)
         </Button>
         <Button

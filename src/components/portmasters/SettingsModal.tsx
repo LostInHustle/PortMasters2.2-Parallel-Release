@@ -6,7 +6,6 @@ import {
   Settings,
   X,
   Volume2,
-  VolumeX,
   Palette,
   Keyboard,
   Moon,

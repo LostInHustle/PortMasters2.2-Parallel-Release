@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { Eye, Trophy, Coins, Anchor } from "lucide-react";
 import type { PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
-import { cn } from "@/lib/utils";
 
 /**
  * [MANIFEST 07: Bequest Routing] Extends the already shipped Silent

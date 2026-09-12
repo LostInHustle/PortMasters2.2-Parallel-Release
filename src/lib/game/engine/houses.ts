@@ -20,8 +20,23 @@
 // writes the chosen House onto the CaptainLegacy row) and this module
 // can read it without one importing the other.
 // =====================================================================
-import type { CaptainLegacySummary, HouseId } from "../legacy";
-import type { GameState } from "../types";
+import type { HouseId } from "../legacy";
+import type { GameState, HousePerks } from "../types";
+
+// The perk flags of a captain who has pledged to no House, which is also
+// what a voyage saved before any House existed should read as. Exported so
+// the empty set has one definition: a field added here and forgotten in a
+// hand written copy elsewhere is a crash waiting on the first captain to
+// load a save from before that field, which is exactly the trap the save
+// normaliser in use-game-session.ts would otherwise have to dodge by hand.
+export function noHousePerks(): HousePerks {
+  return {
+    jadeFreeHireAvailable: false,
+    vermilionExtraCard: false,
+    goldenWageDiscount: false,
+    goldenPirateBump: false,
+  };
+}
 
 export type House = {
   id: HouseId;
@@ -39,14 +54,14 @@ export const HOUSES: House[] = [
     name: "Jade Pavilion",
     icon: "🪷",
     motto: "Patience polishes the stone.",
-    perk: "Your first artisan each voyage joins the crew at no cost.",
+    perk: "Your first artisan each voyage joins at no cost: the first wage is on the House.",
   },
   {
     id: "vermilion_gate",
     name: "Vermilion Gate",
     icon: "🏮",
     motto: "The gate is open to every cargo.",
-    perk: "Your hold carries one extra lot, and one extra purchase card appears each round.",
+    perk: "One more cargo lot joins your Port Purchase board, every round.",
   },
   {
     id: "golden_lotus",
@@ -56,16 +71,6 @@ export const HOUSES: House[] = [
     perk: "Wages cost 20% less, but pirate raids strike 5% more often.",
   },
 ];
-
-// Lookup by id, returning undefined for an unknown id rather than throwing.
-// The caller (Lobby, voyage start) decides whether to coerce to a default
-// House or surface the missing choice to the captain.
-export function housePerkFor(
-  houseId: HouseId | null | undefined,
-): House | undefined {
-  if (!houseId) return undefined;
-  return HOUSES.find((h) => h.id === houseId);
-}
 
 // Applied once, at the head of createInitialGameState (or restartGame,
 // which delegates to it), before the first Boon draft and before the
@@ -96,11 +101,4 @@ export function applyHousePerkAtStart(
     goldenWageDiscount: houseId === "golden_lotus",
     goldenPirateBump: houseId === "golden_lotus",
   };
-}
-
-// What the Lobby's House card shows under a captain's name when they have
-// picked one. Returns null for a captain who hasn't chosen yet, so the UI
-// can render a "Choose your House" prompt rather than an empty line.
-export function houseStandingFor(legacy: CaptainLegacySummary): House | null {
-  return housePerkFor(legacy.houseId) ?? null;
 }

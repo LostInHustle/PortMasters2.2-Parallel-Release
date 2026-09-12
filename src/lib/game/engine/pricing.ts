@@ -18,7 +18,6 @@
 // =====================================================================
 import {
   BOONS,
-  BROKERS_FAVOR_PAYOUT_CAP,
   COMMODITIES,
   PRODUCT_PRICES,
   RECIPES,
@@ -26,6 +25,7 @@ import {
   WAGES,
 } from "../constants";
 import type { GameState, ResourceCard } from "../types";
+import { brokersFavorPayoutCap } from "./ages";
 import { hasModule } from "./core";
 
 export type PriceStep = { label: string; delta: number };
@@ -50,7 +50,7 @@ function boonNameForModifierKey(key: string): string {
   return BOONS.find((b) => key in b.modifiers)?.name ?? "Active boon";
 }
 
-// ---------- Transport ----------
+// ========== Transport ==========
 export function calcTransportCost(
   state: GameState,
   totalItems: number,
@@ -136,7 +136,7 @@ export function explainTransportCost(
   return { base, steps, final: Math.max(0, cost) };
 }
 
-// ---------- Taxes ----------
+// ========== Taxes ==========
 export function calcVAT(
   state: GameState,
   product: string,
@@ -214,7 +214,19 @@ export function calcIncomeTax(state: GameState, preTax: number): number {
   return tax;
 }
 
-// ---------- Market card pricing ----------
+// ========== Market card pricing ==========
+// The two per unit charter module discounts: which goods each one covers,
+// and how many Gold it takes off each unit. Named here because two places
+// apply them, the card charge below and the hover preview in
+// explainExpectedPrice, and keeping the goods and the amounts in one place
+// is what stops the two from drifting apart again. They had: the preview
+// applied neither, so a captain holding the Kiln Cellar saw a Porcelain
+// Clay price two Gold a unit above what the card went on to charge.
+const KILN_CELLAR_GOODS = ["Porcelain Clay", "Copper Ore"];
+const KILN_CELLAR_PER_UNIT = 2;
+const FOREIGN_QUARTER_GOODS = ["Spices", "Pearls"];
+const FOREIGN_QUARTER_PER_UNIT = 3;
+
 // The same math as getCardFinalCost, but reported as a step by step
 // breakdown so the buying phase tooltip can show exactly where a price
 // came from: base cost, then whatever boon or module touched it.
@@ -250,14 +262,14 @@ export function explainCardPrice(
   if (hasModule(state, "kiln_cellar")) {
     const reduction = card.resources.reduce(
       (sum, r) =>
-        r.type === "Porcelain Clay" || r.type === "Copper Ore"
-          ? sum + (r.quantity ?? 0) * 2
+        KILN_CELLAR_GOODS.includes(r.type)
+          ? sum + (r.quantity ?? 0) * KILN_CELLAR_PER_UNIT
           : sum,
       0,
     );
     if (reduction > 0) {
       steps.push({
-        label: "Kiln Cellar module (down 2g per unit)",
+        label: `Kiln Cellar module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -266,14 +278,14 @@ export function explainCardPrice(
   if (hasModule(state, "foreign_quarter_pass")) {
     const reduction = card.resources.reduce(
       (sum, r) =>
-        r.type === "Spices" || r.type === "Pearls"
-          ? sum + (r.quantity ?? 0) * 3
+        FOREIGN_QUARTER_GOODS.includes(r.type)
+          ? sum + (r.quantity ?? 0) * FOREIGN_QUARTER_PER_UNIT
           : sum,
       0,
     );
     if (reduction > 0) {
       steps.push({
-        label: "Foreign Quarter Pass module (down 3g per unit)",
+        label: `Foreign Quarter Pass module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -333,6 +345,31 @@ export function explainExpectedPrice(
         `${boonNameForModifierKey("hemp_price_reduction")} (down ${state.modifierFlags.hemp_price_reduction}g per unit)`,
       );
     }
+    // The two per unit charter module discounts. Flat Gold off a single
+    // unit, so they come off the range the same way the Hemp boon above
+    // does rather than scaling it. Applied in the order the card charge
+    // applies them (see explainCardPrice), since a percentage taken before
+    // a flat subtraction and one taken after settle on different numbers.
+    if (
+      hasModule(state, "kiln_cellar") &&
+      KILN_CELLAR_GOODS.includes(itemType)
+    ) {
+      min = Math.max(0, min - KILN_CELLAR_PER_UNIT);
+      max = Math.max(0, max - KILN_CELLAR_PER_UNIT);
+      modifiers.push(
+        `Kiln Cellar module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
+      );
+    }
+    if (
+      hasModule(state, "foreign_quarter_pass") &&
+      FOREIGN_QUARTER_GOODS.includes(itemType)
+    ) {
+      min = Math.max(0, min - FOREIGN_QUARTER_PER_UNIT);
+      max = Math.max(0, max - FOREIGN_QUARTER_PER_UNIT);
+      modifiers.push(
+        `Foreign Quarter Pass module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
+      );
+    }
     if (hasModule(state, "smugglers_hold")) {
       min = Math.floor(min * 0.85);
       max = Math.floor(max * 0.85);
@@ -343,7 +380,7 @@ export function explainExpectedPrice(
   return { min, max, isProduct: !isResource, modifiers };
 }
 
-// ---------- Wages ----------
+// ========== Wages ==========
 // The canonical per worker, per round wage for a given type, given every
 // currently active modifier. There is no separate one time "hiring fee"
 // in this game (see hireWorker, which never touches state.money);
@@ -360,10 +397,16 @@ export function getHireCost(state: GameState, type: string): number {
   if (state.modifierFlags.hire_discount)
     wage = Math.floor(wage * (1 - state.modifierFlags.hire_discount));
   if (hasModule(state, "artisans_workshop")) wage = Math.floor(wage * 1.2);
+  // Golden Lotus's pledge takes a fifth off every wage. Applied last, so it
+  // discounts the wage actually due rather than the list price, and read
+  // here so hiring, payroll, severance and every interface preview quote
+  // the same figure (see payWages, fireWorker, and the Pending Payroll
+  // preview in GamePhasePanel).
+  if (state.housePerks.goldenWageDiscount) wage = Math.floor(wage * 0.8);
   return wage;
 }
 
-// ---------- Broker intel ----------
+// ========== Broker intel ==========
 // The Gold a captain pays for one Broker's rumor in Phase 1. Used to live
 // directly on GameState as `intelCost`, set to 5 by createInitialGameState
 // and toggled to 2 by the Broker's Network module's equip/unequip hooks in
@@ -381,17 +424,22 @@ export function getIntelCost(state: GameState): number {
   return hasModule(state, "brokers_network") ? 2 : 5;
 }
 
-// ---------- Broker's Favor ----------
+// ========== Broker's Favor ==========
 // The Broker's cut on a Broker's Favor order, a saturating curve rather
 // than a flat rate. Net payout climbs almost one for one with reward at
 // first (a small order keeps the feel of a low flat rate) but bends hard as
-// reward grows, approaching BROKERS_FAVOR_PAYOUT_CAP without ever reaching
-// it. That gives callBrokersFavor a hard ceiling on what a single favor can
-// pay out regardless of how large a quantity a captain asks for, instead of
-// needing to cap the quantity itself.
+// reward grows, approaching the cap in force without ever reaching it. That
+// gives callBrokersFavor a hard ceiling on what a single favor can pay out
+// regardless of how large a quantity a captain asks for, instead of needing
+// to cap the quantity itself. The cap is the Age's, not a fixed constant:
+// see brokersFavorPayoutCap.
 export function brokersFavorCommission(reward: number): number {
-  const net =
-    BROKERS_FAVOR_PAYOUT_CAP *
-    (1 - Math.exp(-reward / BROKERS_FAVOR_PAYOUT_CAP));
+  // The cap comes from the Age in force, not straight off the constant, so
+  // the Broker's Age genuinely lets one favor pay out more than usual (see
+  // brokersFavorPayoutCap). Reading it here rather than at the call sites
+  // keeps the Orders panel, the action suggester's net figure and the
+  // payout itself all quoting the same number.
+  const cap = brokersFavorPayoutCap();
+  const net = cap * (1 - Math.exp(-reward / cap));
   return Math.max(0, reward - Math.floor(net));
 }

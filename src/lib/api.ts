@@ -17,7 +17,7 @@ import type {
   VoyageChronicle,
 } from "@/types/realtime";
 
-// Re-exported so existing call sites that imported PublicUser from
+// Forwarded so existing call sites that imported PublicUser from
 // "@/lib/api" keep compiling. The canonical home is @/types/realtime.
 export type { PublicUser };
 
@@ -173,21 +173,14 @@ export const api = {
     }>("/api/check-in", { method: "POST" }),
 
   // [MANIFEST] Voyage Chronicle: the prose recap of a finished voyage.
-  // The list returns the current user's chronicles, newest first. A single
-  // chronicle by id includes the full headline and body text. The save
-  // endpoint is an opt in write for the Endgame "Save a short chronicle of
-  // this voyage" checkbox: idempotent, returns the existing row when the
-  // realtime auto write already landed, otherwise rebuilds and persists the
-  // chronicle from the saved game state.
+  // Returns the current user's chronicles, newest first. This is the only
+  // chronicle call there is: the rows are written by the realtime layer as
+  // each voyage concludes (see maybeConcludeVoyage), so there is nothing
+  // for a client to ask for. An earlier build also carried a single
+  // chronicle by id and a manual opt in save, both of which nothing ever
+  // called and the automatic write had already made redundant.
   listChronicles: () =>
     jfetch<{ chronicles: VoyageChronicle[] }>("/api/chronicle"),
-  getChronicle: (voyageId: string) =>
-    jfetch<{ chronicle: VoyageChronicle }>(`/api/chronicle/${voyageId}`),
-  saveChronicle: (roomId: string) =>
-    jfetch<{ chronicle: VoyageChronicle }>("/api/chronicle", {
-      method: "POST",
-      body: JSON.stringify({ roomId }),
-    }),
 
   // [MANIFEST] Quick Start Match: asks to be seated with the next captain
   // who asks. The queue lives in the realtime layer's memory, so the real
@@ -201,12 +194,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // [MANIFEST] Captain's Rival: head to head lines for the current user.
-  // The [userId] variant returns the rivalry between the current user and
-  // one named partner, for the Legacy card's head to head line.
+  // [MANIFEST] Captain's Rival: head to head lines for the current user,
+  // read by the Captain's Legacy card on the Endgame screen and by the
+  // profile modal. Every rivalry the account has is in this one list, so
+  // the card picks the entry for whoever else is in the room rather than
+  // asking for that partner by name.
   listRivals: () => jfetch<{ rivals: RivalEntry[] }>("/api/rivals"),
-  getRival: (userId: string) =>
-    jfetch<{ rival: RivalEntry }>(`/api/rivals/${userId}`),
 
   // [MANIFEST] Great Houses: pledge allegiance to one House, and read the
   // harbor wide standings so the Lobby's House picker shows crowns and best

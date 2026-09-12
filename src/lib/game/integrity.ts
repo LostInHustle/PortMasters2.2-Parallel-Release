@@ -18,14 +18,11 @@
 // so the rule can be exercised by a fast deterministic test instead of only
 // against a live server.
 // =====================================================================
-import {
-  BROKERS_FAVOR_PAYOUT_CAP,
-  PRODUCT_PRICES,
-  WORD_ON_THE_DOCKS_REWARD,
-} from "./constants";
+import { PRODUCT_PRICES, WORD_ON_THE_DOCKS_REWARD } from "./constants";
 import { DIFFICULTIES } from "./difficulty";
+import { WIDEST_BROKERS_FAVOR_PAYOUT_CAP } from "./engine";
 
-// ---------- Deriving the ceiling ----------
+// ========== Deriving the ceiling ==========
 // Every number below is read from the live game data rather than written
 // out by hand, the same reasoning merits.ts follows when it reads its own
 // thresholds from MERCHANT_RATINGS: a charter that adds a richer good or a
@@ -56,12 +53,18 @@ const WIDEST_ORDER_BOARD =
 // The most Gold a single round could conceivably produce: every order on the
 // widest board filled at the dearest price with every modifier stacked, plus
 // the Broker's Favor payout cap and the one time Word on the Docks purse.
+//
+// The cap is the widest any Age offers rather than the founding one, because
+// a save is judged when it is next loaded rather than when it was written:
+// under the Broker's Age a favor genuinely pays out past the founding cap,
+// and a captain who collected one must not read as impossible a fortnight
+// later when the Age has moved on.
 const MAX_PLAUSIBLE_GOLD_PER_ROUND =
   DEAREST_PRODUCT *
     MAX_ORDER_QUANTITY *
     MODIFIER_STACK_CEILING *
     WIDEST_ORDER_BOARD +
-  BROKERS_FAVOR_PAYOUT_CAP +
+  WIDEST_BROKERS_FAVOR_PAYOUT_CAP +
   WORD_ON_THE_DOCKS_REWARD;
 
 // Reputation per completed order is floor(reward - transport), so it can
@@ -112,7 +115,7 @@ const SUSPECT_FRACTION = 10;
 
 type IntegritySeverity = "ok" | "suspect" | "impossible";
 
-// ---------- Reading a save ----------
+// ========== Reading a save ==========
 // Both fields are optional, and that is the point. An earlier version
 // required both and returned null if either was missing or the wrong type,
 // which meant a save could skip the guard entirely simply by leaving one of

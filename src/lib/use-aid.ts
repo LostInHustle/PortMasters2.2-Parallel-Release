@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { AidRequest } from "@/types/realtime";
 
-// Re-exported so the Settlement phase component can import the wire shape
+// Forwarded so the Settlement phase component can import the wire shape
 // from the same place it imports the hook. The canonical home is
 // @/types/realtime so the realtime layer and the client hook share
 // one definition.

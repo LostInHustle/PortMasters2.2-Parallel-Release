@@ -32,14 +32,13 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  * phase change reads as one cross fade rather than a stack of
  * overlapping panels.
  *
- * The dispatcher takes the shared `PhasePanelProps` shape, plus three
+ * The dispatcher takes the shared `PhasePanelProps` shape, plus two
  * optional extras that not every caller wires up: `onTutorialOpen`
- * (used by the Welcome screen's New Player Tutorial button),
- * `onSaveChronicle` (used by the Endgame screen's chronicle opt in
- * checkbox), and `voyageResult` (the harbor wide standings payload the
- * server emits on voyage:complete, also consumed by Endgame). Each is
- * optional so a caller that hasn't wired them in still compiles and
- * renders a sensible default.
+ * (used by the Welcome screen's New Player Tutorial button) and
+ * `voyageResult` (the harbor wide standings payload the server emits on
+ * voyage:complete, also consumed by Endgame). Each is optional so a
+ * caller that hasn't wired them in still compiles and renders a
+ * sensible default.
  */
 
 // The shared props every phase panel takes, re exported so any caller
@@ -50,14 +49,13 @@ export type { PhasePanelProps } from "./phases/PhaseShared";
 
 type Props = PhasePanelProps & {
   onTutorialOpen?: () => void;
-  onSaveChronicle?: () => void;
   voyageResult?: VoyageResult | null;
   // Endgame also accepts myLegacy and onRestart as optional, but the
   // dispatcher deliberately does not take them as its own props; if a
   // caller needs them wired through, the Endgame panel can be rendered
   // directly with those props. Keeping the dispatcher's surface narrow
-  // matches the original spec: only onTutorialOpen, onSaveChronicle,
-  // and voyageResult are added on top of PhasePanelProps here.
+  // matches the original spec: only onTutorialOpen and voyageResult are
+  // added on top of PhasePanelProps here.
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
@@ -138,7 +136,6 @@ function ActivePhase(props: Props) {
     colorFor,
     onRumorBoardOpen,
     onTutorialOpen,
-    onSaveChronicle,
     voyageResult,
     myLegacy,
     onRestart,
@@ -259,7 +256,6 @@ function ActivePhase(props: Props) {
           voyageResult={voyageResult}
           myLegacy={myLegacy}
           onRestart={onRestart}
-          onSaveChronicle={onSaveChronicle}
         />
       );
     default:

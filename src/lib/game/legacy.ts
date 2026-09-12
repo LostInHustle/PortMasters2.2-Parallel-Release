@@ -84,7 +84,7 @@ export function renownStartingGoldBonus(level: number): number {
   );
 }
 
-// ---------- Per difficulty breakdown ----------
+// ========== Per difficulty breakdown ==========
 // Sea Master crowns and best score split by the tier they were earned on (see
 // Room.difficulty and src/lib/game/difficulty.ts). The account level
 // seaMasterCrowns and bestScore stay the all tier totals; this is the breakdown

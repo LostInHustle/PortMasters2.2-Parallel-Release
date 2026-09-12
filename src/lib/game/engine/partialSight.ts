@@ -9,13 +9,16 @@
 // This module owns the two small helpers that draw that line, kept here
 // so the rest of the engine never has to reason about visibility rules.
 //
-// The trust threshold mirrors the implicit threshold Backing already
-// uses: a captain needs to be at least Renown Level 5 (Trade Officer) to
-// co sign a loan, and the captain they are looking at needs to be at
-// least Renown Level 3 (Able Seaman) for the detail to be worth showing.
-// Keeping the two thresholds aligned means a captain who can back a loan
-// is also a captain who can see the detail they would need to decide
-// whether to.
+// Two thresholds, answering two different questions: the viewer has to be
+// established enough to be trusted with detail (Renown Level 5, a Trade
+// Officer), and the captain being looked at has to have enough of a
+// record for that detail to say anything (Renown Level 3, an Able
+// Seaman). Below either line, only the headline numbers show.
+//
+// This reads a captain's Renown and nothing else it might have been
+// aligned with. An earlier version of this comment claimed it mirrored a
+// trust gate on Backing, a gate that has never existed: lending and
+// backing are open to every captain whatever their Renown.
 // =====================================================================
 
 // The minimum Renown a viewer needs to see another captain's detail.

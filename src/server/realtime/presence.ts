@@ -210,7 +210,7 @@ function scheduleBootDeparture(
   });
 }
 
-// ---------- Boot time membership reconciliation ----------
+// ========== Boot time membership reconciliation ==========
 // Every map above starts empty on every process boot, but Room/RoomMember
 // in the database persist across it. Without this, a captain who was
 // seated in a room the moment the process went down keeps that seat

@@ -1,13 +1,14 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: Lords of the Silk Road
-// Game constants. Balance, descriptions, and overall wording are carried
-// over verbatim from the original PortMasters build this project branches
-// from; only the project's own name has been updated where it appears in
-// this text, to match the rebrand (see README.md).
+// PortMasters 2.2 Parallel Release: game constants
+// Balance, descriptions, and overall wording are carried over verbatim
+// from the original PortMasters build this project branches from; only
+// the project's own name has been updated where it appears in this text,
+// to match the rebrand (see README.md).
 // =====================================================================
 
 import {
   difficultyConfig,
+  mandateRounds,
   type Difficulty,
   type DifficultyConfig,
 } from "./difficulty";
@@ -190,6 +191,19 @@ export const RECIPES: Record<
     worker_type: "jeweler",
   },
 };
+
+// Silk itself, and every finished good a captain makes from it. Derived
+// from RECIPES rather than listed by hand: the hand written list this
+// replaces named one good at a given Silk ratio and missed two others at
+// the identical ratio, so the Silk Winds boon and the Silk Road Monopoly
+// module quietly did nothing for the two most valuable goods in the game.
+// A good added tomorrow is covered the moment its recipe is written.
+export const SILK_GOODS: readonly string[] = [
+  "Silk",
+  ...Object.entries(RECIPES)
+    .filter(([, recipe]) => (recipe.materials.Silk ?? 0) > 0)
+    .map(([good]) => good),
+];
 
 export const COMMODITIES: Record<
   string,
@@ -739,12 +753,6 @@ function escortPct(cfg: DifficultyConfig): string {
   return `${Math.round(cfg.escortCostRate * 100)}%`;
 }
 
-function mandateRounds(cfg: DifficultyConfig): number[] {
-  return Object.keys(cfg.mandates)
-    .map(Number)
-    .sort((a, b) => a - b);
-}
-
 export function tutorialSteps(
   difficulty: Difficulty,
 ): { title: string; content: string }[] {
@@ -762,7 +770,7 @@ export function tutorialSteps(
       title: "🏆 What you're playing for",
       content: `<p>After ${cfg.rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
 <p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
-<p>Starting gold is <strong>100</strong>. That is enough to get going, but not enough to be careless with.</p>`,
+<p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
       title: "🔄 How a voyage works",

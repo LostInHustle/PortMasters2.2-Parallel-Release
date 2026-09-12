@@ -128,9 +128,12 @@ export function AuthScreen({
             <h1 className="font-display text-xl font-bold tracking-tight">
               <span className="pm-text-sea">{APP_NAME}</span>
             </h1>
+            {/* A tagline, not a second title. This line used to carry the
+                game's old subtitle, which left the screen showing two
+                different names for one game. */}
             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Waves className="h-3.5 w-3.5" /> Lords of the Silk Road, Online
-              Edition
+              <Waves className="h-3.5 w-3.5" /> Maritime trade on the ancient
+              Silk Road
             </p>
           </div>
 

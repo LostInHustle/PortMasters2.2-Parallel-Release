@@ -1,5 +1,5 @@
 {
-  "name": "portmasters2-parallel-release",
+  "name": "portmasters2.2parallelrelease",
   "version": "0.2.1",
   "private": true,
   "description": "A browser based multiplayer trading game on the maritime Silk Road. One npm project serves the site, the API and the realtime channel on a single port.",

@@ -121,7 +121,7 @@ export function Welcome({
         <span className="pm-text-sea">⚓ {APP_NAME} 🚢</span>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        🌊 Eight Voyages await, become the Sea Master!
+        🌊 {cfg.rounds} Voyages await, become the Sea Master!
       </p>
       <div className="flex flex-col items-center gap-3 mb-6">
         <HarborRoster members={members} ids={harborIds} />

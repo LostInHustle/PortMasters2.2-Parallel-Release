@@ -60,12 +60,12 @@ export function HarborActivityFeed({ className }: { className?: string }) {
     <div className={cn("relative", className)}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="pm-chip pm-pressable h-7 px-2.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        className="pm-tool pm-pressable bg-black/[0.05] text-foreground/75 dark:bg-white/10"
         title="Harbor activity feed"
         aria-label="Harbor activity feed"
       >
-        <Activity className="h-3 w-3" />
-        <span className="hidden sm:inline">Activity</span>
+        <Activity className="h-3.5 w-3.5" />
+        <span className="hidden xl:inline">Activity</span>
       </button>
 
       <AnimatePresence>
@@ -75,22 +75,21 @@ export function HarborActivityFeed({ className }: { className?: string }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute right-0 top-full mt-1.5 w-72 rounded-xl border border-border/40 pm-glass-strong p-3 shadow-lg"
-            style={{ zIndex: 30 }}
+            className="pm-glass-strong pm-panel absolute right-0 top-full z-30 mt-1.5 w-72 border border-border/40 shadow-lg"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-teal-500" />
-                <span className="text-xs font-bold pm-text-sea">
+                <span className="pm-text-sea text-xs font-bold">
                   Harbor Activity
                 </span>
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="pm-pressable rounded-full p-0.5 hover:bg-black/5 dark:hover:bg-white/10"
+                className="pm-tool pm-tool-icon pm-pressable -mr-2 text-muted-foreground"
                 aria-label="Close activity feed"
               >
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
 

@@ -1,5 +1,5 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: Lords of the Silk Road (Online Edition)
+// PortMasters 2.2 Parallel Release: database schema
 // Prisma schema covering accounts, sessions, rooms, membership, per
 // player game state, chat, captain legacy, merits, convoy ventures,
 // loans, voyage chronicles, captain rivals, and house standings.
