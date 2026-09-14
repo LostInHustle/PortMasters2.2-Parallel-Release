@@ -21,6 +21,7 @@ import {
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
+import { useLiveAmount } from "@/lib/use-live-amount";
 import { Coins, ClipboardList, CheckCircle2, Clock } from "lucide-react";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
@@ -40,28 +41,27 @@ export function Orders({
   const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
   const [favorItem, setFavorItem] = useState<string | null>(null);
-  const [favorDraft, setFavorDraft] = useState<number | null>(null);
   const favorUnlocked = game.renownLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
   const sellableGoods = [...RESOURCES, ...PRODUCTS].filter(
     (it) => (game.inventory[it] || 0) > 0,
   );
   const favorHeld = favorItem ? game.inventory[favorItem] || 0 : 0;
-  // The ask is read off the live hold rather than captured when the good was
-  // picked, and both directions matter. A trade can land while this panel is
-  // open, and either half of one moves goods: posting an offer escrows the
+  // The ask follows the live hold rather than a figure captured when the good
+  // was picked, and both directions matter. A trade can land while this panel
+  // is open and either half of one moves goods: posting an offer escrows the
   // offered side out of the hold at once, and an accepted trade takes the
   // requested side out and puts the offered side in. So the hold can shrink
   // under a figure the captain can no longer deliver, or grow past one they
   // picked when it was all they had, and the second case is the one a captain
   // actually wants back: goods arriving should widen what the Broker can sell.
-  // null is the whole mechanism, the same sentinel the settlement screen uses,
-  // and it means untouched. Until the captain names a figure the ask is the
-  // entire holding; after that the figure is theirs and is only ever clamped
-  // down to what is still in the hold. callBrokersFavor refuses an out of
-  // range ask regardless, which is why this has to be settled here: the engine
-  // would otherwise answer a correct refusal to a question the panel got
-  // wrong, and the captain would have no way to tell why.
-  const favorAsk = Math.min(favorDraft ?? favorHeld, favorHeld);
+  // The clamp is what keeps the ask inside the hold, which is the range
+  // callBrokersFavor insists on. See useLiveAmount for why the panel settles
+  // that rather than leaving the engine to refuse it.
+  const {
+    value: favorAsk,
+    commit: commitFavorAsk,
+    reset: resetFavorAsk,
+  } = useLiveAmount(favorHeld, true);
   const closeFavor = () => {
     setFavorOpen(false);
     setFavorItem(null);
@@ -129,7 +129,7 @@ export function Orders({
                       className="rounded-lg"
                       onClick={() => {
                         setFavorItem(it);
-                        setFavorDraft(null);
+                        resetFavorAsk();
                       }}
                     >
                       <ItemIcon item={it} className="h-3.5 w-3.5" /> {it} (
@@ -195,7 +195,7 @@ export function Orders({
               <div className="flex items-center gap-2">
                 <QuantityInput
                   value={favorAsk}
-                  onCommit={setFavorDraft}
+                  onCommit={commitFavorAsk}
                   min={1}
                   max={favorHeld}
                   aria-label={`How much ${favorItem} to sell`}
