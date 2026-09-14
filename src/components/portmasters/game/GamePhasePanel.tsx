@@ -256,7 +256,6 @@ function ActivePhase(props: Props) {
       return (
         <Endgame
           game={game}
-          phaseSync={phaseSync}
           me={me}
           room={room}
           voyageResult={voyageResult}

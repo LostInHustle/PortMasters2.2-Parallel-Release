@@ -29,7 +29,7 @@ type ChronicleInput = {
   merchantRating: string;
 };
 
-export type ChronicleOutput = {
+type ChronicleOutput = {
   headline: string;
   body: string;
 };

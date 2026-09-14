@@ -37,7 +37,7 @@ export type RivalOutcome = {
   tie: boolean;
 };
 
-export type RivalSummary = {
+type RivalSummary = {
   meetings: number;
   aWins: number;
   bWins: number;

@@ -16,11 +16,6 @@
 
 import { io, type Socket } from "socket.io-client";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
-import type {
-  GameStatusUpdate,
-  OnlineUser,
-  RoomMemberLive,
-} from "@/types/realtime";
 
 /** The reconnect schedule, kept together so both sides of the audit agree. */
 const RECONNECT = {
@@ -38,11 +33,6 @@ export function setAuthToken(token: string | null) {
 export function getAuthToken(): string | null {
   return authToken;
 }
-
-// Forwarded so the client hooks can import everything realtime from one
-// module. The shapes themselves live in @/types/realtime so the server
-// side can share them without pulling this browser file in.
-export type { OnlineUser, RoomMemberLive, GameStatusUpdate };
 
 let socket: Socket | null = null;
 

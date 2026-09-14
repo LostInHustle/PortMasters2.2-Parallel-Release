@@ -20,4 +20,8 @@ const nextConfig: NextConfig = {
   // so anything that trips it is a real regression that should not ship.
 } satisfies NextConfig;
 
+module.exports = {
+  allowedDevOrigins: ["*.dev", "192.168.*.*"],
+};
+
 export default nextConfig;

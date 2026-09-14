@@ -36,7 +36,7 @@ import { payMaintenance, payWages, processProduction } from "./workers";
 // without dragging in the engine's lifecycle. The barrel (../engine.ts)
 // still re exports it for backwards compatibility, sourced from constants.
 
-export function endRound(state: GameState, logs: string[]) {
+function endRound(state: GameState, logs: string[]) {
   logs.push(`\n📊=== Round ${state.currentRound} Settlement ===`);
   logs.push(`💰 Revenue this round: ${state.roundRevenue} Gold`);
   const totalCost =
@@ -136,7 +136,7 @@ export function skipUpgrade(state: GameState, logs: string[]) {
   endRound(state, logs);
 }
 
-export function endGame(state: GameState, logs: string[]) {
+function endGame(state: GameState, logs: string[]) {
   state.gameOver = true;
   state.phase = "endgame";
   logs.push("\n" + "=".repeat(50));

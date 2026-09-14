@@ -24,6 +24,34 @@ import { sockets } from "./presence";
 
 export const roomBarterOffers = new Map<string, BarterOffer[]>();
 
+// Completed trades this voyage, per room and then per captain. Held here
+// rather than on a socket so a captain who reloads or reconnects midway
+// keeps the attempt they already spent, and held per room rather than per
+// account because the allowance is a voyage's, not a lifetime's, which is
+// also what the offer board itself is scoped to.
+//
+// Deliberately not cleared by clearBarter. That runs every time the room's
+// checkpoint moves off the bartering phase, which happens several times a
+// voyage, and an attempt is a per voyage allowance: clearing it there would
+// hand every captain a fresh trade at each phase boundary. Only a voyage
+// that restarts or concludes clears this, alongside the board it belongs
+// to.
+const roomBarterAttempts = new Map<string, Map<string, number>>();
+
+export function barterAttemptsUsed(roomId: string, userId: string): number {
+  return roomBarterAttempts.get(roomId)?.get(userId) ?? 0;
+}
+
+export function recordBarterAttempt(roomId: string, userId: string): void {
+  const byUser = roomBarterAttempts.get(roomId) ?? new Map<string, number>();
+  byUser.set(userId, (byUser.get(userId) ?? 0) + 1);
+  roomBarterAttempts.set(roomId, byUser);
+}
+
+export function clearBarterAttempts(roomId: string): void {
+  roomBarterAttempts.delete(roomId);
+}
+
 export function barterList(roomId: string): BarterOffer[] {
   return roomBarterOffers.get(roomId) ?? [];
 }
@@ -54,6 +82,13 @@ export function broadcastBarter(io: Server, roomId: string): void {
     io.to(sid).emit("barter:update", {
       roomId,
       offers: visibleBarterOffers(offers, state.userId),
+      // How much of this voyage's barter allowance the receiving captain
+      // has already spent. Carried on the board rather than tallied on the
+      // client, because a client would have to rebuild the tally after
+      // every reload and could only ever hold a second opinion of it. The
+      // policy that turns this into "trades left" lives in
+      // engine/barterAccess, so what travels here stays a plain fact.
+      barterAttemptsUsed: barterAttemptsUsed(roomId, state.userId),
     });
   }
 }

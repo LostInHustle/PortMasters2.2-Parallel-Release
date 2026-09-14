@@ -9,21 +9,21 @@
 // when it gets the go, which is how they all land on the same next
 // phase without this server needing to know what that phase is.
 //
-// checkpointRank and CHECKPOINT_PHASE_ORDER are imported from the
-// parent project's shared checkpoint module so a change to the
-// synchronized phase order lands in one place rather than two.
+// checkpointRank is imported from the parent project's shared checkpoint
+// module, and forwarded below, so a change to the synchronized phase
+// order lands in one place rather than two.
 // =====================================================================
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
-import { CHECKPOINT_PHASE_ORDER, checkpointRank } from "@/lib/game/checkpoint";
+import { checkpointRank } from "@/lib/game/checkpoint";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Checkpoint } from "./types";
 import { roomStatuses } from "./status";
 import { roomPulseTallies } from "./pulse";
 
-export { checkpointRank, CHECKPOINT_PHASE_ORDER };
+export { checkpointRank };
 
 export const roomCheckpoints = new Map<string, Checkpoint>();
 
@@ -56,7 +56,7 @@ export async function getCheckpoint(roomId: string): Promise<Checkpoint> {
 // Deliberately based on durable room membership, not on who currently
 // has a live socket connected. A member who is just slow to load still
 // correctly counts as someone the room needs to wait for.
-export async function activeRosterSet(roomId: string): Promise<Set<string>> {
+async function activeRosterSet(roomId: string): Promise<Set<string>> {
   const statuses = roomStatuses.get(roomId);
   const memberIds = await roomMemberIds(roomId);
   const out = new Set<string>();

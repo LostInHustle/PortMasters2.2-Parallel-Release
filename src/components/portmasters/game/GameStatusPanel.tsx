@@ -66,7 +66,6 @@ export function GameStatusPanel({
     ventures: ConvoyVenture[];
     locked: boolean;
     error: string | null;
-    clearError: () => void;
     post: (targetGold: number, deadlineRound: number) => void;
     contribute: (ventureId: string, amount: number) => void;
   };
@@ -554,7 +553,6 @@ function ConvoyVenturesSection({
     ventures: ConvoyVenture[];
     locked: boolean;
     error: string | null;
-    clearError: () => void;
     post: (targetGold: number, deadlineRound: number) => void;
     contribute: (ventureId: string, amount: number) => void;
   };

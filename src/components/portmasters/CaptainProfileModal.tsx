@@ -90,9 +90,8 @@ export function CaptainProfileModal({
     if (!l) return null;
     const totalVoyages = l.voyagesCompleted;
     const crownRate = totalVoyages > 0 ? l.seaMasterCrowns / totalVoyages : 0;
-    const avgRep = totalVoyages > 0 ? Math.round(l.bestScore / 1) : 0;
     const solventStreak = l.consecutiveSolventVoyages;
-    return { totalVoyages, crownRate, avgRep, solventStreak };
+    return { totalVoyages, crownRate, solventStreak };
   }, [data.legacy]);
 
   if (!open) return null;
@@ -227,7 +226,6 @@ function StatsTab({
   stats: {
     totalVoyages: number;
     crownRate: number;
-    avgRep: number;
     solventStreak: number;
   } | null;
   chronicles: VoyageChronicle[];

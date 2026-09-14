@@ -41,8 +41,10 @@ const MAX_ORDER_QUANTITY = 3;
 // Doubling is comfortably above every combination of those.
 const MODIFIER_STACK_CEILING = 2;
 
-// The widest order board any tier can reach: its base, every charter's
-// extra cards, and the one further card a Tidewatch surge adds.
+// The widest order board any tier can reach: its base plus every
+// charter's extra cards, with one card of headroom on top. That one
+// further card is not a Tidewatch term: the surge adds a lot to the
+// Purchase board and never widens the order board at all.
 const WIDEST_ORDER_BOARD =
   Math.max(
     ...Object.values(DIFFICULTIES).map(

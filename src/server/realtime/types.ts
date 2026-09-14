@@ -4,16 +4,12 @@
 // The wire shapes (PublicUser, CaptainStatus, BarterOffer, AidRequest,
 // LoanRecord, VentureSummary) live in the parent project at
 // src/types/realtime.ts so the client hooks and this service agree on
-// the contract without this Bun process importing anything from the
+// the contract without this server process importing anything from the
 // Next.js src tree at runtime. The types below are the server only
-// shapes that never cross the wire (SocketState, Checkpoint) plus the
-// re declarations that let every module here speak the same shape
-// names without re importing the parent types module in each file.
+// shapes that never cross the wire (SocketState, Checkpoint); a module
+// that wants a wire shape imports it from the shared module directly.
 // =====================================================================
-import type { Server, Socket } from "socket.io";
 import type { PublicUser } from "@/types/realtime";
-
-export type { PublicUser, Server, Socket };
 
 // One connected socket's server side state. A socket starts unauthed
 // with no room; authenticate() fills in userId/user/authed, and

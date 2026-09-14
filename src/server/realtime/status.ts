@@ -9,6 +9,7 @@
 // finisher loop) and each of those should import from one place
 // rather than reaching into presence's internals.
 // =====================================================================
+import type { Server } from "socket.io";
 import type { CaptainStatus } from "./types";
 
 // roomId -> (userId -> last reported status)
@@ -27,7 +28,7 @@ export function rememberStatus(roomId: string, payload: CaptainStatus): void {
 // joined captain sees the full roster's last known phase/gold/reputation
 // without waiting for each member's next heartbeat.
 export function sendStatusBatchTo(
-  io: import("./types").Server,
+  io: Server,
   roomId: string,
   socketId: string,
 ): void {

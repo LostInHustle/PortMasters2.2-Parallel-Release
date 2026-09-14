@@ -11,11 +11,7 @@ import {
 } from "@/lib/game/engine";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
-import {
-  CHECKPOINT_PHASE_ORDER,
-  checkpointRank,
-  parsePhase,
-} from "@/lib/game/checkpoint";
+import { checkpointRank, parsePhase } from "@/lib/game/checkpoint";
 import { api } from "@/lib/api";
 
 export type ReadyState = {
@@ -25,11 +21,8 @@ export type ReadyState = {
   requiredUserIds: string[];
 };
 
-// CHECKPOINT_PHASE_ORDER, checkpointRank, and parsePhase are imported from
-// the shared @/lib/game/checkpoint module so the client and the realtime
-// layer never drift on the synchronized phase order. Forwarded
-// here so any caller that used to read them off this hook still can.
-export { CHECKPOINT_PHASE_ORDER, checkpointRank, parsePhase };
+// Rank and phase parse come from the shared @/lib/game/checkpoint module
+// so the client and the realtime layer never drift on phase order.
 
 /**
  * Gates the six recurring "everyone advances together" phase transitions

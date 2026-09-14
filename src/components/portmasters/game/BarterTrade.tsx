@@ -23,8 +23,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { BARTER_ITEMS, ICONS } from "@/lib/game/constants";
-import { getOwnedAmount, postBarterOffer } from "@/lib/game/engine";
+import {
+  BARTER_ITEMS,
+  FLEXIBLE_BARTER_UNLOCK_LEVEL,
+  ICONS,
+} from "@/lib/game/constants";
+import {
+  barterAttemptsFor,
+  barterAttemptsRemaining,
+  getOwnedAmount,
+  postBarterOffer,
+} from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import type { PublicUser } from "@/lib/api";
 import { itemColorResolver } from "@/lib/use-color-preference";
@@ -58,7 +67,18 @@ export function useOfferDraft(
     offerAmount >= 1 &&
     Number.isInteger(requestAmount) &&
     requestAmount >= 1;
-  const canPost = !sameItem && validAmounts && offerAmount <= owned;
+  // Flexible bartering is Renown gated, and the server holds the
+  // authoritative level. This reads the level off the voyage state, which
+  // is refreshed from the same account row on load, so a captain who is
+  // allowed to post sees the form while one who is not sees what to go and
+  // earn, rather than a form whose every submission would be refused.
+  const barterUnlocked = barterAttemptsFor(game.renownLevel) > 0;
+  const attemptsLeft = barterAttemptsRemaining(
+    game.renownLevel,
+    barter.attemptsUsed,
+  );
+  const canPost =
+    !sameItem && validAmounts && offerAmount <= owned && attemptsLeft > 0;
   // A composer sitting inside a private thread is already addressed to the
   // captain in it, so there is nothing for that one to choose.
   const targetUserId = fixedTargetId ?? chosenTargetId;
@@ -98,6 +118,8 @@ export function useOfferDraft(
     owned,
     sameItem,
     canPost,
+    barterUnlocked,
+    attemptsLeft,
     submit,
   };
 }
@@ -126,6 +148,17 @@ export function OfferCard({
   const canAfford =
     getOwnedAmount(game, offer.requestItem) >= offer.requestAmount;
   const isDirect = Boolean(offer.targetUserId);
+  // The server refuses an accept it should not honour whether or not this
+  // agrees, so this only spares a captain a click that could not succeed.
+  // It reads the same Renown level and the same attempt tally the server
+  // enforces against. The poster's half of the gate is deliberately not
+  // consulted here: a captain's Renown level is not carried on an offer,
+  // and inventing a guess at it would be worse than letting the server
+  // answer.
+  const canAccept =
+    canAfford &&
+    barterAttemptsFor(game.renownLevel) > 0 &&
+    barterAttemptsRemaining(game.renownLevel, barter.attemptsUsed) > 0;
 
   return (
     <div
@@ -171,10 +204,10 @@ export function OfferCard({
           size="sm"
           className={cn(
             "h-7 px-2.5 text-[10px] rounded shrink-0",
-            canAfford && "pm-grad-barter",
+            canAccept && "pm-grad-barter",
           )}
-          variant={canAfford ? "default" : "secondary"}
-          disabled={!canAfford}
+          variant={canAccept ? "default" : "secondary"}
+          disabled={!canAccept}
           onClick={() => barter.accept(offer.id)}
         >
           🤝 Trade
@@ -207,6 +240,23 @@ export function TradeComposer({
   const draft = useOfferDraft(game, barter, act, fixedTarget?.id);
   const selectClass =
     "h-8 rounded-md border border-input bg-transparent px-1.5 text-xs";
+
+  // Below the unlock level there is no form worth drawing. The server
+  // would refuse every post, and handing a captain a full composer whose
+  // only outcome is a refusal is a worse answer than naming the level that
+  // opens it.
+  if (!draft.barterUnlocked) {
+    const toGo = FLEXIBLE_BARTER_UNLOCK_LEVEL - game.renownLevel;
+    return (
+      <div className="w-80 space-y-1 p-3 text-xs text-muted-foreground">
+        <p className="font-medium text-foreground">🔒 Flexible bartering</p>
+        <p>
+          Unlocks at Renown Level {FLEXIBLE_BARTER_UNLOCK_LEVEL}, {toGo} level
+          {toGo === 1 ? "" : "s"} to go.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-80 space-y-2 p-3">
@@ -285,6 +335,11 @@ export function TradeComposer({
           You only have {draft.owned} {draft.offerItem}.
         </p>
       )}
+      <p className="text-[11px] text-muted-foreground">
+        {draft.attemptsLeft === 0
+          ? "You have completed every trade this voyage allows."
+          : `${draft.attemptsLeft} trade${draft.attemptsLeft === 1 ? "" : "s"} left this voyage.`}
+      </p>
       <Button
         className={cn(
           "h-8 w-full rounded-lg text-xs",

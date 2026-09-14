@@ -68,10 +68,7 @@ function useRivalHere(
   return rivals.find((r) => partnerIds.has(r.partner.id)) ?? null;
 }
 
-type EndgameProps = Pick<
-  PhasePanelProps,
-  "game" | "phaseSync" | "me" | "room"
-> & {
+type EndgameProps = Pick<PhasePanelProps, "game" | "me" | "room"> & {
   // The dispatcher in GamePhasePanel only spreads PhasePanelProps in, so
   // these three are wired by the parent (GameRoom) when it renders the
   // Endgame phase: voyageResult is the harbor wide standings payload the

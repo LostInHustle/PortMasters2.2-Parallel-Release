@@ -7,11 +7,10 @@
 // when both figures match). These rows back the /api/rivals endpoint,
 // which groups and folds them for the Legacy card.
 //
-// Uses rivalKey from the parent's engine/rival.ts so the (a, b) ordering
-// is always lexicographic, regardless of who happened to finish first.
+// The pair is ordered lexicographically by id, regardless of who happened
+// to finish first, so the same two captains always record the same way.
 // =====================================================================
 import { db } from "@/lib/db";
-import { rivalKey } from "@/lib/game/engine/rival";
 
 export type RivalStanding = {
   userId: string;
@@ -75,5 +74,3 @@ function resolveOutcome(
     return { aWon: false, bWon: true, tie: false };
   return { aWon: false, bWon: false, tie: true };
 }
-
-export { rivalKey };
