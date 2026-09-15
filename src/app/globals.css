@@ -298,23 +298,11 @@
   .pm-grad-harbors {
     --pm-fill: var(--w-harbors-fill);
   }
-  .pm-grad-captains {
-    --pm-fill: var(--w-captains-fill);
-  }
-  .pm-grad-messages {
-    --pm-fill: var(--w-messages-fill);
-  }
   .pm-grad-houses {
     --pm-fill: var(--w-houses-fill);
   }
   .pm-grad-leaderboard {
     --pm-fill: var(--w-leaderboard-fill);
-  }
-  .pm-grad-chronicles {
-    --pm-fill: var(--w-chronicles-fill);
-  }
-  .pm-grad-activity {
-    --pm-fill: var(--w-activity-fill);
   }
   .pm-grad-settings {
     --pm-fill: var(--w-settings-fill);
@@ -328,17 +316,11 @@
   .pm-grad-legacy {
     --pm-fill: var(--w-legacy-fill);
   }
-  .pm-grad-notifications {
-    --pm-fill: var(--w-notifications-fill);
-  }
   .pm-grad-renown {
     --pm-fill: var(--w-renown-fill);
   }
   .pm-grad-checkin {
     --pm-fill: var(--w-checkin-fill);
-  }
-  .pm-grad-sailing {
-    --pm-fill: var(--w-sailing-fill);
   }
   .pm-grad-quickstart {
     --pm-fill: var(--w-quickstart-fill);
@@ -346,17 +328,8 @@
   .pm-grad-voyage {
     --pm-fill: var(--w-voyage-fill);
   }
-  .pm-grad-ship {
-    --pm-fill: var(--w-ship-fill);
-  }
-  .pm-grad-members {
-    --pm-fill: var(--w-members-fill);
-  }
   .pm-grad-chat {
     --pm-fill: var(--w-chat-fill);
-  }
-  .pm-grad-ledger {
-    --pm-fill: var(--w-ledger-fill);
   }
   .pm-grad-welcome {
     --pm-fill: var(--w-welcome-fill);
@@ -394,20 +367,8 @@
   .pm-grad-advisor {
     --pm-fill: var(--w-advisor-fill);
   }
-  .pm-grad-depth {
-    --pm-fill: var(--w-depth-fill);
-  }
-  .pm-grad-pulse {
-    --pm-fill: var(--w-pulse-fill);
-  }
-  .pm-grad-planner {
-    --pm-fill: var(--w-planner-fill);
-  }
   .pm-grad-boon {
     --pm-fill: var(--w-boon-fill);
-  }
-  .pm-grad-modules {
-    --pm-fill: var(--w-modules-fill);
   }
   .pm-grad-brand {
     --pm-fill: var(--w-brand-fill);

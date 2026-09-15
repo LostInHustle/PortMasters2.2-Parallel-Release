@@ -11,18 +11,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { HOUSES } from "@/lib/game/engine";
-import type { HouseId } from "@/lib/game/legacy";
+import { HOUSE_IDS, normalizeHouseId, type HouseId } from "@/lib/game/legacy";
 import type { HouseStanding } from "@/types/realtime";
-
-const HOUSE_IDS: HouseId[] = [
-  "jade_pavilion",
-  "vermilion_gate",
-  "golden_lotus",
-];
-
-function normalizeHouseId(raw: string | null): HouseId | null {
-  return HOUSE_IDS.includes(raw as HouseId) ? (raw as HouseId) : null;
-}
 
 export async function GET() {
   const user = await getCurrentUser();

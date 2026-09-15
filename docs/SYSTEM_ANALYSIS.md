@@ -4,7 +4,7 @@
 
 PortMasters 2.2 Parallel Release is a browser based multiplayer trading game set on the ancient maritime Silk Road. The original prototype was a single player HTML build titled PortMasters: Lords of the Silk Road. The Parallel Release is the third branch, written by Joe Zhou and Aaron Zhu as a Next.js 16 application that takes the single player game online. One process serves the site, the API, and the realtime Socket.IO layer on a single port.
 
-The verbatim economy (Hemp, Silk, Tea, the founding ports, the all or nothing pirate raid, the 20 percent escort rate) is preserved from the original single player build. The Parallel Release layers on top of it a deterministic multiplayer engine, a persistent Captain's Legacy, a social economy of barter and loans, and a three tier difficulty framework.
+The verbatim economy (Hemp, Silk, Tea, the founding ports, the all or nothing pirate raid, the 10 percent escort fee) is preserved from the original single player build. The Parallel Release layers on top of it a deterministic multiplayer engine, a persistent Captain's Legacy, a social economy of barter and loans, and a three tier difficulty framework.
 
 The 2.2 build branches from [PortMasters 2 Parallel Release](https://github.com/LostInHustle/PortMasters2-Parallel-Release), the earlier multiplayer build, which is where the deterministic engine, the ready check, the three difficulty tiers, the social economy and the Ledger Integrity Pass were designed. Everything that build shipped is still here, working the same way. `docs/RELEASE_NOTES.md` sets the two side by side and walks through the six systems 2.2 adds.
 
@@ -14,7 +14,7 @@ Every captain in a harbor plays the same voyage in lockstep. Nobody advances a p
 
 1. Boon draft. Draw from a fresh pool of boons that bend the rules for the coming round.
 2. Phase 1 Purchase. Buy raw materials from the port market.
-3. Barter. Trade goods and Gold directly with the other captains.
+3. Barter. Trade goods and Gold directly with the other captains, once both ends are at Renown level 10.
 4. Artisan management. Hire artisans and assign what each of them crafts.
 5. Phase 2 Orders. Fill trade orders for Gold and Reputation.
 6. Phase 3 Settlement. Production lands, wages and maintenance come due, pirates may find you.
@@ -40,17 +40,19 @@ type Phase =
 
 The room checkpoint cycles through eight phases per round: 0, 5, 1, barter, worker_mgmt, 2, 3, 4. The personal sub states and terminals never become room checkpoints.
 
+One rule cuts across that order. A completed barter trade can land during any phase, because an offer surfaces in the harbor chat as well as in the exchange and a captain can take it from either. Every phase reads a captain's hold and Gold as they are rather than as they were when the phase opened, so a trade that lands partway through a phase changes what is affordable before the phase ends, and no phase holds a cached copy of those numbers to go stale.
+
 ## The Deterministic Engine
 
 The engine is client authoritative and deterministic by composition. Every captain seeds their own random stream from `roomId:userId` plus `voyageEpoch` plus `currentRound`, so two captains in the same room see identical markets and orders without the server computing anything. The server only owns the ready check voting, the host only transitions, and the genuinely shared harbor state.
 
 What is seeded: the Phase 1 market card draw, the Phase 1 intel rumor pool, the Phase 2 trade order draw. What is not seeded: Salvage Crane refunds, Tax Evasion audits, the pirate raid roll itself, Broker's Favor order generation, Farsight free rumor selection, Boon drafting, Module drafting, the corrupt broker leak roll. This split is intentional. The deterministic stream fixes the shared economy so two captains see the same market. The personal stream keeps each captain's luck private so a lucky Salvage Crane refund on one client never desyncs another.
 
-The engine surface is roughly 2,663 lines across 13 files in `engine/` plus 1,500 lines of supporting pure logic. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
+The engine surface is roughly 3,289 lines across 18 files in `engine/`, plus 3,361 lines across 15 files beside it carrying the shared constants, the types and the pure helpers the modules read from. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
 
 ## The Realtime Layer
 
-The server is a single `attachRealtime` function with nine conceptual sections: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, connection. It runs in one process alongside Next.js and attaches Socket.IO to the same HTTP server.
+The server is `attachRealtime`, a composition root over eighteen modules, one concern to a file: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin and auth, plus the shared types and the module that wires the rest together. It runs in one process alongside Next.js and attaches Socket.IO to the same HTTP server.
 
 The trust model is deliberate. Anything inside one voyage is undefended. A captain can inflate their own Gold and mostly ruins their own afternoon. Anything that escapes into the permanent account record is server defended via the Ledger Integrity Pass. Real money math is pulled out of socket closures into pure modules (`convoy.ts`, `backing.ts`, `harborPulse.ts`) so it can be unit tested.
 
@@ -58,7 +60,7 @@ The ready check protocol is the spine of the multiplayer lockstep. Every captain
 
 ## The Persistence Layer
 
-SQLite via Prisma. The schema covers accounts, sessions, rooms, membership, per player game state, chat (room wide and one to one messages), captain legacy, captain merits, convoy ventures, and loans.
+SQLite via Prisma. The schema covers accounts, sessions, rooms, membership, per player game state, chat (room wide and one to one messages), captain legacy, captain merits, voyage chronicles, captain rivalries, convoy ventures, and loans.
 
 The Ledger Integrity Pass guards the one save endpoint that trusts a client completely. It compares the incoming save against a last known good, flags anything past a theoretical maximum ceiling, and never rejects mid voyage. A captain mid game must never lose it to a mistaken guard. The consequence lands at voyage end. An impossible flagged captain still finishes the voyage and appears in the standings, but banks no Renown XP, no Merits, and no Sea Master crown.
 
@@ -70,7 +72,7 @@ Nine Captain's Merits mark permanent achievements. Three are difficulty scoped. 
 
 ## The Social Economy
 
-Cross player bartering with Direct Barter Offers. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
+Cross player bartering with Direct Barter Offers, gated on Renown at both ends rather than one. A captain at level 10 or above may post and accept, with an allowance of one completed trade a voyage and a second from level 15. The attempt is spent by the trade and never by the offer, so a captain may advertise the same intent in several places at once and take whichever answer arrives first, and a completed trade retires every other offer either captain still had standing. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
 
 ## The Harbor Manifest
 
@@ -79,7 +81,7 @@ Eighteen designed harbor systems covering market rhythm, peer economy, identity 
 Six of the seven systems that were still on the roadmap have shipped:
 
 1. **Partial Sight.** A trusted partner sees a banded range read of another captain's cargo during active play. Pure client side rounding, so it adds no new trust boundary.
-2. **Trading Houses.** A second identity to argue about, separate from the Renown grind. Pledge to one of three Houses, and a harbor wide standings board ranks them on crowns, voyages and best Reputation. Each House grants one small passive perk from the start of every fresh voyage: a free first artisan, one more cargo lot on the purchase board, or cheaper wages against a higher raid chance.
+2. **Great Houses.** A second identity to argue about, separate from the Renown grind. Pledge to one of three Houses, and a harbor wide standings board ranks them on crowns, voyages and best Reputation. Each House grants one small passive perk from the start of every fresh voyage: a free first artisan, one more cargo lot on the purchase board, or cheaper wages against a higher raid chance.
 3. **Ages of the Ledger.** The three peer economy tools take turns in the spotlight. The two week rotation, the banner that announces it, and all three effects are live: a backing pledge pays extra Renown, a completed barter trade lands one extra Reputation, and the Broker's Favor payout cap is raised.
 4. **Captain's Rival.** The friend you keep sailing against gets a scoreboard of their own.
 5. **Voyage Chronicle.** A voyage becomes a short story a captain can read again later.
@@ -89,6 +91,12 @@ The seventh, **House Rally**, did not ship. It would have given a harbor where a
 
 The **Bilingual Harbor** was built in full and then removed at the owner's request. It does not come back without a fresh owner decision.
 
+## Deployment
+
+The repository carries one host configuration file, `railway.json`, rather than a written guide. It builds the service, starts it, names the healthcheck, and requires a volume at `/app/db`, so a deploy that has nowhere to keep its database fails loudly at startup instead of coming up empty. `requiredMountPath` is what turns a forgotten volume into a failed deploy rather than a silent loss of every account.
+
+The hosted service deliberately runs the development server rather than a production build. `next build` wants more memory than the smaller plans provide, and a build killed halfway is a deploy that never lands, so the file trades first load speed for a deploy that finishes. `README.md` covers the two things the file cannot express on its own: the volume itself, which the platform creates rather than the file, and the build variable that keeps the development dependencies in the image.
+
 ## Why It Is State of the Art Already but Kind of Outdated
 
 The engineering and platform are state of the art. Modern stack, deterministic multiplayer, persistent progression, social economy, ledger integrity, designed harbor systems.
@@ -97,7 +105,7 @@ The gameplay content is the deliberately preserved verbatim Easy tier of an olde
 
 ## Architectural Strengths to Conserve
 
-The deterministic engine composition. The pure real money math modules. The ready check phase sync protocol. The Ledger Integrity Pass trust model. The shared helper reputation ceiling. The one venture per voyage room wide rule. The first report wins arbitration pattern. The difficulty as single source of truth threaded through every selector. The eight phase checkpoint cycle. The `_` prefixed transient signal convention for engine to React to socket relay. The normalize on load defensive read pattern. The wholesale replace modifier flags design. The `addOwnedAmount` single mutation path. The harbor pulse lean not shove formula.
+The deterministic engine composition. The pure real money math modules. The ready check phase sync protocol. The Ledger Integrity Pass trust model. The shared helper reputation ceiling. The one venture per voyage room wide rule. The first report wins arbitration pattern. The difficulty as single source of truth threaded through every selector. The eight phase checkpoint cycle. The live reading of hold and purse in every phase, so a mid phase barter changes what a shelf costs before the phase ends. The `_` prefixed transient signal convention for engine to React to socket relay. The normalize on load defensive read pattern. The wholesale replace modifier flags design. The `addOwnedAmount` single mutation path. The harbor pulse lean not shove formula.
 
 ## Defect Report and What Happened to It
 
@@ -107,13 +115,13 @@ Earlier in the project a review produced a list of defects and refactoring targe
 
 The `nextPhase` barter branch used to pass an empty refunds array, so a captain who advanced from the control bar instead of the Bartering panel abandoned every offer they had posted along with its escrow. The refund list is now a parameter, and the control bar forwards the same live list the panel does.
 
-The realtime layer was one 3,097 line function. It is now a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival and quickstart.
+The realtime layer was one 3,097 line function. It is now a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin and auth, with the shared types and the composition root itself alongside them.
 
 `PublicUser` and `CaptainStatus` were duplicated between the client and the server, and so was `CHECKPOINT_PHASE_ORDER`. Both now have one home, in `src/types/realtime.ts` and `src/lib/game/checkpoint.ts`.
 
 `intelCost` was mutable state mirroring a module flag. It is derived from the equipped modules.
 
-`fireWorker` read the raw `WAGES` table and so ignored both wage surcharges. It now reads `getHireCost`, the same accessor the hire and payroll paths use.
+`fireWorker` read the raw `WAGES` table and so ignored both wage surcharges. It now reads `getHireCost`, the same accessor the hire and payroll paths use. Two display sites in the artisan panel had the same habit, quoting the undiscounted list price on the Dismiss button and on the hire roster while the engine charged the discounted wage. Both read the computed wage from the roster now, so the figure a captain budgets against is the figure settlement charges.
 
 `merchantRatingForScore` moved to `constants.ts`. `Worker.task` is a branded `Product` type instead of a bare string. The always zero `Worker.progress` field is gone. The dead `names` map in `hireWorker` is gone. `modifierFlags` is a `Partial<Record<ModifierKey, number>>` with the legal keys pinned in one place. The `api/route.ts` Hello World stub is deleted. The Welcome screen's numbers derive from the room's difficulty instead of hardcoding the founding trade. The Settlement Force Pay button has its own destructive styling. The Shipyard back buttons call engine functions instead of writing `g.phase` directly.
 

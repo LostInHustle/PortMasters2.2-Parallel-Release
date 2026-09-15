@@ -2,7 +2,7 @@
 
 ## Vision
 
-Port the PortMasters 2.2 Parallel Release into the sandbox environment, conserve every piece of greatness from the original, finish the seven un built manifest systems, and dress the whole experience in a natural, modern, colourful East Asian aesthetic that breathes like morning fresh air over a maritime Silk Road harbor.
+Port the PortMasters 2.2 Parallel Release into the sandbox environment, conserve every piece of greatness from the original, finish the unbuilt manifest systems, and dress the whole experience in a natural, modern, colourful East Asian aesthetic that breathes like morning fresh air over a maritime Silk Road harbor.
 
 ## Aesthetic Direction
 
@@ -10,15 +10,15 @@ The palette draws from East Asian art and the morning sea. Celadon green as the 
 
 The atmosphere is morning fresh air. Soft gradients from dawn mist to open sky. Lots of breathing room. Subtle animations like dew sliding off a sail. Glassmorphic panels floating over a sea gradient canvas, evoking porcelain over water. Natural tone everywhere, with no en dashes, no em dashes, no hyphens, no double hyphens, and no unnatural AI sounding phrasing in any user facing text.
 
-The typography keeps Geist for readability but pairs it with generous letter spacing on display headings to evoke brushwork without sacrificing legibility. Emoji continue to carry the cargo of meaning ( Hemp, Silk, Tea, the anchor, the compass) but sit inside softer, more organic containers.
+The typography keeps Geist for readability and sets display headings in Noto Serif SC, with generous letter spacing so the brushwork reads without sacrificing legibility. Emoji continue to carry the cargo of meaning ( Hemp, Silk, Tea, the anchor, the compass) but sit inside softer, more organic containers.
 
 ## Architecture
 
 One process, one port, one npm project. `server.ts` builds a single Node HTTP server and hands it to Next.js, which answers the page and every route under `/api`, and to the realtime layer in `src/server/realtime`, which mounts Socket.IO on `/socket.io` of that same server. The site, the API and the realtime channel therefore share one origin, and a single tunnel is enough to put the whole game online.
 
-The realtime layer is a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival and quickstart. Between them they hold the transient room state, which is the checkpoint ready votes, the open barter offers, the aid requests, the outstanding loans, the convoy ventures, the harbor pulse tallies, the docks winners, the surge flags and the mute lists.
+The realtime layer is a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin and auth, with the shared types and the composition root itself alongside them. Between them they hold the transient room state, which is the checkpoint ready votes, the open barter offers, the aid requests, the outstanding loans, the convoy ventures, the harbor pulse tallies, the docks winners, the surge flags and the mute lists.
 
-Durable state lives in the database instead: accounts, sessions, rooms, memberships, saved game states, loans, ventures, messages, chronicles and legacy. The two halves meet at that boundary. A module reads or writes the database through Prisma, and everything else it needs to know about the other captains arrives over a socket event.
+Durable state lives in the database instead: accounts, sessions, rooms, memberships, saved game states, loans, ventures, messages, chronicles, rivalries, merits and legacy. The two halves meet at that boundary. A module reads or writes the database through Prisma, and everything else it needs to know about the other captains arrives over a socket event.
 
 An earlier revision of this project split the realtime layer into a second process behind a gateway, because the environment it was built in required that shape. That split is gone. It cost the in process sharing the design was built around and bought nothing, so the realtime layer is mounted on the application's own server again.
 
@@ -28,7 +28,7 @@ The entire deterministic engine. The complete constants catalogue. The Prisma sc
 
 ## What Is Refactored
 
-The `realtime.ts` 3,097 line single function splits into modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, connection. The `PublicUser` and `CaptainStatus` types move to a shared `types/realtime.ts` with no runtime deps. The `CHECKPOINT_PHASE_ORDER` moves to a shared `game/checkpoint.ts`. The `api/route.ts` Hello World stub is deleted. The Welcome InfoCard numbers derive from `difficultyConfig` instead of hardcoding the founding trade. The Settlement Force Pay button gets a distinct destructive style. The Shipyard Back buttons call engine functions instead of mutating `g.phase` directly. The `fireWorker` uses `getHireCost`. The `merchantRatingForScore` moves to `constants.ts`. The `hireWorker` dead `names` map is deleted. The `escortHired` flag is documented as a UI signal. The `Worker.progress` field is removed. The `intelCost` becomes a derived value. The `modifierFlags` gets a `ModifierKey` union type. The `Worker.task` gets a branded `Product` type.
+The `realtime.ts` 3,097 line single function splits into modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin and auth, with the shared types and the composition root that wires them together. The `PublicUser` and `CaptainStatus` types move to a shared `types/realtime.ts` with no runtime deps. The `CHECKPOINT_PHASE_ORDER` moves to a shared `game/checkpoint.ts`. The `api/route.ts` Hello World stub is deleted. The Welcome InfoCard numbers derive from `difficultyConfig` instead of hardcoding the founding trade. The Settlement Force Pay button gets a distinct destructive style. The Shipyard Back buttons call engine functions instead of mutating `g.phase` directly. The `fireWorker` uses `getHireCost`. The `merchantRatingForScore` moves to `constants.ts`. The `hireWorker` dead `names` map is deleted. The `escortHired` flag is documented as a UI signal. The `Worker.progress` field is removed. The `intelCost` becomes a derived value. The `modifierFlags` gets a `ModifierKey` union type. The `Worker.task` gets a branded `Product` type.
 
 ## What Is Built New
 
@@ -40,9 +40,9 @@ The seven un built manifest systems, in dependency order:
 
 3. **Captain's Rival** (Manifest 11). The friend you keep sailing against gets a scoreboard of their own. A per pair counter of how many times two specific captains finished a voyage in the same room and who out scored whom. A head to head line on the Captain's Legacy card, shown only when both are in the same room. Needs a `CaptainRival` table keyed on the sorted pair of user ids.
 
-4. **Partial Sight** (Manifest 06). A trusted partner sees a blur, not a wall and not a full ledger. A captain at Renown Level 5 or above gets a banded range read of another captain's cargo during active play. Pure client side rounding. No new server trust boundary. Needs a trust threshold constant and a banding helper.
+4. **Partial Sight** (Manifest 06). A trusted partner sees a blur, not a wall and not a full ledger. A captain at Renown Level 5 or above gets a banded range read of another captain's cargo during active play, once the captain being looked at is at Level 3 or above and their record is long enough to say anything. Pure client side rounding. No new server trust boundary. Needs two threshold constants and a banding helper.
 
-5. **Trading Houses** (Manifest 08). A second identity to argue about, separate from the Renown grind. Pledge to one of three houses, each with one small passive perk (free first artisan, extra cargo capacity, more pirate risk for cheaper wages) plus a separate House Standing counter. Needs a `houseId` field on `CaptainLegacy`, a `HouseStanding` aggregate, and a balance pass.
+5. **Great Houses** (Manifest 08). A second identity to argue about, separate from the Renown grind. Pledge to one of three houses, each with one small passive perk (free first artisan, extra cargo capacity, more pirate risk for cheaper wages) plus a separate House Standing counter. Needs a `houseId` field on `CaptainLegacy`, a `HouseStanding` aggregate, and a balance pass.
 
 6. **House Rally** (Manifest 09). A room where friends share a pledge notices it. A majority same house room triggers a flavor banner and a bonus House Standing at voyage end. Needs a voyage end check on the room's house distribution.
 
@@ -50,13 +50,13 @@ The seven un built manifest systems, in dependency order:
 
 The Bilingual Harbor (Manifest 15) stays dropped. It was built in full and then removed at the owner's request. It does not come back without a fresh owner decision.
 
-**Status in the 2.2 build.** Six of the seven are in the game. Voyage Chronicle, Captain's Rival, Partial Sight and Quick Start Match shipped in full. Trading Houses and Ages of the Ledger shipped in full as well, identity, standings, display and effect: a pledge grants its House perk from the first fresh voyage after it is taken, and each Age leans the harbor it holds. House Rally did not ship and is the one system still on the roadmap. The Bilingual Harbor stayed dropped.
+**Status in the 2.2 build.** Six of the seven are in the game. Voyage Chronicle, Captain's Rival, Partial Sight and Quick Start Match shipped in full. Great Houses and Ages of the Ledger shipped in full as well, identity, standings, display and effect: a pledge grants its House perk from the first fresh voyage after it is taken, and each Age leans the harbor it holds. House Rally did not ship and is the one system still on the roadmap. The Bilingual Harbor stayed dropped.
 
 ## Database and boot behaviour
 
-The Prisma schema drops the custom `output = "../generated/prisma"` path and the `@prisma/adapter-better-sqlite3` driver adapter, and uses the default `@prisma/client` from `node_modules`. The datasource is `url = env("DATABASE_URL")`, which the checked in `.env` points at `db/custom.db` in the project root.
+The Prisma schema drops the custom `output = "../generated/prisma"` path and the `@prisma/adapter-better-sqlite3` driver adapter, and uses the default `@prisma/client` from `node_modules`. The datasource is `url = env("DATABASE_URL")`, which the `.env` a developer copies from `.env.example` points at `db/custom.db` in the project root. The file itself is gitignored, so a fresh clone starts without one.
 
-`reconcileMembershipAfterBoot` arms a departure for every existing `RoomMember` on every process boot. A captain who does not reconnect within the grace period leaves, and a room whose last member departs is removed along with its per room state. This is the intended behaviour: it is what stops the lobby filling up with rooms nobody is sitting in. It does mean that starting the server clears out abandoned harbors, which is worth knowing before restarting with a room left open.
+`reconcileMembershipAfterBoot` arms a departure for every existing `RoomMember` on every process boot. A captain who does not reconnect within the grace period leaves, so a seat cannot outlive the socket that held it. The timer it arms is the boot variant rather than the ordinary one, and that distinction is the point: a harbor whose whole crew fails to come back is left standing instead of being swept away, because the room and the voyage saved inside it belong to the captain and losing them to a restart would be a surprise rather than a cleanup. An empty room cannot hold the ready check hostage either, since the active roster reads the seats and there are none left to wait on.
 
 `hydrateLoans` and `reconcileMembershipAfterBoot` are both fire and forget. They log clearly when they fail rather than taking the server down with them.
 
@@ -65,3 +65,5 @@ The Prisma schema drops the custom `output = "../generated/prisma"` path and the
 The application loads at the sandbox preview URL. A captain can register, log in, create a room, and (in a second browser) join it. The host can start the voyage. Both captains play through a full round in lockstep. The ready check protocol advances the room. The deterministic engine produces identical markets for both captains. The barter board, the aid system, the backing system, and the convoy ventures all work end to end. The voyage concludes with Renown XP, Merits, and a Sea Master crown. The Captain's Legacy card persists across voyages. The daily check in works. The Ledger Integrity Pass flags a forged save. The aesthetic reads as natural, modern, colourful, and East Asian. No en dashes, em dashes, hyphens, or double hyphens appear in any user facing text. The seven new manifest systems are all reachable from the UI.
 
 **Outcome in the 2.2 build.** Six of the seven are reachable from the interface. House Rally did not ship. The per House perks and the per Age effects are applied to play as well as shown in the interface, and `docs/RELEASE_NOTES.md` sets out what each one does.
+
+One rule changed after that build rather than being added to it. Bartering between captains is gated on Renown at both ends now, level 10 to post and accept, with one completed trade allowed a voyage and a second from level 15. It was open to everybody before. The gate is there because the feature turned out to be more powerful than the board it sits beside: it lets two captains agree terms that no rule on the board would have offered either of them, which is the point of it and also the reason it is earned rather than given. `docs/RELEASE_NOTES.md` sets out the terms in full.

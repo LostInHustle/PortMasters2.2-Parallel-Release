@@ -11,9 +11,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
+import { HOUSE_IDS } from "@/lib/game/legacy";
 
 const PledgeSchema = z.object({
-  houseId: z.enum(["jade_pavilion", "vermilion_gate", "golden_lotus"]),
+  houseId: z.enum(HOUSE_IDS),
 });
 
 export async function POST(req: NextRequest) {

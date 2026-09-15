@@ -14,12 +14,17 @@ You need Node.js 20.19 or newer. Nothing else, and in particular no Bun and no s
 # 1. Install the dependencies and generate the database client
 npm install
 
-# 2. Create the database tables (safe to run again, it only adds what is missing)
+# 2. Give the server its environment file
+cp .env.example .env
+
+# 3. Create the database tables (safe to run again, it only adds what is missing)
 npm run db:push
 
-# 3. Start the whole game at http://localhost:8080
+# 4. Start the whole game at http://localhost:8080
 npm run dev
 ```
+
+Step 2 is not optional. The server refuses to start without `DATABASE_URL`, and the Prisma command in step 3 reads the same value from the same file, which is why copying the example is the shortest path to a working setup rather than a formality.
 
 Open http://localhost:8080, register a captain, and look around.
 
@@ -29,18 +34,19 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command               | What it does                                                          |
-| --------------------- | --------------------------------------------------------------------- |
-| `npm run dev`         | Starts the game in development mode on port 8080, with hot reload     |
-| `npm run build`       | Generates the database client and produces a production build         |
-| `npm start`           | Runs the production build on port 8080                                |
-| `npm run typecheck`   | Checks every TypeScript file and reports type errors                  |
-| `npm run lint`        | Runs ESLint across the project                                        |
-| `npm run test:smoke`  | Drives a real voyage through a running server and checks it arrived   |
-| `npm run db:push`     | Creates or updates the SQLite tables to match the schema              |
-| `npm run db:generate` | Regenerates the database client after a schema change                 |
-| `npm run db:migrate`  | Creates a versioned migration instead of pushing straight to the file |
-| `npm run db:reset`    | Drops the database and rebuilds it from scratch                       |
+| Command                 | What it does                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm run dev`           | Starts the game in development mode on port 8080, with hot reload                                   |
+| `npm run build`         | Generates the database client and produces a production build                                       |
+| `npm start`             | Runs the production build on port 8080                                                              |
+| `npm run typecheck`     | Checks every TypeScript file and reports type errors                                                |
+| `npm run lint`          | Runs ESLint across the project                                                                      |
+| `npm run test:smoke`    | Drives a real voyage through a running server and checks it arrived                                 |
+| `npm run check:palette` | Checks the widget hues, their distance from the danger red, and that no raw colour class slipped in |
+| `npm run db:push`       | Creates or updates the SQLite tables to match the schema                                            |
+| `npm run db:generate`   | Regenerates the database client after a schema change                                               |
+| `npm run db:migrate`    | Creates a versioned migration instead of pushing straight to the file                               |
+| `npm run db:reset`      | Drops the database and rebuilds it from scratch                                                     |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 
@@ -53,6 +59,8 @@ npm start
 npm run test:smoke
 ```
 
+Point it elsewhere with `SMOKE_BASE_URL`, which is how it checks a server that is not sitting on 8080.
+
 ## The rules
 
 ### The shape of a round
@@ -63,7 +71,7 @@ Every round runs the same seven steps, and every captain in the harbor goes thro
 | ------------------- | ------------------------------------------------------------------------ |
 | Boon draft          | Draw from a fresh pool of boons that bend the rules for the coming round |
 | Phase 1: Purchase   | Buy raw materials from the port market                                   |
-| Barter              | Trade goods and Gold directly with the other captains                    |
+| Barter              | Trade goods and Gold with the other captains, once Renown allows         |
 | Artisan management  | Hire artisans and assign what each of them crafts                        |
 | Phase 2: Orders     | Fill trade orders for Gold and Reputation                                |
 | Phase 3: Settlement | Production lands, wages and maintenance come due, pirates may find you   |
@@ -93,7 +101,17 @@ A captain may pledge to one House. The pledge is account level, so it carries ac
 
 A pledge is a second identity alongside Renown. Renown measures how long you have sailed; a House says what kind of captain you are while you do it. Every pledge also feeds a harbor wide House standing, so the three Houses compete on crowns, voyages and best Reputation, and the standings board in the lobby ranks them.
 
-Each House was designed with one small passive perk: a free first artisan, an extra hold and an extra purchase card, and cheaper wages against a higher pirate risk. Those three perks are written into the engine and shown on the House picker, but they are not applied when a voyage starts yet, so a pledge currently changes who you sail as rather than what you can do.
+Each House carries one small passive perk, applied when a fresh voyage starts and never partway through one. Jade Pavilion's first artisan joins at no cost. Vermilion Gate adds one more cargo lot to the Port Purchase board every round. Golden Lotus pays a fifth less in wages against a raid chance five percent higher. None of the three touches a number that compounds, which is what keeps a pledge a flavour rather than a power pick, and a captain can change House between voyages.
+
+### Bartering between captains
+
+Captains trade goods and Gold directly, either on the open board or as a direct offer aimed at one named captain. An offer is real room state rather than a message, so the goods behind it are escrowed the moment it is posted and come back to the poster if it is withdrawn or swept. It surfaces in the exchange and in the harbor chat alike, and a captain can take it from either.
+
+Flexible bartering is earned rather than given. Both captains have to be at Renown level 10, because a trade is only ever as good as what the other side can put up, and from there the allowance is one completed trade a voyage. At level 15 it becomes two. The allowance is spent by the trade itself and never by posting, so a captain can advertise the same intent in the harbor chat and in a private thread at once and take whichever answer arrives first.
+
+A completed trade retires every other offer either captain still had standing, on the shared board and in every private thread, because the attempt it just spent leaves nothing behind that could be accepted into anything but a refusal. Nobody loses anything to that: an offer that leaves the board hands its escrow back the same way a withdrawn one does. The board is also swept at each phase boundary, so an offer that nobody took during its stretch of the round returns its goods rather than waiting for a later one.
+
+Because a trade can land at any point in a round, and every phase reads the hold and the purse as they are rather than as they were when the phase opened, a shelf that was out of reach a moment ago can be affordable before the phase ends. Nothing has to be restarted for that to take effect.
 
 ### Winning and losing
 
@@ -107,7 +125,7 @@ A captain goes bankrupt when the bills at Settlement cannot be covered. That end
 
 **The market.** A per captain, per round draw of goods and prices, shaped by what the whole harbor has been buying. Goods the room leans into get dearer, goods nobody touches soften.
 
-**Trading between captains.** Open barter offers on a shared board, direct offers aimed at one named captain, and an escrow that holds the offered goods the moment an offer is posted.
+**Trading between captains.** Open barter offers on a shared board, direct offers aimed at one named captain, and an escrow that holds the offered goods the moment an offer is posted. Renown level 10 opens the exchange and level 15 widens it. The terms are under Bartering between captains above.
 
 **Money between captains.** Financial aid requests, loans between captains, and a third captain who can back a loan as a safety net.
 
@@ -142,8 +160,8 @@ Every system of the earlier build is still here and still working the same way, 
 |                        | The earlier build | PortMasters 2.2 Parallel Release |
 | ---------------------- | ----------------- | -------------------------------- |
 | Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 17 modules                       |
-| Interface components   | 29                | 41                               |
+| Realtime layer         | one long file     | 18 modules                       |
+| Interface components   | 29                | 58                               |
 | Database models        | 10                | 12                               |
 | The port it answers on | 2232              | 8080                             |
 
@@ -153,15 +171,20 @@ The interface and the realtime layer were both rebuilt around the new systems, a
 
 ## Configuration
 
-The server reads three environment variables. All of them have working defaults, so a fresh checkout runs without any setup at all.
+The server reads four environment variables. Three of them configure the process at boot, and the fourth gates the operator account.
 
-| Variable       | Default                | What it does                                                                                             |
-| -------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL` | `file:../db/custom.db` | The SQLite file holding every account, harbor and voyage. The path is relative to `prisma/schema.prisma` |
-| `PORT`         | `8080`                 | The port the whole game answers on                                                                       |
-| `HOST`         | `0.0.0.0`              | The address to bind. Use `127.0.0.1` to keep the game on this machine only                               |
+| Variable           | Value in `.env.example` | What it does                                                                                             |
+| ------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`     | `file:../db/custom.db`  | The SQLite file holding every account, harbor and voyage. The path is relative to `prisma/schema.prisma` |
+| `PORT`             | `8080`                  | The port the whole game answers on                                                                       |
+| `HOST`             | `0.0.0.0`               | The address to bind. Use `127.0.0.1` to keep the game on this machine only                               |
+| `ADMIN_SETUP_CODE` | a placeholder           | The one code that admits an operator account through `/admin`. Empty refuses every attempt               |
 
-Copy `.env.example` to `.env` if you want to change any of them. An environment variable that is already set always wins over the file, which is the order a hosting platform expects.
+`DATABASE_URL` has no fallback and the server will not start without it, so copy `.env.example` to `.env` before the first run. The operator code fails closed, so an installation that never sets a real one has no way in at all, which is the safe direction for that particular door.
+
+An environment variable that is already set always wins over the file, which is the order a hosting platform expects. Point `ENV_FILE` at a different file to read from that one instead, which is how two servers run side by side from a single checkout without editing anything back and forth.
+
+`next.config.ts` reads two more, and only while the development server is running, because they decide which hostnames may load development resources: the compiled chunks under `/_next`, the hot reload channel, and the internal endpoints. Next.js allows `localhost` on its own. `ALLOWED_DEV_ORIGINS` adds any other hostname as a comma separated list, and `RAILWAY_PUBLIC_DOMAIN` is read as well, which the host injects with the hostname the running service answers on. A production build reads neither.
 
 The port is validated at boot. If `PORT` is not a whole number between 1 and 65535, the server stops and tells you which variable it did not like, rather than starting and behaving strangely. A missing `DATABASE_URL` stops the server in the same way.
 
@@ -172,6 +195,34 @@ The game binds to `0.0.0.0` by default, so another device on the same network ca
 ```bash
 ngrok http 8080
 ```
+
+## Putting the game online on Railway
+
+`railway.json` in the project root is the whole host configuration. Point Railway at this repository and it builds and runs from that file, with nothing to set in the dashboard beyond the two steps below.
+
+### Why it runs the development server
+
+`next build` wants more memory to finish than the plan provides, and a build that gets killed halfway is a deploy that never lands, so the file skips the build step entirely. `buildCommand` installs the dependencies including the development ones and generates the database client, and `startCommand` brings the schema up to date and runs `server.ts` with `NODE_ENV=development`.
+
+The trade is real and worth making with your eyes open. The development server compiles each route the first time somebody asks for it, so the first visit to a screen is slow, and the browser downloads a development bundle rather than a built one. In exchange the deploy is one that fits in the memory the plan gives you.
+
+### Two things the file cannot do for you
+
+Both are dashboard clicks, and the first one is not optional.
+
+**Add a volume mounted at `/app/db`.** A container's filesystem is thrown away on every deploy and every restart, so without a volume the database goes with it, and every account goes with the database. The mount path is not arbitrary: `DATABASE_URL` resolves to `db/custom.db` in the project root and `/app` is the project root inside the container. `requiredMountPath` in `railway.json` makes the deploy refuse to start when the volume is missing, so a forgotten volume is a failed deploy rather than a silent loss of every captain. Mount the volume somewhere else and set `DATABASE_URL` yourself to match.
+
+**Set `RAILPACK_PRUNE_DEPS` to `false` as a service variable.** The builder strips development dependencies out of the image by default, and a development server needs them: the TypeScript compiler, Tailwind and the `tsx` that starts the process all live in that half of the manifest. `railway.json` has no way to declare a variable, so this one has to be set on the service itself. The symptom of skipping it is a deploy whose build succeeds and whose start command cannot find `tsx`.
+
+### What the file already handles
+
+`PORT` is injected by Railway and read by the server, and `HOST` defaults to `0.0.0.0`, which is what a container needs. Railway injects `RAILWAY_PUBLIC_DOMAIN` with the hostname the service answers on, and `next.config.ts` reads it so the browser is allowed to load the development resources, which it otherwise would not be. `DATABASE_URL` falls back to the documented default when the service does not set one. `ADMIN_SETUP_CODE` is yours to set if you want an operator account.
+
+The healthcheck is `/api/health`. It answers from the process and reads nothing else, so a database that is briefly busy does not fail the probe and turn a slow query into a restart loop. Railway waits for a 200 on it before it promotes a deploy.
+
+### One date to know
+
+Railway is retiring config as code. `railway.json` keeps working until December 1, 2026, after which the same settings move to the dashboard or to the newer infrastructure as code format. The file is not wrong, it is expiring.
 
 ## How the project is put together
 
@@ -197,6 +248,8 @@ The shared HTTP surface is deliberately narrow. Cross origin socket access is sw
 | `prisma`                     | The database schema                                                         |
 | `scripts`                    | The end to end smoke test                                                   |
 | `docs`                       | The release notes for 2.2 plus the design notes and the analysis            |
+| `next.config.ts`             | The Next.js settings, including which hosts may load development resources  |
+| `railway.json`               | The host configuration: build, start, healthcheck and the volume guard      |
 
 ### The rules engine is separate on purpose
 
@@ -219,6 +272,8 @@ The room itself survives the restart, along with the voyage saved inside it. Sta
 **The server stops at boot and names a variable.** That is the configuration check doing its job. The message lists every problem it found, so you can fix them all in one pass. Compare your `.env` against `.env.example`.
 
 **Changes to a component do not appear.** Hot reload covers everything under `src`, which is the whole application. It does not cover `server.ts` itself, because changing that file changes the process rather than the page. Stop the server and start it again after editing it.
+
+**The page loads but pieces of it are missing, and the browser console mentions a blocked cross origin request.** The development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognises, and it recognises `localhost` and `127.0.0.1` on its own. Any other hostname, such as a custom domain pointed at a hosted deployment, belongs in `ALLOWED_DEV_ORIGINS`. A Railway service reads its own hostname without being told.
 
 **The realtime channel will not connect behind a proxy.** The client asks for `/socket.io` on the same origin it was served from. A reverse proxy in front of the app has to allow WebSocket upgrades on that path, not just plain HTTP.
 

@@ -17,8 +17,8 @@
 // difficulty existed: 8 rounds, a flat 0.2 raid chance, a 0.1 escort fee, 6
 // cards on each board, no mandates and no corrupt brokers. Those numbers used
 // to be flat constants in ./constants; moving them here changed nothing for
-// the existing mode, and it is what lets the two richer tiers vary them.
-// See docs/DIFFICULTY_MODES_PROPOSAL.md.
+// the existing mode, and it is what lets the two richer tiers vary them. The
+// three tiers sit side by side in the README, under Difficulty tiers.
 // =====================================================================
 
 export type Difficulty = "fair_winds" | "open_waters" | "monsoon";
@@ -26,7 +26,6 @@ export type Difficulty = "fair_winds" | "open_waters" | "monsoon";
 export const DEFAULT_DIFFICULTY: Difficulty = "fair_winds";
 
 export interface DifficultyConfig {
-  key: Difficulty;
   // Display metadata, read by the lobby switch, the room card chip, and the
   // in game status chip, so copy and numbers never drift from one source.
   name: string;
@@ -73,8 +72,8 @@ export interface DifficultyConfig {
   brokerCorruptionChance: number;
   brokerCorruptionRisk: number;
 
-  // Imperial mandate schedule: round -> index into MANDATE_TEMPLATES (small,
-  // medium, large). Empty means no mandates on this tier.
+  // Imperial mandate schedule: round -> index into MANDATE_TEMPLATES, which
+  // run small to large. Empty means no mandates on this tier.
   mandates: Record<number, number>;
 
   // Reputation banked as Renown XP at voyage end is scaled by this, so a
@@ -82,11 +81,11 @@ export interface DifficultyConfig {
   renownXpMultiplier: number;
 }
 
-// The launch tuning. fair_winds is calibrated to equal the current single
-// mode exactly; open_waters and monsoon follow docs/DIFFICULTY_MODES_PROPOSAL.md.
+// The launch tuning. fair_winds is calibrated to equal the single mode the
+// game had before tiers existed, and the two richer tiers are tuned up from
+// it: more rounds, a wider charter, a longer memory of what the harbor buys.
 export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   fair_winds: {
-    key: "fair_winds",
     name: "Fair Winds",
     badge: "Fair Winds",
     icon: "🌤️",
@@ -109,7 +108,6 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     renownXpMultiplier: 1.0,
   },
   open_waters: {
-    key: "open_waters",
     name: "Open Waters",
     badge: "Open Waters",
     icon: "🌊",
@@ -132,7 +130,6 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     renownXpMultiplier: 1.25,
   },
   monsoon: {
-    key: "monsoon",
     name: "Monsoon Season",
     badge: "Monsoon",
     icon: "⛈️",
@@ -164,10 +161,9 @@ export const DIFFICULTY_ORDER: readonly Difficulty[] = [
 ];
 
 // Imperial mandate templates, ordered small to large, indexed by the mandates
-// schedule above. Consumed once mandate injection is wired (later phase); kept
-// here so the whole tier definition lives in one file.
+// schedule above. They live here so the whole tier definition sits in one file,
+// and the engine reads one by index; a template carries no id of its own.
 interface MandateTemplate {
-  size: "small" | "medium" | "large";
   port: string;
   resources: { type: string; required: number }[];
   reward: number;
@@ -179,7 +175,6 @@ interface MandateTemplate {
 // not a taxed sale), which is why the engine flags them isProductOrder: false.
 export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
   {
-    size: "small",
     port: "Quanzhou Port",
     resources: [
       { type: "Silk", required: 4 },
@@ -188,7 +183,6 @@ export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
     reward: 135,
   },
   {
-    size: "medium",
     port: "Yangzhou Port",
     resources: [
       { type: "Brocade", required: 2 },
@@ -197,7 +191,6 @@ export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
     reward: 260,
   },
   {
-    size: "large",
     port: "Hangzhou Port",
     resources: [
       { type: "Cotton Clothes", required: 2 },

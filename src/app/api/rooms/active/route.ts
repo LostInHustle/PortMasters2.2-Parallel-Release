@@ -20,6 +20,7 @@
 import { NextResponse } from "next/server";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
+import { serializeRoom } from "@/lib/rooms";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -57,22 +58,11 @@ export async function GET() {
   // Lobby.
   if (!room) return NextResponse.json({ room: null });
 
+  // Serialized through the one shared helper, so a field added to the room
+  // shape reaches this route and every other one at the same time. This
+  // literal was hand written and matched the helper exactly, which is the
+  // state a duplicate sits in right up until the day it does not.
   return NextResponse.json({
-    room: {
-      id: room.id,
-      code: room.code,
-      name: room.name,
-      isPublic: room.isPublic,
-      started: room.started,
-      difficulty: room.difficulty,
-      createdAt: room.createdAt.toISOString(),
-      host: room.host,
-      memberCount: room.members.length,
-      members: room.members.map((m) => ({
-        ...m.user,
-        joinedAt: m.joinedAt.toISOString(),
-      })),
-      isMember: true,
-    },
+    room: { ...serializeRoom(room, room.members), isMember: true },
   });
 }

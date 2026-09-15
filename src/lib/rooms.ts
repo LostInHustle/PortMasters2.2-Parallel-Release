@@ -9,7 +9,7 @@
 // it to be kept), plus the room code generator and the room name
 // normalizer that the API routes and the Lobby's create form both call.
 // =====================================================================
-import { db, type PublicUser } from "./db";
+import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
 import type { Difficulty } from "./game/difficulty";
 import type { RoomDetail, RoomSummary } from "./api";
 
@@ -59,6 +59,55 @@ export function serializeRoom(
       joinedAt: m.joinedAt.toISOString(),
     })),
   };
+}
+
+// The one place a captain is admitted to a room, shared by the two join
+// routes so the rule cannot drift between them again.
+//
+// The gate only guards a voyage somebody is actually sailing. A harbor whose
+// whole crew has gone home holds no game to interrupt, and the server keeps
+// such a harbor standing across a restart, so sealing it would leave a room in
+// the lobby that nobody can ever open again. Whoever walks in next may take it
+// over. The by code route used to seal on `started` alone, which made the same
+// harbor reachable by link and closed to its own code.
+//
+// A returning member always gets back in. A brief disconnect or a refresh must
+// never cost a captain their own seat.
+export async function admitToRoom(
+  room: {
+    id: string;
+    code: string;
+    name: string;
+    isPublic: boolean;
+    started: boolean;
+    difficulty: string;
+    createdAt: Date;
+    host: PublicUser;
+    members: Array<{ userId: string }>;
+  },
+  userId: string,
+): Promise<{ error: string } | { room: RoomSummary }> {
+  const alreadyMember = room.members.some((m) => m.userId === userId);
+  if (!alreadyMember && room.started && room.members.length > 0) {
+    return {
+      error:
+        "This voyage has already set sail. Ask the host to open a new room.",
+    };
+  }
+
+  // A returning member just re affirms their seat.
+  await db.roomMember.upsert({
+    where: { userId_roomId: { userId, roomId: room.id } },
+    create: { userId, roomId: room.id },
+    update: {},
+  });
+
+  const members = await db.roomMember.findMany({
+    where: { roomId: room.id },
+    include: { user: { select: PUBLIC_USER_SELECT } },
+  });
+
+  return { room: serializeRoom(room, members) };
 }
 
 type LeaveRoomResult =
