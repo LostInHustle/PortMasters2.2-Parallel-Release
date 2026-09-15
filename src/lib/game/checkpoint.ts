@@ -16,7 +16,7 @@
 // cross captain trade board, worker_mgmt is artisan assignment, phase
 // 2 is the trade manifest, phase 3 is settlement, phase 4 is the
 // shipyard. Each of these is gated behind a room wide ready check.
-export const CHECKPOINT_PHASE_ORDER = [
+const CHECKPOINT_PHASE_ORDER = [
   "0",
   "5",
   "1",

@@ -15,10 +15,10 @@ The 2.2 build branches from it rather than patching it. Every game system that b
 |                                 | The earlier build      | PortMasters 2.2 Parallel Release |
 | ------------------------------- | ---------------------- | -------------------------------- |
 | Harbor Manifest systems shipped | 10 of 18               | 16 of 18                         |
-| Realtime layer                  | one file, 3,097 lines  | 17 modules, 3,605 lines          |
-| Engine modules                  | 12, across 2,493 lines | 17, across 3,235 lines           |
-| API routes                      | 16, plus a stub        | 22                               |
-| Interface components            | 29                     | 41                               |
+| Realtime layer                  | one file, 3,097 lines  | 18 modules, 4,584 lines          |
+| Engine modules                  | 12, across 2,493 lines | 18, across 3,289 lines           |
+| API routes                      | 16, plus a stub        | 24                               |
+| Interface components            | 29                     | 58                               |
 | Database models                 | 10                     | 12                               |
 | The port the game answers on    | 2232                   | 8080                             |
 | The bind address                | not configurable       | `HOST`, defaulting to `0.0.0.0`  |
@@ -105,7 +105,7 @@ Sound is new as well. The tones are synthesized at runtime through the Web Audio
 
 ## A rebuilt realtime layer
 
-The realtime layer was one 3,097 line function. It is now seventeen small modules under `src/server/realtime`, each owning one concern: presence, the checkpoint protocol, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, auth, types and the composition root that wires them together.
+The realtime layer was one 3,097 line function. It is now eighteen small modules under `src/server/realtime`, each owning one concern: presence, the checkpoint protocol, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin, auth, types and the composition root that wires them together.
 
 Two shapes moved somewhere both halves can reach. `PublicUser` and `CaptainStatus` now live in `src/types/realtime.ts` with no runtime dependencies, so the client and the server are described by one definition rather than two that drift apart. `CHECKPOINT_PHASE_ORDER` moved to `src/lib/game/checkpoint.ts`, so the ready check and the interface read the same list from the same place.
 
@@ -115,21 +115,34 @@ The reason to care is not tidiness. Code buried inside a socket closure can only
 
 The previous build read `PORT` where it happened to be needed and otherwise assumed a working environment. 2.2 reads the environment once, at boot, and validates it.
 
-| Variable       | Default                | What it does                                                |
-| -------------- | ---------------------- | ----------------------------------------------------------- |
-| `DATABASE_URL` | `file:../db/custom.db` | The SQLite file holding every account, harbor and voyage    |
-| `PORT`         | `8080`                 | The port the whole game answers on                          |
-| `HOST`         | `0.0.0.0`              | The bind address, so another device on the network can play |
+| Variable           | Value in `.env.example` | What it does                                                  |
+| ------------------ | ----------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`     | `file:../db/custom.db`  | The SQLite file holding every account, harbor and voyage      |
+| `PORT`             | `8080`                  | The port the whole game answers on                            |
+| `HOST`             | `0.0.0.0`               | The bind address, so another device on the network can play   |
+| `ADMIN_SETUP_CODE` | a placeholder           | The one code that admits an operator account through `/admin` |
 
 A port that is not a whole number between 1 and 65535, a missing database URL or a database URL that names neither SQLite nor Postgres stops the server with a message naming the variable it did not like. Every problem is reported at once rather than one restart per mistake. Binding `0.0.0.0` by default is what lets a phone on the same wifi open the game, and what lets one tunnel put the whole thing online.
 
+`DATABASE_URL` is the one entry with no fallback, and the operator code fails closed rather than open, so a fresh checkout copies `.env.example` to `.env` before its first run. `next.config.ts` reads two more while the development server is up, `ALLOWED_DEV_ORIGINS` and the host's own `RAILWAY_PUBLIC_DOMAIN`, which together decide which hostnames may load development resources. The README covers both of those as well as `ENV_FILE` and `SMOKE_BASE_URL`.
+
 Shutdown changed too. On `SIGINT` or `SIGTERM` the process stops accepting connections, drops the live sockets, closes the HTTP listener and disconnects the database, in that order, so work in flight is allowed to finish rather than being cut off. A second interrupt cannot start a second teardown while the first is still running.
+
+## One rule that changed: flexible bartering is earned
+
+Every rule the earlier build established came across untouched, with one exception, and it is worth its own heading rather than a line in a list.
+
+Trading between captains used to be open to everybody. It is gated on Renown now, and on both ends of the trade rather than one. A barter offer is posted and accepted by captains at level 10 or above, and neither end is exempt: a trade is only ever as good as what the other side can put up, so a captain who has not unlocked it cannot be the partner who makes it possible. Level 10 also brings the allowance, which is one completed trade a voyage. At level 15 it becomes two.
+
+The attempt is spent by the completed trade and never by posting, which is what lets a captain advertise the same intent in the harbor chat and in a private thread at once and take whichever answer arrives first. When a trade does complete, every other offer either captain still had standing is retired, on the shared board and in every private thread, because the attempt it just spent leaves nothing that could be accepted into anything but a refusal. Nothing is lost to that: an offer that leaves the board returns its escrow the way a withdrawn one does. The board is swept at each phase boundary as well, so an offer nobody took during its stretch of the round hands its goods back rather than waiting for a later one.
+
+The other half of the change is that a trade can land at any point in a round, including during a phase that is already open, because the offer surfaces in the harbor chat and a captain can take it from there. A completed trade changes the hold and the purse, and every phase reads those as they are rather than as they were when the phase opened, so a shelf that was out of reach a moment ago can be affordable before the phase ends. No phase holds a cached copy of what a captain could afford, and nothing has to be restarted for the change to take effect.
 
 ## What came across unchanged
 
-Everything the game already did. The verbatim economy from the original single player build: Hemp, Silk and Tea, the founding ports, the all or nothing pirate raid and the escort rate. The three difficulty tiers, Fair Winds, Open Waters and Monsoon Season, with their charters, pirate odds and Renown multipliers. The seven step round and the ready check that keeps every captain in step. The social economy: the barter board, direct offers, financial aid, backing, bequest routing, convoy ventures and Harbor Watch. Harbor Pulse, Word on the Docks and Tidewatch Alerts. The Ledger Integrity Pass. Captain's Legacy, Renown and its seven titles, the nine Captain's Merits and the seven day check in. The colourblind safe palette, the fleet ticker, presence, room chat and direct messages.
+Everything the game already did. The verbatim economy from the original single player build: Hemp, Silk and Tea, the founding ports, the all or nothing pirate raid and the escort rate. The three difficulty tiers, Fair Winds, Open Waters and Monsoon Season, with their charters, pirate odds and Renown multipliers. The seven step round and the ready check that keeps every captain in step. The social economy: the barter board and its escrow, direct offers, financial aid, backing, bequest routing, convoy ventures and Harbor Watch. The board's rules are the one thing that changed, and the section above sets out how. Harbor Pulse, Word on the Docks and Tidewatch Alerts. The Ledger Integrity Pass. Captain's Legacy, Renown and its seven titles, the nine Captain's Merits and the seven day check in. The colourblind safe palette, the fleet ticker, presence, room chat and direct messages.
 
-Nothing in that list was retuned to make room for the new systems. That is the point of the six additions: they lean on actions that were already legal rather than changing what is legal.
+Nothing in that list was retuned to make room for the new systems, with the single exception of who may barter. That is the point of the six additions: they lean on actions that were already legal rather than changing what is legal, and the barter gate is the one place that needed a rule of its own rather than a new system beside it.
 
 ## Repairs alongside the new systems
 
@@ -165,6 +178,8 @@ The Harbor activity feed opens onto a panel that says there has been no recent a
 
 The game is a strict superset. The tooling around it is not, and it is worth knowing which repository carries what.
 
-The previous build carries a deep test suite: eleven `tsx` suites over the pure rules, the harbor systems, convoy and backing math, plus a Playwright layer with five browser scenarios, and it ships a deployment guide for Railway. 2.2 carries one smoke test that runs two captains through registration, a shared harbor, live presence, a status broadcast, a reload and a Quick Start pairing against a server that is already up, and it carries no host configuration.
+The previous build carries a deep test suite: eleven `tsx` suites over the pure rules, the harbor systems, convoy and backing math, plus a Playwright layer with five browser scenarios, and it ships a deployment guide for Railway. 2.2 carries one smoke test that runs two captains through registration, a shared harbor, live presence, a status broadcast, a reload and a Quick Start pairing against a server that is already up.
+
+The deployment surface moved from prose to a file. `railway.json` in the project root is the whole host configuration, so a service builds and runs from the repository as it stands rather than from a guide somebody follows by hand. It carries one deliberate difference from a conventional Node deployment, and the README says why: the hosted service runs the development server, because `next build` wants more memory than the smaller plans provide and a build killed halfway is a deploy that never lands. The same work added `/api/health`, the readiness probe the host repeats before and after it promotes a deploy, which answers from the process and reads nothing else so a busy database cannot fail it.
 
 2.2 is also on Prisma 6 rather than Prisma 7, which is why the connection string lives in `prisma/schema.prisma` here and the client needs no driver adapter, and why there is no `prisma/migrations` history in this repository. `db:push` is the way the tables get created.

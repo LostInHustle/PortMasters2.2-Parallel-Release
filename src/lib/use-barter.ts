@@ -54,6 +54,14 @@ export function useBarter(
 ) {
   const [offers, setOffers] = useState<BarterOffer[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // How many completed trades this voyage has already cost me, as the
+  // server counts them. Held as a count rather than as "trades left"
+  // because the allowance depends on my Renown level, which the server
+  // deliberately does not repeat back to me here: I already hold the
+  // authoritative level on my own voyage state, and engine/barterAccess is
+  // what turns the pair into an answer, so both screens read the same
+  // policy the server enforces.
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
 
   // My own offers exactly as the board last reported them. Never tracked
   // separately from a broadcast, so the server stays the single source of
@@ -84,9 +92,14 @@ export function useBarter(
   useEffect(() => {
     if (!socket) return;
 
-    const onUpdate = (data: { roomId: string; offers: BarterOffer[] }) => {
+    const onUpdate = (data: {
+      roomId: string;
+      offers: BarterOffer[];
+      barterAttemptsUsed?: number;
+    }) => {
       if (data.roomId !== roomId) return;
       setOffers(data.offers);
+      setAttemptsUsed(data.barterAttemptsUsed ?? 0);
       const next = new Map<string, BarterOffer>();
       for (const o of data.offers) {
         if (o.fromUserId === myUserId) next.set(o.id, o);
@@ -189,6 +202,7 @@ export function useBarter(
     offers,
     error,
     clearError: () => setError(null),
+    attemptsUsed,
     post,
     cancel,
     accept,

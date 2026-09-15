@@ -33,6 +33,7 @@
 import "@/server/env";
 import { loadServerConfig } from "@/lib/config";
 import { db } from "@/lib/db";
+import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { io as connect, type Socket } from "socket.io-client";
@@ -776,6 +777,60 @@ async function main(): Promise<void> {
     );
 
     console.log("\nBartering from anywhere");
+    // Flexible bartering is Renown gated, and every captain this run made
+    // is brand new, so the gate is checked first, while they still hold no
+    // Renown at all.
+    const gateRefusal = waitForEvent<{ error?: string }>(
+      hostSocket,
+      "barter:error",
+      (payload) => Boolean(payload?.error),
+    );
+    hostSocket.emit("barter:post", {
+      roomId,
+      offerItem: "Hemp",
+      offerAmount: 1,
+      requestItem: "Gold",
+      requestAmount: 1,
+    });
+    const refusedByGate = await gateRefusal;
+    check(
+      refusedByGate !== null,
+      "a captain with no Renown cannot post an offer",
+    );
+    check(
+      Boolean(
+        refusedByGate?.error?.includes(
+          `Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}`,
+        ),
+      ),
+      "and is told which Renown Level unlocks it",
+    );
+
+    // The gate reads the account row, not anything the client reports, so
+    // a row at the unlock level is exactly what opens the board. Written
+    // straight through Prisma rather than earned, since a voyage's worth
+    // of play is not what this run is here to measure. The XP is set to
+    // the curve's own value for that level so the row stays coherent.
+    // Cleanup needs no special case: CaptainLegacy cascades on the user
+    // delete the run already performs.
+    const seedRenown = async (userId: string) => {
+      await db.captainLegacy.upsert({
+        where: { userId },
+        create: {
+          userId,
+          renownLevel: FLEXIBLE_BARTER_UNLOCK_LEVEL,
+          renownXP: 4500,
+        },
+        update: {
+          renownLevel: FLEXIBLE_BARTER_UNLOCK_LEVEL,
+          renownXP: 4500,
+        },
+      });
+    };
+    await seedRenown(hostId);
+    await seedRenown(guest.id);
+    await seedRenown(third!.id);
+
     // The board is not limited to the Bartering phase any more, so neither
     // is this: no phase is started, and the offer still posts, shows and
     // closes exactly as it would mid voyage.
@@ -798,6 +853,30 @@ async function main(): Promise<void> {
       typeof posted?.createdAt === "string" && posted.createdAt.length > 0,
       "it carries the moment it was posted, so a chat can place it",
     );
+
+    // A second offer from the same captain, so the trade below can be
+    // checked for retiring it. Advertising the same intent in more than
+    // one place is the whole point of allowing it: posting is free, and
+    // only a completed trade spends anything.
+    const secondUp = waitForEvent<{ offers: WireOffer[] }>(
+      hostSocket,
+      "barter:update",
+      (payload) =>
+        (payload?.offers ?? []).filter((o) => o.fromUserId === hostId)
+          .length === 2,
+    );
+    hostSocket.emit("barter:post", {
+      roomId,
+      offerItem: "Silk",
+      offerAmount: 1,
+      requestItem: "Gold",
+      requestAmount: 1,
+    });
+    const bothUp = await secondUp;
+    const second = bothUp?.offers.find(
+      (o) => o.fromUserId === hostId && o.id !== posted?.id,
+    );
+    check(Boolean(second), "a captain can advertise two offers at once");
 
     const seenBoard = waitForEvent<{ offers: WireOffer[] }>(
       guestSocket,
@@ -822,6 +901,14 @@ async function main(): Promise<void> {
       "barter:update",
       (payload) => !(payload?.offers ?? []).some((o) => o.id === posted?.id),
     );
+    // Once a trade completes, the same captain's other offers go with it.
+    // They promised the goods that have just left their hold, so leaving
+    // them up would advertise a swap that can no longer be honoured.
+    const secondRetired = waitForEvent<{ offers: WireOffer[] }>(
+      guestSocket,
+      "barter:update",
+      (payload) => !(payload?.offers ?? []).some((o) => o.id === second?.id),
+    );
     guestSocket.emit("barter:accept", { roomId, offerId: posted?.id });
     check(
       (await fulfilledToTaker) !== null,
@@ -834,6 +921,29 @@ async function main(): Promise<void> {
     check(
       (await offerLeftBoard) !== null,
       "the settled offer leaves the board",
+    );
+    check(
+      (await secondRetired) !== null,
+      "and the poster's other offers are retired along with it",
+    );
+
+    // That trade was this captain's one allowance at the unlock level, and
+    // the server counts it rather than trusting anyone to remember.
+    const spentRefusal = waitForEvent<{ error?: string }>(
+      hostSocket,
+      "barter:error",
+      (payload) => Boolean(payload?.error),
+    );
+    hostSocket.emit("barter:post", {
+      roomId,
+      offerItem: "Hemp",
+      offerAmount: 1,
+      requestItem: "Gold",
+      requestAmount: 1,
+    });
+    check(
+      (await spentRefusal) !== null,
+      "a captain who has traded cannot post again this voyage",
     );
 
     // A trade the poster can never be told about is refused rather than

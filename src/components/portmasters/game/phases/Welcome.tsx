@@ -2,11 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { APP_NAME, STARTING_STOCK } from "@/lib/game/constants";
-import {
-  difficultyConfig,
-  escortRateFor,
-  pirateChanceFor,
-} from "@/lib/game/difficulty";
+import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
 import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
@@ -112,9 +108,6 @@ export function Welcome({
   // incomeTaxRate is not yet a DifficultyConfig dial (every tier still
   // uses the founding 10%), so we fall back to 0.1 until it is added.
   const taxRate = (cfg as { incomeTaxRate?: number }).incomeTaxRate ?? 0.1;
-  // escortRateFor is imported for parity with the other difficulty
-  // selectors even though the lobby card copy does not surface it yet.
-  void escortRateFor;
   return (
     <div className="max-w-3xl mx-auto text-center py-4">
       <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1">

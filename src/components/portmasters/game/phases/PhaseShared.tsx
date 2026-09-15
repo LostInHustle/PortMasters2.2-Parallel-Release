@@ -6,7 +6,6 @@ import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter } from "@/lib/use-barter";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
-import type { useConvoy } from "@/lib/use-convoy";
 import type { useRoomRoster } from "@/lib/use-room-roster";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
@@ -16,7 +15,6 @@ type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
-export type Convoy = ReturnType<typeof useConvoy>;
 export type Roster = ReturnType<typeof useRoomRoster>;
 
 export type PhasePanelProps = {
@@ -27,7 +25,6 @@ export type PhasePanelProps = {
   barter: Barter;
   aid: Aid;
   backing: Backing;
-  convoy: Convoy;
   me: PublicUser;
   members: PublicUser[];
   room: { id: string; code: string; name: string; hostId: string };

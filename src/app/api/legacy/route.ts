@@ -8,25 +8,11 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
+  normalizeHouseId,
   parseStatsByDifficulty,
   type CaptainLegacySummary,
-  type HouseId,
 } from "@/lib/game/legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
-
-// Coerces a stored houseId string (or null) into the HouseId union, or
-// null. Anything stale or hand edited falls back to null rather than
-// poisoning the summary with an unknown id.
-function normalizeHouseId(raw: string | null): HouseId | null {
-  if (
-    raw === "jade_pavilion" ||
-    raw === "vermilion_gate" ||
-    raw === "golden_lotus"
-  ) {
-    return raw;
-  }
-  return null;
-}
 
 export async function GET() {
   const user = await getCurrentUser();

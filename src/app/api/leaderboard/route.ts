@@ -6,18 +6,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import type { HouseId } from "@/lib/game/legacy";
-
-function normalizeHouseId(raw: string | null): HouseId | null {
-  if (
-    raw === "jade_pavilion" ||
-    raw === "vermilion_gate" ||
-    raw === "golden_lotus"
-  ) {
-    return raw;
-  }
-  return null;
-}
+import { normalizeHouseId } from "@/lib/game/legacy";
 
 export async function GET() {
   const me = await getCurrentUser();

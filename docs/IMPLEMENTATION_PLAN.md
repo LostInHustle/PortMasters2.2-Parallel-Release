@@ -60,6 +60,22 @@ npm run test:smoke
 
 The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 
+## Deploying
+
+`railway.json` is the host configuration, and it is the only place a deploy setting belongs. A change to how the service builds, starts or is probed goes in that file rather than in a dashboard somebody has to remember to click.
+
+Four things about it are load bearing, and each one is easy to undo by accident.
+
+**The host runs the development server.** `next build` wants more memory than the smaller plans provide, so the file starts `server.ts` with `NODE_ENV=development` instead. Anything that only works in a production build will not be exercised by a deploy, and first visits are slow because routes compile on demand. Both are accepted costs rather than oversights.
+
+**The database lives on a mounted volume at `/app/db`.** The container filesystem is discarded between deploys, so `DATABASE_URL` resolves to that mount. `requiredMountPath` in the file makes the deploy refuse to start without it, which is what turns a forgotten volume into a failed deploy instead of a silent loss of every account.
+
+**Schema changes ship with the code.** The start command runs `prisma db push --skip-generate` before it starts the process, which is deliberate: a volume is attached when the container starts, not when it builds, so a step running before the deploy would have nowhere to write. A migration added to the repository will not be applied by this path.
+
+**The healthcheck stays dependency free.** `/api/health` answers from the process and touches nothing else, so a database that is briefly busy cannot fail the probe and turn a slow query into a restart loop. Anything added to that route should keep it that way.
+
+One more, for a new hostname: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognises, and it recognises `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
+
 ## Testing more than the smoke test covers
 
 The smoke test proves the wiring. It does not prove the rules, and the rules are where a subtle mistake is most expensive, because a broken voyage is only discovered eight rounds in.

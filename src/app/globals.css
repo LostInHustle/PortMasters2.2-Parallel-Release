@@ -298,23 +298,11 @@
   .pm-grad-harbors {
     --pm-fill: var(--w-harbors-fill);
   }
-  .pm-grad-captains {
-    --pm-fill: var(--w-captains-fill);
-  }
-  .pm-grad-messages {
-    --pm-fill: var(--w-messages-fill);
-  }
   .pm-grad-houses {
     --pm-fill: var(--w-houses-fill);
   }
   .pm-grad-leaderboard {
     --pm-fill: var(--w-leaderboard-fill);
-  }
-  .pm-grad-chronicles {
-    --pm-fill: var(--w-chronicles-fill);
-  }
-  .pm-grad-activity {
-    --pm-fill: var(--w-activity-fill);
   }
   .pm-grad-settings {
     --pm-fill: var(--w-settings-fill);
@@ -328,17 +316,11 @@
   .pm-grad-legacy {
     --pm-fill: var(--w-legacy-fill);
   }
-  .pm-grad-notifications {
-    --pm-fill: var(--w-notifications-fill);
-  }
   .pm-grad-renown {
     --pm-fill: var(--w-renown-fill);
   }
   .pm-grad-checkin {
     --pm-fill: var(--w-checkin-fill);
-  }
-  .pm-grad-sailing {
-    --pm-fill: var(--w-sailing-fill);
   }
   .pm-grad-quickstart {
     --pm-fill: var(--w-quickstart-fill);
@@ -346,17 +328,8 @@
   .pm-grad-voyage {
     --pm-fill: var(--w-voyage-fill);
   }
-  .pm-grad-ship {
-    --pm-fill: var(--w-ship-fill);
-  }
-  .pm-grad-members {
-    --pm-fill: var(--w-members-fill);
-  }
   .pm-grad-chat {
     --pm-fill: var(--w-chat-fill);
-  }
-  .pm-grad-ledger {
-    --pm-fill: var(--w-ledger-fill);
   }
   .pm-grad-welcome {
     --pm-fill: var(--w-welcome-fill);
@@ -394,20 +367,8 @@
   .pm-grad-advisor {
     --pm-fill: var(--w-advisor-fill);
   }
-  .pm-grad-depth {
-    --pm-fill: var(--w-depth-fill);
-  }
-  .pm-grad-pulse {
-    --pm-fill: var(--w-pulse-fill);
-  }
-  .pm-grad-planner {
-    --pm-fill: var(--w-planner-fill);
-  }
   .pm-grad-boon {
     --pm-fill: var(--w-boon-fill);
-  }
-  .pm-grad-modules {
-    --pm-fill: var(--w-modules-fill);
   }
   .pm-grad-brand {
     --pm-fill: var(--w-brand-fill);
@@ -541,26 +502,6 @@
   .pm-pressable:focus-visible {
     outline: 3px solid oklch(0.62 0.09 165 / 0.5);
     outline-offset: 2px;
-  }
-
-  /* The quiet pill worn by the small utility controls in the top bar.
-
-     It carries shape and nothing else, and never motion of its own: five
-     call sites had each grown their own near identical copy of the same
-     dozen utilities, and any change to one of them silently left the other
-     four behind. The lift comes from the pressable class each call site
-     pairs it with, so there is exactly one place that decides how a control
-     moves. Tint and width stay at the call site, so a pill can be a bare
-     icon or an icon with a word beside it without either case restating the
-     shared part. */
-  .pm-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25rem;
-    border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 500;
   }
 
   /* ========== The Lobby's instrument panel ==========

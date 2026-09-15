@@ -1100,7 +1100,6 @@ export function GameRoom({
               barter={barter}
               aid={aid}
               backing={backing}
-              convoy={convoy}
               me={me}
               room={{
                 id: room.id,

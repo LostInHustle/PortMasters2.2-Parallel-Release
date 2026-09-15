@@ -144,6 +144,32 @@ export const STARTING_STOCK: Record<string, number> = {
 // folding Gold into one of those) so the existing buying/inventory
 // listings that iterate those two arrays don't suddenly pick up Gold.
 export const BARTER_ITEMS = ["Gold", ...RESOURCES, ...PRODUCTS] as const;
+
+// Flexible bartering is the free form offer board a captain reaches from
+// the harbor chat or from a private thread, as opposed to any scripted
+// swap the engine resolves on its own. It is deliberately the strongest
+// social tool in the game: an offer moves goods outside the market
+// entirely, from any phase, to any captain in the room. Two limits hold it
+// in check, and both live here so that a screen and the server can never
+// disagree about either one.
+//
+// The first limit is who may take part. Both captains have to be at Renown
+// Level 10, the Harbor Captain tier (see src/lib/game/legacy.ts), before
+// either end of a trade is allowed, not merely the captain posting it.
+// Gating the poster alone would leave the sharper half of the problem
+// open, because the captain doing the harder job in a swap is the one
+// accepting: they are the one who has to judge whether what is on the
+// other side is worth what it costs them. Requiring both sides also keeps
+// the feature alive in a mixed room, since two level 10 captains can still
+// trade with a newer captain sitting at the same table, and no room is
+// ever vetoed by its least established member.
+//
+// The second limit is how often. One completed trade per voyage at level
+// 10, two at level 15. An attempt is spent by a completed trade and never
+// by posting, so a captain may advertise the same intent in several places
+// at once and take whichever answer arrives first.
+export const FLEXIBLE_BARTER_UNLOCK_LEVEL = 10;
+export const FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL = 15;
 export const PORTS_TIER0 = [
   "Quanzhou Port",
   "Guangzhou Port",

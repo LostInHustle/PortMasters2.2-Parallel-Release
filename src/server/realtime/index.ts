@@ -31,6 +31,7 @@ import {
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
   CONVOY_VENTURE_PAYOUT_MULTIPLIER,
+  FLEXIBLE_BARTER_UNLOCK_LEVEL,
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
@@ -42,6 +43,13 @@ import {
   ventureTotal,
 } from "@/lib/game/convoy";
 import { roundsFor } from "@/lib/game/difficulty";
+import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
+import {
+  barterAttemptsFor,
+  canBarterWith,
+  canPostBarter,
+} from "@/lib/game/engine/barterAccess";
+import type { BarterOffer } from "./types";
 
 import { authenticate, requireAuth } from "./auth";
 import {
@@ -84,6 +92,9 @@ import {
   clearBarter,
   removeUserBarterOffers,
   clearBarterSilent,
+  barterAttemptsUsed,
+  recordBarterAttempt,
+  clearBarterAttempts,
 } from "./barter";
 import {
   roomAidRequests,
@@ -151,10 +162,87 @@ import {
 // Deliberately not through the individual clear* helpers that broadcast:
 // the room row is already gone, the Loan rows went with it on cascade,
 // and there is nobody left in the channel to broadcast an empty board to.
+// ========== Flexible bartering gate ==========
+// Renown rides the roster as a client reported, optional number, which is
+// fine for drawing a name and useless for deciding who may trade: a client
+// could simply report level 21. The account row is the only authoritative
+// source, so the gate reads that instead. Nothing is derived here, because
+// the voyage conclusion writes the level column beside the XP it came
+// from, so the two can never disagree about where the curve puts a
+// captain.
+//
+// Returns null rather than a fallback level when the read itself fails, so
+// a database hiccup is never mistaken for a captain who genuinely holds no
+// Renown. A gate that fails open under load is not a gate, and a gate that
+// tells somebody at level 20 that bartering "unlocks at level 10" sends
+// them looking for a problem that does not exist.
+async function authoritativeRenownLevel(
+  userId: string,
+): Promise<number | null> {
+  try {
+    const row = await db.captainLegacy.findUnique({
+      where: { userId },
+      select: { renownLevel: true },
+    });
+    return row?.renownLevel ?? DEFAULT_LEGACY_SUMMARY.renownLevel;
+  } catch {
+    return null;
+  }
+}
+
+// Everything that can stop an offer being accepted, gathered in one place
+// so the accept handler can run the same checks on both sides of its
+// database reads and be certain the second pass saw the board the first
+// one did.
+type OfferInspection =
+  { ok: true; offer: BarterOffer } | { ok: false; reason: string };
+
+function inspectOfferForAccept(
+  roomId: string,
+  userId: string,
+  offerId: string,
+): OfferInspection {
+  const offer = barterList(roomId).find((o) => o.id === offerId);
+  if (!offer)
+    return { ok: false, reason: "That offer is no longer available." };
+  if (offer.fromUserId === userId)
+    return { ok: false, reason: "You can't accept your own offer." };
+  if (offer.targetUserId && offer.targetUserId !== userId)
+    return {
+      ok: false,
+      reason: "That offer is only open to a specific captain.",
+    };
+  // The poster has to be reachable, because a trade the poster is never
+  // told about cannot be settled honestly on their side. Their client
+  // holds the escrow and releases it when it sees the offer leave the
+  // board, so an offer that vanished into a completed trade they never
+  // heard about would hand the goods back to them as well as to whoever
+  // accepted it. Refusing leaves the offer standing for the next attempt,
+  // which costs a moment rather than a duplicate.
+  if (!userSockets.get(offer.fromUserId)?.size)
+    return {
+      ok: false,
+      reason:
+        "That captain is not here right now. Try again when they are back.",
+    };
+  return { ok: true, offer };
+}
+
+// What a captain is told when the gate, rather than the offer, turned them
+// away. The two halves are spelled out separately because they ask
+// different things of the reader: one is told what to go and earn, the
+// other is told they have already had this voyage's share.
+function barterGateReason(myRenownLevel: number): string {
+  return barterAttemptsFor(myRenownLevel) === 0
+    ? `Flexible bartering unlocks at Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}.`
+    : "You have already completed every trade this voyage allows.";
+}
+
 function clearRoomAllMaps(roomId: string): void {
   roomCheckpoints.delete(roomId);
   clearRoomStatuses(roomId);
   clearBarterSilent(roomId);
+  clearBarterAttempts(roomId);
   clearAidSilent(roomId);
   clearLoansSilent(roomId);
   clearPulseTallies(roomId);
@@ -759,6 +847,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       socket.emit("barter:update", {
         roomId,
         offers: visibleBarterOffers(barterList(roomId), s.userId),
+        barterAttemptsUsed: barterAttemptsUsed(roomId, s.userId),
       });
     });
 
@@ -821,6 +910,45 @@ export function attachRealtime(httpServer: HttpServer): Server {
           targetUserId = payload.targetUserId;
           targetName = targetMember.user.displayName;
         }
+        // The gate, checked here rather than trusted from the client. An
+        // open offer can only be checked against its poster, since the
+        // captain who will eventually accept it is not known yet, so the
+        // accepting side is held to the same bar in the accept handler
+        // instead. A direct offer names its other end already and is
+        // checked against both right here, which is what stops a captain
+        // aiming one at somebody who cannot answer it.
+        const myLevel = await authoritativeRenownLevel(s.userId);
+        if (myLevel === null) {
+          socket.emit("barter:error", {
+            roomId,
+            error: "Could not check Renown just now. Try again in a moment.",
+          });
+          return;
+        }
+        if (!canPostBarter(myLevel, barterAttemptsUsed(roomId, s.userId))) {
+          socket.emit("barter:error", {
+            roomId,
+            error: barterGateReason(myLevel),
+          });
+          return;
+        }
+        if (targetUserId) {
+          const theirLevel = await authoritativeRenownLevel(targetUserId);
+          if (theirLevel === null) {
+            socket.emit("barter:error", {
+              roomId,
+              error: "Could not check Renown just now. Try again in a moment.",
+            });
+            return;
+          }
+          if (!canBarterWith(myLevel, theirLevel)) {
+            socket.emit("barter:error", {
+              roomId,
+              error: "That captain has not unlocked flexible bartering yet.",
+            });
+            return;
+          }
+        }
         const offer = {
           id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
           fromUserId: s.userId,
@@ -862,62 +990,81 @@ export function attachRealtime(httpServer: HttpServer): Server {
 
     socket.on(
       "barter:accept",
-      (payload: { roomId?: string; offerId?: string }) => {
+      async (payload: { roomId?: string; offerId?: string }) => {
         const s = requireAuth(socket);
         if (!s) return;
         const roomId = payload?.roomId ?? s.roomId;
-        if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
-        const list = barterList(roomId);
-        const offer = list.find((o) => o.id === payload.offerId);
-        if (!offer) {
-          socket.emit("barter:accept:fail", {
-            roomId,
-            offerId: payload.offerId,
-            reason: "That offer is no longer available.",
-          });
+        const offerId = payload?.offerId;
+        if (!roomId || roomId !== s.roomId || !offerId) return;
+        const fail = (reason: string): void => {
+          socket.emit("barter:accept:fail", { roomId, offerId, reason });
+        };
+
+        const opening = inspectOfferForAccept(roomId, s.userId, offerId);
+        if (!opening.ok) {
+          fail(opening.reason);
           return;
         }
-        if (offer.fromUserId === s.userId) {
-          socket.emit("barter:accept:fail", {
-            roomId,
-            offerId: payload.offerId,
-            reason: "You can't accept your own offer.",
-          });
+
+        // The Renown reads below are the one thing in this handler that
+        // waits on the database, and a different captain can claim the
+        // same offer while they are in flight. So the offer is inspected
+        // again afterwards rather than carried across the gap: everything
+        // from that second inspection down to the broadcast is
+        // synchronous, which is what still keeps one offer from being
+        // accepted twice.
+        const [myLevel, theirLevel] = await Promise.all([
+          authoritativeRenownLevel(s.userId),
+          authoritativeRenownLevel(opening.offer.fromUserId),
+        ]);
+        if (myLevel === null || theirLevel === null) {
+          fail("Could not check Renown just now. Try again in a moment.");
           return;
         }
-        if (offer.targetUserId && offer.targetUserId !== s.userId) {
-          socket.emit("barter:accept:fail", {
-            roomId,
-            offerId: payload.offerId,
-            reason: "That offer is only open to a specific captain.",
-          });
+        if (!canBarterWith(myLevel, theirLevel)) {
+          fail(
+            barterAttemptsFor(myLevel) === 0
+              ? barterGateReason(myLevel)
+              : "That captain has not unlocked flexible bartering yet.",
+          );
           return;
         }
-        // The poster has to be reachable, because a trade the poster is
-        // never told about cannot be settled honestly on their side. Their
-        // client holds the escrow and releases it when it sees the offer
-        // leave the board, so an offer that vanished into a completed trade
-        // they never heard about would hand the goods back to them as well
-        // as to whoever accepted it. Refusing leaves the offer standing for
-        // the next attempt, which costs a moment rather than a duplicate.
-        if (!userSockets.get(offer.fromUserId)?.size) {
-          socket.emit("barter:accept:fail", {
-            roomId,
-            offerId: payload.offerId,
-            reason:
-              "That captain is not here right now. Try again when they are back.",
-          });
+        if (!canPostBarter(myLevel, barterAttemptsUsed(roomId, s.userId))) {
+          fail(barterGateReason(myLevel));
           return;
         }
-        const next = list.filter((o) => o.id !== offer.id);
+
+        const inspected = inspectOfferForAccept(roomId, s.userId, offerId);
+        if (!inspected.ok) {
+          fail(inspected.reason);
+          return;
+        }
+        const offer = inspected.offer;
+
+        // Spending an attempt retires everything else the two of them
+        // still had open, in the harbor or in any private thread. Each has
+        // just used the last trade this voyage allowed them, so an offer
+        // left standing could only ever be accepted into a refusal.
+        // Nobody loses goods to this: an offer that leaves the board
+        // returns its own escrow through the client that posted it, which
+        // is the same route a swept offer already takes.
+        const next = barterList(roomId).filter(
+          (o) =>
+            o.id !== offer.id &&
+            o.fromUserId !== offer.fromUserId &&
+            o.fromUserId !== s.userId,
+        );
         if (next.length) roomBarterOffers.set(roomId, next);
         else roomBarterOffers.delete(roomId);
+        recordBarterAttempt(roomId, offer.fromUserId);
+        recordBarterAttempt(roomId, s.userId);
+
         // Deliberately before the board broadcast, and both are emitted
-        // from this one synchronous handler so a socket can never see
-        // them out of order. A client returns the escrow of its own offer
-        // when that offer leaves the board, so a poster told the offer
-        // left before being told the trade completed would be paid for
-        // the sale and handed its collateral back as well.
+        // from this one synchronous block so a socket can never see them
+        // out of order. A client returns the escrow of its own offer when
+        // that offer leaves the board, so a poster told the offer left
+        // before being told the trade completed would be paid for the sale
+        // and handed its collateral back as well.
         const fulfilled = {
           roomId,
           offer,
@@ -1467,6 +1614,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomCheckpoints.delete(roomId);
         clearRoomStatuses(roomId);
         clearBarter(io, roomId);
+        // A restarted voyage is a new voyage, so the per voyage barter
+        // allowance starts over with it.
+        clearBarterAttempts(roomId);
         clearAid(io, roomId);
         clearLoans(io, roomId);
         clearPulseTallies(roomId);

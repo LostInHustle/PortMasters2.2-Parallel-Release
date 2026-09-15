@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { serializeRoom } from "@/lib/rooms";
+import { admitToRoom } from "@/lib/rooms";
 
 const Schema = z.object({ code: z.string().length(6) });
 
@@ -42,33 +42,9 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
 
-  const alreadyMember = room.members.some((m) => m.userId === user.id);
-  if (!alreadyMember && room.started) {
-    return NextResponse.json(
-      {
-        error:
-          "This voyage has already set sail. Ask the host to open a new room.",
-      },
-      { status: 403 },
-    );
-  }
+  const admitted = await admitToRoom(room, user.id);
+  if ("error" in admitted)
+    return NextResponse.json({ error: admitted.error }, { status: 403 });
 
-  await db.roomMember.upsert({
-    where: { userId_roomId: { userId: user.id, roomId: room.id } },
-    create: { userId: user.id, roomId: room.id },
-    update: {},
-  });
-
-  const members = await db.roomMember.findMany({
-    where: { roomId: room.id },
-    include: {
-      user: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
-  });
-
-  return NextResponse.json({
-    room: serializeRoom(room, members),
-  });
+  return NextResponse.json({ room: admitted.room });
 }

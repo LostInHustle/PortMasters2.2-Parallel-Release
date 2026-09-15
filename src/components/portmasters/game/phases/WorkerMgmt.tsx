@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ICONS, RECIPES, WAGES } from "@/lib/game/constants";
+import { ICONS, RECIPES } from "@/lib/game/constants";
 import {
   assignTask,
   fireWorker,
@@ -36,6 +36,7 @@ function WorkerList({
   list,
   name,
   tasks,
+  cost,
   act,
 }: {
   type: string;
@@ -43,6 +44,10 @@ function WorkerList({
   list: Worker[];
   name: string;
   tasks: string[];
+  /** The wage Phase 3 charges for this artisan, discounts already applied.
+      Passed in rather than looked up here, because the display used to read
+      the raw WAGES table while fireWorker charged getHireCost. */
+  cost: number;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
 }) {
   if (!list.length) return null;
@@ -78,7 +83,7 @@ function WorkerList({
               className="h-6 px-2 text-[10px] rounded border border-alarm/25 bg-alarm/5 text-alarm hover:border-alarm/40 hover:bg-alarm/5 hover:text-alarm"
               onClick={() => act((g, l) => fireWorker(g, type, i, l))}
             >
-              Dismiss ({WAGES[type]}💰)
+              Dismiss ({cost}💰)
             </Button>
           )}
         </div>
@@ -320,7 +325,7 @@ export function WorkerMgmt({
                   return `${t}(${mats})`;
                 })
                 .join(" or ")}
-              , <span className="text-due">{WAGES[r.id]} Gold/round</span>
+              , <span className="text-due">{r.cost} Gold/round</span>
             </div>
           ))}
         </div>
@@ -360,6 +365,7 @@ export function WorkerMgmt({
               list={r.list}
               name={r.label}
               tasks={r.tasks}
+              cost={r.cost}
               act={act}
             />
           ))}

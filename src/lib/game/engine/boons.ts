@@ -89,7 +89,7 @@ function draftBoons(state: GameState): Boon[] {
   return picks;
 }
 
-export function applyBoon(state: GameState, boon: Boon, logs: string[]) {
+function applyBoon(state: GameState, boon: Boon, logs: string[]) {
   state.modifierFlags = boon.modifiers;
   if (boon.modifiers.instant_gold) {
     state.money += boon.modifiers.instant_gold;

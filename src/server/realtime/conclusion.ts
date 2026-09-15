@@ -49,7 +49,7 @@ import {
   broadcastLoans,
 } from "./loans";
 import { resolveExpiredVentures } from "./ventures";
-import { clearBarter } from "./barter";
+import { clearBarter, clearBarterAttempts } from "./barter";
 import { userSockets } from "./presence";
 import { recordRivalOutcomes, type RivalStanding } from "./rival";
 
@@ -145,6 +145,11 @@ export async function maybeConcludeVoyage(
   // save they end the voyage with. Each client returns its own escrow as
   // the board empties.
   clearBarter(io, roomId);
+  // The voyage is over, so the barter allowance goes with it. Next voyage
+  // opens on a full one, which is also the only moment a captain's Renown
+  // can have moved, so the counter can never carry a stale level's worth
+  // of spent attempts into a voyage that allows more of them.
+  clearBarterAttempts(roomId);
 
   const roomForDifficulty = await db.room.findUnique({
     where: { id: roomId },

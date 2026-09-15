@@ -15,6 +15,7 @@ import {
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { useLiveAmount } from "@/lib/use-live-amount";
 import { AlertTriangle, HandCoins, ShieldCheck, Skull, X } from "lucide-react";
 import { ReadyBar } from "../ReadyBar";
 import { type PhasePanelProps } from "./PhaseShared";
@@ -176,7 +177,17 @@ function SettlementBills({
   const myRequest = aid.requests.find((r) => r.fromUserId === myUserId);
   const otherRequests = aid.requests.filter((r) => r.fromUserId !== myUserId);
   const shortfall = Math.max(1, totalDue - game.money);
-  const [requestAmount, setRequestAmount] = useState(shortfall);
+  // The ask starts at whatever covers the shortfall and keeps following it for
+  // as long as the captain leaves it alone. A trade can land with this panel
+  // open, and a completed one moves Gold as readily as goods, so the shortfall
+  // worked out a moment ago is not necessarily the shortfall now. Following it
+  // is what keeps the field honest. Once the captain names a figure of their
+  // own that figure is theirs and a later recalculation does not overwrite it.
+  // There is no clamp here, because asking for more than the shortfall is a
+  // legitimate thing to want: a captain may be after a wider cushion than the
+  // bills alone require, and the House is free to decline. See useLiveAmount.
+  const { value: requestAmount, commit: commitRequestAmount } =
+    useLiveAmount(shortfall);
 
   // [MANIFEST 05: Backing] Only a loan neither side of, and not already
   // backed by someone else, is actually mine to back.
@@ -296,7 +307,7 @@ function SettlementBills({
               <span className="text-muted-foreground">Request</span>
               <QuantityInput
                 value={requestAmount}
-                onCommit={setRequestAmount}
+                onCommit={commitRequestAmount}
                 min={1}
                 aria-label="Loan amount to request"
                 className="w-20 h-9"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSocket, getAuthToken } from "@/lib/realtime";
 import type { OnlineUser, PublicUser } from "@/types/realtime";
 
@@ -102,9 +102,9 @@ export function useRealtime(
     };
   }, [socket]);
 
-  const requestPresence = useCallback(() => {
-    getSocket().emit("presence:request");
-  }, []);
-
-  return { socket, connected, authed, onlineUsers, requestPresence };
+  // The server's presence:request handler stays, because the smoke suite
+  // drives that event directly to assert the answer comes back. Nothing in
+  // the app needs to ask: this hook emits auth on connect, and the server
+  // pushes presence:update from there, so there is nothing to request.
+  return { socket, connected, authed, onlineUsers };
 }

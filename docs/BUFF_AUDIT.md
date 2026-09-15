@@ -19,12 +19,13 @@ Every defect below has since been repaired. The audit is kept in the tense it wa
 | Three things that are written and read by nothing            | The House perks and the Age effects are wired in and live. The Harbor activity feed is not.                                                 |
 | The pledge that strands                                      | The conclusion sweep treats a bankrupt borrower as absent, so their loan is swept and the pledge riding on it resolves.                     |
 | Dead payload and a dead computation                          | The three unread standings fields, the crown total that was summed and never sent, and the unused ship count are gone.                      |
+| Two comments naming different boards for one surge           | Both name the Purchase board now, which is where the surge is added.                                                                        |
 
 Two entries in the last section are deliberately left as they were found. `CaptainMerit.earnedAt` is still stored and still never printed, and it stays: a timestamp on an achievement is a record of when it was earned rather than a field pretending to be one. The Harbor activity feed still opens onto a panel with nothing behind it, and it will keep doing so until the endpoint it would read from exists.
 
 ## How the audit was run
 
-The game declares its buffs in one place and applies them in another. A boon is a row in `src/lib/game/constants.ts` with a `modifiers` object. A module is a row in the same file with a `penalty` or a named flag. A House perk is a boolean in `src/lib/game/engine/houses.ts`. An Age is a number in `src/lib/game/engine/ages.ts`.
+The game declares its buffs in one place and applies them in another. A boon is a row in `src/lib/game/constants.ts` with a `modifiers` object. A module is a row in the same file with a `penalty` or a named flag. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a number in `src/lib/game/engine/ages.ts`.
 
 For each one the audit did three things:
 
@@ -46,8 +47,8 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 | House perks          | 4 fields, 3 Houses   | `src/lib/game/engine/houses.ts`     |
 | Ages                 | 3                    | `src/lib/game/engine/ages.ts`       |
 | Difficulty modifiers | 3 tiers              | `src/lib/game/difficulty.ts`        |
-| Captain's Merits     | 9                    | `src/lib/game/engine/merits.ts`     |
-| Renown titles        | 7                    | `src/lib/game/constants.ts`         |
+| Captain's Merits     | 9                    | `src/lib/game/merits.ts`            |
+| Renown titles        | 7                    | `src/lib/game/legacy.ts`            |
 | Social economy       | 6 systems            | `src/lib/game/engine/` and realtime |
 | Harbor systems       | Harbor Pulse and two | `src/lib/game/harborPulse.ts`       |
 
@@ -201,7 +202,7 @@ The standings rows written at `src/server/realtime/conclusion.ts:384` carry `gol
 
 `src/lib/game/engine/partialSight.ts:12` carries a comment asserting a Backing trust gate at Renown level 5 that does not exist in the code. `docs/PROPOSAL.md:43` repeats it. Both should go, since the feature they describe works and does not need the gate.
 
-`src/lib/game/engine/integrity.ts:49` attributes the surge sizing to the order board while `src/lib/game/engine/market.ts:381` adds it to the purchase board. One of the two comments is wrong.
+`src/lib/game/integrity.ts:49` attributes the surge sizing to the order board while `src/lib/game/engine/market.ts:381` adds it to the purchase board. One of the two comments is wrong.
 
 ## What was verified working
 

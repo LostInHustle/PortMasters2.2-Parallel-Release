@@ -10,7 +10,6 @@
 // triggered this voyage, so a status report arriving after the flip is
 // a harmless no op, not a repeat trigger.
 // =====================================================================
-import { TIDEWATCH_SURGE_THRESHOLD } from "@/lib/game/constants";
 import { roomStatuses } from "./status";
 
 const roomSurges = new Set<string>();
@@ -34,5 +33,3 @@ export function markSurged(roomId: string): void {
 export function clearSurge(roomId: string): void {
   roomSurges.delete(roomId);
 }
-
-export { TIDEWATCH_SURGE_THRESHOLD };

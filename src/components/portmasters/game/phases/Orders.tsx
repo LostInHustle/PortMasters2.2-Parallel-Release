@@ -21,6 +21,7 @@ import {
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
+import { useLiveAmount } from "@/lib/use-live-amount";
 import { Coins, ClipboardList, CheckCircle2, Clock } from "lucide-react";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
@@ -40,12 +41,27 @@ export function Orders({
   const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
   const [favorItem, setFavorItem] = useState<string | null>(null);
-  const [favorQty, setFavorQty] = useState(1);
   const favorUnlocked = game.renownLevel >= BROKERS_FAVOR_UNLOCK_LEVEL;
   const sellableGoods = [...RESOURCES, ...PRODUCTS].filter(
     (it) => (game.inventory[it] || 0) > 0,
   );
   const favorHeld = favorItem ? game.inventory[favorItem] || 0 : 0;
+  // The ask follows the live hold rather than a figure captured when the good
+  // was picked, and both directions matter. A trade can land while this panel
+  // is open and either half of one moves goods: posting an offer escrows the
+  // offered side out of the hold at once, and an accepted trade takes the
+  // requested side out and puts the offered side in. So the hold can shrink
+  // under a figure the captain can no longer deliver, or grow past one they
+  // picked when it was all they had, and the second case is the one a captain
+  // actually wants back: goods arriving should widen what the Broker can sell.
+  // The clamp is what keeps the ask inside the hold, which is the range
+  // callBrokersFavor insists on. See useLiveAmount for why the panel settles
+  // that rather than leaving the engine to refuse it.
+  const {
+    value: favorAsk,
+    commit: commitFavorAsk,
+    reset: resetFavorAsk,
+  } = useLiveAmount(favorHeld, true);
   const closeFavor = () => {
     setFavorOpen(false);
     setFavorItem(null);
@@ -113,7 +129,7 @@ export function Orders({
                       className="rounded-lg"
                       onClick={() => {
                         setFavorItem(it);
-                        setFavorQty(game.inventory[it] || 1);
+                        resetFavorAsk();
                       }}
                     >
                       <ItemIcon item={it} className="h-3.5 w-3.5" /> {it} (
@@ -136,6 +152,40 @@ export function Orders({
                 Cancel
               </Button>
             </div>
+          ) : favorHeld <= 0 ? (
+            // The good left the hold while this panel was open. Sending the
+            // captain back to the picker is the honest answer here: the
+            // alternative is a quantity field with no valid number left in it
+            // and a button that can only refuse.
+            <div className="space-y-2">
+              <div className="font-semibold">
+                <ItemIcon item={favorItem} className="h-4 w-4" /> No {favorItem}{" "}
+                left in your hold
+              </div>
+              <p className="text-muted-foreground">
+                Your hold changed while this was open, so there is nothing here
+                for the Broker to sell now. Pick another good, or call the Favor
+                in later this voyage.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-lg"
+                  onClick={() => setFavorItem(null)}
+                >
+                  Pick another good
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-lg"
+                  onClick={closeFavor}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-2">
               <div className="font-semibold">
@@ -144,8 +194,8 @@ export function Orders({
               </div>
               <div className="flex items-center gap-2">
                 <QuantityInput
-                  value={favorQty}
-                  onCommit={setFavorQty}
+                  value={favorAsk}
+                  onCommit={commitFavorAsk}
                   min={1}
                   max={favorHeld}
                   aria-label={`How much ${favorItem} to sell`}
@@ -164,7 +214,7 @@ export function Orders({
                   size="sm"
                   className="pm-grad-orders font-semibold rounded-lg"
                   onClick={() => {
-                    act((g, l) => callBrokersFavor(g, favorItem, favorQty, l));
+                    act((g, l) => callBrokersFavor(g, favorItem, favorAsk, l));
                     closeFavor();
                   }}
                 >

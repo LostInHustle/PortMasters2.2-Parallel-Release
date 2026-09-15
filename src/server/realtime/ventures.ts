@@ -16,7 +16,6 @@
 // =====================================================================
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import { CONVOY_VENTURE_PAYOUT_MULTIPLIER } from "@/lib/game/constants";
 import {
   computeSettlements,
   parseVentureContributions,
@@ -166,4 +165,4 @@ export async function resolveExpiredVentures(
   if (anyResolved) await broadcastVentures(io, roomId);
 }
 
-export { ventureSummary, ventureTotal, CONVOY_VENTURE_PAYOUT_MULTIPLIER };
+export { ventureSummary };

@@ -9,23 +9,12 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
+  normalizeHouseId,
   parseStatsByDifficulty,
   type CaptainLegacySummary,
-  type HouseId,
 } from "@/lib/game/legacy";
 
 const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
-
-function normalizeHouseId(raw: string | null): HouseId | null {
-  if (
-    raw === "jade_pavilion" ||
-    raw === "vermilion_gate" ||
-    raw === "golden_lotus"
-  ) {
-    return raw;
-  }
-  return null;
-}
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();

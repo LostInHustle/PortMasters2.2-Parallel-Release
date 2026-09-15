@@ -114,6 +114,15 @@ export {
   refundBarterOffer,
   settleBarterTrade,
 } from "./engine/barter";
+// Who may barter and how often. Kept out of the block above on purpose:
+// nothing in ./engine/barter.ts consumes these, they are the policy the
+// callers apply around it.
+export {
+  barterAttemptsFor,
+  barterAttemptsRemaining,
+  canBarterWith,
+  canPostBarter,
+} from "./engine/barterAccess";
 
 // ========== Artisans ==========
 export { assignTask, fireWorker, hireWorker } from "./engine/workers";

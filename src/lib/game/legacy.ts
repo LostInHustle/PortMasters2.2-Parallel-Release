@@ -166,6 +166,26 @@ export function recordVoyageInStats(
 // Great House (see ./engine/houses.ts), null until they pick one.
 export type HouseId = "jade_pavilion" | "vermilion_gate" | "golden_lotus";
 
+// The three Houses as a value rather than only as a type, so a route can
+// validate or iterate over them without retyping the literals. The tuple is
+// what keeps it honest: it is typed to the union above and to a fixed length,
+// so adding a House to one and forgetting the other is a compile error rather
+// than a House that silently fails validation somewhere.
+export const HOUSE_IDS: readonly [HouseId, HouseId, HouseId] = [
+  "jade_pavilion",
+  "vermilion_gate",
+  "golden_lotus",
+];
+
+// Coerces a stored houseId string (or null) into the HouseId union, or null.
+// Anything stale or hand edited falls back to null rather than poisoning a
+// summary with an unknown id. This spent a while as six near identical copies
+// across the API routes, five of them retyping the three literals by hand, so
+// adding a House meant finding every one of them.
+export function normalizeHouseId(raw: string | null): HouseId | null {
+  return HOUSE_IDS.includes(raw as HouseId) ? (raw as HouseId) : null;
+}
+
 export type CaptainLegacySummary = {
   renownLevel: number;
   renownXP: number;
