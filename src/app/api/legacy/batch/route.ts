@@ -7,12 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import {
-  DEFAULT_LEGACY_SUMMARY,
-  normalizeHouseId,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
-} from "@/lib/game/legacy";
+import { toLegacySummary, type CaptainLegacySummary } from "@/lib/game/legacy";
 
 const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
 
@@ -53,20 +48,10 @@ export async function POST(req: NextRequest) {
 
   const legacies: Record<string, CaptainLegacySummary> = {};
   for (const id of ids) {
-    const row = byUserId.get(id);
-    legacies[id] = row
-      ? {
-          renownLevel: row.renownLevel,
-          renownXP: row.renownXP,
-          voyagesCompleted: row.voyagesCompleted,
-          seaMasterCrowns: row.seaMasterCrowns,
-          bestScore: row.bestScore,
-          consecutiveSolventVoyages: row.consecutiveSolventVoyages,
-          meritIds: meritsByUserId.get(id) ?? [],
-          statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
-          houseId: normalizeHouseId(row.houseId),
-        }
-      : DEFAULT_LEGACY_SUMMARY;
+    legacies[id] = toLegacySummary(
+      byUserId.get(id) ?? null,
+      meritsByUserId.get(id) ?? [],
+    );
   }
 
   return NextResponse.json({ legacies });

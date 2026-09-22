@@ -14,7 +14,7 @@ Every captain in a harbor plays the same voyage in lockstep. Nobody advances a p
 
 1. Boon draft. Draw from a fresh pool of boons that bend the rules for the coming round.
 2. Phase 1 Purchase. Buy raw materials from the port market.
-3. Barter. Trade goods and Gold directly with the other captains, once both ends are at Renown level 10.
+3. Barter. Trade goods and Gold directly with the other captains on the Captain's Exchange, which is open to every captain at any Renown level.
 4. Artisan management. Hire artisans and assign what each of them crafts.
 5. Phase 2 Orders. Fill trade orders for Gold and Reputation.
 6. Phase 3 Settlement. Production lands, wages and maintenance come due, pirates may find you.
@@ -72,7 +72,7 @@ Nine Captain's Merits mark permanent achievements. Three are difficulty scoped. 
 
 ## The Social Economy
 
-Cross player bartering with Direct Barter Offers, gated on Renown at both ends rather than one. A captain at level 10 or above may post and accept, with an allowance of one completed trade a voyage and a second from level 15. The attempt is spent by the trade and never by the offer, so a captain may advertise the same intent in several places at once and take whichever answer arrives first, and a completed trade retires every other offer either captain still had standing. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
+Cross player bartering with Direct Barter Offers, on two surfaces over one board. The Captain's Exchange is open to every captain at any Renown level and nothing on it is rationed. Flexible bartering, reached from the harbor chat, is gated on Renown at both ends rather than one: a captain at level 10 or above may post and accept, with an allowance of one completed trade a voyage and a second from level 15. The allowance is spent by the trade and never by the offer, so a captain may advertise the same intent in several places at once and take whichever answer arrives first, and a completed flexible trade retires every other flexible offer its own poster still had standing. Accepting is never rationed on either surface, so a captain whose own offers have all been taken can still take anyone else's. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
 
 ## The Harbor Manifest
 

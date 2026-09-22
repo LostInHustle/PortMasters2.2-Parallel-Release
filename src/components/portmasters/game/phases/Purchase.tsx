@@ -1,13 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { PRODUCTS, RESOURCES } from "@/lib/game/constants";
 import {
-  COMMODITIES,
-  PRODUCT_PRICES,
-  PRODUCTS,
-  RESOURCES,
-} from "@/lib/game/constants";
-import {
+  basePriceRange,
   completePhase1,
   explainCardPrice,
   explainExpectedPrice,
@@ -120,8 +116,7 @@ function MarketPriceReference({
                 <tbody>
                   {goodsWithHistory.map((item) => {
                     const history = game.priceHistory[item];
-                    const range = COMMODITIES[item]?.basePrice ??
-                      PRODUCT_PRICES[item] ?? [0, 100];
+                    const range = basePriceRange(item) ?? [0, 100];
                     return (
                       <tr key={item}>
                         <td
@@ -201,8 +196,7 @@ function TradeAdvisor({
     .flatMap((c) => {
       const finalCost = getCardFinalCost(game, c);
       return c.resources.map((r) => {
-        const range = COMMODITIES[r.type]?.basePrice ??
-          PRODUCT_PRICES[r.type] ?? [0, 100];
+        const range = basePriceRange(r.type) ?? [0, 100];
         const unit = r.price ?? 0;
         const qty = r.quantity ?? 0;
         const [min, max] = range;
@@ -515,9 +509,7 @@ export function Purchase({
                         Unit: {r.price}💰
                       </span>
                       {(() => {
-                        const range =
-                          COMMODITIES[r.type]?.basePrice ??
-                          PRODUCT_PRICES[r.type];
+                        const range = basePriceRange(r.type);
                         if (!range) return null;
                         const [min, max] = range;
                         const price = r.price ?? 0;

@@ -1,13 +1,13 @@
 // =====================================================================
 // [MANIFEST 01: The Harbor Pulse] Pure market pricing formula, split out of
-// src/server/realtime.ts (the same reason pools.ts was split out of
+// src/server/realtime/index.ts (the same reason pools.ts was split out of
 // difficulty.ts): this is real money math that decides every captain's next
 // round's prices, and it belongs next to the rest of the pure game logic in
 // src/lib/game/ rather than nested inside attachRealtime's socket closures,
 // where nothing outside a live server could import or unit test it without
 // dragging in Prisma/socket.io as a side effect.
 //
-// The server (src/server/realtime.ts) is still the one authority that owns
+// The server (src/server/realtime/index.ts) is still the one authority that owns
 // *when* this runs: it tallies every captain's per round purchase report
 // (see addPulseReport there) and calls computeHarborPulse exactly once, the
 // moment the room advances into the next round's Phase 1 (see maybeAdvance).

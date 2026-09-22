@@ -2,15 +2,13 @@
 
 import { useState } from "react";
 import {
-  COMMODITIES,
   CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
-  PRODUCT_PRICES,
 } from "@/lib/game/constants";
-import { getHireCost } from "@/lib/game/engine";
+import { basePriceRange, getHireCost } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { difficultyConfig } from "@/lib/game/difficulty";
 import {
@@ -214,8 +212,7 @@ export function GameStatusPanel({
             for (const item of Object.keys(game.inventory)) {
               const qty = game.inventory[item] || 0;
               if (qty <= 0) continue;
-              const range =
-                COMMODITIES[item]?.basePrice ?? PRODUCT_PRICES[item];
+              const range = basePriceRange(item);
               if (range) {
                 const avg = (range[0] + range[1]) / 2;
                 totalValue += avg * qty;

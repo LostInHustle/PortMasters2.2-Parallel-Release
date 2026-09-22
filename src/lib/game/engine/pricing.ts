@@ -310,6 +310,24 @@ export function getCardFinalCost(state: GameState, card: ResourceCard): number {
   return explainCardPrice(state, card).final;
 }
 
+// The typical price range for any tradable good, resource or product. A
+// raw material carries its range on the COMMODITIES entry it already has
+// for its ports, a finished good keeps its own in PRODUCT_PRICES, and
+// nothing carries both, so one lookup answers for either kind.
+//
+// Returns undefined rather than a made up range for an item that is
+// neither. Callers that only want to annotate a price can then skip an
+// unknown good, while the ones that need a number to divide by, like the
+// deal scoring, can supply their own fallback and make that choice where
+// the division actually happens.
+//
+// Exists because five screens were each rebuilding it with the same two
+// optional chains, three of them with a hand written [0, 100] fallback
+// that only some of them wanted and none of them explained.
+export function basePriceRange(item: string): [number, number] | undefined {
+  return COMMODITIES[item]?.basePrice ?? PRODUCT_PRICES[item];
+}
+
 // A general "what does this typically cost" estimate for a raw material
 // or product, independent of any specific market card. Used for the
 // hover preview during the buying phase (Phase 1) so a captain can size
@@ -324,9 +342,7 @@ export function explainExpectedPrice(
   itemType: string,
 ): ExpectedPrice {
   const isResource = (RESOURCES as readonly string[]).includes(itemType);
-  let [min, max] = isResource
-    ? COMMODITIES[itemType].basePrice
-    : PRODUCT_PRICES[itemType];
+  let [min, max] = basePriceRange(itemType) ?? [0, 100];
   const modifiers: string[] = [];
 
   if (isResource) {

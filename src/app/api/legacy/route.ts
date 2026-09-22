@@ -6,12 +6,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import {
-  DEFAULT_LEGACY_SUMMARY,
-  normalizeHouseId,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
-} from "@/lib/game/legacy";
+import { toLegacySummary } from "@/lib/game/legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
 
 export async function GET() {
@@ -26,19 +21,10 @@ export async function GET() {
     where: { userId: user.id },
     select: { meritId: true },
   });
-  const summary: CaptainLegacySummary = legacy
-    ? {
-        renownLevel: legacy.renownLevel,
-        renownXP: legacy.renownXP,
-        voyagesCompleted: legacy.voyagesCompleted,
-        seaMasterCrowns: legacy.seaMasterCrowns,
-        bestScore: legacy.bestScore,
-        consecutiveSolventVoyages: legacy.consecutiveSolventVoyages,
-        meritIds: merits.map((m) => m.meritId),
-        statsByDifficulty: parseStatsByDifficulty(legacy.statsByDifficulty),
-        houseId: normalizeHouseId(legacy.houseId),
-      }
-    : DEFAULT_LEGACY_SUMMARY;
+  const summary = toLegacySummary(
+    legacy,
+    merits.map((m) => m.meritId),
+  );
 
   // The current user's Daily Check In state rides along here so the lobby
   // renders the widget without a second request. Other players' legacy

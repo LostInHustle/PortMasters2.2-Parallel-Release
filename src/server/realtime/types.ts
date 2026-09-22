@@ -59,8 +59,14 @@ export type Checkpoint = {
 // on a direct offer aimed at one specific captain; an ordinary open
 // offer leaves them unset. createdAt is set once, by the barter:post
 // handler, so a client rendering the offer inside a chat can place it
-// where it belongs in the conversation. Mirrors the same field on
-// BarterOffer in src/types/realtime.ts.
+// where it belongs in the conversation.
+//
+// flexible records which surface the offer was posted from, and it is
+// the only thing that tells the two apart once they are on the board: a
+// flexible offer came from a chat composer and is held to the Renown
+// gate and the flexible allowance, an exchange offer came from the
+// Captain's Exchange in the Bartering phase and is held to neither.
+// Mirrors the same fields on BarterOffer in src/types/realtime.ts.
 export type BarterOffer = {
   id: string;
   fromUserId: string;
@@ -72,6 +78,7 @@ export type BarterOffer = {
   targetUserId?: string;
   targetName?: string;
   createdAt: string;
+  flexible: boolean;
 };
 
 // An open aid request: a captain short on Gold asking the harbor for

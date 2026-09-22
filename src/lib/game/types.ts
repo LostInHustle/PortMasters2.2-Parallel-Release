@@ -216,7 +216,7 @@ export type GameState = {
   // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
   // round's Phase 1, keyed by resource name (Hemp, Silk, Tea), derived room
   // wide from what the whole harbor bought last round (see
-  // computeHarborPulse in src/server/realtime.ts) and delivered on the same
+  // computeHarborPulse in src/server/realtime/index.ts) and delivered on the same
   // phase:advance broadcast that already carries every captain into Phase 1
   // together. Read by genResourceCard in engine.ts as one more multiplier
   // alongside Boons and modules; never persisted beyond the round it was
@@ -232,7 +232,7 @@ export type GameState = {
   priceHistory: Record<string, number[]>;
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
-  // game:status handler in src/server/realtime.ts, which is where every
+  // game:status handler in src/server/realtime/index.ts, which is where every
   // captain's Reputation is already visible). Read by startPhase1 to add one
   // extra card to this captain's board from the next round onward; never
   // flips back, and never touches maxRounds, difficulty, or which tier's

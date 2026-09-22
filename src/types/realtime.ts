@@ -66,6 +66,14 @@ export type GameStatusUpdate = {
 // that says where it belongs is when it was posted. ISO 8601 strings in
 // one format sort chronologically as plain strings, which is the same
 // property the message list already relies on.
+//
+// flexible marks which of the two surfaces the offer was posted from,
+// and it is the only thing that tells them apart once they are on the
+// board. A flexible offer came from a chat composer, is held to the
+// Renown gate, and only so many of its poster's may ever be taken. An
+// exchange offer came from the Captain's Exchange in the Bartering
+// phase and carries no gate and no cap at all. Both kinds sit on the one
+// board and either may be accepted by anyone.
 export type BarterOffer = {
   id: string;
   fromUserId: string;
@@ -77,6 +85,7 @@ export type BarterOffer = {
   targetUserId?: string;
   targetName?: string;
   createdAt: string;
+  flexible?: boolean;
 };
 
 // An open aid request: a captain short on Gold asking the harbor for a

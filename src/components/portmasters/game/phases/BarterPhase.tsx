@@ -27,7 +27,12 @@ export function BarterPhase({
   // each open offer with the same OfferCard a chat shows. Only the layout
   // around them differs, which is why this file is markup and very little
   // else.
-  const draft = useOfferDraft(game, barter, act);
+  //
+  // The draft is built as an exchange one, which is the whole difference
+  // from the chat composer: nothing posted here is held to a Renown level
+  // or to the flexible allowance. This is the round interface and it is
+  // open to every captain from their first voyage.
+  const draft = useOfferDraft(game, barter, act, false);
   const otherMembers = members.filter((m) => m.id !== me.id);
 
   const selectClass =

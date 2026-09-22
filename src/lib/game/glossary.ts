@@ -51,9 +51,9 @@ export const GLOSSARY: Record<string, string> = {
   Module:
     "A permanent ship upgrade, drafted from the Shipyard once you have a free slot. Stays equipped until you swap it out.",
   Barter:
-    "A short window right after buying where captains trade directly with each other instead of through the market. Post what you have for what you want; the offered amount is set aside the moment you post it, and comes back to you if it's canceled or nobody takes it.",
+    "Trade directly with another captain instead of through the market, on the Captain's Exchange during the Bartering phase or from the harbor chat once you reach Renown Level 10. Post what you have for what you want; the offered amount is set aside the moment you post it, and comes back to you if it's canceled, if nobody takes it, or if a flexible offer of yours is taken and this one is retired with it.",
   "Pirate Attack":
-    "A 20% chance, rolled at Phase 3 before wages and maintenance come due, of losing every Gold coin you're carrying. Hire an escort beforehand to guarantee safe passage instead of risking it.",
+    "A roll at Phase 3, before wages and maintenance come due, that can take every Gold coin you're carrying. The charter sets the odds: 20% on Fair Winds, 22% rising to 30% past the midpoint on Open Waters, and 28% rising to 38% past it on Monsoon Season. Hire an escort beforehand to guarantee safe passage instead of risking it.",
   Escort:
     "Guarantees safe passage from that round's pirate attack, for a cost of 10% of your current Gold. Once hired, the round's pirates are no longer a risk.",
   "Financial Aid":

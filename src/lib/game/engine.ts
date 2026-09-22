@@ -75,6 +75,7 @@ export { getOwnedAmount } from "./engine/core";
 // settled inside ./engine/, which is also where the only readers of those
 // two sit.
 export {
+  basePriceRange,
   brokersFavorCommission,
   calcTransportCost,
   explainCardPrice,
@@ -114,14 +115,14 @@ export {
   refundBarterOffer,
   settleBarterTrade,
 } from "./engine/barter";
-// Who may barter and how often. Kept out of the block above on purpose:
-// nothing in ./engine/barter.ts consumes these, they are the policy the
-// callers apply around it.
+// Who may barter flexibly and how often. Kept out of the block above on
+// purpose: nothing in ./engine/barter.ts consumes these, they are the
+// policy the callers apply around it, and it is the flexible surface
+// alone. The Captain's Exchange is not governed from here at all.
 export {
-  barterAttemptsFor,
-  barterAttemptsRemaining,
-  canBarterWith,
-  canPostBarter,
+  flexibleBarterUnlocked,
+  flexibleOffersLeft,
+  bothFlexibleBarterUnlocked,
 } from "./engine/barterAccess";
 
 // ========== Artisans ==========

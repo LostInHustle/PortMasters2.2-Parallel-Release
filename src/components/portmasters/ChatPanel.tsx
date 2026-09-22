@@ -157,13 +157,19 @@ export function ChatPanel({
 
   // Which open offers belong to the conversation being read. The board a
   // socket receives is already scoped to what that captain may see, so the
-  // harbor thread shows it whole, while a private thread shows only the
-  // offers aimed at the two captains in it. A search hides them: it looks
-  // through what was said, and an offer is taken or left on the board.
+  // harbor thread shows it whole, while a private thread shows the offers
+  // aimed at either captain in it: theirs to me and mine to them. Reading
+  // only the second direction left an offer the other captain had addressed
+  // to me out of our own thread, and it could only be taken from the harbor
+  // board, which is the one place a direct offer exists to avoid. A search
+  // hides them: it looks through what was said, and an offer is taken or
+  // left on the board.
   const offers: BarterOffer[] =
     trade && !searching
       ? mode === "dm"
-        ? trade.barter.offers.filter((o) => o.targetUserId === other?.id)
+        ? trade.barter.offers.filter(
+            (o) => o.targetUserId === other?.id || o.targetUserId === me.id,
+          )
         : trade.barter.offers
       : [];
   const offerCount = offers.length;

@@ -15,7 +15,7 @@ import { grantHelperReputation } from "./aid";
 
 // [MANIFEST 05: Backing] Escrows a pledge immediately, the same escrow on
 // commitment timing every other cross player commitment in this game
-// already uses. The server (see backing:offer in src/server/realtime.ts)
+// already uses. The server (see backing:offer in src/server/realtime/index.ts)
 // is what actually decided how much of the requested pledge a loan still
 // has room for, the same relationship venture contributions have with
 // their own overflow cap, so amount here is always already the correct,

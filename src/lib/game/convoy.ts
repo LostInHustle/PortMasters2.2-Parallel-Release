@@ -1,6 +1,6 @@
 // =====================================================================
 // [MANIFEST 04: Convoy Ventures] Pure decision logic, split out of
-// src/server/realtime.ts for the same reason computeHarborPulse was split
+// src/server/realtime/index.ts for the same reason computeHarborPulse was split
 // out into harborPulse.ts: this is real Gold math and the one exploit
 // prevention rule (one filled venture per voyage, room wide) that a
 // doctored client or a race between two captains has to actually be safe
@@ -8,7 +8,7 @@
 // attachRealtime's socket closures, where nothing outside a live server
 // with a live database could import or exercise it.
 //
-// The server (src/server/realtime.ts) is still the one authority over
+// The server (src/server/realtime/index.ts) is still the one authority over
 // *when* each of these run and over the one check that genuinely can't be
 // pure, hasRoomClaimedVenture, which has to ask the database whether any
 // venture in this room's voyage has ever reached "filled". Everything here

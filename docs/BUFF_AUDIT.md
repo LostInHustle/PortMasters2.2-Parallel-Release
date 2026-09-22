@@ -204,6 +204,8 @@ The standings rows written at `src/server/realtime/conclusion.ts:384` carry `gol
 
 `src/lib/game/integrity.ts:49` attributes the surge sizing to the order board while `src/lib/game/engine/market.ts:381` adds it to the purchase board. One of the two comments is wrong.
 
+Both of these have since been cleared, along with the dead payload and the dead computation above. The three standings fields nothing read are gone, so is the unused `totalShips`, and `totalCrowns` is no longer parsed in the leaderboard route. The Partial Sight comment now says it reads a captain's Renown and nothing else, and `docs/PROPOSAL.md` no longer repeats the claim. The integrity comment now says the surge adds to the Purchase board and never widens the order board, which is what `market.ts` does.
+
 ## What was verified working
 
 The audit found more working than broken, and it is worth naming the working parts so the list above reads as the exception it is.

@@ -250,6 +250,11 @@ export function usePhaseSync(
     // the ready state never initialises. Same race fix as GameRoom's
     // room:join effect: without this, a fast mount and slow auth path means
     // the client never hears who's readied up.
+    //
+    // `authed` is a dependency, so the effect re-runs the moment it flips
+    // and this line is what answers the deferred case. A second effect used
+    // to sit below doing the same emit, which meant every ordinary mount
+    // asked twice and the answer was applied twice.
     if (authed) {
       socket.emit("phase:state:request", { roomId });
     }
@@ -262,14 +267,6 @@ export function usePhaseSync(
       socket.off("room:error", onError);
     };
   }, [socket, roomId, act, authed, myUserId]);
-
-  // Once authed flips to true, fire the deferred phase:state:request so the
-  // client gets the room's current checkpoint and ready set. This covers the
-  // case where the effect above mounted before authentication completed.
-  useEffect(() => {
-    if (!socket || !authed) return;
-    socket.emit("phase:state:request", { roomId });
-  }, [socket, authed, roomId]);
 
   const markReady = useCallback(
     (fn: (g: GameState, logs: string[]) => void) => {

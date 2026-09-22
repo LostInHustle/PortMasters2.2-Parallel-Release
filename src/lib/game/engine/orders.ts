@@ -327,9 +327,10 @@ export function startPhase2(
   logs.push(
     `\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`,
   );
-  // [ONLINE] Deterministic trade orders per (room, round): every captain
-  // in the room independently derives the identical base set of
-  // orders here, since this loop never reads anything captain specific.
+  // [ONLINE] Deterministic trade orders: this captain's seed, this voyage,
+  // this round. The loop below reads nothing captain specific, so what
+  // differs between two captains at the same table is the seed and nothing
+  // else, which is what keeps a reload from dealing a fresh hand.
   const orderRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:orders`,
   );
@@ -353,9 +354,9 @@ export function startPhase2(
     });
     logs.push("🛍️ Merchants Converge: One extra order appeared.");
   }
-  // Broker's Whisper guarantee, applied after the shared draw above and
-  // entirely with this captain's own randomness, so it can never nudge
-  // what anyone else in the room sees. One order slot is overwritten per
+  // Broker's Whisper guarantee, applied after the seeded draw above and
+  // entirely with this captain's own randomness, so it cannot shift the
+  // drawn stream that produced the board. One order slot is overwritten per
   // rumor this captain has revealed and not yet cashed in this round
   // (see purchaseIntel), up to however many revealed items and order
   // slots there are; previously a single `intelOrderUsed` flag capped
@@ -376,9 +377,10 @@ export function startPhase2(
   }
   // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the
   // Emperor commissions a single large order. Fixed template data with no rng,
-  // appended after the shared draw, so every captain in the room is dealt the
-  // identical mandate and nobody's seeded market shifts. Flagged
-  // isProductOrder: false, since an imperial levy is never charged VAT.
+  // appended after the seeded draw, so it shifts nobody's stream, and the same
+  // template for everyone on that round, since the tier and round it reads are
+  // the room's rather than this captain's. Flagged isProductOrder: false, since
+  // an imperial levy is never charged VAT.
   const mandateIdx = mandateIndexFor(state.difficulty, state.currentRound);
   const mandate =
     mandateIdx === undefined ? undefined : MANDATE_TEMPLATES[mandateIdx];

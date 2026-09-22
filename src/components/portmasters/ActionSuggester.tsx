@@ -6,12 +6,13 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import {
+  basePriceRange,
+  brokersFavorCommission,
   calcTransportCost,
   getCardFinalCost,
   getIntelCost,
-  brokersFavorCommission,
 } from "@/lib/game/engine";
-import { COMMODITIES, PRODUCT_PRICES, RECIPES } from "@/lib/game/constants";
+import { RECIPES } from "@/lib/game/constants";
 
 /**
  * Autopilot Action Suggester. Analyzes the current game state and
@@ -227,8 +228,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
   let bestGoodName = "";
   for (const card of unpurchased) {
     for (const r of card.resources) {
-      const range = COMMODITIES[r.type]?.basePrice ??
-        PRODUCT_PRICES[r.type] ?? [0, 100];
+      const range = basePriceRange(r.type) ?? [0, 100];
       const unit = r.price ?? 0;
       const [min, max] = range;
       const ratio = (unit - min) / (max - min || 1);

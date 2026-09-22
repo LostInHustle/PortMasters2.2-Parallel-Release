@@ -27,8 +27,10 @@ import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 
 // The most log lines a session keeps around at once (see the APPLY case
-// below, the only place this is enforced). Named so the two places that
-// once used a bare 500 stay in sync by construction rather than by habit.
+// below, the only place this is enforced). Named rather than written out
+// where it is used, so the cap and the trim that applies it cannot drift
+// apart, and so the toast effect's "what's new" window stays in step with
+// the ledger it is reading from.
 const LEDGER_LINE_CAP = 500;
 
 // Exported (along with Action and reducer below) so the reducer, a pure

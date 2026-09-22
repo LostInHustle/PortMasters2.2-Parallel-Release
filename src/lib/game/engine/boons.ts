@@ -303,7 +303,7 @@ export function cancelModuleDraft(state: GameState) {
 // A captain joining a room for the first time should drop into the voyage
 // wherever the room currently is rather than back at round 1, otherwise
 // they'd never be able to ready up for the same checkpoint as everyone
-// else (see the ready check protocol in src/server/realtime.ts). This runs
+// else (see the ready check protocol in src/server/realtime/index.ts). This runs
 // the same setup calls a normal transition would, just once, up front, so
 // a fresh captain lands on a fully formed phase (cards generated, etc.)
 // instead of an empty one.
