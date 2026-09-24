@@ -176,6 +176,7 @@ function ActivePhase(props: Props) {
       return (
         <Purchase
           game={game}
+          ctx={ctx}
           act={act}
           phaseSync={phaseSync}
           members={members}
@@ -187,6 +188,7 @@ function ActivePhase(props: Props) {
       return (
         <BarterPhase
           game={game}
+          ctx={ctx}
           act={act}
           barter={barter}
           me={me}
@@ -210,6 +212,7 @@ function ActivePhase(props: Props) {
       return (
         <Orders
           game={game}
+          ctx={ctx}
           act={act}
           phaseSync={phaseSync}
           members={members}
@@ -220,6 +223,7 @@ function ActivePhase(props: Props) {
       return (
         <Settlement
           game={game}
+          ctx={ctx}
           act={act}
           aid={aid}
           backing={backing}
@@ -232,6 +236,7 @@ function ActivePhase(props: Props) {
       return (
         <Shipyard
           game={game}
+          ctx={ctx}
           act={act}
           phaseSync={phaseSync}
           members={members}

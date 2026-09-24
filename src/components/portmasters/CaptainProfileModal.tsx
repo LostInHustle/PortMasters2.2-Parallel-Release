@@ -22,7 +22,7 @@ import {
 import { api, type PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { VoyageChronicle, RivalEntry } from "@/types/realtime";
-import { Avatar, Pill, MeritIcon } from "./shared";
+import { Avatar, Pill, MeritIcon, TONE_WASH } from "./shared";
 import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colours";
 import { Sparkline } from "./Sparkline";
 import { meritById } from "@/lib/game/merits";
@@ -639,18 +639,15 @@ function ChronicleStat({
   value: number;
   tone: "sea" | "gold" | "due" | "gain";
 }) {
-  /* One map rather than two: the wash and the ink sit on the same
-     element, and the icon inside inherits the ink from it. */
-  const tones: Record<string, string> = {
-    sea: "bg-sea/5 text-sea",
-    gold: "bg-gold/5 text-gold-ink",
-    due: "bg-due/5 text-due",
-    gain: "bg-gain/5 text-gain",
-  };
+  /* The chip wears the wash and the ink together, so the icon inside
+     inherits the colour rather than being told it. */
   return (
     <div className="rounded-xl bg-black/5 dark:bg-white/5 p-3 text-center">
       <div
-        className={cn("mx-auto mb-1 inline-flex rounded-lg p-1.5", tones[tone])}
+        className={cn(
+          "mx-auto mb-1 inline-flex rounded-lg p-1.5",
+          TONE_WASH[tone],
+        )}
       >
         <Icon className="h-3.5 w-3.5" />
       </div>
@@ -750,15 +747,9 @@ function StatTile({
   value: number;
   tone: "sea" | "gold" | "due" | "intel";
 }) {
-  const tones: Record<string, string> = {
-    sea: "bg-sea/5 text-sea",
-    gold: "bg-gold/5 text-gold-ink",
-    due: "bg-due/5 text-due",
-    intel: "bg-intel/5 text-intel",
-  };
   return (
     <div className="pm-glass pm-ink-hover rounded-2xl p-3">
-      <div className={cn("mb-2 inline-flex rounded-lg p-1.5", tones[tone])}>
+      <div className={cn("mb-2 inline-flex rounded-lg p-1.5", TONE_WASH[tone])}>
         <Icon className="h-4 w-4" />
       </div>
       <div className="font-display text-2xl font-bold">{value}</div>

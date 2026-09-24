@@ -124,8 +124,9 @@ export type LoanRecord = {
   redirectToName?: string;
 };
 
-// A single contributor to a convoy venture.
-export type VentureContributor = {
+// A single contributor to a convoy venture. Not exported: it is read
+// through VentureSummary.contributions rather than named by any caller.
+type VentureContributor = {
   userId: string;
   name: string;
   amount: number;

@@ -180,7 +180,7 @@ export function Bankruptcy({
                     {member.displayName}
                   </div>
                   <div className="text-[10px] text-muted-foreground">
-                    R{status.round} · {status.phaseLabel}
+                    {status.phaseLabel}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs">

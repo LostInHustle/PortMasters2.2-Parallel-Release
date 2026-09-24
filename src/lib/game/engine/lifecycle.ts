@@ -13,8 +13,16 @@
 // captain straight onto a given round and phase, which is what lets
 // someone joining a room mid voyage land where everyone else already is
 // rather than back at round 1.
+//
+// Where nextPhase steps TO is not written here. It comes from the room's
+// mode, through the lap in ./mode.ts, so the same engine runs a different
+// leg for a different voyage without a single branch on which mode it is.
+// Every departure below does its own content work and names no successor;
+// the handoff at the bottom of nextPhase is the only thing that decides
+// where a phase leads, and it asks the lap.
 // =====================================================================
 import { APP_NAME, merchantRatingForScore } from "../constants";
+import { closesRound, lapSuccessor, parsePhase } from "../checkpoint";
 import {
   createInitialGameState,
   type GameContext,
@@ -23,11 +31,11 @@ import {
 } from "../types";
 import { settleOutstandingDebts } from "./aid";
 import { completeBarterPhase } from "./barter";
-import { startBoonDrafting } from "./boons";
+import { startBoonDrafting, selectBoon } from "./boons";
 import { completePhase1, startPhase1 } from "./market";
 import { startPhase2 } from "./orders";
 import { resolvePirateAttack } from "./pirates";
-import { calcIncomeTax } from "./pricing";
+import { calcIncomeTax, INCOME_TAX_RATE } from "./pricing";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
 // merchantRatingForScore used to live here. It moved to ../constants.ts so
@@ -51,7 +59,13 @@ function endRound(state: GameState, logs: string[]) {
   if (tax > 0) {
     state.money -= tax;
     state.incomeTaxPaid += tax;
-    const rate = (state.modifierFlags.income_tax_override || 0.1) * 100;
+    // The rate the ledger reports has to be the rate that was charged, so
+    // this reads the same constant calcIncomeTax does rather than repeating
+    // the number. Written out twice, the two agree right up until someone
+    // changes the tax, at which point the receipt starts lying about a
+    // charge that is still being taken.
+    const rate =
+      (state.modifierFlags.income_tax_override || INCOME_TAX_RATE) * 100;
     logs.push(`🏛️ Income Tax Paid (${rate.toFixed(0)}%): ${tax} Gold`);
   } else logs.push("🏛️ No profit, no income tax due");
   if (state.vatPaid > 0)
@@ -79,13 +93,24 @@ function endRound(state: GameState, logs: string[]) {
   state.customerCards = [];
   state.purchasedCards = [];
   state.completedOrders = [];
+  // The one entry onto the lap still named rather than read, and it is named
+  // because it is not a handoff. Nothing was left behind to hand off from: a
+  // round is beginning, and every mode begins one at the boon draft today. It
+  // also takes no GameContext, so it could not ask the lap even if a mode
+  // wanted to open somewhere else. A mode that opens its round at a different
+  // phase is the change that threads ctx down to here.
   startBoonDrafting(state, logs);
 }
 
-export function completePhase2(state: GameState, logs: string[]) {
+// The work of leaving the trading phase, which is a log line and nothing
+// else. Where that leads is the lap's business, not this function's.
+//
+// Private since the lap refactor. It used to be exported because the trade
+// panel called it directly, which is exactly the second code path that would
+// have kept its own opinion about what comes next.
+function completePhase2(state: GameState, logs: string[]) {
   if (state.orderCount === 0) logs.push("⏭️ Trading skipped");
   else logs.push(`✅ Trading ended, completed ${state.orderCount} trades`);
-  startPhase3(state, logs);
 }
 
 function startPhase3(state: GameState, logs: string[]) {
@@ -104,7 +129,14 @@ function startPhase3(state: GameState, logs: string[]) {
 // the old split where wages were deducted the instant Phase 3 started and
 // only maintenance waited for a click, since that split left no room for
 // a captain to react before wages alone could force a bankruptcy.
-export function finishSettlement(state: GameState, logs: string[]) {
+//
+// Like every other departure here, it stops when the books are settled. It
+// used to end by opening the shipyard phase by name, which was one of the
+// seven copies of the phase order the lap now holds instead.
+//
+// Private for the same reason as completePhase2 above: the settlement panel
+// reaches it through nextPhase now, so nothing outside this module names it.
+function finishSettlement(state: GameState, logs: string[]) {
   logs.push("\n💰=== Paying Worker Wages ===");
   const wageResult = payWages(state, logs);
   if (wageResult === "bankruptcy") {
@@ -121,7 +153,6 @@ export function finishSettlement(state: GameState, logs: string[]) {
     state.phase = "bankruptcy";
     return;
   }
-  startPhase4(state, logs);
 }
 
 function startPhase4(state: GameState, logs: string[]) {
@@ -131,9 +162,16 @@ function startPhase4(state: GameState, logs: string[]) {
   );
 }
 
-export function skipUpgrade(state: GameState, logs: string[]) {
+// Passing on the shipyard. All this has to do is say so.
+//
+// It used to call endRound itself, because the shipyard is the phase that
+// closes the round today. That made the round close a fact about the number
+// four: a mode whose lap ended anywhere else would have run out of phases and
+// never settled a round at all. Closing is now the handoff's job, driven by
+// whether the lap says this is its last entry, so a longer leg settles on its
+// own closing phase without the engine being told which one that is.
+function skipUpgrade(logs: string[]) {
   logs.push("⏭️ Skipped Shipyard Actions");
-  endRound(state, logs);
 }
 
 function endGame(state: GameState, logs: string[]) {
@@ -178,30 +216,117 @@ export function showWelcome(state: GameState, logs: string[]) {
   logs.push("=".repeat(50));
 }
 
+// Advances a captain one step from wherever they are.
+//
+// Everything in here is the work of LEAVING a phase. Not one branch names the
+// phase it leads to, because that is the lap's business: the handoff at the
+// bottom reads the mode's own order and opens whatever comes next. Two modes
+// can therefore run two different legs through this same function, and a third
+// one only has to be described in ./mode.ts.
+//
+// The switch falls through to the handoff for every phase whose departure is a
+// ready check step. Phase "0" is the harbor, where nothing advances without the
+// host setting sail, and phase "5" is the boon draft, where the departure is
+// the captain choosing a boon rather than confirming they are done. Leaving
+// either one from here would let a single captain start the voyage or skip
+// their own boon, so they return instead of falling through. The boon draft
+// hands off through lockInBoon below, which is the only caller that knows a
+// boon was actually chosen.
 export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
-  if (state.phase === 1) completePhase1(state, logs);
-  // Leaving the Bartering phase no longer settles anything: the offer
-  // board outlives the phase now, and an offer still open on it is
-  // released when the board itself drops it, wherever the voyage happens
-  // to be by then. See the onRefund contract in src/lib/use-barter.ts.
-  else if (state.phase === "barter") {
-    completeBarterPhase(state, logs);
-  } else if (state.phase === "worker_mgmt") startPhase2(state, ctx, logs);
-  else if (state.phase === 2) completePhase2(state, logs);
-  else if (state.phase === 3) {
-    if (!state.pirateAttackResolved) resolvePirateAttack(state, logs);
-    else finishSettlement(state, logs);
-  } else if (state.phase === 4) skipUpgrade(state, logs);
+  const from = parsePhase(state.phase);
+  switch (from) {
+    case "1":
+      completePhase1(state, logs);
+      break;
+    // Leaving the Bartering phase no longer settles anything: the offer
+    // board outlives the phase now, and an offer still open on it is
+    // released when the board itself drops it, wherever the voyage happens
+    // to be by then. See the onRefund contract in src/lib/use-barter.ts.
+    case "barter":
+      completeBarterPhase(logs);
+      break;
+    // Crew assignment settles nothing of its own; the phase exists so every
+    // captain places their artisans before the manifest is drawn.
+    case "worker_mgmt":
+      break;
+    case "2":
+      completePhase2(state, logs);
+      break;
+    case "3":
+      // The raid is resolved first and the books are settled on the next
+      // press, so this one departure takes two steps.
+      if (!state.pirateAttackResolved) {
+        resolvePirateAttack(state, logs);
+        return;
+      }
+      finishSettlement(state, logs);
+      break;
+    case "4":
+      skipUpgrade(logs);
+      break;
+    default:
+      return;
+  }
+  // A settlement that bankrupted the captain ended the voyage on the spot.
+  // There is no next phase to open.
+  if (state.gameOver) return;
+  handOff(state, ctx, logs, from);
 }
 
-export function snapToCheckpoint(
+// Opens whatever the mode's lap puts after `from`, or settles the round when
+// `from` was the lap's last phase.
+//
+// The last phase of a lap is the one that closes the round, and closing a
+// round is not a step to a successor: endRound settles the books, rolls the
+// round over and opens the next one (or ends the voyage). Reading that off
+// the lap rather than off a phase name is what keeps settling a property of
+// the mode, so a lap that closes somewhere else still settles.
+function handOff(
   state: GameState,
   ctx: GameContext,
-  round: number,
-  phaseStr: string,
   logs: string[],
+  from: string,
+) {
+  if (closesRound(state.mode, from)) {
+    endRound(state, logs);
+    return;
+  }
+  const next = lapSuccessor(state.mode, from);
+  if (next === null) return;
+  enterPhase(state, ctx, logs, next);
+}
+
+// Locks in a boon and then leaves the draft the way the lap says to.
+//
+// This is the one departure that cannot be expressed as "I am done with this
+// phase", because what the captain chose is the work. It lives here rather
+// than in ./boons beside selectBoon for the reason the whole module is shaped
+// this way: only the spine may name a successor, and a sibling that imported
+// the spine back would close the one way flow that keeps the subsystems
+// independently testable.
+export function lockInBoon(
+  state: GameState,
+  ctx: GameContext,
+  boonId: string,
+  logs: string[],
+) {
+  if (!selectBoon(state, boonId, logs)) return;
+  handOff(state, ctx, logs, "5");
+}
+
+// Opens a phase directly, without moving the round.
+//
+// This is the lower half of snapToCheckpoint and the upper half of the lap
+// handoff above, which is why it is one function rather than two switches:
+// a captain catching up to the room and a captain stepping forward through
+// their own voyage have to land in exactly the same state, and the only way
+// to be sure of that is for both to run this.
+function enterPhase(
+  state: GameState,
+  ctx: GameContext,
+  logs: string[],
+  phaseStr: string,
 ): void {
-  state.currentRound = round;
   switch (phaseStr) {
     case "5":
       startBoonDrafting(state, logs);
@@ -227,6 +352,17 @@ export function snapToCheckpoint(
     default:
       return;
   }
+}
+
+export function snapToCheckpoint(
+  state: GameState,
+  ctx: GameContext,
+  round: number,
+  phaseStr: string,
+  logs: string[],
+): void {
+  state.currentRound = round;
+  enterPhase(state, ctx, logs, phaseStr);
 }
 
 // Human readable label for the current phase (for the multiplayer status

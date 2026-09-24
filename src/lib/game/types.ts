@@ -14,6 +14,7 @@ import {
   difficultyConfig,
   type Difficulty,
 } from "./difficulty";
+import { DEFAULT_MODE, type GameMode } from "./mode";
 import type { HouseId } from "./legacy";
 // The two runtime imports this module takes from the engine, and
 // deliberately narrow ones: ./engine/houses.ts imports nothing but types, so
@@ -124,8 +125,8 @@ export type Worker = {
 // Every flag is read somewhere in the engine, and the list of readers is
 // worth keeping straight:
 //
-//   jadeFreeHireAvailable  hireWorker (waives the first wage), payWages
-//                          (spends the waiver on the first payroll run)
+//   jadeFreeHireAvailable  hireWorker (waives the first wage, and clears the
+//                          waiver the moment it is spent)
 //   vermilionExtraCard     startPhase1 (one more cargo lot on the board)
 //   goldenWageDiscount     getHireCost (a fifth off every wage, which
 //                          reaches hiring, payroll and severance alike)
@@ -164,6 +165,13 @@ export type GameState = {
   // from a single room wide source. Every captain in a room carries their own
   // copy of the same room value, which is what keeps their conclusion aligned.
   difficulty: Difficulty;
+  // The room's game mode (see src/lib/game/mode.ts), stamped onto this state
+  // when the voyage is created and refreshed from the room on every load, the
+  // same way difficulty is. Difficulty says how hard the voyage is; mode says
+  // which voyage it is, which is what decides the order this captain's phases
+  // run in. Every captain in a room carries the same value, so they agree on
+  // the lap without the server ever having to name a phase.
+  mode: GameMode;
   // The room's voyage epoch (see Room.voyageEpoch in prisma/schema.prisma),
   // stamped onto this state when the voyage is created and folded into the
   // deterministic seed so a restart (which bumps the epoch) rerolls every
@@ -218,7 +226,7 @@ export type GameState = {
   // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
   // round's Phase 1, keyed by resource name (Hemp, Silk, Tea), derived room
   // wide from what the whole harbor bought last round (see
-  // computeHarborPulse in src/server/realtime/index.ts) and delivered on the same
+  // computeHarborPulse in src/lib/game/harborPulse.ts) and delivered on the same
   // phase:advance broadcast that already carries every captain into Phase 1
   // together. Read by genResourceCard in engine.ts as one more multiplier
   // alongside Boons and modules; never persisted beyond the round it was
@@ -276,7 +284,8 @@ export type GameState = {
   brokerTippedPirates: boolean;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
-  // at the end of Round 8 (see settleOutstandingDebts in engine.ts).
+  // at the end of Round 8 (see settleOutstandingDebts in
+  // src/lib/game/engine/aid.ts).
   debts: Loan[];
   loansGiven: Loan[];
   // Set only by settleOutstandingDebts, when a forced repayment at the end
@@ -421,6 +430,11 @@ export type VoyageSetup = {
   // that know it pass it so maxRounds, starting Gold, and maintenance all
   // follow the room's chosen tier.
   difficulty?: Difficulty;
+  // Defaults to the founding mode (see DEFAULT_MODE) so any caller that does
+  // not yet know the room's mode still produces a valid, shippable voyage
+  // rather than accidentally landing a captain in an experimental one.
+  // Callers that know it pass it so the phase lap matches the room's.
+  mode?: GameMode;
   // The captain's pledged Great House, read from their CaptainLegacy row.
   // Defaults to null, which is the honest answer for a captain who has not
   // pledged yet: no House, and no perk flags lit. The House is applied
@@ -436,6 +450,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     renownLevel = 1,
     voyageEpoch = 0,
     difficulty = DEFAULT_DIFFICULTY,
+    mode = DEFAULT_MODE,
     houseId = null,
   } = setup;
   const cfg = difficultyConfig(difficulty);
@@ -443,6 +458,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     inventory: initialInventory(),
     money: cfg.startingGold + startingGoldBonus,
     difficulty,
+    mode,
     renownLevel,
     brokersFavorUsed: false,
     voyageEpoch,

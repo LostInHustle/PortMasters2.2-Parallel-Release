@@ -6,9 +6,10 @@
 // Reputation banked on the way to Round 8 is now worth something once
 // the voyage ends too: it becomes Renown XP, carried across every harbor
 // that captain ever sails in. Pure functions only, so both the client
-// (the Captain's Legacy card) and the server (src/server/realtime/index.ts,
-// the one place a CaptainLegacy row is ever written) can import this
-// without pulling in anything React or Prisma specific.
+// (the Captain's Legacy card) and the server (the voyage conclusion in
+// src/server/realtime/conclusion.ts, alongside the check in and house
+// routes) can import this without pulling in anything React or Prisma
+// specific.
 // =====================================================================
 
 // Triangular growth: level 2 needs 100 XP, level 3 needs 300, level 4
@@ -157,7 +158,7 @@ export function recordVoyageInStats(
 }
 
 // Shape returned by GET /api/legacy (and its [userId]/batch siblings) and
-// carried on room:voyage_complete standings (see src/server/realtime/index.ts).
+// carried on room:voyage_complete standings (see conclusion.ts).
 // A brand new captain with no CaptainLegacy row yet is simply level 1
 // with nothing banked, rather than a special "no data" case the UI needs
 // to branch on. meritIds is every Captain's Merit (see merits.ts) this

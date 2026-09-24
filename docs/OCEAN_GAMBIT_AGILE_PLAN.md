@@ -1,6 +1,6 @@
 # Ocean Gambit: an Agile delivery plan
 
-Written against the design proposal "PortMasters 3: Ocean Gambit" and against the tree it would be built inside, PortMasters 2.2 Parallel Release. Prepared from the core product management chair.
+Written against the Ocean Gambit design proposal and against the tree it would be built inside, PortMasters 2.2 Parallel Release. That tree is the experimental release before PortMasters 3, so the Ocean Gambit work lands in it as a mode rather than as a game of its own. Prepared from the core product management chair.
 
 ## How to read this
 
@@ -21,7 +21,7 @@ Six standing rules apply to every goal and are not repeated in the blocks below.
 3. **Telemetry before features.** A goal that adds a system without adding its measurement is not done.
 4. **Flags from the first commit.** Nothing reaches the live harbor until its gate passes, so every goal ships behind a switch.
 5. **Definition of done.** `npm run typecheck`, `npm run lint`, `npm run build` and `npm run check:palette` clean, the smoke test passing against a throwaway database, new state round tripping through save and load, and the Ledger Integrity Pass knowing about every new persisted field.
-6. **The live base game stays shippable.** A slice that would leave PortMasters 2 in a worse state than it found it does not merge, no matter how good it is.
+6. **The live base game stays shippable.** A slice that would leave PortMasters 2.2 Parallel Release in a worse state than it found it does not merge, no matter how good it is.
 
 ## Five things the proposal could not see from outside the tree
 

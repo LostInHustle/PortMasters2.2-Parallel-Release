@@ -15,7 +15,7 @@ import type { Server } from "socket.io";
 import type { AidRequest } from "@/types/realtime";
 import { roomCheckpoints } from "./checkpoint";
 
-export const roomAidRequests = new Map<string, AidRequest[]>();
+const roomAidRequests = new Map<string, AidRequest[]>();
 
 // The one place the map is written. A room with nothing open is held as
 // no entry at all rather than an empty list, so every writer has to make
@@ -30,7 +30,7 @@ export function aidList(roomId: string): AidRequest[] {
   return roomAidRequests.get(roomId) ?? [];
 }
 
-export function broadcastAid(io: Server, roomId: string): void {
+function broadcastAid(io: Server, roomId: string): void {
   io.to(`room:${roomId}`).emit("aid:update", {
     roomId,
     requests: aidList(roomId),

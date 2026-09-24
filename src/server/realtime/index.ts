@@ -85,6 +85,7 @@ import {
   broadcastReadyState,
   maybeAdvance,
   checkpointRank,
+  openingPhase,
 } from "./checkpoint";
 import {
   barterList,
@@ -536,7 +537,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // report puts someone further along, and recheck readiness.
         const room = await db.room.findUnique({
           where: { id: roomId },
-          select: { started: true, voyageEpoch: true },
+          select: { started: true, voyageEpoch: true, mode: true },
         });
         if (room) {
           await resolveExpiredVentures(
@@ -549,8 +550,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const cp = await getCheckpoint(roomId);
         const phaseStr = String(broadcast.phase);
-        const newRank = checkpointRank(broadcast.round, phaseStr);
-        const curRank = checkpointRank(cp.round, cp.phase);
+        // Both ranks are read in the room's own lap, which the server can
+        // name because it just loaded the row. A rank is an index within one
+        // mode's phase order, so comparing a report against the checkpoint
+        // only means anything once both are read the same way. A room that
+        // just vanished leaves this undefined, which resolves to the founding
+        // mode; the guard below refuses to move the checkpoint for a room
+        // that is gone anyway, so that rank is never acted on.
+        const newRank = checkpointRank(room?.mode, broadcast.round, phaseStr);
+        const curRank = checkpointRank(room?.mode, cp.round, cp.phase);
         if (
           room?.started &&
           newRank !== null &&
@@ -1582,7 +1590,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (startingRooms.has(roomId)) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
-        select: { hostId: true, started: true },
+        select: { hostId: true, started: true, mode: true },
       });
       if (!room) return;
       if (room.started) {
@@ -1614,13 +1622,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
       startingRooms.add(roomId);
       try {
+        // Where a voyage opens is the mode's business, not this handler's,
+        // so it is read from the lap rather than written as "5" here.
+        const opening = openingPhase(room.mode);
         await db.room.update({
           where: { id: roomId },
-          data: { started: true, currentRound: 1, currentPhase: "5" },
+          data: { started: true, currentRound: 1, currentPhase: opening },
         });
         const cp = await getCheckpoint(roomId);
         cp.round = 1;
-        cp.phase = "5";
+        cp.phase = opening;
         cp.readyUserIds.clear();
         cp.advancing = false;
         io.to(`room:${roomId}`).emit("room:started", { roomId });
@@ -1685,6 +1696,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
           roomId,
           voyageEpoch: restarted.voyageEpoch,
           difficulty: restarted.difficulty,
+          // Rides along for the same reason difficulty does. A restart resets
+          // the voyage but not the harbor, so the mode is whatever the room
+          // was created with, and every captain rebuilding their state here
+          // has to rebuild it on the lap the room is actually keeping. The
+          // restart deliberately cannot change it: a host switching laps
+          // between voyages would be switched out from under the table, so
+          // the mode is fixed at creation exactly as the tier is.
+          mode: restarted.mode,
         });
         const cp = await getCheckpoint(roomId);
         await broadcastReadyState(io, roomId, cp);

@@ -5,10 +5,10 @@ import { ITEMS } from "@/lib/game/constants";
 import {
   basePriceRange,
   priceRatio,
-  completePhase1,
   explainCardPrice,
   explainExpectedPrice,
   getCardFinalCost,
+  nextPhase,
   purchaseCard,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -404,6 +404,7 @@ function MarketDepth({
 
 export function Purchase({
   game,
+  ctx,
   act,
   phaseSync,
   members,
@@ -411,7 +412,13 @@ export function Purchase({
   onRumorBoardOpen,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "phaseSync" | "members" | "colorFor" | "onRumorBoardOpen"
+  | "game"
+  | "ctx"
+  | "act"
+  | "phaseSync"
+  | "members"
+  | "colorFor"
+  | "onRumorBoardOpen"
 >) {
   const resolveColor = itemColorResolver(colorFor);
   return (
@@ -594,7 +601,7 @@ export function Purchase({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Purchase, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => completePhase1(g, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

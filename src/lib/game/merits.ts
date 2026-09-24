@@ -4,8 +4,8 @@
 // progression alongside Renown (see legacy.ts) and Daily Check In (see
 // checkin.ts). Pure functions only (no React, no Prisma), so both the
 // client (the trophy row in CaptainLegacyCard) and the server (the voyage
-// conclusion check in src/server/realtime/index.ts, the only place a merit is
-// ever granted) share the exact same rules for what counts.
+// conclusion check in src/server/realtime/conclusion.ts, the only place a
+// merit is ever granted) share the exact same rules for what counts.
 //
 // Unlike Renown XP and Check In rewards, a merit carries no gameplay
 // power of its own, purely bragging rights, so this list can grow freely

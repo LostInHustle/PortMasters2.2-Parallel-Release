@@ -16,6 +16,7 @@ import {
   getIntelCost,
 } from "@/lib/game/engine";
 import { RECIPES, SILK_GOODS, WORKER_TYPES } from "@/lib/game/constants";
+import { TONE_WASH } from "./shared";
 
 /**
  * Autopilot Action Suggester. Analyzes the current game state and
@@ -33,7 +34,7 @@ type Suggestion = {
   icon: string;
   title: string;
   body: string;
-  tone: "jade" | "amber" | "rose" | "indigo" | "gold";
+  tone: "gain" | "warn" | "alarm" | "intel" | "gold";
 };
 
 /* One wash per tone. A tone names a meaning rather than a panel, so it
@@ -43,36 +44,12 @@ type Suggestion = {
    the gold ink, which is what keeps the words on it legible in either
    mode. */
 const TONE_CLASSES: Record<Suggestion["tone"], string> = {
-  jade: "border-gain/20 bg-gain/[0.04]",
-  amber: "border-warn/20 bg-warn/[0.04]",
-  rose: "border-alarm/20 bg-alarm/[0.04]",
-  indigo: "border-intel/20 bg-intel/[0.04]",
+  gain: "border-gain/20 bg-gain/[0.04]",
+  warn: "border-warn/20 bg-warn/[0.04]",
+  alarm: "border-alarm/20 bg-alarm/[0.04]",
+  intel: "border-intel/20 bg-intel/[0.04]",
   gold: "border-gold/20 bg-gold/[0.04]",
 };
-
-/* The fill the toggle wears, read off the tone by name.
-
-   This is deliberately a switch on the tone and not a match against the
-   class string it produces. The old version asked whether the shell
-   class contained the word emerald, amber or rose, which worked only
-   while those classes were raw palette names. The moment the shell
-   became a token every one of those questions answered no, every
-   suggestion took the last branch, and the toggle stopped agreeing with
-   the panel it opens. A tone read by name cannot drift like that. */
-function toneFill(tone: Suggestion["tone"]): string {
-  switch (tone) {
-    case "jade":
-      return "bg-gain/5 text-gain";
-    case "amber":
-      return "bg-warn/5 text-warn";
-    case "rose":
-      return "bg-alarm/5 text-alarm";
-    case "indigo":
-      return "bg-intel/5 text-intel";
-    case "gold":
-      return "bg-gold/5 text-gold-ink";
-  }
-}
 
 export function ActionSuggester({ game }: { game: GameState }) {
   const [open, setOpen] = useState(false);
@@ -87,7 +64,14 @@ export function ActionSuggester({ game }: { game: GameState }) {
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "pm-pressable inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium",
-          toneFill(suggestion.tone),
+          /* The fill is the wash its tone carries, from the one shared
+             table, so the toggle and the panel it opens cannot disagree
+             about a colour. Read by tone name and never by matching the
+             class string that tone produces: a match like that held only
+             while the classes were raw palette names, and quietly sent
+             every suggestion down the last branch once they became
+             tokens. */
+          TONE_WASH[suggestion.tone],
         )}
         title="Show the recommended action for this phase"
         aria-label="Show action suggestion"
@@ -184,7 +168,7 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
       icon: "💰",
       title: "Take the Emergency Loan",
       body: `You have ${game.money} Gold. The Emergency Loan gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Phase 3.`,
-      tone: "rose",
+      tone: "alarm",
     };
   }
 
@@ -196,7 +180,7 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
       icon: "🎓",
       title: "Pick Master's Apprentice",
       body: "You have no artisans yet. Master's Apprentice halves hiring costs this round, letting you get a Weaver for 4 Gold instead of 8. Good for establishing production early.",
-      tone: "jade",
+      tone: "gain",
     };
   }
 
@@ -207,7 +191,7 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
       icon: "📜",
       title: "Grab the Tax Shelter",
       body: `You have ${score} Reputation. With high earnings expected, the Tax Shelter cuts income tax from 10% to 5%, saving Gold at round end.`,
-      tone: "amber",
+      tone: "warn",
     };
   }
 
@@ -216,7 +200,7 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
     icon: "🧭",
     title: `Consider ${choices[0].name}`,
     body: choices[0].desc,
-    tone: "indigo",
+    tone: "intel",
   };
 }
 
@@ -251,7 +235,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
       icon: "⚠️",
       title: "Skip buying this round",
       body: `The best deal costs ${finalCost} Gold but you only have ${game.money}. Save your Gold for Phase 3 bills. You can still barter for goods you need.`,
-      tone: "rose",
+      tone: "alarm",
     };
   }
 
@@ -265,7 +249,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
       icon: "🔮",
       title: "Buy a Broker's Rumor",
       body: `You have ${game.money} Gold. Spending ${intelCost} Gold on a rumor guarantees a matching order in Phase 2, then buying the ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit sets up a profitable trade.`,
-      tone: "indigo",
+      tone: "intel",
     };
   }
 
@@ -273,7 +257,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
     icon: "🛒",
     title: `Buy ${bestGoodName}`,
     body: `Best deal this round: ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit from ${bestCard.port}. This is ${Math.round(bestScore * 100)}% of the typical price range, making it a good value.`,
-    tone: "jade",
+    tone: "gain",
   };
 }
 
@@ -292,14 +276,14 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
         icon: "👩\u200d🔧",
         title: "Hire a Weaver",
         body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production starts next round, so hire now to get goods by Phase 3.`,
-        tone: "jade",
+        tone: "gain",
       };
     }
     return {
       icon: "⚠️",
       title: "Hold off on hiring",
       body: `A Weaver needs ${weaverWage} Gold per round in wages. With ${game.money} Gold, you can only cover ${Math.floor(game.money / weaverWage)} rounds. Wait until you have at least ${weaverWage * 2 + 20} Gold before hiring.`,
-      tone: "amber",
+      tone: "warn",
     };
   }
 
@@ -308,7 +292,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
       icon: "🏁",
       title: "Last round, no new hires",
       body: "Only one round remains. Hiring now wastes Gold on wages with no production return. Focus on filling orders with what you already have.",
-      tone: "amber",
+      tone: "warn",
     };
   }
 
@@ -336,7 +320,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
               )
                 .map(([m, q]) => `${m} x${q}`)
                 .join(", ")}.`,
-              tone: "jade",
+              tone: "gain",
             };
           }
           return {
@@ -347,7 +331,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
             )
               .map(([m, q]) => `${m} x${q} (have ${game.inventory[m] || 0})`)
               .join(", ")}. Buy these next round.`,
-            tone: "amber",
+            tone: "warn",
           };
         }
       }
@@ -401,7 +385,7 @@ function analyzeOrders(game: GameState): Suggestion | null {
       icon: "🤝",
       title: `Trade order #${bestOrder.id}`,
       body: `This order pays ${bestOrder.reward} Gold with an estimated net profit of ${bestProfit} Gold after transport and taxes. It is the most profitable order you can complete right now.`,
-      tone: "jade",
+      tone: "gain",
     };
   }
 
@@ -422,7 +406,7 @@ function analyzeOrders(game: GameState): Suggestion | null {
       icon: "⏳",
       title: `Almost ready for order #${close.id}`,
       body: `You are only missing ${missing?.type} (have ${game.inventory[missing?.type ?? ""] || 0}, need ${missing?.required}). Try bartering for it, or wait to buy it next round.`,
-      tone: "amber",
+      tone: "warn",
     };
   }
 
@@ -453,22 +437,23 @@ function analyzeSettlement(game: GameState): Suggestion | null {
         icon: "🆘",
         title: "Request a loan",
         body: `You owe about ${totalDue} Gold in wages and maintenance but only have ${game.money} Gold. Ask the harbor for a loan before settling, or you will go bankrupt.`,
-        tone: "rose",
+        tone: "alarm",
       };
     }
     return {
       icon: "✅",
       title: "Settle your bills",
       body: `You have ${game.money} Gold, enough to cover the estimated ${totalDue} Gold in wages and maintenance. Settle and continue to the Shipyard.`,
-      tone: "jade",
+      tone: "gain",
     };
   }
 
-  // Pirate attack not yet resolved
-  // The escort decision: compare escort cost to expected loss
-  // Expected loss = money * raidChance
-  // If expected loss > escort cost, recommend hiring escort
-  return null; // The risk assessment already handles this
+  // Nothing to suggest here. The escort is the only pirate decision a
+  // captain makes, and the Settlement panel already offers it with the
+  // comparison spelled out (escort fee against expected loss, see
+  // phases/Settlement.tsx), so a second recommendation from here would
+  // only repeat a choice the captain is looking at.
+  return null;
 }
 
 function analyzeShipyard(game: GameState): Suggestion | null {
@@ -482,14 +467,14 @@ function analyzeShipyard(game: GameState): Suggestion | null {
         icon: "⚓",
         title: "Upgrade to Ship Level 1",
         body: `Upgrading costs ${cost} Gold and gives +1 module slot and +5 Gold transport discount. With ${roundsLeft} rounds left, the transport savings alone will pay for the upgrade.`,
-        tone: "jade",
+        tone: "gain",
       };
     }
     return {
       icon: "⏭️",
       title: "Skip the shipyard",
       body: `Ship upgrade costs ${cost} Gold but you only have ${game.money}. Save the Gold for Phase 3 bills and continue the voyage.`,
-      tone: "amber",
+      tone: "warn",
     };
   }
 
@@ -499,7 +484,7 @@ function analyzeShipyard(game: GameState): Suggestion | null {
       icon: "🔧",
       title: "Draft and install a module",
       body: `You have ${game.equippedModules.length} of ${game.shipLevel} module slots filled. An empty slot is wasted potential. Draft a module now to gain a permanent bonus.`,
-      tone: "indigo",
+      tone: "intel",
     };
   }
 

@@ -2,31 +2,45 @@
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { lapPhases } from "@/lib/game/checkpoint";
+import type { GameMode } from "@/lib/game/mode";
 import type { Phase } from "@/lib/game/types";
 
 /**
  * Voyage Progress Timeline. A compact horizontal strip showing the
- * eight checkpoint phases of a round and which one is active right now.
+ * checkpoint phases of a round and which one is active right now.
  *
- * The phases cycle: Boon Draft, Purchase, Barter, Workers, Orders,
- * Settlement, Shipyard, then back to Boon Draft. The timeline shows
- * the current round's position in that cycle, plus the overall voyage
- * progress (which round of how many).
+ * The phases cycle, and where they cycle TO is not written here. The
+ * order is the room's mode (see src/lib/game/mode.ts), the same lap the
+ * ready check and the engine walk, because the two modes run these same
+ * phases in a different order. This strip used to hold its own copy of
+ * the order, which is the one place a second copy would have been
+ * invisible: a captain mid round on the experimental leg would have
+ * seen the rail point at the phase they had already finished, and
+ * nothing in the engine would have been wrong. Only the picture of it
+ * would have been.
  *
  * Personal sub states (module_draft, module_swap) and terminals
  * (bankruptcy, endgame) are folded into their parent phase for the
  * timeline display, since they never become room checkpoints.
  */
 
-const PHASES: { key: string; label: string; icon: string; short: string }[] = [
-  { key: "5", label: "Boon Draft", icon: "🧭", short: "Boon" },
-  { key: "1", label: "Purchase", icon: "📦", short: "Buy" },
-  { key: "barter", label: "Barter", icon: "🤝", short: "Barter" },
-  { key: "worker_mgmt", label: "Artisans", icon: "👥", short: "Work" },
-  { key: "2", label: "Orders", icon: "📜", short: "Orders" },
-  { key: "3", label: "Settlement", icon: "💸", short: "Settle" },
-  { key: "4", label: "Shipyard", icon: "🚢", short: "Yard" },
-];
+// What each checkpoint phase is called. Only the names live here now; the
+// order they are drawn in comes from the mode's lap. A phase the lap lists
+// but this table does not is one the rail leaves out, which is how the
+// harbor stays off it: waiting to set sail is not a step a captain takes.
+const PHASE_LABELS: Record<
+  string,
+  { label: string; icon: string; short: string }
+> = {
+  "5": { label: "Boon Draft", icon: "🧭", short: "Boon" },
+  "1": { label: "Purchase", icon: "📦", short: "Buy" },
+  barter: { label: "Barter", icon: "🤝", short: "Barter" },
+  worker_mgmt: { label: "Artisans", icon: "👥", short: "Work" },
+  "2": { label: "Orders", icon: "📜", short: "Orders" },
+  "3": { label: "Settlement", icon: "💸", short: "Settle" },
+  "4": { label: "Shipyard", icon: "🚢", short: "Yard" },
+};
 
 function normalizePhase(phase: Phase): string {
   switch (phase) {
@@ -47,15 +61,23 @@ export function VoyageTimeline({
   currentRound,
   maxRounds,
   phase,
+  mode,
   className,
 }: {
   currentRound: number;
   maxRounds: number;
   phase: Phase;
+  mode: GameMode;
   className?: string;
 }) {
+  // The lap, minus whatever has no face in the table above. Reading the rule
+  // off the table rather than off a second list of exclusions is what keeps
+  // the harbor off the rail without naming it twice.
+  const steps = lapPhases(mode)
+    .filter((key) => PHASE_LABELS[key] !== undefined)
+    .map((key) => ({ key, ...PHASE_LABELS[key] }));
   const currentKey = normalizePhase(phase);
-  const currentIndex = PHASES.findIndex((p) => p.key === currentKey);
+  const currentIndex = steps.findIndex((p) => p.key === currentKey);
   const isTerminal = currentKey === "end";
   const voyageProgress = Math.min(100, (currentRound / maxRounds) * 100);
 
@@ -82,7 +104,7 @@ export function VoyageTimeline({
       {/* Phase timeline */}
       {!isTerminal && (
         <div className="flex items-center gap-0.5">
-          {PHASES.map((p, i) => {
+          {steps.map((p, i) => {
             const isCurrent = i === currentIndex;
             const isPast = currentIndex >= 0 && i < currentIndex;
             const isUpcoming = currentIndex >= 0 && i > currentIndex;

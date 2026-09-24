@@ -10,7 +10,8 @@
 // normalizer that the API routes and the Lobby's create form both call.
 // =====================================================================
 import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
-import type { Difficulty } from "./game/difficulty";
+import { normalizeDifficulty } from "./game/difficulty";
+import { normalizeMode } from "./game/mode";
 import type { RoomDetail, RoomSummary } from "./api";
 
 // Forwarded so callers that work with rooms (the realtime mini
@@ -31,6 +32,14 @@ export type { RoomDetail };
 // the other two have already re read the seats into a separate list after
 // writing one, so the members are passed in beside the room rather than dug
 // out of it.
+//
+// Difficulty and mode both arrive here as bare database strings. They used to
+// leave through an `as Difficulty` cast, which is a promise the compiler takes
+// on faith and the database never made: any value at all, including one this
+// build has never heard of, sailed out of here wearing a valid type. Both now
+// pass through their own normalizer, so a room whose row somehow holds
+// something unexpected resolves to the founding value instead of handing the
+// client a lap or a tier that does not exist.
 export function serializeRoom(
   room: {
     id: string;
@@ -39,6 +48,7 @@ export function serializeRoom(
     isPublic: boolean;
     started: boolean;
     difficulty: string;
+    mode: string;
     createdAt: Date;
     host: PublicUser;
   },
@@ -50,7 +60,8 @@ export function serializeRoom(
     name: room.name,
     isPublic: room.isPublic,
     started: room.started,
-    difficulty: room.difficulty as Difficulty,
+    difficulty: normalizeDifficulty(room.difficulty),
+    mode: normalizeMode(room.mode),
     createdAt: room.createdAt.toISOString(),
     host: room.host,
     memberCount: members.length,
@@ -95,6 +106,13 @@ export function roomLockedFor(
 //
 // A returning member always gets back in. A brief disconnect or a refresh must
 // never cost a captain their own seat.
+//
+// The room parameter is structural, like serializeRoom's, and every caller
+// hands over the row it just loaded. That makes this the one place a newly
+// seated captain learns which voyage they are joining, so a field dropped
+// here is a captain walking into a harbor on the wrong lap with nothing to
+// read that says so. Mode is listed beside difficulty for that reason rather
+// than because the seating rule reads it.
 export async function admitToRoom(
   room: {
     id: string;
@@ -103,6 +121,7 @@ export async function admitToRoom(
     isPublic: boolean;
     started: boolean;
     difficulty: string;
+    mode: string;
     createdAt: Date;
     host: PublicUser;
     members: Array<{ userId: string }>;

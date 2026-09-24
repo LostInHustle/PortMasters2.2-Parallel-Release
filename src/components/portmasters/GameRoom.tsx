@@ -116,17 +116,13 @@ export function GameRoom({
   onSessionLost,
 }: {
   me: PublicUser;
-  room:
-    | RoomDetail
-    | (PublicUser & {
-        id: string;
-        code: string;
-        name: string;
-        isPublic: boolean;
-        host: PublicUser;
-        memberCount: number;
-        members: Array<PublicUser & { joinedAt: string }>;
-      });
+  // The room's own record, which is what the page already holds by the time
+  // this renders. It used to be declared here as a union with a hand written
+  // copy of the same shape that listed every field except difficulty, which
+  // meant the lap deciding field was the one a second copy was free to forget.
+  // Nothing ever passed that branch. Typing it as the real thing is what lets
+  // the session below be told which mode this harbor is playing.
+  room: RoomDetail;
   // The optional message is why the captain is leaving, for the times the
   // harbor was taken away rather than walked out of. The page owns the
   // screen that comes next, so it owns the telling.
@@ -151,6 +147,9 @@ export function GameRoom({
     socket,
     true,
     me.id,
+    // Only read if the save load never reaches the server, so this captain
+    // still starts their voyage on the lap the rest of the harbor is keeping.
+    room.mode,
   );
   const phaseSync = usePhaseSync(
     room.id,

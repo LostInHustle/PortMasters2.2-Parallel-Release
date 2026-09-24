@@ -863,7 +863,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
-<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Phase 3",
@@ -881,7 +881,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">🔧</div>
     <strong>Ship Maintenance</strong><br>
-    <span style="font-size:12px;color:var(--muted-foreground)">15 Gold, every voyage, fixed</span>
+    <span style="font-size:12px;color:var(--muted-foreground)">15 to 22 Gold each round, set by the waters you sail</span>
   </div>
   <div style="background:color-mix(in oklch, var(--w-workers) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">👥</div>

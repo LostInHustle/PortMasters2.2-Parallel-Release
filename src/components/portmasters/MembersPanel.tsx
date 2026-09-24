@@ -192,7 +192,7 @@ export function MembersPanel({
                   )}
                 </div>
                 <div className="text-[10px] text-muted-foreground truncate">
-                  {st ? `R${st.round} · ${st.phaseLabel}` : "loading…"}
+                  {st ? st.phaseLabel : "loading…"}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">

@@ -6,17 +6,17 @@
 // over for everyone still seated in it. Whoever reached endgame (not
 // bankrupt) with the highest reported Reputation is crowned Sea Master.
 //
-// This is also the one place a CaptainLegacy row ever gets written:
-// Reputation earned this voyage becomes Renown XP on every finisher's
-// account, persisting across every future voyage they ever sail, unlike
-// Gold, cargo, and ship level, which a restart wipes on purpose.
+// This is also where Reputation earned this voyage becomes Renown XP on
+// every finisher's account, persisting across every future voyage they
+// ever sail, unlike Gold, cargo, and ship level, which a restart wipes on
+// purpose.
 //
 // concludedRooms guards against firing twice for the same voyage;
 // room:restart clears it so a room that plays again can conclude, and
 // be crowned, again.
 //
 // NEW for the manifest: records one VoyageChronicle row per finisher
-// (using buildChronicle from the parent engine) and CaptainRival rows
+// (using buildChronicle from chronicle.ts) and CaptainRival rows
 // for every pair of finishers (using recordRivalOutcomes from rival.ts).
 // =====================================================================
 import type { Server } from "socket.io";

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants";
-import { completeBarterPhase } from "@/lib/game/engine";
+import { nextPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { Handshake, X } from "lucide-react";
 import { Term } from "../../Term";
@@ -12,6 +12,7 @@ import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 export function BarterPhase({
   game,
+  ctx,
   act,
   barter,
   phaseSync,
@@ -20,7 +21,14 @@ export function BarterPhase({
   me,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "barter" | "phaseSync" | "members" | "colorFor" | "me"
+  | "game"
+  | "ctx"
+  | "act"
+  | "barter"
+  | "phaseSync"
+  | "members"
+  | "colorFor"
+  | "me"
 >) {
   // The board's own composer. It shares useOfferDraft with the one a chat
   // opens, so both surfaces agree on what counts as postable, and it draws
@@ -177,9 +185,7 @@ export function BarterPhase({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Done Bartering, Continue"
-        onConfirm={() =>
-          phaseSync.markReady((g, l) => completeBarterPhase(g, l))
-        }
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

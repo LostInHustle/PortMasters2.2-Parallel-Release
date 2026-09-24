@@ -11,7 +11,7 @@ type BackingResolution = {
 
 // Called once a debt is finally settled, whether repaid voluntarily or
 // through the forced Round 8 settlement (see settleOutstandingDebts in
-// src/lib/game/engine.ts). repaidAmount is whatever the borrower actually
+// src/lib/game/engine/aid.ts). repaidAmount is whatever the borrower actually
 // got to the lender directly; any gap below the loan's original amount is
 // exactly what the backer, if any, is on the hook for, up to whatever they
 // themselves pledged, never more.

@@ -7,7 +7,7 @@ import {
   fireWorker,
   getHireCost,
   hireWorker,
-  startPhase2,
+  nextPhase,
 } from "@/lib/game/engine";
 import {
   unlockedProducts,
@@ -380,7 +380,7 @@ export function WorkerMgmt({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Management, Set Sail"
-        onConfirm={() => phaseSync.markReady((g, l) => startPhase2(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

@@ -50,11 +50,11 @@ function HarborRoster({
 // happens to be, the same way ActionSuggester's tones are: the colour
 // follows the meaning, and a rename of the palette should not have to
 // reach into this file.
-const INFO_TONES: Record<"emerald" | "amber" | "sea" | "rose", string> = {
-  emerald: "bg-gain/[0.06] border-gain/20",
-  amber: "bg-warn/[0.06] border-warn/20",
+const INFO_TONES: Record<"gain" | "warn" | "sea" | "alarm", string> = {
+  gain: "bg-gain/[0.06] border-gain/20",
+  warn: "bg-warn/[0.06] border-warn/20",
   sea: "bg-sea/[0.06] border-sea/20",
-  rose: "bg-alarm/[0.06] border-alarm/20",
+  alarm: "bg-alarm/[0.06] border-alarm/20",
 };
 
 function InfoCard({
@@ -62,7 +62,7 @@ function InfoCard({
   title,
   rows,
 }: {
-  tone: "emerald" | "amber" | "sea" | "rose";
+  tone: "gain" | "warn" | "sea" | "alarm";
   title: string;
   rows: string[];
 }) {
@@ -160,7 +160,7 @@ export function Welcome({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-2xl mx-auto">
         <InfoCard
-          tone="emerald"
+          tone="gain"
           title="🚀 Starting Resources"
           rows={[
             `📦 ${stockLine}`,
@@ -168,7 +168,7 @@ export function Welcome({
           ]}
         />
         <InfoCard
-          tone="amber"
+          tone="warn"
           title="⏱️ Production Delay"
           rows={[
             "Assign task now → item arrives at Phase 3",
@@ -184,7 +184,7 @@ export function Welcome({
           ]}
         />
         <InfoCard
-          tone="rose"
+          tone="alarm"
           title="🧾 Taxes Explained"
           rows={[
             "VAT: 5% of finished good profit margin",
@@ -192,7 +192,7 @@ export function Welcome({
           ]}
         />
         <InfoCard
-          tone="amber"
+          tone="warn"
           title="🏴‍☠️ Pirates & Borrowing"
           rows={[
             `${raidPct}% chance of losing all Gold on hand`,

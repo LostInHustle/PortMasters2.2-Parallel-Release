@@ -24,6 +24,13 @@ import {
   difficultyConfig,
   type Difficulty,
 } from "@/lib/game/difficulty";
+import {
+  MODES,
+  MODE_ORDER,
+  DEFAULT_MODE,
+  modeConfig,
+  type GameMode,
+} from "@/lib/game/mode";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
@@ -68,6 +75,7 @@ import {
   Trophy,
   Info,
   X,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -163,6 +171,75 @@ function GaugeRule() {
   return <span className="h-4 w-px shrink-0 bg-black/10 dark:bg-white/15" />;
 }
 
+// One dial on the create form. Voyage and Waters are two settings of the same
+// kind, picked the same way, drawn inches apart, and meant to read as one pair
+// of dials on one form, so they are drawn by one component rather than by two
+// copies of the same twenty lines of chrome that are free to drift apart.
+//
+// The two dials are told apart by thumbId, which is what stops the sliding
+// pill from animating across from one dial to the other when a host changes
+// both in a row, and by columns, which is a literal rather than an
+// interpolated class so the stylesheet can still see it.
+type DialOption<T extends string> = { key: T; icon: string; badge: string };
+
+function Dial<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  thumbId,
+  columns,
+}: {
+  label: string;
+  options: readonly DialOption<T>[];
+  value: T;
+  onChange: (next: T) => void;
+  thumbId: string;
+  columns: 2 | 3;
+}) {
+  return (
+    <>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div
+        className={cn(
+          "mt-1.5 grid gap-1 rounded-full bg-background/60 p-1",
+          columns === 2 ? "grid-cols-2" : "grid-cols-3",
+        )}
+      >
+        {options.map((option) => {
+          const active = value === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(option.key)}
+              aria-pressed={active}
+              className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
+            >
+              {active && (
+                <motion.span
+                  layoutId={thumbId}
+                  className="pm-grad-charter absolute inset-0 rounded-full"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              )}
+              <span
+                className={cn(
+                  "relative z-10 flex items-center justify-center gap-1.5",
+                  active ? "text-white" : "text-muted-foreground",
+                )}
+              >
+                <span>{option.icon}</span>
+                <span className="truncate">{option.badge}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export function Lobby({
   me,
   onEnterRoom,
@@ -212,6 +289,12 @@ export function Lobby({
   // The host picks one tier for the whole harbor (see src/lib/game/difficulty.ts).
   // It is fixed at creation; changing it afterwards means restarting the voyage.
   const [difficulty, setDifficulty] = useState<Difficulty>("fair_winds");
+  // Which voyage the harbor is playing (see src/lib/game/mode.ts). Fixed at
+  // creation for the same reason the tier is: it decides the order every
+  // captain's phases run in, so a room that changed it mid voyage would be
+  // asking its table to keep two different clocks. Starts on the founding
+  // mode, which is the one a captain who never touches this control gets.
+  const [mode, setMode] = useState<GameMode>(DEFAULT_MODE);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -471,6 +554,7 @@ export function Lobby({
         name: newName.trim(),
         isPublic,
         difficulty,
+        mode,
       });
       setNewName("");
       onEnterRoom(room);
@@ -880,43 +964,57 @@ export function Lobby({
             </div>
 
             <div className="mt-3">
-              <Label className="text-xs text-muted-foreground">Waters</Label>
-              <div className="mt-1.5 grid grid-cols-3 gap-1 rounded-full bg-background/60 p-1">
-                {DIFFICULTY_ORDER.map((key) => {
-                  const cfg = DIFFICULTIES[key];
-                  const active = difficulty === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setDifficulty(key)}
-                      aria-pressed={active}
-                      className="relative cursor-pointer rounded-full px-2 py-1.5 text-xs font-medium"
-                    >
-                      {active && (
-                        <motion.span
-                          layoutId="difficultyThumb"
-                          className="pm-grad-charter absolute inset-0 rounded-full"
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 32,
-                          }}
-                        />
-                      )}
-                      <span
-                        className={cn(
-                          "relative z-10 flex items-center justify-center gap-1.5",
-                          active ? "text-white" : "text-muted-foreground",
-                        )}
-                      >
-                        <span>{cfg.icon}</span>
-                        <span className="truncate">{cfg.badge}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Which voyage, before how hard. Mode is the larger choice of
+                  the two: it decides what the phases are and what order they
+                  run in, where the tier only decides how punishing they are.
+                  It draws with the same dial as the Waters switch below
+                  rather than claiming a look of its own, because the two sit
+                  inches apart and read as one pair of dials on one form,
+                  which is what they are. */}
+              <Dial
+                label="Voyage"
+                options={MODE_ORDER.map((key) => ({
+                  key,
+                  icon: MODES[key].icon,
+                  badge: MODES[key].badge,
+                }))}
+                value={mode}
+                onChange={setMode}
+                thumbId="modeThumb"
+                columns={2}
+              />
+              <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                {modeConfig(mode).tagline}
+              </p>
+              {/* A captain who walks into an unfinished mode without being
+                  told has been misled rather than tested, so the warning is
+                  part of choosing it, not a tooltip behind it. */}
+              {MODES[mode].experimental && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-warn">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>
+                    Experimental, and still being built.{" "}
+                    <span className="text-muted-foreground">
+                      {MODES[mode].summary}
+                    </span>
+                  </span>
+                </p>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <Dial
+                label="Waters"
+                options={DIFFICULTY_ORDER.map((key) => ({
+                  key,
+                  icon: DIFFICULTIES[key].icon,
+                  badge: DIFFICULTIES[key].badge,
+                }))}
+                value={difficulty}
+                onChange={setDifficulty}
+                thumbId="difficultyThumb"
+                columns={3}
+              />
               <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                 {DIFFICULTIES[difficulty].tagline}{" "}
                 <span className="text-foreground">
@@ -1054,6 +1152,21 @@ export function Lobby({
                             {difficultyConfig(room.difficulty).icon}{" "}
                             {difficultyConfig(room.difficulty).badge}
                           </Pill>
+                          {/* Only the exceptions carry a chip. Every harbor
+                              a captain has seen so far is Classic, so
+                              labelling that one would be noise, and the
+                              voyage worth flagging is the one that plays by
+                              a different clock. Its colour is the meaning
+                              token rather than a widget hue, the same way
+                              the Sailing status below is coloured: this
+                              says what the harbor IS, not which panel it
+                              belongs to. */}
+                          {room.mode !== DEFAULT_MODE && (
+                            <Pill tone="none" className="bg-warn/5 text-warn">
+                              {modeConfig(room.mode).icon}{" "}
+                              {modeConfig(room.mode).badge}
+                            </Pill>
+                          )}
                           {room.host.id === me.id && (
                             <Pill tone="gold">Host</Pill>
                           )}

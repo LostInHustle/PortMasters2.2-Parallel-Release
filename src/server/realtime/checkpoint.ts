@@ -9,21 +9,29 @@
 // when it gets the go, which is how they all land on the same next
 // phase without this server needing to know what that phase is.
 //
-// checkpointRank is imported from the parent project's shared checkpoint
-// module, and forwarded below, so a change to the synchronized phase
-// order lands in one place rather than two.
+// checkpointRank and openingPhase are the shared helpers from
+// ./game/checkpoint, forwarded so this module stays the single place
+// server code reads anything about a checkpoint from, and lapSuccessor
+// is read here directly to find the step that opens the port market.
+// All three are a boundary, not a copy: the lap they read lives with the
+// mode (see @/lib/game/mode), so there is nothing here that a change to
+// that lap could leave stale.
 // =====================================================================
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
-import { checkpointRank } from "@/lib/game/checkpoint";
+import {
+  checkpointRank,
+  lapSuccessor,
+  openingPhase,
+} from "@/lib/game/checkpoint";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Checkpoint } from "./types";
 import { roomStatuses } from "./status";
 import { roomPulseTallies } from "./pulse";
 
-export { checkpointRank };
+export { checkpointRank, openingPhase };
 
 export const roomCheckpoints = new Map<string, Checkpoint>();
 
@@ -112,16 +120,23 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
     if (!cp.readyUserIds.has(id)) return;
   }
   cp.advancing = true;
-  // Leaving phase 5 means the room is about to draw round cp.round's port
-  // market, so the pulse is measured against the raw goods that round has
-  // unlocked rather than against a fixed number (see computeHarborPulse).
-  // Read only on this one branch, once per round per room.
+  // The harbor pulse belongs to the step that opens the port market, so
+  // it rides along with the advance into it: last round's purchase
+  // tallies lean the new round's card draw toward whatever the harbor
+  // actually bought. Which checkpoint that is comes from the lap rather
+  // than from the number five, so the pulse lands at the right moment in
+  // a mode that reaches its market another way instead of quietly never
+  // firing.
+  //
+  // The pulse is measured against the raw goods that round has unlocked
+  // rather than against a fixed number (see computeHarborPulse). Read
+  // only on the advance that opens a market.
   let harborPulse: Record<string, number> | undefined;
-  if (cp.phase === "5") {
-    const room = await db.room.findUnique({
-      where: { id: roomId },
-      select: { difficulty: true },
-    });
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { difficulty: true, mode: true },
+  });
+  if (lapSuccessor(room?.mode, cp.phase) === "1") {
     harborPulse = computeHarborPulse(
       roomPulseTallies.get(roomId)?.get(cp.round - 1),
       unlockedResources(room?.difficulty, cp.round),

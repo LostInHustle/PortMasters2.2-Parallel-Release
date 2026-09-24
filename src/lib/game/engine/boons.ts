@@ -29,8 +29,7 @@ import {
 } from "../constants";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
-import type { GameContext, GameState } from "../types";
-import { startPhase1 } from "./market";
+import type { GameState } from "../types";
 
 function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -186,18 +185,27 @@ export function swapBoonChoices(state: GameState, logs: string[]) {
   logs.push(`🔄 Swapped Boon Choices for ${BOON_SWAP_COST} Gold`);
 }
 
+// Applies a boon. Returns whether one was actually applied, which is the
+// answer its caller needs: the boon draft is left by choosing a boon, so a
+// call that matched nothing must not be allowed to move the voyage on.
+//
+// It used to end by starting Phase 1 by name, which both pinned the draft to
+// one voyage's leg and made the choice and the advance impossible to separate.
+// The advance belongs to lockInBoon in ./lifecycle now, which is the one place
+// allowed to name where a phase leads. The GameContext it used to take went
+// with that call, since opening a phase is the only thing here that ever
+// needed one.
 export function selectBoon(
   state: GameState,
-  ctx: GameContext,
   boonId: string,
   logs: string[],
-) {
+): boolean {
   const boon = BOONS.find((b) => b.id === boonId);
-  if (!boon) return;
+  if (!boon) return false;
   logs.push(`🧭 Boon Locked In: ${boon.icon} ${boon.name}`);
   applyBoon(state, boon, logs);
   state.boonChoices = [];
-  startPhase1(state, ctx, logs);
+  return true;
 }
 
 function rollModuleChoices(state: GameState): Module[] {

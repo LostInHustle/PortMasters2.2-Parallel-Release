@@ -401,7 +401,6 @@ export function startPhase1(
 export function completePhase1(state: GameState, logs: string[]) {
   if (state.purchaseCount === 0) logs.push("⏭️ Purchasing skipped");
   else logs.push(`✅ Purchasing ended, bought ${state.purchaseCount} batches`);
-
   // Record price history: for each good the captain bought this round,
   // compute the average unit price paid and append it to the history
   // array. Used by the Purchase phase sparkline to show price trends.
@@ -424,6 +423,9 @@ export function completePhase1(state: GameState, logs: string[]) {
     if (!state.priceHistory[good]) state.priceHistory[good] = [];
     state.priceHistory[good].push(avg);
   }
-
-  state.phase = "barter";
+  // This used to end by setting state.phase to the bartering board by name,
+  // which was one of seven copies of the phase order scattered across the
+  // engine's transitions. Where the purchase phase leads is the lap's
+  // business now (see nextPhase in ./lifecycle), and in the experimental mode
+  // it leads somewhere else entirely.
 }

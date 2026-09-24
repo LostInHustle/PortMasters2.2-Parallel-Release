@@ -14,9 +14,9 @@ import {
   calcTransportCost,
   callBrokersFavor,
   completeOrder,
-  completePhase2,
   explainTransportCost,
   explainVAT,
+  nextPhase,
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -31,13 +31,14 @@ import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 export function Orders({
   game,
+  ctx,
   act,
   phaseSync,
   members,
   colorFor,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "phaseSync" | "members" | "colorFor"
+  "game" | "ctx" | "act" | "phaseSync" | "members" | "colorFor"
 >) {
   const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
@@ -414,7 +415,7 @@ export function Orders({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Trades, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => completePhase2(g, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

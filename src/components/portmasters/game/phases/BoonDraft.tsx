@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { selectBoon, swapBoonChoices } from "@/lib/game/engine";
+import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
 import { BOON_SWAP_COST } from "@/lib/game/constants";
 import { ReadyBar } from "../ReadyBar";
 import { Term } from "../../Term";
@@ -104,7 +104,7 @@ export function BoonDraft({
             <Button
               className="pm-grad-boon font-semibold rounded-xl w-full"
               onClick={() =>
-                phaseSync.markReady((g, l) => selectBoon(g, ctx, b.id, l))
+                phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
               }
             >
               🔒 Lock In Boon

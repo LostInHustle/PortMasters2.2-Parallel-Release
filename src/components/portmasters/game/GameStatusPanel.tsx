@@ -183,6 +183,7 @@ export function GameStatusPanel({
           currentRound={game.currentRound}
           maxRounds={game.maxRounds}
           phase={game.phase}
+          mode={game.mode}
           className="mt-2"
         />
       </div>

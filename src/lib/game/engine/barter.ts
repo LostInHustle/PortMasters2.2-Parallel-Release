@@ -131,7 +131,15 @@ export function settleBarterTrade(
   awardBarterReputation(state, logs);
 }
 
-export function completeBarterPhase(state: GameState, logs: string[]) {
+// Takes the ledger and nothing else, because that is genuinely all the work
+// this departure does now: settling the board is no longer part of it, and
+// where the phase leads belongs to the lap. The signature used to carry the
+// whole game state, and dropping it is the honest reading of what is left.
+export function completeBarterPhase(logs: string[]) {
   logs.push("⏭️ Bartering ended");
-  state.phase = "worker_mgmt";
+  // The successor is not named here on purpose. The trade board sits between
+  // the same two phases in the founding mode, but the experimental one runs
+  // it after the manifest instead of before, so a hardcoded next phase would
+  // be the one line in the engine that quietly pinned this board to one
+  // voyage's leg. See nextPhase in ./lifecycle.
 }

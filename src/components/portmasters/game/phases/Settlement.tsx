@@ -7,9 +7,9 @@ import { WORKER_TYPES } from "@/lib/game/constants";
 import { difficultyConfig } from "@/lib/game/difficulty";
 import {
   escortCost,
-  finishSettlement,
   getHireCost,
   hireEscort,
+  nextPhase,
   pirateChance,
   resolvePirateAttack,
 } from "@/lib/game/engine";
@@ -145,6 +145,7 @@ function PirateAttack({
 
 function SettlementBills({
   game,
+  ctx,
   aid,
   backing,
   me,
@@ -152,7 +153,7 @@ function SettlementBills({
   members,
 }: Pick<
   PhasePanelProps,
-  "game" | "aid" | "backing" | "me" | "phaseSync" | "members"
+  "game" | "ctx" | "aid" | "backing" | "me" | "phaseSync" | "members"
 >) {
   const myUserId = me.id;
   // One pass over the whole roster, deliberately mirroring payWages in
@@ -486,9 +487,7 @@ function SettlementBills({
         <div className="mt-5 text-center">
           <Button
             className={cn("rounded-xl px-6", settleClassName)}
-            onClick={() =>
-              phaseSync.markReady((g, l) => finishSettlement(g, l))
-            }
+            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
           >
             {settleIcon}
             <span className="ml-1.5">{settleLabel}</span>
@@ -501,6 +500,7 @@ function SettlementBills({
 
 export function Settlement({
   game,
+  ctx,
   act,
   aid,
   backing,
@@ -509,12 +509,13 @@ export function Settlement({
   members,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "aid" | "backing" | "me" | "phaseSync" | "members"
+  "game" | "ctx" | "act" | "aid" | "backing" | "me" | "phaseSync" | "members"
 >) {
   if (!game.pirateAttackResolved) return <PirateAttack game={game} act={act} />;
   return (
     <SettlementBills
       game={game}
+      ctx={ctx}
       aid={aid}
       backing={backing}
       me={me}

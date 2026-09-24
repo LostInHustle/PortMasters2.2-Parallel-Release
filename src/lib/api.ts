@@ -8,6 +8,7 @@
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import type { Difficulty } from "@/lib/game/difficulty";
+import type { GameMode } from "@/lib/game/mode";
 import type { HouseId } from "@/lib/game/legacy";
 import type {
   HouseStanding,
@@ -28,6 +29,11 @@ export type RoomSummary = {
   isPublic: boolean;
   started: boolean;
   difficulty: Difficulty;
+  // Which voyage this harbor is playing. The lobby reads it to badge the room
+  // card and to draw the host's mode switch on the right setting, and a
+  // captain who joins reads it to know which lap the room is keeping before
+  // their own state ever loads. See src/lib/game/mode.ts.
+  mode: GameMode;
   createdAt: string;
   host: PublicUser;
   memberCount: number;
@@ -123,6 +129,10 @@ export const api = {
     name: string;
     isPublic?: boolean;
     difficulty?: Difficulty;
+    // Omitted by any caller that does not care, in which case the route's own
+    // schema defaults it to the founding mode. Only the lobby's create form
+    // sends it, and only when the host has picked the experimental one.
+    mode?: GameMode;
   }) =>
     jfetch<{ room: RoomSummary }>("/api/rooms", {
       method: "POST",
@@ -154,6 +164,11 @@ export const api = {
         voyageEpoch: number;
       } | null;
       difficulty: Difficulty;
+      // The room's mode, which decides the phase order this captain's lap
+      // runs in. Loaded with the save rather than read from anywhere the
+      // client already holds, because the room is the single source of truth
+      // for it exactly as it is for difficulty.
+      mode: GameMode;
     }>(`/api/game/state?roomId=${roomId}`),
   saveGameState: (roomId: string, data: unknown) =>
     jfetch<{ ok: true; updatedAt: string }>("/api/game/state", {

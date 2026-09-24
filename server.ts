@@ -11,8 +11,10 @@
 // Because both live on one listener, the browser fetches the site, calls
 // the API and opens its socket on the same origin. There is no gateway
 // in front, no second port to forward, and nothing to keep in step. The
-// realtime layer rewrites the server's request listener when it attaches,
-// forwarding anything that is not /socket.io straight back to Next.
+// one listener works because attaching Socket.IO takes over the request
+// listener and hands anything that is not /socket.io straight back to
+// Next, which is why no routing code for that split appears anywhere in
+// this repo.
 //
 // Run it with `npm run dev` while working, or `npm run build` followed by
 // `npm run start` for the production build.

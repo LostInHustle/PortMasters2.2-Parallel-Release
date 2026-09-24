@@ -6,7 +6,7 @@ import {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
-  skipUpgrade,
+  nextPhase,
   startModuleDrafting,
   swapModuleChoices,
   upgradeShip,
@@ -24,10 +24,11 @@ import type { PhasePanelProps } from "./PhaseShared";
 
 export function Shipyard({
   game,
+  ctx,
   act,
   phaseSync,
   members,
-}: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
+}: Pick<PhasePanelProps, "game" | "ctx" | "act" | "phaseSync" | "members">) {
   const canUpgrade = game.shipLevel < MAX_SHIP_LEVEL;
   const upgCost = canUpgrade
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
@@ -121,7 +122,7 @@ export function Shipyard({
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"
-            onClick={() => phaseSync.markReady((g, l) => skipUpgrade(g, l))}
+            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
           >
             ⏭️ Continue Voyage
           </Button>
