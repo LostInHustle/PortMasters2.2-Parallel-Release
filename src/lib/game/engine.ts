@@ -76,9 +76,12 @@ export { getOwnedAmount } from "./engine/core";
 // two sit.
 export {
   basePriceRange,
+  priceRatio,
   brokersFavorCommission,
   calcTransportCost,
   explainCardPrice,
+  INCOME_TAX_RATE,
+  VAT_RATE,
   explainExpectedPrice,
   explainTransportCost,
   explainVAT,
@@ -119,10 +122,12 @@ export {
 // purpose: nothing in ./engine/barter.ts consumes these, they are the
 // policy the callers apply around it, and it is the flexible surface
 // alone. The Captain's Exchange is not governed from here at all.
+// bothFlexibleBarterUnlocked is deliberately absent: its callers are the
+// server's two flexible offer handlers, and both of them read it from
+// ./engine/barterAccess directly since they run outside this barrel.
 export {
   flexibleBarterUnlocked,
   flexibleOffersLeft,
-  bothFlexibleBarterUnlocked,
 } from "./engine/barterAccess";
 
 // ========== Artisans ==========

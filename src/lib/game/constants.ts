@@ -541,6 +541,12 @@ export const BOONS_TIER2: Boon[] = [
 
 export const BOONS: Boon[] = [...BOONS_TIER0, ...BOONS_TIER1, ...BOONS_TIER2];
 
+// What a boon reroll costs, once per round. The module side has no
+// equivalent fee (its scarcity is the equippable slots), so this is the
+// boon draft's own dial and lives here rather than beside the shared
+// swap policy.
+export const BOON_SWAP_COST = 10;
+
 export type Module = { id: string; name: string; icon: string; desc: string };
 
 export const MODULES_TIER0: Module[] = [
@@ -636,6 +642,16 @@ export const MODULES_TIER2: Module[] = [
     desc: "Freight on Foreign Balm & Pearl String orders is 3 Gold cheaper per unit.",
   },
 ];
+
+// What one ship level takes off every freight bill, and what the
+// upgrade screen promises for the next one. Read by both pricing
+// functions and by the two panels that quote it.
+export const SHIP_DISCOUNT_PER_LEVEL = 5;
+
+// The last ship level there is. upgradeShip refuses past it and the
+// shipyard stops offering the button, and the two had the 3 written out
+// separately.
+export const MAX_SHIP_LEVEL = 3;
 
 export const MODULES: Module[] = [
   ...MODULES_TIER0,

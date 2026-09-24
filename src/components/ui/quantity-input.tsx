@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 /**
  * A numeric field that can actually be typed into.
@@ -100,7 +99,7 @@ export function QuantityInput({
           (e.target as HTMLInputElement).blur();
         }
       }}
-      className={cn(className)}
+      className={className}
     />
   );
 }

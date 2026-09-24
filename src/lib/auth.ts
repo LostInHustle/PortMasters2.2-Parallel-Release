@@ -6,7 +6,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { db } from "./db";
 
-const SESSION_COOKIE = "pm_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 export function hashPassword(password: string): string {
@@ -75,7 +74,11 @@ export async function getUserFromToken(token: string | undefined | null) {
   return session.user;
 }
 
-export const SESSION_COOKIE_NAME = SESSION_COOKIE;
+// The name of the cookie the session token travels in. Read by the API
+// routes, by api-auth when it mints and clears the cookie, and by the
+// realtime layer when it parses a handshake off the wire, so it lives
+// here rather than being retyped at each of those.
+export const SESSION_COOKIE_NAME = "pm_session";
 export const sessionCookieMaxAge = SESSION_TTL_MS / 1000;
 
 // Avatar hue from a string (fallback when a user has none). Kept here next to

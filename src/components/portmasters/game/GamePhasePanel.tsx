@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import type { Phase } from "@/lib/game/types";
 import type { VoyageResult } from "@/types/realtime";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
@@ -41,21 +42,13 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  * sensible default.
  */
 
-// The shared props every phase panel takes, re exported so any caller
-// that needs the shape (the dispatcher itself, the GameRoom that builds
-// it, a storybook fixture) imports it from the canonical home in
-// PhaseShared.
-export type { PhasePanelProps } from "./phases/PhaseShared";
-
+// Everything a phase panel takes lives in PhaseShared, and every panel
+// imports it from there. This type adds the four things the dispatcher
+// alone decides: which overlay is open, whether the voyage has concluded,
+// and the two Endgame extras it forwards rather than renders itself.
 type Props = PhasePanelProps & {
   onTutorialOpen?: () => void;
   voyageResult?: VoyageResult | null;
-  // Endgame also accepts myLegacy and onRestart as optional, but the
-  // dispatcher deliberately does not take them as its own props; if a
-  // caller needs them wired through, the Endgame panel can be rendered
-  // directly with those props. Keeping the dispatcher's surface narrow
-  // matches the original spec: only onTutorialOpen and voyageResult are
-  // added on top of PhasePanelProps here.
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
@@ -66,7 +59,7 @@ export function GamePhasePanel(props: Props) {
   // A phase specific accent gradient strip at the top of the panel.
   // Each phase gets its own colour so the transition between phases is
   // visually distinct even before the content swaps in.
-  const accentGradient = PHASE_ACCENTS[phaseKey] ?? "pm-grad-welcome";
+  const accentGradient = PHASE_ACCENTS[game.phase];
   return (
     <div className="pm-glass relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[520px]">
       {/* Phase accent strip */}
@@ -103,8 +96,14 @@ export function GamePhasePanel(props: Props) {
    Two pairs do share a hue, and neither pair can ever be on screen
    together: bankruptcy wears the Boon Draft colour because a voyage that
    ends there never reaches another boon, and endgame wears the Module
-   Draft colour because a crowned voyage has drafted its last module. */
-const PHASE_ACCENTS: Record<string, string> = {
+   Draft colour because a crowned voyage has drafted its last module.
+
+   Keyed by the Phase union rather than by string, and read with the
+   phase value itself rather than with the widened string form. Both of
+   those are load bearing: a phase added to the union without a colour
+   now fails the build here, and the lookup can no longer come back
+   undefined, so it needs no fallback colour. */
+const PHASE_ACCENTS: Record<Phase, string> = {
   "0": "pm-grad-welcome",
   "1": "pm-grad-purchase",
   "2": "pm-grad-orders",

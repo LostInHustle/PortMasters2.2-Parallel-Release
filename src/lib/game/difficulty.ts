@@ -218,23 +218,13 @@ export function difficultyConfig(value: unknown): DifficultyConfig {
   return DIFFICULTIES[normalizeDifficulty(value)];
 }
 
-// Voyage length is read often enough, and by the test suite in particular, to
-// justify its own accessor. There are deliberately no startingGoldFor /
-// maintenanceFor / brokerCorruptionFor twins: those existed and nothing ever
-// called them, since every consumer reads difficultyConfig(x).field directly,
-// which is just as clear and one fewer indirection to keep in step. The
-// selectors below earn their place because they compute something (a
-// midpoint, an accumulation, a normalization) rather than forwarding a field.
-export function roundsFor(value: unknown): number {
-  return difficultyConfig(value).rounds;
-}
-export function escortRateFor(value: unknown): number {
-  return difficultyConfig(value).escortCostRate;
-}
-
-export function renownMultiplierFor(value: unknown): number {
-  return difficultyConfig(value).renownXpMultiplier;
-}
+// There are no startingGoldFor / maintenanceFor / brokerCorruptionFor /
+// roundsFor / escortRateFor / renownMultiplierFor accessors, and no others
+// of that shape. Every one of them read difficultyConfig(x).field and
+// nothing more, so a consumer writes that directly: it is just as clear and
+// one fewer indirection to keep in step. The selectors further down earn
+// their place by computing something (a midpoint, an accumulation, a
+// normalization) rather than forwarding a field.
 
 // Card counts for both boards on a given round: the base plus every charter
 // bump the voyage has reached by now. Mirrors the accumulation of the
@@ -308,6 +298,19 @@ export function pirateChanceFor(
   const curve = difficultyConfig(value).pirateChance;
   const secondHalf = curve.length === 2 ? curve[1] : curve[0];
   return roundNo <= Math.floor(maxRounds / 2) ? curve[0] : secondHalf;
+}
+
+// A tier's pirate odds as prose, for the two places that quote the figure
+// rather than use it: the glossary entry for a pirate attack and the caution
+// the advisor gives a captain with no solvent streak behind them. A flat tier
+// reads "20%"; one that steps up at the midpoint reads "22% to 30%". Both
+// screens had the numbers typed out by hand, which is one balance pass away
+// from telling a captain the wrong odds going into a roll that takes every
+// coin they are carrying. Says nothing about the midpoint itself, because
+// whether that clause belongs in the sentence is the sentence's business.
+export function pirateOddsLabel(cfg: DifficultyConfig): string {
+  const pcts = cfg.pirateChance.map((r) => Math.round(r * 100));
+  return pcts.length === 1 ? `${pcts[0]}%` : `${pcts[0]}% to ${pcts[1]}%`;
 }
 
 // The scheduled mandate template index for this round, or undefined if none

@@ -12,6 +12,7 @@ import type { VoyageResult } from "@/types/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
@@ -531,7 +532,7 @@ export function GameRoom({
         icon: "🌊",
         title: "Tidewatch Alert",
         lines: [
-          "The harbor crossed 500 combined Reputation.",
+          `The harbor crossed ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation.`,
           "One extra cargo lot joins every Port Purchase board.",
         ],
         category: "tidewatch",
@@ -827,10 +828,6 @@ export function GameRoom({
     phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
   }, [phaseSync, ctx]);
 
-  const handleSetSail = useCallback(() => {
-    phaseSync.startGame();
-  }, [phaseSync]);
-
   const handleRestart = useCallback(() => {
     if (!isHost) {
       toast.error("Only the host can restart the voyage");
@@ -838,10 +835,6 @@ export function GameRoom({
     }
     setRestartConfirmOpen(true);
   }, [isHost]);
-
-  const confirmRestart = useCallback(() => {
-    phaseSync.restartVoyage();
-  }, [phaseSync]);
 
   // Keyboard shortcuts (preserved from original).
   useEffect(() => {
@@ -1119,7 +1112,7 @@ export function GameRoom({
               game={state.game}
               saving={state.saving}
               isHost={isHost}
-              onSetSail={handleSetSail}
+              onSetSail={phaseSync.startGame}
               onNextPhase={handleNext}
               onGuide={() => setGuideOpen(true)}
               onSave={handleSave}
@@ -1254,7 +1247,7 @@ export function GameRoom({
       <RestartConfirmModal
         open={restartConfirmOpen}
         onOpenChange={setRestartConfirmOpen}
-        onConfirm={confirmRestart}
+        onConfirm={phaseSync.restartVoyage}
       />
       <NotificationHistoryModal
         open={notificationsOpen}

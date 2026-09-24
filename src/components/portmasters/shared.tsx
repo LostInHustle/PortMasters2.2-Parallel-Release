@@ -153,6 +153,20 @@ export function Pill({
   );
 }
 
+/**
+ * The three podium medals, by a 1 based rank. The harbor leaderboard and
+ * the Great Houses standings both draw them, and between the two they had
+ * been written three ways: twice as a nested ternary over a zero based
+ * index and once as a map. A rank past the podium gets no entry here, and
+ * each list answers that with its own neutral chip rather than sharing one
+ * fallback, because the two chips are drawn at different sizes.
+ */
+export const RANK_MEDALS: Record<number, string> = {
+  1: "pm-grad-medal-gold",
+  2: "pm-grad-medal-silver",
+  3: "pm-grad-medal-bronze",
+};
+
 const MERIT_ICONS: Record<MeritId, LucideIcon> = {
   first_voyage: Anchor,
   first_crown: Crown,

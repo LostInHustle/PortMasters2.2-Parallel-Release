@@ -28,7 +28,7 @@
 // poster and its one named target.
 // =====================================================================
 import type { Server } from "socket.io";
-import type { BarterOffer } from "./types";
+import type { BarterOffer } from "@/types/realtime";
 import { sockets } from "./presence";
 
 // The room's open offers. Module local on purpose: every reader and every

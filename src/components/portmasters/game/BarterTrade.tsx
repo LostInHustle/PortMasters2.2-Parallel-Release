@@ -70,11 +70,11 @@ export function useOfferDraft(
 
   const owned = getOwnedAmount(game, offerItem);
   const sameItem = offerItem === requestItem;
-  const validAmounts =
-    Number.isInteger(offerAmount) &&
-    offerAmount >= 1 &&
-    Number.isInteger(requestAmount) &&
-    requestAmount >= 1;
+  // There is no test here that both amounts are whole numbers of at least
+  // one. Both fields are QuantityInputs, which parse with parseInt and
+  // clamp to min={1} before they commit, and the two only writers of these
+  // two numbers are that commit and the reset below, so the check had no
+  // reachable false. The engine checks the lot again on the way through.
   // Flexible bartering is Renown gated, and the server holds the
   // authoritative level. This reads the level off the voyage state, which
   // is refreshed from the same account row on load, so a captain who is
@@ -91,7 +91,7 @@ export function useOfferDraft(
     barter.flexibleOffersAccepted,
   );
   const allowed = !flexible || (unlocked && offersLeft > 0);
-  const canPost = allowed && !sameItem && validAmounts && offerAmount <= owned;
+  const canPost = allowed && !sameItem && offerAmount <= owned;
   // A composer sitting inside a private thread is already addressed to the
   // captain in it, so there is nothing for that one to choose.
   const targetUserId = fixedTargetId ?? chosenTargetId;

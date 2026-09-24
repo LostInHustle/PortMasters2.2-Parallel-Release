@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   DIFFICULTIES,
   mandateRounds,
+  pirateOddsLabel,
   type Difficulty,
   type DifficultyConfig,
 } from "@/lib/game/difficulty";
@@ -17,15 +18,16 @@ import {
  * and solvent streak. The advisor is advisory only, the captain can
  * still pick any tier.
  *
- * The recommendation reads four bands, each one wider than the last:
+ * Three bands, read from the top down, and the first one a captain clears
+ * is the advice. Monsoon asks for Renown 8, 10 voyages, a best score of
+ * 200, and a solvent streak of 3. Open Waters asks for Renown 5, 5
+ * voyages, and a best score of 100. Anything below that is pointed at Fair
+ * Winds. The bands were described here as four once, with numbers that two
+ * of the three branches did not check.
  *
- * Renown 1 to 2 with fewer than 3 voyages is pointed at Fair Winds.
- * Renown 3 to 4 with 3 voyages or more and a best score of 50 or more is
- * pointed at Fair Winds or Open Waters.
- * Renown 5 or more with 5 voyages or more, a best score of 100 or more and
- * a solvent streak of 2 or more is pointed at Open Waters.
- * Renown 8 or more with 10 voyages or more, a best score of 200 or more and
- * a solvent streak of 3 or more is pointed at Monsoon.
+ * The cautions run the other way. They fire when the tier the captain has
+ * picked asks for more than they have brought, and each names the bar it
+ * is asking them to clear.
  */
 
 // The three tiers, read off the one table that defines them rather than
@@ -35,6 +37,15 @@ import {
 const fairWinds = DIFFICULTIES.fair_winds;
 const openWaters = DIFFICULTIES.open_waters;
 const monsoon = DIFFICULTIES.monsoon;
+
+// The Renown a captain is expected to have before Open Waters is worth
+// their trouble. Read twice, by the branch that recommends the tier and by
+// the caution telling a Monsoon bound captain to wait, so that the advice
+// and the warning can never quote different bars. Both of those were a
+// bare 5, and a balance pass moving one of them would have left the panel
+// recommending a tier in the same breath as saying the captain is not
+// ready for it.
+const OPEN_WATERS_RENOWN = 5;
 
 // A tier's mandate rounds as prose: "4, 8, and 12".
 function listRounds(cfg: DifficultyConfig): string {
@@ -70,7 +81,11 @@ function getAdvice(
   ) {
     recommended = "monsoon";
     reason = `You have the experience and the streak for the ${monsoon.name}. ${monsoon.rounds} rounds, ${monsoon.renownXpMultiplier}x Renown, and two difficulty scoped Merits await: Storm Sovereign and Eye of the Storm.`;
-  } else if (renownLevel >= 5 && voyagesCompleted >= 5 && bestScore >= 100) {
+  } else if (
+    renownLevel >= OPEN_WATERS_RENOWN &&
+    voyagesCompleted >= 5 &&
+    bestScore >= 100
+  ) {
     recommended = "open_waters";
     reason = `Your Renown and voyage count suggest you are ready for ${openWaters.name}. ${openWaters.rounds} rounds, ${openWaters.renownXpMultiplier}x Renown, and Imperial Mandates on rounds ${listRounds(openWaters)}.`;
   } else {
@@ -79,15 +94,13 @@ function getAdvice(
   }
 
   // Cautions for overreaching
-  if (selected === "monsoon" && renownLevel < 5) {
-    caution =
-      "Monsoon Season is very tough for a new captain. Consider Open Waters or Fair Winds until you reach Renown Level 5.";
+  if (selected === "monsoon" && renownLevel < OPEN_WATERS_RENOWN) {
+    caution = `Monsoon Season is very tough for a new captain. Consider Open Waters or Fair Winds until you reach Renown Level ${OPEN_WATERS_RENOWN}.`;
   } else if (selected === "open_waters" && voyagesCompleted < 3) {
     caution =
       "Open Waters introduces mandates and charter goods. Try a few Fair Winds voyages first to learn the core loop.";
   } else if (selected === "monsoon" && solventStreak === 0) {
-    caution =
-      "Monsoon has a 28 to 38 percent pirate raid chance. Make sure you can survive a bankruptcy before risking it.";
+    caution = `${monsoon.name} has a ${pirateOddsLabel(monsoon)} pirate raid chance. Make sure you can survive a bankruptcy before risking it.`;
   }
 
   return {
@@ -120,52 +133,56 @@ export function DifficultyAdvisor({
     solventStreak,
   );
 
-  if (dismissed) return null;
-
+  // The test sits inside the AnimatePresence rather than above it, so the
+  // panel is still in the tree for the frame its exit animation runs.
+  // Returning null up here instead drops it instantly and makes that exit
+  // prop dead. The other dialogs in this folder are written the same way.
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ opacity: 1, height: "auto" }}
-        exit={{ opacity: 0, height: 0 }}
-        className={cn(
-          "mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed",
-          advice.match
-            ? "border-gain/20 bg-gain/[0.04]"
-            : advice.caution
-              ? "border-warn/20 bg-warn/[0.04]"
-              : "border-intel/15 bg-intel/[0.03]",
-        )}
-      >
-        <div className="flex items-start gap-1.5">
-          {advice.match ? (
-            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-gain" />
-          ) : advice.caution ? (
-            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
-          ) : (
-            <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-intel" />
+      {!dismissed && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className={cn(
+            "mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed",
+            advice.match
+              ? "border-gain/20 bg-gain/[0.04]"
+              : advice.caution
+                ? "border-warn/20 bg-warn/[0.04]"
+                : "border-intel/15 bg-intel/[0.03]",
           )}
-          <div className="flex-1 min-w-0">
-            {!advice.match && (
-              <p className="font-medium text-foreground">
-                {advice.caution
-                  ? "Heads up"
-                  : `Consider ${advice.recommended.replace(/_/g, " ")}`}
-              </p>
+        >
+          <div className="flex items-start gap-1.5">
+            {advice.match ? (
+              <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-gain" />
+            ) : advice.caution ? (
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
+            ) : (
+              <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-intel" />
             )}
-            <p className="text-muted-foreground">
-              {advice.caution ?? advice.reason}
-            </p>
+            <div className="flex-1 min-w-0">
+              {!advice.match && (
+                <p className="font-medium text-foreground">
+                  {advice.caution
+                    ? "Heads up"
+                    : `Consider ${advice.recommended.replace(/_/g, " ")}`}
+                </p>
+              )}
+              <p className="text-muted-foreground">
+                {advice.caution ?? advice.reason}
+              </p>
+            </div>
+            <button
+              onClick={() => setDismissed(true)}
+              className="pm-pressable shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+              aria-label="Dismiss advice"
+            >
+              <span className="text-xs">x</span>
+            </button>
           </div>
-          <button
-            onClick={() => setDismissed(true)}
-            className="pm-pressable shrink-0 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-            aria-label="Dismiss advice"
-          >
-            <span className="text-xs">x</span>
-          </button>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

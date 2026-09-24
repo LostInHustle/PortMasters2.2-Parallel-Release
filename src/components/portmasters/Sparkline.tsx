@@ -9,10 +9,8 @@ import { cn } from "@/lib/utils";
  * charting library, no canvas, no layout cost beyond one SVG element.
  *
  * The sparkline shows the shape of the data: trends, spikes, dips. It
- * does not show axis labels or grid lines, since the point is a glance
- * read, not a precise measurement. An optional threshold line marks a
- * baseline so a captain can see at a glance whether the current value
- * is above or below average.
+ * does not show axis labels, grid lines or markers, since the point is a
+ * glance read, not a precise measurement.
  *
  * Two screens draw one of these. The Purchase phase market price reference
  * shows each good's price trend across rounds, and the Captain Profile
@@ -28,8 +26,6 @@ export function Sparkline({
   fillClassName = "fill-celadon/10",
   showArea = true,
   strokeWidth = 1.5,
-  showDots = false,
-  baseline,
 }: {
   data: number[];
   width?: number;
@@ -39,12 +35,10 @@ export function Sparkline({
   fillClassName?: string;
   showArea?: boolean;
   strokeWidth?: number;
-  showDots?: boolean;
-  baseline?: number;
 }) {
-  const { points, areaPath, baselineY } = useMemo(() => {
+  const { points, areaPath } = useMemo(() => {
     if (data.length === 0) {
-      return { points: "", areaPath: "", baselineY: 0 };
+      return { points: "", areaPath: "" };
     }
     const min = Math.min(...data);
     const max = Math.max(...data);
@@ -72,13 +66,8 @@ export function Sparkline({
           )} L ${(pad + (data.length - 1) * stepX).toFixed(1)},${height - pad} Z`
       : "";
 
-    const bY =
-      baseline !== undefined
-        ? pad + usableH - ((baseline - min) / range) * usableH
-        : 0;
-
-    return { points: pointsStr, areaPath: areaPathStr, baselineY: bY };
-  }, [data, width, height, showArea, strokeWidth, baseline]);
+    return { points: pointsStr, areaPath: areaPathStr };
+  }, [data, width, height, showArea, strokeWidth]);
 
   if (data.length === 0) {
     return (
@@ -97,7 +86,7 @@ export function Sparkline({
   if (data.length === 1) {
     return (
       <svg
-        className={cn(className)}
+        className={className}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
@@ -115,24 +104,13 @@ export function Sparkline({
 
   return (
     <svg
-      className={cn(className)}
+      className={className}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
     >
       {showArea && areaPath && (
         <path d={areaPath} className={fillClassName} stroke="none" />
-      )}
-      {baseline !== undefined && baselineY > 0 && baselineY < height && (
-        <line
-          x1={0}
-          x2={width}
-          y1={baselineY}
-          y2={baselineY}
-          className="stroke-muted-foreground/30"
-          strokeWidth={0.5}
-          strokeDasharray="2 2"
-        />
       )}
       <polyline
         points={points}
@@ -142,28 +120,6 @@ export function Sparkline({
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      {showDots &&
-        data.map((_, i) => {
-          const min = Math.min(...data);
-          const max = Math.max(...data);
-          const range = max - min || 1;
-          const pad = strokeWidth;
-          const usableH = height - pad * 2;
-          const usableW = width - pad * 2;
-          const stepX = data.length > 1 ? usableW / (data.length - 1) : 0;
-          const x = pad + i * stepX;
-          const y = pad + usableH - ((data[i] - min) / range) * usableH;
-          return (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r={strokeWidth + 0.5}
-              className={strokeClassName}
-              fill="currentColor"
-            />
-          );
-        })}
     </svg>
   );
 }

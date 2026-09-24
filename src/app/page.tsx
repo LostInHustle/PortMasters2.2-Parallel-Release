@@ -9,6 +9,7 @@ import { AuthScreen } from "@/components/portmasters/AuthScreen";
 import { Lobby } from "@/components/portmasters/Lobby";
 import { GameRoom } from "@/components/portmasters/GameRoom";
 import type { RoomDetail } from "@/lib/rooms";
+import type { RoomSummary } from "@/lib/api";
 
 type Status = "loading" | "auth" | "lobby" | "game";
 
@@ -105,20 +106,26 @@ export default function Home() {
     );
   }
 
+  // Entering a harbor always means the same two things: hold the room
+  // detail this page renders from, and switch to the game screen. Both
+  // Lobby renders below hand over this handler, so the fall through one
+  // cannot strand a click by having no room to pass on.
+  const enterRoom = async (summary: RoomSummary) => {
+    try {
+      const { room: detail } = await api.getRoom(summary.id);
+      setRoom(detail);
+      setStatus("game");
+    } catch {
+      setRoom(null);
+      setStatus("lobby");
+    }
+  };
+
   if (status === "lobby") {
     return (
       <Lobby
         me={user}
-        onEnterRoom={async (r) => {
-          try {
-            const { room: detail } = await api.getRoom(r.id);
-            setRoom(detail);
-            setStatus("game");
-          } catch {
-            setRoom(null);
-            setStatus("lobby");
-          }
-        }}
+        onEnterRoom={enterRoom}
         onLogout={handleLogout}
         onSessionLost={handleSessionLost}
         notice={notice}
@@ -147,9 +154,7 @@ export default function Home() {
   return (
     <Lobby
       me={user}
-      onEnterRoom={async () => {
-        setStatus("lobby");
-      }}
+      onEnterRoom={enterRoom}
       onLogout={handleLogout}
       onSessionLost={handleSessionLost}
       notice={notice}

@@ -251,7 +251,7 @@ export function usePhaseSync(
     // room:join effect: without this, a fast mount and slow auth path means
     // the client never hears who's readied up.
     //
-    // `authed` is a dependency, so the effect re-runs the moment it flips
+    // `authed` is a dependency, so the effect runs again the moment it flips
     // and this line is what answers the deferred case. A second effect used
     // to sit below doing the same emit, which meant every ordinary mount
     // asked twice and the answer was applied twice.

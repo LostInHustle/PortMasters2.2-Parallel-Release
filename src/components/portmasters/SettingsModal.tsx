@@ -15,6 +15,15 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
+import {
+  notifCategoryPref,
+  setNotifCategoryPref,
+  type NotifCategory,
+} from "@/lib/use-notifications";
+import {
+  TIDEWATCH_SURGE_THRESHOLD,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+} from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,14 +36,6 @@ import { cn } from "@/lib/utils";
  * GameRoom header. Notification preferences control which events
  * produce a toast.
  */
-
-const STORAGE_KEYS = {
-  soundEnabled: "portmasters_sound_enabled",
-  soundVolume: "portmasters_sound_volume",
-  notifRoomEvents: "portmasters_notif_room_events",
-  notifDocks: "portmasters_notif_docks",
-  notifTidewatch: "portmasters_notif_tidewatch",
-};
 
 export function SettingsModal({
   open,
@@ -56,30 +57,13 @@ export function SettingsModal({
   onVolumeChange: (v: number) => void;
 }) {
   const { theme, setTheme } = useTheme();
-  const [notifRoom, setNotifRoom] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      return localStorage.getItem(STORAGE_KEYS.notifRoomEvents) !== "false";
-    } catch {
-      return true;
-    }
-  });
-  const [notifDocks, setNotifDocks] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      return localStorage.getItem(STORAGE_KEYS.notifDocks) !== "false";
-    } catch {
-      return true;
-    }
-  });
-  const [notifTidewatch, setNotifTidewatch] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      return localStorage.getItem(STORAGE_KEYS.notifTidewatch) !== "false";
-    } catch {
-      return true;
-    }
-  });
+  const [notifRoom, setNotifRoom] = useState(() => notifCategoryPref("room"));
+  const [notifDocks, setNotifDocks] = useState(() =>
+    notifCategoryPref("docks"),
+  );
+  const [notifTidewatch, setNotifTidewatch] = useState(() =>
+    notifCategoryPref("tidewatch"),
+  );
 
   // There is deliberately no load effect here. Every preference on this
   // screen is read from localStorage by its own lazy initializer when the
@@ -92,16 +76,12 @@ export function SettingsModal({
   };
 
   const toggleNotif = (
-    key: keyof typeof STORAGE_KEYS,
+    category: NotifCategory,
     setter: React.Dispatch<React.SetStateAction<boolean>>,
     current: boolean,
   ) => {
     const next = !current;
-    try {
-      localStorage.setItem(STORAGE_KEYS[key], String(next));
-    } catch {
-      // private browsing
-    }
+    setNotifCategoryPref(category, next);
     setter(next);
   };
 
@@ -209,28 +189,22 @@ export function SettingsModal({
                   label="Room events"
                   description="Captains joining, leaving, and system messages"
                   checked={notifRoom}
-                  onChange={() =>
-                    toggleNotif("notifRoomEvents", setNotifRoom, notifRoom)
-                  }
+                  onChange={() => toggleNotif("room", setNotifRoom, notifRoom)}
                 />
                 <ToggleRow
                   label="Word on the Docks"
-                  description="The race to five completed orders"
+                  description={`The race to ${WORD_ON_THE_DOCKS_THRESHOLD} completed orders`}
                   checked={notifDocks}
                   onChange={() =>
-                    toggleNotif("notifDocks", setNotifDocks, notifDocks)
+                    toggleNotif("docks", setNotifDocks, notifDocks)
                   }
                 />
                 <ToggleRow
                   label="Tidewatch Surge"
-                  description="The harbor crossing 500 combined Reputation"
+                  description={`The harbor crossing ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation`}
                   checked={notifTidewatch}
                   onChange={() =>
-                    toggleNotif(
-                      "notifTidewatch",
-                      setNotifTidewatch,
-                      notifTidewatch,
-                    )
+                    toggleNotif("tidewatch", setNotifTidewatch, notifTidewatch)
                   }
                 />
               </Section>

@@ -7,8 +7,13 @@ import {
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
+  SHIP_DISCOUNT_PER_LEVEL,
 } from "@/lib/game/constants";
 import { basePriceRange, getHireCost } from "@/lib/game/engine";
+import {
+  computeVentureDeadlineBounds,
+  ventureAlreadySpentReason,
+} from "@/lib/game/convoy";
 import type { GameState } from "@/lib/game/types";
 import { difficultyConfig } from "@/lib/game/difficulty";
 import {
@@ -71,7 +76,7 @@ export function GameStatusPanel({
   colorFor?: (item: string) => string | undefined;
 }) {
   const resolveColor = itemColorResolver(colorFor);
-  const discount = game.shipLevel * 5;
+  const discount = game.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
 
   // Summed across the whole unlocked roster, not the three founding types.
@@ -86,6 +91,12 @@ export function GameStatusPanel({
   const pendTotal = pendWages + pendMaint;
   const safe = game.money >= pendTotal;
   const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
+  // The two halves of the hold, resolved once each. Both are pure lookups
+  // off the difficulty and the round, and the Cargo tab draws them as two
+  // lists and then counts them again for the composition bar at the
+  // bottom, which had the pair being asked for four times per render.
+  const cargoResources = unlockedResources(game.difficulty, game.currentRound);
+  const cargoProducts = unlockedProducts(game.difficulty, game.currentRound);
   const cfg = difficultyConfig(game.difficulty);
   const hasLoans = game.debts.length > 0 || game.loansGiven.length > 0;
   const duesAlert = (showObligations && !safe) || game.debts.length > 0;
@@ -241,7 +252,7 @@ export function GameStatusPanel({
           <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-0.5">
             ━━ Raw Materials ━━
           </div>
-          {unlockedResources(game.difficulty, game.currentRound).map((r) => (
+          {cargoResources.map((r) => (
             <InvItem
               key={r}
               icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
@@ -254,7 +265,7 @@ export function GameStatusPanel({
           <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">
             ━━ Finished Goods ━━
           </div>
-          {unlockedProducts(game.difficulty, game.currentRound).map((r) => (
+          {cargoProducts.map((r) => (
             <InvItem
               key={r}
               icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
@@ -286,14 +297,14 @@ export function GameStatusPanel({
           ) : null}
           {/* Cargo composition bar */}
           {(() => {
-            const rawCount = unlockedResources(
-              game.difficulty,
-              game.currentRound,
-            ).reduce((s, r) => s + (game.inventory[r] || 0), 0);
-            const productCount = unlockedProducts(
-              game.difficulty,
-              game.currentRound,
-            ).reduce((s, p) => s + (game.inventory[p] || 0), 0);
+            const rawCount = cargoResources.reduce(
+              (s, r) => s + (game.inventory[r] || 0),
+              0,
+            );
+            const productCount = cargoProducts.reduce(
+              (s, p) => s + (game.inventory[p] || 0),
+              0,
+            );
             const total = rawCount + productCount;
             if (total === 0) return null;
             const rawPct = Math.round((rawCount / total) * 100);
@@ -487,7 +498,7 @@ export function GameStatusPanel({
         </TabsContent>
 
         <TabsContent value="log" className="min-h-0 flex-1">
-          <GameLogPanel logs={logs} embedded />
+          <GameLogPanel logs={logs} />
         </TabsContent>
       </Tabs>
     </div>
@@ -563,17 +574,30 @@ function ConvoyVenturesSection({
     {},
   );
 
-  const maxRoundsAhead = Math.min(
+  // Both of these come from the same function the server checks the post
+  // against, rather than from a second window worked out here. A captain
+  // who can see the form and press Post is a captain the server has
+  // already agreed has room left in the voyage, which is the only way the
+  // two ends can be guaranteed to agree about it.
+  const window = computeVentureDeadlineBounds(
+    game.currentRound,
+    game.maxRounds,
+    CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
     CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
-    game.maxRounds - 1 - game.currentRound,
   );
-  const tooLateToPost = maxRoundsAhead < CONVOY_VENTURE_MIN_ROUNDS_AHEAD;
+  const tooLateToPost = window === null;
+  const maxRoundsAhead = window ? window.maxRound - game.currentRound : 0;
+
+  // The deadline field is a text input, so it can read as something that
+  // is not a number the moment it is looked at. Derived once, and read by
+  // the post, the preview line under the field and the test above that
+  // line, so the three can never disagree about what the field holds.
+  const roundsAheadCount = Math.floor(Number(roundsAhead));
 
   function submitPost() {
     const t = Math.floor(Number(target));
-    const r = Math.floor(Number(roundsAhead));
-    if (!Number.isFinite(t) || !Number.isFinite(r)) return;
-    convoy.post(t, game.currentRound + r);
+    if (!Number.isFinite(t) || !Number.isFinite(roundsAheadCount)) return;
+    convoy.post(t, game.currentRound + roundsAheadCount);
     setTarget("");
     setRoundsAhead(String(CONVOY_VENTURE_MIN_ROUNDS_AHEAD));
   }
@@ -600,8 +624,7 @@ function ConvoyVenturesSection({
 
       {convoy.locked ? (
         <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
-          This harbor has already used its one Convoy Venture for this voyage.
-          It opens again on a fresh voyage or a restart.
+          {ventureAlreadySpentReason()}
         </p>
       ) : tooLateToPost ? (
         <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
@@ -647,12 +670,11 @@ function ConvoyVenturesSection({
             </Button>
           </div>
 
-          {game.currentRound + Number(roundsAhead || 0) > 0 && (
+          {Number.isFinite(roundsAheadCount) && (
             <p className="mb-2 text-[9px] text-muted-foreground">
-              Fills by Round{" "}
-              {game.currentRound + (Math.floor(Number(roundsAhead)) || 0)}. Miss
-              it and every contributor only gets back a partial refund. This
-              harbor only gets one venture per voyage, so make it count.
+              Fills by Round {game.currentRound + roundsAheadCount}. Miss it and
+              every contributor only gets back a partial refund. This harbor
+              only gets one venture per voyage, so make it count.
             </p>
           )}
         </>

@@ -21,7 +21,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
 
-import { SOCKET_PATH } from "@/lib/realtime-endpoint";
+import { CHAT_MESSAGE_MAX, SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
 import {
@@ -40,21 +40,23 @@ import {
   computeAcceptedContribution,
   computeVentureDeadlineBounds,
   parseVentureContributions,
+  ventureAlreadySpentReason,
   ventureTotal,
 } from "@/lib/game/convoy";
-import { roundsFor } from "@/lib/game/difficulty";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
 import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
-import type { BarterOffer } from "./types";
+import type { BarterOffer } from "@/types/realtime";
 
 import { authenticate, requireAuth } from "./auth";
 import {
   sockets,
   userSockets,
+  emitToUser,
   rememberSocket,
   forgetSocket,
   onlineUsers,
@@ -98,10 +100,10 @@ import {
   clearFlexibleAccepted,
 } from "./barter";
 import {
-  roomAidRequests,
   aidList,
-  broadcastAid,
   clearAid,
+  setAidRequest,
+  removeAidRequest,
   removeUserAidRequest,
   currentCheckpointRound,
   clearAidSilent,
@@ -244,6 +246,24 @@ function flexibleLockedReason(): string {
   return `Flexible bartering unlocks at Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}.`;
 }
 
+// What a captain is told when the account read behind the gate fails. It
+// is deliberately not a refusal: nothing was decided, so the copy says the
+// check did not run rather than pretending the captain failed it, and it
+// tells them the attempt costs nothing. Written out three times across the
+// two barter handlers before this existed, once per place a level is read.
+function renownUnavailableReason(): string {
+  return "Could not check Renown just now. Try again in a moment.";
+}
+
+// What the poster is told when the captain they aimed a flexible offer at
+// is below the unlock level themselves. Both ends are held to the same bar
+// (see bothFlexibleBarterUnlocked), and this is the half of that answer
+// that names the other captain rather than the asker, so the refusal does
+// not send them looking at their own level.
+function otherCaptainLockedReason(): string {
+  return "That captain has not unlocked flexible bartering yet.";
+}
+
 // What a captain is told once others have already taken every flexible
 // offer this voyage allows them. It names the two things that still work
 // so the refusal reads as an allowance running out rather than as a
@@ -298,20 +318,6 @@ async function tearDownIfRoomGone(roomId: string): Promise<void> {
     select: { id: true },
   });
   if (!room) clearRoomAllMaps(roomId);
-}
-
-// One event, every socket a captain is holding. A captain may have two
-// tabs open on the same room, and a direct message addressed to them has
-// to arrive on both.
-function emitToUser(
-  io: Server,
-  userId: string,
-  event: string,
-  payload: unknown,
-): void {
-  for (const sid of userSockets.get(userId) ?? []) {
-    io.to(sid).emit(event, payload);
-  }
 }
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -371,7 +377,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const previousRoomId = s.roomId;
         socket.leave(`room:${previousRoomId}`);
         s.roomId = null;
-        forgetStatusIfLastSocket(previousRoomId, s.userId, userSockets);
+        // Unconditional, the same rule room:leave applies below and the
+        // same rule the barter and aid sweeps just under this line apply.
+        // It used to ask whether this was the captain's last socket, which
+        // is a question about a socket that is still connected and still
+        // registered, so the answer was always no and the previous room
+        // kept a status row for a captain who had sailed on. Later joiners
+        // were then handed it as if they were there, and it counted toward
+        // the old room's Tidewatch total. A captain who does come back
+        // sends their status again on the next phase, so nothing is lost
+        // by dropping it here.
+        forgetStatus(previousRoomId, s.userId);
         // The seat in the old harbor is gone, so any offer left standing
         // there has to go with it. Leaving one up would let a captain who
         // has sailed on watch a trade close against goods they can no
@@ -705,12 +721,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
           socket.emit("venture:error", {
             roomId,
-            error:
-              "This harbor has already used its one Convoy Venture for this voyage.",
+            error: ventureAlreadySpentReason(),
           });
           return;
         }
-        const voyageRounds = roundsFor(room.difficulty);
+        const voyageRounds = difficultyConfig(room.difficulty).rounds;
         const bounds = computeVentureDeadlineBounds(
           room.currentRound,
           voyageRounds,
@@ -789,8 +804,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (await hasRoomClaimedVenture(roomId, venture.voyageEpoch)) {
           socket.emit("venture:error", {
             roomId,
-            error:
-              "This harbor has already used its one Convoy Venture for this voyage.",
+            error: ventureAlreadySpentReason(),
           });
           return;
         }
@@ -957,7 +971,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           if (myLevel === null) {
             socket.emit("barter:error", {
               roomId,
-              error: "Could not check Renown just now. Try again in a moment.",
+              error: renownUnavailableReason(),
             });
             return;
           }
@@ -992,15 +1006,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
             if (theirLevel === null) {
               socket.emit("barter:error", {
                 roomId,
-                error:
-                  "Could not check Renown just now. Try again in a moment.",
+                error: renownUnavailableReason(),
               });
               return;
             }
             if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
               socket.emit("barter:error", {
                 roomId,
-                error: "That captain has not unlocked flexible bartering yet.",
+                error: otherCaptainLockedReason(),
               });
               return;
             }
@@ -1081,13 +1094,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
             authoritativeRenownLevel(opening.offer.fromUserId),
           ]);
           if (myLevel === null || theirLevel === null) {
-            fail("Could not check Renown just now. Try again in a moment.");
+            fail(renownUnavailableReason());
             return;
           }
           if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
             fail(
               flexibleBarterUnlocked(myLevel)
-                ? "That captain has not unlocked flexible bartering yet."
+                ? otherCaptainLockedReason()
                 : flexibleLockedReason(),
             );
             return;
@@ -1147,11 +1160,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           accepterName: s.user.displayName,
         };
         socket.emit("barter:fulfilled", fulfilled);
-        const posterSockets = userSockets.get(offer.fromUserId);
-        if (posterSockets) {
-          for (const sid of posterSockets)
-            io.to(sid).emit("barter:fulfilled", fulfilled);
-        }
+        emitToUser(io, offer.fromUserId, "barter:fulfilled", fulfilled);
         broadcastBarter(io, roomId);
       },
     );
@@ -1182,9 +1191,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         amount: amount as number,
         round: currentCheckpointRound(roomId),
       };
-      const others = aidList(roomId).filter((r) => r.fromUserId !== s.userId);
-      roomAidRequests.set(roomId, [...others, request]);
-      broadcastAid(io, roomId);
+      setAidRequest(io, roomId, request);
     });
 
     socket.on("aid:cancel", (payload: { roomId?: string }) => {
@@ -1220,10 +1227,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
-        const next = list.filter((r) => r.id !== request.id);
-        if (next.length) roomAidRequests.set(roomId, next);
-        else roomAidRequests.delete(roomId);
-        broadcastAid(io, roomId);
+        removeAidRequest(io, roomId, request.id);
         const granted = {
           roomId,
           requestId: request.id,
@@ -1245,11 +1249,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
         broadcastLoans(io, roomId);
         socket.emit("aid:granted", granted);
-        const borrowerSockets = userSockets.get(request.fromUserId);
-        if (borrowerSockets) {
-          for (const sid of borrowerSockets)
-            io.to(sid).emit("aid:granted", granted);
-        }
+        emitToUser(io, request.fromUserId, "aid:granted", granted);
       },
     );
 
@@ -1279,10 +1279,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const loan = loanList(roomId).find((l) => l.debtId === debtId);
         if (loan && loan.borrowerId === s.userId) {
           removeLoan(roomId, debtId);
-          const repaySockets = userSockets.get(
-            loan.redirectToUserId ?? loan.lenderId,
-          );
-          if (repaySockets && (amount as number) > 0) {
+          const payeeId = loan.redirectToUserId ?? loan.lenderId;
+          if ((amount as number) > 0) {
             const repaid = {
               roomId,
               debtId,
@@ -1290,20 +1288,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
               fromUserId: s.userId,
               fromName: s.user.displayName,
             };
-            for (const sid of repaySockets)
-              io.to(sid).emit("aid:repaid", repaid);
+            emitToUser(io, payeeId, "aid:repaid", repaid);
           }
           if (loan.redirectToUserId) {
-            const originalLenderSockets = userSockets.get(loan.lenderId);
-            if (originalLenderSockets) {
-              const redirected = {
-                roomId,
-                debtId,
-                redirectedToName: loan.redirectToName ?? "another captain",
-              };
-              for (const sid of originalLenderSockets)
-                io.to(sid).emit("aid:redirected", redirected);
-            }
+            emitToUser(io, loan.lenderId, "aid:redirected", {
+              roomId,
+              debtId,
+              redirectedToName: loan.redirectToName ?? "another captain",
+            });
           }
           resolveBackingFor(io, roomId, loan, amount as number);
           broadcastLoans(io, roomId);
@@ -1400,11 +1392,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         updateLoan(roomId, loan);
         broadcastLoans(io, roomId);
         const acceptedEvent = { ...loan, roomId };
-        const backerSockets = userSockets.get(s.userId);
-        if (backerSockets) {
-          for (const sid of backerSockets)
-            io.to(sid).emit("backing:accepted", acceptedEvent);
-        }
+        emitToUser(io, s.userId, "backing:accepted", acceptedEvent);
       },
     );
 
@@ -1417,8 +1405,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const roomId = payload?.roomId ?? s.roomId;
         const targetUserId = payload?.targetUserId;
         if (!roomId || !targetUserId || roomId !== s.roomId) return;
-        const targetSockets = userSockets.get(targetUserId);
-        if (!targetSockets || targetSockets.size === 0) {
+        if (!userSockets.get(targetUserId)?.size) {
           socket.emit("player:detail:response", {
             roomId,
             targetUserId,
@@ -1426,13 +1413,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
-        for (const sid of targetSockets) {
-          io.to(sid).emit("player:detail:request", {
-            roomId,
-            targetUserId,
-            requesterId: s.userId,
-          });
-        }
+        emitToUser(io, targetUserId, "player:detail:request", {
+          roomId,
+          targetUserId,
+          requesterId: s.userId,
+        });
       },
     );
 
@@ -1450,15 +1435,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const requesterId = payload?.requesterId;
         if (!roomId || !requesterId || payload?.targetUserId !== s.userId)
           return;
-        const reqSockets = userSockets.get(requesterId);
-        if (!reqSockets) return;
-        for (const sid of reqSockets) {
-          io.to(sid).emit("player:detail:response", {
-            roomId,
-            targetUserId: s.userId,
-            data: payload?.data ?? null,
-          });
-        }
+        emitToUser(io, requesterId, "player:detail:response", {
+          roomId,
+          targetUserId: s.userId,
+          data: payload?.data ?? null,
+        });
       },
     );
 
@@ -1474,7 +1455,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!roomId || roomId !== s.roomId) return;
       const content = (payload?.content ?? "").trim();
       if (!content) return;
-      if (content.length > 1000) return;
+      if (content.length > CHAT_MESSAGE_MAX) return;
       if (isMuted(roomId, s.userId)) {
         socket.emit("chat:muted", { roomId });
         return;
@@ -1499,7 +1480,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const recipientId = payload?.recipientId;
         const content = (payload?.content ?? "").trim();
         if (!recipientId || !content || recipientId === s.userId) return;
-        if (content.length > 1000) return;
+        if (content.length > CHAT_MESSAGE_MAX) return;
 
         const ownerRoomId = s.roomId ?? seatedRoomOf(recipientId);
         if (ownerRoomId) {
@@ -1538,12 +1519,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           mine: false,
         };
         socket.emit("chat:dm", { ...messagePayload, mine: true });
-        const recSet = userSockets.get(recipientId);
-        if (recSet) {
-          for (const sid of recSet) {
-            io.to(sid).emit("chat:dm", messagePayload);
-          }
-        }
+        emitToUser(io, recipientId, "chat:dm", messagePayload);
       },
     );
 

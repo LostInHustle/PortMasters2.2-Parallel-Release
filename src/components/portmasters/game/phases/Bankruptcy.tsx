@@ -2,6 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Eye, Trophy, Coins, Anchor } from "lucide-react";
+import type { GameStatusUpdate } from "@/types/realtime";
+import type { PublicUser } from "@/lib/api";
 import type { PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
 
@@ -32,13 +34,22 @@ export function Bankruptcy({
       member: m,
       status: statuses[m.id],
     }))
+    // Stated as a type predicate rather than left to be re asserted at
+    // every read below: the six `status?.` and `?? 0` this replaces were
+    // all saying the same thing, and one of them would eventually have
+    // been written without the guard.
     .filter(
-      (s) =>
-        s.status &&
+      (
+        s,
+      ): s is {
+        member: PublicUser;
+        status: GameStatusUpdate;
+      } =>
+        Boolean(s.status) &&
         s.status.phase !== "bankruptcy" &&
         s.status.phase !== "endgame",
     )
-    .sort((a, b) => (b.status?.reputation ?? 0) - (a.status?.reputation ?? 0));
+    .sort((a, b) => b.status.reputation - a.status.reputation);
 
   return (
     <div className="mx-auto max-w-2xl py-4 text-center">
@@ -97,8 +108,8 @@ export function Bankruptcy({
           </p>
           <div className="space-y-2">
             {game.loansGiven.map((l) => {
-              const live = backing?.loans.find((o) => o.debtId === l.id);
-              const candidates = (members ?? []).filter(
+              const live = backing.loans.find((o) => o.debtId === l.id);
+              const candidates = members.filter(
                 (m) => m.id !== l.counterpartyId && m.id !== myUserId,
               );
               return (
@@ -110,7 +121,7 @@ export function Bankruptcy({
                     </span>
                     <span className="font-bold text-gain">{l.amount}g</span>
                   </div>
-                  {backing && candidates.length > 0 && (
+                  {candidates.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <span>Send repayment to</span>
                       <select
@@ -169,17 +180,17 @@ export function Bankruptcy({
                     {member.displayName}
                   </div>
                   <div className="text-[10px] text-muted-foreground">
-                    R{status?.round ?? "?"} · {status?.phaseLabel ?? "Sailing"}
+                    R{status.round} · {status.phaseLabel}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <Pill tone="gold" className="font-mono">
                     <Coins className="h-3 w-3" />
-                    {status?.gold ?? 0}
+                    {status.gold}
                   </Pill>
                   <Pill tone="favor" className="font-mono">
                     <Trophy className="h-3 w-3" />
-                    {status?.reputation ?? 0}
+                    {status.reputation}
                   </Pill>
                 </div>
               </div>

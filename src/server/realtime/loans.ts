@@ -20,8 +20,8 @@
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { computeBackingResolution } from "@/lib/game/backing";
-import type { LoanRecord } from "./types";
-import { userSockets } from "./presence";
+import type { LoanRecord } from "@/types/realtime";
+import { emitToUser } from "./presence";
 
 const roomOutstandingLoans = new Map<string, LoanRecord[]>();
 
@@ -157,24 +157,20 @@ export function resolveBackingFor(
     repaidAmount,
     loan.backedAmount,
   );
-  for (const sid of userSockets.get(loan.backerId) ?? []) {
-    io.to(sid).emit("backing:resolved", {
+  emitToUser(io, loan.backerId, "backing:resolved", {
+    roomId,
+    debtId: loan.debtId,
+    refundAmount,
+    calledAmount,
+  });
+  if (calledAmount > 0) {
+    emitToUser(io, loan.lenderId, "backing:covered", {
       roomId,
       debtId: loan.debtId,
-      refundAmount,
-      calledAmount,
+      amount: calledAmount,
+      backerName: loan.backerName,
+      borrowerName: loan.borrowerName,
     });
-  }
-  if (calledAmount > 0) {
-    for (const sid of userSockets.get(loan.lenderId) ?? []) {
-      io.to(sid).emit("backing:covered", {
-        roomId,
-        debtId: loan.debtId,
-        amount: calledAmount,
-        backerName: loan.backerName,
-        borrowerName: loan.borrowerName,
-      });
-    }
   }
 }
 

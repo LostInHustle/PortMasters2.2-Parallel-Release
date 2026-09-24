@@ -50,7 +50,10 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(url, {
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      // Any headers a caller hands in replace this map outright, since the
+      // spread below lands after it. No caller passes any today, so the two
+      // are never actually in conflict.
+      headers: { "Content-Type": "application/json" },
       ...init,
     });
   } catch {

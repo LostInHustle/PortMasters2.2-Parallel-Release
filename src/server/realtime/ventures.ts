@@ -24,7 +24,7 @@ import {
   type VentureOutcome,
 } from "@/lib/game/convoy";
 
-function ventureSummary(v: {
+export function ventureSummary(v: {
   id: string;
   posterId: string;
   posterName: string;
@@ -164,5 +164,3 @@ export async function resolveExpiredVentures(
   }
   if (anyResolved) await broadcastVentures(io, roomId);
 }
-
-export { ventureSummary };

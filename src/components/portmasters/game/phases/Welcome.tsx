@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { APP_NAME, STARTING_STOCK } from "@/lib/game/constants";
+import { INCOME_TAX_RATE } from "@/lib/game/engine";
 import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
 import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
@@ -45,6 +46,17 @@ function HarborRoster({
   );
 }
 
+// Named for the meaning each one carries rather than the colour it
+// happens to be, the same way ActionSuggester's tones are: the colour
+// follows the meaning, and a rename of the palette should not have to
+// reach into this file.
+const INFO_TONES: Record<"emerald" | "amber" | "sea" | "rose", string> = {
+  emerald: "bg-gain/[0.06] border-gain/20",
+  amber: "bg-warn/[0.06] border-warn/20",
+  sea: "bg-sea/[0.06] border-sea/20",
+  rose: "bg-alarm/[0.06] border-alarm/20",
+};
+
 function InfoCard({
   tone,
   title,
@@ -54,14 +66,8 @@ function InfoCard({
   title: string;
   rows: string[];
 }) {
-  const tones: Record<string, string> = {
-    emerald: "bg-gain/[0.06] border-gain/20",
-    amber: "bg-warn/[0.06] border-warn/20",
-    sea: "bg-sea/[0.06] border-sea/20",
-    rose: "bg-alarm/[0.06] border-alarm/20",
-  };
   return (
-    <div className={cn("rounded-lg border p-3", tones[tone])}>
+    <div className={cn("rounded-lg border p-3", INFO_TONES[tone])}>
       <div className="font-semibold text-sm mb-1">{title}</div>
       {rows.map((r, i) => (
         <div key={i} className="text-xs">
@@ -100,14 +106,14 @@ export function Welcome({
   // Open Waters and Monsoon advertise their real dials.
   const cfg = difficultyConfig(game.difficulty);
   const stockLine = ["Hemp", "Silk", "Tea"]
-    .map((r) => `${r}×${STARTING_STOCK[r] ?? 0}`)
+    .map((r) => `${r}×${STARTING_STOCK[r]}`)
     .join(", ");
   const raidPct = Math.round(
     pirateChanceFor(game.difficulty, 1, game.maxRounds) * 100,
   );
-  // incomeTaxRate is not yet a DifficultyConfig dial (every tier still
-  // uses the founding 10%), so we fall back to 0.1 until it is added.
-  const taxRate = (cfg as { incomeTaxRate?: number }).incomeTaxRate ?? 0.1;
+  // income tax is not yet a DifficultyConfig dial: every charter still
+  // uses the founding 10%, which is what calcIncomeTax charges.
+  const taxRate = INCOME_TAX_RATE;
   return (
     <div className="max-w-3xl mx-auto text-center py-4">
       <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1">

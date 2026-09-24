@@ -18,7 +18,10 @@ export function combinedReputation(roomId: string): number {
   const statuses = roomStatuses.get(roomId);
   if (!statuses) return 0;
   let total = 0;
-  for (const st of statuses.values()) total += st.reputation ?? 0;
+  // Read straight rather than guarded: the game:status handler fills
+  // every numeric field of the cached status with `?? 0` before it
+  // remembers it, so nothing in this map is ever missing one.
+  for (const st of statuses.values()) total += st.reputation;
   return total;
 }
 

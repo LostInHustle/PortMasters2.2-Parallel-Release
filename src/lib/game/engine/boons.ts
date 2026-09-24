@@ -14,12 +14,19 @@
 // backing out with "Back to Draft" still shows every original option.
 // Only finalizeModuleSwap, once a slot has actually been given up, takes
 // it out of the pool. Reversing those two would duplicate a module or
-// lose one. scripts/tests/unit.drafting.ts pins both branches.
+// lose one.
 //
 // draftBoons weights the offer against the captain's own position, which
 // is why it reads inventory and roster before picking.
 // =====================================================================
-import { BOONS, type Boon, type Module } from "../constants";
+import {
+  BOON_SWAP_COST,
+  BOONS,
+  MAX_SHIP_LEVEL,
+  SHIP_DISCOUNT_PER_LEVEL,
+  type Boon,
+  type Module,
+} from "../constants";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
 import type { GameContext, GameState } from "../types";
@@ -98,7 +105,7 @@ function applyBoon(state: GameState, boon: Boon, logs: string[]) {
 }
 
 export function upgradeShip(state: GameState, logs: string[]) {
-  if (state.shipLevel >= 3) return;
+  if (state.shipLevel >= MAX_SHIP_LEVEL) return;
   const cost =
     state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
   if (state.money < cost) {
@@ -108,7 +115,8 @@ export function upgradeShip(state: GameState, logs: string[]) {
   state.money -= cost;
   state.shipLevel++;
   logs.push(
-    `🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, +5 Discount`,
+    `🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, ` +
+      `+${SHIP_DISCOUNT_PER_LEVEL} Discount`,
   );
 }
 
@@ -157,25 +165,25 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }
 
-// Rerolls the current boon pool for 10 Gold, once per round. The fee (and
-// the cap) exist so a captain can correct for genuinely bad luck without
-// being able to free reroll until the pool happens to contain whatever
-// they want, see the matching swapModuleChoices below for the no cost
-// equivalent on the module side, where the scarcity is the equippable
-// slots rather than a gold sink.
+// Rerolls the current boon pool for BOON_SWAP_COST, once per round. The
+// fee (and the cap) exist so a captain can correct for genuinely bad luck
+// without being able to free reroll until the pool happens to contain
+// whatever they want, see the matching swapModuleChoices below for the no
+// cost equivalent on the module side, where the scarcity is the
+// equippable slots rather than a gold sink.
 export function swapBoonChoices(state: GameState, logs: string[]) {
   if (state.boonSwapUsed) {
     logs.push("❌ You've already swapped your boon choices this round");
     return;
   }
-  if (state.money < 10) {
-    logs.push("❌ Need 10 Gold to swap boon choices");
+  if (state.money < BOON_SWAP_COST) {
+    logs.push(`❌ Need ${BOON_SWAP_COST} Gold to swap boon choices`);
     return;
   }
-  state.money -= 10;
+  state.money -= BOON_SWAP_COST;
   state.boonChoices = draftBoons(state);
   state.boonSwapUsed = true;
-  logs.push("🔄 Swapped Boon Choices for 10 Gold");
+  logs.push(`🔄 Swapped Boon Choices for ${BOON_SWAP_COST} Gold`);
 }
 
 export function selectBoon(

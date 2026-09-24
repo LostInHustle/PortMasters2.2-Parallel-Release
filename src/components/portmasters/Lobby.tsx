@@ -18,7 +18,6 @@ import {
 import { useRealtime } from "@/lib/use-realtime";
 import { useColorPreference } from "@/lib/use-color-preference";
 import { useSound } from "@/lib/use-sound";
-import { getSocket } from "@/lib/realtime";
 import {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
@@ -73,6 +72,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatDate, normalizeRoomName } from "@/lib/utils";
+import { roomLockedFor } from "@/lib/rooms";
 import { APP_NAME } from "@/lib/game/constants";
 import {
   DEFAULT_LEGACY_SUMMARY,
@@ -413,7 +413,12 @@ export function Lobby({
   // they end up in the same room. We fetch the full room detail and enter,
   // exactly as if the captain had typed the code in by hand.
   useEffect(() => {
-    const sock = getSocket();
+    // The live socket off the hook, not a second one fetched from the
+    // module. They were the same object, but only the hook's is in any
+    // dependency array: this effect listed neither, so a socket that was
+    // torn down and rebuilt on a sign out left it listening on a dead
+    // connection while the queue effect above moved to the new one.
+    if (!socket) return;
 
     const onMatched = (data: { roomId: string }) => {
       queuedForMatch.current = false;
@@ -442,20 +447,20 @@ export function Lobby({
       setQuickStarting(false);
     };
 
-    sock.on("quickstart:matched", onMatched);
-    sock.on("quickstart:error", onQueueError);
+    socket.on("quickstart:matched", onMatched);
+    socket.on("quickstart:error", onQueueError);
     return () => {
-      sock.off("quickstart:matched", onMatched);
-      sock.off("quickstart:error", onQueueError);
+      socket.off("quickstart:matched", onMatched);
+      socket.off("quickstart:error", onQueueError);
       // Leaving the lobby must not leave a seat behind in the queue, or
       // the next captain to press the button gets paired with somebody who
       // stopped waiting long ago.
       if (queuedForMatch.current) {
         queuedForMatch.current = false;
-        sock.emit("quickstart:leave");
+        socket.emit("quickstart:leave");
       }
     };
-  }, [onEnterRoom]);
+  }, [socket, onEnterRoom]);
 
   async function createRoom() {
     if (!newName.trim()) return;
@@ -522,26 +527,12 @@ export function Lobby({
     }
   }
 
-  // Re fetch DM history when switching targets (initial seed for ChatPanel).
-  useEffect(() => {
-    if (!dmTarget) return;
-    let alive = true;
-    // No setDmLoading(true) here: the only thing that ever sets a target is
-    // openDm, which raises the flag before this effect can run. Setting it
-    // again synchronously in the effect body only cost a cascading render.
-    api
-      .getDmHistory(dmTarget.id)
-      .then(({ messages }) => {
-        if (alive) {
-          setDmHistory(messages);
-          setDmLoading(false);
-        }
-      })
-      .catch(() => alive && setDmLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [dmTarget?.id]);
+  // There is no effect here watching dmTarget to seed the thread. One sat
+  // here, keyed on the target's id, and openDm above is the only thing in
+  // the whole file that ever sets a target, so opening a captain fired the
+  // same history request twice and the second answer landed on top of the
+  // first. The clear, the loading flag and the request now all belong to
+  // the one click that changes the target, and the thread is fetched once.
 
   // [MANIFEST: Voyage Chronicle] Fetch the captain's chronicles when the
   // dialog opens. Newest first as returned by /api/chronicle.
@@ -1034,8 +1025,11 @@ export function Lobby({
                 </div>
               ) : (
                 rooms.map((room) => {
-                  const isMember = room.members.some((m) => m.id === me.id);
-                  const locked = room.started && !isMember;
+                  const locked = roomLockedFor(
+                    room.started,
+                    room.members.map((m) => m.id),
+                    me.id,
+                  );
                   return (
                     <motion.div
                       key={room.id}

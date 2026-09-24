@@ -15,24 +15,50 @@ export type NotificationItem = {
 const HISTORY_LIMIT = 50;
 const BUBBLE_DURATION_MS = 8000;
 
+// The categories a captain can mute. Every one of them has a switch on
+// the Settings screen.
+export type NotifCategory = "room" | "docks" | "tidewatch";
+
 // localStorage keys for per category suppression. When "false", push
 // calls for that category are silently dropped (the item still lands in
 // the history list, just no bubble and no unread increment).
-const PREF_KEYS: Record<string, string> = {
+const PREF_KEYS: Record<NotifCategory, string> = {
   room: "portmasters_notif_room_events",
   docks: "portmasters_notif_docks",
   tidewatch: "portmasters_notif_tidewatch",
 };
 
-function isCategoryEnabled(category?: string): boolean {
-  if (!category || category === "default") return true;
-  const key = PREF_KEYS[category];
-  if (!key) return true;
+// The read and the write, both here, so that the screen holding the
+// switches and the code deciding whether to show a bubble are looking at
+// the same key. Settings kept its own copy of these three names, which is
+// the kind of duplication that fails silently in one direction only: the
+// screen would go on saving a preference under a key nothing reads, and
+// the switch would move while the bubbles kept coming.
+//
+// Both answer true when storage is unreachable, since a captain who has
+// blocked storage has not muted anything.
+export function notifCategoryPref(category: NotifCategory): boolean {
   try {
-    return localStorage.getItem(key) !== "false";
+    return localStorage.getItem(PREF_KEYS[category]) !== "false";
   } catch {
     return true;
   }
+}
+
+export function setNotifCategoryPref(
+  category: NotifCategory,
+  on: boolean,
+): void {
+  try {
+    localStorage.setItem(PREF_KEYS[category], String(on));
+  } catch {
+    // private browsing
+  }
+}
+
+function isCategoryEnabled(category?: NotificationItem["category"]): boolean {
+  if (!category || category === "default") return true;
+  return notifCategoryPref(category);
 }
 
 /**

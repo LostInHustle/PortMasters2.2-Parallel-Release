@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { WORKER_TYPES } from "@/lib/game/constants";
-import { difficultyConfig, roundsFor } from "@/lib/game/difficulty";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import {
   escortCost,
   finishSettlement,
@@ -163,12 +163,22 @@ function SettlementBills({
   // below, since canAfford decides whether it appears at all: a captain who
   // genuinely could not pay was told they could, never got the chance to ask
   // the harbor for help, and went bankrupt anyway.
-  const roster = WORKER_TYPES.map((w) => (game.workers[w.id] ?? []).length);
-  const wagesDue = WORKER_TYPES.reduce(
-    (sum, w, i) => sum + roster[i] * getHireCost(game, w.id),
+  //
+  // The pair of numbers below come off that one pass rather than off a
+  // second walk of it. They used to run in lockstep with WORKER_TYPES as a
+  // bare array of counts read back by index, which is the shape that goes
+  // quietly wrong the day either list is reordered on its own, and the
+  // name it carried was already spoken for by the live roster in
+  // PhasePanelProps.
+  const hires = WORKER_TYPES.map((w) => ({
+    type: w,
+    count: (game.workers[w.id] ?? []).length,
+  }));
+  const wagesDue = hires.reduce(
+    (sum, h) => sum + h.count * getHireCost(game, h.type.id),
     0,
   );
-  const nWorkers = roster.reduce((sum, n) => sum + n, 0);
+  const nWorkers = hires.reduce((sum, h) => sum + h.count, 0);
   const maintCost = game.fixedCost + game.maintenancePenalty;
   const totalDue = wagesDue + maintCost;
   const canAfford = game.money >= totalDue;
@@ -327,7 +337,7 @@ function SettlementBills({
           <p className="text-[11px] text-muted-foreground mt-2">
             A loan transfers instantly if someone helps. Repay it any time
             before the voyage ends, or it is deducted automatically at Round{" "}
-            {roundsFor(game.difficulty)} and handed to them.
+            {difficultyConfig(game.difficulty).rounds} and handed to them.
           </p>
         </div>
       )}
@@ -377,11 +387,12 @@ function SettlementBills({
           </h3>
           <div className="space-y-1.5">
             {backableLoans.map((l) => {
-              const pledge = Math.min(
-                backAmounts[l.debtId] ?? l.amount,
-                l.amount,
-              );
-              const canBack = game.money >= pledge && pledge >= 1;
+              // Both ends of the range are held by the field itself: it
+              // clamps to max={l.amount} before it commits, and the value
+              // it takes over from is l.amount to begin with, so there is
+              // nothing left for a clamp to do here.
+              const pledge = backAmounts[l.debtId] ?? l.amount;
+              const canBack = game.money >= pledge;
               return (
                 <div
                   key={l.debtId}
@@ -397,10 +408,7 @@ function SettlementBills({
                     <QuantityInput
                       value={pledge}
                       onCommit={(v) =>
-                        setBackAmounts((prev) => ({
-                          ...prev,
-                          [l.debtId]: Math.min(v, l.amount),
-                        }))
+                        setBackAmounts((prev) => ({ ...prev, [l.debtId]: v }))
                       }
                       min={1}
                       max={l.amount}

@@ -7,11 +7,7 @@
 // round's waters, so hiring an escort after the roll is refused and rolling
 // again after an escort cannot happen.
 // =====================================================================
-import {
-  difficultyConfig,
-  escortRateFor,
-  pirateChanceFor,
-} from "../difficulty";
+import { difficultyConfig, pirateChanceFor } from "../difficulty";
 import type { GameState } from "../types";
 import { hasModule } from "./core";
 
@@ -60,7 +56,7 @@ export function pirateChance(state: GameState): number {
 // tier rate while the charge applied the Escort Pact, so the button offered
 // one price and took another.
 export function escortCost(state: GameState): number {
-  let rate = escortRateFor(state.difficulty);
+  let rate = difficultyConfig(state.difficulty).escortCostRate;
   if (state.modifierFlags.escort_discount)
     rate *= 1 - state.modifierFlags.escort_discount;
   return Math.floor(state.money * rate);

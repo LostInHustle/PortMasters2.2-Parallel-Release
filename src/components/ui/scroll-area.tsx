@@ -28,24 +28,16 @@ function ScrollArea({
   );
 }
 
-// Drawn by ScrollArea below rather than by callers, so it stays local.
-function ScrollBar({
-  className,
-  orientation = "vertical",
-  ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
+// Drawn by ScrollArea below rather than by callers, and only ever as a
+// vertical bar, so it stays local and takes nothing.
+function ScrollBar(
+  props: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
+) {
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       data-slot="scroll-area-scrollbar"
-      orientation={orientation}
-      className={cn(
-        "flex touch-none p-px transition-colors select-none",
-        orientation === "vertical" &&
-          "h-full w-2.5 border-l border-l-transparent",
-        orientation === "horizontal" &&
-          "h-2.5 flex-col border-t border-t-transparent",
-        className,
-      )}
+      orientation="vertical"
+      className="flex touch-none p-px transition-colors select-none h-full w-2.5 border-l border-l-transparent"
       {...props}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb

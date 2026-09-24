@@ -10,12 +10,15 @@
 // rather than reaching into presence's internals.
 // =====================================================================
 import type { Server } from "socket.io";
-import type { CaptainStatus } from "./types";
+import type { GameStatusUpdate } from "@/types/realtime";
 
 // roomId -> (userId -> last reported status)
-export const roomStatuses = new Map<string, Map<string, CaptainStatus>>();
+export const roomStatuses = new Map<string, Map<string, GameStatusUpdate>>();
 
-export function rememberStatus(roomId: string, payload: CaptainStatus): void {
+export function rememberStatus(
+  roomId: string,
+  payload: GameStatusUpdate,
+): void {
   let m = roomStatuses.get(roomId);
   if (!m) {
     m = new Map();
@@ -54,13 +57,16 @@ export function forgetStatus(roomId: string, userId: string): void {
 // one piece of data the roster uses to show live gold/reputation/phase,
 // not while another tab or a just reconnected socket is still around
 // to keep it current.
+// Every writer of userSockets drops the whole entry the moment its last
+// socket goes (presence.ts reaping, auth.ts re authenticating as somebody
+// else), so a missing entry and an empty one are the same fact here and
+// there is no separate size test to write.
 export function forgetStatusIfLastSocket(
   roomId: string,
   userId: string,
   userSockets: Map<string, Set<string>>,
 ): void {
-  const set = userSockets.get(userId);
-  if (!set || set.size === 0) forgetStatus(roomId, userId);
+  if (!userSockets.get(userId)) forgetStatus(roomId, userId);
 }
 
 // Wipes the entire status cache for a room. Called on room:restart and

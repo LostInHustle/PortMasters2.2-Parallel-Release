@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { toLegacySummary } from "@/lib/game/legacy";
+import { legacySummaryFor } from "@/lib/captain-legacy";
 
 export async function GET(
   _req: NextRequest,
@@ -27,15 +27,7 @@ export async function GET(
   if (!other)
     return NextResponse.json({ error: "Captain not found" }, { status: 404 });
 
-  const legacy = await db.captainLegacy.findUnique({ where: { userId } });
-  const merits = await db.captainMerit.findMany({
-    where: { userId },
-    select: { meritId: true },
-  });
-  const summary = toLegacySummary(
-    legacy,
-    merits.map((m) => m.meritId),
-  );
+  const { summary } = await legacySummaryFor(userId);
 
   return NextResponse.json({ legacy: summary });
 }

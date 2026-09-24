@@ -7,12 +7,15 @@ import { cn } from "@/lib/utils";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import {
   basePriceRange,
+  priceRatio,
   brokersFavorCommission,
   calcTransportCost,
+  explainVAT,
   getCardFinalCost,
+  getHireCost,
   getIntelCost,
 } from "@/lib/game/engine";
-import { RECIPES } from "@/lib/game/constants";
+import { RECIPES, SILK_GOODS, WORKER_TYPES } from "@/lib/game/constants";
 
 /**
  * Autopilot Action Suggester. Analyzes the current game state and
@@ -230,9 +233,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
     for (const r of card.resources) {
       const range = basePriceRange(r.type) ?? [0, 100];
       const unit = r.price ?? 0;
-      const [min, max] = range;
-      const ratio = (unit - min) / (max - min || 1);
-      const score = 1 - Math.max(0, Math.min(1, ratio));
+      const score = 1 - priceRatio(unit, range);
       if (score > bestScore) {
         bestScore = score;
         bestCard = card;
@@ -282,7 +283,10 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
 
   if (!hasWorkers && roundsLeft >= 3) {
     // Recommend hiring a Weaver (cheapest)
-    const weaverWage = 8;
+    // The engine's own price, not the list wage: the same modifiers that
+    // move every other payroll figure move this one, and this screen quotes
+    // the number out loud in both branches below.
+    const weaverWage = getHireCost(game, "weaver");
     if (game.money >= weaverWage * 2 + 20) {
       return {
         icon: "👩\u200d🔧",
@@ -366,14 +370,22 @@ function analyzeOrders(game: GameState): Suggestion | null {
       (r) => (game.inventory[r.type] || 0) >= (r.required ?? 0),
     );
     if (!canComplete) continue;
-    const hasSilk = o.resources.some((r) =>
-      ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type),
-    );
+    const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
     const transport = calcTransportCost(game, o.totalItems, hasSilk);
     let net = o.reward - transport;
     if (o.isProductOrder) {
-      // Simplified VAT estimate
-      net -= Math.round(o.reward * 0.05);
+      // Charged exactly as completeOrder charges it, per unit, rather than
+      // as a flat five percent of the reward. The real figure comes off the
+      // sale net of the material and wage cost of making the thing, and
+      // then moves with the captain's own VAT modifiers. This reads the
+      // engine mirror Orders already reads rather than a second estimate,
+      // because the estimate was the one the captain was never charged.
+      const required = o.resources[0].required ?? 0;
+      if (required > 0) {
+        net -=
+          explainVAT(game, o.resources[0].type, o.reward / required).final *
+          required;
+      }
     }
     if (o.isBrokerFavor) {
       net -= brokersFavorCommission(o.reward);
@@ -419,15 +431,22 @@ function analyzeOrders(game: GameState): Suggestion | null {
 
 function analyzeSettlement(game: GameState): Suggestion | null {
   if (game.pirateAttackResolved) {
-    // Already resolved the pirate attack, now it is about bills
-    const totalDue =
-      game.fixedCost +
-      game.maintenancePenalty +
-      Object.entries(game.workers ?? {}).reduce(
-        (sum, [, list]) => sum + (list ?? []).length,
-        0,
-      ) *
-        8; // simplified wage estimate
+    // Already resolved the pirate attack, now it is about bills.
+    //
+    // Summed the way payWages charges and the way Settlement and the status
+    // panel already total it, one artisan at a time off getHireCost. This
+    // used to multiply the whole roster by a single artisan's wage, which
+    // was wrong twice over: the trades do not share a wage (8 through 24),
+    // and every wage carries the captain's own modifiers. On a harbor of
+    // Perfumers and Jewelers the estimate came out at less than half the
+    // bill, so the advice below could call a captain solvent on the round
+    // they went bankrupt.
+    const wagesDue = WORKER_TYPES.reduce(
+      (sum, w) =>
+        sum + (game.workers[w.id] ?? []).length * getHireCost(game, w.id),
+      0,
+    );
+    const totalDue = game.fixedCost + game.maintenancePenalty + wagesDue;
 
     if (game.money < totalDue) {
       return {

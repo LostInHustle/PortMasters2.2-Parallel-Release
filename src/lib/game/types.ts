@@ -142,7 +142,9 @@ export type HousePerks = {
 // of these per outstanding loan, kept in sync through the aid:* socket
 // events (see src/lib/use-aid.ts) rather than any shared server record,
 // the same trust model bartering already uses for cross player state.
-export type Loan = {
+// Local to this file: the two fields above are the only readers, and no
+// module outside ever imports the shape by name.
+type Loan = {
   id: string;
   counterpartyId: string;
   counterpartyName: string;

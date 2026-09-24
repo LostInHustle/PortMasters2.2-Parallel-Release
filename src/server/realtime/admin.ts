@@ -39,6 +39,7 @@ import {
   reapDeparture,
   sockets,
   userSockets,
+  emitToUser,
   type DepartureCleanup,
 } from "./presence";
 
@@ -340,11 +341,9 @@ export async function revokeAdmin(
   // Their next click would be refused anyway, since every handler reads the
   // role again. Saying so now means an open console reports it instead of
   // going quiet until something is asked of it.
-  for (const socketId of userSockets.get(target.id) ?? []) {
-    io.to(socketId).emit("admin:error", {
-      error: "This account is no longer an administrator.",
-    });
-  }
+  emitToUser(io, target.id, "admin:error", {
+    error: "This account is no longer an administrator.",
+  });
   return { ok: true };
 }
 

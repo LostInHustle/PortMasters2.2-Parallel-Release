@@ -34,11 +34,7 @@ import {
 } from "@/lib/game/constants";
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { checkSave, describeFindings } from "@/lib/game/integrity";
-import {
-  normalizeDifficulty,
-  renownMultiplierFor,
-  roundsFor,
-} from "@/lib/game/difficulty";
+import { difficultyConfig, normalizeDifficulty } from "@/lib/game/difficulty";
 import { buildChronicle } from "@/lib/game/engine/chronicle";
 import type { PublicUser } from "@/types/realtime";
 import { roomStatuses } from "./status";
@@ -125,8 +121,8 @@ export async function maybeConcludeVoyage(
     finished.push({
       userId: id,
       user: st.user,
-      reputation: st.reputation ?? 0,
-      gold: st.gold ?? 0,
+      reputation: st.reputation,
+      gold: st.gold,
       phase,
     });
   }
@@ -156,7 +152,7 @@ export async function maybeConcludeVoyage(
     select: { difficulty: true, voyageEpoch: true },
   });
   const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
-  const renownMultiplier = renownMultiplierFor(roomDifficulty);
+  const renownMultiplier = difficultyConfig(roomDifficulty).renownXpMultiplier;
 
   // Force resolve every still open venture: the voyage is over, so
   // anything still open never will fill.
@@ -209,7 +205,7 @@ export async function maybeConcludeVoyage(
   for (const f of finished) {
     const verdict = checkSave(
       { money: f.gold, score: f.reputation },
-      roundsFor(roomDifficulty),
+      difficultyConfig(roomDifficulty).rounds,
     );
     if (verdict.severity !== "ok") {
       console.warn(
@@ -369,7 +365,7 @@ export async function maybeConcludeVoyage(
     const chronicle = buildChronicle({
       displayName: f.user.displayName,
       difficulty: roomDifficulty,
-      rounds: roundsFor(roomDifficulty),
+      rounds: difficultyConfig(roomDifficulty).rounds,
       peakReputation: extras.peakReputation,
       finalReputation: f.reputation,
       largestTrade: extras.largestTrade,
@@ -386,7 +382,7 @@ export async function maybeConcludeVoyage(
           roomId,
           voyageEpoch: roomForDifficulty?.voyageEpoch ?? 0,
           difficulty: roomDifficulty,
-          rounds: roundsFor(roomDifficulty),
+          rounds: difficultyConfig(roomDifficulty).rounds,
           peakReputation: extras.peakReputation,
           finalReputation: f.reputation,
           finalGold: f.gold,

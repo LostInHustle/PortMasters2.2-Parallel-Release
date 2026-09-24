@@ -31,13 +31,14 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ["F1"], label: "Open the full navigation guide", group: "Help" },
   { keys: ["?"], label: "Open this shortcut help", group: "Help" },
   { keys: ["F2"], label: "Open this shortcut help", group: "Help" },
-  { keys: ["Esc"], label: "Close any open dialog", group: "Navigation" },
-  {
-    keys: ["Alt", "T"],
-    label: "Focus the notifications panel",
-    group: "Navigation",
-  },
+  { keys: ["Esc"], label: "Close this shortcut help", group: "Navigation" },
 ];
+
+// Every row above names a key the window keydown listener in GameRoom
+// actually acts on. Alt T used to sit here promising to focus the
+// notifications panel, and nothing anywhere read altKey, so it was a
+// shortcut that did nothing on a screen whose entire job is to say which
+// keys do something. A row goes back in beside the handler that reads it.
 
 const GROUP_ORDER: Shortcut["group"][] = ["Game Actions", "Navigation", "Help"];
 const GROUP_ICONS: Record<Shortcut["group"], string> = {

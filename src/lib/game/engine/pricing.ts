@@ -15,6 +15,13 @@
 // tooltip. The cost of that choice is that a balance change has to be made
 // in two places; the benefit is that a tooltip bug can never become a
 // pricing bug.
+//
+// The card price is the one exception, and the header would be lying if it
+// did not say so: explainCardPrice is the real thing, and getCardFinalCost
+// reads the final step off it. The two were never independent. A card's
+// price is short enough that the breakdown *is* the calculation, so
+// splitting them would mean copying the whole body to buy a separation
+// that had already gone, and a second copy is where a drift would start.
 // =====================================================================
 import {
   BOONS,
@@ -22,6 +29,7 @@ import {
   PRODUCT_PRICES,
   RECIPES,
   RESOURCES,
+  SHIP_DISCOUNT_PER_LEVEL,
   WAGES,
 } from "../constants";
 import type { GameState, ResourceCard } from "../types";
@@ -57,7 +65,7 @@ export function calcTransportCost(
   hasSilk = false,
 ): number {
   let base = totalItems * 2;
-  let discount = state.shipLevel * 5;
+  let discount = state.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   if (state.modifierFlags.transport_flat_discount)
     discount += state.modifierFlags.transport_flat_discount;
   let cost = Math.max(5, base - discount);
@@ -85,7 +93,7 @@ export function explainTransportCost(
   const base = totalItems * 2;
   let cost = base;
 
-  const shipDiscount = state.shipLevel * 5;
+  const shipDiscount = state.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   if (shipDiscount > 0) {
     const next = Math.max(5, cost - shipDiscount);
     steps.push({
@@ -151,7 +159,7 @@ export function calcVAT(
   const workerCost = WAGES[recipe.worker_type];
   const taxable = sellingPrice - matCost - workerCost;
   if (taxable > 0) {
-    let vat = Math.floor(taxable * 0.05);
+    let vat = Math.floor(taxable * VAT_RATE);
     if (state.modifierFlags.vat_discount)
       vat = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
     if (hasModule(state, "tax_evasion")) vat = Math.floor(vat * 0.5);
@@ -184,8 +192,11 @@ export function explainVAT(
     },
   ];
   if (taxable <= 0) return { base: sellingPrice, steps, final: 0 };
-  let vat = Math.floor(taxable * 0.05);
-  steps.push({ label: "5% VAT on the margin", delta: -vat });
+  let vat = Math.floor(taxable * VAT_RATE);
+  steps.push({
+    label: `${Math.round(VAT_RATE * 100)}% VAT on the margin`,
+    delta: -vat,
+  });
   if (state.modifierFlags.vat_discount) {
     const next = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
     steps.push({
@@ -205,9 +216,19 @@ export function explainVAT(
   return { base: sellingPrice, steps, final: vat };
 }
 
+// The rate every charter is on until one of them dials it, which no
+// charter does yet. Named because the Welcome screen quotes the same
+// figure to a new captain, and two copies of it had already been written.
+export const INCOME_TAX_RATE = 0.1;
+
+// The tax on the margin of a finished good sale. Written out four times
+// before this existed, and the tooltip was one of them, which is the copy
+// a captain reads while deciding whether to sell.
+export const VAT_RATE = 0.05;
+
 export function calcIncomeTax(state: GameState, preTax: number): number {
   if (preTax <= 0) return 0;
-  const rate = state.modifierFlags.income_tax_override || 0.1;
+  const rate = state.modifierFlags.income_tax_override || INCOME_TAX_RATE;
   let tax = Math.floor(preTax * rate);
   if (hasModule(state, "smugglers_hold")) tax = Math.floor(tax * 1.2);
   if (hasModule(state, "tax_evasion")) tax = Math.floor(tax * 0.5);
@@ -227,9 +248,11 @@ const KILN_CELLAR_PER_UNIT = 2;
 const FOREIGN_QUARTER_GOODS = ["Spices", "Pearls"];
 const FOREIGN_QUARTER_PER_UNIT = 3;
 
-// The same math as getCardFinalCost, but reported as a step by step
-// breakdown so the buying phase tooltip can show exactly where a price
-// came from: base cost, then whatever boon or module touched it.
+// What a market card actually costs, reported as a step by step breakdown
+// so the buying phase tooltip can show exactly where a price came from:
+// base cost, then whatever boon or module touched it. getCardFinalCost
+// below reads the final step, so this is the only price of a card there is
+// rather than a second opinion of one.
 export function explainCardPrice(
   state: GameState,
   card: ResourceCard,
@@ -326,6 +349,22 @@ export function getCardFinalCost(state: GameState, card: ResourceCard): number {
 // that only some of them wanted and none of them explained.
 export function basePriceRange(item: string): [number, number] | undefined {
   return COMMODITIES[item]?.basePrice ?? PRODUCT_PRICES[item];
+}
+
+// Where a price sits inside its range, as a 0 to 1 fraction: 0 at the
+// floor of the range, 1 at the ceiling, and anything outside pinned to
+// the nearer end. Three screens were working this out for themselves,
+// two of them to colour a cell and one to score a deal, and each of the
+// three wrote the divide by zero guard and the clamp out by hand.
+//
+// Takes an already resolved range rather than an item name, so the
+// caller still chooses its own fallback for a good with no range at all,
+// which is the choice basePriceRange deliberately leaves open above.
+export function priceRatio(
+  unitPrice: number,
+  [min, max]: [number, number],
+): number {
+  return Math.max(0, Math.min(1, (unitPrice - min) / (max - min || 1)));
 }
 
 // A general "what does this typically cost" estimate for a raw material

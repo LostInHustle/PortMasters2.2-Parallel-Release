@@ -4,9 +4,8 @@
 // voyage conclusion check in the realtime layer and the check in
 // route; this route is read only.
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import { toLegacySummary } from "@/lib/game/legacy";
+import { legacySummaryFor } from "@/lib/captain-legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
 
 export async function GET() {
@@ -14,17 +13,7 @@ export async function GET() {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const legacy = await db.captainLegacy.findUnique({
-    where: { userId: user.id },
-  });
-  const merits = await db.captainMerit.findMany({
-    where: { userId: user.id },
-    select: { meritId: true },
-  });
-  const summary = toLegacySummary(
-    legacy,
-    merits.map((m) => m.meritId),
-  );
+  const { legacy, summary } = await legacySummaryFor(user.id);
 
   // The current user's Daily Check In state rides along here so the lobby
   // renders the widget without a second request. Other players' legacy

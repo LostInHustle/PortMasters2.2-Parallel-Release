@@ -16,7 +16,7 @@ import type { RoomDetail, RoomSummary } from "./api";
 // Forwarded so callers that work with rooms (the realtime mini
 // service, the API routes) can import everything room related from one
 // module instead of piecing it together from ./db, ./api, and ./utils.
-export type { RoomSummary, RoomDetail };
+export type { RoomDetail };
 
 // The one place a room row becomes the shape the client reads.
 //
@@ -61,6 +61,28 @@ export function serializeRoom(
   };
 }
 
+// Whether a harbor is closed to a captain who is not already in it.
+//
+// Two callers reach this and they name the field differently: the lobby's
+// summary carries members with an id, and the room row the join routes load
+// carries members with a userId. Both hand over the started flag and the
+// list of ids, which is everything the rule reads.
+//
+// The lobby had been drawing this as `started && !isMember` and stopping
+// there, so a harbor whose whole crew had gone home showed as Locked, with
+// its Enter button disabled under the label and the takeover described below
+// reachable only by whoever still had the code. Kept here, beside the
+// function that enforces it, because the two halves of that rule have to be
+// read together.
+export function roomLockedFor(
+  started: boolean,
+  memberIds: readonly string[],
+  userId: string,
+): boolean {
+  if (!started || memberIds.includes(userId)) return false;
+  return memberIds.length > 0;
+}
+
 // The one place a captain is admitted to a room, shared by the two join
 // routes so the rule cannot drift between them again.
 //
@@ -87,8 +109,13 @@ export async function admitToRoom(
   },
   userId: string,
 ): Promise<{ error: string } | { room: RoomSummary }> {
-  const alreadyMember = room.members.some((m) => m.userId === userId);
-  if (!alreadyMember && room.started && room.members.length > 0) {
+  if (
+    roomLockedFor(
+      room.started,
+      room.members.map((m) => m.userId),
+      userId,
+    )
+  ) {
     return {
       error:
         "This voyage has already set sail. Ask the host to open a new room.",
