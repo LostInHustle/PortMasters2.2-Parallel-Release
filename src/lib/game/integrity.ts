@@ -105,7 +105,7 @@ function plausibleCeiling(perRound: number, roundsElapsed: number) {
 // maximum, so far past real play that nothing honest can reach it, and
 // therefore safe to attach a real consequence to. Anything over it loses
 // the voyage's Renown and merits (see maybeConcludeVoyage in
-// src/server/realtime.ts).
+// src/server/realtime/conclusion.ts).
 //
 // The suspect band sits a tenth of the way up. Still several times what a
 // genuine high scoring round reaches, so it is not evidence of anything on

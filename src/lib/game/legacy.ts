@@ -2,13 +2,14 @@
 // PortMasters 2.2 Parallel Release: Captain's Legacy
 // Persistent, cross voyage progression tied to a captain's account
 // rather than any single room. A voyage's Gold, cargo, and ship level
-// always reset (see the restart flow in src/server/realtime.ts), but the
+// always reset (see the restart flow in src/server/realtime/index.ts), but the
 // Reputation banked on the way to Round 8 is now worth something once
 // the voyage ends too: it becomes Renown XP, carried across every harbor
 // that captain ever sails in. Pure functions only, so both the client
-// (the Captain's Legacy card) and the server (src/server/realtime.ts,
-// the one place a CaptainLegacy row is ever written) can import this
-// without pulling in anything React or Prisma specific.
+// (the Captain's Legacy card) and the server (the voyage conclusion in
+// src/server/realtime/conclusion.ts, alongside the check in and house
+// routes) can import this without pulling in anything React or Prisma
+// specific.
 // =====================================================================
 
 // Triangular growth: level 2 needs 100 XP, level 3 needs 300, level 4
@@ -157,7 +158,7 @@ export function recordVoyageInStats(
 }
 
 // Shape returned by GET /api/legacy (and its [userId]/batch siblings) and
-// carried on room:voyage_complete standings (see src/server/realtime.ts).
+// carried on room:voyage_complete standings (see conclusion.ts).
 // A brand new captain with no CaptainLegacy row yet is simply level 1
 // with nothing banked, rather than a special "no data" case the UI needs
 // to branch on. meritIds is every Captain's Merit (see merits.ts) this
@@ -212,3 +213,46 @@ export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
   statsByDifficulty: {},
   houseId: null,
 };
+
+// The stored columns a summary is built from. Deliberately a structural
+// type rather than the Prisma model: a caller that reads only these fields
+// can hand its row straight over without fetching or faking the rest,
+// which is what lets the check in route pass the narrow result of its own
+// findUnique and still land here.
+export type LegacySummarySource = {
+  renownLevel: number;
+  renownXP: number;
+  voyagesCompleted: number;
+  seaMasterCrowns: number;
+  bestScore: number;
+  consecutiveSolventVoyages: number;
+  statsByDifficulty: string;
+  houseId: string | null;
+};
+
+// The one place a stored row becomes the summary the wire carries. A
+// missing row is the default summary rather than an error, since a captain
+// who has never finished a voyage legitimately has no Legacy row yet.
+//
+// Four routes used to spell this field list out by hand, three of them
+// byte for byte identical, which is four chances for one to drift the day
+// a column is added. meritIds is passed in rather than queried here
+// because it lives in a different table, and because the one caller that
+// needs it several times per request would otherwise repeat the query.
+export function toLegacySummary(
+  row: LegacySummarySource | null,
+  meritIds: string[],
+): CaptainLegacySummary {
+  if (!row) return DEFAULT_LEGACY_SUMMARY;
+  return {
+    renownLevel: row.renownLevel,
+    renownXP: row.renownXP,
+    voyagesCompleted: row.voyagesCompleted,
+    seaMasterCrowns: row.seaMasterCrowns,
+    bestScore: row.bestScore,
+    consecutiveSolventVoyages: row.consecutiveSolventVoyages,
+    meritIds,
+    statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
+    houseId: normalizeHouseId(row.houseId),
+  };
+}

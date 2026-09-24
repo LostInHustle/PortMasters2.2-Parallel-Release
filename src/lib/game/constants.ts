@@ -146,28 +146,33 @@ export const STARTING_STOCK: Record<string, number> = {
 export const BARTER_ITEMS = ["Gold", ...RESOURCES, ...PRODUCTS] as const;
 
 // Flexible bartering is the free form offer board a captain reaches from
-// the harbor chat or from a private thread, as opposed to any scripted
-// swap the engine resolves on its own. It is deliberately the strongest
-// social tool in the game: an offer moves goods outside the market
-// entirely, from any phase, to any captain in the room. Two limits hold it
-// in check, and both live here so that a screen and the server can never
-// disagree about either one.
+// the harbor chat or from a private thread, as opposed to the Captain's
+// Exchange on the round interface and any scripted swap the engine
+// resolves on its own. It is deliberately the strongest social tool in the
+// game: an offer moves goods outside the market entirely, from any phase,
+// to any captain in the room. Two limits hold it in check, and both live
+// here so that a screen and the server can never disagree about either one.
 //
 // The first limit is who may take part. Both captains have to be at Renown
-// Level 10, the Harbor Captain tier (see src/lib/game/legacy.ts), before
-// either end of a trade is allowed, not merely the captain posting it.
-// Gating the poster alone would leave the sharper half of the problem
-// open, because the captain doing the harder job in a swap is the one
-// accepting: they are the one who has to judge whether what is on the
-// other side is worth what it costs them. Requiring both sides also keeps
-// the feature alive in a mixed room, since two level 10 captains can still
-// trade with a newer captain sitting at the same table, and no room is
-// ever vetoed by its least established member.
+// Level 10, the level the flexible composer opens at, before either end of
+// a trade is allowed, not merely the captain posting it. Gating the poster
+// alone would leave the sharper half of the problem open, because the
+// captain doing the harder job in a swap is the one accepting: they are the
+// one who has to judge whether what is on the other side is worth what it
+// costs them. Requiring both sides also keeps the feature alive in a mixed
+// room, since two level 10 captains can still trade with each other while a
+// newer captain sits at the same table, and no room is ever vetoed by its
+// least established member. None of this reaches the Captain's Exchange,
+// which is open to every captain at every level.
 //
 // The second limit is how often. One completed trade per voyage at level
-// 10, two at level 15. An attempt is spent by a completed trade and never
-// by posting, so a captain may advertise the same intent in several places
-// at once and take whichever answer arrives first.
+// 10, two at level 15. The allowance is spent by a completed trade and
+// never by posting, so while any of it is left a captain may advertise the
+// same intent in several places at once and take whichever answer arrives
+// first. Only the poster's own allowance is ever spent, and posting is
+// refused only once it is gone: accepting is not rationed on either
+// surface, so a captain whose offers have all been taken can still take
+// anyone else's.
 export const FLEXIBLE_BARTER_UNLOCK_LEVEL = 10;
 export const FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL = 15;
 export const PORTS_TIER0 = [
@@ -536,6 +541,12 @@ export const BOONS_TIER2: Boon[] = [
 
 export const BOONS: Boon[] = [...BOONS_TIER0, ...BOONS_TIER1, ...BOONS_TIER2];
 
+// What a boon reroll costs, once per round. The module side has no
+// equivalent fee (its scarcity is the equippable slots), so this is the
+// boon draft's own dial and lives here rather than beside the shared
+// swap policy.
+export const BOON_SWAP_COST = 10;
+
 export type Module = { id: string; name: string; icon: string; desc: string };
 
 export const MODULES_TIER0: Module[] = [
@@ -632,6 +643,16 @@ export const MODULES_TIER2: Module[] = [
   },
 ];
 
+// What one ship level takes off every freight bill, and what the
+// upgrade screen promises for the next one. Read by both pricing
+// functions and by the two panels that quote it.
+export const SHIP_DISCOUNT_PER_LEVEL = 5;
+
+// The last ship level there is. upgradeShip refuses past it and the
+// shipyard stops offering the button, and the two had the 3 written out
+// separately.
+export const MAX_SHIP_LEVEL = 3;
+
 export const MODULES: Module[] = [
   ...MODULES_TIER0,
   ...MODULES_TIER1,
@@ -714,7 +735,7 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // the rest of the voyage. A one time, one direction flip per voyage, purely
 // additive on top of whatever the difficulty tier's own charter schedule is
 // already doing, and never subtracted back out. See the game:status handler
-// in src/server/realtime.ts for where the combined total is actually read.
+// in src/server/realtime/index.ts for where the combined total is actually read.
 export const TIDEWATCH_SURGE_THRESHOLD = 500;
 
 // [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
@@ -725,7 +746,7 @@ export const TIDEWATCH_SURGE_THRESHOLD = 500;
 // across every contributor in exact proportion to what they put in. Missing
 // the deadline instead pays every contributor back only a fraction of their
 // own stake, so joining one is a real wager on the room finishing it, not a
-// free favor with no downside. See src/server/realtime.ts for where a
+// free favor with no downside. See src/server/realtime/index.ts for where a
 // venture is actually posted, contributed to, and resolved.
 export const CONVOY_VENTURE_MIN_TARGET = 150;
 export const CONVOY_VENTURE_MAX_TARGET = 2000;
@@ -842,7 +863,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
-<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every voyage</strong>, even when idle. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Phase 3",
@@ -860,7 +881,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">🔧</div>
     <strong>Ship Maintenance</strong><br>
-    <span style="font-size:12px;color:var(--muted-foreground)">15 Gold, every voyage, fixed</span>
+    <span style="font-size:12px;color:var(--muted-foreground)">15 to 22 Gold each round, set by the waters you sail</span>
   </div>
   <div style="background:color-mix(in oklch, var(--w-workers) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">👥</div>

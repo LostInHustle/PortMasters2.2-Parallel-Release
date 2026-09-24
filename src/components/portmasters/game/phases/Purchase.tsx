@@ -1,17 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ITEMS } from "@/lib/game/constants";
 import {
-  COMMODITIES,
-  PRODUCT_PRICES,
-  PRODUCTS,
-  RESOURCES,
-} from "@/lib/game/constants";
-import {
-  completePhase1,
+  basePriceRange,
+  priceRatio,
   explainCardPrice,
   explainExpectedPrice,
   getCardFinalCost,
+  nextPhase,
   purchaseCard,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -51,7 +48,7 @@ function MarketPriceReference({
         ━━ MARKET PRICE REFERENCE (hover for details) ━━
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {[...RESOURCES, ...PRODUCTS].map((item) => {
+        {ITEMS.map((item) => {
           const history = game.priceHistory?.[item] ?? [];
           const hasHistory = history.length > 0;
           return (
@@ -88,7 +85,7 @@ function MarketPriceReference({
       </div>
       {/* Price history heatmap */}
       {(() => {
-        const goodsWithHistory = [...RESOURCES, ...PRODUCTS].filter(
+        const goodsWithHistory = ITEMS.filter(
           (item) => (game.priceHistory?.[item]?.length ?? 0) > 0,
         );
         if (goodsWithHistory.length === 0) return null;
@@ -120,8 +117,7 @@ function MarketPriceReference({
                 <tbody>
                   {goodsWithHistory.map((item) => {
                     const history = game.priceHistory[item];
-                    const range = COMMODITIES[item]?.basePrice ??
-                      PRODUCT_PRICES[item] ?? [0, 100];
+                    const range = basePriceRange(item) ?? [0, 100];
                     return (
                       <tr key={item}>
                         <td
@@ -140,8 +136,7 @@ function MarketPriceReference({
                             );
                           }
                           const [min, max] = range;
-                          const ratio = (price - min) / (max - min || 1);
-                          const clamped = Math.max(0, Math.min(1, ratio));
+                          const clamped = priceRatio(price, range);
                           const hue = clamped < 0.5 ? 150 : 25;
                           return (
                             <td key={i} className="px-0.5 text-center">
@@ -192,6 +187,7 @@ function TradeAdvisor({
     qty: number;
     totalCost: number;
     isProduct: boolean;
+    matchesIntel: boolean;
     score: number;
     range: [number, number];
   };
@@ -201,17 +197,16 @@ function TradeAdvisor({
     .flatMap((c) => {
       const finalCost = getCardFinalCost(game, c);
       return c.resources.map((r) => {
-        const range = COMMODITIES[r.type]?.basePrice ??
-          PRODUCT_PRICES[r.type] ?? [0, 100];
+        const range = basePriceRange(r.type) ?? [0, 100];
         const unit = r.price ?? 0;
         const qty = r.quantity ?? 0;
-        const [min, max] = range;
-        const ratio = (unit - min) / (max - min || 1);
-        const clamped = Math.max(0, Math.min(1, ratio));
-        const baseScore = 1 - clamped;
+        const baseScore = 1 - priceRatio(unit, range);
         // Boost score for goods that match revealed intel (guaranteed
         // orders in Phase 2), since buying them now secures a known
-        // future reward.
+        // future reward. The flag rides along on the scored row, because
+        // the badge below is drawn from it and the alternative was asking
+        // the intel list the same question a second time about a good
+        // that had already been scored.
         const matchesIntel = game.revealedIntel.some((i) => i.item === r.type);
         const score = matchesIntel ? Math.min(1, baseScore + 0.2) : baseScore;
         return {
@@ -222,6 +217,7 @@ function TradeAdvisor({
           qty,
           totalCost: finalCost,
           isProduct: c.isProductCard,
+          matchesIntel,
           score,
           range: range as [number, number],
         };
@@ -238,44 +234,39 @@ function TradeAdvisor({
         <Lightbulb className="h-3.5 w-3.5" /> Best Deals This Round
       </div>
       <div className="flex flex-wrap gap-2">
-        {scored.map((s, i) => {
-          const matchesIntel = game.revealedIntel.some(
-            (intel) => intel.item === s.goodName,
-          );
-          return (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
-            >
-              <span className="font-bold text-intel">{i + 1}.</span>
-              <ItemIcon item={s.goodName} className="h-3.5 w-3.5" />
-              <span style={{ color: colorFor(s.goodName) }}>{s.goodName}</span>
-              <span className="text-muted-foreground">x{s.qty}</span>
-              <span className="font-bold text-gain">{s.unitPrice}</span>
-              <span className="text-[9px] text-muted-foreground">g</span>
-              {matchesIntel && (
-                <span
-                  className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
-                  title="Matches a Broker's Whisper, guaranteed order in Phase 2"
-                >
-                  Intel
-                </span>
-              )}
+        {scored.map((s, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-1.5 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
+          >
+            <span className="font-bold text-intel">{i + 1}.</span>
+            <ItemIcon item={s.goodName} className="h-3.5 w-3.5" />
+            <span style={{ color: colorFor(s.goodName) }}>{s.goodName}</span>
+            <span className="text-muted-foreground">x{s.qty}</span>
+            <span className="font-bold text-gain">{s.unitPrice}</span>
+            <span className="text-[9px] text-muted-foreground">g</span>
+            {s.matchesIntel && (
               <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white",
-                  s.score > 0.6
-                    ? "bg-gain"
-                    : s.score > 0.3
-                      ? "bg-warn"
-                      : "bg-alarm",
-                )}
+                className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
+                title="Matches a Broker's Whisper, guaranteed order in Phase 2"
               >
-                {Math.round(s.score * 100)}%
+                Intel
               </span>
-            </div>
-          );
-        })}
+            )}
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[8px] font-bold text-white",
+                s.score > 0.6
+                  ? "bg-gain"
+                  : s.score > 0.3
+                    ? "bg-warn"
+                    : "bg-alarm",
+              )}
+            >
+              {Math.round(s.score * 100)}%
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -413,6 +404,7 @@ function MarketDepth({
 
 export function Purchase({
   game,
+  ctx,
   act,
   phaseSync,
   members,
@@ -420,7 +412,13 @@ export function Purchase({
   onRumorBoardOpen,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "phaseSync" | "members" | "colorFor" | "onRumorBoardOpen"
+  | "game"
+  | "ctx"
+  | "act"
+  | "phaseSync"
+  | "members"
+  | "colorFor"
+  | "onRumorBoardOpen"
 >) {
   const resolveColor = itemColorResolver(colorFor);
   return (
@@ -515,9 +513,7 @@ export function Purchase({
                         Unit: {r.price}💰
                       </span>
                       {(() => {
-                        const range =
-                          COMMODITIES[r.type]?.basePrice ??
-                          PRODUCT_PRICES[r.type];
+                        const range = basePriceRange(r.type);
                         if (!range) return null;
                         const [min, max] = range;
                         const price = r.price ?? 0;
@@ -605,7 +601,7 @@ export function Purchase({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Purchase, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => completePhase1(g, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

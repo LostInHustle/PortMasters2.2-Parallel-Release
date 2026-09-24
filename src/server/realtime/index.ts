@@ -21,7 +21,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
 
-import { SOCKET_PATH } from "@/lib/realtime-endpoint";
+import { CHAT_MESSAGE_MAX, SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
 import {
@@ -40,21 +40,23 @@ import {
   computeAcceptedContribution,
   computeVentureDeadlineBounds,
   parseVentureContributions,
+  ventureAlreadySpentReason,
   ventureTotal,
 } from "@/lib/game/convoy";
-import { roundsFor } from "@/lib/game/difficulty";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
 import {
-  barterAttemptsFor,
-  canBarterWith,
-  canPostBarter,
+  bothFlexibleBarterUnlocked,
+  flexibleBarterUnlocked,
+  flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
-import type { BarterOffer } from "./types";
+import type { BarterOffer } from "@/types/realtime";
 
 import { authenticate, requireAuth } from "./auth";
 import {
   sockets,
   userSockets,
+  emitToUser,
   rememberSocket,
   forgetSocket,
   onlineUsers,
@@ -83,24 +85,26 @@ import {
   broadcastReadyState,
   maybeAdvance,
   checkpointRank,
+  openingPhase,
 } from "./checkpoint";
 import {
-  roomBarterOffers,
   barterList,
-  visibleBarterOffers,
+  barterPayloadFor,
+  setBarterOffers,
   broadcastBarter,
   clearBarter,
   removeUserBarterOffers,
   clearBarterSilent,
-  barterAttemptsUsed,
-  recordBarterAttempt,
-  clearBarterAttempts,
+  consumeAcceptedOffer,
+  flexibleOffersAccepted,
+  recordFlexibleAccept,
+  clearFlexibleAccepted,
 } from "./barter";
 import {
-  roomAidRequests,
   aidList,
-  broadcastAid,
   clearAid,
+  setAidRequest,
+  removeAidRequest,
   removeUserAidRequest,
   currentCheckpointRound,
   clearAidSilent,
@@ -163,6 +167,11 @@ import {
 // the room row is already gone, the Loan rows went with it on cascade,
 // and there is nobody left in the channel to broadcast an empty board to.
 // ========== Flexible bartering gate ==========
+// This gate stands in front of flexible bartering alone, the composer a
+// chat carries. The Captain's Exchange in the Bartering phase reads
+// nothing here: it is open to every captain at every Renown level, and
+// every branch that would have consulted a level for it is gone.
+//
 // Renown rides the roster as a client reported, optional number, which is
 // fine for drawing a name and useless for deciding who may trade: a client
 // could simply report level 21. The account row is the only authoritative
@@ -228,21 +237,48 @@ function inspectOfferForAccept(
   return { ok: true, offer };
 }
 
-// What a captain is told when the gate, rather than the offer, turned them
-// away. The two halves are spelled out separately because they ask
-// different things of the reader: one is told what to go and earn, the
-// other is told they have already had this voyage's share.
-function barterGateReason(myRenownLevel: number): string {
-  return barterAttemptsFor(myRenownLevel) === 0
-    ? `Flexible bartering unlocks at Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}.`
-    : "You have already completed every trade this voyage allows.";
+// What a captain below the unlock level is told when the gate, rather
+// than the offer, turned them away. It names the level to go and earn,
+// because a refusal that only says no leaves them nothing to act on.
+//
+// There is no counterpart for the Captain's Exchange, since nothing there
+// can refuse on these grounds any more.
+function flexibleLockedReason(): string {
+  return `Flexible bartering unlocks at Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}.`;
+}
+
+// What a captain is told when the account read behind the gate fails. It
+// is deliberately not a refusal: nothing was decided, so the copy says the
+// check did not run rather than pretending the captain failed it, and it
+// tells them the attempt costs nothing. Written out three times across the
+// two barter handlers before this existed, once per place a level is read.
+function renownUnavailableReason(): string {
+  return "Could not check Renown just now. Try again in a moment.";
+}
+
+// What the poster is told when the captain they aimed a flexible offer at
+// is below the unlock level themselves. Both ends are held to the same bar
+// (see bothFlexibleBarterUnlocked), and this is the half of that answer
+// that names the other captain rather than the asker, so the refusal does
+// not send them looking at their own level.
+function otherCaptainLockedReason(): string {
+  return "That captain has not unlocked flexible bartering yet.";
+}
+
+// What a captain is told once others have already taken every flexible
+// offer this voyage allows them. It names the two things that still work
+// so the refusal reads as an allowance running out rather than as a
+// lockout, which is exactly the confusion the two surfaces were split
+// apart to end.
+function flexibleSpentReason(): string {
+  return "Every flexible trade this voyage allows you has already been taken. You can still use the Captain's Exchange and accept any offer.";
 }
 
 function clearRoomAllMaps(roomId: string): void {
   roomCheckpoints.delete(roomId);
   clearRoomStatuses(roomId);
   clearBarterSilent(roomId);
-  clearBarterAttempts(roomId);
+  clearFlexibleAccepted(roomId);
   clearAidSilent(roomId);
   clearLoansSilent(roomId);
   clearPulseTallies(roomId);
@@ -283,20 +319,6 @@ async function tearDownIfRoomGone(roomId: string): Promise<void> {
     select: { id: true },
   });
   if (!room) clearRoomAllMaps(roomId);
-}
-
-// One event, every socket a captain is holding. A captain may have two
-// tabs open on the same room, and a direct message addressed to them has
-// to arrive on both.
-function emitToUser(
-  io: Server,
-  userId: string,
-  event: string,
-  payload: unknown,
-): void {
-  for (const sid of userSockets.get(userId) ?? []) {
-    io.to(sid).emit(event, payload);
-  }
 }
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -356,7 +378,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const previousRoomId = s.roomId;
         socket.leave(`room:${previousRoomId}`);
         s.roomId = null;
-        forgetStatusIfLastSocket(previousRoomId, s.userId, userSockets);
+        // Unconditional, the same rule room:leave applies below and the
+        // same rule the barter and aid sweeps just under this line apply.
+        // It used to ask whether this was the captain's last socket, which
+        // is a question about a socket that is still connected and still
+        // registered, so the answer was always no and the previous room
+        // kept a status row for a captain who had sailed on. Later joiners
+        // were then handed it as if they were there, and it counted toward
+        // the old room's Tidewatch total. A captain who does come back
+        // sends their status again on the next phase, so nothing is lost
+        // by dropping it here.
+        forgetStatus(previousRoomId, s.userId);
         // The seat in the old harbor is gone, so any offer left standing
         // there has to go with it. Leaving one up would let a captain who
         // has sailed on watch a trade close against goods they can no
@@ -391,10 +423,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         "phase:ready_update",
         await readyStatePayload(roomId, cp),
       );
-      io.to(socket.id).emit("barter:update", {
-        roomId,
-        offers: visibleBarterOffers(barterList(roomId), s.userId),
-      });
+      io.to(socket.id).emit(
+        "barter:update",
+        barterPayloadFor(roomId, s.userId),
+      );
       io.to(socket.id).emit("aid:update", {
         roomId,
         requests: aidList(roomId),
@@ -505,7 +537,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // report puts someone further along, and recheck readiness.
         const room = await db.room.findUnique({
           where: { id: roomId },
-          select: { started: true, voyageEpoch: true },
+          select: { started: true, voyageEpoch: true, mode: true },
         });
         if (room) {
           await resolveExpiredVentures(
@@ -518,8 +550,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const cp = await getCheckpoint(roomId);
         const phaseStr = String(broadcast.phase);
-        const newRank = checkpointRank(broadcast.round, phaseStr);
-        const curRank = checkpointRank(cp.round, cp.phase);
+        // Both ranks are read in the room's own lap, which the server can
+        // name because it just loaded the row. A rank is an index within one
+        // mode's phase order, so comparing a report against the checkpoint
+        // only means anything once both are read the same way. A room that
+        // just vanished leaves this undefined, which resolves to the founding
+        // mode; the guard below refuses to move the checkpoint for a room
+        // that is gone anyway, so that rank is never acted on.
+        const newRank = checkpointRank(room?.mode, broadcast.round, phaseStr);
+        const curRank = checkpointRank(room?.mode, cp.round, cp.phase);
         if (
           room?.started &&
           newRank !== null &&
@@ -690,12 +729,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
           socket.emit("venture:error", {
             roomId,
-            error:
-              "This harbor has already used its one Convoy Venture for this voyage.",
+            error: ventureAlreadySpentReason(),
           });
           return;
         }
-        const voyageRounds = roundsFor(room.difficulty);
+        const voyageRounds = difficultyConfig(room.difficulty).rounds;
         const bounds = computeVentureDeadlineBounds(
           room.currentRound,
           voyageRounds,
@@ -774,8 +812,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (await hasRoomClaimedVenture(roomId, venture.voyageEpoch)) {
           socket.emit("venture:error", {
             roomId,
-            error:
-              "This harbor has already used its one Convoy Venture for this voyage.",
+            error: ventureAlreadySpentReason(),
           });
           return;
         }
@@ -844,11 +881,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId || roomId !== s.roomId) return;
-      socket.emit("barter:update", {
-        roomId,
-        offers: visibleBarterOffers(barterList(roomId), s.userId),
-        barterAttemptsUsed: barterAttemptsUsed(roomId, s.userId),
-      });
+      socket.emit("barter:update", barterPayloadFor(roomId, s.userId));
     });
 
     socket.on(
@@ -860,6 +893,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         requestItem?: string;
         requestAmount?: number;
         targetUserId?: string;
+        flexible?: boolean;
       }) => {
         const s = requireAuth(socket);
         if (!s) return;
@@ -910,43 +944,87 @@ export function attachRealtime(httpServer: HttpServer): Server {
           targetUserId = payload.targetUserId;
           targetName = targetMember.user.displayName;
         }
-        // The gate, checked here rather than trusted from the client. An
-        // open offer can only be checked against its poster, since the
-        // captain who will eventually accept it is not known yet, so the
-        // accepting side is held to the same bar in the accept handler
-        // instead. A direct offer names its other end already and is
-        // checked against both right here, which is what stops a captain
-        // aiming one at somebody who cannot answer it.
-        const myLevel = await authoritativeRenownLevel(s.userId);
-        if (myLevel === null) {
+        // Which of the two surfaces this came from, and the only thing
+        // that decides whether the flexible gate applies to it at all.
+        //
+        // The client says which one it is using, because one socket
+        // carries both surfaces and nothing in the frame itself tells
+        // them apart. So the claim is pinned down rather than taken on
+        // faith: an offer that says it is an exchange offer is only
+        // accepted while the room is actually sitting in the Bartering
+        // phase, which is the only time the Captain's Exchange is on
+        // screen. A chat composer claiming to be the exchange board to
+        // slip past the gate is therefore refused rather than believed,
+        // and during the phase there is nothing to gain by claiming it,
+        // since the exchange is open to everyone anyway.
+        const flexible = payload?.flexible === true;
+        if (!flexible && (await getCheckpoint(roomId)).phase !== "barter") {
           socket.emit("barter:error", {
             roomId,
-            error: "Could not check Renown just now. Try again in a moment.",
+            error:
+              "The Captain's Exchange is only open during the Bartering phase.",
           });
           return;
         }
-        if (!canPostBarter(myLevel, barterAttemptsUsed(roomId, s.userId))) {
-          socket.emit("barter:error", {
-            roomId,
-            error: barterGateReason(myLevel),
-          });
-          return;
-        }
-        if (targetUserId) {
-          const theirLevel = await authoritativeRenownLevel(targetUserId);
-          if (theirLevel === null) {
+
+        // The flexible gate, checked here rather than trusted from the
+        // client. An open flexible offer can only be checked against its
+        // poster, since the captain who will eventually accept it is not
+        // known yet, so the accepting side is held to the same bar in the
+        // accept handler instead. A direct one names its other end
+        // already and is checked against both right here, which is what
+        // stops a captain aiming one at somebody who cannot answer it.
+        if (flexible) {
+          const myLevel = await authoritativeRenownLevel(s.userId);
+          if (myLevel === null) {
             socket.emit("barter:error", {
               roomId,
-              error: "Could not check Renown just now. Try again in a moment.",
+              error: renownUnavailableReason(),
             });
             return;
           }
-          if (!canBarterWith(myLevel, theirLevel)) {
+          if (!flexibleBarterUnlocked(myLevel)) {
             socket.emit("barter:error", {
               roomId,
-              error: "That captain has not unlocked flexible bartering yet.",
+              error: flexibleLockedReason(),
             });
             return;
+          }
+          // Posting is free and always allowed while there is something
+          // left to take, which is what lets a captain advertise the same
+          // intent in several places at once and accept whichever answer
+          // arrives first. Once every flexible offer of theirs has been
+          // taken there is nothing left for another one to do, so it is
+          // refused here rather than left holding escrow on a board where
+          // clicking it could only ever produce a refusal.
+          if (
+            flexibleOffersLeft(
+              myLevel,
+              flexibleOffersAccepted(roomId, s.userId),
+            ) === 0
+          ) {
+            socket.emit("barter:error", {
+              roomId,
+              error: flexibleSpentReason(),
+            });
+            return;
+          }
+          if (targetUserId) {
+            const theirLevel = await authoritativeRenownLevel(targetUserId);
+            if (theirLevel === null) {
+              socket.emit("barter:error", {
+                roomId,
+                error: renownUnavailableReason(),
+              });
+              return;
+            }
+            if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
+              socket.emit("barter:error", {
+                roomId,
+                error: otherCaptainLockedReason(),
+              });
+              return;
+            }
           }
         }
         const offer = {
@@ -957,6 +1035,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           offerAmount: offerAmount as number,
           requestItem,
           requestAmount: requestAmount as number,
+          flexible,
           ...(targetUserId ? { targetUserId, targetName } : {}),
           // Stamped once, here, so a client rendering the offer inside a
           // chat can place it at the point in the conversation where it
@@ -965,7 +1044,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           // says where it belongs.
           createdAt: new Date().toISOString(),
         };
-        roomBarterOffers.set(roomId, [...barterList(roomId), offer]);
+        setBarterOffers(roomId, [...barterList(roomId), offer]);
         broadcastBarter(io, roomId);
       },
     );
@@ -982,8 +1061,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           (o) => !(o.id === payload.offerId && o.fromUserId === s.userId),
         );
         if (next.length === list.length) return;
-        if (next.length) roomBarterOffers.set(roomId, next);
-        else roomBarterOffers.delete(roomId);
+        setBarterOffers(roomId, next);
         broadcastBarter(io, roomId);
       },
     );
@@ -1006,32 +1084,49 @@ export function attachRealtime(httpServer: HttpServer): Server {
           return;
         }
 
-        // The Renown reads below are the one thing in this handler that
-        // waits on the database, and a different captain can claim the
-        // same offer while they are in flight. So the offer is inspected
-        // again afterwards rather than carried across the gap: everything
-        // from that second inspection down to the broadcast is
-        // synchronous, which is what still keeps one offer from being
-        // accepted twice.
-        const [myLevel, theirLevel] = await Promise.all([
-          authoritativeRenownLevel(s.userId),
-          authoritativeRenownLevel(opening.offer.fromUserId),
-        ]);
-        if (myLevel === null || theirLevel === null) {
-          fail("Could not check Renown just now. Try again in a moment.");
-          return;
-        }
-        if (!canBarterWith(myLevel, theirLevel)) {
-          fail(
-            barterAttemptsFor(myLevel) === 0
-              ? barterGateReason(myLevel)
-              : "That captain has not unlocked flexible bartering yet.",
+        // Only a flexible offer has anything left to check, and only a
+        // flexible offer needs the database at all. An exchange offer
+        // from the Captain's Exchange is open to every captain at every
+        // Renown level, so it is accepted here without a level being read
+        // for either side.
+        //
+        // The reads below are the one thing in this handler that waits on
+        // the database, and a different captain can claim the same offer
+        // while they are in flight. So the offer is inspected again
+        // afterwards rather than carried across the gap: everything from
+        // that second inspection down to the broadcast is synchronous,
+        // which is what still keeps one offer from being accepted twice.
+        if (opening.offer.flexible) {
+          const [myLevel, theirLevel] = await Promise.all([
+            authoritativeRenownLevel(s.userId),
+            authoritativeRenownLevel(opening.offer.fromUserId),
+          ]);
+          if (myLevel === null || theirLevel === null) {
+            fail(renownUnavailableReason());
+            return;
+          }
+          if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
+            fail(
+              flexibleBarterUnlocked(myLevel)
+                ? otherCaptainLockedReason()
+                : flexibleLockedReason(),
+            );
+            return;
+          }
+          // The poster's own half of the policy, and the only thing an
+          // accepted offer ever spends. Note what is missing: nothing
+          // here consults the accepter's tally, because taking offers
+          // from others is never rationed. A captain who has had every
+          // flexible offer of their own taken can still take as many as
+          // they like from everyone else.
+          const theirAccepted = flexibleOffersAccepted(
+            roomId,
+            opening.offer.fromUserId,
           );
-          return;
-        }
-        if (!canPostBarter(myLevel, barterAttemptsUsed(roomId, s.userId))) {
-          fail(barterGateReason(myLevel));
-          return;
+          if (flexibleOffersLeft(theirLevel, theirAccepted) === 0) {
+            fail("Every flexible trade that captain has this voyage is done.");
+            return;
+          }
         }
 
         const inspected = inspectOfferForAccept(roomId, s.userId, offerId);
@@ -1041,23 +1136,24 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const offer = inspected.offer;
 
-        // Spending an attempt retires everything else the two of them
-        // still had open, in the harbor or in any private thread. Each has
-        // just used the last trade this voyage allowed them, so an offer
-        // left standing could only ever be accepted into a refusal.
-        // Nobody loses goods to this: an offer that leaves the board
-        // returns its own escrow through the client that posted it, which
-        // is the same route a swept offer already takes.
-        const next = barterList(roomId).filter(
-          (o) =>
-            o.id !== offer.id &&
-            o.fromUserId !== offer.fromUserId &&
-            o.fromUserId !== s.userId,
-        );
-        if (next.length) roomBarterOffers.set(roomId, next);
-        else roomBarterOffers.delete(roomId);
-        recordBarterAttempt(roomId, offer.fromUserId);
-        recordBarterAttempt(roomId, s.userId);
+        // Taking an offer retires it, and if it was a flexible one it
+        // also retires every other flexible offer its poster still had
+        // up, in the harbor or in any private thread: those share the one
+        // allowance, so once one has gone through the rest could only
+        // ever be accepted into a refusal.
+        //
+        // Nobody else's offers move. The captain who accepted keeps
+        // everything they had open, and the poster's own exchange offers
+        // stay standing, because neither of those is rationed. That is
+        // the whole point of the split: a completed trade costs the two
+        // captains the trade itself and nothing more. Goods are not lost
+        // to this either way, since an offer that leaves the board
+        // returns its own escrow through the client that posted it,
+        // which is the same route a swept offer already takes.
+        consumeAcceptedOffer(roomId, offer);
+        if (offer.flexible) {
+          recordFlexibleAccept(roomId, offer.fromUserId);
+        }
 
         // Deliberately before the board broadcast, and both are emitted
         // from this one synchronous block so a socket can never see them
@@ -1072,11 +1168,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           accepterName: s.user.displayName,
         };
         socket.emit("barter:fulfilled", fulfilled);
-        const posterSockets = userSockets.get(offer.fromUserId);
-        if (posterSockets) {
-          for (const sid of posterSockets)
-            io.to(sid).emit("barter:fulfilled", fulfilled);
-        }
+        emitToUser(io, offer.fromUserId, "barter:fulfilled", fulfilled);
         broadcastBarter(io, roomId);
       },
     );
@@ -1107,9 +1199,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         amount: amount as number,
         round: currentCheckpointRound(roomId),
       };
-      const others = aidList(roomId).filter((r) => r.fromUserId !== s.userId);
-      roomAidRequests.set(roomId, [...others, request]);
-      broadcastAid(io, roomId);
+      setAidRequest(io, roomId, request);
     });
 
     socket.on("aid:cancel", (payload: { roomId?: string }) => {
@@ -1145,10 +1235,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
-        const next = list.filter((r) => r.id !== request.id);
-        if (next.length) roomAidRequests.set(roomId, next);
-        else roomAidRequests.delete(roomId);
-        broadcastAid(io, roomId);
+        removeAidRequest(io, roomId, request.id);
         const granted = {
           roomId,
           requestId: request.id,
@@ -1170,11 +1257,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
         broadcastLoans(io, roomId);
         socket.emit("aid:granted", granted);
-        const borrowerSockets = userSockets.get(request.fromUserId);
-        if (borrowerSockets) {
-          for (const sid of borrowerSockets)
-            io.to(sid).emit("aid:granted", granted);
-        }
+        emitToUser(io, request.fromUserId, "aid:granted", granted);
       },
     );
 
@@ -1204,10 +1287,8 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const loan = loanList(roomId).find((l) => l.debtId === debtId);
         if (loan && loan.borrowerId === s.userId) {
           removeLoan(roomId, debtId);
-          const repaySockets = userSockets.get(
-            loan.redirectToUserId ?? loan.lenderId,
-          );
-          if (repaySockets && (amount as number) > 0) {
+          const payeeId = loan.redirectToUserId ?? loan.lenderId;
+          if ((amount as number) > 0) {
             const repaid = {
               roomId,
               debtId,
@@ -1215,20 +1296,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
               fromUserId: s.userId,
               fromName: s.user.displayName,
             };
-            for (const sid of repaySockets)
-              io.to(sid).emit("aid:repaid", repaid);
+            emitToUser(io, payeeId, "aid:repaid", repaid);
           }
           if (loan.redirectToUserId) {
-            const originalLenderSockets = userSockets.get(loan.lenderId);
-            if (originalLenderSockets) {
-              const redirected = {
-                roomId,
-                debtId,
-                redirectedToName: loan.redirectToName ?? "another captain",
-              };
-              for (const sid of originalLenderSockets)
-                io.to(sid).emit("aid:redirected", redirected);
-            }
+            emitToUser(io, loan.lenderId, "aid:redirected", {
+              roomId,
+              debtId,
+              redirectedToName: loan.redirectToName ?? "another captain",
+            });
           }
           resolveBackingFor(io, roomId, loan, amount as number);
           broadcastLoans(io, roomId);
@@ -1325,11 +1400,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         updateLoan(roomId, loan);
         broadcastLoans(io, roomId);
         const acceptedEvent = { ...loan, roomId };
-        const backerSockets = userSockets.get(s.userId);
-        if (backerSockets) {
-          for (const sid of backerSockets)
-            io.to(sid).emit("backing:accepted", acceptedEvent);
-        }
+        emitToUser(io, s.userId, "backing:accepted", acceptedEvent);
       },
     );
 
@@ -1342,8 +1413,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const roomId = payload?.roomId ?? s.roomId;
         const targetUserId = payload?.targetUserId;
         if (!roomId || !targetUserId || roomId !== s.roomId) return;
-        const targetSockets = userSockets.get(targetUserId);
-        if (!targetSockets || targetSockets.size === 0) {
+        if (!userSockets.get(targetUserId)?.size) {
           socket.emit("player:detail:response", {
             roomId,
             targetUserId,
@@ -1351,13 +1421,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
-        for (const sid of targetSockets) {
-          io.to(sid).emit("player:detail:request", {
-            roomId,
-            targetUserId,
-            requesterId: s.userId,
-          });
-        }
+        emitToUser(io, targetUserId, "player:detail:request", {
+          roomId,
+          targetUserId,
+          requesterId: s.userId,
+        });
       },
     );
 
@@ -1375,15 +1443,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const requesterId = payload?.requesterId;
         if (!roomId || !requesterId || payload?.targetUserId !== s.userId)
           return;
-        const reqSockets = userSockets.get(requesterId);
-        if (!reqSockets) return;
-        for (const sid of reqSockets) {
-          io.to(sid).emit("player:detail:response", {
-            roomId,
-            targetUserId: s.userId,
-            data: payload?.data ?? null,
-          });
-        }
+        emitToUser(io, requesterId, "player:detail:response", {
+          roomId,
+          targetUserId: s.userId,
+          data: payload?.data ?? null,
+        });
       },
     );
 
@@ -1399,7 +1463,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!roomId || roomId !== s.roomId) return;
       const content = (payload?.content ?? "").trim();
       if (!content) return;
-      if (content.length > 1000) return;
+      if (content.length > CHAT_MESSAGE_MAX) return;
       if (isMuted(roomId, s.userId)) {
         socket.emit("chat:muted", { roomId });
         return;
@@ -1424,7 +1488,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         const recipientId = payload?.recipientId;
         const content = (payload?.content ?? "").trim();
         if (!recipientId || !content || recipientId === s.userId) return;
-        if (content.length > 1000) return;
+        if (content.length > CHAT_MESSAGE_MAX) return;
 
         const ownerRoomId = s.roomId ?? seatedRoomOf(recipientId);
         if (ownerRoomId) {
@@ -1463,12 +1527,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           mine: false,
         };
         socket.emit("chat:dm", { ...messagePayload, mine: true });
-        const recSet = userSockets.get(recipientId);
-        if (recSet) {
-          for (const sid of recSet) {
-            io.to(sid).emit("chat:dm", messagePayload);
-          }
-        }
+        emitToUser(io, recipientId, "chat:dm", messagePayload);
       },
     );
 
@@ -1531,7 +1590,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (startingRooms.has(roomId)) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
-        select: { hostId: true, started: true },
+        select: { hostId: true, started: true, mode: true },
       });
       if (!room) return;
       if (room.started) {
@@ -1563,13 +1622,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
       startingRooms.add(roomId);
       try {
+        // Where a voyage opens is the mode's business, not this handler's,
+        // so it is read from the lap rather than written as "5" here.
+        const opening = openingPhase(room.mode);
         await db.room.update({
           where: { id: roomId },
-          data: { started: true, currentRound: 1, currentPhase: "5" },
+          data: { started: true, currentRound: 1, currentPhase: opening },
         });
         const cp = await getCheckpoint(roomId);
         cp.round = 1;
-        cp.phase = "5";
+        cp.phase = opening;
         cp.readyUserIds.clear();
         cp.advancing = false;
         io.to(`room:${roomId}`).emit("room:started", { roomId });
@@ -1614,9 +1676,9 @@ export function attachRealtime(httpServer: HttpServer): Server {
         roomCheckpoints.delete(roomId);
         clearRoomStatuses(roomId);
         clearBarter(io, roomId);
-        // A restarted voyage is a new voyage, so the per voyage barter
-        // allowance starts over with it.
-        clearBarterAttempts(roomId);
+        // A restarted voyage is a new voyage, so the flexible allowance
+        // starts over with it.
+        clearFlexibleAccepted(roomId);
         clearAid(io, roomId);
         clearLoans(io, roomId);
         clearPulseTallies(roomId);
@@ -1634,6 +1696,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
           roomId,
           voyageEpoch: restarted.voyageEpoch,
           difficulty: restarted.difficulty,
+          // Rides along for the same reason difficulty does. A restart resets
+          // the voyage but not the harbor, so the mode is whatever the room
+          // was created with, and every captain rebuilding their state here
+          // has to rebuild it on the lap the room is actually keeping. The
+          // restart deliberately cannot change it: a host switching laps
+          // between voyages would be switched out from under the table, so
+          // the mode is fixed at creation exactly as the tier is.
+          mode: restarted.mode,
         });
         const cp = await getCheckpoint(roomId);
         await broadcastReadyState(io, roomId, cp);

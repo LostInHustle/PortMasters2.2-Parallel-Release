@@ -1,9 +1,13 @@
 // =====================================================================
-// Seedable PRNG (mulberry32) so that card / order / boon generation is
-// deterministic per (room + round). Every captain in the same room, on
-// the same voyage, sees the *same* port market and the *same* trade
-// orders, which keeps shared sessions perfectly synchronized, while each
-// captain still earns their own gold and reputation independently.
+// Seedable PRNG (mulberry32), used for the draws a captain should be able
+// to ask for twice and get the same answer: the port market, the trade
+// orders, and the round's intel pool.
+//
+// The seed carries the captain's own id as well as the room's (see the
+// seedBase in useGameSession), so the charter is reproducible per captain
+// rather than shared by the table. Two captains in one harbor sail
+// different markets and are dealt different orders, and reloading a tab
+// replays the same ones rather than rerolling them.
 // =====================================================================
 
 // Hash an arbitrary string into a 32 bit unsigned integer (xfnv1a).

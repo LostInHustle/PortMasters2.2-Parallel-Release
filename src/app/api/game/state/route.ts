@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
+import { DEFAULT_DIFFICULTY } from "@/lib/game/difficulty";
+import { DEFAULT_MODE } from "@/lib/game/mode";
 import {
   checkSave,
   describeFindings,
@@ -34,6 +36,12 @@ export async function GET(req: NextRequest) {
   // should also drop into the voyage at wherever the room currently is,
   // not back at round 1. The room's checkpoint is what the synchronized
   // ready check keeps everyone else lined up against.
+  //
+  // The room's mode rides along for exactly the same reasons, and one
+  // sharper one: mode decides the order this captain's phases run in, and
+  // a client that restored a save under the wrong lap would run the right
+  // phases in the wrong order and desynchronize from the room without
+  // either side being able to tell why.
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: {
@@ -41,9 +49,11 @@ export async function GET(req: NextRequest) {
       currentPhase: true,
       voyageEpoch: true,
       difficulty: true,
+      mode: true,
     },
   });
-  const difficulty = room?.difficulty ?? "fair_winds";
+  const difficulty = room?.difficulty ?? DEFAULT_DIFFICULTY;
+  const mode = room?.mode ?? DEFAULT_MODE;
   const checkpoint =
     !state && room
       ? {
@@ -57,6 +67,7 @@ export async function GET(req: NextRequest) {
     state: state?.data ?? null,
     checkpoint,
     difficulty,
+    mode,
   });
 }
 

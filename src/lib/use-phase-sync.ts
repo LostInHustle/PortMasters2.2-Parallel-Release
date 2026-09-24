@@ -11,6 +11,7 @@ import {
 } from "@/lib/game/engine";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
+import { normalizeMode } from "@/lib/game/mode";
 import { checkpointRank, parsePhase } from "@/lib/game/checkpoint";
 import { api } from "@/lib/api";
 
@@ -35,12 +36,11 @@ export type ReadyState = {
  * next phase without the server needing to know any game rules.
  *
  * Starting the voyage itself (phase 0, the lobby) is not part of that
- * vote. It is a one time, host only action gated on the room having at
- * least two members, handled by `startGame` below and answered with a
- * dedicated `room:started` broadcast rather than `phase:advance`, since
- * nobody but the host called anything and there is no per client pending
- * action to resume. Every client just runs startBoonDrafting() the
- * moment they hear it.
+ * vote. It is a one time, host only action, handled by `startGame` below
+ * and answered with a dedicated `room:started` broadcast rather than
+ * `phase:advance`, since nobody but the host called anything and there is
+ * no per client pending action to resume. Every client just runs
+ * startBoonDrafting() the moment they hear it.
  */
 export function usePhaseSync(
   roomId: string,
@@ -92,8 +92,20 @@ export function usePhaseSync(
       // just left. If the room somehow advanced multiple phases (extremely
       // rare), the next phase:ready_update heartbeat will trigger another
       // catch up step.
-      const serverRank = checkpointRank(data.round, data.phase);
-      const clientRank = checkpointRank(g.currentRound, parsePhase(g.phase));
+      // Both ranks are read in the lap this captain believes the room is
+      // keeping, which is the room's own mode as it arrived on load or on the
+      // restart broadcast. Comparing them inside one lap is the only way the
+      // comparison means anything: ranks are index times lap length, so two
+      // modes produce numbers of the same magnitude that stand for different
+      // phases. Reading both from the same snapshot is also what keeps a
+      // captain who has somehow drifted onto the wrong mode from being told
+      // they are perfectly in step.
+      const serverRank = checkpointRank(g.mode, data.round, data.phase);
+      const clientRank = checkpointRank(
+        g.mode,
+        g.currentRound,
+        parsePhase(g.phase),
+      );
       if (
         serverRank !== null &&
         clientRank !== null &&
@@ -145,8 +157,12 @@ export function usePhaseSync(
     }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
-      const advanceRank = checkpointRank(data.round, data.phase);
-      const clientRank = checkpointRank(g.currentRound, parsePhase(g.phase));
+      const advanceRank = checkpointRank(g.mode, data.round, data.phase);
+      const clientRank = checkpointRank(
+        g.mode,
+        g.currentRound,
+        parsePhase(g.phase),
+      );
       if (advanceRank === null || clientRank === null) return;
       // Stale advance for a checkpoint we've already passed, ignore.
       if (advanceRank < clientRank) return;
@@ -182,6 +198,11 @@ export function usePhaseSync(
       // Only the captains still sitting in the lobby need to act on this;
       // anyone who has already moved on (a late reconnect, say) ignores it.
       if (g.currentRound !== 1 || parsePhase(g.phase) !== "0") return;
+      // Setting sail names the opening phase rather than reading it off the
+      // room's lap, which is correct while every mode opens at the boon
+      // draft. This is the same direct entry endRound makes at the top of
+      // each later round; both are round openers, not handoffs, so there is
+      // no phase behind them to hand off from.
       act((state, logs) => startBoonDrafting(state, logs));
     };
     const onError = (data: { roomId: string; error: string }) => {
@@ -200,6 +221,7 @@ export function usePhaseSync(
       roomId: string;
       voyageEpoch?: number;
       difficulty?: string;
+      mode?: string;
     }) => {
       if (data.roomId !== roomId) return;
       pendingFn.current = null;
@@ -231,6 +253,12 @@ export function usePhaseSync(
           // The room's tier is the source of truth; if the payload lacks it,
           // keep the captain's current tier rather than silently resetting it.
           difficulty: normalizeDifficulty(data.difficulty ?? state.difficulty),
+          // Same rule for the mode, and it has to be the same rule rather
+          // than falling back to the default: a captain whose state was
+          // rebuilt on the founding lap inside an experimental harbor would
+          // be running a different phase order than the room for the whole
+          // rest of the voyage, and nothing downstream would say so.
+          mode: normalizeMode(data.mode ?? state.mode),
           // A refetch that failed leaves this null, and the new voyage keeps
           // the House the captain was already sailing under rather than
           // dropping a pledge because of one bad request.
@@ -250,6 +278,11 @@ export function usePhaseSync(
     // the ready state never initialises. Same race fix as GameRoom's
     // room:join effect: without this, a fast mount and slow auth path means
     // the client never hears who's readied up.
+    //
+    // `authed` is a dependency, so the effect runs again the moment it flips
+    // and this line is what answers the deferred case. A second effect used
+    // to sit below doing the same emit, which meant every ordinary mount
+    // asked twice and the answer was applied twice.
     if (authed) {
       socket.emit("phase:state:request", { roomId });
     }
@@ -262,14 +295,6 @@ export function usePhaseSync(
       socket.off("room:error", onError);
     };
   }, [socket, roomId, act, authed, myUserId]);
-
-  // Once authed flips to true, fire the deferred phase:state:request so the
-  // client gets the room's current checkpoint and ready set. This covers the
-  // case where the effect above mounted before authentication completed.
-  useEffect(() => {
-    if (!socket || !authed) return;
-    socket.emit("phase:state:request", { roomId });
-  }, [socket, authed, roomId]);
 
   const markReady = useCallback(
     (fn: (g: GameState, logs: string[]) => void) => {

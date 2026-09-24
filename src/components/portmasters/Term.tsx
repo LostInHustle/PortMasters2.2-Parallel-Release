@@ -6,18 +6,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { GLOSSARY } from "@/lib/game/glossary";
-import { cn } from "@/lib/utils";
 
 export function Term({
   children,
   term,
   content,
-  className,
 }: {
   children: React.ReactNode;
   term?: string;
   content?: React.ReactNode;
-  className?: string;
 }) {
   const body =
     content ??
@@ -28,12 +25,7 @@ export function Term({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span
-          className={cn(
-            "underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 cursor-help",
-            className,
-          )}
-        >
+        <span className="underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 cursor-help">
           {children}
         </span>
       </TooltipTrigger>

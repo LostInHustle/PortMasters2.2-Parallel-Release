@@ -33,9 +33,8 @@ export type OnlineUser = PublicUser & { roomId: string | null };
 export type RoomMemberLive = PublicUser & { joinedAt?: string };
 
 // One captain's last reported status, broadcast on the game:status
-// channel. Mirrors the server's CaptainStatus exactly. The phase is a
-// number or string because the Phase union has both, and the server
-// keeps it as a string for comparison.
+// channel. The phase is a number or string because the Phase union has
+// both, and the server keeps it as a string for comparison.
 //
 // renownLevel is optional because the server does not always populate it;
 // when it is present, the Partial Sight peek button in MembersPanel can
@@ -55,9 +54,9 @@ export type GameStatusUpdate = {
   renownLevel?: number;
 };
 
-// An open barter offer, identical to the server side type. The optional
-// targetUserId fields are set only on a direct offer aimed at one
-// specific captain; an ordinary open offer leaves them unset.
+// An open barter offer. The optional targetUserId fields are set only
+// on a direct offer aimed at one specific captain; an ordinary open
+// offer leaves them unset.
 //
 // createdAt is the moment the server accepted the post, as an ISO
 // string. It exists so an offer can be placed at the right point in a
@@ -66,6 +65,21 @@ export type GameStatusUpdate = {
 // that says where it belongs is when it was posted. ISO 8601 strings in
 // one format sort chronologically as plain strings, which is the same
 // property the message list already relies on.
+//
+// flexible marks which of the two surfaces the offer was posted from,
+// and it is the only thing that tells them apart once they are on the
+// board. A flexible offer came from a chat composer, is held to the
+// Renown gate, and only so many of its poster's may ever be taken. An
+// exchange offer came from the Captain's Exchange in the Bartering
+// phase and carries no gate and no cap at all. Both kinds sit on the one
+// board and either may be accepted by anyone.
+//
+// Required rather than optional, because the server sets it on every
+// offer it accepts: it is read off the posted payload with
+// `payload?.flexible === true`, so anything on the board without it is
+// an exchange offer. An optional flag would have made "absent" and
+// "false" the same value, which is exactly the pair that has to stay
+// distinguishable.
 export type BarterOffer = {
   id: string;
   fromUserId: string;
@@ -77,11 +91,12 @@ export type BarterOffer = {
   targetUserId?: string;
   targetName?: string;
   createdAt: string;
+  flexible: boolean;
 };
 
 // An open aid request: a captain short on Gold asking the harbor for a
-// loan. Mirrors the server type. The round it was posted in is carried
-// so a voyage restart knows which requests to clear.
+// loan. The round it was posted in is carried so a voyage restart knows
+// which requests to clear.
 export type AidRequest = {
   id: string;
   fromUserId: string;
@@ -90,10 +105,10 @@ export type AidRequest = {
   round: number;
 };
 
-// An outstanding loan between two captains, mirroring the server's
-// LoanRecord. The optional backer and redirect fields are set only when
-// a third captain has pledged a safety net, or the original lender has
-// redirected future repayment elsewhere (typically at bankruptcy).
+// An outstanding loan between two captains. The optional backer and
+// redirect fields are set only when a third captain has pledged a safety
+// net, or the original lender has redirected future repayment elsewhere
+// (typically at bankruptcy).
 export type LoanRecord = {
   debtId: string;
   borrowerId: string;
@@ -109,18 +124,17 @@ export type LoanRecord = {
   redirectToName?: string;
 };
 
-// A single contributor to a convoy venture. Mirrors the server's
-// VentureContributor type.
-export type VentureContributor = {
+// A single contributor to a convoy venture. Not exported: it is read
+// through VentureSummary.contributions rather than named by any caller.
+type VentureContributor = {
   userId: string;
   name: string;
   amount: number;
 };
 
-// A convoy venture, mirroring the server's ConvoyVenture type. Status
-// is one of "open", "filled", "failed", or "destroyed" but kept as a
-// string here so this file has no runtime dependency on the convoy
-// module's enum.
+// A convoy venture as the venture channel sends it. Status is one of
+// "open", "filled", "failed", or "destroyed" but kept as a string here
+// so this file has no runtime dependency on the convoy module's enum.
 export type VentureSummary = {
   id: string;
   posterId: string;

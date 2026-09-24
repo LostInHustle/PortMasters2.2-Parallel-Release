@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /**
  * Harbor Activity. A shelf control that opens a panel on the masthead.
@@ -22,11 +21,11 @@ import { cn } from "@/lib/utils";
  * drawing a row per event, and doing that from scratch is no more work than
  * repairing scaffolding that never carried anything.
  */
-export function HarborActivityFeed({ className }: { className?: string }) {
+export function HarborActivityFeed() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={cn("relative", className)}>
+    <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"

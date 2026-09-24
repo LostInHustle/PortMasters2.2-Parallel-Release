@@ -105,11 +105,15 @@ Each House carries one small passive perk, applied when a fresh voyage starts an
 
 ### Bartering between captains
 
-Captains trade goods and Gold directly, either on the open board or as a direct offer aimed at one named captain. An offer is real room state rather than a message, so the goods behind it are escrowed the moment it is posted and come back to the poster if it is withdrawn or swept. It surfaces in the exchange and in the harbor chat alike, and a captain can take it from either.
+Captains trade goods and Gold directly, on two surfaces that share one board. An offer can be open to the whole harbor or aimed at one named captain, and it is real room state rather than a message, so the goods behind it are escrowed the moment it is posted and come back to the poster if it is withdrawn or swept.
 
-Flexible bartering is earned rather than given. Both captains have to be at Renown level 10, because a trade is only ever as good as what the other side can put up, and from there the allowance is one completed trade a voyage. At level 15 it becomes two. The allowance is spent by the trade itself and never by posting, so a captain can advertise the same intent in the harbor chat and in a private thread at once and take whichever answer arrives first.
+The Captain's Exchange is the first surface, and it stands open for the whole Bartering phase of every round, to every captain aboard, from their first voyage. The harbor chat carries the second one, which is where flexible bartering lives, and that is the surface that is earned rather than given.
 
-A completed trade retires every other offer either captain still had standing, on the shared board and in every private thread, because the attempt it just spent leaves nothing behind that could be accepted into anything but a refusal. Nobody loses anything to that: an offer that leaves the board hands its escrow back the same way a withdrawn one does. The board is also swept at each phase boundary, so an offer that nobody took during its stretch of the round returns its goods rather than waiting for a later one.
+Flexible bartering opens at Renown level 10. Both captains have to be at that level, because a trade is only ever as good as what the other side can put up, and the allowance is one completed trade a voyage. At level 15 it becomes two. Posting is free and unlimited while any of the allowance is left, so a captain can advertise the same intent on the shared board and in a private thread at once and take whichever answer arrives first. Only a completed trade spends anything.
+
+Accepting is never rationed, on either surface. A captain can take as many offers from other captains as they like, no matter how much of their own flexible allowance has gone, and no matter which surface the offer came from.
+
+A completed flexible trade retires every other flexible offer its own poster still had standing, on the shared board and in every private thread, because those share the one allowance and the rest could only ever be accepted into a refusal. The captain who took it keeps every offer of their own, and so does everyone else in the harbor, because none of those is rationed. Nobody loses anything to that: an offer that leaves the board hands its escrow back the same way a withdrawn one does. The board is also swept at each phase boundary, so an offer that nobody took during its stretch of the round returns its goods rather than waiting for a later one.
 
 Because a trade can land at any point in a round, and every phase reads the hold and the purse as they are rather than as they were when the phase opened, a shelf that was out of reach a moment ago can be affordable before the phase ends. Nothing has to be restarted for that to take effect.
 
@@ -125,7 +129,7 @@ A captain goes bankrupt when the bills at Settlement cannot be covered. That end
 
 **The market.** A per captain, per round draw of goods and prices, shaped by what the whole harbor has been buying. Goods the room leans into get dearer, goods nobody touches soften.
 
-**Trading between captains.** Open barter offers on a shared board, direct offers aimed at one named captain, and an escrow that holds the offered goods the moment an offer is posted. Renown level 10 opens the exchange and level 15 widens it. The terms are under Bartering between captains above.
+**Trading between captains.** Open barter offers on a shared board, direct offers aimed at one named captain, and an escrow that holds the offered goods the moment an offer is posted. The Captain's Exchange is open to every captain at any Renown level, and the flexible surface in the harbor chat opens at level 10 and widens at level 15. The terms are under Bartering between captains above.
 
 **Money between captains.** Financial aid requests, loans between captains, and a third captain who can back a loan as a safety net.
 

@@ -9,7 +9,7 @@ import type { GameState } from "../types";
 // [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
 // same moment barter posting escrows an offer (see postBarterOffer) rather
 // than waiting for the venture to actually resolve. The server (see
-// src/server/realtime.ts) is the one authority on whether this contribution
+// src/server/realtime/index.ts) is the one authority on whether this contribution
 // actually landed (a venture that filled or expired between the click and
 // the server's response never reaches this call at all), so this only ever
 // runs once the server has already confirmed the contribution was accepted.
@@ -40,7 +40,7 @@ export function contributeToVenture(
 // claimed this voyage's one shared chance, so this one never got to run its
 // own course and nobody who backed it is penalized for that). Only one
 // venture can ever end "filled" in a single voyage; see venture:post and
-// venture:contribute in src/server/realtime.ts for where that's enforced.
+// venture:contribute in src/server/realtime/index.ts for where that's enforced.
 export function receiveVentureSettlement(
   state: GameState,
   amount: number,

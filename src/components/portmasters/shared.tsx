@@ -95,6 +95,35 @@ export function OnlineDot({
   );
 }
 
+/* The wash a meaning-tone wears, read by name.
+ *
+ * Every entry is a soft wash of its own token, so the thing wearing it
+ * and the words inside it are the same colour in both modes and neither
+ * needs a dark variant. Four copies of this rule used to sit in three
+ * files: a Pill, the two stat tiles in the captain profile, and the
+ * suggestion toggle. They all say the same kind of thing about a number
+ * and have to say it in the same colour, so they read this one map now.
+ *
+ * This covers the whole meaning half of the palette, and a surface may
+ * offer a subset of it: Pill has no warn tone, because nothing has asked
+ * a Pill for one yet. Gold is the entry that made one copy worth having.
+ * It is the one tone whose words do not wear the token's own text colour,
+ * pairing its wash with the gold ink instead, and both --gold and
+ * --gold-ink are real tokens. A copy that reached for the wrong one
+ * would render in a plausible colour rather than a broken one, which is
+ * the kind of mistake that survives a review.
+ */
+export const TONE_WASH: Record<string, string> = {
+  gold: "bg-gold/5 text-gold-ink",
+  sea: "bg-sea/5 text-sea",
+  gain: "bg-gain/5 text-gain",
+  warn: "bg-warn/5 text-warn",
+  alarm: "bg-alarm/5 text-alarm",
+  due: "bg-due/5 text-due",
+  favor: "bg-favor/5 text-favor",
+  intel: "bg-intel/5 text-intel",
+};
+
 export function Pill({
   children,
   tone = "default",
@@ -132,13 +161,7 @@ export function Pill({
        would otherwise be settled by Tailwind's own rule order rather
        than by anything visible in the markup. */
     none: "",
-    gold: "bg-gold/5 text-gold-ink",
-    sea: "bg-sea/5 text-sea",
-    gain: "bg-gain/5 text-gain",
-    alarm: "bg-alarm/5 text-alarm",
-    due: "bg-due/5 text-due",
-    favor: "bg-favor/5 text-favor",
-    intel: "bg-intel/5 text-intel",
+    ...TONE_WASH,
   };
   return (
     <span
@@ -152,6 +175,20 @@ export function Pill({
     </span>
   );
 }
+
+/**
+ * The three podium medals, by a 1 based rank. The harbor leaderboard and
+ * the Great Houses standings both draw them, and between the two they had
+ * been written three ways: twice as a nested ternary over a zero based
+ * index and once as a map. A rank past the podium gets no entry here, and
+ * each list answers that with its own neutral chip rather than sharing one
+ * fallback, because the two chips are drawn at different sizes.
+ */
+export const RANK_MEDALS: Record<number, string> = {
+  1: "pm-grad-medal-gold",
+  2: "pm-grad-medal-silver",
+  3: "pm-grad-medal-bronze",
+};
 
 const MERIT_ICONS: Record<MeritId, LucideIcon> = {
   first_voyage: Anchor,

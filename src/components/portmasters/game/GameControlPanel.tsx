@@ -42,6 +42,9 @@ export function GameControlPanel({
   requiredCount: number;
   onCancelReady: () => void;
 }) {
+  // Both conditions are the same fact read twice: waiting is only ever set
+  // on the recurring Next Phase transition, so the button wears the quiet
+  // variant whenever it is not the one to press.
   let startText = "🚢 Set Sail";
   let startDisabled = true;
   let nextText = "⏭️ Continue";
@@ -107,7 +110,7 @@ export function GameControlPanel({
           "rounded-lg",
           !nextDisabled && !waiting && "pm-grad-voyage",
         )}
-        variant={nextDisabled ? "secondary" : waiting ? "secondary" : "default"}
+        variant={nextDisabled || waiting ? "secondary" : "default"}
         disabled={nextDisabled}
         onClick={waiting ? onCancelReady : onNextPhase}
       >

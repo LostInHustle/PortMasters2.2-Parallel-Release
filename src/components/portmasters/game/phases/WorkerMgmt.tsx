@@ -7,7 +7,7 @@ import {
   fireWorker,
   getHireCost,
   hireWorker,
-  startPhase2,
+  nextPhase,
 } from "@/lib/game/engine";
 import {
   unlockedProducts,
@@ -138,8 +138,11 @@ export function WorkerMgmt({
         list,
         cost,
         due: list.length * cost,
+        // Every product has a recipe, which is what makes it a product,
+        // so this lookup is read straight. The other six reads of RECIPES
+        // in this project do the same.
         tasks: openProducts.filter((p) => {
-          const owner = RECIPES[p]?.worker_type;
+          const owner = RECIPES[p].worker_type;
           return owner === w.id || (w.id === "master" && owner === "weaver");
         }),
       };
@@ -261,25 +264,26 @@ export function WorkerMgmt({
           </div>
           {/* Wage Efficiency Indicator */}
           {(() => {
+            // What the artisans actually turned out, weighed against the
+            // payroll figure already totalled for the block above. A
+            // second accumulator used to sit in this loop summing r.due
+            // into its own totalWagesPaid, skipping empty worker types on
+            // the way: an empty type's due is zero, so it was rebuilding
+            // the same number under a different name, and the panel then
+            // printed both, in the denominator and in the caption beside
+            // it.
             let totalProducedValue = 0;
-            let totalWagesPaid = 0;
             for (const r of roster) {
-              if (r.list.length === 0) continue;
               for (const w of r.list) {
-                const produced = w.producedCount ?? 0;
-                if (produced > 0 && w.task) {
-                  const recipe = RECIPES[w.task];
-                  if (recipe) {
-                    totalProducedValue += recipe.value * produced;
-                  }
+                if (w.producedCount > 0 && w.task) {
+                  totalProducedValue += RECIPES[w.task].value * w.producedCount;
                 }
               }
-              totalWagesPaid += r.due;
             }
             if (totalProducedValue === 0) return null;
             const efficiency =
-              totalWagesPaid > 0
-                ? Math.round((totalProducedValue / totalWagesPaid) * 10) / 10
+              totalWages > 0
+                ? Math.round((totalProducedValue / totalWages) * 10) / 10
                 : 0;
             return (
               <div className="mt-2 border-t border-due/15 pt-2 flex items-center justify-between text-[11px]">
@@ -299,7 +303,7 @@ export function WorkerMgmt({
                 >
                   {efficiency}x return
                   <span className="font-normal text-muted-foreground ml-1">
-                    ({totalProducedValue}g value / {totalWagesPaid}g wages)
+                    ({totalProducedValue}g value / {totalWages}g wages)
                   </span>
                 </span>
               </div>
@@ -319,7 +323,7 @@ export function WorkerMgmt({
               :{" "}
               {r.tasks
                 .map((t) => {
-                  const mats = Object.entries(RECIPES[t]?.materials ?? {})
+                  const mats = Object.entries(RECIPES[t].materials)
                     .map(([m, a]) => `${a} ${m}`)
                     .join("+");
                   return `${t}(${mats})`;
@@ -376,7 +380,7 @@ export function WorkerMgmt({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Management, Set Sail"
-        onConfirm={() => phaseSync.markReady((g, l) => startPhase2(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );

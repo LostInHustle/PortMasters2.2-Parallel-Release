@@ -5,7 +5,7 @@
 // barter trade. Both sides need to agree it happened, but neither side's
 // Gold total is the server's to know, so posting a request and finding a
 // captain to help happen over the aid:* socket events
-// (src/server/realtime.ts, src/lib/use-aid.ts) while the functions here
+// (src/server/realtime/index.ts, src/lib/use-aid.ts) while the functions here
 // only move the money on whichever client they run on.
 //
 // grantHelperReputation lives here rather than in ./backingState because
@@ -142,8 +142,9 @@ export function clearRedirectedLoan(
   logs.push(`🤝 Your bequest was paid out to ${redirectedToName}`);
 }
 
-// Called once, at the true end of Round 8 (see endRound below), never
-// before: any loan a captain hasn't already repaid by then gets forced
+// Called once, at the true end of the last round (see the endRound
+// settlement in ./lifecycle, which settles the voyage's loans right
+// before endGame), never before: any loan a captain hasn't already repaid by then gets forced
 // through, paying whatever can be covered. Falling short of the full
 // amount owed is what flags defaultedDebt for the endgame screen, rather
 // than bankrupting mid voyage, since by this point the voyage is ending
@@ -163,7 +164,7 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
     // Reported even when paid is 0. This record is not only "credit the
     // lender", it is also the one signal that closes the debt on the server's
     // ledger and resolves any Backing pledge on it (see aid:repay in
-    // src/server/realtime.ts). Skipping it for a total default used to strand
+    // src/server/realtime/index.ts). Skipping it for a total default used to strand
     // the loan open forever: the backer's escrowed Gold was neither returned
     // nor called, and the lender never received the coverage that pledge
     // existed for, which is precisely the case Backing is meant to cover.

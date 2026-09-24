@@ -10,6 +10,7 @@ import {
   serializeRoom,
 } from "@/lib/rooms";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
+import { normalizeMode } from "@/lib/game/mode";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -45,6 +46,10 @@ const CreateSchema = z.object({
   // Optional so existing callers keep working; any unknown value is
   // coerced to the entry tier by normalizeDifficulty below.
   difficulty: z.string().optional(),
+  // Optional for the same reason, and coerced the same way. A caller that
+  // does not name a mode gets the founding one, which is what every room
+  // created before modes existed is already playing.
+  mode: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest) {
   }
   const { name, isPublic } = parsed.data;
   const difficulty = normalizeDifficulty(parsed.data.difficulty);
+  const mode = normalizeMode(parsed.data.mode);
 
   const room = await db.room.create({
     data: {
@@ -75,6 +81,7 @@ export async function POST(req: NextRequest) {
       hostId: user.id,
       isPublic,
       difficulty,
+      mode,
       members: { create: [{ userId: user.id }] },
     },
     include: {

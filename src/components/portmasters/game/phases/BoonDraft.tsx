@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { selectBoon, swapBoonChoices } from "@/lib/game/engine";
+import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
+import { BOON_SWAP_COST } from "@/lib/game/constants";
 import { ReadyBar } from "../ReadyBar";
 import { Term } from "../../Term";
 import type { PhasePanelProps } from "./PhaseShared";
@@ -43,7 +44,7 @@ export function BoonDraft({
       </div>
     );
   }
-  const canSwap = !game.boonSwapUsed && game.money >= 10;
+  const canSwap = !game.boonSwapUsed && game.money >= BOON_SWAP_COST;
   return (
     <div className="max-w-4xl mx-auto text-center py-2">
       <div className="text-2xl font-bold mb-1 text-boon">
@@ -66,8 +67,8 @@ export function BoonDraft({
           onClick={() => act((g, l) => swapBoonChoices(g, l))}
         >
           {game.boonSwapUsed
-            ? "✅ Boons Swapped This Voyage"
-            : "🔄 Swap Boons (10💰, 1 use/voyage)"}
+            ? "✅ Boons Swapped This Round"
+            : `🔄 Swap Boons (${BOON_SWAP_COST}💰, 1 use/round)`}
         </Button>
       </div>
       <motion.div
@@ -103,7 +104,7 @@ export function BoonDraft({
             <Button
               className="pm-grad-boon font-semibold rounded-xl w-full"
               onClick={() =>
-                phaseSync.markReady((g, l) => selectBoon(g, ctx, b.id, l))
+                phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
               }
             >
               🔒 Lock In Boon

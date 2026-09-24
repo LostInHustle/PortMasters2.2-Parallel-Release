@@ -70,6 +70,14 @@ model Room {
   voyageEpoch  Int    @default(0)
   started      Boolean @default(false)
   difficulty   String @default("fair_winds")
+  // Which voyage this harbor is playing (see src/lib/game/mode.ts). Chosen
+  // once, when the room is created, exactly like difficulty: a host picks a
+  // mode and every captain resolves the same record. It decides that mode's
+  // synchronized phase order, so a captain whose state disagrees with the
+  // room is running the right phases in the wrong order. Defaults to the
+  // founding mode, which is what every room created before this column
+  // existed is playing.
+  mode         String @default("classic")
 
   host           User            @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
   members        RoomMember[]

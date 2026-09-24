@@ -35,8 +35,10 @@ import type { GameContext, GameState, OrderCard, ResourceCard } from "../types";
 import { addOwnedAmount } from "./core";
 import { getCardFinalCost } from "./pricing";
 
-// [ONLINE] These use a seeded RNG so the market is identical for every
-// captain in the same room on the same voyage.
+// [ONLINE] These use a seeded RNG so the market is stable for one
+// captain across a reload rather than redrawn on every mount. Each
+// captain's seed carries their own id, so no two of them see the same
+// charter.
 // quantityOverride is only ever set by callBrokersFavor, letting a captain
 // choose exactly how much of a filtered good the guaranteed order asks for
 // instead of leaving it to the usual randInt roll below.
@@ -257,7 +259,7 @@ export function applyHarborPulse(
 
 // [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
 // instant the server confirms the combined Reputation threshold was crossed
-// (see the game:status handler in src/server/realtime.ts). A one direction
+// (see the game:status handler in src/server/realtime/index.ts). A one direction
 // flip: nothing in this codebase ever sets tidewatchSurge back to false
 // mid voyage, and a fresh voyage already resets it through
 // createInitialGameState. Logged once here, at the moment it happens,
@@ -323,7 +325,8 @@ export function startPhase1(
   state.purchaseCount = 0;
   state.purchasedCards = [];
   state.phase2DemandTags = [];
-  // [ONLINE] Deterministic intel pool per (room, round).
+  // [ONLINE] Deterministic intel pool: this captain's seed, this voyage,
+  // this round.
   const intelRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:intel`,
   );
@@ -352,7 +355,8 @@ export function startPhase1(
   }
   logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
-  // [ONLINE] Deterministic port market per (room, round).
+  // [ONLINE] Deterministic port market: this captain's seed, this
+  // voyage, this round.
   const marketRng = createRng(
     `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:market`,
   );
@@ -397,7 +401,6 @@ export function startPhase1(
 export function completePhase1(state: GameState, logs: string[]) {
   if (state.purchaseCount === 0) logs.push("⏭️ Purchasing skipped");
   else logs.push(`✅ Purchasing ended, bought ${state.purchaseCount} batches`);
-
   // Record price history: for each good the captain bought this round,
   // compute the average unit price paid and append it to the history
   // array. Used by the Purchase phase sparkline to show price trends.
@@ -420,6 +423,9 @@ export function completePhase1(state: GameState, logs: string[]) {
     if (!state.priceHistory[good]) state.priceHistory[good] = [];
     state.priceHistory[good].push(avg);
   }
-
-  state.phase = "barter";
+  // This used to end by setting state.phase to the bartering board by name,
+  // which was one of seven copies of the phase order scattered across the
+  // engine's transitions. Where the purchase phase leads is the lap's
+  // business now (see nextPhase in ./lifecycle), and in the experimental mode
+  // it leads somewhere else entirely.
 }

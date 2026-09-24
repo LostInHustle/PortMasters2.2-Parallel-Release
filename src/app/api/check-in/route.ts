@@ -9,9 +9,8 @@ import { getCurrentUser } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
   levelForRenownXP,
-  normalizeHouseId,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
+  toLegacySummary,
+  type LegacySummarySource,
 } from "@/lib/game/legacy";
 import {
   applyCheckIn,
@@ -20,39 +19,14 @@ import {
   type CheckInState,
 } from "@/lib/game/checkin";
 
-type LegacyRow = {
-  renownLevel: number;
-  renownXP: number;
-  voyagesCompleted: number;
-  seaMasterCrowns: number;
-  bestScore: number;
-  consecutiveSolventVoyages: number;
-  statsByDifficulty: string;
+// A CaptainLegacy row as this route reads it: the columns a summary is
+// built from, plus the two the check in cycle keeps in the same table.
+// Spelled out because the checks below need the pair as well as the
+// summary, and the summary half is handed straight to toLegacySummary.
+type LegacyRow = LegacySummarySource & {
   checkInCount: number;
   lastCheckInDate: string | null;
-  houseId: string | null;
 };
-
-// meritIds is threaded in rather than queried here, since every call in
-// this file is for the one signed in user and a claim never changes their
-// merits, so one query up front in POST covers all of them.
-function toSummary(
-  row: LegacyRow | null,
-  meritIds: string[],
-): CaptainLegacySummary {
-  if (!row) return DEFAULT_LEGACY_SUMMARY;
-  return {
-    renownLevel: row.renownLevel,
-    renownXP: row.renownXP,
-    voyagesCompleted: row.voyagesCompleted,
-    seaMasterCrowns: row.seaMasterCrowns,
-    bestScore: row.bestScore,
-    consecutiveSolventVoyages: row.consecutiveSolventVoyages,
-    meritIds,
-    statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
-    houseId: normalizeHouseId(row.houseId),
-  };
-}
 
 function stateOf(row: LegacyRow | null): CheckInState {
   return {
@@ -82,7 +56,7 @@ export async function POST() {
     // render "come back tomorrow" rather than treat it as an error.
     return NextResponse.json({
       claimed: false,
-      legacy: toSummary(prior, meritIds),
+      legacy: toLegacySummary(prior, meritIds),
       checkIn: checkInStatus(stateOf(prior), today),
     });
   }
@@ -144,7 +118,7 @@ export async function POST() {
     })) as LegacyRow | null;
     return NextResponse.json({
       claimed: false,
-      legacy: toSummary(fresh, meritIds),
+      legacy: toLegacySummary(fresh, meritIds),
       checkIn: checkInStatus(stateOf(fresh), today),
     });
   }
@@ -155,7 +129,7 @@ export async function POST() {
     xpGained: result.xp,
     leveledUp: newLevel > priorLevel,
     legacy: {
-      ...toSummary(prior, meritIds),
+      ...toLegacySummary(prior, meritIds),
       renownXP: newXP,
       renownLevel: newLevel,
     },

@@ -2,18 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { VentureContributor, VentureSummary } from "@/types/realtime";
+import type { VentureSummary } from "@/types/realtime";
 import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
 
 // The wire shape for a venture lives in @/types/realtime as VentureSummary.
-// The hook keeps the original ConvoyVenture alias and the VentureContributor
-// re export for back compat with the Settlement phase component's imports.
+// The hook keeps the original ConvoyVenture alias, which the game room
+// imports by that name.
 //
 // VentureOutcome and VentureSettlement are re exported here rather than
 // declared a second time. Their one home is the pure module that computes
 // them, src/lib/game/convoy.ts, and a duplicate pair of declarations in
 // this file was only ever a way for the two to drift apart unnoticed.
-export type { VentureContributor, VentureOutcome, VentureSettlement };
+//
+// VentureContributor is not re exported: it rides inside VentureSummary
+// and nothing outside @/types/realtime ever names it on its own.
+export type { VentureOutcome, VentureSettlement };
 export type ConvoyVenture = VentureSummary;
 
 /**
@@ -134,7 +137,6 @@ export function useConvoy(
     ventures,
     locked,
     error,
-    clearError: () => setError(null),
     post,
     contribute,
   };

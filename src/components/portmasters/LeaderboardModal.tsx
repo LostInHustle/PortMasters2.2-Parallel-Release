@@ -5,18 +5,54 @@ import { motion } from "framer-motion";
 import { Trophy, Crown, Star, Ship, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import type { LeaderboardEntry } from "@/types/realtime";
-import { Avatar, Pill } from "./shared";
+import { Avatar, Pill, RANK_MEDALS } from "./shared";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 
 type SortKey =
   "renownXP" | "seaMasterCrowns" | "bestScore" | "voyagesCompleted";
 
-const SORT_OPTIONS: { key: SortKey; label: string; icon: typeof Trophy }[] = [
-  { key: "renownXP", label: "Renown", icon: Star },
-  { key: "seaMasterCrowns", label: "Crowns", icon: Crown },
-  { key: "bestScore", label: "Best Rep", icon: Trophy },
-  { key: "voyagesCompleted", label: "Voyages", icon: Ship },
+// The four ways the harbor can be sorted, one row each: the button that
+// picks it, the field on an entry it reads, and the two labels it prints.
+// The row that renders a captain used to rebuild all of that for itself
+// out of eight `sortKey ===` tests, four for the metric and four for its
+// caption, each pair reading the same option the button above already
+// named.
+const SORT_OPTIONS: {
+  key: SortKey;
+  label: string;
+  caption: string;
+  icon: typeof Trophy;
+  format: (e: LeaderboardEntry) => string;
+}[] = [
+  {
+    key: "renownXP",
+    label: "Renown",
+    caption: "Renown XP",
+    icon: Star,
+    format: (e) => `${e.renownXP} XP`,
+  },
+  {
+    key: "seaMasterCrowns",
+    label: "Crowns",
+    caption: "Crowns",
+    icon: Crown,
+    format: (e) => `${e.seaMasterCrowns}`,
+  },
+  {
+    key: "bestScore",
+    label: "Best Rep",
+    caption: "Best Rep",
+    icon: Trophy,
+    format: (e) => `${e.bestScore}`,
+  },
+  {
+    key: "voyagesCompleted",
+    label: "Voyages",
+    caption: "Voyages",
+    icon: Ship,
+    format: (e) => `${e.voyagesCompleted}`,
+  },
 ];
 
 export function LeaderboardModal({
@@ -30,7 +66,9 @@ export function LeaderboardModal({
 }) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("renownXP");
+  // The option itself, not its key. Every read below wants the row, and
+  // holding the key meant looking the row back up to ask it anything.
+  const [sort, setSort] = useState(SORT_OPTIONS[0]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +92,7 @@ export function LeaderboardModal({
   if (!open) return null;
 
   const sorted = [...entries].sort((a, b) => {
-    const diff = (b[sortKey] as number) - (a[sortKey] as number);
+    const diff = b[sort.key] - a[sort.key];
     if (diff !== 0) return diff;
     return b.renownXP - a.renownXP;
   });
@@ -104,10 +142,10 @@ export function LeaderboardModal({
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setSortKey(opt.key)}
+              onClick={() => setSort(opt)}
               className={cn(
                 "pm-pressable flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
-                sortKey === opt.key
+                sort.key === opt.key
                   ? "pm-grad-medal-gold"
                   : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5",
               )}
@@ -155,13 +193,8 @@ export function LeaderboardModal({
                     <span
                       className={cn(
                         "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                        i === 0
-                          ? "pm-grad-medal-gold"
-                          : i === 1
-                            ? "pm-grad-medal-silver"
-                            : i === 2
-                              ? "pm-grad-medal-bronze"
-                              : "bg-black/5 text-muted-foreground dark:bg-white/10",
+                        RANK_MEDALS[i + 1] ??
+                          "bg-black/5 text-muted-foreground dark:bg-white/10",
                       )}
                     >
                       {i + 1}
@@ -199,18 +232,10 @@ export function LeaderboardModal({
                     {/* Sort metric value */}
                     <div className="shrink-0 text-right">
                       <div className="font-display text-sm font-bold tabular-nums text-leaderboard">
-                        {sortKey === "renownXP" && `${entry.renownXP} XP`}
-                        {sortKey === "seaMasterCrowns" &&
-                          `${entry.seaMasterCrowns}`}
-                        {sortKey === "bestScore" && `${entry.bestScore}`}
-                        {sortKey === "voyagesCompleted" &&
-                          `${entry.voyagesCompleted}`}
+                        {sort.format(entry)}
                       </div>
                       <div className="text-[9px] text-muted-foreground">
-                        {sortKey === "renownXP" && "Renown XP"}
-                        {sortKey === "seaMasterCrowns" && "Crowns"}
-                        {sortKey === "bestScore" && "Best Rep"}
-                        {sortKey === "voyagesCompleted" && "Voyages"}
+                        {sort.caption}
                       </div>
                     </div>
                   </motion.div>

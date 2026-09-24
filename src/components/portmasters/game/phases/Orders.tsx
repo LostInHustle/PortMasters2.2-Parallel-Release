@@ -7,15 +7,16 @@ import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
   PRODUCTS,
   RESOURCES,
+  SILK_GOODS,
 } from "@/lib/game/constants";
 import {
   brokersFavorCommission,
   calcTransportCost,
   callBrokersFavor,
   completeOrder,
-  completePhase2,
   explainTransportCost,
   explainVAT,
+  nextPhase,
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -30,13 +31,14 @@ import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 export function Orders({
   game,
+  ctx,
   act,
   phaseSync,
   members,
   colorFor,
 }: Pick<
   PhasePanelProps,
-  "game" | "act" | "phaseSync" | "members" | "colorFor"
+  "game" | "ctx" | "act" | "phaseSync" | "members" | "colorFor"
 >) {
   const resolveColor = itemColorResolver(colorFor);
   const [favorOpen, setFavorOpen] = useState(false);
@@ -239,9 +241,7 @@ export function Orders({
             (r) => (game.inventory[r.type] || 0) >= r.required!,
           );
           const completed = game.completedOrders.includes(o.id);
-          const hasSilk = o.resources.some((r) =>
-            ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type),
-          );
+          const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
           const transport = calcTransportCost(game, o.totalItems, hasSilk);
           const transportBreakdown = explainTransportCost(
             game,
@@ -415,7 +415,7 @@ export function Orders({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Trades, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => completePhase2(g, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>
   );
@@ -449,9 +449,7 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
           missing.push({ item: r.type, have, need });
         }
       }
-      const hasSilk = o.resources.some((r) =>
-        ["Silk", "Brocade", "Sachet", "Cotton Clothes"].includes(r.type),
-      );
+      const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
       const transport = calcTransportCost(game, o.totalItems, hasSilk);
       let net = o.reward - transport;
       if (o.isProductOrder) {
@@ -475,13 +473,19 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
       };
     });
 
-  const readyCount = plans.filter((p) => p.ready).length;
-  const closeCount = plans.filter(
+  // The two groups everything below is drawn from. Both were filtered out
+  // of plans three times over on the way down the panel, which is five
+  // walks of the order list to answer two questions, and the "close"
+  // predicate was written out three times in a row, two of them for the
+  // same use.
+  const readyPlans = plans.filter((p) => p.ready);
+  const closePlans = plans.filter(
     (p) => !p.ready && p.missingGoods.length <= 2,
-  ).length;
-  const totalPotential = plans
-    .filter((p) => p.ready)
-    .reduce((sum, p) => sum + p.netProfit, 0);
+  );
+
+  const readyCount = readyPlans.length;
+  const closeCount = closePlans.length;
+  const totalPotential = readyPlans.reduce((sum, p) => sum + p.netProfit, 0);
 
   if (plans.length === 0) return null;
 
@@ -514,34 +518,31 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
         )}
       </div>
       {/* Missing goods for close orders */}
-      {plans.filter((p) => !p.ready && p.missingGoods.length <= 2).length >
-        0 && (
+      {closeCount > 0 && (
         <div className="mt-2 border-t border-planner/10 pt-2 space-y-1">
-          {plans
-            .filter((p) => !p.ready && p.missingGoods.length <= 2)
-            .map((p) => (
-              <div key={p.id} className="flex items-center gap-2 text-[10px]">
-                <Clock className="h-3 w-3 text-warn" />
-                <span className="text-muted-foreground">
-                  Order #{p.id} needs:
-                </span>
-                {p.missingGoods.map((m, i) => (
-                  <span key={i} className="inline-flex items-center gap-0.5">
-                    <ItemIcon item={m.item} className="h-3 w-3" />
-                    <span className="font-medium">{m.item}</span>
-                    <span className="text-alarm">
-                      {m.have}/{m.need}
-                    </span>
-                    {i < p.missingGoods.length - 1 && (
-                      <span className="text-muted-foreground">,</span>
-                    )}
+          {closePlans.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 text-[10px]">
+              <Clock className="h-3 w-3 text-warn" />
+              <span className="text-muted-foreground">
+                Order #{p.id} needs:
+              </span>
+              {p.missingGoods.map((m, i) => (
+                <span key={i} className="inline-flex items-center gap-0.5">
+                  <ItemIcon item={m.item} className="h-3 w-3" />
+                  <span className="font-medium">{m.item}</span>
+                  <span className="text-alarm">
+                    {m.have}/{m.need}
                   </span>
-                ))}
-                <span className="ml-auto text-gain font-medium">
-                  +{p.netProfit}g
+                  {i < p.missingGoods.length - 1 && (
+                    <span className="text-muted-foreground">,</span>
+                  )}
                 </span>
-              </div>
-            ))}
+              ))}
+              <span className="ml-auto text-gain font-medium">
+                +{p.netProfit}g
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>

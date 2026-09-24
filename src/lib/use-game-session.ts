@@ -25,10 +25,13 @@ import {
 } from "@/lib/game/types";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
+import { normalizeMode, type GameMode } from "@/lib/game/mode";
 
 // The most log lines a session keeps around at once (see the APPLY case
-// below, the only place this is enforced). Named so the two places that
-// once used a bare 500 stay in sync by construction rather than by habit.
+// below, the only place this is enforced). Named rather than written out
+// where it is used, so the cap and the trim that applies it cannot drift
+// apart, and so the toast effect's "what's new" window stays in step with
+// the ledger it is reading from.
 const LEDGER_LINE_CAP = 500;
 
 // Exported (along with Action and reducer below) so the reducer, a pure
@@ -66,6 +69,10 @@ type Action =
       renownLevel?: number;
       voyageEpoch?: number;
       difficulty?: Difficulty;
+      // The room's mode, so a brand new voyage in an experimental harbor is
+      // stamped with that mode rather than the founding one. Omitted by any
+      // caller that does not know it, which lands on the default.
+      mode?: GameMode;
       houseId?: HouseId | null;
     }
   | { type: "SET_SAVING"; saving: boolean; at: number };
@@ -86,6 +93,7 @@ function reducer(state: SessionState, action: Action): SessionState {
         renownLevel: action.renownLevel ?? 1,
         voyageEpoch: action.voyageEpoch ?? 0,
         difficulty: action.difficulty,
+        mode: action.mode,
         houseId: action.houseId ?? null,
       });
       const logs: string[] = [];
@@ -120,6 +128,22 @@ export function useGameSession(
   socket: Socket | null,
   enabled: boolean,
   userId: string = "",
+  // The room's mode, as its summary already carries it, handed in by the
+  // caller that was sitting in the lobby a moment ago. Only the two fallback
+  // paths below read it, and they need it for a reason the successful load
+  // does not have: they fire precisely when the server could not be reached,
+  // which is the one moment this hook has no way to ask the room what lap it
+  // is keeping. Seeding those captains Classic would put them on the wrong
+  // phase order for the whole voyage, and because both laps list the same
+  // number of phases, their checkpoint ranks would still compare cleanly
+  // against everyone else's. They would diverge silently, which is the one
+  // failure this whole design is built to make impossible.
+  //
+  // Difficulty is deliberately not threaded the same way. A wrong tier is a
+  // captain playing a slightly different game on their own; a wrong mode is a
+  // captain playing a different lap than the room they are being synchronized
+  // against.
+  roomMode?: GameMode,
 ) {
   // The captain's own deterministic seed identity. Folding userId in is what
   // gives every captain their own market, orders, and Broker intel instead of
@@ -180,13 +204,23 @@ export function useGameSession(
         houseId: houseIdRef.current,
         renownLevel: renownRef.current,
         startingGoldBonus: renownStartingGoldBonus(renownRef.current),
+        mode: roomMode,
       });
     }, LOAD_TIMEOUT_MS);
 
     (async () => {
       try {
         const [
-          { state: raw, checkpoint, difficulty: roomDifficulty },
+          {
+            state: raw,
+            checkpoint,
+            difficulty: roomDifficulty,
+            // Named for what it is rather than shadowing the roomMode the
+            // caller passed in. Both are in play below and they are allowed
+            // to disagree: the response is the room answering live, the
+            // argument is what the lobby said a moment before the request.
+            mode: apiMode,
+          },
           legacyResult,
         ] = await Promise.all([
           api.getGameState(roomId),
@@ -279,6 +313,14 @@ export function useGameSession(
           game.difficulty = normalizeDifficulty(
             roomDifficulty ?? game.difficulty,
           );
+          // Refresh mode from the room for the same reason, and with more at
+          // stake: mode decides which order this captain's phases run in. A
+          // save that predates modes carries no mode at all, and one restored
+          // under a lap the room is not keeping would run the right phases in
+          // the wrong order and quietly desynchronize from everyone else. The
+          // room is authoritative, so it wins; the caller's hint covers a
+          // response that does not carry the field.
+          game.mode = normalizeMode(apiMode ?? roomMode ?? game.mode);
           dispatch({ type: "INIT", game, logs: [] });
         } else {
           dispatch({
@@ -294,6 +336,7 @@ export function useGameSession(
             renownLevel,
             voyageEpoch: checkpoint?.voyageEpoch ?? 0,
             difficulty: roomDifficulty,
+            mode: apiMode ?? roomMode,
             houseId,
           });
         }
@@ -314,6 +357,7 @@ export function useGameSession(
             houseId: houseIdRef.current,
             renownLevel: renownRef.current,
             startingGoldBonus: renownStartingGoldBonus(renownRef.current),
+            mode: roomMode,
           });
         }
       }
@@ -322,7 +366,7 @@ export function useGameSession(
       alive = false;
       clearTimeout(timeoutId);
     };
-  }, [roomId, enabled, ctx]);
+  }, [roomId, enabled, ctx, roomMode]);
 
   // The payload both broadcasts below send, built in one place.
   //

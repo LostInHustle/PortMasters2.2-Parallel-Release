@@ -9,12 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import {
-  DEFAULT_LEGACY_SUMMARY,
-  normalizeHouseId,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
-} from "@/lib/game/legacy";
+import { legacySummaryFor } from "@/lib/captain-legacy";
 
 export async function GET(
   _req: NextRequest,
@@ -32,24 +27,7 @@ export async function GET(
   if (!other)
     return NextResponse.json({ error: "Captain not found" }, { status: 404 });
 
-  const legacy = await db.captainLegacy.findUnique({ where: { userId } });
-  const merits = await db.captainMerit.findMany({
-    where: { userId },
-    select: { meritId: true },
-  });
-  const summary: CaptainLegacySummary = legacy
-    ? {
-        renownLevel: legacy.renownLevel,
-        renownXP: legacy.renownXP,
-        voyagesCompleted: legacy.voyagesCompleted,
-        seaMasterCrowns: legacy.seaMasterCrowns,
-        bestScore: legacy.bestScore,
-        consecutiveSolventVoyages: legacy.consecutiveSolventVoyages,
-        meritIds: merits.map((m) => m.meritId),
-        statsByDifficulty: parseStatsByDifficulty(legacy.statsByDifficulty),
-        houseId: normalizeHouseId(legacy.houseId),
-      }
-    : DEFAULT_LEGACY_SUMMARY;
+  const { summary } = await legacySummaryFor(userId);
 
   return NextResponse.json({ legacy: summary });
 }

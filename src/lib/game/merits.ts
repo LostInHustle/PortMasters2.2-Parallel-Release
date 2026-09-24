@@ -4,8 +4,8 @@
 // progression alongside Renown (see legacy.ts) and Daily Check In (see
 // checkin.ts). Pure functions only (no React, no Prisma), so both the
 // client (the trophy row in CaptainLegacyCard) and the server (the voyage
-// conclusion check in src/server/realtime.ts, the only place a merit is
-// ever granted) share the exact same rules for what counts.
+// conclusion check in src/server/realtime/conclusion.ts, the only place a
+// merit is ever granted) share the exact same rules for what counts.
 //
 // Unlike Renown XP and Check In rewards, a merit carries no gameplay
 // power of its own, purely bragging rights, so this list can grow freely
@@ -99,7 +99,7 @@ export function meritById(id: string): MeritDef | undefined {
 // Everything the voyage conclusion check needs to decide which merits a
 // captain qualifies for, gathered into one plain object so the rule set
 // itself stays a pure function (see maybeConcludeVoyage in
-// src/server/realtime.ts for where each field comes from). All the
+// src/server/realtime/index.ts for where each field comes from). All the
 // "new" fields already include this voyage's own contribution, since the
 // caller has usually just computed them anyway for Renown.
 type MeritEvalInput = {

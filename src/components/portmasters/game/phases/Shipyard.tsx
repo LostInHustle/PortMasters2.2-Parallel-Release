@@ -6,11 +6,16 @@ import {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
-  skipUpgrade,
+  nextPhase,
   startModuleDrafting,
   swapModuleChoices,
   upgradeShip,
 } from "@/lib/game/engine";
+import {
+  MAX_SHIP_LEVEL,
+  MODULES,
+  SHIP_DISCOUNT_PER_LEVEL,
+} from "@/lib/game/constants";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
@@ -19,11 +24,12 @@ import type { PhasePanelProps } from "./PhaseShared";
 
 export function Shipyard({
   game,
+  ctx,
   act,
   phaseSync,
   members,
-}: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
-  const canUpgrade = game.shipLevel < 3;
+}: Pick<PhasePanelProps, "game" | "ctx" | "act" | "phaseSync" | "members">) {
+  const canUpgrade = game.shipLevel < MAX_SHIP_LEVEL;
   const upgCost = canUpgrade
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
     : 0;
@@ -38,8 +44,8 @@ export function Shipyard({
       </div>
       <div className="rounded-xl border-2 border-shipyard/20 bg-shipyard/[0.04] p-5 my-4">
         <div className="text-base font-bold text-shipyard">
-          🚢 Ship Level: {game.shipLevel} | ⚓ Discount: {game.shipLevel * 5}{" "}
-          Gold
+          🚢 Ship Level: {game.shipLevel} | ⚓ Discount:{" "}
+          {game.shipLevel * SHIP_DISCOUNT_PER_LEVEL} Gold
         </div>
         <div className="text-sm text-shipyard mt-1.5">
           🔌 Module Slots: {game.equippedModules.length} / {game.shipLevel}
@@ -95,7 +101,7 @@ export function Shipyard({
               onClick={() => act((g, l) => upgradeShip(g, l))}
             >
               ⚓ Upgrade Ship (Lvl {game.shipLevel + 1}), Cost {upgCost} Gold |
-              +1 Slot, +5 Discount
+              +1 Slot, +{SHIP_DISCOUNT_PER_LEVEL} Discount
             </Button>
           )}
           <Button
@@ -116,7 +122,7 @@ export function Shipyard({
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"
-            onClick={() => phaseSync.markReady((g, l) => skipUpgrade(g, l))}
+            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
           >
             ⏭️ Continue Voyage
           </Button>
@@ -131,7 +137,7 @@ export function ModuleDraft({
   act,
 }: Pick<PhasePanelProps, "game" | "act">) {
   const picks = game._draftChoices ?? [];
-  const canSwap = !game.moduleSwapUsed && picks.length > 0;
+  const canSwap = !game.moduleSwapUsed;
   return (
     <div className="max-w-4xl mx-auto text-center">
       <div className="text-2xl font-bold mb-1 font-display text-module-draft pm-brush">
@@ -142,8 +148,8 @@ export function ModuleDraft({
       </p>
       {picks.length === 0 ? (
         <div className="text-center text-muted-foreground text-sm py-8">
-          You&apos;ve already drafted your module choices for this voyage. New
-          options arrive next voyage.
+          No module choices are on offer right now. A fresh set is rolled each
+          round.
         </div>
       ) : (
         <>
@@ -156,8 +162,8 @@ export function ModuleDraft({
               onClick={() => act((g, l) => swapModuleChoices(g, l))}
             >
               {game.moduleSwapUsed
-                ? "✅ Choices Swapped This Voyage"
-                : "🎲 Swap Choices (1 use/voyage)"}
+                ? "✅ Choices Swapped This Round"
+                : "🎲 Swap Choices (1 use/round)"}
             </Button>
           </div>
           <motion.div
@@ -279,16 +285,13 @@ export function ModuleSwap({
 }
 
 /**
- * Module Synergy Analyzer. Shows how equipped modules interact:
- * which bonuses are active, which modules complement each other, and
- * which carry penalties. Only renders when 2 or more modules are
- * equipped, since a single module has no synergy to analyze.
- */
-/**
- * Data driven module synergy rules. Each rule maps a set of module IDs
- * to a synergy description and tone. The analyzer iterates over these
- * rules and checks whether all required IDs are present in the
- * equipped set. Adding a new synergy is a one line addition here.
+ * Module interaction rules. Each rule names a set of module IDs and the
+ * interaction they produce, and the analyzer checks whether every ID in a
+ * rule is equipped. Adding an interaction is one entry here.
+ *
+ * These are the only hand written part of the analyzer, because an
+ * interaction is exactly the thing neither module's own catalogue entry
+ * can state: each is a claim about what two of them do together.
  */
 const MODULE_SYNERGY_RULES: {
   ids: string[];
@@ -310,13 +313,13 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["artisans_workshop", "salvage_crane"],
     label:
-      "Production Engine: Artisan's Workshop boosts worker output and Salvage Crane refunds on every order. More goods, more Gold back.",
+      "Production Engine: Artisan's Workshop boosts worker output and Salvage Crane refunds the freight on most orders. More goods, more Gold back.",
     tone: "gain",
   },
   {
     ids: ["brokers_network", "ocean_relay"],
     label:
-      "Intel Network: Broker's Network halves rumor cost and Ocean Relay adds a free rumor per purchase. Maximum market intelligence.",
+      "Intel Network: Broker's Network drops a rumor to 2 Gold and reveals two, and Ocean Relay adds a third free. Maximum market intelligence.",
     tone: "intel",
   },
   {
@@ -334,7 +337,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["foreign_quarter_pass", "fleet_of_treasures"],
     label:
-      "Exotic Trade: Foreign Quarter Pass discounts Spices and Pearls, and Fleet of Treasures discounts their transport. Tier 2 goods at tier 0 prices.",
+      "Exotic Trade: Foreign Quarter Pass discounts Spices and Pearls, and Fleet of Treasures discounts freight on Foreign Balm and Pearl String. Tier 2 goods at tier 0 prices.",
     tone: "gain",
   },
   {
@@ -345,56 +348,28 @@ const MODULE_SYNERGY_RULES: {
   },
 ];
 
-/**
- * Data driven active bonus rules. Each rule maps a module ID to a
- * human readable bonus description. The analyzer checks whether each
- * module is equipped and lists its bonus.
- */
-const MODULE_BONUS_RULES: { id: string; icon: string; text: string }[] = [
-  { id: "smugglers_hold", icon: "📦", text: "Purchase costs down 15%" },
-  { id: "tax_evasion", icon: "🧾", text: "VAT and income tax halved" },
-  {
-    id: "silk_monopoly",
-    icon: "🧵",
-    text: "Silk route transport zeroed, +20% reward",
-  },
-  {
-    id: "brokers_network",
-    icon: "🔮",
-    text: "Rumors cost 2 Gold instead of 5",
-  },
-  { id: "salvage_crane", icon: "🏗️", text: "30% refund per completed order" },
-  {
-    id: "artisans_workshop",
-    icon: "🔨",
-    text: "Workers produce +1 item per task",
-  },
-  { id: "bulk_hauler", icon: "📦", text: "Transport cost down per item" },
-  {
-    id: "overdrive_engine",
-    icon: "⚙️",
-    text: "Transport flat discount 5 Gold",
-  },
-  { id: "bureau_token", icon: "🎫", text: "Charter goods orders +10%" },
-  {
-    id: "kiln_cellar",
-    icon: "🏺",
-    text: "Porcelain Clay and Copper Ore 2 Gold less",
-  },
-  { id: "ocean_relay", icon: "🌊", text: "One extra rumor per purchase" },
-  {
-    id: "foreign_quarter_pass",
-    icon: "🪪",
-    text: "Spices and Pearls 3 Gold less per unit",
-  },
-  { id: "persian_dome_compass", icon: "🧭", text: "Pirate risk down 30%" },
-  {
-    id: "fleet_of_treasures",
-    icon: "⛵",
-    text: "Tier 2 product transport discounted",
-  },
-];
+// One wash per tone, read by name. Module level rather than rebuilt on
+// every render, since nothing about it depends on the game.
+const SYNERGY_TONES: Record<"gain" | "intel" | "warn", string> = {
+  gain: "border-gain/20 bg-gain/[0.04] text-gain",
+  intel: "border-intel/20 bg-intel/[0.04] text-intel",
+  warn: "border-warn/20 bg-warn/[0.04] text-warn",
+};
 
+/**
+ * Module Synergy Analyzer. Shows how equipped modules interact: which
+ * bonuses are active, which modules complement each other, and which
+ * carry penalties. Only rendered with two or more equipped, since a
+ * single module has no interaction to analyze.
+ *
+ * The active bonus list reads each equipped module's own catalogue entry
+ * rather than a second copy of it. The copy that used to live here had
+ * drifted badly: ten of the fourteen modules wore the wrong icon, and
+ * every penalty clause had been left off, so the analysis showed a
+ * captain the Smuggler's Hold's purchase discount with none of its income
+ * tax and a Salvage Crane that "refunds 30% per completed order" when it
+ * is a 30% chance of refunding the freight alone.
+ */
 function ModuleSynergyAnalyzer({
   modules,
 }: {
@@ -407,14 +382,8 @@ function ModuleSynergyAnalyzer({
     rule.ids.every((id) => ids.has(id)),
   );
 
-  // Data driven active bonuses: list every equipped module's bonus
-  const activeBonuses = MODULE_BONUS_RULES.filter((rule) => ids.has(rule.id));
-
-  const toneClasses: Record<string, string> = {
-    gain: "border-gain/20 bg-gain/[0.04] text-gain",
-    intel: "border-intel/20 bg-intel/[0.04] text-intel",
-    warn: "border-warn/20 bg-warn/[0.04] text-warn",
-  };
+  // Every equipped module, in catalogue order.
+  const activeBonuses = MODULES.filter((m) => ids.has(m.id));
 
   return (
     <div className="rounded-xl border border-modules/15 bg-modules/[0.02] p-3.5 mb-4">
@@ -433,7 +402,7 @@ function ModuleSynergyAnalyzer({
                 key={i}
                 className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
               >
-                {b.icon} {b.text}
+                {b.icon} {b.name}: {b.desc}
               </span>
             ))}
           </div>
@@ -450,7 +419,7 @@ function ModuleSynergyAnalyzer({
               key={i}
               className={cn(
                 "rounded-lg border px-2.5 py-1.5 text-[10px] leading-relaxed",
-                toneClasses[s.tone] ?? toneClasses.gain,
+                SYNERGY_TONES[s.tone],
               )}
             >
               {s.label}

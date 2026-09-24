@@ -29,8 +29,8 @@ import {
   ICONS,
 } from "@/lib/game/constants";
 import {
-  barterAttemptsFor,
-  barterAttemptsRemaining,
+  flexibleBarterUnlocked,
+  flexibleOffersLeft,
   getOwnedAmount,
   postBarterOffer,
 } from "@/lib/game/engine";
@@ -48,10 +48,18 @@ type Act = (fn: (g: GameState, logs: string[]) => void) => void;
 // about what counts as postable. The amounts are held as plain numbers
 // rather than as strings: QuantityInput commits a number, and the
 // engine's own validation is expressed in numbers too.
+//
+// `flexible` names the surface this draft belongs to and is the only
+// thing that differs between them. A draft on a chat is flexible
+// bartering: earned at a Renown level, and capped at however many of
+// this captain's own offers others may take. A draft on the Captain's
+// Exchange is neither, so it is postable on exactly what the engine will
+// check and nothing else.
 export function useOfferDraft(
   game: GameState,
   barter: Barter,
   act: Act,
+  flexible: boolean,
   fixedTargetId?: string,
 ) {
   const [offerItem, setOfferItem] = useState<string>("Hemp");
@@ -62,23 +70,28 @@ export function useOfferDraft(
 
   const owned = getOwnedAmount(game, offerItem);
   const sameItem = offerItem === requestItem;
-  const validAmounts =
-    Number.isInteger(offerAmount) &&
-    offerAmount >= 1 &&
-    Number.isInteger(requestAmount) &&
-    requestAmount >= 1;
+  // There is no test here that both amounts are whole numbers of at least
+  // one. Both fields are QuantityInputs, which parse with parseInt and
+  // clamp to min={1} before they commit, and the two only writers of these
+  // two numbers are that commit and the reset below, so the check had no
+  // reachable false. The engine checks the lot again on the way through.
   // Flexible bartering is Renown gated, and the server holds the
   // authoritative level. This reads the level off the voyage state, which
   // is refreshed from the same account row on load, so a captain who is
   // allowed to post sees the form while one who is not sees what to go and
   // earn, rather than a form whose every submission would be refused.
-  const barterUnlocked = barterAttemptsFor(game.renownLevel) > 0;
-  const attemptsLeft = barterAttemptsRemaining(
+  //
+  // Both are computed for either surface, so the hook returns one shape to
+  // both composers, but only a flexible draft consults them: `allowed`
+  // short circuits on `flexible` before either is read, and only the chat
+  // composer draws the count.
+  const unlocked = flexibleBarterUnlocked(game.renownLevel);
+  const offersLeft = flexibleOffersLeft(
     game.renownLevel,
-    barter.attemptsUsed,
+    barter.flexibleOffersAccepted,
   );
-  const canPost =
-    !sameItem && validAmounts && offerAmount <= owned && attemptsLeft > 0;
+  const allowed = !flexible || (unlocked && offersLeft > 0);
+  const canPost = allowed && !sameItem && offerAmount <= owned;
   // A composer sitting inside a private thread is already addressed to the
   // captain in it, so there is nothing for that one to choose.
   const targetUserId = fixedTargetId ?? chosenTargetId;
@@ -90,13 +103,14 @@ export function useOfferDraft(
     act((g, l) => {
       postBarterOffer(g, offerItem, offerAmount, requestItem, requestAmount, l);
     });
-    barter.post(
+    barter.post({
       offerItem,
       offerAmount,
       requestItem,
       requestAmount,
-      targetUserId || undefined,
-    );
+      targetUserId: targetUserId || undefined,
+      flexible,
+    });
     setOfferAmount(1);
     setRequestAmount(1);
     setChosenTargetId("");
@@ -118,8 +132,8 @@ export function useOfferDraft(
     owned,
     sameItem,
     canPost,
-    barterUnlocked,
-    attemptsLeft,
+    unlocked,
+    offersLeft,
     submit,
   };
 }
@@ -150,15 +164,19 @@ export function OfferCard({
   const isDirect = Boolean(offer.targetUserId);
   // The server refuses an accept it should not honour whether or not this
   // agrees, so this only spares a captain a click that could not succeed.
-  // It reads the same Renown level and the same attempt tally the server
-  // enforces against. The poster's half of the gate is deliberately not
-  // consulted here: a captain's Renown level is not carried on an offer,
-  // and inventing a guess at it would be worse than letting the server
-  // answer.
+  //
+  // Taking an offer is never rationed, so this captain's own tally is
+  // deliberately not read here: having every flexible offer of their own
+  // taken does not stop them taking as many of anybody else's as they
+  // like. A flexible offer does ask that they be at the unlock level,
+  // since both ends of a flexible trade are held to the same bar, while
+  // an exchange offer asks for no level at all.
+  //
+  // The poster's half of the flexible gate is not consulted either way: a
+  // captain's Renown level is not carried on an offer, and inventing a
+  // guess at it would be worse than letting the server answer.
   const canAccept =
-    canAfford &&
-    barterAttemptsFor(game.renownLevel) > 0 &&
-    barterAttemptsRemaining(game.renownLevel, barter.attemptsUsed) > 0;
+    canAfford && (!offer.flexible || flexibleBarterUnlocked(game.renownLevel));
 
   return (
     <div
@@ -217,9 +235,16 @@ export function OfferCard({
   );
 }
 
-// The compact form used from a chat. It holds its own draft, so it is
-// mounted only where there is a board to post to, which is also what
-// keeps a Lobby conversation entirely free of trade controls.
+// The compact form used from a chat, which is the flexible surface and
+// the only one that is earned. It holds its own draft, so it is mounted
+// only where there is a board to post to, which is also what keeps a
+// Lobby conversation entirely free of trade controls.
+//
+// Nothing here is shared with the Captain's Exchange beyond the draft and
+// the offer card. The exchange is the round interface and is open to
+// everyone; this one is the extra a captain reaches from a conversation,
+// so it is the one that names a Renown level and says how many of this
+// captain's own offers are still open to being taken.
 export function TradeComposer({
   game,
   act,
@@ -237,15 +262,16 @@ export function TradeComposer({
   fixedTarget?: PublicUser;
   onPosted?: () => void;
 }) {
-  const draft = useOfferDraft(game, barter, act, fixedTarget?.id);
+  const draft = useOfferDraft(game, barter, act, true, fixedTarget?.id);
   const selectClass =
     "h-8 rounded-md border border-input bg-transparent px-1.5 text-xs";
 
   // Below the unlock level there is no form worth drawing. The server
   // would refuse every post, and handing a captain a full composer whose
   // only outcome is a refusal is a worse answer than naming the level that
-  // opens it.
-  if (!draft.barterUnlocked) {
+  // opens it. Only flexible bartering is refused this way; the Captain's
+  // Exchange draws its own composer and is never locked.
+  if (!draft.unlocked) {
     const toGo = FLEXIBLE_BARTER_UNLOCK_LEVEL - game.renownLevel;
     return (
       <div className="w-80 space-y-1 p-3 text-xs text-muted-foreground">
@@ -253,6 +279,9 @@ export function TradeComposer({
         <p>
           Unlocks at Renown Level {FLEXIBLE_BARTER_UNLOCK_LEVEL}, {toGo} level
           {toGo === 1 ? "" : "s"} to go.
+        </p>
+        <p>
+          The Captain's Exchange in the Bartering phase is open to you already.
         </p>
       </div>
     );
@@ -336,9 +365,9 @@ export function TradeComposer({
         </p>
       )}
       <p className="text-[11px] text-muted-foreground">
-        {draft.attemptsLeft === 0
-          ? "You have completed every trade this voyage allows."
-          : `${draft.attemptsLeft} trade${draft.attemptsLeft === 1 ? "" : "s"} left this voyage.`}
+        {draft.offersLeft === 0
+          ? "Every flexible trade this voyage allows you has been taken. You can still use the Captain's Exchange and accept any offer."
+          : `Others can still take ${draft.offersLeft} more offer${draft.offersLeft === 1 ? "" : "s"} from you this voyage.`}
       </p>
       <Button
         className={cn(

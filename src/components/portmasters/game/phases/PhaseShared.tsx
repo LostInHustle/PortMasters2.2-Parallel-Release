@@ -15,7 +15,7 @@ type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
-export type Roster = ReturnType<typeof useRoomRoster>;
+type Roster = ReturnType<typeof useRoomRoster>;
 
 export type PhasePanelProps = {
   game: GameState;

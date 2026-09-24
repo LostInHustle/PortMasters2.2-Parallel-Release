@@ -10,13 +10,14 @@
 // normalizer that the API routes and the Lobby's create form both call.
 // =====================================================================
 import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
-import type { Difficulty } from "./game/difficulty";
+import { normalizeDifficulty } from "./game/difficulty";
+import { normalizeMode } from "./game/mode";
 import type { RoomDetail, RoomSummary } from "./api";
 
 // Forwarded so callers that work with rooms (the realtime mini
 // service, the API routes) can import everything room related from one
 // module instead of piecing it together from ./db, ./api, and ./utils.
-export type { RoomSummary, RoomDetail };
+export type { RoomDetail };
 
 // The one place a room row becomes the shape the client reads.
 //
@@ -31,6 +32,14 @@ export type { RoomSummary, RoomDetail };
 // the other two have already re read the seats into a separate list after
 // writing one, so the members are passed in beside the room rather than dug
 // out of it.
+//
+// Difficulty and mode both arrive here as bare database strings. They used to
+// leave through an `as Difficulty` cast, which is a promise the compiler takes
+// on faith and the database never made: any value at all, including one this
+// build has never heard of, sailed out of here wearing a valid type. Both now
+// pass through their own normalizer, so a room whose row somehow holds
+// something unexpected resolves to the founding value instead of handing the
+// client a lap or a tier that does not exist.
 export function serializeRoom(
   room: {
     id: string;
@@ -39,6 +48,7 @@ export function serializeRoom(
     isPublic: boolean;
     started: boolean;
     difficulty: string;
+    mode: string;
     createdAt: Date;
     host: PublicUser;
   },
@@ -50,7 +60,8 @@ export function serializeRoom(
     name: room.name,
     isPublic: room.isPublic,
     started: room.started,
-    difficulty: room.difficulty as Difficulty,
+    difficulty: normalizeDifficulty(room.difficulty),
+    mode: normalizeMode(room.mode),
     createdAt: room.createdAt.toISOString(),
     host: room.host,
     memberCount: members.length,
@@ -59,6 +70,28 @@ export function serializeRoom(
       joinedAt: m.joinedAt.toISOString(),
     })),
   };
+}
+
+// Whether a harbor is closed to a captain who is not already in it.
+//
+// Two callers reach this and they name the field differently: the lobby's
+// summary carries members with an id, and the room row the join routes load
+// carries members with a userId. Both hand over the started flag and the
+// list of ids, which is everything the rule reads.
+//
+// The lobby had been drawing this as `started && !isMember` and stopping
+// there, so a harbor whose whole crew had gone home showed as Locked, with
+// its Enter button disabled under the label and the takeover described below
+// reachable only by whoever still had the code. Kept here, beside the
+// function that enforces it, because the two halves of that rule have to be
+// read together.
+export function roomLockedFor(
+  started: boolean,
+  memberIds: readonly string[],
+  userId: string,
+): boolean {
+  if (!started || memberIds.includes(userId)) return false;
+  return memberIds.length > 0;
 }
 
 // The one place a captain is admitted to a room, shared by the two join
@@ -73,6 +106,13 @@ export function serializeRoom(
 //
 // A returning member always gets back in. A brief disconnect or a refresh must
 // never cost a captain their own seat.
+//
+// The room parameter is structural, like serializeRoom's, and every caller
+// hands over the row it just loaded. That makes this the one place a newly
+// seated captain learns which voyage they are joining, so a field dropped
+// here is a captain walking into a harbor on the wrong lap with nothing to
+// read that says so. Mode is listed beside difficulty for that reason rather
+// than because the seating rule reads it.
 export async function admitToRoom(
   room: {
     id: string;
@@ -81,14 +121,20 @@ export async function admitToRoom(
     isPublic: boolean;
     started: boolean;
     difficulty: string;
+    mode: string;
     createdAt: Date;
     host: PublicUser;
     members: Array<{ userId: string }>;
   },
   userId: string,
 ): Promise<{ error: string } | { room: RoomSummary }> {
-  const alreadyMember = room.members.some((m) => m.userId === userId);
-  if (!alreadyMember && room.started && room.members.length > 0) {
+  if (
+    roomLockedFor(
+      room.started,
+      room.members.map((m) => m.userId),
+      userId,
+    )
+  ) {
     return {
       error:
         "This voyage has already set sail. Ask the host to open a new room.",

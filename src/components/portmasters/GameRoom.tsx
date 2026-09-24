@@ -12,6 +12,7 @@ import type { VoyageResult } from "@/types/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
+  TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
@@ -115,17 +116,13 @@ export function GameRoom({
   onSessionLost,
 }: {
   me: PublicUser;
-  room:
-    | RoomDetail
-    | (PublicUser & {
-        id: string;
-        code: string;
-        name: string;
-        isPublic: boolean;
-        host: PublicUser;
-        memberCount: number;
-        members: Array<PublicUser & { joinedAt: string }>;
-      });
+  // The room's own record, which is what the page already holds by the time
+  // this renders. It used to be declared here as a union with a hand written
+  // copy of the same shape that listed every field except difficulty, which
+  // meant the lap deciding field was the one a second copy was free to forget.
+  // Nothing ever passed that branch. Typing it as the real thing is what lets
+  // the session below be told which mode this harbor is playing.
+  room: RoomDetail;
   // The optional message is why the captain is leaving, for the times the
   // harbor was taken away rather than walked out of. The page owns the
   // screen that comes next, so it owns the telling.
@@ -150,6 +147,9 @@ export function GameRoom({
     socket,
     true,
     me.id,
+    // Only read if the save load never reaches the server, so this captain
+    // still starts their voyage on the lap the rest of the harbor is keeping.
+    room.mode,
   );
   const phaseSync = usePhaseSync(
     room.id,
@@ -531,7 +531,7 @@ export function GameRoom({
         icon: "🌊",
         title: "Tidewatch Alert",
         lines: [
-          "The harbor crossed 500 combined Reputation.",
+          `The harbor crossed ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation.`,
           "One extra cargo lot joins every Port Purchase board.",
         ],
         category: "tidewatch",
@@ -827,10 +827,6 @@ export function GameRoom({
     phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
   }, [phaseSync, ctx]);
 
-  const handleSetSail = useCallback(() => {
-    phaseSync.startGame();
-  }, [phaseSync]);
-
   const handleRestart = useCallback(() => {
     if (!isHost) {
       toast.error("Only the host can restart the voyage");
@@ -838,10 +834,6 @@ export function GameRoom({
     }
     setRestartConfirmOpen(true);
   }, [isHost]);
-
-  const confirmRestart = useCallback(() => {
-    phaseSync.restartVoyage();
-  }, [phaseSync]);
 
   // Keyboard shortcuts (preserved from original).
   useEffect(() => {
@@ -1119,7 +1111,7 @@ export function GameRoom({
               game={state.game}
               saving={state.saving}
               isHost={isHost}
-              onSetSail={handleSetSail}
+              onSetSail={phaseSync.startGame}
               onNextPhase={handleNext}
               onGuide={() => setGuideOpen(true)}
               onSave={handleSave}
@@ -1254,7 +1246,7 @@ export function GameRoom({
       <RestartConfirmModal
         open={restartConfirmOpen}
         onOpenChange={setRestartConfirmOpen}
-        onConfirm={confirmRestart}
+        onConfirm={phaseSync.restartVoyage}
       />
       <NotificationHistoryModal
         open={notificationsOpen}

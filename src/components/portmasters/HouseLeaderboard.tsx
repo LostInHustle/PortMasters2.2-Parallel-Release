@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Crown, Ship, Star, TrendingUp } from "lucide-react";
 import type { HouseStanding } from "@/types/realtime";
 import { cn } from "@/lib/utils";
+import { RANK_MEDALS } from "./shared";
 import {
   HOUSE_BAR,
   HOUSE_BAR_FALLBACK,
@@ -101,13 +102,8 @@ export function HouseLeaderboard({
                 <span
                   className={cn(
                     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                    i === 0
-                      ? "pm-grad-medal-gold"
-                      : i === 1
-                        ? "pm-grad-medal-silver"
-                        : i === 2
-                          ? "pm-grad-medal-bronze"
-                          : "bg-black/10 text-muted-foreground dark:bg-white/10",
+                    RANK_MEDALS[i + 1] ??
+                      "bg-black/10 text-muted-foreground dark:bg-white/10",
                   )}
                 >
                   {i + 1}
@@ -204,19 +200,12 @@ function PodiumCard({
 }) {
   const isMine = standing.houseId === myHouseId;
   const gradient = HOUSE_CREST[standing.houseId] ?? HOUSE_FALLBACK;
-  /* The podium wears the same three medals as the rows below it, so a
-     first place looks like a first place in both places. */
-  const rankColors: Record<number, string> = {
-    1: "pm-grad-medal-gold",
-    2: "pm-grad-medal-silver",
-    3: "pm-grad-medal-bronze",
-  };
   return (
     <div className="flex w-1/4 flex-col items-center">
       <div
         className={cn(
           "mb-1 flex h-8 w-8 items-center justify-center rounded-full shadow-md",
-          rankColors[rank],
+          RANK_MEDALS[rank],
         )}
       >
         <span className="text-sm font-bold">{rank}</span>

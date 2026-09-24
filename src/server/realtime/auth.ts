@@ -4,7 +4,7 @@
 // Auto called on every connection (from the handshake cookie) and
 // again on the explicit "auth" event (with an explicit token, for
 // cross origin realtime where the cookie isn't sent). Reads the
-// shared Session table through the parent project's Prisma client,
+// shared Session table through the Prisma client in @/lib/db,
 // deletes expired sessions on sight, and on success stamps the
 // socket's state with the user and triggers a presence broadcast.
 // =====================================================================

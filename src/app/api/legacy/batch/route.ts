@@ -5,14 +5,8 @@
 // Lobby's "Captains Online" list, doesn't need one request per captain.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
-import {
-  DEFAULT_LEGACY_SUMMARY,
-  normalizeHouseId,
-  parseStatsByDifficulty,
-  type CaptainLegacySummary,
-} from "@/lib/game/legacy";
+import { legacySummariesFor } from "@/lib/captain-legacy";
 
 const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
 
@@ -35,39 +29,7 @@ export async function POST(req: NextRequest) {
     );
 
   const ids = [...new Set(parsed.data.userIds)];
-  const rows = await db.captainLegacy.findMany({
-    where: { userId: { in: ids } },
-  });
-  const byUserId = new Map(rows.map((r) => [r.userId, r]));
-
-  const meritRows = await db.captainMerit.findMany({
-    where: { userId: { in: ids } },
-    select: { userId: true, meritId: true },
-  });
-  const meritsByUserId = new Map<string, string[]>();
-  for (const m of meritRows) {
-    const list = meritsByUserId.get(m.userId);
-    if (list) list.push(m.meritId);
-    else meritsByUserId.set(m.userId, [m.meritId]);
-  }
-
-  const legacies: Record<string, CaptainLegacySummary> = {};
-  for (const id of ids) {
-    const row = byUserId.get(id);
-    legacies[id] = row
-      ? {
-          renownLevel: row.renownLevel,
-          renownXP: row.renownXP,
-          voyagesCompleted: row.voyagesCompleted,
-          seaMasterCrowns: row.seaMasterCrowns,
-          bestScore: row.bestScore,
-          consecutiveSolventVoyages: row.consecutiveSolventVoyages,
-          meritIds: meritsByUserId.get(id) ?? [],
-          statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),
-          houseId: normalizeHouseId(row.houseId),
-        }
-      : DEFAULT_LEGACY_SUMMARY;
-  }
+  const legacies = await legacySummariesFor(ids);
 
   return NextResponse.json({ legacies });
 }

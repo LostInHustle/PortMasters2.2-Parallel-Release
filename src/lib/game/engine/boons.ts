@@ -14,16 +14,22 @@
 // backing out with "Back to Draft" still shows every original option.
 // Only finalizeModuleSwap, once a slot has actually been given up, takes
 // it out of the pool. Reversing those two would duplicate a module or
-// lose one. scripts/tests/unit.drafting.ts pins both branches.
+// lose one.
 //
 // draftBoons weights the offer against the captain's own position, which
 // is why it reads inventory and roster before picking.
 // =====================================================================
-import { BOONS, type Boon, type Module } from "../constants";
+import {
+  BOON_SWAP_COST,
+  BOONS,
+  MAX_SHIP_LEVEL,
+  SHIP_DISCOUNT_PER_LEVEL,
+  type Boon,
+  type Module,
+} from "../constants";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
-import type { GameContext, GameState } from "../types";
-import { startPhase1 } from "./market";
+import type { GameState } from "../types";
 
 function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -98,7 +104,7 @@ function applyBoon(state: GameState, boon: Boon, logs: string[]) {
 }
 
 export function upgradeShip(state: GameState, logs: string[]) {
-  if (state.shipLevel >= 3) return;
+  if (state.shipLevel >= MAX_SHIP_LEVEL) return;
   const cost =
     state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
   if (state.money < cost) {
@@ -108,7 +114,8 @@ export function upgradeShip(state: GameState, logs: string[]) {
   state.money -= cost;
   state.shipLevel++;
   logs.push(
-    `🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, +5 Discount`,
+    `🎉 Ship Upgraded to Level ${state.shipLevel}! +1 Module Slot, ` +
+      `+${SHIP_DISCOUNT_PER_LEVEL} Discount`,
   );
 }
 
@@ -157,39 +164,48 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }
 
-// Rerolls the current boon pool for 10 Gold, once per round. The fee (and
-// the cap) exist so a captain can correct for genuinely bad luck without
-// being able to free reroll until the pool happens to contain whatever
-// they want, see the matching swapModuleChoices below for the no cost
-// equivalent on the module side, where the scarcity is the equippable
-// slots rather than a gold sink.
+// Rerolls the current boon pool for BOON_SWAP_COST, once per round. The
+// fee (and the cap) exist so a captain can correct for genuinely bad luck
+// without being able to free reroll until the pool happens to contain
+// whatever they want, see the matching swapModuleChoices below for the no
+// cost equivalent on the module side, where the scarcity is the
+// equippable slots rather than a gold sink.
 export function swapBoonChoices(state: GameState, logs: string[]) {
   if (state.boonSwapUsed) {
     logs.push("❌ You've already swapped your boon choices this round");
     return;
   }
-  if (state.money < 10) {
-    logs.push("❌ Need 10 Gold to swap boon choices");
+  if (state.money < BOON_SWAP_COST) {
+    logs.push(`❌ Need ${BOON_SWAP_COST} Gold to swap boon choices`);
     return;
   }
-  state.money -= 10;
+  state.money -= BOON_SWAP_COST;
   state.boonChoices = draftBoons(state);
   state.boonSwapUsed = true;
-  logs.push("🔄 Swapped Boon Choices for 10 Gold");
+  logs.push(`🔄 Swapped Boon Choices for ${BOON_SWAP_COST} Gold`);
 }
 
+// Applies a boon. Returns whether one was actually applied, which is the
+// answer its caller needs: the boon draft is left by choosing a boon, so a
+// call that matched nothing must not be allowed to move the voyage on.
+//
+// It used to end by starting Phase 1 by name, which both pinned the draft to
+// one voyage's leg and made the choice and the advance impossible to separate.
+// The advance belongs to lockInBoon in ./lifecycle now, which is the one place
+// allowed to name where a phase leads. The GameContext it used to take went
+// with that call, since opening a phase is the only thing here that ever
+// needed one.
 export function selectBoon(
   state: GameState,
-  ctx: GameContext,
   boonId: string,
   logs: string[],
-) {
+): boolean {
   const boon = BOONS.find((b) => b.id === boonId);
-  if (!boon) return;
+  if (!boon) return false;
   logs.push(`🧭 Boon Locked In: ${boon.icon} ${boon.name}`);
   applyBoon(state, boon, logs);
   state.boonChoices = [];
-  startPhase1(state, ctx, logs);
+  return true;
 }
 
 function rollModuleChoices(state: GameState): Module[] {
@@ -303,7 +319,7 @@ export function cancelModuleDraft(state: GameState) {
 // A captain joining a room for the first time should drop into the voyage
 // wherever the room currently is rather than back at round 1, otherwise
 // they'd never be able to ready up for the same checkpoint as everyone
-// else (see the ready check protocol in src/server/realtime.ts). This runs
+// else (see the ready check protocol in src/server/realtime/index.ts). This runs
 // the same setup calls a normal transition would, just once, up front, so
 // a fresh captain lands on a fully formed phase (cards generated, etc.)
 // instead of an empty one.

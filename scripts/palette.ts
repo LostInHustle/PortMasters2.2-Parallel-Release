@@ -6,7 +6,7 @@
  * table is the source of truth, and palette.css is checked against it
  * rather than the other way round.
  *
- * Five things have to hold, and each one has a way of going wrong that
+ * Six things have to hold, and each one has a way of going wrong that
  * nothing else in the toolchain would notice. TypeScript does not read
  * colours, ESLint does not read class strings, and the smoke test only
  * asks whether the pages answer.
@@ -21,8 +21,14 @@
  *   4. Every pm-grad- class used in src/ has a rule to fill it. A class
  *      with no rule leaves the element with no background at all, which
  *      is silent in every other check.
- *   5. No raw Tailwind palette class is left in src/. A tree that still
+ *   5. Every bright fill has an ink that can be read on it. A gradient
+ *      is written in CSS and an ink in a className, so nothing connects
+ *      the two unless this check does.
+ *   6. No raw Tailwind palette class is left in src/. A tree that still
  *      has them has two colour systems in it.
+ *
+ * Rules 1 and 2 are one pass over the table and share checkDistances
+ * below, so the six rules are five checks.
  *
  * Run with npm run check:palette.
  */

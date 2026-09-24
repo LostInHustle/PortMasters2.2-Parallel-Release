@@ -75,9 +75,13 @@ export { getOwnedAmount } from "./engine/core";
 // settled inside ./engine/, which is also where the only readers of those
 // two sit.
 export {
+  basePriceRange,
+  priceRatio,
   brokersFavorCommission,
   calcTransportCost,
   explainCardPrice,
+  INCOME_TAX_RATE,
+  VAT_RATE,
   explainExpectedPrice,
   explainTransportCost,
   explainVAT,
@@ -92,7 +96,6 @@ export {
 export {
   applyHarborPulse,
   applyTidewatchSurge,
-  completePhase1,
   purchaseCard,
   tallyPurchasesByResource,
 } from "./engine/market";
@@ -103,25 +106,25 @@ export {
   claimWordOnTheDocksReward,
   completeOrder,
   purchaseIntel,
-  startPhase2,
 } from "./engine/orders";
 
 // ========== Bartering ==========
 export {
   acceptBarterOffer,
-  completeBarterPhase,
   postBarterOffer,
   refundBarterOffer,
   settleBarterTrade,
 } from "./engine/barter";
-// Who may barter and how often. Kept out of the block above on purpose:
-// nothing in ./engine/barter.ts consumes these, they are the policy the
-// callers apply around it.
+// Who may barter flexibly and how often. Kept out of the block above on
+// purpose: nothing in ./engine/barter.ts consumes these, they are the
+// policy the callers apply around it, and it is the flexible surface
+// alone. The Captain's Exchange is not governed from here at all.
+// bothFlexibleBarterUnlocked is deliberately absent: its callers are the
+// server's two flexible offer handlers, and both of them read it from
+// ./engine/barterAccess directly since they run outside this barrel.
 export {
-  barterAttemptsFor,
-  barterAttemptsRemaining,
-  canBarterWith,
-  canPostBarter,
+  flexibleBarterUnlocked,
+  flexibleOffersLeft,
 } from "./engine/barterAccess";
 
 // ========== Artisans ==========
@@ -132,7 +135,6 @@ export {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
-  selectBoon,
   startBoonDrafting,
   startModuleDrafting,
   swapBoonChoices,
@@ -170,14 +172,26 @@ export {
 } from "./engine/convoyState";
 
 // ========== Voyage lifecycle and phase orchestration ==========
+// The departures are deliberately not forwarded. completePhase2,
+// finishSettlement and skipUpgrade used to be here because the panels
+// called them directly, which is what gave the engine a second route
+// around the lap. Every panel reaches the spine through nextPhase or
+// lockInBoon now, so those three are private to ./engine/lifecycle.ts.
+//
+// The same goes for the per phase enter and complete steps further up
+// this file: completePhase1, startPhase2, completeBarterPhase and
+// selectBoon are each called by ./engine/lifecycle.ts and nothing else,
+// and it reaches them through their own submodules rather than through
+// here. Re-exporting a step whose only caller is the spine is what made
+// the second route possible in the first place, so they stay off the
+// public surface. A caller outside ./engine/ advances a voyage with
+// nextPhase and never by naming a step.
 export {
-  completePhase2,
-  finishSettlement,
+  lockInBoon,
   nextPhase,
   phaseLabel,
   restartGame,
   showWelcome,
-  skipUpgrade,
   snapToCheckpoint,
 } from "./engine/lifecycle";
 

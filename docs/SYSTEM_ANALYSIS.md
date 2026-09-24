@@ -14,7 +14,7 @@ Every captain in a harbor plays the same voyage in lockstep. Nobody advances a p
 
 1. Boon draft. Draw from a fresh pool of boons that bend the rules for the coming round.
 2. Phase 1 Purchase. Buy raw materials from the port market.
-3. Barter. Trade goods and Gold directly with the other captains, once both ends are at Renown level 10.
+3. Barter. Trade goods and Gold directly with the other captains on the Captain's Exchange, which is open to every captain at any Renown level.
 4. Artisan management. Hire artisans and assign what each of them crafts.
 5. Phase 2 Orders. Fill trade orders for Gold and Reputation.
 6. Phase 3 Settlement. Production lands, wages and maintenance come due, pirates may find you.
@@ -38,7 +38,7 @@ type Phase =
   | "endgame"; // terminal
 ```
 
-The room checkpoint cycles through eight phases per round: 0, 5, 1, barter, worker_mgmt, 2, 3, 4. The personal sub states and terminals never become room checkpoints.
+The room checkpoint cycles through eight phases per round, and which eight in which order is the room's mode (`src/lib/game/mode.ts`, the one place a lap is written down). Classic runs 0, 5, 1, barter, worker_mgmt, 2, 3, 4, which is the order the engine hardcoded before modes existed. Ocean Gambit runs the same eight with the trade manifest moved ahead of the cross captain trade board: 0, 5, 1, 2, barter, worker_mgmt, 3, 4. Both laps visit each phase exactly once, so a round still closes the same way in either. The personal sub states and terminals never become room checkpoints.
 
 One rule cuts across that order. A completed barter trade can land during any phase, because an offer surfaces in the harbor chat as well as in the exchange and a captain can take it from either. Every phase reads a captain's hold and Gold as they are rather than as they were when the phase opened, so a trade that lands partway through a phase changes what is affordable before the phase ends, and no phase holds a cached copy of those numbers to go stale.
 
@@ -72,7 +72,7 @@ Nine Captain's Merits mark permanent achievements. Three are difficulty scoped. 
 
 ## The Social Economy
 
-Cross player bartering with Direct Barter Offers, gated on Renown at both ends rather than one. A captain at level 10 or above may post and accept, with an allowance of one completed trade a voyage and a second from level 15. The attempt is spent by the trade and never by the offer, so a captain may advertise the same intent in several places at once and take whichever answer arrives first, and a completed trade retires every other offer either captain still had standing. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
+Cross player bartering with Direct Barter Offers, on two surfaces over one board. The Captain's Exchange is open to every captain at any Renown level and nothing on it is rationed. Flexible bartering, reached from the harbor chat, is gated on Renown at both ends rather than one: a captain at level 10 or above may post and accept, with an allowance of one completed trade a voyage and a second from level 15. The allowance is spent by the trade and never by the offer, so a captain may advertise the same intent in several places at once and take whichever answer arrives first, and a completed flexible trade retires every other flexible offer its own poster still had standing. Accepting is never rationed on either surface, so a captain whose own offers have all been taken can still take anyone else's. Financial Aid loans. Backing where a third captain co signs an outstanding loan. Convoy Ventures where the harbor pools Gold toward a shared target. Bequest Routing where a bankrupt captain redirects outstanding loans to a still active captain. Harbor Watch where the host mutes one captain's room chat.
 
 ## The Harbor Manifest
 

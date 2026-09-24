@@ -6,17 +6,17 @@
 // over for everyone still seated in it. Whoever reached endgame (not
 // bankrupt) with the highest reported Reputation is crowned Sea Master.
 //
-// This is also the one place a CaptainLegacy row ever gets written:
-// Reputation earned this voyage becomes Renown XP on every finisher's
-// account, persisting across every future voyage they ever sail, unlike
-// Gold, cargo, and ship level, which a restart wipes on purpose.
+// This is also where Reputation earned this voyage becomes Renown XP on
+// every finisher's account, persisting across every future voyage they
+// ever sail, unlike Gold, cargo, and ship level, which a restart wipes on
+// purpose.
 //
 // concludedRooms guards against firing twice for the same voyage;
 // room:restart clears it so a room that plays again can conclude, and
 // be crowned, again.
 //
 // NEW for the manifest: records one VoyageChronicle row per finisher
-// (using buildChronicle from the parent engine) and CaptainRival rows
+// (using buildChronicle from chronicle.ts) and CaptainRival rows
 // for every pair of finishers (using recordRivalOutcomes from rival.ts).
 // =====================================================================
 import type { Server } from "socket.io";
@@ -34,11 +34,7 @@ import {
 } from "@/lib/game/constants";
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { checkSave, describeFindings } from "@/lib/game/integrity";
-import {
-  normalizeDifficulty,
-  renownMultiplierFor,
-  roundsFor,
-} from "@/lib/game/difficulty";
+import { difficultyConfig, normalizeDifficulty } from "@/lib/game/difficulty";
 import { buildChronicle } from "@/lib/game/engine/chronicle";
 import type { PublicUser } from "@/types/realtime";
 import { roomStatuses } from "./status";
@@ -49,7 +45,7 @@ import {
   broadcastLoans,
 } from "./loans";
 import { resolveExpiredVentures } from "./ventures";
-import { clearBarter, clearBarterAttempts } from "./barter";
+import { clearBarter, clearFlexibleAccepted } from "./barter";
 import { userSockets } from "./presence";
 import { recordRivalOutcomes, type RivalStanding } from "./rival";
 
@@ -125,8 +121,8 @@ export async function maybeConcludeVoyage(
     finished.push({
       userId: id,
       user: st.user,
-      reputation: st.reputation ?? 0,
-      gold: st.gold ?? 0,
+      reputation: st.reputation,
+      gold: st.gold,
       phase,
     });
   }
@@ -145,18 +141,18 @@ export async function maybeConcludeVoyage(
   // save they end the voyage with. Each client returns its own escrow as
   // the board empties.
   clearBarter(io, roomId);
-  // The voyage is over, so the barter allowance goes with it. Next voyage
-  // opens on a full one, which is also the only moment a captain's Renown
-  // can have moved, so the counter can never carry a stale level's worth
-  // of spent attempts into a voyage that allows more of them.
-  clearBarterAttempts(roomId);
+  // The voyage is over, so the flexible allowance goes with it. Next
+  // voyage opens on a full one, which is also the only moment a captain's
+  // Renown can have moved, so the counter can never carry a stale level's
+  // worth of taken offers into a voyage that allows more of them.
+  clearFlexibleAccepted(roomId);
 
   const roomForDifficulty = await db.room.findUnique({
     where: { id: roomId },
     select: { difficulty: true, voyageEpoch: true },
   });
   const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
-  const renownMultiplier = renownMultiplierFor(roomDifficulty);
+  const renownMultiplier = difficultyConfig(roomDifficulty).renownXpMultiplier;
 
   // Force resolve every still open venture: the voyage is over, so
   // anything still open never will fill.
@@ -209,7 +205,7 @@ export async function maybeConcludeVoyage(
   for (const f of finished) {
     const verdict = checkSave(
       { money: f.gold, score: f.reputation },
-      roundsFor(roomDifficulty),
+      difficultyConfig(roomDifficulty).rounds,
     );
     if (verdict.severity !== "ok") {
       console.warn(
@@ -369,7 +365,7 @@ export async function maybeConcludeVoyage(
     const chronicle = buildChronicle({
       displayName: f.user.displayName,
       difficulty: roomDifficulty,
-      rounds: roundsFor(roomDifficulty),
+      rounds: difficultyConfig(roomDifficulty).rounds,
       peakReputation: extras.peakReputation,
       finalReputation: f.reputation,
       largestTrade: extras.largestTrade,
@@ -386,7 +382,7 @@ export async function maybeConcludeVoyage(
           roomId,
           voyageEpoch: roomForDifficulty?.voyageEpoch ?? 0,
           difficulty: roomDifficulty,
-          rounds: roundsFor(roomDifficulty),
+          rounds: difficultyConfig(roomDifficulty).rounds,
           peakReputation: extras.peakReputation,
           finalReputation: f.reputation,
           finalGold: f.gold,

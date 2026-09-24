@@ -16,6 +16,7 @@
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
+import { DEFAULT_MODE } from "@/lib/game/mode";
 import { generateRoomCode, normalizeRoomName } from "@/lib/rooms";
 import { userSockets } from "./presence";
 
@@ -86,12 +87,22 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     // a previous queued captain in this same loop is preferred, which
     // tends to fill rooms before spilling into new ones.
     //
+    // Restricted to the founding mode. Quick Start is a one click path with
+    // no choice in it, and the experimental mode is deliberately something a
+    // captain walks into on purpose: it says so on the label, and it plays by
+    // a different lap. Dropping someone into one because they pressed a
+    // button that promised them a game is the one way an experimental mode
+    // could reach a player who never agreed to test anything. The mode is a
+    // room property like difficulty, but unlike the tier it is not inherited
+    // silently, so a queued captain only ever lands in a Classic harbor.
+    //
     // The member ids come back with the room so the liveness check below
     // can be made without a second query.
     const candidate = await db.room.findFirst({
       where: {
         isPublic: true,
         started: false,
+        mode: DEFAULT_MODE,
         members: { some: {} },
       },
       include: {
@@ -127,6 +138,12 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
       // in the tier they picked in the lobby before pressing the button.
       // The tier used to be hardcoded to fair_winds here, which quietly
       // threw away the captain's choice.
+      //
+      // No mode is written, so the row takes the schema default, which is
+      // the founding mode. That is not an omission to fill in later: a
+      // Quick Start harbor is Classic by definition, for the reason the
+      // candidate query above spells out, and the column default is the one
+      // place that says so for both halves of this function at once.
       roomCode = generateRoomCode();
       const created = await db.room.create({
         data: {

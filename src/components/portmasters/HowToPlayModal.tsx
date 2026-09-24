@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   BookOpen,
   X,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { BOON_SWAP_COST } from "@/lib/game/constants";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,7 +51,7 @@ const STEPS: Step[] = [
     title: "Draft a Boon",
     gradient: "pm-grad-boon",
     body: "Each round opens with a boon draft. Pick one of three boons that bend the rules for the coming round: cheaper purchases, faster production, a tax shelter, or an emergency loan of 40 Gold.",
-    tip: "You can swap your boon choices once per round for 10 Gold if none of the three fit your strategy.",
+    tip: `You can swap your boon choices once per round for ${BOON_SWAP_COST} Gold if none of the three fit your strategy.`,
   },
   {
     icon: Package,
@@ -111,144 +112,152 @@ export function HowToPlayModal({
   onOpenChange: (v: boolean) => void;
 }) {
   const [step, setStep] = useState(0);
-  if (!open) return null;
   const current = STEPS[step];
   const Icon = current.icon;
 
+  // The test sits inside the AnimatePresence rather than above it, so the
+  // panel below is still in the tree for the frame its exit animation
+  // runs. Returning null up here instead would drop it instantly and make
+  // that exit prop dead. SettingsModal and KeyboardShortcutHelp, the two
+  // sibling dialogs, are written the same way.
   return (
-    <ModalOverlay onClose={() => onOpenChange(false)}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="pm-glass-strong pm-crackle relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
-      >
-        {/* Header */}
-        <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">
-          <div className="pm-seigaiha absolute inset-0 opacity-30 pointer-events-none" />
-          <div className="relative flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="pm-grad-guide flex h-9 w-9 items-center justify-center rounded-xl">
-                <BookOpen className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="font-display text-lg font-bold text-guide">
-                  How to Play
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  Step {step + 1} of {STEPS.length}: {current.title}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-              aria-label="Close guide"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="h-1 bg-black/5 dark:bg-white/5">
+    <AnimatePresence>
+      {open && (
+        <ModalOverlay onClose={() => onOpenChange(false)}>
           <motion.div
-            className="h-full bg-gradient-to-r from-celadon to-jade"
-            initial={false}
-            animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 pm-scroll">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-4"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="pm-glass-strong pm-crackle relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
           >
-            <div className="flex items-center gap-2.5">
-              <div
-                className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl text-white",
-                  current.gradient,
-                )}
-              >
-                <Icon className="h-5 w-5" />
+            {/* Header */}
+            <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">
+              <div className="pm-seigaiha absolute inset-0 opacity-30 pointer-events-none" />
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="pm-grad-guide flex h-9 w-9 items-center justify-center rounded-xl">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-guide">
+                      How to Play
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground">
+                      Step {step + 1} of {STEPS.length}: {current.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onOpenChange(false)}
+                  className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+                  aria-label="Close guide"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <h3 className="font-display text-lg font-bold text-guide">
-                {current.title}
-              </h3>
             </div>
-            <p className="text-sm leading-relaxed text-foreground">
-              {current.body}
-            </p>
-            <div className="rounded-xl bg-warn/[0.07] border border-warn/20 p-3">
-              <p className="text-xs text-warn">
-                <span className="font-semibold">Tip: </span>
-                {current.tip}
-              </p>
+
+            {/* Progress bar */}
+            <div className="h-1 bg-black/5 dark:bg-white/5">
+              <motion.div
+                className="h-full bg-gradient-to-r from-celadon to-jade"
+                initial={false}
+                animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 pm-scroll">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-xl text-white",
+                      current.gradient,
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-display text-lg font-bold text-guide">
+                    {current.title}
+                  </h3>
+                </div>
+                <p className="text-sm leading-relaxed text-foreground">
+                  {current.body}
+                </p>
+                <div className="rounded-xl bg-warn/[0.07] border border-warn/20 p-3">
+                  <p className="text-xs text-warn">
+                    <span className="font-semibold">Tip: </span>
+                    {current.tip}
+                  </p>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Step dots: pinned below the scroll area, above the navigation,
+                so they are always centred regardless of content height. */}
+            <div className="flex items-center justify-center gap-1.5 py-2 border-t border-border/20">
+              {STEPS.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => setStep(i)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    i === step
+                      ? "w-5 bg-celadon"
+                      : "w-1.5 bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30",
+                  )}
+                  aria-label={`Go to step ${i + 1}: ${s.title}`}
+                />
+              ))}
+            </div>
+
+            {/* Navigation: three column grid so the page indicator is
+                always perfectly centred regardless of button widths. */}
+            <div className="grid grid-cols-3 items-center border-t border-border/40 p-4">
+              <div className="justify-self-start">
+                <button
+                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+                  disabled={step === 0}
+                  className="pm-pressable rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  Back
+                </button>
+              </div>
+              <span className="justify-self-center text-xs text-muted-foreground tabular-nums">
+                {step + 1} / {STEPS.length}
+              </span>
+              <div className="justify-self-end">
+                {step < STEPS.length - 1 ? (
+                  <button
+                    onClick={() =>
+                      setStep((s) => Math.min(STEPS.length - 1, s + 1))
+                    }
+                    className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onOpenChange(false)}
+                    className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
+                  >
+                    Set Sail
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
-        </div>
-
-        {/* Step dots: pinned below the scroll area, above the navigation,
-            so they are always centred regardless of content height. */}
-        <div className="flex items-center justify-center gap-1.5 py-2 border-t border-border/20">
-          {STEPS.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => setStep(i)}
-              className={cn(
-                "h-1.5 rounded-full transition-all",
-                i === step
-                  ? "w-5 bg-celadon"
-                  : "w-1.5 bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30",
-              )}
-              aria-label={`Go to step ${i + 1}: ${s.title}`}
-            />
-          ))}
-        </div>
-
-        {/* Navigation: three column grid so the page indicator is
-            always perfectly centred regardless of button widths. */}
-        <div className="grid grid-cols-3 items-center border-t border-border/40 p-4">
-          <div className="justify-self-start">
-            <button
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-              disabled={step === 0}
-              className="pm-pressable rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              Back
-            </button>
-          </div>
-          <span className="justify-self-center text-xs text-muted-foreground tabular-nums">
-            {step + 1} / {STEPS.length}
-          </span>
-          <div className="justify-self-end">
-            {step < STEPS.length - 1 ? (
-              <button
-                onClick={() =>
-                  setStep((s) => Math.min(STEPS.length - 1, s + 1))
-                }
-                className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
-              >
-                Continue
-              </button>
-            ) : (
-              <button
-                onClick={() => onOpenChange(false)}
-                className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
-              >
-                Set Sail
-              </button>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    </ModalOverlay>
+        </ModalOverlay>
+      )}
+    </AnimatePresence>
   );
 }

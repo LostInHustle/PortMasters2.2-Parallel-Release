@@ -49,6 +49,59 @@ import {
 } from "lucide-react";
 import type { NotificationItem } from "@/lib/use-notifications";
 
+/**
+ * The long form reading dialogs: the Navigation Guide and the Trade
+ * Strategy Advice. Both are a heading with a badge beside it and a
+ * scrollable wall of preformatted text, and they were written out twice
+ * line for line, down to the scroll cap and the Close button. The only
+ * things that ever differed were the heading, the badge, and which block
+ * of text got printed.
+ *
+ * The badge comes in as a node rather than as an icon plus a class,
+ * because the two headings do not wear theirs the same way: the Guide
+ * puts its book on a gradient tile, and the Advice leaves the bulb as a
+ * plain coloured icon.
+ */
+function TextModal({
+  open,
+  onOpenChange,
+  badge,
+  title,
+  description,
+  body,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  badge: React.ReactNode;
+  title: string;
+  description: string;
+  body: string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {badge}
+            {title}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
+          {body}
+        </pre>
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function GuideModal({
   open,
   onOpenChange,
@@ -59,29 +112,18 @@ export function GuideModal({
   difficulty: Difficulty;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="pm-grad-guide inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <BookOpen className="h-4 w-4" />
-            </span>
-            Navigation Guide
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            {APP_NAME} rules and shortcuts
-          </DialogDescription>
-        </DialogHeader>
-        <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {guideText(difficulty)}
-        </pre>
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <TextModal
+      open={open}
+      onOpenChange={onOpenChange}
+      badge={
+        <span className="pm-grad-guide inline-flex h-7 w-7 items-center justify-center rounded-lg">
+          <BookOpen className="h-4 w-4" />
+        </span>
+      }
+      title="Navigation Guide"
+      description={`${APP_NAME} rules and shortcuts`}
+      body={guideText(difficulty)}
+    />
   );
 }
 
@@ -95,27 +137,14 @@ export function TipsModal({
   difficulty: Difficulty;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-advisor" />
-            Trade Strategy Advice
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Bankruptcy avoidance strategies
-          </DialogDescription>
-        </DialogHeader>
-        <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
-          {tipsText(difficulty)}
-        </pre>
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <TextModal
+      open={open}
+      onOpenChange={onOpenChange}
+      badge={<Lightbulb className="h-5 w-5 text-advisor" />}
+      title="Trade Strategy Advice"
+      description="Bankruptcy avoidance strategies"
+      body={tipsText(difficulty)}
+    />
   );
 }
 
@@ -759,17 +788,24 @@ function ComparisonBar({
     shipLevel: number;
     inventory: Record<string, number>;
   };
-  theirDetail: PlayerDetailData | null | undefined;
+  // Their detail is not optional: the only call site renders this inside
+  // its `detail` arm, so by the time the bar draws there is a detail to
+  // draw. Their player is the half that can still be missing, because a
+  // captain can leave the harbor between the peek opening and the reply
+  // landing.
+  theirDetail: PlayerDetailData;
   theirPlayer: PublicUser | null;
 }) {
-  if (!theirDetail || !theirPlayer) return null;
+  if (!theirPlayer) return null;
 
-  const myCargoValue = Object.entries(myDetail.inventory ?? {}).reduce(
-    (sum, [, qty]) => sum + (qty ?? 0),
+  // Cargo is counted in items, not in Gold, so a hold reads the same
+  // whichever goods it happens to be carrying.
+  const myCargoValue = Object.values(myDetail.inventory).reduce(
+    (sum, qty) => sum + qty,
     0,
   );
-  const theirCargoValue = Object.entries(theirDetail.inventory ?? {}).reduce(
-    (sum, [, qty]) => sum + (qty ?? 0),
+  const theirCargoValue = Object.values(theirDetail.inventory).reduce(
+    (sum, qty) => sum + qty,
     0,
   );
 
@@ -778,32 +814,28 @@ function ComparisonBar({
       label: "Gold",
       mine: myDetail.money,
       theirs: theirDetail.money,
-      myTone: "text-gold-ink",
-      theirTone: "text-gold-ink",
+      tone: "text-gold-ink",
       barClass: "bg-gold",
     },
     {
       label: "Reputation",
       mine: myDetail.score,
       theirs: theirDetail.score,
-      myTone: "text-favor",
-      theirTone: "text-favor",
+      tone: "text-favor",
       barClass: "bg-favor",
     },
     {
       label: "Ship Lv",
       mine: myDetail.shipLevel,
       theirs: theirDetail.shipLevel,
-      myTone: "text-sea",
-      theirTone: "text-sea",
+      tone: "text-sea",
       barClass: "bg-sea",
     },
     {
       label: "Cargo",
       mine: myCargoValue,
       theirs: theirCargoValue,
-      myTone: "text-intel",
-      theirTone: "text-intel",
+      tone: "text-intel",
       barClass: "bg-intel",
     },
   ];
@@ -829,12 +861,16 @@ function ComparisonBar({
   );
 }
 
+// One colour for both captains. The type used to carry myTone and
+// theirTone as two fields, and every entry set them to the same string,
+// so the pair only ever read as an invitation to give one captain a
+// different colour from the other, which is not what the bar does: the
+// bar compares two numbers, and the tint names the stat.
 type ComparisonStat = {
   label: string;
   mine: number;
   theirs: number;
-  myTone: string;
-  theirTone: string;
+  tone: string;
   barClass: string;
 };
 
@@ -847,7 +883,7 @@ function ComparisonRow({ stat }: { stat: ComparisonStat }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <div className="flex w-20 items-center justify-end gap-1">
-        <span className={cn("font-bold tabular-nums", stat.myTone)}>
+        <span className={cn("font-bold tabular-nums", stat.tone)}>
           {stat.mine}
         </span>
         {iWin && <span className="text-[8px]">{"<"}</span>}
@@ -868,7 +904,7 @@ function ComparisonRow({ stat }: { stat: ComparisonStat }) {
       </div>
       <div className="flex w-20 items-center gap-1">
         {theyWin && <span className="text-[8px]">{">"}</span>}
-        <span className={cn("font-bold tabular-nums", stat.theirTone)}>
+        <span className={cn("font-bold tabular-nums", stat.tone)}>
           {stat.theirs}
         </span>
       </div>

@@ -35,6 +35,23 @@ import { forgetStatusIfLastSocket } from "./status";
 export const sockets = new Map<string, SocketState>();
 export const userSockets = new Map<string, Set<string>>();
 
+// One event, every socket a captain is holding. A captain may have two
+// tabs open on the same room, and a direct message addressed to them has
+// to arrive on both. It sits here beside the map it walks rather than in
+// the file that first needed it, because the loan, venture and admin
+// modules reach for it too and every one of them was writing this loop
+// out by hand instead.
+export function emitToUser(
+  io: Server,
+  userId: string,
+  event: string,
+  payload: unknown,
+): void {
+  for (const sid of userSockets.get(userId) ?? []) {
+    io.to(sid).emit(event, payload);
+  }
+}
+
 // Abandoned seat cleanup. Keyed by "roomId:userId" since a user can
 // only hold one pending departure per room at a time.
 const departureTimers = new Map<string, ReturnType<typeof setTimeout>>();

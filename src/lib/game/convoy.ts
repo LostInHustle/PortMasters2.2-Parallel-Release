@@ -1,6 +1,6 @@
 // =====================================================================
 // [MANIFEST 04: Convoy Ventures] Pure decision logic, split out of
-// src/server/realtime.ts for the same reason computeHarborPulse was split
+// src/server/realtime/index.ts for the same reason computeHarborPulse was split
 // out into harborPulse.ts: this is real Gold math and the one exploit
 // prevention rule (one filled venture per voyage, room wide) that a
 // doctored client or a race between two captains has to actually be safe
@@ -8,7 +8,7 @@
 // attachRealtime's socket closures, where nothing outside a live server
 // with a live database could import or exercise it.
 //
-// The server (src/server/realtime.ts) is still the one authority over
+// The server (src/server/realtime/index.ts) is still the one authority over
 // *when* each of these run and over the one check that genuinely can't be
 // pure, hasRoomClaimedVenture, which has to ask the database whether any
 // venture in this room's voyage has ever reached "filled". Everything here
@@ -153,6 +153,17 @@ export function computeVentureDeadlineBounds(
   const maxRound = Math.min(currentRound + maxRoundsAhead, voyageRounds - 1);
   if (minRound > maxRound) return null;
   return { minRound, maxRound };
+}
+
+// What a captain is told when the harbor's one Convoy Venture chance for
+// this voyage is already gone. The server says it to whoever posts anyway,
+// and the captain's own rail prints it as the reason there is no form to
+// fill in. One string for both, because the rail carried its own longer
+// version of the sentence: a refusal that reads differently from the notice
+// sitting above it is how a captain ends up reporting a button that was
+// never going to do anything.
+export function ventureAlreadySpentReason(): string {
+  return "This harbor has already used its one Convoy Venture for this voyage. It opens again on a fresh voyage or a restart.";
 }
 
 // The room wide chat announcement for each outcome, kept alongside the

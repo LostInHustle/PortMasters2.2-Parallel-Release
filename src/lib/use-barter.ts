@@ -20,6 +20,14 @@ export type { BarterOffer };
  * or a sweep) is the caller's job via the engine functions in
  * src/lib/game/engine.ts.
  *
+ * One hook, both surfaces. The Captain's Exchange in the Bartering phase
+ * and the composer on a chat post into the same board through the same
+ * call, and differ only in the `flexible` flag they carry: that flag is
+ * what the server reads to decide whether the Renown gate and the
+ * flexible allowance apply. Nothing in this hook enforces either one, so
+ * a screen that draws both surfaces from here cannot invent a rule the
+ * server does not have.
+ *
  * `onFulfilled` fires once for every trade involving me, on both sides:
  * as the accepter (pay the requested item, receive the offered one) and
  * as the original poster (receive the requested item, the offered side
@@ -54,14 +62,17 @@ export function useBarter(
 ) {
   const [offers, setOffers] = useState<BarterOffer[]>([]);
   const [error, setError] = useState<string | null>(null);
-  // How many completed trades this voyage has already cost me, as the
-  // server counts them. Held as a count rather than as "trades left"
-  // because the allowance depends on my Renown level, which the server
-  // deliberately does not repeat back to me here: I already hold the
-  // authoritative level on my own voyage state, and engine/barterAccess is
-  // what turns the pair into an answer, so both screens read the same
-  // policy the server enforces.
-  const [attemptsUsed, setAttemptsUsed] = useState(0);
+  // How many of my own flexible offers others have already taken this
+  // voyage, as the server counts them. Held as a count rather than as
+  // "offers left" because the allowance depends on my Renown level, which
+  // the server deliberately does not repeat back to me here: I already
+  // hold the authoritative level on my own voyage state, and
+  // engine/barterAccess is what turns the pair into an answer, so both
+  // screens read the same policy the server enforces.
+  //
+  // It says nothing about the Captain's Exchange, which is never
+  // rationed, so only the flexible composer on a chat reads this.
+  const [flexibleOffersAccepted, setFlexibleOffersAccepted] = useState(0);
 
   // My own offers exactly as the board last reported them. Never tracked
   // separately from a broadcast, so the server stays the single source of
@@ -95,11 +106,11 @@ export function useBarter(
     const onUpdate = (data: {
       roomId: string;
       offers: BarterOffer[];
-      barterAttemptsUsed?: number;
+      flexibleOffersAccepted?: number;
     }) => {
       if (data.roomId !== roomId) return;
       setOffers(data.offers);
-      setAttemptsUsed(data.barterAttemptsUsed ?? 0);
+      setFlexibleOffersAccepted(data.flexibleOffersAccepted ?? 0);
       const next = new Map<string, BarterOffer>();
       for (const o of data.offers) {
         if (o.fromUserId === myUserId) next.set(o.id, o);
@@ -152,23 +163,23 @@ export function useBarter(
     };
   }, [socket, roomId, myUserId]);
 
+  // Takes the whole offer rather than a row of positional arguments,
+  // because `flexible` has to travel with it. It names which surface the
+  // post came from, which is the one thing that decides from here on
+  // whether the offer is held to the Renown gate and the flexible
+  // allowance or whether it is a plain Captain's Exchange offer with
+  // neither.
   const post = useCallback(
-    (
-      offerItem: string,
-      offerAmount: number,
-      requestItem: string,
-      requestAmount: number,
-      targetUserId?: string,
-    ) => {
+    (offer: {
+      offerItem: string;
+      offerAmount: number;
+      requestItem: string;
+      requestAmount: number;
+      targetUserId?: string;
+      flexible?: boolean;
+    }) => {
       if (!socket) return;
-      socket.emit("barter:post", {
-        roomId,
-        offerItem,
-        offerAmount,
-        requestItem,
-        requestAmount,
-        ...(targetUserId ? { targetUserId } : {}),
-      });
+      socket.emit("barter:post", { roomId, ...offer });
     },
     [socket, roomId],
   );
@@ -202,7 +213,7 @@ export function useBarter(
     offers,
     error,
     clearError: () => setError(null),
-    attemptsUsed,
+    flexibleOffersAccepted,
     post,
     cancel,
     accept,

@@ -45,16 +45,13 @@ function getCtx(): AudioContext | null {
   return audioCtx;
 }
 
-type ToneKind =
-  | "click"
-  | "confirm"
-  | "success"
-  | "warn"
-  | "error"
-  | "arrive"
-  | "depart"
-  | "coin"
-  | "phase";
+// The four tones this game plays, one per moment worth marking: a
+// something landed, a round went well, something needs attention, and
+// Gold moved. There were nine of these once, and the five with no caller
+// (click, error, arrive, depart, phase) were an unreachable half of the
+// table that a reader had no way to pick out except by grepping every
+// call site. A fifth tone goes back in here beside a call that plays it.
+type ToneKind = "confirm" | "success" | "warn" | "coin";
 
 const TONE_PROFILES: Record<
   ToneKind,
@@ -66,15 +63,10 @@ const TONE_PROFILES: Record<
     sweep?: number;
   }
 > = {
-  click: { freq: 440, dur: 0.05, type: "sine", vol: 0.04 },
   confirm: { freq: 523, dur: 0.12, type: "sine", vol: 0.06, sweep: 659 },
   success: { freq: 587, dur: 0.18, type: "triangle", vol: 0.07, sweep: 880 },
   warn: { freq: 330, dur: 0.15, type: "sawtooth", vol: 0.05 },
-  error: { freq: 220, dur: 0.25, type: "sawtooth", vol: 0.06 },
-  arrive: { freq: 660, dur: 0.3, type: "sine", vol: 0.08, sweep: 880 },
-  depart: { freq: 880, dur: 0.3, type: "sine", vol: 0.08, sweep: 440 },
   coin: { freq: 988, dur: 0.08, type: "triangle", vol: 0.05 },
-  phase: { freq: 392, dur: 0.2, type: "sine", vol: 0.06, sweep: 523 },
 };
 
 function playTone(kind: ToneKind, volumeScale: number = 1) {

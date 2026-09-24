@@ -7,12 +7,13 @@ import type { Socket } from "socket.io-client";
 import { Avatar } from "./shared";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CHAT_MESSAGE_MAX } from "@/lib/realtime-endpoint";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { SendHorizontal, Loader2, Search, X, Handshake } from "lucide-react";
+import { SendHorizontal, Search, X, Handshake } from "lucide-react";
 import type { GameState } from "@/lib/game/types";
 import type { BarterOffer } from "@/lib/use-barter";
 import { cn } from "@/lib/utils";
@@ -114,7 +115,6 @@ export function ChatPanel({
   other,
   initialMessages,
   trade,
-  className,
   disabled,
 }: {
   socket: Socket | null;
@@ -124,7 +124,6 @@ export function ChatPanel({
   other?: PublicUser;
   initialMessages?: ChatMessage[];
   trade?: ChatTrade;
-  className?: string;
   // [MANIFEST 14: Harbor Watch] Set only for the room mode instance, only
   // while the host has muted this captain. A muted captain keeps reading
   // room chat live same as anyone; they just can't post to it until the
@@ -136,7 +135,6 @@ export function ChatPanel({
     initialMessages ?? [],
   );
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -157,13 +155,19 @@ export function ChatPanel({
 
   // Which open offers belong to the conversation being read. The board a
   // socket receives is already scoped to what that captain may see, so the
-  // harbor thread shows it whole, while a private thread shows only the
-  // offers aimed at the two captains in it. A search hides them: it looks
-  // through what was said, and an offer is taken or left on the board.
+  // harbor thread shows it whole, while a private thread shows the offers
+  // aimed at either captain in it: theirs to me and mine to them. Reading
+  // only the second direction left an offer the other captain had addressed
+  // to me out of our own thread, and it could only be taken from the harbor
+  // board, which is the one place a direct offer exists to avoid. A search
+  // hides them: it looks through what was said, and an offer is taken or
+  // left on the board.
   const offers: BarterOffer[] =
     trade && !searching
       ? mode === "dm"
-        ? trade.barter.offers.filter((o) => o.targetUserId === other?.id)
+        ? trade.barter.offers.filter(
+            (o) => o.targetUserId === other?.id || o.targetUserId === me.id,
+          )
         : trade.barter.offers
       : [];
   const offerCount = offers.length;
@@ -284,20 +288,20 @@ export function ChatPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, offerCount]);
 
-  async function send() {
+  // Deliberately not async and deliberately stateless. An emit returns as
+  // soon as the socket has taken the frame, so any "sending" flag raised
+  // around one is cleared again before the next paint and the spinner it
+  // drove could never be seen. Clearing the composer is the whole of the
+  // feedback, which is what a chat line has always done here.
+  function send() {
     const content = input.trim();
-    if (!content || sending) return;
-    setSending(true);
+    if (!content) return;
     setInput("");
-    try {
-      if (mode === "room" && roomId) {
-        // Optimistic echo handled by server broadcast to room (including self).
-        socket?.emit("chat:room", { roomId, content });
-      } else if (mode === "dm" && other) {
-        socket?.emit("chat:dm", { recipientId: other.id, content });
-      }
-    } finally {
-      setSending(false);
+    if (mode === "room" && roomId) {
+      // Optimistic echo handled by server broadcast to room (including self).
+      socket?.emit("chat:room", { roomId, content });
+    } else if (mode === "dm" && other) {
+      socket?.emit("chat:dm", { recipientId: other.id, content });
     }
   }
 
@@ -311,7 +315,7 @@ export function ChatPanel({
   const tradeTarget = mode === "dm" ? trade?.defaultTarget : undefined;
 
   return (
-    <div className={cn("flex h-full flex-col min-h-0", className)}>
+    <div className="flex h-full flex-col min-h-0">
       {/* Search bar */}
       {searchOpen && (
         <div className="flex items-center gap-1.5 border-b border-black/5 px-2.5 py-2 dark:border-white/10">
@@ -481,19 +485,15 @@ export function ChatPanel({
                 : `Message ${other?.displayName ?? ""}…`
             }
             className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
-            maxLength={1000}
+            maxLength={CHAT_MESSAGE_MAX}
           />
           <Button
             size="icon"
             onClick={send}
-            disabled={!input.trim() || sending}
+            disabled={!input.trim()}
             className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
           >
-            {sending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SendHorizontal className="h-4 w-4" />
-            )}
+            <SendHorizontal className="h-4 w-4" />
           </Button>
         </div>
       )}

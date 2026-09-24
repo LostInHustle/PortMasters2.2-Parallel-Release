@@ -278,7 +278,7 @@ function FinancialSummary({ game }: { game: GameState }) {
     },
     {
       label: "Emergency Loan",
-      value: game.modifierFlags?.instant_gold ?? 0,
+      value: game.modifierFlags.instant_gold ?? 0,
       icon: "💰",
       tone: "text-due",
     },
@@ -404,13 +404,13 @@ function FinancialSummary({ game }: { game: GameState }) {
  * reputation cap).
  */
 function PeerEconomySummary({ game }: { game: GameState }) {
-  const loansGiven = game.loansGiven ?? [];
-  const debts = game.debts ?? [];
+  const loansGiven = game.loansGiven;
+  const debts = game.debts;
   const totalLent = loansGiven.reduce((s, l) => s + l.amount, 0);
   const totalBorrowed = debts.reduce((s, l) => s + l.amount, 0);
   const outstandingLent = loansGiven.length;
   const outstandingBorrowed = debts.length;
-  const helperRep = game.helperReputationEarned ?? 0;
+  const helperRep = game.helperReputationEarned;
 
   // Only show if there was any peer economy activity
   if (totalLent === 0 && totalBorrowed === 0 && helperRep === 0) return null;
@@ -483,7 +483,7 @@ function CrewSummary({ game }: { game: GameState }) {
   const allWorkers = flatWorkerRoster(game);
   const totalHired = allWorkers.length;
   const skilledCount = allWorkers.filter((w) => w.isSkilled).length;
-  const totalWages = game.workerWages ?? 0;
+  const totalWages = game.workerWages;
 
   // Estimate total items produced from worker producedCount
   const totalProduced = allWorkers.reduce(
