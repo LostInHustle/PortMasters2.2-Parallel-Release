@@ -52,7 +52,7 @@ The engine is client authoritative and deterministic by composition. Every capta
 
 What is seeded: the Phase 1 market card draw, the Phase 1 intel rumor pool, the Phase 2 trade order draw. What is not seeded: Salvage Crane refunds, Tax Evasion audits, the pirate raid roll itself, Broker's Favor order generation, Farsight free rumor selection, Boon drafting, Module drafting, the corrupt broker leak roll. This split is intentional. The deterministic stream fixes the shared economy so two captains see the same market. The personal stream keeps each captain's luck private so a lucky Salvage Crane refund on one client never desyncs another.
 
-The engine surface is roughly 3,289 lines across 18 files in `engine/`, plus 3,361 lines across 15 files beside it carrying the shared constants, the types and the pure helpers the modules read from. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
+The engine surface is roughly 3,606 lines across 19 files in `engine/`, plus 4,205 lines across 18 files beside it carrying the shared constants, the types and the pure helpers the modules read from. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
 
 ## The Realtime Layer
 
@@ -127,7 +127,7 @@ Earlier in the project a review produced a list of defects and refactoring targe
 
 The `nextPhase` barter branch used to pass an empty refunds array, so a captain who advanced from the control bar instead of the Bartering panel abandoned every offer they had posted along with its escrow. The refund list is now a parameter, and the control bar forwards the same live list the panel does.
 
-The realtime layer was one 3,097 line function. It is now a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin, auth and gambit, with the shared types and the composition root itself alongside them.
+The realtime layer was one 3,097 line function. It is now a composition root over small modules: presence, checkpoint, barter, aid, loans, ventures, chat, conclusion, pulse, objective, docks, surge, rival, quickstart, status, admin, auth and gambit, with the shared types and the composition root itself alongside them.
 
 `PublicUser` and `CaptainStatus` were duplicated between the client and the server, and so was `CHECKPOINT_PHASE_ORDER`. Both now have one home, in `src/types/realtime.ts` and `src/lib/game/checkpoint.ts`.
 

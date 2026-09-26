@@ -164,9 +164,9 @@ Every system of the earlier build is still here and still working the same way, 
 |                        | The earlier build | PortMasters 2.2 Parallel Release |
 | ---------------------- | ----------------- | -------------------------------- |
 | Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 18 modules                       |
-| Interface components   | 29                | 58                               |
-| Database models        | 10                | 12                               |
+| Realtime layer         | one long file     | 20 modules                       |
+| Interface components   | 29                | 60                               |
+| Database models        | 10                | 13                               |
 | The port it answers on | 2232              | 8080                             |
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.

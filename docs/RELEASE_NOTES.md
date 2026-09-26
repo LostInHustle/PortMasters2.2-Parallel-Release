@@ -15,11 +15,11 @@ The 2.2 build branches from it rather than patching it. Every game system that b
 |                                 | The earlier build      | PortMasters 2.2 Parallel Release |
 | ------------------------------- | ---------------------- | -------------------------------- |
 | Harbor Manifest systems shipped | 10 of 18               | 16 of 18                         |
-| Realtime layer                  | one file, 3,097 lines  | 18 modules, 4,584 lines          |
-| Engine modules                  | 12, across 2,493 lines | 18, across 3,289 lines           |
-| API routes                      | 16, plus a stub        | 24                               |
-| Interface components            | 29                     | 58                               |
-| Database models                 | 10                     | 12                               |
+| Realtime layer                  | one file, 3,097 lines  | 20 modules, 5,374 lines          |
+| Engine modules                  | 12, across 2,493 lines | 19, across 3,606 lines           |
+| API routes                      | 16, plus a stub        | 25                               |
+| Interface components            | 29                     | 60                               |
+| Database models                 | 10                     | 13                               |
 | The port the game answers on    | 2232                   | 8080                             |
 | The bind address                | not configurable       | `HOST`, defaulting to `0.0.0.0`  |
 
@@ -105,7 +105,7 @@ Sound is new as well. The tones are synthesized at runtime through the Web Audio
 
 ## A rebuilt realtime layer
 
-The realtime layer was one 3,097 line function. It is now eighteen small modules under `src/server/realtime`, each owning one concern: presence, the checkpoint protocol, barter, aid, loans, ventures, chat, conclusion, pulse, docks, surge, rival, quickstart, status, admin, auth, types and the composition root that wires them together.
+The realtime layer was one 3,097 line function. It is now twenty small modules under `src/server/realtime`, each owning one concern: presence, the checkpoint protocol, barter, aid, loans, ventures, chat, conclusion, pulse, objective, docks, surge, rival, quickstart, status, admin, auth, gambit, types and the composition root that wires them together.
 
 Two shapes moved somewhere both halves can reach. `PublicUser` and `CaptainStatus` now live in `src/types/realtime.ts` with no runtime dependencies, so the client and the server are described by one definition rather than two that drift apart. `CHECKPOINT_PHASE_ORDER` moved to `src/lib/game/checkpoint.ts`, so the ready check and the interface read the same list from the same place.
 
