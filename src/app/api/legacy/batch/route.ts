@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/api-auth";
 import { legacySummariesFor } from "@/lib/captain-legacy";
+import { readJson } from "@/lib/api-json";
 
 const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
 
@@ -15,20 +16,10 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = BatchSchema.safeParse(body);
-  if (!parsed.success)
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
+  const body = await readJson(req, BatchSchema);
+  if (!body.ok) return body.response;
 
-  const ids = [...new Set(parsed.data.userIds)];
+  const ids = [...new Set(body.data.userIds)];
   const legacies = await legacySummariesFor(ids);
 
   return NextResponse.json({ legacies });

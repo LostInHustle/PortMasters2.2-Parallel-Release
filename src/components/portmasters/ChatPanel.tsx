@@ -90,17 +90,20 @@ function TradeButton({
 }
 
 /**
- * A self contained chat surface. Two modes: room, messages broadcast to a
- * room channel (socket `chat:room`); dm, 1 to 1 messages with another user
- * (socket `chat:dm`).
+ * A self contained chat surface. Three modes: room, messages broadcast to a
+ * room channel (socket `chat:room`); lobby, messages broadcast to the harbor
+ * square every captain in the lobby is standing in (socket `chat:lobby`); dm,
+ * 1 to 1 messages with another user (socket `chat:dm`).
  *
  * The socket is passed in (shared singleton). The seed history comes from
  * the parent: the Lobby fetches it over REST, a session hands over what the
  * server hydrated on join, because a session conversation is never written
- * down and so has nowhere to be fetched from later. Live messages arrive
- * over the socket. Mine uses the celadon pm-grad-chat, others get a soft
- * black tint so the conversation reads as two sides of a brush without
- * leaning on the rose tint the old build used for the same distinction.
+ * down and so has nowhere to be fetched from later. The two public channels
+ * split the same way on the server, where a room's chat dies with the voyage
+ * and the square's is written down. Live messages arrive over the socket.
+ * Mine uses the celadon pm-grad-chat, others get a soft black tint so the
+ * conversation reads as two sides of a brush without leaning on the rose
+ * tint the old build used for the same distinction.
  *
  * Given a `trade`, the panel also carries the shared offer board: open
  * offers that belong to this conversation appear in the stream where they
@@ -119,7 +122,7 @@ export function ChatPanel({
 }: {
   socket: Socket | null;
   me: PublicUser;
-  mode: "room" | "dm";
+  mode: "room" | "dm" | "lobby";
   roomId?: string;
   other?: PublicUser;
   initialMessages?: ChatMessage[];
@@ -245,6 +248,21 @@ export function ChatPanel({
           : [...prev, { ...message, mine: message.sender.id === me.id }],
       );
     };
+    // The harbor square. It is public and addressed to nobody, so there is
+    // no membership to test and no peer to match against: every one of
+    // these belongs to this panel, and the only question is whether it is
+    // already on screen.
+    const onLobby = (data: { message: ChatMessage }) => {
+      if (mode !== "lobby") return;
+      setMessages((prev) =>
+        prev.some((m) => m.id === data.message.id)
+          ? prev
+          : [
+              ...prev,
+              { ...data.message, mine: data.message.sender.id === me.id },
+            ],
+      );
+    };
     // A room whose conversation the host has just wiped. The messages on
     // screen belong to the voyage that was just thrown away, so they go with
     // it. Offers are board state and are untouched by a restart, so they are
@@ -267,11 +285,13 @@ export function ChatPanel({
       });
     };
     socket.on("chat:room", onRoom);
+    socket.on("chat:lobby", onLobby);
     socket.on("chat:dm", onDm);
     socket.on("chat:cleared", onCleared);
     socket.on("chat:muted", onMuted);
     return () => {
       socket.off("chat:room", onRoom);
+      socket.off("chat:lobby", onLobby);
       socket.off("chat:dm", onDm);
       socket.off("chat:cleared", onCleared);
       socket.off("chat:muted", onMuted);
@@ -300,15 +320,19 @@ export function ChatPanel({
     if (mode === "room" && roomId) {
       // Optimistic echo handled by server broadcast to room (including self).
       socket?.emit("chat:room", { roomId, content });
+    } else if (mode === "lobby") {
+      // The same echo, from the square rather than from a room.
+      socket?.emit("chat:lobby", { content });
     } else if (mode === "dm" && other) {
       socket?.emit("chat:dm", { recipientId: other.id, content });
     }
   }
 
-  const emptyText =
-    mode === "room"
-      ? "No messages yet. Break the ice with your fellow captains."
-      : "No messages yet between you two.";
+  const emptyText = {
+    lobby: "Nothing on the harbor square yet. Say hello to the fleet.",
+    room: "No messages yet. Break the ice with your fellow captains.",
+    dm: "No messages yet between you two.",
+  }[mode];
 
   // A private thread trades with the captain it is with, so the composer
   // has no target to pick.
@@ -480,9 +504,11 @@ export function ChatPanel({
               }
             }}
             placeholder={
-              mode === "room"
-                ? "Message the harbor…"
-                : `Message ${other?.displayName ?? ""}…`
+              {
+                room: "Message the harbor…",
+                lobby: "Message the lobby…",
+                dm: `Message ${other?.displayName ?? ""}…`,
+              }[mode]
             }
             className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
             maxLength={CHAT_MESSAGE_MAX}

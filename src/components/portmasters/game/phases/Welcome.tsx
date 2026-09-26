@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { APP_NAME, STARTING_STOCK } from "@/lib/game/constants";
 import { INCOME_TAX_RATE } from "@/lib/game/engine";
 import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
+import { modeConfig } from "@/lib/game/mode";
 import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
@@ -202,9 +203,8 @@ export function Welcome({
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
         <div className="rounded-lg bg-sea/[0.06] border border-sea/15 px-3.5 py-2.5 text-xs">
-          <strong>🔄 4 Phases per Voyage:</strong> 1️⃣ Buy at Ports (+ 🤝 Barter)
-          → 2️⃣ Fill Trade Orders → 3️⃣ Pirates, Wages &amp; Maintenance → 4️⃣
-          Upgrade Ship
+          <strong>🔄 4 Phases per Voyage:</strong>{" "}
+          {modeConfig(game.mode).lapBlurb}
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
           <strong>💡 New Player Tip:</strong> Rely on raw material orders early.

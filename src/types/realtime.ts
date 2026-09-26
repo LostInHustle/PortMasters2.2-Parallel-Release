@@ -10,6 +10,7 @@
 // =====================================================================
 
 import type { Difficulty } from "@/lib/game/difficulty";
+import type { GambitRole } from "@/lib/game/gambit";
 import type { HouseId } from "@/lib/game/legacy";
 
 // The public projection of a user account: what every other captain is
@@ -31,6 +32,72 @@ export type OnlineUser = PublicUser & { roomId: string | null };
 // stamp lives on the membership row and is included wherever the lobby
 // or the room panel needs to render it.
 export type RoomMemberLive = PublicUser & { joinedAt?: string };
+
+// =====================================================================
+// The private channel.
+//
+// One entry, addressed to one captain, delivered on `private:entry` to
+// that captain's sockets and to nobody else. Everything hidden in this
+// game travels this way and nothing hidden travels any other way: no
+// broadcast payload carries a secret, which is a rule the realtime layer
+// holds rather than a habit, and the smoke test asserts it by keeping
+// every frame every socket in a room receives and reading them back.
+//
+// An entry is a line for a captain's own log rather than a state change,
+// which is why it carries its own text: the server writes the line, and
+// the interface prints what it was sent rather than assembling the same
+// sentence out of fields on this side of the wire.
+//
+// role is the one field in the whole protocol that can name an alignment.
+// It is optional because most entries will not have one, and it is typed
+// rather than a string so that a second place to put an alignment would
+// not compile.
+// =====================================================================
+
+export type PrivateEntry = {
+  /** What kind of entry this is. "card" is the dealt alignment. */
+  kind: "card";
+  /** The line the captain reads. */
+  text: string;
+  /** A hidden alignment, and the only wire field that can carry one. */
+  role?: GambitRole;
+};
+
+export type PrivateEntryDelivery = {
+  roomId: string;
+  entry: PrivateEntry;
+};
+
+// =====================================================================
+// The fleet commission, and the deliberate contrast with the block above.
+//
+// The objective is public: everyone in the harbor owes the same commission
+// and everyone can see how much of it has been handed over. So this shape
+// is the one place in the mode that is meant to be broadcast to the whole
+// room, and it carries two fields for the same reason the private entry
+// carries a typed role: a payload with nowhere to put a secret cannot leak
+// one. There is no captain id in either direction. A report says what one
+// captain handed over and nothing about who they are, and the total the
+// room receives is a sum that names nobody.
+// =====================================================================
+
+/** What one captain reports to the harbor: their own running total. */
+export type ObjectiveReport = {
+  roomId: string;
+  delivered: Record<string, number>;
+};
+
+/**
+ * The harbor's total, summed server side and sent to the whole room.
+ *
+ * `total` is keyed by good and holds items handed over, not gold: the
+ * server never has to know what the commission pays, only what it asked
+ * for, which is what lets it clamp a report without the deck's prices.
+ */
+export type ObjectiveProgress = {
+  roomId: string;
+  total: Record<string, number>;
+};
 
 // One captain's last reported status, broadcast on the game:status
 // channel. The phase is a number or string because the Phase union has
@@ -263,4 +330,25 @@ export type AdminAccount = {
 // never has to guess what its own click did.
 export type AdminRoster = {
   accounts: AdminAccount[];
+};
+
+// The four things an operator can do to a whole selection at once. The
+// same four are on every row one account at a time, and they are worded
+// from the console's side rather than the database's: "grant" is the
+// console's Make admin, and "purge" is its Delete.
+export type AdminBulkAction = "ban" | "unban" | "grant" | "purge";
+
+// What a bulk action did. The request is answered account by account
+// rather than as a yes or a no, because a selection is allowed to contain
+// accounts an action does not apply to: one that is already banned, or
+// the operator's own. Each of those is skipped with the reason the server
+// would have given if it had been the only one asked for, and the console
+// prints them rather than hiding them, so an operator who selected twelve
+// accounts and sees eleven changes knows which one was left and why.
+export type AdminBulkReport = {
+  action: AdminBulkAction;
+  // How many accounts the request named, and how many of them changed.
+  requested: number;
+  applied: number;
+  skipped: string[];
 };

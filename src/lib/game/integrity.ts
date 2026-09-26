@@ -21,6 +21,7 @@
 import { PRODUCT_PRICES, WORD_ON_THE_DOCKS_REWARD } from "./constants";
 import { DIFFICULTIES } from "./difficulty";
 import { WIDEST_BROKERS_FAVOR_PAYOUT_CAP } from "./engine";
+import { widestObjectivePayout } from "./objectives";
 
 // ========== Deriving the ceiling ==========
 // Every number below is read from the live game data rather than written
@@ -61,13 +62,22 @@ const WIDEST_ORDER_BOARD =
 // under the Broker's Age a favor genuinely pays out past the founding cap,
 // and a captain who collected one must not read as impossible a fortnight
 // later when the Age has moved on.
+//
+// The commission term is the one that is not an order: in Ocean Gambit the
+// Emperor buys goods out of the hold for Gold, so it is a real income
+// source and a save that collected one is a save this pass has to find
+// plausible. It is read from the deck rather than written down, so a deck
+// that grows a richer commission cannot leave this ceiling behind, and it
+// is the whole payout rather than a per round share because nothing caps
+// how much of a commission one round can hand over.
 const MAX_PLAUSIBLE_GOLD_PER_ROUND =
   DEAREST_PRODUCT *
     MAX_ORDER_QUANTITY *
     MODIFIER_STACK_CEILING *
     WIDEST_ORDER_BOARD +
   WIDEST_BROKERS_FAVOR_PAYOUT_CAP +
-  WORD_ON_THE_DOCKS_REWARD;
+  WORD_ON_THE_DOCKS_REWARD +
+  widestObjectivePayout();
 
 // Reputation per completed order is floor(reward - transport), so it can
 // never outrun the Gold ceiling above. Lending and backing add a little on

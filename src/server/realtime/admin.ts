@@ -32,7 +32,12 @@ import type { Server, Socket } from "socket.io";
 import { db } from "@/lib/db";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { roomIdsForUser } from "@/lib/rooms";
-import type { AdminAccount, AdminRoster } from "@/types/realtime";
+import type {
+  AdminAccount,
+  AdminBulkAction,
+  AdminBulkReport,
+  AdminRoster,
+} from "@/types/realtime";
 import {
   detachUser,
   emptyRoom,
@@ -357,9 +362,6 @@ export async function purgeAccount(
   if (!found.ok) return found;
   const { target } = found;
 
-  if (target.id === actor.id) {
-    return { ok: false, error: "You cannot delete your own account." };
-  }
   // The whole action is irreversible and it takes other captains' voyages
   // with it, so the operator has to have typed the name they are looking
   // at. Checked here rather than on the client, where a bug would be
@@ -369,6 +371,25 @@ export async function purgeAccount(
       ok: false,
       error: `Type ${target.username} to confirm the deletion.`,
     };
+  }
+  return purgeResolved(io, cleanup, actor, target);
+}
+
+// A purge of an account that has already been resolved, and the two checks
+// that stand between it and the delete. The caller owns the confirmation
+// and the two callers own different ones: the single path has the operator
+// type the captain name they are looking at, the bulk path has them type
+// how many accounts the selection holds. Neither reaches here without one,
+// and neither can be talked out of it by a client that sets a flag, which
+// is why the confirmation is not a parameter of this function.
+async function purgeResolved(
+  io: Server,
+  cleanup: DepartureCleanup,
+  actor: AdminActor,
+  target: TargetAccount,
+): Promise<AdminResult> {
+  if (target.id === actor.id) {
+    return { ok: false, error: "You cannot delete your own account." };
   }
   if (await isLastAdministrator(target)) {
     return {
@@ -421,4 +442,115 @@ export async function purgeAccount(
     socket.disconnect(true);
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------
+// Acting on a selection
+// ---------------------------------------------------------------------
+
+// What a bulk event carries: which of the four actions, the accounts it is
+// aimed at as the console holds them, and, for the delete, how many of them
+// the operator counted before asking for it.
+export type BulkPayload = {
+  action?: unknown;
+  userIds?: unknown;
+  confirmCount?: unknown;
+};
+
+// A bulk action answers with the roster the way every other action does,
+// and with this beside it, because a selection is allowed to contain
+// accounts an action does not apply to: one that is already banned, or the
+// operator's own.
+type BulkOutcome =
+  { ok: true; report: AdminBulkReport } | { ok: false; error: string };
+
+const BULK_ACTIONS: AdminBulkAction[] = ["ban", "unban", "grant", "purge"];
+
+function isBulkAction(value: unknown): value is AdminBulkAction {
+  return BULK_ACTIONS.includes(value as AdminBulkAction);
+}
+
+export async function bulkAct(
+  io: Server,
+  cleanup: DepartureCleanup,
+  actor: AdminActor,
+  payload: BulkPayload,
+): Promise<BulkOutcome> {
+  if (!isBulkAction(payload?.action)) {
+    return { ok: false, error: "That is not an action the console can take." };
+  }
+  const action = payload.action;
+  const named = Array.isArray(payload.userIds)
+    ? payload.userIds.filter((id): id is string => typeof id === "string")
+    : [];
+  // The selection arrives from a table the operator has been clicking in,
+  // so an account can only be in it once. Making that a fact rather than an
+  // assumption is what lets the typed count be compared against the number
+  // of accounts this request will actually touch.
+  const ids = Array.from(new Set(named));
+  if (ids.length === 0) {
+    return { ok: false, error: "Select at least one account first." };
+  }
+
+  // The delete is confirmed once for the whole selection rather than by a
+  // typed name per account, which would be a paragraph to retype, and the
+  // confirmation is the count: a number the operator can only produce by
+  // looking at what they selected. Read before anything is touched, so a
+  // mistyped count costs nothing.
+  if (action === "purge" && payload.confirmCount !== ids.length) {
+    return {
+      ok: false,
+      error:
+        ids.length === 1
+          ? "Type 1 to confirm deleting one account."
+          : `Type ${ids.length} to confirm deleting ${ids.length} accounts.`,
+    };
+  }
+
+  // Every action goes through the same single account function the row
+  // buttons use, so a selection can never do something one account cannot,
+  // and the guards those functions carry are not written twice. The delete
+  // is the one exception and it is a deliberate one: its confirmation
+  // belongs to this path, so it reaches the shared half of the purge
+  // directly, having satisfied its own.
+  const actOnOne = async (userId: string): Promise<AdminResult> => {
+    switch (action) {
+      case "ban":
+        return banAccount(io, cleanup, actor, { userId });
+      case "unban":
+        return unbanAccount({ userId });
+      case "grant":
+        return grantAdmin({ userId });
+      case "purge": {
+        const found = await resolveTarget({ userId });
+        return found.ok
+          ? purgeResolved(io, cleanup, actor, found.target)
+          : found;
+      }
+    }
+  };
+
+  const skipped: string[] = [];
+  let applied = 0;
+  for (const userId of ids) {
+    const result = await actOnOne(userId);
+    if (result.ok) {
+      applied += 1;
+      continue;
+    }
+    // The refusal is carried word for word. Each one is a sentence the
+    // single account path would have shown as it stands, and the ones that
+    // name the account are exactly the ones where the name is needed.
+    skipped.push(result.error);
+  }
+
+  // Nothing changed, so there is no roster worth sending and nothing that
+  // happened: this is a refusal like any other, and the console shows it in
+  // the same place.
+  if (applied === 0) return { ok: false, error: skipped.join(" ") };
+
+  return {
+    ok: true,
+    report: { action, requested: ids.length, applied, skipped },
+  };
 }

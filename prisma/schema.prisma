@@ -36,6 +36,7 @@ model User {
   memberships  RoomMember[]
   ownedRooms   Room[]         @relation("RoomHost")
   gameStates   GameState[]
+  voyageRoles  VoyageRole[]
   sentMessages Message[]      @relation("MessageSender")
   recvMessages Message[]      @relation("MessageRecipient")
   legacy       CaptainLegacy?
@@ -83,6 +84,7 @@ model Room {
   members        RoomMember[]
   messages       Message[]
   gameStates     GameState[]
+  voyageRoles    VoyageRole[]
   convoyVentures ConvoyVenture[]
   loans          Loan[]
   chronicles     VoyageChronicle[]
@@ -120,6 +122,38 @@ model GameState {
   @@unique([userId, roomId])
   @@index([userId])
   @@index([roomId])
+}
+
+// Ocean Gambit: one captain's alignment for one voyage, in the one place
+// nothing in the interface can read.
+//
+// There is deliberately no client path to this table in either direction.
+// It is written once, by the realtime layer, in the same breath as the
+// room setting sail, and it is read back only to answer the captain the
+// row belongs to. No route, no socket handler and no broadcast takes a
+// row from here and hands it to anyone else, which is what the whole
+// private information spine is for. It is therefore not a Ledger
+// Integrity Pass subject either: that pass guards the one save endpoint
+// that trusts a client, and this table is never written by one.
+//
+// The row is the record rather than a seed to re-derive from. A seed
+// would have to be kept for the whole voyage, and re-running it over a
+// roster that gained a captain mid voyage would move every card at the
+// table, including the ones already read.
+model VoyageRole {
+  id       String   @id @default(cuid())
+  roomId   String
+  userId   String
+  // One of the roles in src/lib/game/gambit.ts: honest, pirate, broker.
+  role     String
+  drawnAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
 }
 
 model CaptainLegacy {
@@ -231,6 +265,17 @@ model VoyageChronicle {
   merchantRating  String
   headline        String
   body            String
+  // [H2: the fleet commission] The measurement half of Ocean Gambit's
+  // objective, recorded where every other voyage outcome already is.
+  // objectiveTrace is JSON text for the same reason GameState.data is: the
+  // per leg detail is read by analysis scripts, never by a query.
+  // A row is per captain, so the total in it is the harbor's as that one
+  // client last saw it, and a later pass takes the room's max rather than
+  // trusting any single row. Empty in Classic, where no objective is drawn.
+  mode            String   @default("classic")
+  objectiveId     String   @default("")
+  objectiveMet    Boolean  @default(false)
+  objectiveTrace  String   @default("")
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -153,6 +153,17 @@ type Loan = {
   roundBorrowed: number;
 };
 
+// [H2: the fleet commission] One leg's worth of the harbor's objective
+// total, as a captain's own client last watched it. Exported because the
+// voyage's end reads these back out of the save blob and writes them onto
+// the Chronicle row, and a reader that re-declared the shape would be
+// reading a different shape the first time this one gained a field.
+export type ObjectiveTraceEntry = {
+  round: number;
+  at: number;
+  delivered: Record<string, number>;
+};
+
 export type GameState = {
   inventory: Record<string, number>;
   money: number;
@@ -240,6 +251,21 @@ export type GameState = {
   // render a sparkline showing price trends. Seeded empty on a fresh
   // voyage and appended once per round at the end of Phase 1.
   priceHistory: Record<string, number[]>;
+  // [H2: the fleet commission] What this captain has handed to the
+  // voyage's public objective so far, by good, cumulative for the voyage.
+  // This is the captain's own contribution and not the harbor's total: the
+  // total is transient server state (see src/server/realtime/objective.ts)
+  // and this is the record a reload or a server restart re-reports from.
+  // Ocean Gambit only, and empty in Classic, where no objective is drawn.
+  objectiveDelivered: Record<string, number>;
+  // [H2: the fleet commission] The harbor's total as this captain watched
+  // it move, stamped once per round with the clock time it was observed.
+  // Nothing reads this to play the game. It exists because the epic's
+  // evaluation is message volume in the legs where the objective is close
+  // to being met, and no round boundaries are recorded anywhere else, so
+  // without these stamps the conversations cannot be attributed to the legs
+  // they happened in. Copied into the Chronicle when the voyage concludes.
+  objectiveTrace: ObjectiveTraceEntry[];
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
   // game:status handler in src/server/realtime/index.ts, which is where every
@@ -405,6 +431,13 @@ export type GameContext = {
   // intel, reproducible on reload but different from every other captain and
   // rerolled whenever the host restarts the voyage.
   seedBase: string;
+  // The room's own identity, without the captain's. The one draw that has
+  // to come out the same for everybody in the harbor rather than differ per
+  // captain is the public objective, so it seeds from this instead of from
+  // seedBase. Derived from the room id rather than by stripping the captain
+  // off seedBase, because a string that is only ever split back apart is a
+  // promise about a format rather than a value.
+  harborId: string;
 };
 
 // Everything a fresh voyage needs beyond its own defaults. An options
@@ -495,6 +528,8 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     revealedIntel: [],
     harborPulse: {},
     priceHistory: {},
+    objectiveDelivered: {},
+    objectiveTrace: [],
     tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],

@@ -149,7 +149,13 @@ export function useGameSession(
   // gives every captain their own market, orders, and Broker intel instead of
   // the room wide identical economy this used to derive from roomId alone.
   const ctx: GameContext = useMemo(
-    () => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }),
+    () => ({
+      seedBase: userId ? `${roomId}:${userId}` : roomId,
+      // The same room, without the captain. Only the public objective seeds
+      // from this, because it is the one draw the whole harbor has to agree
+      // on rather than one each.
+      harborId: roomId,
+    }),
     [roomId, userId],
   );
   const [state, dispatch] = useReducer(reducer, {
@@ -276,6 +282,12 @@ export function useGameSession(
           game.housePerks = game.housePerks ?? noHousePerks();
           game.houseId = game.houseId ?? null;
           game.priceHistory = game.priceHistory ?? {};
+          // A voyage saved before the fleet commission existed carries
+          // neither field, and both the panel and the report to the harbor
+          // read them, so an unhealed save would turn a missing key into a
+          // crash on the first render.
+          game.objectiveDelivered = game.objectiveDelivered ?? {};
+          game.objectiveTrace = game.objectiveTrace ?? [];
           // Guarantees a key for every catalogued good and scrubs any value a
           // pre catalogue save poisoned with NaN (stored as null by JSON), so
           // a damaged hold heals on load instead of staying broken forever.

@@ -11,6 +11,7 @@ import {
 } from "@/lib/rooms";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { normalizeMode } from "@/lib/game/mode";
+import { readJson } from "@/lib/api-json";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -57,22 +58,11 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = CreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
-  }
-  const { name, isPublic } = parsed.data;
-  const difficulty = normalizeDifficulty(parsed.data.difficulty);
-  const mode = normalizeMode(parsed.data.mode);
+  const body = await readJson(req, CreateSchema);
+  if (!body.ok) return body.response;
+  const { name, isPublic } = body.data;
+  const difficulty = normalizeDifficulty(body.data.difficulty);
+  const mode = normalizeMode(body.data.mode);
 
   const room = await db.room.create({
     data: {

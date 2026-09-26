@@ -28,7 +28,7 @@
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { leaveRoomForUser } from "@/lib/rooms";
-import type { PublicUser } from "@/types/realtime";
+import type { PublicUser, PrivateEntry } from "@/types/realtime";
 import type { SocketState } from "./types";
 import { forgetStatusIfLastSocket } from "./status";
 
@@ -50,6 +50,21 @@ export function emitToUser(
   for (const sid of userSockets.get(userId) ?? []) {
     io.to(sid).emit(event, payload);
   }
+}
+
+// The one way a secret reaches its owner, and the reason it is a function
+// rather than a line at each call site: the entry goes to the sockets of
+// the captain it is about and nowhere else, never into a room channel and
+// never into a broadcast. Everything hidden in this game rides this, so
+// the rule lives in one place that can be read at a glance rather than in
+// every handler that has a secret to deliver.
+export function emitPrivate(
+  io: Server,
+  roomId: string,
+  userId: string,
+  entry: PrivateEntry,
+): void {
+  emitToUser(io, userId, "private:entry", { roomId, entry });
 }
 
 // Abandoned seat cleanup. Keyed by "roomId:userId" since a user can

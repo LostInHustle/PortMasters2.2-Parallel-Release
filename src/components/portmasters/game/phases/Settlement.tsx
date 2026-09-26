@@ -16,9 +16,8 @@ import {
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { useLiveAmount } from "@/lib/use-live-amount";
-import { AlertTriangle, HandCoins, ShieldCheck, Skull, X } from "lucide-react";
-import { ReadyBar } from "../ReadyBar";
-import { type PhasePanelProps } from "./PhaseShared";
+import { AlertTriangle, HandCoins, ShieldCheck, Skull } from "lucide-react";
+import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 function PirateAttack({
   game,
@@ -442,58 +441,33 @@ function SettlementBills({
       )}
 
       {backing.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {backing.error}</span>
-          <button onClick={backing.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={backing.error}
+          onDismiss={backing.clearError}
+          className="mb-3.5"
+        />
       )}
 
       {aid.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {aid.error}</span>
-          <button onClick={aid.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={aid.error}
+          onDismiss={aid.clearError}
+          className="mb-3.5"
+        />
       )}
 
-      {/* The destructive Force Pay variant needs an inline icon, which the
-          shared ReadyFooter does not accept (its idleLabel is a plain
-          string). Rather than widen the shared footer's API for one screen,
-          we inline the same waiting/idle structure here so the AlertTriangle
-          button stays visually distinct from the Settle Bills button on the
-          calm path. */}
-      {phaseSync.waiting ? (
-        <div className="mt-5 space-y-3 text-center">
-          <div className="text-sm font-medium text-warn">
-            Waiting for the rest of the crew
-          </div>
-          <ReadyBar
-            ready={phaseSync.ready}
-            members={members}
-            className="justify-center"
-          />
-          <Button
-            variant="secondary"
-            className="rounded-xl"
-            onClick={phaseSync.cancelReady}
-          >
-            Not ready yet
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-5 text-center">
-          <Button
-            className={cn("rounded-xl px-6", settleClassName)}
-            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
-          >
+      <ReadyFooter
+        phaseSync={phaseSync}
+        members={members}
+        idleLabel={
+          <>
             {settleIcon}
             <span className="ml-1.5">{settleLabel}</span>
-          </Button>
-        </div>
-      )}
+          </>
+        }
+        idleClassName={settleClassName}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+      />
     </div>
   );
 }

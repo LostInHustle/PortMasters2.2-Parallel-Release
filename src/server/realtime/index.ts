@@ -50,7 +50,11 @@ import {
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
-import type { BarterOffer } from "@/types/realtime";
+import type {
+  BarterOffer,
+  ObjectiveProgress,
+  ObjectiveReport,
+} from "@/types/realtime";
 
 import { authenticate, requireAuth } from "./auth";
 import {
@@ -142,12 +146,21 @@ import {
   clearSessionChat,
 } from "./chat";
 import { concludedRooms, maybeConcludeVoyage } from "./conclusion";
+import { clearAlignments, dealAlignments, sendAlignment } from "./gambit";
 import { addPulseReport, clearPulseTallies } from "./pulse";
+import {
+  clearObjectiveTallies,
+  objectiveForRoom,
+  objectiveTotalFor,
+  recordObjectiveReport,
+  roomObjectiveTallies,
+} from "./objective";
 import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
 import {
   banAccount,
+  bulkAct,
   grantAdmin,
   listAccounts,
   purgeAccount,
@@ -157,6 +170,7 @@ import {
   type AdminActor,
   type AdminPayload,
   type AdminResult,
+  type BulkPayload,
 } from "./admin";
 
 // ========== Cross module room teardown ==========
@@ -282,6 +296,7 @@ function clearRoomAllMaps(roomId: string): void {
   clearAidSilent(roomId);
   clearLoansSilent(roomId);
   clearPulseTallies(roomId);
+  clearObjectiveTallies(roomId);
   clearDocksWinner(roomId);
   clearSurge(roomId);
   concludedRooms.delete(roomId);
@@ -441,6 +456,31 @@ export function attachRealtime(httpServer: HttpServer): Server {
         harbor: [...harborLog(roomId)],
         direct: directLogFor(roomId, s.userId),
       });
+      // And the one card in this game that is this captain's alone, if the
+      // voyage they are sitting in has dealt them one. It goes straight to
+      // the socket that just asked, never to the room: a reload replays
+      // what this captain is already holding and tells the table nothing.
+      void sendAlignment(io, roomId, s.userId);
+      // The opposite half of the same idea, and the contrast is the point:
+      // the commission board is public, so it goes to the joiner rather
+      // than waiting for someone else to move. It is only a head start on
+      // the client's own heartbeat report, which is what rebuilds the
+      // board after a server restart.
+      //
+      // Only when the room has a board to hand over. An empty tally is a
+      // client's own default, so a harbor nobody has delivered in costs no
+      // query and gets no frame, and a room that has just restarted is
+      // indistinguishable from one that never set sail.
+      if (roomObjectiveTallies.has(roomId)) {
+        const objective = await objectiveForRoom(roomId);
+        if (objective) {
+          const board: ObjectiveProgress = {
+            roomId,
+            total: objectiveTotalFor(roomId, objective),
+          };
+          io.to(socket.id).emit("objective:progress", board);
+        }
+      }
       broadcastPresence(io);
     });
 
@@ -651,6 +691,22 @@ export function attachRealtime(httpServer: HttpServer): Server {
         addPulseReport(roomId, payload.round, payload.tally);
       },
     );
+
+    // ========== The fleet commission ==========
+    // Ocean Gambit's public objective. A report is a captain's own running
+    // total, so it carries no captain id and the answer carries no name:
+    // what the room hears is a sum. The room's mode and epoch are read
+    // server side, never from the payload, which is what keeps a Classic
+    // room from ever carrying a board.
+    socket.on("objective:report", (payload: Partial<ObjectiveReport>) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      const delivered = payload?.delivered;
+      if (!delivered || typeof delivered !== "object") return;
+      void recordObjectiveReport(io, roomId, s.userId, delivered);
+    });
 
     // ========== Word on the Docks ==========
     socket.on("docks:claim", (payload: { roomId?: string }) => {
@@ -1473,6 +1529,48 @@ export function attachRealtime(httpServer: HttpServer): Server {
       io.to(`room:${roomId}`).emit("chat:room", { roomId, message });
     });
 
+    // The lobby's own channel, which is the harbor square rather than a
+    // voyage: public, so a null recipient is exactly what makes it public,
+    // and written down rather than held in a session log, because two
+    // captains standing in the lobby are already having the kind of
+    // conversation that is meant to still be there tomorrow. A voyage's
+    // chat is deliberately the other way round on both counts.
+    socket.on("chat:lobby", async (payload: { content?: string }) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const content = (payload?.content ?? "").trim();
+      if (!content) return;
+      if (content.length > CHAT_MESSAGE_MAX) return;
+      const msg = await db.message.create({
+        data: { roomId: null, senderId: s.userId, recipientId: null, content },
+        include: { sender: { select: PUBLIC_USER_SELECT } },
+      });
+      const message = {
+        id: msg.id,
+        content: msg.content,
+        createdAt: msg.createdAt,
+        sender: {
+          id: msg.sender.id,
+          username: msg.sender.username,
+          displayName: msg.sender.displayName,
+          avatarHue: msg.sender.avatarHue,
+        },
+      };
+      // Only the lobby hears it. A captain at sea is not standing in this
+      // square and has no surface for it, and the poster is always one of
+      // the captains in the lobby because that is the only place the
+      // composer exists. A captain at sea reads the backlog on landing.
+      // The loop is also where `mine` is settled, since it is the one
+      // thing here that differs between the captain who spoke and the
+      // captains who heard, exactly as the direct thread handles it.
+      for (const [socketId, state] of sockets) {
+        if (!state.authed || state.roomId) continue;
+        io.to(socketId).emit("chat:lobby", {
+          message: { ...message, mine: state.userId === s.userId },
+        });
+      }
+    });
+
     // A direct message is a session conversation the moment either
     // captain is at sea, and it is held against whichever harbor is
     // involved, the sender's own when they are the one at sea. That log
@@ -1635,6 +1733,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         cp.readyUserIds.clear();
         cp.advancing = false;
         io.to(`room:${roomId}`).emit("room:started", { roomId });
+        // The private half of setting sail. It runs after the room has
+        // been told the voyage is under way, so a card can never arrive
+        // for a voyage that did not open, and it has to run here rather
+        // than on a client: the seed it draws from is generated in this
+        // process and is not carried anywhere. A Classic room is sent
+        // nothing, which is the mode guard inside the deal itself.
+        await dealAlignments(io, roomId, room.mode);
         await broadcastReadyState(io, roomId, cp);
       } finally {
         startingRooms.delete(roomId);
@@ -1673,6 +1778,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
           },
         });
         await db.gameState.deleteMany({ where: { roomId } });
+        // The cards belonged to the voyage that just ended, so they go
+        // with the rest of it. Clients drop their copy on the signal
+        // below, and the next departure deals a fresh hand.
+        await clearAlignments(roomId);
         roomCheckpoints.delete(roomId);
         clearRoomStatuses(roomId);
         clearBarter(io, roomId);
@@ -1682,6 +1791,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         clearAid(io, roomId);
         clearLoans(io, roomId);
         clearPulseTallies(roomId);
+        // The commission board goes with the voyage it belonged to, and
+        // this clear cannot be left to the clients reporting zero: the
+        // tally merges by max, so a zero report leaves the old number
+        // standing and the new voyage would inherit the old one's board.
+        clearObjectiveTallies(roomId);
         clearDocksWinner(roomId);
         clearSurge(roomId);
         concludedRooms.delete(roomId);
@@ -1793,6 +1907,24 @@ export function attachRealtime(httpServer: HttpServer): Server {
     adminAction("admin:purge", (actor, payload) =>
       purgeAccount(io, departureCleanup, actor, payload),
     );
+
+    // The same five, aimed at a selection. This one does not go through
+    // adminAction, because a selection can succeed for some accounts and
+    // be refused for others, so the console is owed both answers: the
+    // roster as it stands afterwards, and a line for each account that was
+    // left alone. A request that changed nothing is an ordinary refusal
+    // and takes the ordinary route.
+    socket.on("admin:bulk", async (payload: BulkPayload | undefined) => {
+      const actor = await requireAdmin(socket);
+      if (!actor) return;
+      const outcome = await bulkAct(io, departureCleanup, actor, payload ?? {});
+      if (!outcome.ok) {
+        socket.emit("admin:error", { error: outcome.error });
+        return;
+      }
+      socket.emit("admin:accounts", await listAccounts());
+      socket.emit("admin:bulk-result", { report: outcome.report });
+    });
 
     // ========== Disconnect ==========
     socket.on("disconnect", () => {

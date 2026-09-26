@@ -4,7 +4,7 @@
 // and cryptographically random session tokens stored in the DB.
 // =====================================================================
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
-import { db } from "./db";
+import { db, type PublicUser } from "./db";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
@@ -58,6 +58,52 @@ export async function createSession(
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await db.session.create({ data: { token, userId, expiresAt } });
   return { token, expiresAt };
+}
+
+// The one wording for a name that is already registered. Both register
+// routes refuse with it, for the same reason BANNED_ACCOUNT_ERROR is shared:
+// the two cannot then describe the same refusal differently.
+export const USERNAME_TAKEN_ERROR = "That captain name is already registered";
+
+// A captain account, made and signed in. The order is the part worth
+// holding in one place: the name is checked before anything is written, the
+// password is hashed rather than stored, and the session is minted from the
+// row that came back.
+export type AccountCreation =
+  | {
+      created: true;
+      // The created row, which carries more than the wire does. Each route
+      // hands back the part its own shape has: an operator carries its role,
+      // a captain does not.
+      user: PublicUser & { role: string };
+      token: string;
+      expiresAt: Date;
+    }
+  | { created: false; reason: "taken" };
+
+export async function createAccountAndSession(account: {
+  username: string;
+  password: string;
+  displayName?: string;
+  role?: string;
+}): Promise<AccountCreation> {
+  const existing = await db.user.findUnique({
+    where: { username: account.username },
+  });
+  if (existing) return { created: false, reason: "taken" };
+
+  const user = await db.user.create({
+    data: {
+      username: account.username,
+      passwordHash: hashPassword(account.password),
+      displayName: (account.displayName ?? account.username).trim(),
+      avatarHue: hueFromString(account.username),
+      ...(account.role ? { role: account.role } : {}),
+    },
+  });
+
+  const { token, expiresAt } = await createSession(user.id);
+  return { created: true, user, token, expiresAt };
 }
 
 export async function getUserFromToken(token: string | undefined | null) {

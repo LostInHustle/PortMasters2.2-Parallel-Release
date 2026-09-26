@@ -23,6 +23,8 @@ import {
   usePlayerDetail,
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
+import { usePrivateLog } from "@/lib/use-private-log";
+import { useObjective } from "@/lib/use-objective";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import {
   useAid,
@@ -46,6 +48,8 @@ import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
+import { PrivateCard } from "./game/PrivateCard";
+import { ObjectivePanel } from "./game/ObjectivePanel";
 import {
   GuideModal,
   TipsModal,
@@ -575,6 +579,13 @@ export function GameRoom({
     [state.game, state.logs],
   );
   const playerDetail = usePlayerDetail(socket, room.id, myDetail);
+  // Whatever this voyage has told this captain and no one else. Empty in
+  // every Classic harbor, because nothing is ever sent there.
+  const privateLog = usePrivateLog(socket, room.id);
+  // The other half of that contrast: the one thing this voyage tells
+  // everyone. No objective is drawn in Classic, so the hook stays inert
+  // and the panel renders nothing there.
+  const objective = useObjective(socket, room.id, state.game, ctx, act);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
   const [guideOpen, setGuideOpen] = useState(false);
@@ -1066,9 +1077,19 @@ export function GameRoom({
           me={me}
           initialMembers={members}
         />
+        {/* The voyage's public objective, full width because it is owed by
+            the whole harbor rather than by the captain whose column it
+            would otherwise sit in. Renders nothing at all in Classic. */}
+        <ObjectivePanel
+          game={state.game}
+          objective={objective.objective}
+          progress={objective.progress}
+          deliverable={objective.deliverable}
+          onDeliver={objective.deliver}
+        />
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
           {/* Left: the captain's own rail */}
-          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
+          <div className="order-3 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
             <div className="pm-glass h-full rounded-2xl p-3">
               <GameStatusPanel
                 game={state.game}
@@ -1082,7 +1103,7 @@ export function GameRoom({
           </div>
 
           {/* Center: phase + controls */}
-          <div className="space-y-3 order-1 lg:order-2 min-w-0">
+          <div className="space-y-3 order-2 lg:order-2 min-w-0">
             <GamePhasePanel
               game={state.game}
               ctx={ctx}
@@ -1121,6 +1142,13 @@ export function GameRoom({
               requiredCount={phaseSync.requiredCount}
               onCancelReady={phaseSync.cancelReady}
             />
+            {/* The captain's own card, below the controls, where it
+                stands under the buttons rather than between them and the
+                phase they act on. It draws nothing at all in a harbor
+                that has not dealt one. */}
+            {privateLog.map((entry, index) => (
+              <PrivateCard key={`${entry.kind}:${index}`} entry={entry} />
+            ))}
             {/* Wraps rather than overflowing. These five hint chips and
                 their labels are wider than a phone, and a centred row
                 with no wrap spills off both edges at once, which both
@@ -1154,9 +1182,15 @@ export function GameRoom({
             </div>
           </div>
 
-          {/* Right: roster + chat */}
-          <div className="order-3 space-y-3 min-w-0">
-            <div className="h-[320px]">
+          {/* Right: roster + chat. Under the lg breakpoint this column leads
+              the stack and the chat leads inside it. The chat used to come
+              last of everything, below the phase panel and the roster, which
+              put it three screens down on a narrow window and left captains
+              reading it as missing. The FleetTicker above already carries the
+              roster at these widths, so nothing is lost by following with it
+              rather than opening with it. */}
+          <div className="order-1 flex flex-col gap-3 min-w-0 lg:order-3 lg:block lg:space-y-3">
+            <div className="order-2 h-[320px]">
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1168,7 +1202,7 @@ export function GameRoom({
               />
             </div>
             <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
+              className="order-1 pm-glass rounded-2xl overflow-hidden flex flex-col"
               style={{ height: 380 }}
             >
               <Tabs
@@ -1176,6 +1210,16 @@ export function GameRoom({
                 onValueChange={(v) => setChatTab(v as "room" | "dm")}
                 className="flex flex-col h-full"
               >
+                {/* The panel names itself. The tabs below say which channel
+                    is open, and without a head above them the harbor chat
+                    was only ever legible as a tab label rather than as a
+                    widget a captain could look for. */}
+                <div className="flex items-center gap-2 px-3 pt-3">
+                  <MessageCircle className="h-3.5 w-3.5 text-chat" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-chat">
+                    {chatTab === "room" ? "Harbor chat" : "Direct messages"}
+                  </span>
+                </div>
                 <TabsList className="grid grid-cols-2 m-2 mb-0">
                   <TabsTrigger value="room">
                     <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor
@@ -1184,8 +1228,16 @@ export function GameRoom({
                     <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Direct
                   </TabsTrigger>
                 </TabsList>
+                {/* Both channels stay mounted. The panel holds the lines it
+                    was handed live, so unmounting the harbor on the way to
+                    Direct would drop every line said while the captain was
+                    looking at the other one, and switching back would show
+                    the log as it stood when the voyage started. The room's
+                    history reaches this panel once, on join, so there is
+                    nothing to re seed it from. */}
                 <TabsContent
                   value="room"
+                  forceMount
                   className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
                 >
                   <ChatPanel
@@ -1200,6 +1252,7 @@ export function GameRoom({
                 </TabsContent>
                 <TabsContent
                   value="dm"
+                  forceMount
                   className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
                 >
                   <DmTab

@@ -17,6 +17,7 @@ import {
   describeFindings,
   snapshotFromSave,
 } from "@/lib/game/integrity";
+import { readJson } from "@/lib/api-json";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -81,20 +82,9 @@ export async function PUT(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = SaveSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
-  }
-  const { roomId, data } = parsed.data;
+  const body = await readJson(req, SaveSchema);
+  if (!body.ok) return body.response;
+  const { roomId, data } = body.data;
 
   // Must be a member of the room to save state there.
   const member = await db.roomMember.findUnique({

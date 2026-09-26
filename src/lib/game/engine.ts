@@ -108,6 +108,15 @@ export {
   purchaseIntel,
 } from "./engine/orders";
 
+// ========== The fleet commission ==========
+// The Ocean Gambit objective. Lives out here rather than in the phase 2
+// block above because the deck it delivers against is the mode's, not the
+// manifest's, even though it opens in the manifest phase.
+export {
+  deliverToObjective,
+  OBJECTIVE_DELIVERY_PHASE,
+} from "./engine/objectives";
+
 // ========== Bartering ==========
 export {
   acceptBarterOffer,

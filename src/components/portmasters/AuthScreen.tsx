@@ -4,9 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type PublicUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Field, Notice } from "@/components/portmasters/shared";
+import { CredentialField, Notice } from "@/components/portmasters/shared";
 import { Loader2, Anchor, Ship, Waves } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants";
 
@@ -167,61 +166,51 @@ export function AuthScreen({
 
             <form onSubmit={submit} className="space-y-4">
               <TabsContent value="login" className="mt-0 space-y-4">
-                <Field label="Captain Name">
-                  <Input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="your captain name"
-                    autoFocus
-                    autoComplete="username"
-                    className="h-11"
-                  />
-                </Field>
-                <Field label="Password">
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="password"
-                    autoComplete="current-password"
-                    className="h-11"
-                  />
-                </Field>
+                <CredentialField
+                  label="Captain Name"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="your captain name"
+                  autoFocus
+                  autoComplete="username"
+                />
+                <CredentialField
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="password"
+                  autoComplete="current-password"
+                />
               </TabsContent>
 
               <TabsContent value="register" className="mt-0 space-y-4">
-                <Field
+                <CredentialField
                   label="Captain Name"
                   hint="3 to 20 chars, letters, numbers, underscore"
-                >
-                  <Input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="choose a captain name"
-                    autoFocus
-                    autoComplete="username"
-                    className="h-11"
-                  />
-                </Field>
-                <Field label="Display Name" hint="shown to other sailors">
-                  <Input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="for example, Captain Mei"
-                    maxLength={24}
-                    className="h-11"
-                  />
-                </Field>
-                <Field label="Password" hint="at least 6 characters">
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="password"
-                    autoComplete="new-password"
-                    className="h-11"
-                  />
-                </Field>
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="choose a captain name"
+                  autoFocus
+                  autoComplete="username"
+                />
+                <CredentialField
+                  label="Display Name"
+                  hint="shown to other sailors"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="for example, Captain Mei"
+                  maxLength={24}
+                />
+                <CredentialField
+                  label="Password"
+                  hint="at least 6 characters"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="password"
+                  autoComplete="new-password"
+                />
               </TabsContent>
 
               <AnimatePresence>

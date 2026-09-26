@@ -25,15 +25,32 @@ export type GameMode = "classic" | "ocean_gambit";
 export const DEFAULT_MODE: GameMode = "classic";
 
 interface ModeConfig {
-  // Display metadata. The lobby switch reads icon and badge, the tagline
-  // sits under it, and the experimental warning reads summary. There is
-  // deliberately no long display name: badge is what the interface has
-  // room to show, and the two surfaces that show it agree because they
-  // read it from here.
+  // Display metadata. The voyage card reads icon, badge, tagline and
+  // summary, and the room card reads icon and badge. There is deliberately
+  // no long display name: badge is what the interface has room to show, and
+  // the surfaces that show it agree because they read it from here.
   badge: string;
   icon: string;
   tagline: string;
   summary: string;
+
+  // How this mode's round is described to a captain on the Welcome screen,
+  // in the captain's terms rather than the engine's.
+  //
+  // It lives here rather than in the screen because it is a statement about
+  // the lap, and the lap is in this record. The two are written together so
+  // that a mode whose order changes is a mode whose description is being
+  // looked at, and a Gambit harbor can never brief its crew on Classic's
+  // order, which is what a hardcoded blurb does the moment a second mode
+  // exists.
+  //
+  // It is prose rather than a join over checkpointPhaseOrder on purpose:
+  // the lap is eight checkpoints and this is four numbered legs, because
+  // the welcome and the boon draft are not legs to a player, and barter is
+  // grouped with the leg it sits beside. Deriving the sentence from the
+  // array would change the shipped mode's own briefing to say more than it
+  // means to.
+  lapBlurb: string;
 
   // Flags a mode that is still being built. The interface says so plainly
   // wherever a captain could choose it, because a player who walks into an
@@ -61,6 +78,11 @@ export const MODES: Record<GameMode, ModeConfig> = {
     summary:
       "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and refit.",
     experimental: false,
+    // Byte for byte what the Welcome screen printed before modes existed,
+    // and the reason it moved rather than being rewritten: the shipped mode
+    // briefs its crew in the words it always has.
+    lapBlurb:
+      "1️⃣ Buy at Ports (+ 🤝 Barter) → 2️⃣ Fill Trade Orders → 3️⃣ Pirates, Wages & Maintenance → 4️⃣ Upgrade Ship",
     // Unchanged from the single hardcoded order the shared checkpoint
     // module carried before modes existed. Port market, then the cross
     // captain trade board, then artisan assignment, then the trade
@@ -78,11 +100,28 @@ export const MODES: Record<GameMode, ModeConfig> = {
   },
   ocean_gambit: {
     badge: "Gambit",
-    icon: "🌊",
-    tagline: "Experimental. Orders lock before the table opens.",
+    // A compass rather than a wave. Open Waters in ./difficulty.ts already
+    // carries the wave, and the two controls sit one above the other on the
+    // create form, so a Gambit card and an Open Waters stop were showing the
+    // same icon inches apart.
+    icon: "🧭",
+    // No "Experimental" prefix on the tagline: the card carries that as a
+    // pill, and one card saying it twice is the drift this record exists to
+    // prevent.
+    tagline: "Orders lock before the table opens.",
+    // Written to roughly the length of the Classic summary, because the two
+    // are read side by side on the voyage cards and a grid row stretches both
+    // cells to the taller of the two. The longer this runs, the more blank
+    // space the shipped mode is handed underneath its own text.
     summary:
-      "The experimental voyage, built to grow a survival layer and a table that does not trust itself. Trade orders are committed before the social window opens, so a promise about what you are going to do is a promise that can be broken invisibly.",
+      "Trade orders are committed before the social window opens, so a promise about what you are going to do can be broken invisibly.",
     experimental: true,
+    // The one visible difference from the Classic blurb is the move the
+    // whole mode is built on: barter comes after the orders instead of
+    // beside the market, so it is its own leg in the list rather than a
+    // parenthetical on the first one.
+    lapBlurb:
+      "1️⃣ Buy at Ports → 2️⃣ Fill Trade Orders → 🤝 Barter → 3️⃣ Pirates, Wages & Maintenance → 4️⃣ Upgrade Ship",
     // The one structural change this mode makes on day one, and it is the
     // center of the whole design argument: the trade manifest moves ahead of
     // the cross captain trade board. Ordering and committing happen

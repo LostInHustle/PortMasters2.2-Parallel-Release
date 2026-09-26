@@ -12,6 +12,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { HOUSE_IDS } from "@/lib/game/legacy";
+import { readJson } from "@/lib/api-json";
 
 const PledgeSchema = z.object({
   houseId: z.enum(HOUSE_IDS),
@@ -22,20 +23,9 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = PledgeSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
-  }
-  const houseId = parsed.data.houseId;
+  const body = await readJson(req, PledgeSchema);
+  if (!body.ok) return body.response;
+  const houseId = body.data.houseId;
 
   // Upsert so a brand new captain can pledge before they have any other
   // legacy row written. Switching an existing pledge just overwrites the

@@ -69,11 +69,24 @@ const LOBBY = "lobby";
 
 const WIDGETS: Widget[] = [
   /* The Lobby. Twelve surfaces, because the dialogs are their own
-     screens, and every one of these is on screen at the same moment.
-     Twelve across the 322 degrees clear of the meaning red is 26.8
-     degrees each, which is the roomiest any dense screen gets. The hues
-     are handed out on a stride rather than in page order, so two panels
-     stacked next to each other are rarely two steps apart on the wheel. */
+     screens. Twelve across the 322 degrees clear of the meaning red is
+     26.8 degrees each, which is the roomiest any dense screen gets. The
+     hues are handed out on a stride rather than in page order, so two
+     panels stacked next to each other are rarely two steps apart on the
+     wheel.
+
+     These were counted as all being on screen at the same moment, which
+     is what the floor below was set to hold. The lobby now switches
+     between two views, so the chart form and the room board are never up
+     together. The geometry is left alone: that pair is legal beside each
+     other as it stands, and retuning the floor to one piece of slack
+     would buy nothing a captain can see. A new Lobby surface still has to
+     earn its rung here.
+
+     The rail's chat carries two parts under one head, the harbor square
+     and the private threads, and they share the rung the private threads
+     already held: one panel, one head, one hue. The square did not take a
+     rung of its own, and there was none going spare to take. */
   {
     name: "brand",
     hue: 49.4,
@@ -112,7 +125,12 @@ const WIDGETS: Widget[] = [
     what: "Chart a new harbor, and the Waters selector",
   },
   { name: "quickstart", hue: 344.6, screens: [LOBBY], what: "Quick Start" },
-  { name: "messages", hue: 156.8, screens: [LOBBY], what: "Direct Messages" },
+  {
+    name: "messages",
+    hue: 156.8,
+    screens: [LOBBY],
+    what: "Chat, the harbor square and Direct Messages",
+  },
   { name: "activity", hue: 290.9, screens: [LOBBY], what: "Harbor Activity" },
   {
     name: "guide",

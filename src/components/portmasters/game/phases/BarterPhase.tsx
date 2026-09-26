@@ -5,10 +5,10 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants";
 import { nextPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
-import { Handshake, X } from "lucide-react";
+import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
-import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
+import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 export function BarterPhase({
   game,
@@ -149,12 +149,11 @@ export function BarterPhase({
       </div>
 
       {barter.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-4 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {barter.error}</span>
-          <button onClick={barter.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={barter.error}
+          onDismiss={barter.clearError}
+          className="mb-4"
+        />
       )}
 
       <div className="rounded-xl border border-ship/15 bg-ship/[0.03] p-4 mb-4">

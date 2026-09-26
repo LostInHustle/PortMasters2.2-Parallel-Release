@@ -14,25 +14,15 @@ import { getCurrentUser } from "@/lib/api-auth";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import type { VoyageChronicle } from "@/types/realtime";
 
-function toChronicle(row: {
-  id: string;
-  roomId: string;
-  voyageEpoch: number;
+// The row as the database holds it. Derived from the wire shape rather than
+// written out a second time, so a field added to one cannot be forgotten in
+// the other: the two the wire formats differently are the two named here.
+type ChronicleRow = Omit<VoyageChronicle, "difficulty" | "createdAt"> & {
   difficulty: string;
-  rounds: number;
-  peakReputation: number;
-  finalReputation: number;
-  finalGold: number;
-  largestTrade: number;
-  lendCount: number;
-  borrowCount: number;
-  crowned: boolean;
-  bankrupt: boolean;
-  merchantRating: string;
-  headline: string;
-  body: string;
   createdAt: Date;
-}): VoyageChronicle {
+};
+
+function toChronicle(row: ChronicleRow): VoyageChronicle {
   return {
     id: row.id,
     roomId: row.roomId,

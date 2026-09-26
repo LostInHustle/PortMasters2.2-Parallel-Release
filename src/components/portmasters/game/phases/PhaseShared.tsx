@@ -9,6 +9,7 @@ import type { useBacking } from "@/lib/use-backing";
 import type { useRoomRoster } from "@/lib/use-room-roster";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 import { ReadyBar } from "../ReadyBar";
 
 type PhaseSync = ReturnType<typeof usePhaseSync>;
@@ -45,7 +46,12 @@ export function ReadyFooter({
 }: {
   phaseSync: PhaseSync;
   members: PublicUser[];
-  idleLabel: string;
+  /**
+   * The content of the idle button. A node rather than a string because
+   * the Force Pay variant carries an icon; every other screen passes a
+   * plain sentence and reads as one.
+   */
+  idleLabel: React.ReactNode;
   onConfirm: () => void;
   idleClassName?: string;
 }) {
@@ -78,6 +84,40 @@ export function ReadyFooter({
       >
         {idleLabel}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * An action on this screen that did not go through: a pledge the purse
+ * could not cover, a hire that fell through, an offer the market refused.
+ * Smaller than the shared Notice because it sits inside the panel rather
+ * than above it, and carrying the warning glyph because the captain should
+ * see at a glance that nothing happened.
+ *
+ * No outer spacing of its own, for the same reason Notice has none: each
+ * screen knows what it is sitting next to.
+ */
+export function PhaseError({
+  message,
+  onDismiss,
+  className,
+}: {
+  message: string;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between rounded-lg border border-alarm/25 bg-alarm/5 px-3.5 py-2 text-xs text-alarm",
+        className,
+      )}
+    >
+      <span>⚠️ {message}</span>
+      <button type="button" onClick={onDismiss} aria-label="Dismiss error">
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

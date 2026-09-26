@@ -4,7 +4,7 @@
 // the realtime layer when the socket opens.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { db, publicUser } from "@/lib/db";
 import {
   BANNED_ACCOUNT_ERROR,
   createSession,
@@ -12,6 +12,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { sessionCookie } from "@/lib/api-auth";
+import { readJson } from "@/lib/api-json";
 
 const Schema = z.object({
   username: z.string().min(1).max(20),
@@ -19,17 +20,11 @@ const Schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = Schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  }
-  const { username, password } = parsed.data;
+  // One sentence whatever was wrong with the shape, because this is a sign
+  // in: naming the field that failed tells a guesser which half they got.
+  const body = await readJson(req, Schema, "Invalid input");
+  if (!body.ok) return body.response;
+  const { username, password } = body.data;
 
   const user = await db.user.findUnique({ where: { username } });
   if (!user) {
@@ -61,12 +56,7 @@ export async function POST(req: NextRequest) {
 
   const { token, expiresAt } = await createSession(user.id);
   const res = NextResponse.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      avatarHue: user.avatarHue,
-    },
+    user: publicUser(user),
     expiresAt,
     token,
   });

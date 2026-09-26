@@ -35,6 +35,13 @@ import {
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { checkSave, describeFindings } from "@/lib/game/integrity";
 import { difficultyConfig, normalizeDifficulty } from "@/lib/game/difficulty";
+import { normalizeMode } from "@/lib/game/mode";
+import {
+  drawObjective,
+  objectiveProgress,
+  objectiveSeed,
+} from "@/lib/game/objectives";
+import type { ObjectiveTraceEntry } from "@/lib/game/types";
 import { buildChronicle } from "@/lib/game/engine/chronicle";
 import type { PublicUser } from "@/types/realtime";
 import { roomStatuses } from "./status";
@@ -67,6 +74,7 @@ function extractChronicleExtras(
   largestTrade: number;
   lendCount: number;
   borrowCount: number;
+  objectiveTrace: ObjectiveTraceEntry[];
 } {
   if (forged || !rawData) {
     return {
@@ -74,6 +82,10 @@ function extractChronicleExtras(
       largestTrade: 0,
       lendCount: 0,
       borrowCount: 0,
+      // A forged save's commission record is exactly as trustworthy as the
+      // Gold it reported, which is to say not at all, so it is dropped the
+      // same way the peak reputation is.
+      objectiveTrace: [],
     };
   }
   try {
@@ -86,6 +98,7 @@ function extractChronicleExtras(
       largestTrade: 0,
       lendCount: Array.isArray(data.loansGiven) ? data.loansGiven.length : 0,
       borrowCount: Array.isArray(data.debts) ? data.debts.length : 0,
+      objectiveTrace: readObjectiveTrace(data.objectiveTrace),
     };
   } catch {
     return {
@@ -93,8 +106,51 @@ function extractChronicleExtras(
       largestTrade: 0,
       lendCount: 0,
       borrowCount: 0,
+      objectiveTrace: [],
     };
   }
+}
+
+// The longest commission record worth keeping. A round appends at most one
+// entry and no voyage runs past a couple of dozen, so this is headroom
+// rather than a limit on honest play; it is here because the blob is
+// written by a client, and an unbounded array from one would land in the
+// Chronicle verbatim.
+const MAX_TRACE_ENTRIES = 64;
+
+// Reads the captain's own commission record back out of a save. Every field
+// is treated as untrusted, the same discipline snapshotFromSave applies to
+// money and score: an entry that is not exactly the shape expected is
+// dropped rather than repaired, because a half read leg would be worse than
+// an absent one. The most recent entries are the ones kept.
+function readObjectiveTrace(raw: unknown): ObjectiveTraceEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: ObjectiveTraceEntry[] = [];
+  for (const item of raw.slice(-MAX_TRACE_ENTRIES)) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    if (
+      typeof entry.round !== "number" ||
+      !Number.isFinite(entry.round) ||
+      typeof entry.at !== "number" ||
+      !Number.isFinite(entry.at) ||
+      !entry.delivered ||
+      typeof entry.delivered !== "object" ||
+      Array.isArray(entry.delivered)
+    ) {
+      continue;
+    }
+    const delivered: Record<string, number> = {};
+    for (const [good, count] of Object.entries(
+      entry.delivered as Record<string, unknown>,
+    )) {
+      if (typeof count === "number" && Number.isFinite(count)) {
+        delivered[good] = count;
+      }
+    }
+    entries.push({ round: entry.round, at: entry.at, delivered });
+  }
+  return entries;
 }
 
 export async function maybeConcludeVoyage(
@@ -149,10 +205,23 @@ export async function maybeConcludeVoyage(
 
   const roomForDifficulty = await db.room.findUnique({
     where: { id: roomId },
-    select: { difficulty: true, voyageEpoch: true },
+    select: { difficulty: true, voyageEpoch: true, mode: true },
   });
   const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
   const renownMultiplier = difficultyConfig(roomDifficulty).renownXpMultiplier;
+
+  // The commission this harbor was working on, drawn from the same seed
+  // every client drew it from: the room's id is the harbor's id, and the
+  // epoch is the one the voyage sailed under, so the server arrives at the
+  // identical deck entry without ever having been told what it was. Null in
+  // Classic, where no objective is drawn and the three columns stay empty.
+  const roomMode = normalizeMode(roomForDifficulty?.mode);
+  const objective =
+    roomMode === "ocean_gambit"
+      ? drawObjective(
+          objectiveSeed(roomId, roomForDifficulty?.voyageEpoch ?? 0),
+        )
+      : null;
 
   // Force resolve every still open venture: the voyage is over, so
   // anything still open never will fill.
@@ -362,6 +431,11 @@ export async function maybeConcludeVoyage(
       forged,
       f.reputation,
     );
+    // Whether the commission was met is read from the last leg this
+    // captain's client recorded, which is the only place it was ever
+    // known: the fleet's total is transient server state and is gone by
+    // the time the voyage concludes.
+    const lastSeen = extras.objectiveTrace[extras.objectiveTrace.length - 1];
     const chronicle = buildChronicle({
       displayName: f.user.displayName,
       difficulty: roomDifficulty,
@@ -394,6 +468,12 @@ export async function maybeConcludeVoyage(
           merchantRating: merchantRatingForScore(f.reputation).label,
           headline: chronicle.headline,
           body: chronicle.body,
+          mode: roomMode,
+          objectiveId: objective?.id ?? "",
+          objectiveMet: objective
+            ? objectiveProgress(objective, lastSeen?.delivered ?? {}).met
+            : false,
+          objectiveTrace: JSON.stringify(extras.objectiveTrace),
         },
       })
       .catch((err) => {

@@ -182,6 +182,11 @@ export const api = {
       `/api/messages/dm/${otherUserId}`,
     ),
 
+  // The harbor square. Public and addressed to nobody, so there is no
+  // captain to name in the request.
+  getLobbyChat: () =>
+    jfetch<{ messages: ChatMessage[] }>("/api/messages/lobby"),
+
   // Captain's Legacy (persistent Renown, across every voyage the account has
   // played). The current user's own legacy also carries their Daily Check In
   // status.

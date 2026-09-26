@@ -33,7 +33,19 @@
 import "@/server/env";
 import { loadServerConfig } from "@/lib/config";
 import { db } from "@/lib/db";
-import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants";
+import {
+  FLEXIBLE_BARTER_UNLOCK_LEVEL,
+  PRODUCTS_TIER0,
+  RESOURCES_TIER0,
+  STARTING_STOCK,
+} from "@/lib/game/constants";
+import { dealRoles, variableCount } from "@/lib/game/gambit";
+import {
+  OBJECTIVE_DECK,
+  drawObjective,
+  objectiveSeed,
+  objectiveTotalItems,
+} from "@/lib/game/objectives";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { io as connect, type Socket } from "socket.io-client";
@@ -97,6 +109,24 @@ type WireAccount = {
 // The roster a console is handed, on admin:accounts.
 type WireRoster = { accounts: WireAccount[] };
 
+// What a bulk action reports back on admin:bulk-result: how many accounts
+// the request named, how many of them changed, and the reason for each one
+// that did not.
+type WireBulkReport = {
+  action: string;
+  requested: number;
+  applied: number;
+  skipped: string[];
+};
+
+// One entry off the private channel, and the room it belongs to. role is
+// present only when the entry is a dealt card, which is the one wire
+// field in the protocol that can name an alignment.
+type WireDelivery = {
+  roomId: string;
+  entry: { kind: string; text: string; role?: string };
+};
+
 const failures: string[] = [];
 
 function check(condition: boolean, description: string): void {
@@ -130,7 +160,13 @@ function cookieFrom(res: Response): string {
   return raw.map((c) => c.split(";")[0]).join("; ");
 }
 
-/** Registers a captain and keeps the token and cookie the app hands back. */
+/**
+ * Registers a captain and keeps the token and cookie the app hands back.
+ *
+ * The label has a short leash: a username is capped at 20 characters and
+ * this builds `smoke_<label>_<6 random>`, so a label longer than eight
+ * characters is refused by the server rather than by anything here.
+ */
 async function signUp(label: string): Promise<Captain> {
   const username = `smoke_${label}_${suffix}`;
   const res = await fetch(`${BASE}/api/auth/register`, {
@@ -457,6 +493,66 @@ async function main(): Promise<void> {
       "and hands the conversation back, which is what the Lobby shows",
     );
 
+    console.log("\nThe harbor square");
+    // The lobby's own channel, which is the public half of the rail's chat.
+    // Public is a shape rather than a flag: the row has no harbor and no
+    // recipient, and that absence is the whole of what lets every captain
+    // ashore read it and no captain at sea hear it. These two are still
+    // standing in the Lobby, so both of them are in the square.
+    const squareLine = "the tide is turning at the north quay";
+    const heardAtQuaySquare = waitForEvent<{ message: WireMessage }>(
+      quaySocket,
+      "chat:lobby",
+      (payload) => payload?.message?.content === squareLine,
+    );
+    const heardAtAshoreSquare = waitForEvent<{ message: WireMessage }>(
+      ashoreSocket,
+      "chat:lobby",
+      (payload) => payload?.message?.content === squareLine,
+    );
+    ashoreSocket.emit("chat:lobby", { content: squareLine });
+    const quaySquare = await heardAtQuaySquare;
+    const ashoreSquare = await heardAtAshoreSquare;
+    check(
+      quaySquare?.message?.content === squareLine,
+      "a line on the square reaches the other captain in the Lobby",
+    );
+    check(
+      quaySquare?.message?.mine === false,
+      "who does not read it as their own",
+    );
+    check(
+      ashoreSquare?.message?.mine === true,
+      "and the sender is given their own copy",
+    );
+
+    const squareWritten = await db.message.findMany({
+      where: { senderId: ashore.id, content: squareLine },
+      select: { roomId: true, recipientId: true },
+    });
+    check(squareWritten.length === 1, "the square's line is written down");
+    check(
+      squareWritten[0]?.roomId === null &&
+        squareWritten[0]?.recipientId === null,
+      "with neither a harbor nor a recipient, which is what makes it public",
+    );
+
+    const squareHistory = await call<{ messages: Array<{ content: string }> }>(
+      "/api/messages/lobby",
+      { cookie: quay.cookie },
+    );
+    check(squareHistory.status === 200, "the square's history route answers");
+    check(
+      (squareHistory.body?.messages ?? []).some(
+        (m) => m.content === squareLine,
+      ),
+      "and hands the square back to a captain who did not say it",
+    );
+    check(
+      (squareHistory.body?.messages ?? []).every((m) => m.content !== quayLine),
+      "without the private thread written at the same moment",
+    );
+
     console.log("\nOpening and joining a harbor");
     const created = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
@@ -542,6 +638,43 @@ async function main(): Promise<void> {
     ]);
     check(hostRoster !== null, "the host joined the harbor channel");
     check(guestRoster !== null, "the guest joined the harbor channel");
+
+    // The square belongs to the Lobby, and a captain at sea has no surface
+    // for it. The guest has just taken a seat, so a line posted now is
+    // heard by the two captains still ashore and by nobody who sailed.
+    const squareLeaksToSea: string[] = [];
+    guestSocket.on("chat:lobby", (payload: { message?: WireMessage }) => {
+      squareLeaksToSea.push(payload?.message?.content ?? "");
+    });
+    const ashoreOnDeck = "the harbor gate is open for the evening watch";
+    const heardAshoreAtSea = waitForEvent<{ message: WireMessage }>(
+      ashoreSocket,
+      "chat:lobby",
+      (payload) => payload?.message?.content === ashoreOnDeck,
+    );
+    const heardQuayAtSea = waitForEvent<{ message: WireMessage }>(
+      quaySocket,
+      "chat:lobby",
+      (payload) => payload?.message?.content === ashoreOnDeck,
+    );
+    quaySocket.emit("chat:lobby", { content: ashoreOnDeck });
+    const [shoreHeard, quayHeard] = await Promise.all([
+      heardAshoreAtSea,
+      heardQuayAtSea,
+    ]);
+    check(
+      shoreHeard?.message?.content === ashoreOnDeck &&
+        quayHeard?.message?.content === ashoreOnDeck,
+      "the square still reaches both captains ashore",
+    );
+    // Both Lobby sockets have taken delivery of frames the server emitted
+    // in the same loop that would have carried the guest's, so a short
+    // settle is enough to tell whether the guest was handed one too.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    check(
+      squareLeaksToSea.length === 0,
+      "and is never handed to a captain who took a seat",
+    );
 
     // The host reports a live status, the same payload the voyage screen
     // emits on every game change. The guest must receive those numbers.
@@ -1537,6 +1670,883 @@ async function main(): Promise<void> {
     check(
       crewStillAboard.body?.user?.id === crew.id,
       "and a captain who was only sitting there keeps their account",
+    );
+
+    // Everything the single account actions just proved, asked again for a
+    // whole selection at once. The accounts used here are new ones rather
+    // than the captains above, so a bulk ban landing on somebody cannot
+    // change the answer to a check that already ran.
+    console.log("\nActing on a selection");
+    const crowdA = await signUp("crowd_a");
+    const crowdB = await signUp("crowd_b");
+    const outcast = await signUp("outcast");
+    extraAccounts.push(crowdA, crowdB, outcast);
+
+    // One account is put out of standing on its own first, so that the
+    // selection below has a refusal to report and not only successes.
+    const bannedOutcast = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+    );
+    operatorSocket.emit("admin:ban", { userId: outcast.id });
+    check(
+      accountIn(await bannedOutcast, outcast.id)?.bannedAt != null,
+      "one account is banned on its own, to be skipped in the batch",
+    );
+
+    const bulkBan = waitForEvent<{ report: WireBulkReport }>(
+      operatorSocket,
+      "admin:bulk-result",
+    );
+    const rosterAfterBulkBan = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+    );
+    operatorSocket.emit("admin:bulk", {
+      action: "ban",
+      userIds: [crowdA.id, crowdB.id, outcast.id, operator.id],
+    });
+    const banReport = (await bulkBan)?.report;
+    check(
+      banReport?.applied === 2,
+      "a selection of four bans the two captains it can",
+    );
+    check(
+      banReport?.requested === 4 && banReport?.skipped.length === 2,
+      "and reports the whole request, with the two accounts it could not change",
+    );
+    check(
+      (banReport?.skipped ?? []).some((reason) =>
+        reason.includes("already banned"),
+      ),
+      "including the one that was already banned",
+    );
+    check(
+      (banReport?.skipped ?? []).some((reason) =>
+        reason.includes("your own account"),
+      ),
+      "and the operator's own account, which no selection may take",
+    );
+    const bannedInBulk = await rosterAfterBulkBan;
+    check(
+      accountIn(bannedInBulk, crowdA.id)?.bannedAt != null &&
+        accountIn(bannedInBulk, crowdB.id)?.bannedAt != null,
+      "the roster comes back with both of them banned",
+    );
+    // The bulk path runs the same single account function the row buttons
+    // run, so the parts of a ban that are not the flag have to be there
+    // too: the sessions are meant to be gone with it.
+    const crowdASession = await call<{ user: unknown }>("/api/auth/me", {
+      cookie: crowdA.cookie,
+    });
+    check(
+      crowdASession.body?.user === null,
+      "the ban took their sessions with it, exactly as a single ban does",
+    );
+
+    const refusedEmpty = waitForEvent<{ error: string }>(
+      operatorSocket,
+      "admin:error",
+    );
+    const rosterForNothing = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+      undefined,
+      1200,
+    );
+    operatorSocket.emit("admin:bulk", { action: "ban", userIds: [] });
+    check(
+      (await refusedEmpty) !== null,
+      "a selection with nothing in it is refused",
+    );
+    check(
+      (await rosterForNothing) === null,
+      "and there is no change for a roster to describe",
+    );
+
+    const refusedNothing = waitForEvent<{ error: string }>(
+      operatorSocket,
+      "admin:error",
+    );
+    const rosterForNoChange = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+      undefined,
+      1200,
+    );
+    operatorSocket.emit("admin:bulk", { action: "unban", userIds: [host.id] });
+    const noChange = await refusedNothing;
+    check(
+      noChange !== null,
+      "an action that would change none of the accounts it named is refused rather than reported as done",
+    );
+    check(
+      noChange?.error.includes("not banned") === true,
+      "carrying the reason the single account path would have given",
+    );
+    check(
+      (await rosterForNoChange) === null,
+      "and no roster is sent, because none of it moved",
+    );
+
+    const bulkUnban = waitForEvent<{ report: WireBulkReport }>(
+      operatorSocket,
+      "admin:bulk-result",
+    );
+    const rosterAfterBulkUnban = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+    );
+    operatorSocket.emit("admin:bulk", {
+      action: "unban",
+      userIds: [crowdA.id, crowdB.id],
+    });
+    const unbanReport = (await bulkUnban)?.report;
+    check(
+      unbanReport?.applied === 2 && unbanReport?.skipped.length === 0,
+      "a selection every account applies to reports a clean run",
+    );
+    check(
+      accountIn(await rosterAfterBulkUnban, crowdA.id)?.bannedAt === null,
+      "and the roster shows them in good standing",
+    );
+
+    const bulkGrant = waitForEvent<{ report: WireBulkReport }>(
+      operatorSocket,
+      "admin:bulk-result",
+    );
+    const rosterAfterBulkGrant = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+    );
+    operatorSocket.emit("admin:bulk", {
+      action: "grant",
+      userIds: [crowdA.id, crowdB.id],
+    });
+    check(
+      (await bulkGrant)?.report.applied === 2,
+      "a selection can be handed the administrator role together",
+    );
+    const promotedInBulk = await rosterAfterBulkGrant;
+    check(
+      accountIn(promotedInBulk, crowdA.id)?.role === "admin" &&
+        accountIn(promotedInBulk, crowdB.id)?.role === "admin",
+      "and both of them wear it in the roster",
+    );
+
+    const refusedBatchCount = waitForEvent<{ error: string }>(
+      operatorSocket,
+      "admin:error",
+    );
+    operatorSocket.emit("admin:bulk", {
+      action: "purge",
+      userIds: [crowdA.id],
+      confirmCount: 2,
+    });
+    check(
+      (await refusedBatchCount) !== null,
+      "a deletion whose typed count does not match the selection is refused",
+    );
+    check(
+      (await db.user.findUnique({
+        where: { id: crowdA.id },
+        select: { id: true },
+      })) !== null,
+      "and the account it named is still there",
+    );
+
+    // The operator is deliberately inside the selection. A typed count of
+    // three has to delete the two accounts and leave the third, which is
+    // the one thing a selection must never be able to do.
+    const bulkPurge = waitForEvent<{ report: WireBulkReport }>(
+      operatorSocket,
+      "admin:bulk-result",
+    );
+    const rosterAfterBulkPurge = waitForEvent<WireRoster>(
+      operatorSocket,
+      "admin:accounts",
+    );
+    operatorSocket.emit("admin:bulk", {
+      action: "purge",
+      userIds: [crowdA.id, crowdB.id, operator.id],
+      confirmCount: 3,
+    });
+    const purgeReport = (await bulkPurge)?.report;
+    check(
+      purgeReport?.applied === 2,
+      "a typed count of three deletes the two accounts and stops there",
+    );
+    check(
+      (purgeReport?.skipped ?? []).some((reason) =>
+        reason.includes("your own account"),
+      ),
+      "because a selection still cannot delete the operator's own account",
+    );
+    const afterBatch = await rosterAfterBulkPurge;
+    check(
+      accountIn(afterBatch, crowdA.id) === undefined &&
+        accountIn(afterBatch, crowdB.id) === undefined,
+      "both accounts are gone from the roster",
+    );
+    check(
+      (await db.user.findUnique({
+        where: { id: operator.id },
+        select: { id: true },
+      })) !== null,
+      "and the operator is still holding the console",
+    );
+
+    console.log("\nThe private information spine");
+    // Ocean Gambit's foundation, and the one part of this tree that has to
+    // be tested adversarially rather than happily: a card that reaches the
+    // wrong captain makes the mode worthless, and it does so silently, so
+    // "the right captain got a card" proves nothing on its own. Every
+    // frame every socket in the harbor receives is kept below and read
+    // back afterwards, which is the only way a leak would be seen at all.
+
+    // The counting rule first, which needs no sockets. The sizes are the
+    // plan's: four or five captains deal one Variable, six deal two, and
+    // a larger harbor is capped rather than dealt a third.
+    const rosterOf = (n: number) =>
+      Array.from({ length: n }, (_, i) => `captain-${i}`);
+    check(
+      variableCount(3) === 0,
+      "a three captain table is dealt no Variable at all",
+    );
+    check(
+      variableCount(4) === 1 && variableCount(5) === 1,
+      "four and five captains yield one",
+    );
+    check(variableCount(6) === 2, "six captains yield two");
+    check(
+      variableCount(9) === 2,
+      "and a larger harbor is capped at two rather than dealt a third",
+    );
+
+    const seed = "a-seed-of-its-own";
+    const drawn = dealRoles(rosterOf(6), seed);
+    const variables = Object.values(drawn).filter((role) => role !== "honest");
+    check(
+      variables.length === 2 && variables.includes("pirate"),
+      "a six captain draw holds two Variables, one of them a Pirate",
+    );
+    check(
+      variables.filter((role) => role === "broker").length <= 1,
+      "and never two Brokers, since a Broker sails alone",
+    );
+    check(
+      JSON.stringify(dealRoles(rosterOf(6), seed)) === JSON.stringify(drawn),
+      "the same seed deals the same hand twice",
+    );
+    check(
+      JSON.stringify(dealRoles(rosterOf(6).reverse(), seed)) ===
+        JSON.stringify(drawn),
+      "and deals it whatever order the roster arrives in",
+    );
+
+    const gambitHost = await signUp("gamb_a");
+    const gambitSecond = await signUp("gamb_b");
+    const gambitThird = await signUp("gamb_c");
+    const gambitFourth = await signUp("gamb_d");
+    extraAccounts.push(gambitHost, gambitSecond, gambitThird, gambitFourth);
+    const gambitCrew = [gambitHost, gambitSecond, gambitThird, gambitFourth];
+
+    const gambitRoom = await call<{
+      room: { id: string; code: string; mode?: string };
+    }>("/api/rooms", {
+      method: "POST",
+      cookie: gambitHost.cookie,
+      body: JSON.stringify({
+        name: `Smoke gambit harbor ${suffix}`,
+        isPublic: false,
+        mode: "ocean_gambit",
+      }),
+    });
+    if (gambitRoom.status !== 200) {
+      throw new Error("No Gambit harbor to test with, stopping here.");
+    }
+    const gambitRoomId = gambitRoom.body.room.id;
+    check(
+      gambitRoom.body.room.mode === "ocean_gambit",
+      "a harbor can be opened on the Ocean Gambit lap",
+    );
+
+    const gambitSeats = await Promise.all(
+      gambitCrew.slice(1).map((captain) =>
+        call<{ room: { id: string } }>("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: gambitRoom.body.room.code }),
+        }),
+      ),
+    );
+    check(
+      gambitSeats.every((seat) => seat.status === 200),
+      "and the other three captains join it",
+    );
+
+    // Four sockets, each with a recorder attached before it takes its
+    // seat, so the frames under test include everything the harbor said
+    // rather than only the card that was expected.
+    type Frame = { event: string; text: string };
+    const seated: Array<{
+      captain: Captain;
+      socket: Socket;
+      frames: Frame[];
+    }> = [];
+    for (const captain of gambitCrew) {
+      const socket = await openAuthedSocket(captain);
+      sockets.push(socket);
+      const frames: Frame[] = [];
+      socket.onAny((event: string, ...args: unknown[]) => {
+        frames.push({ event, text: JSON.stringify(args) });
+      });
+      const takenASeat = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === gambitRoomId,
+      );
+      socket.emit("room:join", { roomId: gambitRoomId });
+      const seat = await takenASeat;
+      check(
+        seat !== null,
+        `${captain.username} takes a seat in the Gambit harbor`,
+      );
+      seated.push({ captain, socket, frames });
+    }
+
+    const dealtCards = seated.map((seat) =>
+      waitForEvent<WireDelivery>(
+        seat.socket,
+        "private:entry",
+        (payload) => payload?.roomId === gambitRoomId,
+      ),
+    );
+    seated[0].socket.emit("room:start", { roomId: gambitRoomId });
+    const cards = await Promise.all(dealtCards);
+    check(
+      cards.every((card) => card !== null),
+      "every captain at the table is dealt a card when the voyage sets sail",
+    );
+
+    const dealtRows = await db.voyageRole.findMany({
+      where: { roomId: gambitRoomId },
+      select: { userId: true, role: true },
+    });
+    const roleOf = (userId: string) =>
+      dealtRows.find((row) => row.userId === userId)?.role;
+    check(
+      dealtRows.length === gambitCrew.length,
+      "and one row per captain is written and no more",
+    );
+    const hidden = dealtRows.filter((row) => row.role !== "honest");
+    check(
+      hidden.length === 1,
+      "the harbor holds exactly one Variable at four captains",
+    );
+    for (const [index, seat] of seated.entries()) {
+      const card = cards[index];
+      check(
+        card?.entry?.kind === "card",
+        `${seat.captain.username} is handed a card rather than a bare line`,
+      );
+      check(
+        card?.entry?.role === roleOf(seat.captain.id),
+        "and it is the card this table dealt them, read back from the row",
+      );
+    }
+
+    // Let the departure's broadcasts land before the frames are read
+    // back, since the leak this is looking for would ride one of them.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const secret = hidden[0]?.role ?? "pirate";
+    const leaks: string[] = [];
+    for (const seat of seated) {
+      for (const frame of seat.frames) {
+        if (!frame.text.includes(secret)) continue;
+        // The only frame allowed to name it is the hidden captain's own
+        // card. Everything else, on any socket, is the defect this
+        // section exists to catch.
+        const own =
+          frame.event === "private:entry" &&
+          seat.captain.id === hidden[0]?.userId;
+        if (!own) {
+          leaks.push(`${seat.captain.username} on ${frame.event}`);
+        }
+      }
+    }
+    check(
+      leaks.length === 0,
+      `no other captain's frames name the ${secret} anywhere in them`,
+    );
+    // The sweep above only means something if the word it looks for was
+    // really on the wire, and on exactly one socket. Without this, a card
+    // that never arrived at all would pass it as clean.
+    check(
+      seated.some(
+        (seat) =>
+          seat.captain.id === hidden[0]?.userId &&
+          seat.frames.some((frame) => frame.text.includes(secret)),
+      ),
+      `and the ${secret}'s own socket does carry it, so the sweep had something to find`,
+    );
+    check(
+      seated.every(
+        (seat) =>
+          seat.frames.filter((frame) => frame.event === "private:entry")
+            .length === 1,
+      ),
+      "and every socket received exactly one private entry, its own",
+    );
+
+    // A reload is a captain asking for the card they already hold. The
+    // row is read back rather than drawn again, which is what keeps a
+    // refresh from moving every card at the table.
+    const rejoining = await openAuthedSocket(gambitSecond);
+    sockets.push(rejoining);
+    const replayed = waitForEvent<WireDelivery>(
+      rejoining,
+      "private:entry",
+      (payload) => payload?.roomId === gambitRoomId,
+    );
+    rejoining.emit("room:join", { roomId: gambitRoomId });
+    const replayedCard = await replayed;
+    check(
+      replayedCard?.entry?.role === roleOf(gambitSecond.id),
+      "a captain who reloads is handed the card they were already holding",
+    );
+    check(
+      (await db.voyageRole.count({ where: { roomId: gambitRoomId } })) ===
+        gambitCrew.length,
+      "and nothing was dealt a second time",
+    );
+
+    seated[0].socket.emit("room:restart", { roomId: gambitRoomId });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    check(
+      (await db.voyageRole.count({ where: { roomId: gambitRoomId } })) === 0,
+      "restarting the voyage clears the hand it dealt",
+    );
+    const redealt = waitForEvent<WireDelivery>(
+      seated[1].socket,
+      "private:entry",
+      (payload) => payload?.roomId === gambitRoomId,
+    );
+    seated[0].socket.emit("room:start", { roomId: gambitRoomId });
+    check((await redealt) !== null, "and setting sail again deals a new one");
+
+    // The other half of the guard: a harbor on the founding lap deals
+    // nothing at all, so a Classic voyage is untouched by any of this.
+    const classicRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: gambitHost.cookie,
+        body: JSON.stringify({
+          name: `Smoke classic harbor ${suffix}`,
+          isPublic: false,
+        }),
+      },
+    );
+    if (classicRoom.status !== 200) {
+      throw new Error("No Classic harbor to test with, stopping here.");
+    }
+    const classicRoomId = classicRoom.body.room.id;
+    await Promise.all(
+      gambitCrew.slice(1).map((captain) =>
+        call<{ room: { id: string } }>("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: classicRoom.body.room.code }),
+        }),
+      ),
+    );
+    const classicFrames: string[] = [];
+    for (const seat of seated) {
+      const takenASeat = waitForEvent<WireHistory>(
+        seat.socket,
+        "chat:history",
+        (payload) => payload?.roomId === classicRoomId,
+      );
+      seat.socket.onAny((event: string, ...args: unknown[]) => {
+        classicFrames.push(
+          `${seat.captain.username}:${event}:${JSON.stringify(args)}`,
+        );
+      });
+      seat.socket.emit("room:join", { roomId: classicRoomId });
+      await takenASeat;
+    }
+    seated[0].socket.emit("room:start", { roomId: classicRoomId });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    check(
+      !classicFrames.some((frame) => frame.includes("private:entry")),
+      "a Classic harbor sends no private entry to anyone",
+    );
+    check(
+      (await db.voyageRole.count({ where: { roomId: classicRoomId } })) === 0,
+      "and writes no alignment at all",
+    );
+
+    console.log("\nThe fleet commission");
+    // Ocean Gambit's one public surface, and the contrast with the section
+    // above is the point of both: the alignment is a secret defended all
+    // the way to the wire, and this is a shared number that only has to be
+    // un-inflatable. So these checks are about the deck holding its own
+    // authoring rule, about every captain hearing the same board, and about
+    // a doctored report not moving it.
+
+    // ---- The deck, which needs no sockets ----
+    const foundingTier = new Set<string>([
+      ...RESOURCES_TIER0,
+      ...PRODUCTS_TIER0,
+    ]);
+    const openingHold = Object.values(STARTING_STOCK).reduce(
+      (sum, held) => sum + held,
+      0,
+    );
+    check(
+      OBJECTIVE_DECK.every((objective) =>
+        objective.resources.every((r) => foundingTier.has(r.type)),
+      ),
+      "every commission asks only for goods the founding tier can put on the table",
+    );
+    check(
+      OBJECTIVE_DECK.every((objective) =>
+        objective.resources.some(
+          (r) => r.required > (STARTING_STOCK[r.type] ?? 0),
+        ),
+      ),
+      "and every one asks for more of some good than a hold begins the voyage with",
+    );
+    check(
+      OBJECTIVE_DECK.every(
+        (objective) =>
+          objective.resources.length >= 2 &&
+          objectiveTotalItems(objective) > openingHold,
+      ),
+      "so no captain can fill one alone, and none of them is one round's work",
+    );
+    check(
+      drawObjective(objectiveSeed("harbor-a", 3)).id ===
+        drawObjective(objectiveSeed("harbor-a", 3)).id,
+      "one harbor draws the same commission twice",
+    );
+    check(
+      objectiveSeed("harbor-a", 3) === "harbor-a:V3:objective",
+      "and its seed is the harbor and the voyage with no captain anywhere in it",
+    );
+    const voyageDraws = new Set(
+      Array.from(
+        { length: 40 },
+        (_, epoch) => drawObjective(objectiveSeed("harbor-a", epoch)).id,
+      ),
+    );
+    check(
+      voyageDraws.size > 1,
+      "a run of voyages pulls more than one entry off the deck",
+    );
+
+    // ---- The board, over the wire ----
+    // A socket holds one harbor at a time, so the four captains sail back
+    // into the Gambit room to report there. The commission is drawn here
+    // the way both the server and a client draw it, from the harbor and
+    // the voyage, which is also what makes the clamp check below a
+    // statement about the two of them agreeing.
+    const gambitNow = await db.room.findUnique({
+      where: { id: gambitRoomId },
+      select: { voyageEpoch: true },
+    });
+    const commission = drawObjective(
+      objectiveSeed(gambitRoomId, gambitNow?.voyageEpoch ?? 0),
+    );
+    const owed = commission.resources[0];
+
+    const backInHarbor = seated.map((seat) =>
+      waitForEvent<WireHistory>(
+        seat.socket,
+        "chat:history",
+        (payload) => payload?.roomId === gambitRoomId,
+      ),
+    );
+    for (const seat of seated) {
+      seat.socket.emit("room:join", { roomId: gambitRoomId });
+    }
+    await Promise.all(backInHarbor);
+
+    const boardOn = (socket: Socket) =>
+      waitForEvent<{
+        roomId: string;
+        total: Record<string, number>;
+      }>(
+        socket,
+        "objective:progress",
+        (payload) => payload?.roomId === gambitRoomId,
+        4000,
+      );
+
+    // Every socket in the harbor is listened to at once, because a board
+    // that reached only the captain who moved would still look right to
+    // that captain.
+    const heardByEveryone = seated.map((seat) => boardOn(seat.socket));
+    seated[0].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [owed.type]: 2 },
+    });
+    const boardHeard = await Promise.all(heardByEveryone);
+    check(
+      boardHeard.every((frame) => frame?.total?.[owed.type] === 2),
+      `a delivery of 2 ${owed.type} reaches every captain in the harbor`,
+    );
+
+    const summed = boardOn(seated[0].socket);
+    seated[1].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [owed.type]: 3 },
+    });
+    check(
+      (await summed)?.total?.[owed.type] === 5,
+      "and a second captain's report adds to the same board",
+    );
+
+    const boardReplayed = boardOn(seated[0].socket);
+    seated[0].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [owed.type]: 2 },
+    });
+    check(
+      (await boardReplayed)?.total?.[owed.type] === 5,
+      "a re-report of what was already sent does not count twice",
+    );
+
+    const walkedBack = boardOn(seated[0].socket);
+    seated[1].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [owed.type]: 1 },
+    });
+    check(
+      (await walkedBack)?.total?.[owed.type] === 5,
+      "and a report that goes backwards cannot walk the board down",
+    );
+
+    const inflated = boardOn(seated[0].socket);
+    seated[2].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [owed.type]: 999999, Unobtainium: 5 },
+    });
+    const clamped = await inflated;
+    check(
+      clamped?.total?.[owed.type] === owed.required,
+      `a report claiming six figures is capped at the ${owed.required} the commission asks for`,
+    );
+    check(
+      clamped !== null &&
+        Object.keys(clamped.total).every((good) =>
+          commission.resources.some((r) => r.type === good),
+        ),
+      "and the board names no good the deck does not",
+    );
+
+    const lateArrival = await openAuthedSocket(gambitThird);
+    sockets.push(lateArrival);
+    const greeted = boardOn(lateArrival);
+    lateArrival.emit("room:join", { roomId: gambitRoomId });
+    check(
+      (await greeted)?.total?.[owed.type] === owed.required,
+      "a captain who joins late is handed the board as it stands",
+    );
+
+    // The frames the two sections above collected, read back for the same
+    // reason the alignment frames were: a payload with nowhere to put a
+    // secret cannot leak one, so the claim is about the shape it carries.
+    const boardFrames = seated.flatMap((seat) =>
+      seat.frames.filter((frame) => frame.event === "objective:progress"),
+    );
+    check(
+      boardFrames.length > 0,
+      "the harbor's board really did ride the wire, so the next checks have something to read",
+    );
+    check(
+      boardFrames.every((frame) => {
+        const payload = JSON.parse(frame.text)[0] as Record<string, unknown>;
+        return (
+          JSON.stringify(Object.keys(payload).sort()) ===
+          JSON.stringify(["roomId", "total"])
+        );
+      }),
+      "and every frame of it carries exactly a room and a total, nothing else",
+    );
+    const secretPattern = new RegExp(`\\b${secret}\\b`);
+    check(
+      boardFrames.every((frame) => !secretPattern.test(frame.text)),
+      `and none of them names the ${secret}, on any socket`,
+    );
+
+    // The tally this captain owns rides inside the per voyage save blob,
+    // which nothing in this file covered before now.
+    const saved = {
+      objectiveDelivered: { [owed.type]: 4 },
+      objectiveTrace: [
+        { round: 2, at: Date.now(), delivered: { [owed.type]: 4 } },
+      ],
+    };
+    const put = await call<{ ok: boolean }>("/api/game/state", {
+      method: "PUT",
+      cookie: gambitHost.cookie,
+      body: JSON.stringify({ roomId: gambitRoomId, data: saved }),
+    });
+    check(
+      put.status === 200,
+      "a voyage state carrying a commission record saves",
+    );
+    const loaded = await call<{ state: string | null }>(
+      `/api/game/state?roomId=${gambitRoomId}`,
+      { cookie: gambitHost.cookie },
+    );
+    // The route hands back the stored blob as the text it is, and every
+    // client parses it, so this reads it back the way a client does.
+    const loadedState =
+      typeof loaded.body.state === "string"
+        ? (JSON.parse(loaded.body.state) as typeof saved)
+        : null;
+    check(
+      loadedState?.objectiveDelivered?.[owed.type] === 4 &&
+        loadedState?.objectiveTrace?.[0]?.round === 2,
+      "and loads back with the tally and the trace it was given",
+    );
+
+    // A restarted voyage starts the board empty, and this is the one check
+    // in the section that cannot be satisfied by a client re-reporting: a
+    // report of zero cannot clear a max merged tally, because max(old, 0)
+    // is old. Without the clear in room:restart, the dead voyage's numbers
+    // are still there and this report lands on top of them.
+    seated[0].socket.emit("room:restart", { roomId: gambitRoomId });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const nextRoom = await db.room.findUnique({
+      where: { id: gambitRoomId },
+      select: { voyageEpoch: true },
+    });
+    const nextCommission = drawObjective(
+      objectiveSeed(gambitRoomId, nextRoom?.voyageEpoch ?? 0),
+    );
+    const nextOwed = nextCommission.resources[0];
+    const freshBoard = boardOn(seated[0].socket);
+    seated[0].socket.emit("objective:report", {
+      roomId: gambitRoomId,
+      delivered: { [nextOwed.type]: 2 },
+    });
+    check(
+      (await freshBoard)?.total?.[nextOwed.type] === 2,
+      "restarting the voyage starts the board empty rather than on the dead voyage's numbers",
+    );
+
+    // ---- What a concluded voyage leaves behind ----
+    // The measurement half of the mode, and the one thing here no other
+    // part of this file reaches: a voyage that ends writes the commission
+    // onto its Chronicle rows, and a slice about telemetry that never
+    // exercises the write would be claiming something it never checked.
+    //
+    // One captain ends holding a trace that met the commission and the
+    // others end holding nothing, which is what makes the two branches of
+    // the met flag both testable in one voyage.
+    const fullBoard: Record<string, number> = {};
+    for (const r of nextCommission.resources) fullBoard[r.type] = r.required;
+    await call<{ ok: boolean }>("/api/game/state", {
+      method: "PUT",
+      cookie: gambitHost.cookie,
+      body: JSON.stringify({
+        roomId: gambitRoomId,
+        data: {
+          objectiveDelivered: fullBoard,
+          objectiveTrace: [{ round: 4, at: Date.now(), delivered: fullBoard }],
+        },
+      }),
+    });
+
+    // Only a captain's newest socket may report a status, so each one is
+    // sent from the socket the server considers current: the reloaded
+    // socket for the second captain and the late arrival for the third,
+    // not the seats they took first.
+    const finishers = [
+      { socket: seated[0].socket, captain: gambitHost },
+      { socket: rejoining, captain: gambitSecond },
+      { socket: lateArrival, captain: gambitThird },
+      { socket: seated[3].socket, captain: gambitFourth },
+    ];
+    for (const finisher of finishers) {
+      finisher.socket.emit("game:status", {
+        roomId: gambitRoomId,
+        round: 5,
+        phase: "endgame",
+        phaseLabel: "Voyage Complete",
+        gold: 40,
+        reputation: 30,
+        shipLevel: 2,
+        gameOver: true,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+
+    const chronicles = await db.voyageChronicle.findMany({
+      where: { roomId: gambitRoomId },
+      select: {
+        userId: true,
+        mode: true,
+        objectiveId: true,
+        objectiveMet: true,
+        objectiveTrace: true,
+      },
+    });
+    check(
+      chronicles.length === finishers.length,
+      "a concluded voyage writes one chronicle per captain",
+    );
+    check(
+      chronicles.every((row) => row.mode === "ocean_gambit"),
+      "and every one records the lap it was sailed on",
+    );
+    check(
+      chronicles.every((row) => row.objectiveId === nextCommission.id),
+      `and names the commission the fleet was working on (${nextCommission.id})`,
+    );
+    const hostChronicle = chronicles.find(
+      (row) => row.userId === gambitHost.id,
+    );
+    check(
+      JSON.parse(hostChronicle?.objectiveTrace ?? "[]").length === 1,
+      "and carries the per leg trace rather than dropping it",
+    );
+    check(
+      hostChronicle?.objectiveMet === true &&
+        chronicles
+          .filter((row) => row.userId !== gambitHost.id)
+          .every((row) => row.objectiveMet === false),
+      "reading the met flag out of that trace, and never inventing one for a captain who kept none",
+    );
+
+    // The mode is a room property the server reads for itself, so the
+    // other half of the guard is that a Classic harbor has no board at
+    // all, whatever it is sent.
+    const boardRefused: string[] = [];
+    const collector = (event: string, ...args: unknown[]) =>
+      boardRefused.push(`${event}:${JSON.stringify(args)}`);
+    seated[0].socket.onAny(collector);
+    const backInClassic = waitForEvent<WireHistory>(
+      seated[0].socket,
+      "chat:history",
+      (payload) => payload?.roomId === classicRoomId,
+    );
+    seated[0].socket.emit("room:join", { roomId: classicRoomId });
+    await backInClassic;
+    seated[0].socket.emit("objective:report", {
+      roomId: classicRoomId,
+      delivered: { [nextOwed.type]: 2 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    seated[0].socket.offAny(collector);
+    check(
+      !boardRefused.some((frame) => frame.startsWith("objective:progress")),
+      "a Classic harbor is sent no commission board at all",
     );
 
     console.log("\nSigning out");

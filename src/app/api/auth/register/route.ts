@@ -2,14 +2,14 @@
 // Creates a new captain account, then signs them in (same shape as login).
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { publicUser } from "@/lib/db";
 import {
-  hashPassword,
-  createSession,
-  hueFromString,
+  createAccountAndSession,
   sessionCookieMaxAge,
+  USERNAME_TAKEN_ERROR,
 } from "@/lib/auth";
 import { sessionCookie } from "@/lib/api-auth";
+import { readJson } from "@/lib/api-json";
 
 const Schema = z.object({
   username: z
@@ -25,50 +25,27 @@ const Schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = Schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
-  }
-  const { username, password, displayName } = parsed.data;
-  const name = (displayName ?? username).trim();
+  const body = await readJson(req, Schema);
+  if (!body.ok) return body.response;
+  const { username, password, displayName } = body.data;
 
-  const existing = await db.user.findUnique({ where: { username } });
-  if (existing) {
-    return NextResponse.json(
-      { error: "That captain name is already registered" },
-      { status: 409 },
-    );
-  }
-
-  const user = await db.user.create({
-    data: {
-      username,
-      passwordHash: hashPassword(password),
-      displayName: name,
-      avatarHue: hueFromString(username),
-    },
+  const account = await createAccountAndSession({
+    username,
+    password,
+    displayName,
   });
+  if (!account.created) {
+    return NextResponse.json({ error: USERNAME_TAKEN_ERROR }, { status: 409 });
+  }
 
-  const { token, expiresAt } = await createSession(user.id);
   const res = NextResponse.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      avatarHue: user.avatarHue,
-    },
-    expiresAt,
-    token,
+    user: publicUser(account.user),
+    expiresAt: account.expiresAt,
+    token: account.token,
   });
-  res.headers.set("Set-Cookie", sessionCookie(token, sessionCookieMaxAge));
+  res.headers.set(
+    "Set-Cookie",
+    sessionCookie(account.token, sessionCookieMaxAge),
+  );
   return res;
 }

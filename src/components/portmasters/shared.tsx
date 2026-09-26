@@ -16,6 +16,7 @@ import {
 import type { MeritId } from "@/lib/game/merits";
 import { ICONS } from "@/lib/game/constants";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function Avatar({
@@ -251,6 +252,27 @@ export function Field({
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * A Field wrapping the input both credential cards draw the same way: one
+ * height, and then whatever the caller's own placeholder, type and
+ * autocomplete are. Six of these sit across the two cards, which is what
+ * this exists to stop them drifting apart one attribute at a time.
+ */
+export function CredentialField({
+  label,
+  hint,
+  ...input
+}: {
+  label: string;
+  hint?: string;
+} & React.ComponentProps<typeof Input>) {
+  return (
+    <Field label={label} hint={hint}>
+      <Input className="h-11" {...input} />
+    </Field>
   );
 }
 
