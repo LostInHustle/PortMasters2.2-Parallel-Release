@@ -9,8 +9,8 @@ import {
   mandateRounds,
   pirateOddsLabel,
   type Difficulty,
-  type DifficultyConfig,
 } from "@/lib/game/difficulty";
+import { voyageRoundsFor, type GameMode } from "@/lib/game/mode";
 
 /**
  * Voyage Difficulty Advisor. Suggests which difficulty tier to pick
@@ -47,14 +47,6 @@ const monsoon = DIFFICULTIES.monsoon;
 // ready for it.
 const OPEN_WATERS_RENOWN = 5;
 
-// A tier's mandate rounds as prose: "4, 8, and 12".
-function listRounds(cfg: DifficultyConfig): string {
-  const rounds = mandateRounds(cfg);
-  if (rounds.length === 0) return "none";
-  if (rounds.length === 1) return String(rounds[0]);
-  return `${rounds.slice(0, -1).join(", ")}, and ${rounds[rounds.length - 1]}`;
-}
-
 type Advice = {
   recommended: Difficulty;
   reason: string;
@@ -64,6 +56,7 @@ type Advice = {
 
 function getAdvice(
   selected: Difficulty,
+  mode: GameMode,
   renownLevel: number,
   voyagesCompleted: number,
   bestScore: number,
@@ -73,6 +66,24 @@ function getAdvice(
   let reason = "";
   let caution: string | undefined;
 
+  // [I5: session length, and table size] The length the voyage will run,
+  // not the tier's own ladder: a mode that pins its length sails the same
+  // number of legs on every tier, and the advice below is read while the
+  // host is choosing both. The mandate list is filtered to the same number
+  // for the same reason, since a mandate scheduled past the last leg is a
+  // promise the voyage cannot keep. Classic filters nothing, because its
+  // ladder is the tier's and every scheduled mandate already falls inside
+  // it, which is what keeps this sentence byte for byte what it was there.
+  const roundsFor = (tier: Difficulty): number => voyageRoundsFor(mode, tier);
+  const mandatesFor = (tier: Difficulty): string => {
+    const rounds = mandateRounds(DIFFICULTIES[tier]).filter(
+      (round) => round <= roundsFor(tier),
+    );
+    if (rounds.length === 0) return "none";
+    if (rounds.length === 1) return String(rounds[0]);
+    return `${rounds.slice(0, -1).join(", ")}, and ${rounds[rounds.length - 1]}`;
+  };
+
   if (
     renownLevel >= 8 &&
     voyagesCompleted >= 10 &&
@@ -80,17 +91,17 @@ function getAdvice(
     solventStreak >= 3
   ) {
     recommended = "monsoon";
-    reason = `You have the experience and the streak for the ${monsoon.name}. ${monsoon.rounds} rounds, ${monsoon.renownXpMultiplier}x Renown, and two difficulty scoped Merits await: Storm Sovereign and Eye of the Storm.`;
+    reason = `You have the experience and the streak for the ${monsoon.name}. ${roundsFor("monsoon")} rounds, ${monsoon.renownXpMultiplier}x Renown, and two difficulty scoped Merits await: Storm Sovereign and Eye of the Storm.`;
   } else if (
     renownLevel >= OPEN_WATERS_RENOWN &&
     voyagesCompleted >= 5 &&
     bestScore >= 100
   ) {
     recommended = "open_waters";
-    reason = `Your Renown and voyage count suggest you are ready for ${openWaters.name}. ${openWaters.rounds} rounds, ${openWaters.renownXpMultiplier}x Renown, and Imperial Mandates on rounds ${listRounds(openWaters)}.`;
+    reason = `Your Renown and voyage count suggest you are ready for ${openWaters.name}. ${roundsFor("open_waters")} rounds, ${openWaters.renownXpMultiplier}x Renown, and Imperial Mandates on rounds ${mandatesFor("open_waters")}.`;
   } else {
     recommended = "fair_winds";
-    reason = `${fairWinds.name} is the right starting point. ${fairWinds.rounds} rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.`;
+    reason = `${fairWinds.name} is the right starting point. ${roundsFor("fair_winds")} rounds, gentle pirate odds, and no mandates. Learn the loop before taking on heavier waters.`;
   }
 
   // Cautions for overreaching
@@ -113,12 +124,16 @@ function getAdvice(
 
 export function DifficultyAdvisor({
   selectedDifficulty,
+  mode,
   renownLevel,
   voyagesCompleted,
   bestScore,
   solventStreak,
 }: {
   selectedDifficulty: Difficulty;
+  // The mode the harbor is being charted in, because the length the advice
+  // quotes is the voyage's rather than the tier's alone.
+  mode: GameMode;
   renownLevel: number;
   voyagesCompleted: number;
   bestScore: number;
@@ -127,6 +142,7 @@ export function DifficultyAdvisor({
   const [dismissed, setDismissed] = useState(false);
   const advice = getAdvice(
     selectedDifficulty,
+    mode,
     renownLevel,
     voyagesCompleted,
     bestScore,

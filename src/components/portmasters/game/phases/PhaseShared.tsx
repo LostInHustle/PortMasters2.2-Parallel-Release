@@ -6,6 +6,8 @@ import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter } from "@/lib/use-barter";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
+import type { useAudit } from "@/lib/use-audit";
+import type { useMaroon } from "@/lib/use-maroon";
 import type { useRoomRoster } from "@/lib/use-room-roster";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,8 @@ type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
+type Audit = ReturnType<typeof useAudit>;
+type Maroon = ReturnType<typeof useMaroon>;
 type Roster = ReturnType<typeof useRoomRoster>;
 
 export type PhasePanelProps = {
@@ -26,6 +30,17 @@ export type PhasePanelProps = {
   barter: Barter;
   aid: Aid;
   backing: Backing;
+  // The Manifest Audit, threaded like the hooks above rather than called
+  // inside the one phase that reads it, because the finding outlives the
+  // phase it was made in and the room level strip reads the same state.
+  audit: Audit;
+  // [H7: Maroon and the Harbormaster] The heavier vote, threaded the same
+  // way and for the same reason: the vote is called at the Parley table,
+  // and the result it leaves behind is read by the room. The roster comes
+  // with it rather than being called again, because the card has to know
+  // which captains the harbor may still name, and the room already has an
+  // answer to that on this screen.
+  maroon: Maroon;
   me: PublicUser;
   members: PublicUser[];
   room: { id: string; code: string; name: string; hostId: string };

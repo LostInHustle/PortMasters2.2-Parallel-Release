@@ -7,9 +7,11 @@
 // =====================================================================
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
+import type { DashboardReading } from "@/lib/game/dashboard";
 import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameMode } from "@/lib/game/mode";
 import type { HouseId } from "@/lib/game/legacy";
+import type { UnlockId } from "@/lib/unlock";
 import type {
   HouseStanding,
   LeaderboardEntry,
@@ -34,6 +36,12 @@ export type RoomSummary = {
   // captain who joins reads it to know which lap the room is keeping before
   // their own state ever loads. See src/lib/game/mode.ts.
   mode: GameMode;
+  // [H9: the unlock code] Which phrase opened this harbor, or null for one
+  // that was never sealed. The lobby reads it to name the door on the room
+  // card, so a captain joining a table can see it was opened rather than
+  // found. The phrase itself is not on the wire and is not what this is:
+  // see src/lib/unlock.ts, where the label lives beside it.
+  unlock: UnlockId | null;
   createdAt: string;
   host: PublicUser;
   memberCount: number;
@@ -133,6 +141,11 @@ export const api = {
     // schema defaults it to the founding mode. Only the lobby's create form
     // sends it, and only when the host has picked the experimental one.
     mode?: GameMode;
+    // [H9: the unlock code] The phrase a host typed for a sealed mode, sent
+    // only when the mode they picked takes one. The route is what decides
+    // whether it opens anything: this client never checks it, so the form
+    // cannot refuse a phrase the harbor would have taken.
+    unlock?: string;
   }) =>
     jfetch<{ room: RoomSummary }>("/api/rooms", {
       method: "POST",
@@ -169,6 +182,12 @@ export const api = {
       // client already holds, because the room is the single source of truth
       // for it exactly as it is for difficulty.
       mode: GameMode;
+      // [H5: the quota rung] How many captains this voyage was dealt to, as
+      // the room pinned it at departure. The commission's quotas scale with
+      // it, so a captain who reloads mid voyage draws the board the fleet is
+      // actually working on from this rather than from the roster they can
+      // see. 0 means the room has no voyage pinned.
+      seats: number;
     }>(`/api/game/state?roomId=${roomId}`),
   saveGameState: (roomId: string, data: unknown) =>
     jfetch<{ ok: true; updatedAt: string }>("/api/game/state", {
@@ -266,4 +285,12 @@ export const api = {
   // the order they arrive.
   getLeaderboard: () =>
     jfetch<{ leaderboard: LeaderboardEntry[] }>("/api/leaderboard"),
+
+  // [I3: the dashboard, and the front page number] The balance reading:
+  // every launch gate the window can answer, and the reason beside every
+  // gate it cannot. The route is gated on the account row (401 for a
+  // stranger, 403 for a captain), so this call is only ever made by the
+  // balance page, which is only shown to an operator.
+  adminBalance: () =>
+    jfetch<{ reading: DashboardReading }>("/api/admin/balance"),
 };

@@ -406,6 +406,16 @@ async function purgeResolved(
   // that no longer exists.
   const hosted = await hostedRoomIds(target.id);
   const socketIds = detachUser(io, target.id);
+  // [I1: the telemetry spine] The records of the harbors this account
+  // hosted go with them, and this is the one place that has to say so by
+  // hand. Every other row hanging off a room cascades with it; a telemetry
+  // record deliberately does not (see VoyageTelemetry in
+  // prisma/schema.prisma), because it has to outlive the ordinary room
+  // deletion that ends most voyages. A purge is not that: the operator is
+  // erasing an account, and a record that names it is part of the account.
+  if (hosted.length) {
+    await db.voyageTelemetry.deleteMany({ where: { roomId: { in: hosted } } });
+  }
   for (const roomId of hosted) {
     io.to(`room:${roomId}`).emit("room:closed", {
       roomId,

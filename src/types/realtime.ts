@@ -12,6 +12,8 @@
 import type { Difficulty } from "@/lib/game/difficulty";
 import type { GambitRole } from "@/lib/game/gambit";
 import type { HouseId } from "@/lib/game/legacy";
+import type { Objective } from "@/lib/game/objectives";
+import type { ObjectiveTraceEntry, OrderFill } from "@/lib/game/types";
 
 // The public projection of a user account: what every other captain is
 // allowed to know about anyone, never the password hash or the email.
@@ -61,6 +63,24 @@ export type PrivateEntry = {
   text: string;
   /** A hidden alignment, and the only wire field that can carry one. */
   role?: GambitRole;
+  /**
+   * The personal goal an Honest card carries, by id, out of the deck in
+   * src/lib/game/gambit.ts. Private by the rule above rather than by a
+   * different one: it is dealt with the card and it belongs to the one
+   * captain holding it.
+   */
+  flourish?: string;
+  /**
+   * The other Pirate, at a table that dealt two of them.
+   *
+   * The one field in the protocol that names a captain other than the
+   * receiver, and it is the design rather than a leak: a Pirate pair is
+   * meant to know each other. It is shaped so it cannot say more than
+   * that. There is no role in it, so a client reading it learns who its
+   * ally is and nothing about anyone else, and it is delivered to the two
+   * captains it names and to no other socket.
+   */
+  ally?: { userId: string; name: string };
 };
 
 export type PrivateEntryDelivery = {
@@ -88,6 +108,26 @@ export type ObjectiveReport = {
 };
 
 /**
+ * [I1: the telemetry spine] What one captain reports about a leg they
+ * played: the orders it dealt them, the ones they filled, and the number
+ * of different goods their hold closed it carrying.
+ *
+ * The actor is deliberately not a field. The captain sending this is the
+ * captain it is about, and the server reads them off the socket rather
+ * than off the payload, so a report cannot be filed against somebody
+ * else. `leg` is the client's own, because only the client knows which
+ * leg it was playing; the server bounds it against the voyage before
+ * recording anything.
+ */
+export type LegReport = {
+  roomId: string;
+  leg: number;
+  ordersDealt: number;
+  ordersFilled: number;
+  distinctGoods: number;
+};
+
+/**
  * The harbor's total, summed server side and sent to the whole room.
  *
  * `total` is keyed by good and holds items handed over, not gold: the
@@ -99,6 +139,160 @@ export type ObjectiveProgress = {
   total: Record<string, number>;
 };
 
+// =====================================================================
+// The Manifest Audit, which is neither of the two above.
+//
+// The private entry is a secret defended to the wire and the commission
+// is a number nobody needs defending from. This is a third thing: one
+// captain's own business, opened to the whole harbor by a vote of the
+// harbor. It is therefore the one broadcast in the protocol that names a
+// captain, and the only reason that is safe is what it is allowed to name
+// them for. The reveal is built out of the manifest record (see OrderFill
+// in @/lib/game/types) and the shape below is the whole of it, so the
+// same property that protects the private channel protects this one from
+// the other side: there is nowhere in these three payloads to put an
+// alignment, a hold, a purse or a card, so no version of a reveal can
+// leak one. The smoke suite reads every frame the room receives back and
+// checks that, rather than trusting the types.
+//
+// The vote and its running tally are public by design. A nomination is
+// made out loud, like a ready check: the room is meant to see who is
+// accusing whom, because the argument that follows is the feature. What
+// is not public is the manifest itself, which only the carried reveal
+// carries, and only for the one captain the majority named.
+// =====================================================================
+
+/** One captain's nomination, sent to the server. */
+export type AuditVote = {
+  roomId: string;
+  /** The leg the vote belongs to, checked against the room's checkpoint. */
+  round: number;
+  targetUserId: string;
+};
+
+/**
+ * The nominations so far this leg, broadcast after every vote including
+ * the one that carries. Keyed by voter rather than counted, because the
+ * count is arithmetic the client can do and the names are the part it
+ * cannot reconstruct.
+ */
+export type AuditTally = {
+  roomId: string;
+  round: number;
+  /** voter id -> the captain they nominated. */
+  votes: Record<string, string>;
+};
+
+/**
+ * What the harbor was shown, once the majority carried.
+ *
+ * `fulfillments` is the sample drawn out of the target's manifest: the
+ * lines themselves rather than a summary, so the room reads what the
+ * captain did instead of being told what to conclude about it. It can be
+ * shorter than the reveal count, and it is empty for a captain who has
+ * filled nothing, which is a finding rather than a failure.
+ */
+export type AuditReveal = {
+  roomId: string;
+  round: number;
+  /**
+   * Who was audited. The same shape the private channel uses to name an
+   * ally, and here as there it is a name and an id and nothing else.
+   */
+  target: { userId: string; name: string };
+  fulfillments: OrderFill[];
+};
+
+// =====================================================================
+// [H7: Maroon and the Harbormaster] The harbor's second vote, and the one
+// action in the protocol by which a captain moves another captain's books.
+//
+// Laid out like the audit block above, and for the same reason: the vote
+// and its running tally are public because the argument that follows is
+// the feature, and the result is public because it is a thing the harbor
+// did out loud to a captain standing at its table. Nothing private lives
+// in any of these payloads and there is nowhere in them to put anything
+// private. The result names a captain and a leg; the shift names a port
+// and a direction.
+//
+// The shift is the one worth describing. It is a client's action whose
+// effect lands on other clients' books, since every captain in the harbor
+// prices their own market against it, so it travels the road the Harbor
+// Pulse already travels rather than a second road built beside it: the
+// server holds it for the leg, broadcasts the notice below, and includes
+// the bare shift on the advance that opens a port market (see
+// maybeAdvance in src/server/realtime/checkpoint.ts). Nothing prices a
+// market off the notice. The notice is what the room reads.
+// =====================================================================
+
+/** One captain's nomination, sent to the server. */
+export type MaroonVote = {
+  roomId: string;
+  /** The leg the vote belongs to, checked against the room's checkpoint. */
+  round: number;
+  targetUserId: string;
+};
+
+/**
+ * The nominations so far this leg, broadcast after every vote including
+ * the one that carries. The same frame the audit's tally uses, and for
+ * the same reason: the count is arithmetic the client can do and the
+ * names are the part it cannot reconstruct.
+ */
+export type MaroonTally = {
+  roomId: string;
+  round: number;
+  /** voter id -> the captain they nominated. */
+  votes: Record<string, string>;
+};
+
+/**
+ * Who the harbor put ashore, once two thirds carried.
+ *
+ * Broadcast once and kept for the voyage on the server's side, so a
+ * captain who reloads into a harbor that has already voted is handed the
+ * same frame they would have seen live. There is nothing else in it: not
+ * what was taken, not where the captain stands now. Those are facts about
+ * one captain's books, and they travel the way every other fact about a
+ * captain's books travels, on their own screen.
+ */
+export type MaroonResult = {
+  roomId: string;
+  round: number;
+  target: { userId: string; name: string };
+};
+
+/**
+ * The Harbormaster's call, sent to the server: one port, one direction.
+ *
+ * The leg and the harbor are read off the room rather than trusted from
+ * here, the same way an audit nomination's are, so a client cannot lean a
+ * market it is not standing in or name a port the room has not unlocked.
+ */
+export type PortShiftCall = {
+  roomId: string;
+  round: number;
+  port: string;
+  direction: 1 | -1;
+};
+
+/**
+ * The same call as the room receives it, with the hand that made it.
+ *
+ * The name is in the frame because the power is public by design: a
+ * captain who moves every price in a harbor has to be nameable at the
+ * moment they do it, not reconstructed from a state field later. It comes
+ * from the server's own roster rather than from the caller, for the
+ * reason every name in this file does.
+ */
+export type PortShiftNotice = {
+  roomId: string;
+  round: number;
+  port: string;
+  direction: 1 | -1;
+  by: { userId: string; name: string };
+};
+
 // One captain's last reported status, broadcast on the game:status
 // channel. The phase is a number or string because the Phase union has
 // both, and the server keeps it as a string for comparison.
@@ -107,6 +301,13 @@ export type ObjectiveProgress = {
 // when it is present, the Partial Sight peek button in MembersPanel can
 // gate itself with canSeeDetail without an extra round trip. When it is
 // missing, the peek button simply stays hidden.
+//
+// bankrupt and marooned are the marks a failed voyage leaves on a seat
+// that keeps sailing (see GameState). They are optional so that a client
+// from before this slice, and every Classic voyage that has never had
+// either, reads as neither: the roster badges a captain only on an
+// explicit true, and the server refuses to maroon a captain it has been
+// told is already written off.
 export type GameStatusUpdate = {
   roomId: string;
   user: PublicUser;
@@ -119,6 +320,8 @@ export type GameStatusUpdate = {
   gameOver: boolean;
   at: number;
   renownLevel?: number;
+  bankrupt?: boolean;
+  marooned?: boolean;
 };
 
 // An open barter offer. The optional targetUserId fields are set only
@@ -224,6 +427,11 @@ type StandingsEntry = {
   reputation: number;
   crowned: boolean;
   bankrupt: boolean;
+  // [H7: Maroon and the Harbormaster] Whether the harbor put this captain
+  // ashore. Read beside bankrupt rather than folded into it because the
+  // standings say what happened to a captain, and the two are different
+  // things that can both be true of one seat.
+  marooned: boolean;
   xpGained: number;
   leveledUp: boolean;
   brokersFavorUnlocked: boolean;
@@ -237,6 +445,82 @@ export type VoyageResult = {
   roomId: string;
   winnerId: string | null;
   standings: StandingsEntry[];
+};
+
+// [H8: the reveal and the replay ledger] One captain's card, flipped.
+//
+// This is the one frame in the mode that carries an alignment to the whole
+// room, and the reason it may is that the voyage is over by the time it is
+// built: there is nothing left for the secret to protect. It is emitted by
+// the conclusion and by nothing else, and handed to a captain who reloads
+// after it by the same room:join hand out the audit's reveal uses.
+//
+// Every field is either a verdict or a mark the conclusion already wrote to
+// this captain's own Chronicle row, or a reading of the same save blob
+// those came from, so the ledger and the record under it cannot disagree.
+export type RevealedCaptain = {
+  userId: string;
+  displayName: string;
+  avatarHue: number;
+  // The card this captain was dealt, or null for a seat the hand never
+  // reached. Null rather than a default role because a late arrival was
+  // promised nothing and judged on nothing, and a ledger that drew them a
+  // card would be telling a story that did not happen.
+  role: GambitRole | null;
+  // The personal goal an Honest card carried, by id. Sent as the id rather
+  // than as the sentence for the reason the private entry sends it that
+  // way: the deck is the one place a goal is written, and the surface
+  // resolves it with flourishById, so the ledger and the card cannot print
+  // two different goals. Null on the two cards that carry none, and on a
+  // goal id the deck no longer holds, which the conclusion has already
+  // resolved before this is built.
+  flourishId: string | null;
+  // Whether this captain won the game their card set them: the verdict the
+  // Chronicle row holds, decided by the same rule the card printed. False
+  // for a forged finish, which wins nothing, and false for a seat that was
+  // dealt no card.
+  won: boolean;
+  crowned: boolean;
+  bankrupt: boolean;
+  marooned: boolean;
+  // A finish the Ledger Integrity Pass disqualified. The numbers beside it
+  // are the ones the harbor watched rather than the ones the save claimed,
+  // and the ledger says so rather than printing them as a result.
+  forged: boolean;
+  gold: number;
+  reputation: number;
+  // Coin taken from other captains in trade, net of coin paid to them, and
+  // never anything the port paid: for a Broker this is the whole verdict.
+  peerTradeProfit: number;
+  // What this captain handed to the commission themselves, by good,
+  // cumulative. The other half of the fleet's number above, and the half
+  // the ledger attributes to a name.
+  delivered: Record<string, number>;
+  // What this captain was seen to trade, from the order fulfillments their
+  // own client recorded, oldest first. The window is the audit's
+  // (AUDIT_WINDOW), so on a long voyage this is the closing legs rather
+  // than all of it, which is everything that is durably kept.
+  fills: OrderFill[];
+};
+
+// The reveal, as the conclusion builds it and as a rejoining captain is
+// handed it. The card, the verdicts and the marks for every finisher, plus
+// the two things a ledger needs to tell the story of the evening: what the
+// fleet handed over, leg by leg, and what each captain handed over
+// themselves.
+export type VoyageReveal = {
+  roomId: string;
+  // The commission this harbor was working on, resolved rather than
+  // seeded, because the ledger draws the board at the size the voyage
+  // sailed at and a client re drawing it would have to know the rung.
+  // Drawn by the server from the room's own epoch and pinned seats, which
+  // is what keeps it the board the fleet was actually working against.
+  objective: Objective;
+  // The commission's progress leg by leg, merged across every captain's
+  // record of it. Empty for a harbor whose captains never watched a board.
+  fleetTrace: ObjectiveTraceEntry[];
+  // Every finisher, in the order the standings arrive in.
+  captains: RevealedCaptain[];
 };
 
 // A finished voyage's chronicle, as stored on the VoyageChronicle row
@@ -256,6 +540,11 @@ export type VoyageChronicle = {
   borrowCount: number;
   crowned: boolean;
   bankrupt: boolean;
+  // Whether the harbor voted this captain ashore. Written from the
+  // server's own record of the vote rather than from a reported status,
+  // so a client cannot write one into its own history (see
+  // recordMaroonVote and maybeConcludeVoyage).
+  marooned: boolean;
   merchantRating: string;
   headline: string;
   body: string;

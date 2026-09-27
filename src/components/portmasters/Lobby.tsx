@@ -29,8 +29,13 @@ import {
   MODE_ORDER,
   DEFAULT_MODE,
   modeConfig,
+  voyageRoundsFor,
   type GameMode,
 } from "@/lib/game/mode";
+// The labels of the doors a harbor can be opened through, so a room card
+// names the code that made it rather than an id this screen would have to
+// translate. The phrase itself is not read here.
+import { UNLOCKS } from "@/lib/unlock";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
 import { CaptainLegacyCard } from "./CaptainLegacyCard";
@@ -188,6 +193,11 @@ type VoyageOption<T extends string> = {
   tagline: string;
   summary: string;
   experimental: boolean;
+  // [H9: the unlock code] Whether this voyage has to be opened with a
+  // phrase. Read from the mode record rather than from the unlock table,
+  // because the question the card answers is about the voyage it is
+  // offering and the table only says which doorway that is.
+  sealed: boolean;
 };
 
 function VoyageCards<T extends string>({
@@ -249,6 +259,13 @@ function VoyageCards<T extends string>({
                       Experimental
                     </Pill>
                   )}
+                  {/* [H9: the unlock code] The seal, beside the state above
+                      rather than in it. A card can wear both, and they say
+                      different things: one is how finished the voyage is
+                      and one is how a host gets into it. The key is the
+                      same glyph the room card uses for the table it opened,
+                      so the pair reads as one idea in two places. */}
+                  {option.sealed && <Pill tone="default">🔒 Sealed</Pill>}
                 </span>
                 <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
                   {option.tagline}
@@ -269,6 +286,16 @@ function VoyageCards<T extends string>({
                   <span className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-warn">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>Still being built.</span>
+                  </span>
+                )}
+                {/* Not a caution, so not the caution's colour: a sealed
+                    voyage is finished, and what it asks for is a phrase
+                    rather than patience. The line names the ask and the
+                    field under the cards is where it is answered. */}
+                {option.sealed && (
+                  <span className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
+                    <KeyRound className="mt-0.5 h-3 w-3 shrink-0" />
+                    <span>Opens with a phrase.</span>
                   </span>
                 )}
               </span>
@@ -422,6 +449,11 @@ export function Lobby({
   // asking its table to keep two different clocks. Starts on the founding
   // mode, which is the one a captain who never touches this control gets.
   const [mode, setMode] = useState<GameMode>(DEFAULT_MODE);
+  // [H9: the unlock code] What the host typed to open a sealed voyage, sent
+  // only when the mode they picked takes a phrase. Cleared once a harbor is
+  // opened with it, because a phrase that has already worked is not one the
+  // next form needs to hand over again.
+  const [unlockPhrase, setUnlockPhrase] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -694,10 +726,20 @@ export function Lobby({
         isPublic,
         difficulty,
         mode,
+        // [H9: the unlock code] The phrase rides only with the voyage that
+        // asks for one. The route refuses a phrase whose door is not the
+        // mode requested, which is the right answer for a request that
+        // names a phrase and an open mode together, so the open modes
+        // never send one.
+        ...(modeConfig(mode).sealed ? { unlock: unlockPhrase } : {}),
       });
       setNewName("");
+      setUnlockPhrase("");
       onEnterRoom(room);
     } catch (e) {
+      // A refused phrase is the route's answer to a bad phrase rather than
+      // a failure of the form, and its message already says which of the
+      // two mistakes it was: nothing typed, or the wrong words.
       setError(e instanceof Error ? e.message : "Failed to create room");
     } finally {
       setBusy(false);
@@ -1336,6 +1378,24 @@ export function Lobby({
                                     {modeConfig(room.mode).badge}
                                   </Pill>
                                 )}
+                                {/* [H9: the unlock code] What opened the
+                                    harbor, worn beside the voyage it opened.
+                                    It takes the charter colour rather than
+                                    the caution above it, because it is not a
+                                    warning about the room: it is how the room
+                                    was charted, which is what that token
+                                    means everywhere else on this screen. A
+                                    captain reading a room list can see which
+                                    tables were opened with a phrase rather
+                                    than found. */}
+                                {room.unlock && (
+                                  <Pill
+                                    tone="none"
+                                    className="bg-charter/[0.07] text-charter"
+                                  >
+                                    🔑 {UNLOCKS[room.unlock].label}
+                                  </Pill>
+                                )}
                                 {room.host.id === me.id && (
                                   <Pill tone="gold">Host</Pill>
                                 )}
@@ -1468,10 +1528,46 @@ export function Lobby({
                       tagline: MODES[key].tagline,
                       summary: MODES[key].summary,
                       experimental: MODES[key].experimental,
+                      sealed: MODES[key].sealed,
                     }))}
                     value={mode}
                     onChange={setMode}
                   />
+
+                  {/* [H9: the unlock code] The phrase, drawn under the cards
+                      rather than inside one because it is an answer to the
+                      choice rather than a third thing to choose, and it is
+                      drawn only while the card above it is sealed. The
+                      route is what decides whether a phrase opens anything:
+                      nothing here checks it, so the form can never refuse a
+                      phrase the harbor would have taken. */}
+                  {modeConfig(mode).sealed && (
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="unlock-phrase"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Unlock phrase
+                      </Label>
+                      <Input
+                        id="unlock-phrase"
+                        value={unlockPhrase}
+                        onChange={(e) => setUnlockPhrase(e.target.value)}
+                        placeholder="The phrase the harbor asks for"
+                        maxLength={120}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="pm-field"
+                        onKeyDown={(e) => e.key === "Enter" && createRoom()}
+                      />
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        A captain&apos;s tenth completed voyage hands them this
+                        phrase, and the guide keeps a copy for whoever goes
+                        looking. Anyone who has it can open the table, and every
+                        seat at that table sails the voyage it opens.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <WatersScale
@@ -1480,7 +1576,11 @@ export function Lobby({
                         key,
                         icon: DIFFICULTIES[key].icon,
                         badge: DIFFICULTIES[key].badge,
-                        rounds: DIFFICULTIES[key].rounds,
+                        // The length the voyage will actually run, not the
+                        // tier's alone: a sealed mode pins its own (see
+                        // voyageRoundsFor in src/lib/game/mode), and the
+                        // chip is what the host is choosing the voyage on.
+                        rounds: voyageRoundsFor(mode, key),
                       }))}
                       value={difficulty}
                       onChange={setDifficulty}
@@ -1491,6 +1591,7 @@ export function Lobby({
                     {/* Difficulty Advisor */}
                     <DifficultyAdvisor
                       selectedDifficulty={difficulty}
+                      mode={mode}
                       renownLevel={renownProgress(legacy.renownXP).level}
                       voyagesCompleted={legacy.voyagesCompleted}
                       bestScore={legacy.bestScore}

@@ -31,6 +31,7 @@ import { leaveRoomForUser } from "@/lib/rooms";
 import type { PublicUser, PrivateEntry } from "@/types/realtime";
 import type { SocketState } from "./types";
 import { forgetStatusIfLastSocket } from "./status";
+import { closeVoyageTelemetry, noteCaptainLeft } from "./telemetry";
 
 export const sockets = new Map<string, SocketState>();
 export const userSockets = new Map<string, Set<string>>();
@@ -71,6 +72,57 @@ export function emitPrivate(
 // only hold one pending departure per room at a time.
 const departureTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const DEPARTURE_GRACE_MS = 30_000;
+
+// [J1: the private information review] The on demand detail question,
+// held server side between the ask and the answer.
+//
+// Keyed by the pair, "askerId:targetId", because that pair is what an
+// answer names and a captain stands in one harbor at a time, so the room
+// is a value on the entry rather than part of the key. The answer carries
+// no room and no requester of its own now: the server relays the ones
+// written down here, which is what stops a captain from composing a
+// response about a question nobody asked and addressing it at any
+// account in the tree.
+const detailRequests = new Map<string, { roomId: string; askedAt: number }>();
+// The window an answer is worth relaying in. Longer than a detail popup
+// is ever open on a live socket, and short enough that a question left
+// behind by a client that never answered cannot be used later.
+const DETAIL_REQUEST_TTL_MS = 30_000;
+
+export function rememberDetailRequest(
+  roomId: string,
+  askerId: string,
+  targetId: string,
+): void {
+  const now = Date.now();
+  for (const [key, held] of detailRequests) {
+    if (now - held.askedAt > DETAIL_REQUEST_TTL_MS) detailRequests.delete(key);
+  }
+  detailRequests.set(`${askerId}:${targetId}`, { roomId, askedAt: now });
+}
+
+// The room the question was asked about, or null when there is no
+// question waiting, which is the answer that drops the frame. Consumed
+// either way, so one question relays one answer.
+export function takeDetailRequest(
+  targetId: string,
+  askerId: string,
+): string | null {
+  const key = `${askerId}:${targetId}`;
+  const held = detailRequests.get(key);
+  if (!held) return null;
+  detailRequests.delete(key);
+  if (Date.now() - held.askedAt > DETAIL_REQUEST_TTL_MS) return null;
+  return held.roomId;
+}
+
+// A restarted voyage is a new voyage, and a harbor that has gone takes
+// its questions with it. Same shape as every other per room clear.
+export function forgetDetailRequests(roomId: string): void {
+  for (const [key, held] of detailRequests) {
+    if (held.roomId === roomId) detailRequests.delete(key);
+  }
+}
 
 // In process locks that guard room:start and room:restart against
 // firing twice for the same room if the host double clicks or has two
@@ -206,11 +258,29 @@ export async function reapDeparture(
   }).catch(() => null);
   if (!result) return;
 
+  // [I1: the telemetry spine] The seat is actually gone, so the voyage
+  // that was under way just lost its captain: the plan's abandon point,
+  // recorded after the write that took the seat rather than before it, so
+  // a leave that failed is not counted as one. A harbor whose voyage
+  // never started has nothing open to record against, which is what keeps
+  // every ordinary lobby departure out of the records.
+  noteCaptainLeft(roomId, userId);
+
   if (result.roomDeleted) {
     // The room was deleted because this was its last member. Tear
     // down every in memory structure for it so a future room (with a
     // different id) doesn't inherit stale data from a room that no
     // longer exists.
+    //
+    // [I1: the telemetry spine] A voyage the harbor abandoned mid leg is
+    // exactly the broken voyage the plan asks a record to explain, so the
+    // record is written before the teardown and with nobody present: the
+    // last captain just walked out, which is the whole of what this
+    // outcome means. It survives the room it describes, unlike a
+    // chronicle or a loan, because a measurement that vanished with the
+    // lobby it was taken in would read as a harbor where nobody ever
+    // abandons anything.
+    void closeVoyageTelemetry(roomId, "emptied", []);
     cleanup.clearRoomAllMaps(roomId);
   } else {
     io.to(`room:${roomId}`).emit("room:system", {

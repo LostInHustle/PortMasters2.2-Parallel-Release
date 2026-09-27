@@ -5,7 +5,8 @@ import type { PublicUser } from "@/lib/api";
 import { useRoomRoster } from "@/lib/use-room-roster";
 import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
-import { Coins, Trophy, SkullIcon } from "lucide-react";
+import { Coins, Trophy, SkullIcon, Anchor } from "lucide-react";
+import { seatMarks } from "@/lib/seatMarks";
 
 /**
  * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
@@ -48,7 +49,10 @@ export function FleetTicker({
         {sorted.map((m) => {
           const st = statuses[m.id];
           const isMe = m.id === me.id;
-          const isBankrupt = st?.phase === "bankruptcy";
+          // [H7: Maroon and the Harbormaster] Both marks come off the one
+          // rule in seatMarks, which is what stops this strip and the
+          // roster panel spelling the same captain two different ways.
+          const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
           return (
             <div
               key={m.id}
@@ -63,6 +67,14 @@ export function FleetTicker({
               <span className="text-[11px] font-medium max-w-[84px] truncate">
                 {isMe ? "You" : m.displayName}
               </span>
+              {isMarooned && (
+                <span
+                  className="flex items-center text-alarm"
+                  title="Put ashore by a vote of the harbor"
+                >
+                  <Anchor className="h-3 w-3" />
+                </span>
+              )}
               {isBankrupt ? (
                 <span className="flex items-center gap-1 text-[10px] text-alarm">
                   <SkullIcon className="h-3 w-3" /> Bankrupt

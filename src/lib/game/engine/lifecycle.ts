@@ -36,6 +36,7 @@ import { completePhase1, startPhase1 } from "./market";
 import { startPhase2 } from "./orders";
 import { resolvePirateAttack } from "./pirates";
 import { calcIncomeTax, INCOME_TAX_RATE } from "./pricing";
+import { failSeat } from "./seats";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
 // merchantRatingForScore used to live here. It moved to ../constants.ts so
@@ -125,10 +126,16 @@ function startPhase3(state: GameState, logs: string[]) {
 
 // Pays wages then maintenance in one confirmed step (the financial aid
 // request, if a captain needed one, has already happened by the time this
-// is called), bankrupting only if either still can't be covered. Replaces
-// the old split where wages were deducted the instant Phase 3 started and
-// only maintenance waited for a click, since that split left no room for
-// a captain to react before wages alone could force a bankruptcy.
+// is called), failing the seat only if either still can't be covered.
+// Replaces the old split where wages were deducted the instant Phase 3
+// started and only maintenance waited for a click, since that split left no
+// room for a captain to react before wages alone could force a bankruptcy.
+//
+// Both failures hand off to ./seats, which is the one place a seat's fate
+// is decided: what happens next depends on the mode rather than on this
+// step (see ModeConfig.bankruptcyIsFinal), and the classic terminal
+// transition is now one of its branches rather than four lines written
+// out here twice.
 //
 // Like every other departure here, it stops when the books are settled. It
 // used to end by opening the shipyard phase by name, which was one of the
@@ -139,20 +146,12 @@ function startPhase3(state: GameState, logs: string[]) {
 function finishSettlement(state: GameState, logs: string[]) {
   logs.push("\n💰=== Paying Worker Wages ===");
   const wageResult = payWages(state, logs);
-  if (wageResult === "bankruptcy") {
-    state.gameOver = true;
-    state.phase = "bankruptcy";
-    return;
-  }
+  if (wageResult === "bankruptcy") return failSeat(state, logs);
   logs.push(
     `\n🔧=== Round ${state.currentRound} · Phase 3: Ship Maintenance ===`,
   );
   const maintResult = payMaintenance(state, logs);
-  if (maintResult === "bankruptcy") {
-    state.gameOver = true;
-    state.phase = "bankruptcy";
-    return;
-  }
+  if (maintResult === "bankruptcy") return failSeat(state, logs);
 }
 
 function startPhase4(state: GameState, logs: string[]) {
@@ -267,8 +266,12 @@ export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
     default:
       return;
   }
-  // A settlement that bankrupted the captain ended the voyage on the spot.
-  // There is no next phase to open.
+  // A settlement that bankrupted the captain ends the voyage on the spot
+  // in the mode that treats insolvency as final, and there is then no next
+  // phase to open. In the other mode the seat sails on, so this guard does
+  // not fire and the lap carries the captain into the shipyard like every
+  // other settlement: the flag is what the voyage now reads them by, not
+  // the phase.
   if (state.gameOver) return;
   handOff(state, ctx, logs, from);
 }

@@ -30,6 +30,7 @@ import {
   unlockedResourceDraw,
   unlockedResources,
 } from "../pools";
+import { portShiftMultiplier, type PortShift } from "../maroon";
 import { createRng, pick, randInt, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard, ResourceCard } from "../types";
 import { addOwnedAmount } from "./core";
@@ -183,10 +184,21 @@ function genProductPurchaseCard(
 // empty object so every existing call site (and every test of the
 // preserved verbatim economy) keeps producing identical prices when no
 // pulse is in play, which is always true on round 1.
+//
+// [H7: Maroon and the Harbormaster] shift is the other hand on the same
+// price, and the two are passed rather than read off the state for the
+// reason the header above gives: a captain's draw is a pure function of
+// the seed and the charter, so which captain is selling at that port has
+// nothing to do with what anything costs. The shift lands on raw goods
+// only, which is the same clause the pulse follows and for its own
+// reason: a port lean is a hand on that port's market for goods it
+// trades, and a finished product's card is priced from its recipe rather
+// than from the port it is standing in.
 function genResourceCard(
   rng: Rng,
   pools: MarketPools,
   pulse: Record<string, number> = {},
+  shift: PortShift | null = null,
 ): Omit<ResourceCard, "id"> {
   if (rng() < 0.3) return genProductPurchaseCard(rng, pools);
   const num = randInt(rng, 1, 3);
@@ -194,6 +206,7 @@ function genResourceCard(
   const available = [...pools.draw.items];
   const probs = [...pools.draw.probs];
   const port = pick(rng, pools.ports);
+  const lean = portShiftMultiplier(shift, port);
   for (let i = 0; i < num; i++) {
     if (!available.length) break;
     let r = rng(),
@@ -213,8 +226,15 @@ function genResourceCard(
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
     let price = COMMODITIES[chosen].ports.includes(port) ? base - 1 : base + 1;
+    // One rounding for both hands rather than one each, so a port the
+    // harbor leaned into and the Harbormaster leaned against is priced
+    // the way the net of the two says and not the way either alone
+    // rounds. `?? 0` because an absent key is not a nudge of zero until
+    // this line makes it one.
     const nudge = pulse[chosen];
-    if (nudge) price = Math.max(1, Math.round(price * (1 + nudge)));
+    if (nudge || lean !== 1) {
+      price = Math.max(1, Math.round(price * (1 + (nudge ?? 0)) * lean));
+    }
     resources.push({ type: chosen, quantity: qty, price });
   }
   const total = resources.reduce((s, r) => s + r.quantity * r.price, 0);
@@ -255,6 +275,20 @@ export function applyHarborPulse(
   pulse: Record<string, number>,
 ) {
   state.harborPulse = pulse;
+}
+
+// [H7: Maroon and the Harbormaster] Stamps the Harbormaster's hand onto
+// local state, on the same broadcast the pulse above rides and in the same
+// act, so the market that is about to be drawn is already leaning when
+// genResourceCard runs.
+//
+// Null is a real value here and not an omission: the power is called once
+// a leg or not at all, so the leg a Harbormaster said nothing in has to
+// clear the one they called last leg rather than leave it leaning. The
+// server sends the answer for every market it opens (see maybeAdvance in
+// src/server/realtime/checkpoint.ts), which is what makes that possible.
+export function applyPortShift(state: GameState, shift: PortShift | null) {
+  state.portShift = shift;
 }
 
 // [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
@@ -393,7 +427,12 @@ export function startPhase1(
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,
-      ...genResourceCard(marketRng, marketPools, state.harborPulse),
+      ...genResourceCard(
+        marketRng,
+        marketPools,
+        state.harborPulse,
+        state.portShift,
+      ),
     });
   }
 }

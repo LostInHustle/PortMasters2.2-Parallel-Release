@@ -12,6 +12,14 @@ import {
   type Difficulty,
   type DifficultyConfig,
 } from "./difficulty";
+// The two pieces of copy below state how long the voyage runs, and that is
+// the mode's number rather than the tier's alone: a mode whose length is
+// pinned sails the same legs on every tier (see voyageLegs in ./mode), so
+// the tier's ladder would have the guide quoting a voyage the captain is
+// not sailing. Read through the one selector, which returns the tier's own
+// ladder for the founding mode and so leaves its copy byte for byte what it
+// was.
+import { voyageRoundsFor, type GameMode } from "./mode";
 
 // Single source of truth for the project's display name. Every screen,
 // log line, and metadata tag that shows the game's name should pull from
@@ -415,11 +423,15 @@ export const AID_REPUTATION_PER_GOLD = 1 / 5;
 const HELPER_REPUTATION_BASE = 48;
 const HELPER_REPUTATION_PER_ROUND = 6;
 
-export function helperReputationCapFor(difficulty: unknown): number {
-  return (
-    HELPER_REPUTATION_BASE +
-    HELPER_REPUTATION_PER_ROUND * difficultyConfig(difficulty).rounds
-  );
+// The cap takes the voyage's own length rather than the room's tier, and
+// the caller passes the length the voyage was pinned to (GameState.maxRounds
+// through ./engine/aid). Reading the tier here was right while a tier and a
+// voyage were the same number of rounds and wrong the moment they were not:
+// a Gambit voyage is twelve legs on every tier, so a tier read would hand a
+// Fair Winds crew the cap of an eight round voyage and cut them off at
+// eighty percent of what they had honestly earned.
+export function helperReputationCapFor(voyageRounds: number): number {
+  return HELPER_REPUTATION_BASE + HELPER_REPUTATION_PER_ROUND * voyageRounds;
 }
 
 export type Boon = {
@@ -801,27 +813,35 @@ function escortPct(cfg: DifficultyConfig): string {
 }
 
 export function tutorialSteps(
+  mode: GameMode,
   difficulty: Difficulty,
 ): { title: string; content: string }[] {
   const cfg = difficultyConfig(difficulty);
+  const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
   return [
     {
       title: "⚓ Welcome aboard",
-      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${cfg.rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
+      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
 <p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the four things that catch new players out most.</p>
 <p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
     },
     {
       title: "🏆 What you're playing for",
-      content: `<p>After ${cfg.rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
+      content: `<p>After ${rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
 <p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
 <p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
       title: "🔄 How a voyage works",
-      content: `<p>Each of the ${cfg.rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
+      // The count is the voyage's, read from the mode, while the cards
+      // below are still the founding mode's four phases drawn by hand.
+      // Making the cards follow the mode as well means rendering the
+      // briefing record here rather than keeping a second copy of the lap,
+      // which is a change this feature does not own: the count is the
+      // number this feature moved, so the count is what moves here.
+      content: `<p>Each of the ${rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0">
   <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--gain);color:var(--foreground)"><strong>1️⃣ Buy</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Stock up at port markets</span></div>
   <div style="background:color-mix(in oklch, var(--w-barter) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-barter);color:var(--foreground)"><strong>🤝 Barter</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Swap goods with other captains</span></div>
@@ -911,8 +931,9 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   ];
 }
 
-export function guideText(difficulty: Difficulty): string {
+export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
+  const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
   return `⚓ ${APP_NAME}: Rules
 
@@ -920,7 +941,7 @@ export function guideText(difficulty: Difficulty): string {
 ${cfg.summary}
 
 🚢 Objective:
-Travel ${cfg.rounds} voyages, accumulate wealth and reputation!
+Travel ${rounds} voyages, accumulate wealth and reputation!
 
 📦 Goods System:
 Raw Materials: Hemp(3 to 6💰), Silk(6 to 10💰), Tea(10 to 14💰)
@@ -1016,8 +1037,12 @@ Captain's Legacy:
 ⚓ Bon Voyage and Good Luck!`;
 }
 
-export function tipsText(difficulty: Difficulty): string {
-  const cfg = difficultyConfig(difficulty);
+// The advice below is difficulty blind except for the one line about a
+// loan running out: it names the round the harbor settles a debt on its
+// own, and that round is the voyage's last one, which is the voyage's
+// length rather than the tier's on a mode that pins one.
+export function tipsText(mode: GameMode, difficulty: Difficulty): string {
+  const rounds = voyageRoundsFor(mode, difficulty);
   return `⚓ Avoiding Bankruptcy Strategies:
 
 💰 Financial Management:
@@ -1062,7 +1087,7 @@ export function tipsText(difficulty: Difficulty): string {
 3. Sailing without one is a fair bet when you have little to lose anyway
 
 🆘 Borrowing and Lending:
-1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round ${cfg.rounds}
+1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round ${rounds}
 2. Lending Gold raises your own reputation, so helping a captain who can clearly repay you is rarely a bad trade
 3. Watch how much you've lent out across the voyage; it's still your Gold until it's actually repaid
 

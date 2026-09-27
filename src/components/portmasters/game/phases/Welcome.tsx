@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Avatar } from "../../shared";
+import { RoundFlow } from "../RoundFlow";
 import type { PhasePanelProps } from "./PhaseShared";
 
 // The pre voyage lobby roster: just avatars and a headcount, no ready/not
@@ -101,6 +102,10 @@ export function Welcome({
   // just the one captain.
   const canStart = harborIds.length >= 1;
   const isHost = me.id === room.hostId;
+  // One shape or the other, and the mode record is what decides which:
+  // the screen renders the briefing a mode hands it rather than choosing
+  // a shape on the mode's behalf. See ModeBriefing in src/lib/game/mode.
+  const briefing = modeConfig(game.mode).briefing;
   // The InfoCard numbers derive from the room's difficulty tier rather
   // than the old hardcoded founding trade figures. Fair Winds reads
   // exactly like the original (20% raid, 15 Gold maintenance), while
@@ -121,7 +126,12 @@ export function Welcome({
         <span className="text-welcome">⚓ {APP_NAME} 🚢</span>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        🌊 {cfg.rounds} Voyages await, become the Sea Master!
+        {/* The voyage's own length, read from the state the captain is
+            sailing rather than from the tier: a Gambit voyage is twelve
+            legs on every tier, so the tier's ladder would greet the crew
+            with the length of a voyage they are not on (see voyageLegs in
+            src/lib/game/mode). */}
+        🌊 {game.maxRounds} Voyages await, become the Sea Master!
       </p>
       <div className="flex flex-col items-center gap-3 mb-6">
         <HarborRoster members={members} ids={harborIds} />
@@ -202,9 +212,34 @@ export function Welcome({
         />
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
+        {/* The count this label used to carry is gone, and its absence is
+            the fix rather than an omission. It read "4 Phases per Voyage"
+            above a mode record that counts its own steps, and the Gambit
+            record lists five, so the headline contradicted the sentence it
+            was introducing, on one row of one pill. A number that has to
+            agree with a list beside it is a second copy of that list, and
+            the label is the copy that rots: a mode changes its lap and
+            rewrites its own description, and nobody remembers the number
+            on the pill above it. So the legs are counted where they are
+            written, and the label introduces them without one. The wording
+            avoids "in Order" for the same reason it avoids a count: in
+            this game Order is a noun, and the leg the mode moved is the
+            one that carries it.
+
+            What follows the label is whatever shape the mode briefs in,
+            and the shape is the mode's decision rather than this screen's:
+            a line for the mode that has always printed one, and the chart
+            for the mode whose whole design is the order its legs run in.
+            A line and a chart are two renderings of one record, not two
+            records, which is why this branch is a branch on the data
+            rather than a second panel beside the first. */}
         <div className="rounded-lg bg-sea/[0.06] border border-sea/15 px-3.5 py-2.5 text-xs">
-          <strong>🔄 4 Phases per Voyage:</strong>{" "}
-          {modeConfig(game.mode).lapBlurb}
+          <strong>🔄 How a Round Runs:</strong>{" "}
+          {briefing.kind === "line" ? (
+            briefing.text
+          ) : (
+            <RoundFlow legs={briefing.legs} closes={briefing.closes} />
+          )}
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
           <strong>💡 New Player Tip:</strong> Rely on raw material orders early.

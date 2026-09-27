@@ -106,10 +106,17 @@ export async function objectiveForRoom(
 ): Promise<Objective | null> {
   const room = await db.room.findUnique({
     where: { id: roomId },
-    select: { mode: true, voyageEpoch: true },
+    select: { mode: true, voyageEpoch: true, voyageSeats: true },
   });
   if (!room || normalizeMode(room.mode) !== "ocean_gambit") return null;
-  return drawObjective(objectiveSeed(roomId, room.voyageEpoch));
+  // The rung's two inputs, read from the room for the same reason the epoch
+  // is: they are facts of the voyage in progress rather than of the report,
+  // so a client cannot report against a commission of its own invention, at
+  // its own table size, and have it stand.
+  return drawObjective(
+    objectiveSeed(roomId, room.voyageEpoch, room.voyageSeats),
+    room.voyageSeats,
+  );
 }
 
 /**

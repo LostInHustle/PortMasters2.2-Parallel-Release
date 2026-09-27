@@ -38,6 +38,8 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 **One venture per voyage per room.** The convoy rule is room wide on purpose, and the check belongs on the server so two captains cannot both claim the same voyage.
 
+**A new private path repeats the private information review.** A new private channel, a new persisted secret, a new broadcast payload, or a new path that trusts a client repeats the review in `docs/SECURITY_REVIEW.md` before it repeats the closed test, and `npm run check:private` is the part of that a command can hold. The reason is written there: a secret that arrives by a second path is a leak nobody reviewed, and nothing else in the toolchain would notice one.
+
 ## Changing the interface
 
 The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colours, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
@@ -51,14 +53,17 @@ Two habits worth keeping:
 ## Verifying a change
 
 ```bash
-npm run typecheck   # every type error, including the ones a build would skip
+npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
-npm run build       # type errors fail the build on purpose
-npm run dev         # then, in a second terminal:
+npm run check:private    # no second path to a secret the game hides
+npm run build            # type errors fail the build on purpose
+npm run dev              # then, in a second terminal:
 npm run test:smoke
 ```
 
 The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
+
+Before a run that involves players who are not the authors, `npm run check:closed-test` is the first command: it refuses to bless anything but a local SQLite file whose name begins with `closed-test`, so the invitations go out from somebody who has just read the database's name and a count of what is already inside it.
 
 ## Deploying
 

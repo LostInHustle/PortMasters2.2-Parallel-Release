@@ -40,7 +40,7 @@ import type {
 } from "@/types/realtime";
 import { useRealtime } from "@/lib/use-realtime";
 import { useAdmin } from "@/lib/use-admin";
-import { Avatar, Notice, OnlineDot } from "@/components/portmasters/shared";
+import { Avatar, Notice, OnlineDot, Th } from "@/components/portmasters/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Ban,
+  Gauge,
   Loader2,
   LogOut,
   RefreshCw,
@@ -198,6 +199,18 @@ export function AdminConsole({
                   : `${accounts.length} accounts, ${onlineCount} online, for ${APP_NAME}`}
               </p>
             </div>
+            {/* The console's one neighbour: the balance dashboard reads
+                the two measurement tables rather than the account rows, so
+                it is a page of its own. It lives one level down from here
+                and this is the way in. */}
+            <a
+              href="/admin/balance"
+              className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
+              title="The balance dashboard"
+            >
+              <Gauge className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Balance</span>
+            </a>
             <button
               onClick={refresh}
               className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
@@ -491,22 +504,6 @@ function announceBulk(report: AdminBulkReport): void {
 
 function plural(count: number): string {
   return count === 1 ? "account" : "accounts";
-}
-
-function Th({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <th
-      className={`px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${className ?? ""}`}
-    >
-      {children}
-    </th>
-  );
 }
 
 function RosterRow({

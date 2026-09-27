@@ -99,8 +99,8 @@ export function ObjectivePanel({
       </div>
 
       <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        No win condition is in force yet. The Emperor pays for what you hand
-        over, and nothing else reads it.
+        The Emperor pays for what you hand over, and the commission is read when
+        the voyage ends.
       </p>
     </div>
   );

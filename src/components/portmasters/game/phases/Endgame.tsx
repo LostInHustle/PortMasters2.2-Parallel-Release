@@ -6,6 +6,7 @@ import {
   Coins,
   Crown,
   Skull,
+  Anchor,
   Receipt,
   Handshake,
   Heart,
@@ -18,10 +19,11 @@ import { merchantRatingForScore } from "@/lib/game/engine";
 import { meritById } from "@/lib/game/merits";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import type { RivalEntry, VoyageResult } from "@/types/realtime";
+import type { RivalEntry, VoyageResult, VoyageReveal } from "@/types/realtime";
 import { cn } from "@/lib/utils";
 import { Avatar, MeritIcon } from "../../shared";
 import { CaptainLegacyCard } from "../../CaptainLegacyCard";
+import { RevealPanel } from "../RevealPanel";
 import type { PhasePanelProps } from "./PhaseShared";
 
 // The head to head line the Legacy card draws when both captains are in
@@ -70,13 +72,15 @@ function useRivalHere(
 
 type EndgameProps = Pick<PhasePanelProps, "game" | "me" | "room"> & {
   // The dispatcher in GamePhasePanel only spreads PhasePanelProps in, so
-  // these three are wired by the parent (GameRoom) when it renders the
+  // these four are wired by the parent (GameRoom) when it renders the
   // Endgame phase: voyageResult is the harbor wide standings payload the
-  // server emits on voyage:complete, myLegacy is the captain's post voyage
+  // server emits on voyage:complete, reveal is the harbor's cards turned
+  // face up on voyage:reveal, myLegacy is the captain's post voyage
   // CaptainLegacySummary, and onRestart is the host's "restart voyage"
-  // handler. All three are optional so the Endgame panel still renders a
+  // handler. All four are optional so the Endgame panel still renders a
   // sane waiting state when the parent hasn't wired them through yet.
   voyageResult?: VoyageResult | null;
+  reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
@@ -86,6 +90,7 @@ export function Endgame({
   me,
   room,
   voyageResult,
+  reveal,
   myLegacy,
   onRestart,
 }: EndgameProps) {
@@ -169,6 +174,12 @@ export function Endgame({
               </div>
             );
           })}
+          {/* [H8: the reveal and the replay ledger] The cards come down
+              before the standings, because the reveal is what the evening
+              was for and the standings are the record of it. A harbor that
+              dealt no cards, which is every Classic harbor, is sent no
+              reveal and matches none of this. */}
+          {reveal && <RevealPanel reveal={reveal} myUserId={myUserId} />}
           <div className="rounded-xl border border-black/5 dark:border-white/10 overflow-hidden">
             <div className="px-3 py-2 text-xs font-semibold bg-black/[0.03] dark:bg-white/[0.05]">
               🏁 Final Standings
@@ -194,6 +205,14 @@ export function Endgame({
                   )}
                   {s.bankrupt && (
                     <Skull className="h-3.5 w-3.5 text-alarm shrink-0" />
+                  )}
+                  {/* [H7: Maroon and the Harbormaster] The other way a
+                      voyage can go wrong, and a different icon rather
+                      than a second use of the skull: a captain can be
+                      put ashore and still be solvent, and the standings
+                      are the last place that should blur the two. */}
+                  {s.marooned && (
+                    <Anchor className="h-3.5 w-3.5 text-alarm shrink-0" />
                   )}
                   <span className="text-xs text-muted-foreground shrink-0">
                     {s.reputation} Rep.
@@ -232,9 +251,20 @@ export function Endgame({
           )}
         </div>
       ) : (
-        <div className="text-sm text-muted-foreground mb-5">
-          ⏳ Waiting on the rest of the harbor to finish their voyage before Sea
-          Master is crowned…
+        <div className="space-y-3 mb-5 text-left">
+          {/* A captain who reloads onto a finished voyage is handed the
+              reveal and nothing else of the conclusion, since the standings
+              are a frame and not a record. They have not been waiting on
+              the harbor by then, so the waiting line is what is wrong on
+              that screen rather than what is missing. */}
+          {reveal ? (
+            <RevealPanel reveal={reveal} myUserId={myUserId} />
+          ) : (
+            <div className="text-sm text-center text-muted-foreground">
+              ⏳ Waiting on the rest of the harbor to finish their voyage before
+              Sea Master is crowned…
+            </div>
+          )}
         </div>
       )}
 

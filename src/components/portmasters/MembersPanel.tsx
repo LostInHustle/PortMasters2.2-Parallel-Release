@@ -13,6 +13,7 @@ import {
   Trophy,
   Crown,
   SkullIcon,
+  Anchor,
   VolumeX,
   Volume2,
   Eye,
@@ -28,6 +29,7 @@ import {
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
 import { bandFor, canSeeDetail } from "@/lib/game/engine";
+import { seatMarks } from "@/lib/seatMarks";
 
 /**
  * Live roster of room members, collapsed down to what matters at a glance:
@@ -133,7 +135,13 @@ export function MembersPanel({
           const st = statuses[m.id];
           const isMe = m.id === me.id;
           const isHost = m.id === hostId;
-          const isBankrupt = st?.phase === "bankruptcy";
+          // [H7: Maroon and the Harbormaster] The two marks a failed
+          // voyage leaves on a seat, read through the one place that
+          // states the rule (see seatMarks). Both are read from the
+          // broadcast status for the reason the bankruptcy mark always
+          // was: in Ocean Gambit a failed seat sails on, so the phase
+          // alone would badge nobody.
+          const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
           const isMuted = mutedUserIds.has(m.id);
           // [MANIFEST: Partial Sight] The target's Renown level arrives
           // with the roster status when the server reports it. If it is
@@ -202,6 +210,14 @@ export function MembersPanel({
                   </Pill>
                 ) : (
                   <>
+                    {/* A marooned captain still has real books, so the
+                        gold and reputation pills stay; the badge says what
+                        happened to the ship, not to the purse. */}
+                    {isMarooned && (
+                      <Pill tone="alarm">
+                        <Anchor className="h-3 w-3" /> Ashore
+                      </Pill>
+                    )}
                     <Pill tone="gold">
                       <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
                     </Pill>

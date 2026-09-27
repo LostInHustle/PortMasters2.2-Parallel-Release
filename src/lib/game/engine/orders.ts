@@ -27,6 +27,7 @@ import {
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "../constants";
+import { AUDIT_WINDOW } from "../audit";
 import {
   MANDATE_TEMPLATES,
   difficultyConfig,
@@ -178,6 +179,25 @@ export function completeOrder(
   state.completedOrders.push(order.id);
   state.orderCount++;
   state.totalOrdersCompleted++;
+  // [H6: the Manifest Audit] The line an audit may later read, written here
+  // because this is the only moment the facts exist: which order, which
+  // goods went into it and what it actually paid are all locals that the
+  // settlement above has finished adjusting. The reward recorded is the one
+  // that was credited rather than the card's face value, so a manifest line
+  // shows what the order was worth to the captain after every modifier,
+  // which is the same number the log line below prints.
+  //
+  // Trimmed on every push rather than only when the audit reads it, so the
+  // save itself stays the size the sample expects and a long voyage does
+  // not quietly accumulate an archive of every order its captain ever
+  // filled.
+  state.orderFills.push({
+    round: state.currentRound,
+    port: order.demandPort,
+    items: order.resources.map((r) => ({ type: r.type, qty: r.required! })),
+    reward,
+  });
+  state.orderFills = state.orderFills.slice(-AUDIT_WINDOW);
   const txt = order.resources
     .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
     .join(" + ");

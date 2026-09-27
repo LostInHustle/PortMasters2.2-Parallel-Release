@@ -6,11 +6,12 @@
 // Three separate facts live in this hook and it is worth keeping them
 // apart, because two of them are numbers and the screen shows one.
 //
-//   The objective is drawn locally, from the harbor id and the voyage
-//   epoch, which is the whole trick: the server never has to tell anyone
-//   what the commission is, because every captain can work it out from
-//   values they already hold and they all get the same answer. It is null
-//   in Classic, and every other part of this hook is inert there.
+//   The objective is drawn locally, from the harbor id, the voyage epoch
+//   and the size of the fleet the voyage was dealt to, which is the whole
+//   trick: the server never has to tell anyone what the commission is,
+//   because every captain can work it out from values they already hold
+//   and they all get the same answer. It is null in Classic, and every
+//   other part of this hook is inert there.
 //
 //   What this captain has handed over is their own, lives in the voyage
 //   state, is persisted with it, and is what a reload or a server restart
@@ -21,6 +22,16 @@
 //   screen reads the higher of the total and this captain's own record, so
 //   a delivery is visible the instant it happens and an in-flight
 //   broadcast can never take one away.
+//
+// The fleet's size comes in as an argument rather than being counted here,
+// and it is the one input that can be unknown for a moment (see
+// use-game-session): a voyage's seats are pinned on the room at departure,
+// and until the room has answered, the board on screen is the founding one
+// and the button below is shut. Shut rather than absent is the point. A
+// captain who hands goods over against a board the fleet is not working
+// would report a delivery against a quota nobody set, and the commission
+// those goods were meant for would come up short, which is a loss the
+// Pirate did not have to earn.
 //
 // The report is cumulative and the server merges by max, which is what
 // makes all of this idempotent: reporting twice changes nothing, reporting
@@ -81,6 +92,10 @@ export function useObjective(
   game: GameState,
   ctx: GameContext,
   act: (fn: (g: GameState, logs: string[]) => void) => void,
+  // The size the voyage was dealt to, or null while the room has not said.
+  // Both the draw and the delivery button are gated on it, and both read it
+  // from here rather than from the roster, which drifts.
+  seats: number | null,
 ): {
   objective: Objective | null;
   progress: ObjectiveProgress | null;
@@ -91,9 +106,12 @@ export function useObjective(
   const objective = useMemo(
     () =>
       mode === "ocean_gambit"
-        ? drawObjective(objectiveSeed(ctx.harborId, game.voyageEpoch))
+        ? drawObjective(
+            objectiveSeed(ctx.harborId, game.voyageEpoch, seats ?? 0),
+            seats ?? 0,
+          )
         : null,
-    [mode, ctx.harborId, game.voyageEpoch],
+    [mode, ctx.harborId, game.voyageEpoch, seats],
   );
 
   // Stamped with its room, exactly as the private log is, so a captain who
@@ -187,12 +205,15 @@ export function useObjective(
     });
   }, [objective, totalJson, act]);
 
-  // What the screen shows, and what the button would move right now.
+  // What the screen shows, and what the button would move right now. The
+  // button needs the fleet's size as much as it needs the phase: with the
+  // size unknown the board on screen is the founding one, and handing goods
+  // over against it would spend them on a quota the fleet is not working.
   const progress = objective
     ? objectiveProgress(objective, higherOf(total, delivered))
     : null;
   const deliverable =
-    objective && game.phase === OBJECTIVE_DELIVERY_PHASE
+    objective && game.phase === OBJECTIVE_DELIVERY_PHASE && seats !== null
       ? objectiveTaking(objective, game.inventory, delivered).reduce(
           (sum, row) => sum + row.take,
           0,

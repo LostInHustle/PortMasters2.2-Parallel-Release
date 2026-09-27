@@ -337,7 +337,7 @@ function SettlementBills({
           <p className="text-[11px] text-muted-foreground mt-2">
             A loan transfers instantly if someone helps. Repay it any time
             before the voyage ends, or it is deducted automatically at Round{" "}
-            {difficultyConfig(game.difficulty).rounds} and handed to them.
+            {game.maxRounds} and handed to them.
           </p>
         </div>
       )}

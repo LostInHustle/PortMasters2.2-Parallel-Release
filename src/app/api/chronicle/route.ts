@@ -37,6 +37,7 @@ function toChronicle(row: ChronicleRow): VoyageChronicle {
     borrowCount: row.borrowCount,
     crowned: row.crowned,
     bankrupt: row.bankrupt,
+    marooned: row.marooned,
     merchantRating: row.merchantRating,
     headline: row.headline,
     body: row.body,

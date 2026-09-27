@@ -47,7 +47,10 @@ export function grantHelperReputation(
   rawGain: number,
   logs: string[],
 ): number {
-  const cap = helperReputationCapFor(state.difficulty);
+  // The cap follows the voyage's own pinned length rather than the room's
+  // tier, because the two stopped being the same number when the mode
+  // gained a length of its own (see voyageLegs in ../mode).
+  const cap = helperReputationCapFor(state.maxRounds);
   const headroom = Math.max(0, cap - state.helperReputationEarned);
   const granted = Math.min(Math.max(1, rawGain), headroom);
   if (granted <= 0) {

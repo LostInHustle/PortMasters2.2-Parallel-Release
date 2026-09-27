@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { Phase } from "@/lib/game/types";
-import type { VoyageResult } from "@/types/realtime";
+import type { VoyageResult, VoyageReveal } from "@/types/realtime";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
 import { Purchase } from "./phases/Purchase";
@@ -43,12 +43,16 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  */
 
 // Everything a phase panel takes lives in PhaseShared, and every panel
-// imports it from there. This type adds the four things the dispatcher
-// alone decides: which overlay is open, whether the voyage has concluded,
-// and the two Endgame extras it forwards rather than renders itself.
+// imports it from there. This type adds the things the dispatcher alone
+// decides: which overlay is open, whether the voyage has concluded, and
+// the Endgame extras it forwards rather than renders itself. The reveal
+// arrives the same way the standings do, from the parent rather than from
+// a hook, because the frame carrying it is the conclusion's own and both
+// halves of it are read off the same handler.
 type Props = PhasePanelProps & {
   onTutorialOpen?: () => void;
   voyageResult?: VoyageResult | null;
+  reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
@@ -137,6 +141,8 @@ function ActivePhase(props: Props) {
     barter,
     aid,
     backing,
+    audit,
+    maroon,
     me,
     members,
     room,
@@ -144,6 +150,7 @@ function ActivePhase(props: Props) {
     onRumorBoardOpen,
     onTutorialOpen,
     voyageResult,
+    reveal,
     myLegacy,
     onRestart,
     roster,
@@ -191,10 +198,13 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           barter={barter}
+          audit={audit}
+          maroon={maroon}
           me={me}
           phaseSync={phaseSync}
           members={members}
           colorFor={colorFor}
+          roster={roster}
         />
       );
     case "worker_mgmt":
@@ -263,6 +273,7 @@ function ActivePhase(props: Props) {
           me={me}
           room={room}
           voyageResult={voyageResult}
+          reveal={reveal}
           myLegacy={myLegacy}
           onRestart={onRestart}
         />

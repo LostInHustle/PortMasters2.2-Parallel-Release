@@ -43,7 +43,7 @@ import {
   ventureAlreadySpentReason,
   ventureTotal,
 } from "@/lib/game/convoy";
-import { difficultyConfig } from "@/lib/game/difficulty";
+import { voyageRoundsFor } from "@/lib/game/mode";
 import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
 import {
   bothFlexibleBarterUnlocked,
@@ -52,6 +52,7 @@ import {
 } from "@/lib/game/engine/barterAccess";
 import type {
   BarterOffer,
+  LegReport,
   ObjectiveProgress,
   ObjectiveReport,
 } from "@/types/realtime";
@@ -73,6 +74,9 @@ import {
   publicUserOf,
   startingRooms,
   restartingRooms,
+  rememberDetailRequest,
+  takeDetailRequest,
+  forgetDetailRequests,
   type DepartureCleanup,
 } from "./presence";
 import {
@@ -155,6 +159,24 @@ import {
   recordObjectiveReport,
   roomObjectiveTallies,
 } from "./objective";
+import { auditRevealFor, clearAudits, recordAuditVote } from "./audit";
+import {
+  clearMaroons,
+  maroonResultFor,
+  maroonShiftNoticeFor,
+  recordMaroonVote,
+  recordPortShift,
+} from "./maroon";
+import { clearReveals, revealFor } from "./reveal";
+import {
+  openVoyageTelemetry,
+  closeVoyageTelemetry,
+  dropVoyageTelemetry,
+  noteCaptainLeft,
+  noteLegAdvanced,
+  noteLegReport,
+  noteTelemetry,
+} from "./telemetry";
 import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
@@ -297,11 +319,26 @@ function clearRoomAllMaps(roomId: string): void {
   clearLoansSilent(roomId);
   clearPulseTallies(roomId);
   clearObjectiveTallies(roomId);
+  clearAudits(roomId);
+  clearMaroons(roomId);
+  clearReveals(roomId);
   clearDocksWinner(roomId);
   clearSurge(roomId);
   concludedRooms.delete(roomId);
   clearMutedUsers(roomId);
   clearSessionChat(roomId);
+  // The detail questions waiting on captains in this harbor, which are
+  // questions about a room that no longer exists.
+  forgetDetailRequests(roomId);
+  // [I1: the telemetry spine] And the voyage the spine was holding, which
+  // is dropped and not written, because every caller that reaches this
+  // function with a voyage still open has already written it. The reaper
+  // writes an emptied record before it calls this, and the REST leave
+  // writes one from tearDownIfRoomGone. What is left is the operator's
+  // purge, where there is no measurement to take: the account is being
+  // erased and the row written for it would name captains who no longer
+  // exist.
+  dropVoyageTelemetry(roomId);
 }
 
 // Builds the cleanup callbacks scheduleDeparture needs. Defined once
@@ -328,12 +365,23 @@ function buildDepartureCleanup(): DepartureCleanup {
 // memory until the process restarted. The client's leave always sends
 // room:leave straight after that route call, so this is where the check
 // can be made.
+//
+// [I1: the telemetry spine] A room that is gone because its last seat was
+// given up is a voyage that stopped, and this is the only place the last
+// captain's own Leave can be noticed: the REST route that took the seat
+// runs in a different copy of this module and cannot see the accumulator,
+// and by the time the grace timer would have reaped them there is no seat
+// left to take. So the record is written here, as emptied and with nobody
+// present, before the maps are cleared underneath it.
 async function tearDownIfRoomGone(roomId: string): Promise<void> {
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: { id: true },
   });
-  if (!room) clearRoomAllMaps(roomId);
+  if (!room) {
+    void closeVoyageTelemetry(roomId, "emptied", []);
+    clearRoomAllMaps(roomId);
+  }
 }
 
 export function attachRealtime(httpServer: HttpServer): Server {
@@ -481,6 +529,33 @@ export function attachRealtime(httpServer: HttpServer): Server {
           io.to(socket.id).emit("objective:progress", board);
         }
       }
+      // The audit's reveal is public in the same way and for a sharper
+      // reason: the room voted for it. A captain who reloads or joins after
+      // the vote has to see what the harbor was shown, or the verdict the
+      // table is arguing about is missing from their screen and the
+      // argument makes no sense to them. Sent to the joining socket only,
+      // exactly like the board above, and only when there is a reveal to
+      // hand over: a harbor that has not audited anyone costs no frame.
+      const audit = auditRevealFor(roomId);
+      if (audit) io.to(socket.id).emit("audit:reveal", audit);
+      // The maroon is handed over on the same reasoning, and it has to be:
+      // a joiner who is not told the harbor put a captain ashore would read
+      // that captain's empty ship as a bug, and a joiner who is not told
+      // which port the Harbormaster leaned would trade the market to a
+      // different set of prices than the rest of the table. Both are sent
+      // only when they exist.
+      const maroon = maroonResultFor(roomId);
+      if (maroon) io.to(socket.id).emit("maroon:result", maroon);
+      const shift = maroonShiftNoticeFor(roomId);
+      if (shift) io.to(socket.id).emit("maroon:shift", shift);
+      // The reveal goes to a joiner on the same reasoning, and it is the
+      // one that has to: the voyage is over, so a captain who reloads onto
+      // a finished table is looking at a screen whose story is already
+      // told, and the cards are not something their own client ever held.
+      // Sent to the joining socket only, so a captain who arrives late is
+      // told what everybody saw rather than telling the room again.
+      const reveal = revealFor(roomId);
+      if (reveal) io.to(socket.id).emit("voyage:reveal", reveal);
       broadcastPresence(io);
     });
 
@@ -494,6 +569,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
       forgetStatus(roomId, s.userId);
       removeUserBarterOffers(io, roomId, s.userId);
       removeUserAidRequest(io, roomId, s.userId);
+      // [I1: the telemetry spine] The ordinary way out of a voyage. The
+      // client sends this only for a deliberate departure and only after
+      // the REST call that gives up the seat has succeeded, and the grace
+      // timer's reap will find no seat left to take, so this is where the
+      // Leave button's abandonment is recorded. It is inert without an
+      // accumulator, and it ignores anyone the voyage never counted as a
+      // captain, so a spectator's exit costs the record nothing.
+      noteCaptainLeft(roomId, s.userId);
       io.to(`room:${roomId}`).emit("room:system", {
         roomId,
         content: `${s.user.displayName} left the harbor`,
@@ -516,6 +599,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         shipLevel?: number;
         gameOver?: boolean;
         renownLevel?: number;
+        // [H7: Maroon and the Harbormaster] The two marks a failed voyage
+        // leaves on a seat that keeps sailing. A client sends them on every
+        // status; they are optional because a client that has never failed
+        // a voyage, and every client from before this slice, reports
+        // neither.
+        bankrupt?: boolean;
+        marooned?: boolean;
       }) => {
         const s = requireAuth(socket);
         if (!s) return;
@@ -554,6 +644,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
             typeof payload?.renownLevel === "number"
               ? payload.renownLevel
               : undefined,
+          // [H7: Maroon and the Harbormaster] The two marks a failed
+          // voyage leaves on a seat that keeps sailing. They have to ride
+          // this frame rather than the client's own copy of it, for the
+          // reason the phase does: the roster badges a captain from here,
+          // a late joiner is hydrated from the cache below, and the maroon
+          // vote reads the same cache to refuse a captain the harbor has
+          // already written off. An allow list is what made that a bug
+          // rather than an omission, so only an explicit true is a mark
+          // and anything else reads as neither at every reader.
+          bankrupt: payload?.bankrupt === true ? true : undefined,
+          marooned: payload?.marooned === true ? true : undefined,
           at: Date.now(),
         };
         rememberStatus(roomId, broadcast);
@@ -614,7 +715,28 @@ export function attachRealtime(httpServer: HttpServer): Server {
               data: { currentRound: cp.round, currentPhase: cp.phase },
             })
             .catch(() => {});
-          if (cp.phase !== "barter") clearBarter(io, roomId);
+          // [I1: the telemetry spine] The one place a room's leg actually
+          // moves, so the one place the spine is told about it: every
+          // event it stamps afterwards belongs to this leg. Recorded only
+          // when the leg moved forward, which the note decides, so a
+          // captain re reporting the checkpoint they are already standing
+          // at cannot fill a record with the same leg twice.
+          noteLegAdvanced(roomId, cp.round);
+          if (cp.phase !== "barter") {
+            // [I1: the telemetry spine] Leaving the bartering phase hands
+            // every standing offer back to its poster, and that is the
+            // plan's expired line: read before the sweep, because after it
+            // there is no board left to count. Goods are the escrowed
+            // side of each offer, the same side the posted and filled
+            // lines count.
+            const swept = barterList(roomId);
+            if (swept.length) {
+              noteTelemetry(roomId, "offer_expired", {
+                goods: swept.reduce((sum, o) => sum + o.offerAmount, 0),
+              });
+            }
+            clearBarter(io, roomId);
+          }
           if (cp.phase !== "3") clearAid(io, roomId);
         }
         await broadcastReadyState(io, roomId, cp);
@@ -692,6 +814,41 @@ export function attachRealtime(httpServer: HttpServer): Server {
       },
     );
 
+    // ========== The leg report ==========
+    // [I1: the telemetry spine] The one telemetry event a client sends,
+    // and the only place three of the plan's numbers exist at all: the
+    // orders a leg dealt and the ones it filled are the captain's own
+    // screen, and the server never sees them. Recorded as a claim rather
+    // than a fact, bounded by the voyage it is filed against, and the
+    // actor comes from the socket so a report cannot name somebody else.
+    socket.on("telemetry:leg", (payload: Partial<LegReport>) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      const leg = payload?.leg;
+      if (typeof leg !== "number" || !Number.isInteger(leg)) return;
+      const check = (value: unknown): number | null =>
+        typeof value === "number" && Number.isFinite(value)
+          ? Math.max(0, Math.floor(value))
+          : null;
+      const ordersDealt = check(payload?.ordersDealt);
+      const ordersFilled = check(payload?.ordersFilled);
+      const distinctGoods = check(payload?.distinctGoods);
+      if (
+        ordersDealt === null ||
+        ordersFilled === null ||
+        distinctGoods === null
+      ) {
+        return;
+      }
+      noteLegReport(roomId, s.userId, leg, {
+        ordersDealt,
+        ordersFilled,
+        distinctGoods,
+      });
+    });
+
     // ========== The fleet commission ==========
     // Ocean Gambit's public objective. A report is a captain's own running
     // total, so it carries no captain id and the answer carries no name:
@@ -707,6 +864,88 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (!delivered || typeof delivered !== "object") return;
       void recordObjectiveReport(io, roomId, s.userId, delivered);
     });
+
+    // ========== The Manifest Audit ==========
+    // The room's one majority vote (see ./audit). The guards here are the
+    // ones that belong to the phase machinery rather than to the vote: the
+    // room is on the Gambit lap, the room is the caller's, the checkpoint
+    // is the Parley step and the leg is the one the vote names. Everything
+    // else the vote is judged against, including the roster it needs a
+    // majority of, is read in recordAuditVote from the room rather than
+    // from the payload, so a doctored frame cannot widen a majority.
+    socket.on(
+      "audit:vote",
+      (payload: { roomId?: string; round?: number; targetUserId?: string }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const targetUserId = payload?.targetUserId;
+        if (!targetUserId) return;
+        void (async () => {
+          const cp = await getCheckpoint(roomId);
+          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          await recordAuditVote(io, roomId, s.userId, cp.round, targetUserId);
+        })();
+      },
+    );
+
+    // ========== Maroon, and the Harbormaster's hand ==========
+    // The room's heavier vote (see ./maroon). Same guards as the audit's
+    // and for the same reason: the leg and the phase come from the
+    // checkpoint rather than from the payload, and everything the vote is
+    // actually judged against (the rung, the roster, the marks on the
+    // target) is read from the room inside recordMaroonVote. A doctored
+    // frame can name a captain; it cannot widen the harbor that has to
+    // agree.
+    socket.on(
+      "maroon:vote",
+      (payload: { roomId?: string; round?: number; targetUserId?: string }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const targetUserId = payload?.targetUserId;
+        if (!targetUserId) return;
+        void (async () => {
+          const cp = await getCheckpoint(roomId);
+          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          await recordMaroonVote(io, roomId, s.userId, cp.round, targetUserId);
+        })();
+      },
+    );
+
+    // The marooned captain's one lever. Which captain that is comes from
+    // the server's own record of the vote rather than from anything this
+    // frame says about itself, and the port has to be one the market it
+    // lands on has unlocked (see recordPortShift).
+    socket.on(
+      "maroon:shift",
+      (payload: {
+        roomId?: string;
+        round?: number;
+        port?: string;
+        direction?: number;
+      }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        if (typeof payload?.port !== "string" || !payload.port) return;
+        void (async () => {
+          const cp = await getCheckpoint(roomId);
+          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          await recordPortShift(
+            io,
+            roomId,
+            s.userId,
+            cp.round,
+            payload.port as string,
+            payload.direction,
+          );
+        })();
+      },
+    );
 
     // ========== Word on the Docks ==========
     socket.on("docks:claim", (payload: { roomId?: string }) => {
@@ -779,7 +1018,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         }
         const room = await db.room.findUnique({
           where: { id: roomId },
-          select: { voyageEpoch: true, currentRound: true, difficulty: true },
+          select: {
+            voyageEpoch: true,
+            currentRound: true,
+            difficulty: true,
+            mode: true,
+          },
         });
         if (!room) return;
         if (await hasRoomClaimedVenture(roomId, room.voyageEpoch)) {
@@ -789,7 +1033,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
-        const voyageRounds = difficultyConfig(room.difficulty).rounds;
+        // The voyage's own length rather than the tier's, because the
+        // deadline below has to fall inside the voyage in front of the
+        // caller: on a mode with a length of its own the tier's number
+        // describes a different voyage (see voyageLegs in ./mode).
+        const voyageRounds = voyageRoundsFor(room.mode, room.difficulty);
         const bounds = computeVentureDeadlineBounds(
           room.currentRound,
           voyageRounds,
@@ -1101,6 +1349,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
           createdAt: new Date().toISOString(),
         };
         setBarterOffers(roomId, [...barterList(roomId), offer]);
+        // [I1: the telemetry spine] One offer standing, counted in the
+        // units its poster just escrowed, which is the side the filled and
+        // expired lines count as well.
+        noteTelemetry(roomId, "offer_posted", {
+          actor: s.userId,
+          goods: offer.offerAmount,
+        });
         broadcastBarter(io, roomId);
       },
     );
@@ -1225,6 +1480,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
         };
         socket.emit("barter:fulfilled", fulfilled);
         emitToUser(io, offer.fromUserId, "barter:fulfilled", fulfilled);
+        // [I1: the telemetry spine] One offer taken off the board, and the
+        // only event a peer trade produces: the accept path is where a
+        // trade between two captains actually settles, so counting it here
+        // and nowhere else keeps a reader from adding one trade up twice.
+        // The accepter is the actor, and the units are the escrowed side,
+        // which is what they received.
+        noteTelemetry(roomId, "offer_filled", {
+          actor: s.userId,
+          goods: offer.offerAmount,
+        });
         broadcastBarter(io, roomId);
       },
     );
@@ -1461,14 +1726,32 @@ export function attachRealtime(httpServer: HttpServer): Server {
     );
 
     // ========== On demand player detail ==========
+    // A question about a captain is written down here before it is
+    // forwarded, and an answer is relayed only against a question that is
+    // waiting for one. Before [J1: the private information review] the
+    // response handler took a client's word for it: it checked that the
+    // sender claimed to be the captain the answer was about and nothing
+    // else, so any authenticated captain could push a snapshot of their
+    // own composing, at a moment nobody asked for it, into another
+    // captain's detail panel, and could address any account in the tree
+    // while doing it since the room on the frame was the sender's to name.
+    // The hold makes the pair a real question and answer, and the room
+    // and the requester on the relayed frame are the ones the server
+    // wrote down rather than the ones the answering client sent back.
     socket.on(
       "player:detail:request",
-      (payload: { roomId?: string; targetUserId?: string }) => {
+      async (payload: { roomId?: string; targetUserId?: string }) => {
         const s = requireAuth(socket);
         if (!s) return;
         const roomId = payload?.roomId ?? s.roomId;
         const targetUserId = payload?.targetUserId;
         if (!roomId || !targetUserId || roomId !== s.roomId) return;
+        // The question may only be about a captain in this harbor, which
+        // is what the popup is for. A target elsewhere would never answer
+        // anyway, since their own client compares the room on the frame
+        // against the one they are in, and this is the cheaper way to say
+        // the same thing.
+        if (!(await roomMemberIds(roomId)).includes(targetUserId)) return;
         if (!userSockets.get(targetUserId)?.size) {
           socket.emit("player:detail:response", {
             roomId,
@@ -1477,6 +1760,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           });
           return;
         }
+        rememberDetailRequest(roomId, s.userId, targetUserId);
         emitToUser(io, targetUserId, "player:detail:request", {
           roomId,
           targetUserId,
@@ -1495,12 +1779,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }) => {
         const s = requireAuth(socket);
         if (!s) return;
-        const roomId = payload?.roomId;
         const requesterId = payload?.requesterId;
-        if (!roomId || !requesterId || payload?.targetUserId !== s.userId)
-          return;
+        if (!requesterId || payload?.targetUserId !== s.userId) return;
+        // The room and the requester are read off the waiting question,
+        // never off the frame: a response that names a question nobody
+        // asked is dropped rather than relayed.
+        const asked = takeDetailRequest(s.userId, requesterId);
+        if (!asked) return;
+        // The asker has to still be standing in the harbor the question
+        // was about. Read off the live presence map rather than the
+        // database, because this is a frame about the room as it is now.
+        if (!roomMembers(asked).some((m) => m.id === requesterId)) return;
         emitToUser(io, requesterId, "player:detail:response", {
-          roomId,
+          roomId: asked,
           targetUserId: s.userId,
           data: payload?.data ?? null,
         });
@@ -1526,6 +1817,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
       }
       const message = buildSessionMessage(content, s.user);
       recordHarborMessage(roomId, message);
+      // [I1: the telemetry spine] One message in the harbor's own room,
+      // which is what the plan counts for messages per captain per leg.
+      // The lobby square and the direct threads are not voyage talk and
+      // are deliberately not counted; see the note on the event itself.
+      noteTelemetry(roomId, "message_sent", { actor: s.userId });
       io.to(`room:${roomId}`).emit("chat:room", { roomId, message });
     });
 
@@ -1688,7 +1984,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
       if (startingRooms.has(roomId)) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
-        select: { hostId: true, started: true, mode: true },
+        select: {
+          id: true,
+          hostId: true,
+          started: true,
+          mode: true,
+          difficulty: true,
+          voyageEpoch: true,
+          createdAt: true,
+        },
       });
       if (!room) return;
       if (room.started) {
@@ -1723,16 +2027,43 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // Where a voyage opens is the mode's business, not this handler's,
         // so it is read from the lap rather than written as "5" here.
         const opening = openingPhase(room.mode);
+        // [H5: the quota rung] The fleet's size, pinned to the roster that
+        // was actually dealt in at departure. Written before the room is
+        // told the voyage is under way, so no client can be playing a
+        // commission drawn from a size this row has not recorded yet, and
+        // written here rather than left to be counted later because
+        // membership can change mid voyage and the rung must not.
         await db.room.update({
           where: { id: roomId },
-          data: { started: true, currentRound: 1, currentPhase: opening },
+          data: {
+            started: true,
+            currentRound: 1,
+            currentPhase: opening,
+            voyageSeats: roster.length,
+          },
         });
+        // [I1: the telemetry spine] The voyage is under way, so the spine
+        // opens on it. Here rather than at the end of the handler because
+        // the record's header is read from the row above and the roster
+        // this update just pinned, and synchronous so nothing a captain
+        // hears below can arrive before the voyage it belongs to is being
+        // recorded. A room the sampler passes over opens nothing, and
+        // every note below is then a no-op.
+        openVoyageTelemetry(room, roster);
         const cp = await getCheckpoint(roomId);
         cp.round = 1;
         cp.phase = opening;
         cp.readyUserIds.clear();
         cp.advancing = false;
-        io.to(`room:${roomId}`).emit("room:started", { roomId });
+        // The seat count rides the start broadcast because the commission a
+        // client draws is a function of it: this frame is what moves a
+        // lobby into a voyage, so a client that hears it can draw the right
+        // board on the first render of one, and a reload is covered by the
+        // same number on the state route.
+        io.to(`room:${roomId}`).emit("room:started", {
+          roomId,
+          seats: roster.length,
+        });
         // The private half of setting sail. It runs after the room has
         // been told the voyage is under way, so a card can never arrive
         // for a voyage that did not open, and it has to run here rather
@@ -1775,6 +2106,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
             currentRound: 1,
             currentPhase: "0",
             voyageEpoch: { increment: 1 },
+            // The pin belongs to the voyage that just ended. Clearing it
+            // here rather than at the next departure keeps "0 means no
+            // voyage is pinned" true at every moment, so a captain who
+            // reloads into a reopened lobby draws the founding board for
+            // the epoch waiting to start rather than the dead voyage's.
+            voyageSeats: 0,
           },
         });
         await db.gameState.deleteMany({ where: { roomId } });
@@ -1796,8 +2133,27 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // tally merges by max, so a zero report leaves the old number
         // standing and the new voyage would inherit the old one's board.
         clearObjectiveTallies(roomId);
+        // And the audit goes with them, for the harsher version of the same
+        // reason: the reveal is the flag that makes the audit once per
+        // voyage, so a new voyage that kept the old one would start having
+        // already spent it, and the room's first vote would vanish with no
+        // frame to explain why.
+        clearAudits(roomId);
+        // And the maroon, which is the same flag with a ship behind it: the
+        // result is what makes the vote once a voyage and what tells the
+        // server who the Harbormaster is, and the shift is the market the
+        // new voyage's first leg would otherwise be priced against.
+        clearMaroons(roomId);
+        // And the reveal, which is the ledger the ended voyage was written
+        // up in. It holds no flag, so a new voyage that kept it would not
+        // refuse anything: it would hand the old table's cards to the first
+        // captain who joined, which is the one way this frame can lie.
+        clearReveals(roomId);
         clearDocksWinner(roomId);
         clearSurge(roomId);
+        // And the detail questions that were waiting on the ended voyage,
+        // which are about captains standing in a harbor that has moved on.
+        forgetDetailRequests(roomId);
         concludedRooms.delete(roomId);
         // A restarted voyage is a new voyage, so the conversation that
         // belonged to the old one goes with it. Clients drop their local
@@ -1806,6 +2162,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (clearSessionChat(roomId))
           io.to(`room:${roomId}`).emit("chat:cleared", { roomId });
         if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
+        // [I1: the telemetry spine] The voyage that was under way stops
+        // here, and it stops by the host's hand rather than by an ending,
+        // which is the outcome this record carries. Written before the
+        // frame that tells the room it is over, so a record exists by the
+        // time any captain can ask the room what just happened, and
+        // deliberately not awaited: the write is a measurement, and a slow
+        // disk is not allowed to hold up a table waiting to play again.
+        void closeVoyageTelemetry(
+          roomId,
+          "restarted",
+          roomMembers(roomId).map((m) => m.id),
+        );
         io.to(`room:${roomId}`).emit("room:restarted", {
           roomId,
           voyageEpoch: restarted.voyageEpoch,

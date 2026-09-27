@@ -43,12 +43,21 @@ export async function GET(req: NextRequest) {
   // a client that restored a save under the wrong lap would run the right
   // phases in the wrong order and desynchronize from the room without
   // either side being able to tell why.
+  //
+  // [H5: the quota rung] The seat count this voyage was pinned to rides
+  // along as well, and it is the one room fact here a client cannot work
+  // out for itself: the commission's quotas scale with the size of the
+  // fleet the voyage was dealt to, so a captain who reloads mid voyage has
+  // to be handed the departure's number rather than counting the names on
+  // a roster that may have changed since. 0 means the room has no voyage
+  // pinned, and the client draws the founding board for it.
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: {
       currentRound: true,
       currentPhase: true,
       voyageEpoch: true,
+      voyageSeats: true,
       difficulty: true,
       mode: true,
     },
@@ -69,6 +78,7 @@ export async function GET(req: NextRequest) {
     checkpoint,
     difficulty,
     mode,
+    seats: room?.voyageSeats ?? 0,
   });
 }
 
@@ -76,6 +86,24 @@ const SaveSchema = z.object({
   roomId: z.string().min(1),
   data: z.record(z.string(), z.any()),
 });
+
+// [J1: the private information review] A bound on the blob itself, which
+// no other part of this route has. The check above judges four numbers
+// inside the save and the design is deliberately that everything else is
+// written as sent: the engine is client authoritative, so a captain's own
+// voyage is theirs to compute. What no client needs is an unbounded one.
+// A save is not a private cost to the captain who wrote it either, because
+// the harbor reads it: the conclusion parses every save at the table and
+// the Manifest Audit samples one of them, so an enormous blob is paid for
+// by everyone in the room, on every finish, in the code path that has to
+// finish before a voyage can end.
+//
+// Measured before the number was chosen: five real rows on a live database
+// run 1.5 KB to 3.5 KB. 64 KB is around twenty times the largest, which is
+// room for a long voyage, a big hold and a full ledger. The parse has
+// already happened by the time this runs, so what it bounds is everything
+// after it rather than the request itself.
+const SAVE_BODY_MAX = 64 * 1024;
 
 export async function PUT(req: NextRequest) {
   const user = await getCurrentUser();
@@ -118,6 +146,12 @@ export async function PUT(req: NextRequest) {
     : { plausible: true, severity: "ok" as const, findings: [] };
 
   const json = JSON.stringify(data);
+  if (json.length > SAVE_BODY_MAX) {
+    return NextResponse.json(
+      { error: "That voyage save is too large to store." },
+      { status: 413 },
+    );
+  }
   // Only ever set the mark, never clear it. A save that was implausible
   // once stays flagged even if every later save looks ordinary, since
   // the point is that this account claimed it at all. The severity

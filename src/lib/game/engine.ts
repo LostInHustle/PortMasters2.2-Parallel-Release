@@ -95,6 +95,7 @@ export {
 // ========== Phase 1: the port market ==========
 export {
   applyHarborPulse,
+  applyPortShift,
   applyTidewatchSurge,
   purchaseCard,
   tallyPurchasesByResource,
@@ -138,6 +139,15 @@ export {
 
 // ========== Artisans ==========
 export { assignTask, fireWorker, hireWorker } from "./engine/workers";
+
+// ========== A seat that failed ==========
+// [H7: Maroon and the Harbormaster] The harbor's two ways of writing a
+// captain off. Both are reached by name from a socket handler rather than
+// from a button, which is why they are here rather than staying private to
+// ./engine/seats: the maroon arrives as a broadcast the client has to
+// apply, and the bankruptcy is applied by the settlement the client is
+// already running.
+export { failSeat, maroonSeat } from "./engine/seats";
 
 // ========== Boons and ship modules ==========
 export {

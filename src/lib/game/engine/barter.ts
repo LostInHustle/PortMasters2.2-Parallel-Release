@@ -36,6 +36,39 @@ function awardBarterReputation(state: GameState, logs: string[]) {
   );
 }
 
+// [H4: the Broker] The peer ledger: coin that changed hands with another
+// captain, net of coin paid to them. The Broker's card is measured on this
+// and nothing else, which is why it is counted here rather than where the
+// trade is reported. Both sides of every completed trade run through
+// exactly one of the two functions below, and nothing else in the engine
+// can touch it: a port sale, a wage, a tax, a fine, a loan and a convoy
+// payout all move Gold without ever reaching this file, which is exactly
+// the distinction the role is made of.
+//
+// Escrow is deliberately not counted. Posting an offer and having it
+// refunded moves Gold and is not a trade, so only settlement counts, and
+// the two counted sides read their amounts off the same trade: whatever
+// one captain counts as profit the other counts as loss. That zero sum
+// property is what the epic's evaluation leans on, and the smoke suite
+// asserts it rather than trusting this comment.
+//
+// Nothing is logged. A line naming this figure would put a Broker's
+// progress into the ledger tail another captain can open from the roster
+// (see PlayerDetailData), and the card already tells its holder what the
+// number is and where it stands.
+function awardPeerTradeProfit(
+  state: GameState,
+  paidItem: string,
+  paidAmount: number,
+  receivedItem: string,
+  receivedAmount: number,
+) {
+  const paid = paidItem === "Gold" ? paidAmount : 0;
+  const received = receivedItem === "Gold" ? receivedAmount : 0;
+  if (paid === 0 && received === 0) return;
+  state.peerTradeProfit += received - paid;
+}
+
 // Posting an offer escrows the offered amount immediately (deducted on the
 // spot, the same way buying a card spends gold right away), so a captain
 // can't post the same Hemp in two offers at once and double spend it once
@@ -112,16 +145,31 @@ export function acceptBarterOffer(
     `🤝 Traded ${requestAmount} ${requestItem} for ${offerAmount} ${offerItem}`,
   );
   awardBarterReputation(state, logs);
+  awardPeerTradeProfit(
+    state,
+    requestItem,
+    requestAmount,
+    offerItem,
+    offerAmount,
+  );
   return true;
 }
 
 // The posting side of a completed trade: the offered item was already
 // escrowed away in postBarterOffer, so all that's left is to receive
 // whatever was requested in return.
+//
+// The escrowed side is passed in rather than read back off the state
+// because escrow left no trace there: the goods were taken at post time,
+// the offer lives on the server's board, and this is the moment the board
+// stops listing it. Both sides of the trade are therefore read off one
+// offer, which is what keeps the two captains' ledgers exact mirrors.
 export function settleBarterTrade(
   state: GameState,
   requestItem: string,
   requestAmount: number,
+  offerItem: string,
+  offerAmount: number,
   logs: string[],
 ) {
   addOwnedAmount(state, requestItem, requestAmount);
@@ -129,6 +177,13 @@ export function settleBarterTrade(
     `🤝 Barter offer accepted, received ${requestAmount} ${requestItem}`,
   );
   awardBarterReputation(state, logs);
+  awardPeerTradeProfit(
+    state,
+    offerItem,
+    offerAmount,
+    requestItem,
+    requestAmount,
+  );
 }
 
 // Takes the ledger and nothing else, because that is genuinely all the work

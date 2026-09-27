@@ -119,6 +119,25 @@ export function upgradeShip(state: GameState, logs: string[]) {
   );
 }
 
+// The two modules that carry a lasting cost for as long as they are
+// installed, and the accounting that undoes it. It is one function rather
+// than two lines at each site because there are now two ways a module
+// leaves a ship: a swap at the yard, and the harbor taking the whole ship
+// off a marooned captain (see ./seats). A second copy of these two lines
+// is how a captain whose hull went to the harbor would keep paying the
+// surcharge for a module that went with it.
+//
+// [REFACTOR] brokers_network used to set state.intelCost = 5 here on
+// unequip (and = 2 on equip below). With intelCost now derived from
+// hasModule(state, "brokers_network") in ./pricing.ts#getIntelCost,
+// these writes are dead and the field is gone from GameState; the
+// discount is read live off the equipped set, so equip and unequip no
+// longer need to keep a parallel field in sync.
+export function unequipModuleAccounting(state: GameState, mod: Module): void {
+  if (mod.id === "bulk_hauler") state.shipUpgradePenalty -= 15;
+  if (mod.id === "overdrive_engine") state.maintenancePenalty -= 10;
+}
+
 function equipModule(
   state: GameState,
   mod: Module,
@@ -127,8 +146,7 @@ function equipModule(
 ) {
   if (swapIdx !== null) {
     const old = state.equippedModules[swapIdx];
-    if (old.id === "bulk_hauler") state.shipUpgradePenalty -= 15;
-    if (old.id === "overdrive_engine") state.maintenancePenalty -= 10;
+    unequipModuleAccounting(state, old);
     // [REFACTOR] brokers_network used to set state.intelCost = 5 here on
     // unequip (and = 2 on equip below). With intelCost now derived from
     // hasModule(state, "brokers_network") in ./pricing.ts#getIntelCost,

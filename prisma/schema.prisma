@@ -69,6 +69,17 @@ model Room {
   currentRound Int    @default(1)
   currentPhase String @default("0")
   voyageEpoch  Int    @default(0)
+  // [H5: the quota rung] How many captains the voyage now under way was
+  // dealt to, written in the same update that sets `started` and cleared
+  // in the one that restarts the voyage. It is the fleet's size as a fact
+  // of the voyage rather than of the harbor: membership can change mid
+  // voyage, and the rung that scales the commission has to be read from
+  // the departure rather than from whoever is still sitting at the table.
+  // It sails for both modes because it is a record of the voyage rather
+  // than an Ocean Gambit artifact. 0 means the voyage was never pinned,
+  // which is what a room whose voyage began before this column existed
+  // reads as, and what the rung draws for: the founding deck, unchanged.
+  voyageSeats  Int    @default(0)
   started      Boolean @default(false)
   difficulty   String @default("fair_winds")
   // Which voyage this harbor is playing (see src/lib/game/mode.ts). Chosen
@@ -79,6 +90,18 @@ model Room {
   // founding mode, which is what every room created before this column
   // existed is playing.
   mode         String @default("classic")
+  // [H9: the unlock code] Which phrase opened this harbor, by its id in
+  // src/lib/unlock.ts, or the empty string for a room chartered without
+  // one. Written once at creation beside difficulty and mode, for the same
+  // reason: it is a property of the room rather than of any account, so
+  // every captain who reads this room reads the same answer, and a captain
+  // who heard the phrase can open the table for the whole crew.
+  //
+  // The empty string rather than null, and no phrase ever stored here:
+  // what a room remembers is which door it opened, never the words that
+  // opened it, so a table can be named by the code that made it without
+  // carrying a copy of the code around with it.
+  unlock       String @default("")
 
   host           User            @relation("RoomHost", fields: [hostId], references: [id], onDelete: Cascade)
   members        RoomMember[]
@@ -124,8 +147,9 @@ model GameState {
   @@index([roomId])
 }
 
-// Ocean Gambit: one captain's alignment for one voyage, in the one place
-// nothing in the interface can read.
+// Ocean Gambit: one captain's private card for one voyage, in the one
+// place nothing in the interface can read. A card is the alignment they
+// were dealt plus, for most of the table, the personal goal it carried.
 //
 // There is deliberately no client path to this table in either direction.
 // It is written once, by the realtime layer, in the same breath as the
@@ -146,6 +170,13 @@ model VoyageRole {
   userId   String
   // One of the roles in src/lib/game/gambit.ts: honest, pirate, broker.
   role     String
+  // The personal goal an Honest card was dealt, by id, out of the flourish
+  // deck in src/lib/game/gambit.ts. Null on a Variable card, on a captain
+  // who joined a voyage already under way and was handed the majority card
+  // without a hand to draw from, and on every row written before this
+  // column existed. A nullable addition rather than a table of its own,
+  // because a flourish has no life apart from the card it was dealt with.
+  flourish String?
   drawnAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -262,6 +293,13 @@ model VoyageChronicle {
   borrowCount     Int
   crowned         Boolean @default(false)
   bankrupt        Boolean @default(false)
+  // [H7: Maroon and the Harbormaster] Whether the harbor voted this
+  // captain ashore. Its own column rather than a comment in the body text
+  // because the chronicle viewer tags the row with it and because the
+  // epic's evaluation reads maroon outcomes back by query, the same way it
+  // reads bankrupt ones. Written from the server's record of the vote, so
+  // unlike bankrupt it never depends on what a client reported.
+  marooned        Boolean @default(false)
   merchantRating  String
   headline        String
   body            String
@@ -276,6 +314,27 @@ model VoyageChronicle {
   objectiveId     String   @default("")
   objectiveMet    Boolean  @default(false)
   objectiveTrace  String   @default("")
+  // [H4: the Broker] Whether this captain won their own voyage, decided by
+  // evaluateVictory in src/lib/game/victory.ts at the moment the voyage
+  // concluded, and the alignment they sailed under, recorded right beside
+  // it. Both are private: a chronicle row is read only by the captain it
+  // belongs to (see /api/chronicle), and the reveal at the table is a later
+  // slice. They are stored here rather than broadcast because the epic's
+  // evaluation reads them back: every win rate band in the plan is a query
+  // over alignment and won on rows from finished voyages, including the
+  // honest side's, which nothing could measure before this column existed.
+  // Empty alignment in Classic, where no hand was dealt.
+  alignment       String   @default("")
+  won             Boolean  @default(false)
+  // [H5: the quota rung] How many captains the voyage that wrote this row
+  // was dealt to, copied from Room.voyageSeats as the conclusion writes
+  // it. The rung scales the commission by that number, so an outcome
+  // recorded without it cannot be grouped by table size, and the plan's
+  // gate is a claim about table size: the same rate at four, five and six
+  // seats. 0 for every voyage that sailed before the rung existed, which
+  // reads as the anchor band and is the honest reading of the board those
+  // voyages were in fact judged on.
+  seats           Int      @default(0)
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -307,4 +366,58 @@ model CaptainRival {
 
   @@index([userAId, userBId])
   @@index([roomId])
+}
+
+// [I1: the telemetry spine] One voyage, as the spine saw it: the record the
+// accumulator in src/server/realtime/telemetry.ts writes when a voyage
+// stops, however it stops.
+//
+// The body is JSON text for the same reason GameState.data and
+// objectiveTrace are: a record is one document, read whole by a reader that
+// walks its events, and never joined against. The columns beside it are the
+// header the plan asks to be queryable without opening the document: which
+// mode and difficulty the voyage was chartered with, the rung it was judged
+// on, how it ended, the leg it ended at, and when it ran. A dashboard that
+// wanted "the abandon rate by leg" would group by these rather than parse
+// four thousand events per voyage.
+//
+// One row per voyage, written once. roomId is deliberately a bare string
+// with no relation on it, unlike every other room-scoped row in this
+// schema, and the reason is written down because it looks like an
+// oversight: a room is deleted the moment its last member leaves, which is
+// the ordinary end of an ordinary voyage, and the interesting records are
+// exactly the ones that end that way. A cascade would erase every voyage
+// that concluded and every voyage that emptied out along with the lobby
+// nobody is sitting in anymore, which is the whole of what this table is
+// for. So the record outlives the harbor it describes, and the one caller
+// that must not leave one behind, the account purge, deletes the records of
+// the rooms it destroys by hand (see purgeResolved in src/server/realtime/admin.ts).
+model VoyageTelemetry {
+  id          String   @id @default(cuid())
+  roomId      String
+  voyageEpoch Int
+  mode        String
+  difficulty  String
+  // The rung, copied from Room.voyageSeats at departure the way the
+  // chronicle copies it at conclusion: the seats a voyage sailed with are
+  // a fact of that voyage and must not follow a roster that moved on.
+  seats       Int
+  // The vocabulary version and the sampling rate the voyage ran under, so
+  // a later reader knows which build wrote the body and what it is a
+  // sample of.
+  version     Int
+  sampleRate  Float
+  // "concluded", "restarted" or "emptied" (TelemetryOutcome in
+  // src/lib/game/telemetry.ts). A string rather than an enum for the same
+  // reason Room.mode is: the set grows with the vocabulary, and a new
+  // outcome must not need a migration to be storable.
+  outcome     String
+  leg         Int
+  startedAt   DateTime
+  endedAt     DateTime
+  record      String
+  createdAt   DateTime @default(now())
+
+  @@index([roomId])
+  @@index([endedAt])
 }

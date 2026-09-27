@@ -106,8 +106,11 @@ export function OnlineDot({
  * and have to say it in the same colour, so they read this one map now.
  *
  * This covers the whole meaning half of the palette, and a surface may
- * offer a subset of it: Pill has no warn tone, because nothing has asked
- * a Pill for one yet. Gold is the entry that made one copy worth having.
+ * offer a subset of it. The warn tone landed for the balance dashboard's
+ * state chips, which have to say that a gate is out of band without
+ * calling it an error: a mode that has not shipped yet is watched rather
+ * than broken, and red would be the wrong word for it. Gold is the entry
+ * that made one copy worth having.
  * It is the one tone whose words do not wear the token's own text colour,
  * pairing its wash with the gold ink instead, and both --gold and
  * --gold-ink are real tokens. A copy that reached for the wrong one
@@ -145,6 +148,7 @@ export function Pill({
     | "gold"
     | "sea"
     | "gain"
+    | "warn"
     | "alarm"
     | "due"
     | "favor"
@@ -225,6 +229,29 @@ export function ItemIcon({
     <span className={className} aria-hidden>
       {ICONS[item] ?? ""}
     </span>
+  );
+}
+
+/**
+ * The header cell of the two operator tables. Both are read by the same
+ * person in the same sitting, so both draw their headings the same way:
+ * small, uppercase, and quiet enough that the numbers under them are what
+ * the eye lands on. A caller passes whatever alignment its own column
+ * wants; nothing else differs between them.
+ */
+export function Th({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <th
+      className={`px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${className ?? ""}`}
+    >
+      {children}
+    </th>
   );
 }
 

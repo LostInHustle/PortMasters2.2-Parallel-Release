@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { BOON_SWAP_COST } from "@/lib/game/constants";
+import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,6 +37,14 @@ type Step = {
   gradient: string;
   body: string;
   tip: string;
+  // [H9: the unlock code] The manual's own appendix, printed on the step it
+  // belongs to rather than in a panel of its own. It is prose from the
+  // world rather than advice about a phase, so it reads as a notice under
+  // the tip, and it is written with the phrase rather than without it: the
+  // plan seeds the phrase on a page of the manual, and this is the manual a
+  // captain can actually open. Built from the table so a second sealed
+  // harbor adds a sentence here rather than a second copy of this one.
+  aside?: string;
 };
 
 const STEPS: Step[] = [
@@ -101,6 +110,10 @@ const STEPS: Step[] = [
     gradient: "pm-grad-renown",
     body: "Every voyage's final Reputation becomes Renown XP, multiplied by the difficulty tier. Renown levels grant titles, a small starting Gold bonus, and at level 5 unlock the Broker's Favor. The captain with the highest Reputation in a voyage is crowned Sea Master.",
     tip: "Check in daily for a seven day cycle of Renown XP rewards. It is not a streak, so a missed day never resets your progress.",
+    // The last page, because the harbor's one locked door is about a
+    // captain's record rather than about a phase, and this is the page
+    // where the record is explained.
+    aside: UNLOCK_ORDER.map((id) => UNLOCKS[id].manual).join(" "),
   },
 ];
 
@@ -199,6 +212,17 @@ export function HowToPlayModal({
                     {current.tip}
                   </p>
                 </div>
+                {/* The manual's appendix, under the advice rather than
+                    inside it: the tip is one voice and the world's own
+                    prose is another, and the two used to be told apart by
+                    their colour here too. */}
+                {current.aside && (
+                  <div className="rounded-xl bg-charter/[0.07] p-3">
+                    <p className="text-xs leading-relaxed text-charter">
+                      {current.aside}
+                    </p>
+                  </div>
+                )}
               </motion.div>
             </div>
 

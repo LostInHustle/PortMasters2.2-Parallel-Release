@@ -14,7 +14,8 @@ import {
   difficultyConfig,
   type Difficulty,
 } from "./difficulty";
-import { DEFAULT_MODE, type GameMode } from "./mode";
+import { DEFAULT_MODE, voyageRoundsFor, type GameMode } from "./mode";
+import type { PortShift } from "./maroon";
 import type { HouseId } from "./legacy";
 // The two runtime imports this module takes from the engine, and
 // deliberately narrow ones: ./engine/houses.ts imports nothing but types, so
@@ -164,6 +165,25 @@ export type ObjectiveTraceEntry = {
   delivered: Record<string, number>;
 };
 
+// [H6: the Manifest Audit] What one order fulfillment left behind: the
+// port it was filled at, the goods that went into it, what it paid, and
+// the leg it happened in. Exported because the audit's sample is drawn
+// from these server side, out of a save blob, and the reveal puts them on
+// the wire.
+//
+// The shape is the allow list, which is why it is this short. An
+// alignment, a hold, a purse or a card would each need a field here to
+// reach the room, and there is no field for any of them, so no version of
+// the reveal can carry one. Widening this type is the only way to widen
+// what the audit can show, and it should be a deliberate change with the
+// smoke suite's sweep updated on the same commit.
+export type OrderFill = {
+  round: number;
+  port: string;
+  items: { type: string; qty: number }[];
+  reward: number;
+};
+
 export type GameState = {
   inventory: Record<string, number>;
   money: number;
@@ -218,6 +238,14 @@ export type GameState = {
   // Reputation already earned this voyage from lending and backing, kept
   // so both can share one ceiling (see HELPER_REPUTATION_VOYAGE_CAP).
   helperReputationEarned: number;
+  // [H4: the Broker] Coin this captain has taken from other captains in
+  // trade, net of coin paid to them, across the whole voyage. The one
+  // number a Broker's card is measured on (see evaluateVictory in
+  // ../victory), accumulated at the two barter settlement paths and never
+  // by a port sale, which is the distinction the role is made of. Durable
+  // rather than per round because the design has to track it from leg one
+  // and cannot reconstruct it later.
+  peerTradeProfit: number;
   // [MANIFEST 02: Word on the Docks] Trade orders completed across the whole
   // voyage, never reset per round the way orderCount is, only by a fresh
   // voyage (createInitialGameState). completeOrder increments this alongside
@@ -231,6 +259,22 @@ export type GameState = {
   // engine function that needs the React layer to act on its behalf.
   _pendingDocksClaim?: { total: number };
   gameOver: boolean;
+  // [H7: Maroon and the Harbormaster] The two marks a failed voyage leaves
+  // on a seat that is still sailing, and the reason they are flags on the
+  // state rather than phases. In the mode that treats insolvency as final
+  // (see ModeConfig.bankruptcyIsFinal) a bankrupt captain leaves the lap
+  // and the phase says so; in the mode that keeps the seat, the phase goes
+  // on describing where they are in the round, and these two say what the
+  // harbor has decided about them.
+  //
+  // They are read in three places and nowhere else: the verdict, which
+  // will not crown either of them, the status a captain broadcasts, which
+  // is how the roster badges them, and the Harbormaster's power, which is
+  // the only thing marooned unlocks. Nothing else in the engine branches
+  // on them, which is what keeps a failed seat playable rather than a
+  // half state with rules of its own.
+  bankrupt: boolean;
+  marooned: boolean;
   modifierFlags: Partial<Record<ModifierKey, number>>;
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
@@ -246,6 +290,20 @@ export type GameState = {
   // their own report still contributes a zero tally, exactly like everyone
   // else's.
   harborPulse: Record<string, number>;
+  // [H7: Maroon and the Harbormaster] The other hand on a port's prices,
+  // and the one that is a captain rather than a room. A marooned captain
+  // names one port and a direction at the Parley of each leg, and every
+  // price at that port is read against this from the next port market
+  // until the one after it (see genResourceCard in engine/market.ts, which
+  // multiplies by portShiftMultiplier). It arrives on the same advance
+  // broadcast the pulse above does, and a leg the Harbormaster said
+  // nothing in arrives as null and clears it.
+  //
+  // Public by design rather than by accident: the record of who leaned
+  // what is broadcast to the room the moment it is called, and this field
+  // is only the market's copy of it. Null on every voyage with no
+  // Harbormaster, which is every Classic voyage and most Gambit ones.
+  portShift: PortShift | null;
   // Price history: for each good, the average unit price paid across
   // all purchases in each prior round. Used by the Purchase phase to
   // render a sparkline showing price trends. Seeded empty on a fresh
@@ -266,6 +324,17 @@ export type GameState = {
   // without these stamps the conversations cannot be attributed to the legs
   // they happened in. Copied into the Chronicle when the voyage concludes.
   objectiveTrace: ObjectiveTraceEntry[];
+  // [H6: the Manifest Audit] This captain's most recent order
+  // fulfillments, oldest first, capped at AUDIT_WINDOW (see
+  // ../game/audit for the cap, the sample drawn from it and the reason
+  // nothing older is kept). The one piece of evidence in the mode, and it
+  // is here rather than in a table of its own because it is written by the
+  // pure engine at the moment an order settles, which is a place no server
+  // code can see. Ocean Gambit only in practice, since that is the only
+  // mode with an audit to run, though a Classic voyage filling orders
+  // records the same lines harmlessly: nothing reads them and no client
+  // broadcasts them.
+  orderFills: OrderFill[];
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
   // game:status handler in src/server/realtime/index.ts, which is where every
@@ -497,7 +566,12 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     voyageEpoch,
     score: 0,
     currentRound: 1,
-    maxRounds: cfg.rounds,
+    // [I5: session length, and table size] The voyage's length, pinned here
+    // at departure and never recomputed: the mode's own number where it has
+    // one, the tier's ladder where it does not. Everything downstream reads
+    // this field rather than either record, which is what keeps the lap, the
+    // chronicle row and the integrity ceiling one length.
+    maxRounds: voyageRoundsFor(mode, difficulty),
     totalRevenue: 0,
     totalCosts: 0,
     materialCosts: 0,
@@ -521,15 +595,22 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     purchaseCount: 0,
     orderCount: 0,
     helperReputationEarned: 0,
+    peerTradeProfit: 0,
     totalOrdersCompleted: 0,
     gameOver: false,
+    // [H7: Maroon and the Harbormaster] A fresh voyage owes nobody
+    // anything and no port leans anywhere.
+    bankrupt: false,
+    marooned: false,
     modifierFlags: {},
     phase2DemandTags: [],
     revealedIntel: [],
     harborPulse: {},
+    portShift: null,
     priceHistory: {},
     objectiveDelivered: {},
     objectiveTrace: [],
+    orderFills: [],
     tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],

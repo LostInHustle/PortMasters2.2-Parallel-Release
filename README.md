@@ -34,19 +34,23 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command                 | What it does                                                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `npm run dev`           | Starts the game in development mode on port 8080, with hot reload                                   |
-| `npm run build`         | Generates the database client and produces a production build                                       |
-| `npm start`             | Runs the production build on port 8080                                                              |
-| `npm run typecheck`     | Checks every TypeScript file and reports type errors                                                |
-| `npm run lint`          | Runs ESLint across the project                                                                      |
-| `npm run test:smoke`    | Drives a real voyage through a running server and checks it arrived                                 |
-| `npm run check:palette` | Checks the widget hues, their distance from the danger red, and that no raw colour class slipped in |
-| `npm run db:push`       | Creates or updates the SQLite tables to match the schema                                            |
-| `npm run db:generate`   | Regenerates the database client after a schema change                                               |
-| `npm run db:migrate`    | Creates a versioned migration instead of pushing straight to the file                               |
-| `npm run db:reset`      | Drops the database and rebuilds it from scratch                                                     |
+| Command                     | What it does                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                   |
+| `npm run build`             | Generates the database client and produces a production build                                       |
+| `npm start`                 | Runs the production build on port 8080                                                              |
+| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                |
+| `npm run lint`              | Runs ESLint across the project                                                                      |
+| `npm run test:smoke`        | Drives a real voyage through a running server and checks it arrived                                 |
+| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw colour class slipped in |
+| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one           |
+| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file          |
+| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size             |
+| `npm run report:gates`      | Prints the plan's sixteen launch gates over the last three hundred voyages, with the ship decision  |
+| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                            |
+| `npm run db:generate`       | Regenerates the database client after a schema change                                               |
+| `npm run db:migrate`        | Creates a versioned migration instead of pushing straight to the file                               |
+| `npm run db:reset`          | Drops the database and rebuilds it from scratch                                                     |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 
@@ -60,6 +64,8 @@ npm run test:smoke
 ```
 
 Point it elsewhere with `SMOKE_BASE_URL`, which is how it checks a server that is not sitting on 8080.
+
+The telemetry checks inside it read the records a voyage leaves behind, so a server under test has to be recording them. That is the default, and a server started with `TELEMETRY_SAMPLE_RATE=0` is refused with a sentence saying so rather than passing green over a database nothing was written to.
 
 ## The rules
 
@@ -123,6 +129,16 @@ Reputation decides the voyage. Gold buys you the means, but Reputation is the sc
 
 A captain goes bankrupt when the bills at Settlement cannot be covered. That ends the voyage for them but not for the harbor, and the rest of the crew sails on. The final Reputation then becomes Renown XP, multiplied by the difficulty tier, which levels the account up over many voyages.
 
+### Sealed voyages
+
+One voyage on the create form is sealed. Ocean Gambit, where the trade orders are committed before the social window opens, is not offered to a host who walks up to it cold: the harbor asks for a phrase before it will open that table, and a host who does not have it can still charter anything else.
+
+The phrase is seeded in the world rather than printed on the form, and there are three places it turns up. A captain's tenth completed voyage writes it into the chronicle of that voyage, which the game hands them directly. The How to Play guide keeps a copy on its last page for whoever goes looking. And this page keeps one too, because a captain who was told about the door by a friend has to be able to find the key:
+
+    the second ledger
+
+It is a room setting rather than an account one, and that is the design rather than a shortcut. Whoever has the phrase can open the table for everybody who sits down at it, the harbor remembers which door it was opened through and says so on the room card, and nothing is spent or rationed by using it. A phrase that opened one harbor opens the next one too.
+
 ## What is in the game
 
 **The harbor and the room.** Public and private harbors, a six character join code, a live roster, a ready check that keeps the whole crew in step, and a host who controls the difficulty and the restart.
@@ -164,9 +180,9 @@ Every system of the earlier build is still here and still working the same way, 
 |                        | The earlier build | PortMasters 2.2 Parallel Release |
 | ---------------------- | ----------------- | -------------------------------- |
 | Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 20 modules                       |
-| Interface components   | 29                | 60                               |
-| Database models        | 10                | 13                               |
+| Realtime layer         | one long file     | 25 modules                       |
+| Interface components   | 29                | 65                               |
+| Database models        | 10                | 14                               |
 | The port it answers on | 2232              | 8080                             |
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
@@ -175,16 +191,19 @@ The interface and the realtime layer were both rebuilt around the new systems, a
 
 ## Configuration
 
-The server reads four environment variables. Three of them configure the process at boot, and the fourth gates the operator account.
+The server reads five environment variables. Four of them configure the process at boot, and the fifth gates the operator account.
 
-| Variable           | Value in `.env.example` | What it does                                                                                             |
-| ------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`     | `file:../db/custom.db`  | The SQLite file holding every account, harbor and voyage. The path is relative to `prisma/schema.prisma` |
-| `PORT`             | `8080`                  | The port the whole game answers on                                                                       |
-| `HOST`             | `0.0.0.0`               | The address to bind. Use `127.0.0.1` to keep the game on this machine only                               |
-| `ADMIN_SETUP_CODE` | a placeholder           | The one code that admits an operator account through `/admin`. Empty refuses every attempt               |
+| Variable                | Value in `.env.example` | What it does                                                                                               |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`          | `file:../db/custom.db`  | The SQLite file holding every account, harbor and voyage. The path is relative to `prisma/schema.prisma`   |
+| `PORT`                  | `8080`                  | The port the whole game answers on                                                                         |
+| `HOST`                  | `0.0.0.0`               | The address to bind. Use `127.0.0.1` to keep the game on this machine only                                 |
+| `ADMIN_SETUP_CODE`      | a placeholder           | The one code that admits an operator account through `/admin`. Empty refuses every attempt                 |
+| `TELEMETRY_SAMPLE_RATE` | `1`                     | The share of voyages recorded for balance analysis, as a fraction of one. `1` is every voyage, `0` is none |
 
 `DATABASE_URL` has no fallback and the server will not start without it, so copy `.env.example` to `.env` before the first run. The operator code fails closed, so an installation that never sets a real one has no way in at all, which is the safe direction for that particular door.
+
+`TELEMETRY_SAMPLE_RATE` is the one setting a live game reads without any captain noticing. A voyage that ends leaves one row describing what happened in it, which is where any later reading of the numbers is taken from, and this is the share of voyages that leave one. It is a fraction of one, so `0.25` records a quarter of them, and the decision is drawn once per voyage and held for its whole life rather than made per event, so a recorded voyage is recorded from its first leg to its last. Leave it unset and every voyage is recorded, which is the default because a game this size has no volume problem yet. Nothing in a voyage waits on that write, and no rule of the game reads a record back, so turning it down or off changes what the harbor remembers and never how it plays.
 
 An environment variable that is already set always wins over the file, which is the order a hosting platform expects. Point `ENV_FILE` at a different file to read from that one instead, which is how two servers run side by side from a single checkout without editing anything back and forth.
 

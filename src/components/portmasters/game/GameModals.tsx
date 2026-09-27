@@ -18,6 +18,12 @@ import {
   tutorialSteps,
 } from "@/lib/game/constants";
 import type { Difficulty } from "@/lib/game/difficulty";
+// The two modals below that quote a voyage's length take the mode as well
+// as the tier, because the length is the voyage's rather than the tier's
+// alone (see voyageLegs in src/lib/game/mode). The caller reads both off
+// the state the captain is sailing, which is what keeps the copy and the
+// voyage it describes the same voyage.
+import type { GameMode } from "@/lib/game/mode";
 import {
   unlockedProducts,
   unlockedResources,
@@ -105,10 +111,12 @@ function TextModal({
 export function GuideModal({
   open,
   onOpenChange,
+  mode,
   difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  mode: GameMode;
   difficulty: Difficulty;
 }) {
   return (
@@ -122,7 +130,7 @@ export function GuideModal({
       }
       title="Navigation Guide"
       description={`${APP_NAME} rules and shortcuts`}
-      body={guideText(difficulty)}
+      body={guideText(mode, difficulty)}
     />
   );
 }
@@ -130,10 +138,12 @@ export function GuideModal({
 export function TipsModal({
   open,
   onOpenChange,
+  mode,
   difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  mode: GameMode;
   difficulty: Difficulty;
 }) {
   return (
@@ -143,7 +153,7 @@ export function TipsModal({
       badge={<Lightbulb className="h-5 w-5 text-advisor" />}
       title="Trade Strategy Advice"
       description="Bankruptcy avoidance strategies"
-      body={tipsText(difficulty)}
+      body={tipsText(mode, difficulty)}
     />
   );
 }
@@ -355,14 +365,19 @@ export function RestartConfirmModal({
 export function TutorialModal({
   open,
   onOpenChange,
+  mode,
   difficulty,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  mode: GameMode;
   difficulty: Difficulty;
 }) {
   const [step, setStep] = useState(0);
-  const steps = useMemo(() => tutorialSteps(difficulty), [difficulty]);
+  const steps = useMemo(
+    () => tutorialSteps(mode, difficulty),
+    [mode, difficulty],
+  );
   const total = steps.length;
   const s = steps[step];
   const pct = Math.round(((step + 1) / total) * 100);

@@ -28,10 +28,13 @@
 // going rate on purpose. A commission is a commission; the cost to a
 // captain is the goods and the orders they are not filling, not a discount
 // on the goods themselves. These numbers are the balance knob the epic's
-// evaluation will move, so they live in one place.
+// evaluation will move, so they live in one place. The other knob, the
+// quota rung that scales a commission with the size of the fleet that owes
+// it, lives in this module too and is written out below the deck.
 // =====================================================================
 
 import { createRng, pick } from "./rng";
+import type { ObjectiveTraceEntry } from "./types";
 
 export type Objective = {
   id: string;
@@ -47,7 +50,11 @@ export type Objective = {
 
 // Six commissions, every good drawn from the founding tier so an objective
 // is fillable in the first round of every difficulty. Ordered smallest to
-// largest, which is the order the difficulty rung iteration will filter on.
+// largest, which is the order a reader wants them in. The rung below does
+// not filter on that order: it scales every entry's quotas, because the
+// authoring rule above is a property of the entry rather than of its size,
+// and an entry deleted for being small would take a commission out of the
+// deck rather than make the deck harder.
 export const OBJECTIVE_DECK: readonly Objective[] = [
   {
     id: "hemp_cordage",
@@ -108,29 +115,108 @@ export const OBJECTIVE_DECK: readonly Objective[] = [
   },
 ];
 
+// ========== The quota rung ==========
+// The deck's quotas are authored for a founding table, and a voyage with a
+// fifth and a sixth captain on it moves half again as much cargo. Left
+// alone, one commission gets easier with every extra seat, which is not a
+// difficulty setting anybody chose: it is the sabotage window widening as
+// the table shrinks, and the Pirate is the captain who pays for it. So the
+// quotas scale with the fleet the voyage was dealt to, and only the quotas:
+// every price stays put, so a wider commission pays the fleet more for the
+// extra cargo rather than paying less per item for it.
+//
+// Quota per head held constant is what makes the rung flat rather than
+// merely harder. Four captains are the deck's authoring table, so four or
+// fewer is the anchor and multiplies by nothing, which is what keeps a
+// voyage that began before the rung existed on exactly the board it drew.
+// Five captains carry a quarter more than four, six carry half again, and
+// the rounding is up rather than nearest because the error it can introduce
+// (at most one item per good) should fall on the side the Pirate's band
+// lives on. A table larger than six sails on the top band: the deal itself
+// is authored for six (see ./gambit.ts), and a seventh seat is a size this
+// rung has no measurement for.
+export type SeatBand = {
+  // The fewest captains in this band. 0 is the anchor's own floor, and the
+  // reading for a voyage that was never pinned.
+  min: number;
+  // What every quota in the drawn commission is multiplied by.
+  factor: number;
+  // What the band is called wherever a human reads it. Authored rather
+  // than derived from the floor above, because "4 or fewer" is the sentence
+  // a report wants and "0 to 4" is a range.
+  label: string;
+};
+
+// The bands, smallest first, which is also the order a report reads them
+// in. Exported because the two readers outside this module (the win rate
+// reader in ../balance and the smoke suite) have to walk the same bands
+// this table holds rather than list them again.
+export const SEAT_BANDS: readonly SeatBand[] = [
+  { min: 0, factor: 1, label: "4 or fewer" },
+  { min: 5, factor: 1.25, label: "5" },
+  { min: 6, factor: 1.5, label: "6 or more" },
+];
+
+// Which band a fleet of this size sails on. A pinned count and 0 both land
+// here, which is the backward compatibility: 0 is the anchor, so a room
+// that started before the rung existed draws the founding deck.
+export function seatBand(seats: number): SeatBand {
+  let band = SEAT_BANDS[0];
+  for (const candidate of SEAT_BANDS) {
+    if (seats >= candidate.min) band = candidate;
+  }
+  return band;
+}
+
 // The seed for the draw. It carries the harbor and the voyage and no
 // captain, which is the whole mechanism: every captain in one harbor has to
 // arrive at the same commission, and the only way for that to be true
 // without the server telling them is for the seed to be built out of values
 // they all already hold. The voyage epoch is what makes a restarted voyage
 // draw a new commission rather than replaying one the fleet already met.
-export function objectiveSeed(harborId: string, voyageEpoch: number): string {
-  return `${harborId}:V${voyageEpoch}:objective`;
+//
+// The fleet's size is folded in on the same reasoning and adds one case of
+// its own: the count is a public fact of the room (see Room.voyageSeats),
+// so every captain still works the commission out rather than being told
+// it, and a harbor restarted at a different size draws a different
+// commission for the same reason a restarted epoch does. It is appended
+// only above the anchor band, so a founding table's seed is the string it
+// always was and its board is the board it always drew.
+export function objectiveSeed(
+  harborId: string,
+  voyageEpoch: number,
+  seats = 0,
+): string {
+  const base = `${harborId}:V${voyageEpoch}:objective`;
+  return seatBand(seats).factor === 1 ? base : `${base}:S${seats}`;
 }
 
 /**
  * Which commission this harbor owes, from a seed the caller owns.
  *
- * The draw chooses the objective and nothing else. Every number inside an
- * entry is fixed data, exactly as the mandate templates are, so the
- * question "what does this ask for" never depends on the rng.
+ * The draw chooses the objective and nothing else. What the fleet's size
+ * decides is the rung: the entry the seed names, with every count in it
+ * multiplied by the band's factor. That is applied here and nowhere else,
+ * so a caller does not have to know the rung exists beyond passing the size
+ * it already holds, and the two callers that matter (the server clamping
+ * what a captain reports, the client showing the board) cannot scale it
+ * twice or forget to scale it at all.
  *
- * A difficulty rung, when the epic gets to one, filters OBJECTIVE_DECK here
- * and nowhere else: no caller passes difficulty in, so no caller has to
- * know that a rung exists.
+ * An entry at the anchor comes back as it is authored rather than as a copy
+ * of it, which is both the board every voyage before the rung drew and the
+ * object the smoke suite compares against.
  */
-export function drawObjective(seed: string): Objective {
-  return pick(createRng(seed), OBJECTIVE_DECK);
+export function drawObjective(seed: string, seats = 0): Objective {
+  const objective = pick(createRng(seed), OBJECTIVE_DECK);
+  const { factor } = seatBand(seats);
+  if (factor === 1) return objective;
+  return {
+    ...objective,
+    resources: objective.resources.map((r) => ({
+      ...r,
+      required: Math.ceil(r.required * factor),
+    })),
+  };
 }
 
 // How many items the commission is for, across every good.
@@ -138,18 +224,25 @@ export function objectiveTotalItems(objective: Objective): number {
   return objective.resources.reduce((sum, r) => sum + r.required, 0);
 }
 
-// What the whole commission pays out if the fleet fills it. Read by the
-// Ledger Integrity Pass, which has to know the largest amount of gold this
-// mode can conjure out of a hold in a round.
+// What the whole commission pays out if the fleet fills it, at the widest
+// band it can be drawn on. Read by the Ledger Integrity Pass, which has to
+// know the largest amount of Gold this mode can conjure out of a hold in a
+// round, so it is read across every band rather than off the deck as
+// authored: a six captain commission pays half again what the founding one
+// does, and a ceiling that read the deck alone would call that payout
+// impossible the first time a full table filled one.
 export function widestObjectivePayout(): number {
-  return OBJECTIVE_DECK.reduce(
-    (widest, o) =>
-      Math.max(
-        widest,
-        o.resources.reduce((sum, r) => sum + r.required * r.price, 0),
-      ),
-    0,
-  );
+  let widest = 0;
+  for (const band of SEAT_BANDS) {
+    for (const objective of OBJECTIVE_DECK) {
+      const payout = objective.resources.reduce(
+        (sum, r) => sum + Math.ceil(r.required * band.factor) * r.price,
+        0,
+      );
+      widest = Math.max(widest, payout);
+    }
+  }
+  return widest;
 }
 
 /**
@@ -174,6 +267,48 @@ export function clampObjectiveTally(
     clean[r.type] = Math.min(whole, r.required);
   }
   return clean;
+}
+
+/**
+ * The fleet's commission leg by leg, merged out of every captain's own
+ * record of it.
+ *
+ * What each client writes down is the harbor's total rather than its own
+ * contribution (see the trace effect in src/lib/use-objective.ts), so this
+ * is one number seen by several captains and not a sum of parts. That is
+ * why it merges by max per good per leg, the rule the live board already
+ * merges by: a captain whose client missed a leg, reloaded, or joined the
+ * voyage late cannot walk the curve backwards, and a leg that two clients
+ * both recorded is recorded once. Legs come back in order, because the
+ * whole point of the trace is that it reads as a story.
+ *
+ * [H8: the reveal and the replay ledger] Written here rather than in the
+ * one module that calls it, because this is the same arithmetic
+ * objectiveProgress and clampObjectiveTally are written with, and a second
+ * reading of what the fleet handed over is how the ledger would come to
+ * disagree with the board it is drawn beside.
+ */
+export function fleetTrace(
+  traces: readonly (readonly ObjectiveTraceEntry[])[],
+): ObjectiveTraceEntry[] {
+  const byRound = new Map<number, ObjectiveTraceEntry>();
+  for (const trace of traces) {
+    for (const entry of trace) {
+      const round = Math.floor(entry.round);
+      if (!Number.isFinite(round)) continue;
+      const standing = byRound.get(round);
+      const delivered = standing?.delivered ?? {};
+      for (const [good, count] of Object.entries(entry.delivered)) {
+        delivered[good] = Math.max(delivered[good] ?? 0, count);
+      }
+      byRound.set(round, {
+        round,
+        at: Math.max(standing?.at ?? 0, entry.at),
+        delivered,
+      });
+    }
+  }
+  return [...byRound.values()].sort((a, b) => a.round - b.round);
 }
 
 /**

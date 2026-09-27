@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants";
@@ -7,6 +8,8 @@ import { nextPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
+import { AuditVoteCard } from "../AuditPanel";
+import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
@@ -15,20 +18,26 @@ export function BarterPhase({
   ctx,
   act,
   barter,
+  audit,
+  maroon,
   phaseSync,
   members,
   colorFor,
   me,
+  roster,
 }: Pick<
   PhasePanelProps,
   | "game"
   | "ctx"
   | "act"
   | "barter"
+  | "audit"
+  | "maroon"
   | "phaseSync"
   | "members"
   | "colorFor"
   | "me"
+  | "roster"
 >) {
   // The board's own composer. It shares useOfferDraft with the one a chat
   // opens, so both surfaces agree on what counts as postable, and it draws
@@ -42,6 +51,29 @@ export function BarterPhase({
   // open to every captain from their first voyage.
   const draft = useOfferDraft(game, barter, act, false);
   const otherMembers = members.filter((m) => m.id !== me.id);
+
+  // [H6: the Manifest Audit] The leg this screen is on ends the moment the
+  // vote carries, so the captain reads the finding on the strip above and
+  // this phase, which the audit just spent, closes behind it.
+  //
+  // It closes the way every phase closes: by marking ready. That is the
+  // whole reason this belongs in the component rather than in the realtime
+  // layer. A server that emptied the checkpoint's ready set on the room's
+  // behalf would move the checkpoint while every client sat waiting to be
+  // told to move, which is a room stuck forever; here each client runs the
+  // one transition it already knows, and the room advances through the
+  // protocol it was already using.
+  //
+  // The guards are the ones that keep a stale finding from spending a
+  // later leg: the reveal carries the leg it was made in, so a captain who
+  // reloads in leg seven is shown the finding without being pushed out of
+  // a Parley the harbor never voted to end.
+  const revealedRound = audit.reveal?.round;
+  useEffect(() => {
+    if (revealedRound === undefined) return;
+    if (game.phase !== "barter" || game.currentRound !== revealedRound) return;
+    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
+  }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
 
   const selectClass =
     "h-9 rounded-md border border-input bg-transparent px-2 text-sm";
@@ -147,6 +179,23 @@ export function BarterPhase({
           </p>
         )}
       </div>
+
+      {/* [H7: Maroon and the Harbormaster] The console sits above the two
+          votes because it belongs to one captain and it is the reason this
+          screen is open for them: everything under it is the table's
+          business, and this is theirs. It renders nothing at all for a
+          captain the harbor has not put ashore. */}
+      <HarbormasterConsole game={game} maroon={maroon} />
+
+      <AuditVoteCard game={game} members={members} me={me} audit={audit} />
+
+      <MaroonVoteCard
+        game={game}
+        members={members}
+        me={me}
+        maroon={maroon}
+        statuses={roster?.statuses}
+      />
 
       {barter.error && (
         <PhaseError

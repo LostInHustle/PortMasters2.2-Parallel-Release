@@ -12,6 +12,7 @@
 import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
 import { normalizeDifficulty } from "./game/difficulty";
 import { normalizeMode } from "./game/mode";
+import { unlockById } from "./unlock";
 import type { RoomDetail, RoomSummary } from "./api";
 
 // Forwarded so callers that work with rooms (the realtime mini
@@ -39,7 +40,10 @@ export type { RoomDetail };
 // build has never heard of, sailed out of here wearing a valid type. Both now
 // pass through their own normalizer, so a room whose row somehow holds
 // something unexpected resolves to the founding value instead of handing the
-// client a lap or a tier that does not exist.
+// client a lap or a tier that does not exist. Unlock is read the same way and
+// resolves to nothing rather than to a phrase this build does not have, so a
+// row opened by a table that has since changed hands reads as an ordinary
+// harbor rather than as one wearing a code nobody can name.
 export function serializeRoom(
   room: {
     id: string;
@@ -49,6 +53,7 @@ export function serializeRoom(
     started: boolean;
     difficulty: string;
     mode: string;
+    unlock: string;
     createdAt: Date;
     host: PublicUser;
   },
@@ -62,6 +67,7 @@ export function serializeRoom(
     started: room.started,
     difficulty: normalizeDifficulty(room.difficulty),
     mode: normalizeMode(room.mode),
+    unlock: unlockById(room.unlock),
     createdAt: room.createdAt.toISOString(),
     host: room.host,
     memberCount: members.length,
@@ -112,7 +118,10 @@ export function roomLockedFor(
 // seated captain learns which voyage they are joining, so a field dropped
 // here is a captain walking into a harbor on the wrong lap with nothing to
 // read that says so. Mode is listed beside difficulty for that reason rather
-// than because the seating rule reads it.
+// than because the seating rule reads it, and unlock is listed beside the two
+// of them because it is the third thing a seated captain is handed: the table
+// they just joined may have been opened by a phrase, and the card they read
+// it off is this one.
 export async function admitToRoom(
   room: {
     id: string;
@@ -122,6 +131,7 @@ export async function admitToRoom(
     started: boolean;
     difficulty: string;
     mode: string;
+    unlock: string;
     createdAt: Date;
     host: PublicUser;
     members: Array<{ userId: string }>;

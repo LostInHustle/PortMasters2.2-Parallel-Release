@@ -26,8 +26,10 @@ import {
   openingPhase,
 } from "@/lib/game/checkpoint";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
+import type { PortShift } from "@/lib/game/maroon";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Checkpoint } from "./types";
+import { portShiftFor } from "./maroon";
 import { roomStatuses } from "./status";
 import { roomPulseTallies } from "./pulse";
 
@@ -64,7 +66,13 @@ export async function getCheckpoint(roomId: string): Promise<Checkpoint> {
 // Deliberately based on durable room membership, not on who currently
 // has a live socket connected. A member who is just slow to load still
 // correctly counts as someone the room needs to wait for.
-async function activeRosterSet(roomId: string): Promise<Set<string>> {
+//
+// Exported for the one caller that is not an advance: the Manifest
+// Audit's majority (see ./audit) is counted against this same roster, so
+// the room the audit is put to and the room a phase waits for are the
+// same set of captains. A second roster read that meant "who counts"
+// would be a second answer to that question.
+export async function activeRosterSet(roomId: string): Promise<Set<string>> {
   const statuses = roomStatuses.get(roomId);
   const memberIds = await roomMemberIds(roomId);
   const out = new Set<string>();
@@ -111,6 +119,14 @@ export async function broadcastReadyState(
 // round's purchase tallies are folded into a harbor pulse and delivered
 // alongside the advance, so every client's genResourceCard leans the
 // new round's market toward whatever the harbor actually bought.
+//
+// [H7: Maroon and the Harbormaster] The Harbormaster's shift rides the
+// same broadcast, for the same reason and by the same route: it is a
+// per leg hand on the market that is about to be drawn, so it has to land
+// before genResourceCard runs rather than as a round trip that could
+// arrive after it. It is sent as null on a leg nobody leaned, which is
+// what clears last leg's shift; see applyPortShift for why that has to be
+// a value rather than an omission.
 export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
   const cp = await getCheckpoint(roomId);
   if (cp.advancing) return;
@@ -132,6 +148,7 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
   // rather than against a fixed number (see computeHarborPulse). Read
   // only on the advance that opens a market.
   let harborPulse: Record<string, number> | undefined;
+  let portShift: PortShift | null | undefined;
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: { difficulty: true, mode: true },
@@ -141,11 +158,13 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
       roomPulseTallies.get(roomId)?.get(cp.round - 1),
       unlockedResources(room?.difficulty, cp.round),
     );
+    portShift = portShiftFor(roomId, cp.round);
   }
   io.to(`room:${roomId}`).emit("phase:advance", {
     roomId,
     round: cp.round,
     phase: cp.phase,
     ...(harborPulse ? { harborPulse } : {}),
+    ...(portShift !== undefined ? { portShift } : {}),
   });
 }
