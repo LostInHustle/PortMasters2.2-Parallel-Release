@@ -25,3 +25,18 @@ export type PublicUser = {
   displayName: string;
   avatarHue: number;
 };
+
+/**
+ * The four fields every wire user carries, picked off a row that holds
+ * more. A create returns the whole row, and the routes that mint a session
+ * hand back only this much of it, so the picking happens in one place
+ * rather than once per route.
+ */
+export function publicUser(row: PublicUser): PublicUser {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.displayName,
+    avatarHue: row.avatarHue,
+  };
+}

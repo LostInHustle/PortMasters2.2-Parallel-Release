@@ -8,7 +8,11 @@ import {
   type PublicUser,
   type RoomDetail,
 } from "@/lib/api";
-import type { VoyageResult } from "@/types/realtime";
+import type {
+  RoomMembersPayload,
+  VoyageResult,
+  VoyageReveal,
+} from "@/types/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
@@ -16,6 +20,7 @@ import {
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
+import { normalizeStandingOrders } from "@/lib/game/standing";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
@@ -23,6 +28,12 @@ import {
   usePlayerDetail,
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
+import { usePrivateLog } from "@/lib/use-private-log";
+import { useVoyageLog } from "@/lib/use-voyage-log";
+import { useObjective } from "@/lib/use-objective";
+import { useLegReport } from "@/lib/use-leg-report";
+import { useAudit } from "@/lib/use-audit";
+import { useMaroon } from "@/lib/use-maroon";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import {
   useAid,
@@ -46,6 +57,11 @@ import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
+import { PrivateCard } from "./game/PrivateCard";
+import { StandingOrdersModal } from "./game/StandingOrdersModal";
+import { ObjectivePanel } from "./game/ObjectivePanel";
+import { AuditRevealStrip } from "./game/AuditPanel";
+import { MaroonResultStrip, PortShiftStrip } from "./game/MaroonPanel";
 import {
   GuideModal,
   TipsModal,
@@ -142,7 +158,7 @@ export function GameRoom({
     volume: soundVolume,
     setVolume: setSoundVolume,
   } = useSound();
-  const { state, act, ctx, flush, startingGoldBonus } = useGameSession(
+  const { state, act, ctx, flush, startingGoldBonus, seats } = useGameSession(
     room.id,
     socket,
     true,
@@ -156,6 +172,9 @@ export function GameRoom({
     socket,
     state.game,
     act,
+    // The voyage's own seed identity, which the engine's autoCommit needs to
+    // leave a seat on the clock's behalf (see [B2] in @/lib/use-phase-sync).
+    ctx,
     authed,
     me.id,
     startingGoldBonus,
@@ -185,7 +204,14 @@ export function GameRoom({
         );
       } else if (offer.fromUserId === me.id) {
         act((g, l) =>
-          settleBarterTrade(g, offer.requestItem, offer.requestAmount, l),
+          settleBarterTrade(
+            g,
+            offer.requestItem,
+            offer.requestAmount,
+            offer.offerItem,
+            offer.offerAmount,
+            l,
+          ),
         );
       }
     },
@@ -380,6 +406,12 @@ export function GameRoom({
   }, [socket, authed, room.id]);
 
   const [voyageResult, setVoyageResult] = useState<VoyageResult | null>(null);
+  // [H8: the reveal and the replay ledger] The harbor's cards, face up.
+  // It arrives once, when the voyage concludes, and again for a captain
+  // who reloads onto a finished table: the server hands the same payload
+  // to a joining socket, which is the only way a browser that was not
+  // there for the reveal can be given one.
+  const [reveal, setReveal] = useState<VoyageReveal | null>(null);
   const [myLegacy, setMyLegacy] = useState<CaptainLegacySummary | null>(null);
   useEffect(() => {
     if (!socket) return;
@@ -415,11 +447,21 @@ export function GameRoom({
     const onRestarted = (data: { roomId: string }) => {
       if (data.roomId !== room.id) return;
       setVoyageResult(null);
+      // The cards belonged to the voyage that just ended, so they go with
+      // it. The next departure deals a fresh hand and the next conclusion
+      // is what flips it.
+      setReveal(null);
+    };
+    const onReveal = (data: VoyageReveal) => {
+      if (data.roomId !== room.id) return;
+      setReveal(data);
     };
     socket.on("room:voyage_complete", onVoyageComplete);
+    socket.on("voyage:reveal", onReveal);
     socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("room:voyage_complete", onVoyageComplete);
+      socket.off("voyage:reveal", onReveal);
       socket.off("room:restarted", onRestarted);
     };
   }, [socket, room.id, me.id]);
@@ -575,6 +617,38 @@ export function GameRoom({
     [state.game, state.logs],
   );
   const playerDetail = usePlayerDetail(socket, room.id, myDetail);
+  // Whatever this voyage has told this captain and no one else. Empty in
+  // every Classic harbor, because nothing is ever sent there.
+  const privateLog = usePrivateLog(socket, room.id);
+  // [B4: the log surfaces] The room's own log, which is the other half of
+  // the same pair and is read beside it at Dusk. It subscribes here, where
+  // the socket is, but it asks the server for nothing until the screen
+  // that draws it says so.
+  const voyageLog = useVoyageLog(socket, room.id);
+  // The other half of that contrast: the one thing this voyage tells
+  // everyone. No objective is drawn in Classic, so the hook stays inert
+  // and the panel renders nothing there. The fleet's size goes with it,
+  // because the commission's quotas are scaled by it and only the room
+  // knows what it was pinned to.
+  const objective = useObjective(socket, room.id, state.game, ctx, act, seats);
+  // [I1: the telemetry spine] What this voyage's records are missing
+  // otherwise: the orders each leg dealt and filled, and how varied the
+  // hold closed it. Nothing comes back from this, and nothing on the
+  // screen reads it: it is the one subscription in this component that is
+  // purely a measurement.
+  useLegReport(socket, room.id, state.game);
+  // [H6: the Manifest Audit] The harbor's vote and its finding, in one
+  // hook because they are one interaction: the vote is what the Parley
+  // phase offers, and the finding is what outlives it. Both are broadcast
+  // and both are room stamped inside the hook. Inert in Classic, where no
+  // vote can be called and none is ever sent.
+  const audit = useAudit(socket, room.id, state.game, me.id);
+  // [H7: Maroon and the Harbormaster] The second vote, and the one piece
+  // of state in this component a client applies to its own books on
+  // somebody else's word, which is why this hook is handed `act`. Inert in
+  // Classic, where no rung exists, no vote can be called and no leaning
+  // port can be named.
+  const maroon = useMaroon(socket, room.id, state.game, me.id, act);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
   const [guideOpen, setGuideOpen] = useState(false);
@@ -583,6 +657,8 @@ export function GameRoom({
   const [tutOpen, setTutOpen] = useState(false);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  // [B3: standing orders] The captain's own record, edited in place.
+  const [standingOpen, setStandingOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
@@ -607,12 +683,11 @@ export function GameRoom({
   const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
   useEffect(() => {
     if (!socket) return;
-    const onMembers = (data: {
-      roomId: string;
-      members?: Array<PublicUser & { joinedAt?: string }>;
-      hostId: string | null;
-      mutedUserIds?: string[];
-    }) => {
+    // Read defensively, field by field, even though the server always
+    // writes all three: this is a wire frame, and a client that has
+    // reloaded into a slightly older bundle should read the part it can
+    // rather than drop the whole roster over a field it does not expect.
+    const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== room.id) return;
       if (data.hostId) setHostId(data.hostId);
       if (data.members) setMembers(data.members);
@@ -789,7 +864,7 @@ export function GameRoom({
       typeof window !== "undefined"
         ? localStorage.getItem(TUTORIAL_SEEN_KEY)
         : null;
-    if (!seen && state.loaded && state.game.phase === 0) {
+    if (!seen && state.loaded && state.game.phase === "harbor") {
       autoTutorialFired.current = true;
       const t = setTimeout(() => setTutOpen(true), 600);
       return () => clearTimeout(t);
@@ -1066,9 +1141,32 @@ export function GameRoom({
           me={me}
           initialMembers={members}
         />
+        {/* The voyage's public objective, full width because it is owed by
+            the whole harbor rather than by the captain whose column it
+            would otherwise sit in. Renders nothing at all in Classic. */}
+        <ObjectivePanel
+          game={state.game}
+          objective={objective.objective}
+          progress={objective.progress}
+          deliverable={objective.deliverable}
+          onDeliver={objective.deliver}
+        />
+        {/* Whatever the harbor voted to open, and nothing at all in a
+            voyage that has not audited anyone. It sits under the
+            commission because it is the other thing the whole table
+            shares, and it stays for the rest of the voyage: the argument
+            about what it means is the feature. */}
+        <AuditRevealStrip reveal={audit.reveal} />
+        {/* The harbor's heavier vote, and the market condition it leaves
+            behind. Both sit in the same place for the same reason: they
+            belong to the table rather than to a column, and the market
+            strip has to be readable while a captain is pricing a card.
+            Each renders nothing at all in a voyage neither has touched. */}
+        <MaroonResultStrip result={maroon.result} />
+        <PortShiftStrip shift={maroon.shift} round={state.game.currentRound} />
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
           {/* Left: the captain's own rail */}
-          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
+          <div className="order-3 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
             <div className="pm-glass h-full rounded-2xl p-3">
               <GameStatusPanel
                 game={state.game}
@@ -1082,7 +1180,7 @@ export function GameRoom({
           </div>
 
           {/* Center: phase + controls */}
-          <div className="space-y-3 order-1 lg:order-2 min-w-0">
+          <div className="space-y-3 order-2 lg:order-2 min-w-0">
             <GamePhasePanel
               game={state.game}
               ctx={ctx}
@@ -1092,6 +1190,10 @@ export function GameRoom({
               barter={barter}
               aid={aid}
               backing={backing}
+              audit={audit}
+              maroon={maroon}
+              voyageLog={voyageLog}
+              privateLog={privateLog}
               me={me}
               room={{
                 id: room.id,
@@ -1100,6 +1202,7 @@ export function GameRoom({
                 hostId,
               }}
               voyageResult={voyageResult}
+              reveal={reveal}
               myLegacy={myLegacy}
               onRestart={handleRestart}
               onRumorBoardOpen={() => setRumorOpen(true)}
@@ -1119,8 +1222,28 @@ export function GameRoom({
               waiting={phaseSync.waiting}
               readyCount={phaseSync.readyCount}
               requiredCount={phaseSync.requiredCount}
+              clock={phaseSync.phaseClock}
+              onStandingOrders={() => setStandingOpen(true)}
               onCancelReady={phaseSync.cancelReady}
             />
+            {/* The captain's own card, below the controls, where it
+                stands under the buttons rather than between them and the
+                phase they act on. It draws nothing at all in a harbor
+                that has not dealt one.
+
+                The peer ledger is the one thing a card shows that the
+                server did not send: it is read from the captain's own
+                voyage, on the captain's own screen, and no drawer holds
+                it, which is why the card asks for it rather than it
+                travelling on the private entry. Only a Broker's card
+                prints it. */}
+            {privateLog.map((entry, index) => (
+              <PrivateCard
+                key={`${entry.kind}:${index}`}
+                entry={entry}
+                peerTradeProfit={state.game.peerTradeProfit}
+              />
+            ))}
             {/* Wraps rather than overflowing. These five hint chips and
                 their labels are wider than a phone, and a centred row
                 with no wrap spills off both edges at once, which both
@@ -1154,9 +1277,15 @@ export function GameRoom({
             </div>
           </div>
 
-          {/* Right: roster + chat */}
-          <div className="order-3 space-y-3 min-w-0">
-            <div className="h-[320px]">
+          {/* Right: roster + chat. Under the lg breakpoint this column leads
+              the stack and the chat leads inside it. The chat used to come
+              last of everything, below the phase panel and the roster, which
+              put it three screens down on a narrow window and left captains
+              reading it as missing. The FleetTicker above already carries the
+              roster at these widths, so nothing is lost by following with it
+              rather than opening with it. */}
+          <div className="order-1 flex flex-col gap-3 min-w-0 lg:order-3 lg:block lg:space-y-3">
+            <div className="order-2 h-[320px]">
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1168,7 +1297,7 @@ export function GameRoom({
               />
             </div>
             <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
+              className="order-1 pm-glass rounded-2xl overflow-hidden flex flex-col"
               style={{ height: 380 }}
             >
               <Tabs
@@ -1176,6 +1305,16 @@ export function GameRoom({
                 onValueChange={(v) => setChatTab(v as "room" | "dm")}
                 className="flex flex-col h-full"
               >
+                {/* The panel names itself. The tabs below say which channel
+                    is open, and without a head above them the harbor chat
+                    was only ever legible as a tab label rather than as a
+                    widget a captain could look for. */}
+                <div className="flex items-center gap-2 px-3 pt-3">
+                  <MessageCircle className="h-3.5 w-3.5 text-chat" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-chat">
+                    {chatTab === "room" ? "Harbor chat" : "Direct messages"}
+                  </span>
+                </div>
                 <TabsList className="grid grid-cols-2 m-2 mb-0">
                   <TabsTrigger value="room">
                     <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor
@@ -1184,8 +1323,16 @@ export function GameRoom({
                     <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Direct
                   </TabsTrigger>
                 </TabsList>
+                {/* Both channels stay mounted. The panel holds the lines it
+                    was handed live, so unmounting the harbor on the way to
+                    Direct would drop every line said while the captain was
+                    looking at the other one, and switching back would show
+                    the log as it stood when the voyage started. The room's
+                    history reaches this panel once, on join, so there is
+                    nothing to re seed it from. */}
                 <TabsContent
                   value="room"
+                  forceMount
                   className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
                 >
                   <ChatPanel
@@ -1200,6 +1347,7 @@ export function GameRoom({
                 </TabsContent>
                 <TabsContent
                   value="dm"
+                  forceMount
                   className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
                 >
                   <DmTab
@@ -1225,11 +1373,13 @@ export function GameRoom({
       <GuideModal
         open={guideOpen}
         onOpenChange={setGuideOpen}
+        mode={state.game.mode}
         difficulty={state.game.difficulty}
       />
       <TipsModal
         open={tipsOpen}
         onOpenChange={setTipsOpen}
+        mode={state.game.mode}
         difficulty={state.game.difficulty}
       />
       <RumorBoardModal
@@ -1241,7 +1391,24 @@ export function GameRoom({
       <TutorialModal
         open={tutOpen}
         onOpenChange={handleTutorialOpenChange}
+        mode={state.game.mode}
         difficulty={state.game.difficulty}
+      />
+      {/* [B3: standing orders] The form writes the record the way the
+          load heal does, through the normalizer, rather than trusting
+          what the controls composed. The controls can only build the
+          closed vocabulary, so this is not a guard against them: it is
+          what keeps one shape of the record on the voyage whether it
+          arrived from a form, from a save, or from a restart. */}
+      <StandingOrdersModal
+        open={standingOpen}
+        onOpenChange={setStandingOpen}
+        game={state.game}
+        onChange={(orders) =>
+          act((g) => {
+            g.standingOrders = normalizeStandingOrders(orders);
+          })
+        }
       />
       <RestartConfirmModal
         open={restartConfirmOpen}

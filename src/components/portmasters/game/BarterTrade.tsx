@@ -1,10 +1,10 @@
 "use client";
 
 // =====================================================================
-// The trade surface that both a chat and the Bartering phase board use.
+// The trade surface that both a chat and the Parley board use.
 //
-// There are two places a captain can compose a swap now: the Bartering
-// phase panel, and the composer on either chat. The rules for what makes
+// There are two places a captain can compose a swap now: the Parley
+// panel, and the composer on either chat. The rules for what makes
 // an offer legal cannot be allowed to differ between them, so they live
 // once, in useOfferDraft, and each surface only supplies the markup
 // around them.
@@ -222,7 +222,7 @@ export function OfferCard({
           size="sm"
           className={cn(
             "h-7 px-2.5 text-[10px] rounded shrink-0",
-            canAccept && "pm-grad-barter",
+            canAccept && "pm-grad-parley",
           )}
           variant={canAccept ? "default" : "secondary"}
           disabled={!canAccept}
@@ -280,9 +280,7 @@ export function TradeComposer({
           Unlocks at Renown Level {FLEXIBLE_BARTER_UNLOCK_LEVEL}, {toGo} level
           {toGo === 1 ? "" : "s"} to go.
         </p>
-        <p>
-          The Captain's Exchange in the Bartering phase is open to you already.
-        </p>
+        <p>The Captain's Exchange at the Parley is open to you already.</p>
       </div>
     );
   }
@@ -372,7 +370,7 @@ export function TradeComposer({
       <Button
         className={cn(
           "h-8 w-full rounded-lg text-xs",
-          draft.canPost && "pm-grad-barter",
+          draft.canPost && "pm-grad-parley",
         )}
         variant={draft.canPost ? "default" : "secondary"}
         disabled={!draft.canPost}

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { admitToRoom } from "@/lib/rooms";
+import { readJson } from "@/lib/api-json";
 
 const Schema = z.object({ code: z.string().length(6) });
 
@@ -12,20 +13,13 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = Schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "A 6 character room code is required" },
-      { status: 400 },
-    );
-  }
-  const code = parsed.data.code.toUpperCase();
+  const body = await readJson(
+    req,
+    Schema,
+    "A 6 character room code is required",
+  );
+  if (!body.ok) return body.response;
+  const code = body.data.code.toUpperCase();
 
   const room = await db.room.findUnique({
     where: { code },

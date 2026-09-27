@@ -331,26 +331,26 @@
   .pm-grad-chat {
     --pm-fill: var(--w-chat-fill);
   }
-  .pm-grad-welcome {
-    --pm-fill: var(--w-welcome-fill);
+  .pm-grad-harbor {
+    --pm-fill: var(--w-harbor-fill);
   }
-  .pm-grad-purchase {
-    --pm-fill: var(--w-purchase-fill);
+  .pm-grad-market {
+    --pm-fill: var(--w-market-fill);
   }
   .pm-grad-orders {
     --pm-fill: var(--w-orders-fill);
   }
-  .pm-grad-barter {
-    --pm-fill: var(--w-barter-fill);
+  .pm-grad-parley {
+    --pm-fill: var(--w-parley-fill);
   }
-  .pm-grad-workers {
-    --pm-fill: var(--w-workers-fill);
+  .pm-grad-market {
+    --pm-fill: var(--w-market-fill);
   }
-  .pm-grad-shipyard {
-    --pm-fill: var(--w-shipyard-fill);
+  .pm-grad-dusk {
+    --pm-fill: var(--w-dusk-fill);
   }
-  .pm-grad-settlement {
-    --pm-fill: var(--w-settlement-fill);
+  .pm-grad-resolve {
+    --pm-fill: var(--w-resolve-fill);
   }
   .pm-grad-endgame {
     --pm-fill: var(--w-endgame-fill);
@@ -367,8 +367,8 @@
   .pm-grad-advisor {
     --pm-fill: var(--w-advisor-fill);
   }
-  .pm-grad-boon {
-    --pm-fill: var(--w-boon-fill);
+  .pm-grad-dawn {
+    --pm-fill: var(--w-dawn-fill);
   }
   .pm-grad-brand {
     --pm-fill: var(--w-brand-fill);
@@ -378,6 +378,9 @@
   }
   .pm-grad-rumors {
     --pm-fill: var(--w-rumors-fill);
+  }
+  .pm-grad-standing {
+    --pm-fill: var(--w-standing-fill);
   }
   .pm-grad-admin {
     --pm-fill: var(--w-admin-fill);

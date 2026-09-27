@@ -86,7 +86,7 @@ export const HOUSES: House[] = [
 //
 // Jade Pavilion's free first artisan is consumed by hireWorker the first
 // time it runs after this; Vermilion Gate's extra card is read by
-// startPhase1; Golden Lotus's wage discount stacks with hire_discount in
+// startMarket; Golden Lotus's wage discount stacks with hire_discount in
 // getHireCost, and its pirate bump stacks with the broker corruption leak
 // in resolvePirateAttack. None of those modules import this one: they
 // read the flags straight off the state.

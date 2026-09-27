@@ -12,15 +12,15 @@
 // deployment that never set one cannot be registered into at all.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { publicUser } from "@/lib/db";
 import {
-  createSession,
-  hashPassword,
-  hueFromString,
+  createAccountAndSession,
   sessionCookieMaxAge,
+  USERNAME_TAKEN_ERROR,
   verifySetupCode,
 } from "@/lib/auth";
 import { sessionCookie } from "@/lib/api-auth";
+import { readJson } from "@/lib/api-json";
 
 const Schema = z.object({
   username: z
@@ -37,20 +37,9 @@ const Schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = Schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
-    );
-  }
-  const { username, password, displayName, setupCode } = parsed.data;
+  const body = await readJson(req, Schema);
+  if (!body.ok) return body.response;
+  const { username, password, displayName, setupCode } = body.data;
 
   // Asked first, before any account is looked up: nothing about this route
   // answers to anyone who is not holding the code.
@@ -61,37 +50,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const existing = await db.user.findUnique({ where: { username } });
-  if (existing) {
-    return NextResponse.json(
-      { error: "That captain name is already registered" },
-      { status: 409 },
-    );
+  // The whole point of this route. Every other account is a captain.
+  const account = await createAccountAndSession({
+    username,
+    password,
+    displayName,
+    role: "admin",
+  });
+  if (!account.created) {
+    return NextResponse.json({ error: USERNAME_TAKEN_ERROR }, { status: 409 });
   }
 
-  const user = await db.user.create({
-    data: {
-      username,
-      passwordHash: hashPassword(password),
-      displayName: (displayName ?? username).trim(),
-      avatarHue: hueFromString(username),
-      // The whole point of this route. Every other account is a captain.
-      role: "admin",
-    },
-  });
-
-  const { token, expiresAt } = await createSession(user.id);
   const res = NextResponse.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      avatarHue: user.avatarHue,
-      role: user.role,
-    },
-    expiresAt,
-    token,
+    user: { ...publicUser(account.user), role: account.user.role },
+    expiresAt: account.expiresAt,
+    token: account.token,
   });
-  res.headers.set("Set-Cookie", sessionCookie(token, sessionCookieMaxAge));
+  res.headers.set(
+    "Set-Cookie",
+    sessionCookie(account.token, sessionCookieMaxAge),
+  );
   return res;
 }

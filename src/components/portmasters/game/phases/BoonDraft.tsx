@@ -4,9 +4,8 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
 import { BOON_SWAP_COST } from "@/lib/game/constants";
-import { ReadyBar } from "../ReadyBar";
 import { Term } from "../../Term";
-import type { PhasePanelProps } from "./PhaseShared";
+import { PhaseClockBar, type PhasePanelProps } from "./PhaseShared";
 
 export function BoonDraft({
   game,
@@ -23,16 +22,16 @@ export function BoonDraft({
   if (phaseSync.waiting) {
     return (
       <div className="max-w-md mx-auto text-center py-10">
-        <div className="text-2xl font-bold mb-1 text-boon">
+        <div className="text-2xl font-bold mb-1 text-dawn">
           🧭 Boon Locked In
         </div>
         <p className="text-sm text-muted-foreground mb-5">
           The voyage begins once every captain has chosen.
         </p>
-        <ReadyBar
-          ready={phaseSync.ready}
+        <PhaseClockBar
+          phaseSync={phaseSync}
           members={members}
-          className="justify-center mb-5"
+          className="mb-5"
         />
         <Button
           variant="secondary"
@@ -47,17 +46,13 @@ export function BoonDraft({
   const canSwap = !game.boonSwapUsed && game.money >= BOON_SWAP_COST;
   return (
     <div className="max-w-4xl mx-auto text-center py-2">
-      <div className="text-2xl font-bold mb-1 text-boon">
+      <div className="text-2xl font-bold mb-1 text-dawn">
         🧭 The Navigator's Compass
       </div>
       <p className="text-sm text-muted-foreground mb-2">
         Draft a Boon to synergize with your strategy
       </p>
-      <ReadyBar
-        ready={phaseSync.ready}
-        members={members}
-        className="justify-center mb-3"
-      />
+      <PhaseClockBar phaseSync={phaseSync} members={members} className="mb-3" />
       <div className="flex justify-center mb-4">
         <Button
           size="sm"
@@ -92,7 +87,7 @@ export function BoonDraft({
               },
             }}
             whileHover={{ y: -6 }}
-            className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-boon/15"
+            className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-dawn/15"
           >
             <div className="text-5xl mb-2">{b.icon}</div>
             <div className="font-semibold text-foreground mb-2">
@@ -102,7 +97,7 @@ export function BoonDraft({
               {b.desc}
             </div>
             <Button
-              className="pm-grad-boon font-semibold rounded-xl w-full"
+              className="pm-grad-dawn font-semibold rounded-xl w-full"
               onClick={() =>
                 phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
               }

@@ -9,6 +9,7 @@
 // checkpoint.
 // =====================================================================
 import type { PublicUser } from "@/types/realtime";
+import type { Phase } from "@/lib/game/types";
 
 // One connected socket's server side state. A socket starts unauthed
 // with no room; authenticate() fills in userId/user/authed, and
@@ -27,7 +28,18 @@ export type SocketState = {
 // prevents firing phase:advance twice while clients catch up.
 export type Checkpoint = {
   round: number;
-  phase: string;
+  // A phase of the leg, or the pier before the leg begins. Held as the
+  // engine's own Phase rather than as a loose string, so a checkpoint can
+  // only ever be written with a value some lap contains; the two places
+  // that take one off a wire or out of the database normalize it first.
+  phase: Phase;
   readyUserIds: Set<string>;
   advancing: boolean;
+  // [B2: hard timers, the server as timekeeper] The epoch millisecond this
+  // seat's clock runs out, or null when no clock is running: the pier, a
+  // harbor that has not set sail, and a server started with the clock off
+  // are all this null. It is the published half of the clock, which is what
+  // the ready payload carries to the clients; the timer itself is the
+  // mechanism behind it and stays private to the module that arms it.
+  endsAt: number | null;
 };

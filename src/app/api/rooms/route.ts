@@ -10,7 +10,9 @@ import {
   serializeRoom,
 } from "@/lib/rooms";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
-import { normalizeMode } from "@/lib/game/mode";
+import { modeConfig, normalizeMode } from "@/lib/game/mode";
+import { UNLOCKS, normalizePhrase, unlockForPhrase } from "@/lib/unlock";
+import { readJson } from "@/lib/api-json";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -50,6 +52,10 @@ const CreateSchema = z.object({
   // does not name a mode gets the founding one, which is what every room
   // created before modes existed is already playing.
   mode: z.string().optional(),
+  // [H9: the unlock code] The phrase a host types to open a sealed mode.
+  // Bounded rather than free, because it is normalized and compared after
+  // it arrives and nothing but a phrase is ever that long.
+  unlock: z.string().max(200).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -57,22 +63,42 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const parsed = CreateSchema.safeParse(body);
-  if (!parsed.success) {
+  const body = await readJson(req, CreateSchema);
+  if (!body.ok) return body.response;
+  const { name, isPublic } = body.data;
+  const difficulty = normalizeDifficulty(body.data.difficulty);
+  const mode = normalizeMode(body.data.mode);
+
+  // [H9: the unlock code] The gate. A sealed mode opens with the phrase
+  // and with nothing else: not with the host's own record, which is the
+  // whole point of the entitlement being a room setting, and not with a
+  // phrase that answers to some other door.
+  //
+  // The three refusals are worded separately because they are three
+  // different mistakes. A host who mistyped the phrase has to be told the
+  // words were wrong rather than told they never sent any, and a host
+  // holding a phrase that opens something else has to be told that the
+  // phrase worked and the request is what did not match. Each of them
+  // leaves the harbor unbuilt, which is what a refusal here means: the
+  // room row below is the only thing that ever records an unlock, so a
+  // request that stops here leaves nothing behind to open later.
+  const unlock = unlockForPhrase(body.data.unlock);
+  if (unlock && UNLOCKS[unlock].mode !== mode) {
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 },
+      { error: "That phrase opens a different voyage than the one asked for." },
+      { status: 403 },
     );
   }
-  const { name, isPublic } = parsed.data;
-  const difficulty = normalizeDifficulty(parsed.data.difficulty);
-  const mode = normalizeMode(parsed.data.mode);
+  if (modeConfig(mode).sealed && !unlock) {
+    return NextResponse.json(
+      {
+        error: normalizePhrase(body.data.unlock)
+          ? "That phrase does not open this voyage. Check the words and try again."
+          : "This voyage is sealed. It opens with a phrase, and the harbor was not given one.",
+      },
+      { status: 403 },
+    );
+  }
 
   const room = await db.room.create({
     data: {
@@ -82,6 +108,10 @@ export async function POST(req: NextRequest) {
       isPublic,
       difficulty,
       mode,
+      // The door this harbor was opened through, or nothing for a harbor
+      // that never had one. The phrase itself is never stored: what a room
+      // remembers is which code opened it.
+      unlock: unlock ?? "",
       members: { create: [{ userId: user.id }] },
     },
     include: {

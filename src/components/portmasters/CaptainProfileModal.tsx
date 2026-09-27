@@ -515,6 +515,11 @@ function ChroniclesTab({ chronicles }: { chronicles: VoyageChronicle[] }) {
                     <Skull className="h-3 w-3" /> Bankrupt
                   </Pill>
                 )}
+                {c.marooned && (
+                  <Pill tone="alarm">
+                    <Anchor className="h-3 w-3" /> Put ashore
+                  </Pill>
+                )}
                 <span className="ml-auto text-xs text-muted-foreground">
                   {formatTime(c.createdAt)}
                 </span>

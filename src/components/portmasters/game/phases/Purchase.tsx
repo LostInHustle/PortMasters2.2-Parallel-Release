@@ -8,7 +8,6 @@ import {
   explainCardPrice,
   explainExpectedPrice,
   getCardFinalCost,
-  nextPhase,
   purchaseCard,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -29,7 +28,7 @@ import {
   ExpectedPriceTooltip,
   priceAwareTermContent,
 } from "../PriceTooltips";
-import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
+import { type PhasePanelProps } from "./PhaseShared";
 
 // Every raw material and product gets a price preview here, not just the
 // ones that happened to roll onto one of this round's five market cards.
@@ -43,7 +42,7 @@ function MarketPriceReference({
   colorFor: (item: string) => string | undefined;
 }) {
   return (
-    <div className="rounded-xl border border-purchase/15 bg-purchase/[0.03] px-3.5 py-2.5 mb-3.5">
+    <div className="rounded-xl border border-market/15 bg-market/[0.03] px-3.5 py-2.5 mb-3.5">
       <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-1.5">
         ━━ MARKET PRICE REFERENCE (hover for details) ━━
       </div>
@@ -93,7 +92,7 @@ function MarketPriceReference({
           ...goodsWithHistory.map((g) => game.priceHistory[g].length),
         );
         return (
-          <div className="mt-2 border-t border-purchase/10 pt-2">
+          <div className="mt-2 border-t border-market/10 pt-2">
             <div className="text-[9px] text-muted-foreground mb-1">
               Price History Heatmap
             </div>
@@ -202,7 +201,7 @@ function TradeAdvisor({
         const qty = r.quantity ?? 0;
         const baseScore = 1 - priceRatio(unit, range);
         // Boost score for goods that match revealed intel (guaranteed
-        // orders in Phase 2), since buying them now secures a known
+        // orders at Orders), since buying them now secures a known
         // future reward. The flag rides along on the scored row, because
         // the badge below is drawn from it and the alternative was asking
         // the intel list the same question a second time about a good
@@ -248,7 +247,7 @@ function TradeAdvisor({
             {s.matchesIntel && (
               <span
                 className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
-                title="Matches a Broker's Whisper, guaranteed order in Phase 2"
+                title="Matches a Broker's Whisper, guaranteed order at Orders"
               >
                 Intel
               </span>
@@ -279,7 +278,7 @@ function TradeAdvisor({
  * The pulse is built from the round the room just finished: a good the
  * crews leaned into harder than an even three way split comes out pricier,
  * one nobody touched comes out softer. The server computes it the moment
- * the room advances into Phase 1, and startPhase1 hands it straight to
+ * the room advances into Market, and startMarket hands it straight to
  * genResourceCard, so by the time this panel draws, the lean is already in
  * the numbers on the cards. It is a reading of the board, not a prediction
  * about the round to come, and saying so plainly matters: a captain who
@@ -404,28 +403,27 @@ function MarketDepth({
 
 export function Purchase({
   game,
-  ctx,
   act,
-  phaseSync,
-  members,
   colorFor,
   onRumorBoardOpen,
-}: Pick<
-  PhasePanelProps,
-  | "game"
-  | "ctx"
-  | "act"
-  | "phaseSync"
-  | "members"
-  | "colorFor"
-  | "onRumorBoardOpen"
->) {
+  onContinue,
+}: Pick<PhasePanelProps, "game" | "act" | "colorFor" | "onRumorBoardOpen"> & {
+  /**
+   * Walks to the artisan bench, the second station of this phase. Handed in
+   * by the Market container rather than named here: which station follows
+   * this board is the phase's business, and this board has no ready vote of
+   * its own to spend on it. A captain is not done with Market when they are
+   * done with the board. It also means the harbor is not waited on from
+   * here, which is why this panel no longer takes the room's member list.
+   */
+  onContinue: () => void;
+}) {
   const resolveColor = itemColorResolver(colorFor);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Anchor className="h-5 w-5 text-purchase" />
+          <Anchor className="h-5 w-5 text-market" />
           Port Merchant Exchange
         </h2>
         <Button
@@ -449,7 +447,7 @@ export function Purchase({
           ))}
           <span className="text-muted-foreground">
             {" "}
-            (a matching order is guaranteed in Phase 2, buy accordingly).
+            (a matching order is guaranteed at Orders, buy accordingly).
           </span>
         </div>
       )}
@@ -584,7 +582,7 @@ export function Purchase({
                 <Button
                   className={cn(
                     "w-full rounded-lg",
-                    canAfford ? "pm-grad-purchase" : "",
+                    canAfford ? "pm-grad-market" : "",
                   )}
                   variant={canAfford ? "default" : "secondary"}
                   disabled={!canAfford}
@@ -597,12 +595,11 @@ export function Purchase({
           );
         })}
       </div>
-      <ReadyFooter
-        phaseSync={phaseSync}
-        members={members}
-        idleLabel="✅ Complete Purchase, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
-      />
+      <div className="mt-5 text-center">
+        <Button className="rounded-xl px-6" onClick={onContinue}>
+          ✅ Board Done, to the Artisan Bench
+        </Button>
+      </div>
     </div>
   );
 }

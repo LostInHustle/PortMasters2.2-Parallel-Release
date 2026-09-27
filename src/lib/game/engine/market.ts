@@ -1,5 +1,5 @@
 // =====================================================================
-// Phase 1, the port market: what a captain may buy this round, what it
+// Market, the port board: what a captain may buy this round, what it
 // costs them, and the deterministic draw that decides the board.
 //
 // The generators here are the reason this file matters. They run on a
@@ -12,7 +12,7 @@
 // the RNG alone.
 //
 // genRawOrder, genProductOrder and genMixedOrder are exported rather than
-// private because Phase 2 (./orders) draws the trade board with the same
+// private because Orders (./orders) draws the trade board with the same
 // generators. They were file private before the split purely because
 // everything lived in one file.
 // =====================================================================
@@ -30,6 +30,7 @@ import {
   unlockedResourceDraw,
   unlockedResources,
 } from "../pools";
+import { portShiftMultiplier, type PortShift } from "../maroon";
 import { createRng, pick, randInt, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard, ResourceCard } from "../types";
 import { addOwnedAmount } from "./core";
@@ -133,7 +134,7 @@ export function genProductOrder(
 // header), so letting the draw depend on mutable intel state made a
 // captain's own orders non reproducible: regenerating the draw after a
 // reload, with different intel state, silently shifted every order after
-// the one the intel touched. See startPhase2 for where the intel guarantee
+// the one the intel touched. See startOrders for where the intel guarantee
 // happens now: entirely after, and independent of, this draw.
 export function genMixedOrder(
   rng: Rng,
@@ -183,10 +184,21 @@ function genProductPurchaseCard(
 // empty object so every existing call site (and every test of the
 // preserved verbatim economy) keeps producing identical prices when no
 // pulse is in play, which is always true on round 1.
+//
+// [H7: Maroon and the Harbormaster] shift is the other hand on the same
+// price, and the two are passed rather than read off the state for the
+// reason the header above gives: a captain's draw is a pure function of
+// the seed and the charter, so which captain is selling at that port has
+// nothing to do with what anything costs. The shift lands on raw goods
+// only, which is the same clause the pulse follows and for its own
+// reason: a port lean is a hand on that port's market for goods it
+// trades, and a finished product's card is priced from its recipe rather
+// than from the port it is standing in.
 function genResourceCard(
   rng: Rng,
   pools: MarketPools,
   pulse: Record<string, number> = {},
+  shift: PortShift | null = null,
 ): Omit<ResourceCard, "id"> {
   if (rng() < 0.3) return genProductPurchaseCard(rng, pools);
   const num = randInt(rng, 1, 3);
@@ -194,6 +206,7 @@ function genResourceCard(
   const available = [...pools.draw.items];
   const probs = [...pools.draw.probs];
   const port = pick(rng, pools.ports);
+  const lean = portShiftMultiplier(shift, port);
   for (let i = 0; i < num; i++) {
     if (!available.length) break;
     let r = rng(),
@@ -213,27 +226,50 @@ function genResourceCard(
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
     let price = COMMODITIES[chosen].ports.includes(port) ? base - 1 : base + 1;
+    // One rounding for both hands rather than one each, so a port the
+    // harbor leaned into and the Harbormaster leaned against is priced
+    // the way the net of the two says and not the way either alone
+    // rounds. `?? 0` because an absent key is not a nudge of zero until
+    // this line makes it one.
     const nudge = pulse[chosen];
-    if (nudge) price = Math.max(1, Math.round(price * (1 + nudge)));
+    if (nudge || lean !== 1) {
+      price = Math.max(1, Math.round(price * (1 + (nudge ?? 0)) * lean));
+    }
     resources.push({ type: chosen, quantity: qty, price });
   }
   const total = resources.reduce((s, r) => s + r.quantity * r.price, 0);
   return { port, resources, totalCost: total, isProductCard: false };
 }
 
-// [MANIFEST 01: The Harbor Pulse] What this captain bought this Phase 1,
+// [MANIFEST 01: The Harbor Pulse] What this captain bought this Market,
 // summed by raw resource only (Hemp, Silk, Tea), the same set genResourceCard
 // prices. Finished product purchase cards (genProductPurchaseCard) don't
 // count, the pulse is about the harbor leaning into a raw good, not about who
-// bought a finished Sachet. Read once, right before completePhase1 clears
+// bought a finished Sachet. Read once, right before completeMarket clears
 // purchasedCards/resourceCards, and relayed to the server (see
 // src/lib/use-phase-sync.ts) so it can fold this captain's draw into the
 // room wide tally the next round's pulse is built from.
 export function tallyPurchasesByResource(
   state: GameState,
 ): Record<string, number> {
+  return tallyCardPurchases(state, state.purchasedCards);
+}
+
+// The same sum over a named set of cards rather than over everything the
+// captain has bought. One implementation behind both readings, because
+// the second caller is a delta: a market a captain's standing orders
+// played reports the lots those orders bought, on top of the report that
+// already carried whatever they had bought by hand (see
+// workStandingOrders in ./standing and the relay in
+// src/lib/use-phase-sync.ts). Written out twice, the two would eventually
+// price a lot differently and the harbor's pulse would quietly lean on a
+// number that was not the goods.
+export function tallyCardPurchases(
+  state: GameState,
+  cardIds: readonly number[],
+): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const id of state.purchasedCards) {
+  for (const id of cardIds) {
     const card = state.resourceCards.find((c) => c.id === id);
     if (!card || card.isProductCard) continue;
     for (const r of card.resources) {
@@ -246,7 +282,7 @@ export function tallyPurchasesByResource(
 
 // [MANIFEST 01: The Harbor Pulse] Stamps the room wide pulse the server
 // computed for this round onto local state, so genResourceCard picks it up
-// the moment startPhase1 runs below. A plain setter kept as its own function,
+// the moment startMarket runs below. A plain setter kept as its own function,
 // the same convention purchaseIntel/receiveLoan/etc already follow, so the
 // client's phase advance handler can call it through the same act() dispatch
 // as every other socket driven state change.
@@ -257,13 +293,27 @@ export function applyHarborPulse(
   state.harborPulse = pulse;
 }
 
+// [H7: Maroon and the Harbormaster] Stamps the Harbormaster's hand onto
+// local state, on the same broadcast the pulse above rides and in the same
+// act, so the market that is about to be drawn is already leaning when
+// genResourceCard runs.
+//
+// Null is a real value here and not an omission: the power is called once
+// a leg or not at all, so the leg a Harbormaster said nothing in has to
+// clear the one they called last leg rather than leave it leaning. The
+// server sends the answer for every market it opens (see maybeAdvance in
+// src/server/realtime/checkpoint.ts), which is what makes that possible.
+export function applyPortShift(state: GameState, shift: PortShift | null) {
+  state.portShift = shift;
+}
+
 // [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
 // instant the server confirms the combined Reputation threshold was crossed
 // (see the game:status handler in src/server/realtime/index.ts). A one direction
 // flip: nothing in this codebase ever sets tidewatchSurge back to false
 // mid voyage, and a fresh voyage already resets it through
 // createInitialGameState. Logged once here, at the moment it happens,
-// rather than every round afterward in startPhase1.
+// rather than every round afterward in startMarket.
 export function applyTidewatchSurge(state: GameState, logs: string[]) {
   if (state.tidewatchSurge) return;
   state.tidewatchSurge = true;
@@ -316,12 +366,15 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   logs.push(`📊 Purchased ${state.purchaseCount} cargo batches`);
 }
 
-export function startPhase1(
+// Named for the phase it opens rather than for its old place in the
+// numbering, which the leg dropped in [B1]. See its counterpart
+// completeMarket below for the other half of the phase.
+export function startMarket(
   state: GameState,
   ctx: GameContext,
   logs: string[],
 ) {
-  state.phase = 1;
+  state.phase = "market";
   state.purchaseCount = 0;
   state.purchasedCards = [];
   state.phase2DemandTags = [];
@@ -353,7 +406,7 @@ export function startPhase1(
       `🔮 Farsight: 'Word from ${port}: High demand for ${item}!' (free)`,
     );
   }
-  logs.push(`\n⚓=== Round ${state.currentRound} · Phase 1: Port Purchase ===`);
+  logs.push(`\n⚓=== Round ${state.currentRound} · Market: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);
   // [ONLINE] Deterministic port market: this captain's seed, this
   // voyage, this round.
@@ -393,12 +446,17 @@ export function startPhase1(
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,
-      ...genResourceCard(marketRng, marketPools, state.harborPulse),
+      ...genResourceCard(
+        marketRng,
+        marketPools,
+        state.harborPulse,
+        state.portShift,
+      ),
     });
   }
 }
 
-export function completePhase1(state: GameState, logs: string[]) {
+export function completeMarket(state: GameState, logs: string[]) {
   if (state.purchaseCount === 0) logs.push("⏭️ Purchasing skipped");
   else logs.push(`✅ Purchasing ended, bought ${state.purchaseCount} batches`);
   // Record price history: for each good the captain bought this round,

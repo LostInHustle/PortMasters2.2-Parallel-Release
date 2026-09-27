@@ -19,8 +19,7 @@ import {
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
-import { ReadyBar } from "../ReadyBar";
-import type { PhasePanelProps } from "./PhaseShared";
+import { PhaseClockBar, type PhasePanelProps } from "./PhaseShared";
 
 export function Shipyard({
   game,
@@ -39,15 +38,15 @@ export function Shipyard({
     game.equippedModules.length >= game.shipLevel && game.shipLevel > 0;
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-2xl font-bold text-center mb-4 font-display text-shipyard pm-brush">
+      <div className="text-2xl font-bold text-center mb-4 font-display text-dusk pm-brush">
         🚢 Shipyard &amp; Module Rigging
       </div>
-      <div className="rounded-xl border-2 border-shipyard/20 bg-shipyard/[0.04] p-5 my-4">
-        <div className="text-base font-bold text-shipyard">
+      <div className="rounded-xl border-2 border-dusk/20 bg-dusk/[0.04] p-5 my-4">
+        <div className="text-base font-bold text-dusk">
           🚢 Ship Level: {game.shipLevel} | ⚓ Discount:{" "}
           {game.shipLevel * SHIP_DISCOUNT_PER_LEVEL} Gold
         </div>
-        <div className="text-sm text-shipyard mt-1.5">
+        <div className="text-sm text-dusk mt-1.5">
           🔌 Module Slots: {game.equippedModules.length} / {game.shipLevel}
         </div>
         {game.equippedModules.length ? (
@@ -77,11 +76,7 @@ export function Shipyard({
           <div className="text-sm font-medium text-warn">
             ⏳ Waiting for the rest of the crew…
           </div>
-          <ReadyBar
-            ready={phaseSync.ready}
-            members={members}
-            className="justify-center"
-          />
+          <PhaseClockBar phaseSync={phaseSync} members={members} />
           <Button
             variant="secondary"
             className="rounded-xl"
@@ -92,11 +87,17 @@ export function Shipyard({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {/* [B2: hard timers, the server as timekeeper] The clock on the
+              screen a captain has not acted on, drawn from the same
+              published pair the waiting bar above draws. Dusk is a seat of
+              the leg like the others, so a captain deciding what to build
+              is owed the same countdown as one deciding what to buy. */}
+          <PhaseClockBar phaseSync={phaseSync} members={members} />
           {canUpgrade && (
             <Button
               size="lg"
               variant={affordable ? "default" : "secondary"}
-              className={cn("rounded-xl", affordable && "pm-grad-shipyard")}
+              className={cn("rounded-xl", affordable && "pm-grad-dusk")}
               disabled={!affordable}
               onClick={() => act((g, l) => upgradeShip(g, l))}
             >

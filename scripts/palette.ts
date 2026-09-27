@@ -69,11 +69,24 @@ const LOBBY = "lobby";
 
 const WIDGETS: Widget[] = [
   /* The Lobby. Twelve surfaces, because the dialogs are their own
-     screens, and every one of these is on screen at the same moment.
-     Twelve across the 322 degrees clear of the meaning red is 26.8
-     degrees each, which is the roomiest any dense screen gets. The hues
-     are handed out on a stride rather than in page order, so two panels
-     stacked next to each other are rarely two steps apart on the wheel. */
+     screens. Twelve across the 322 degrees clear of the meaning red is
+     26.8 degrees each, which is the roomiest any dense screen gets. The
+     hues are handed out on a stride rather than in page order, so two
+     panels stacked next to each other are rarely two steps apart on the
+     wheel.
+
+     These were counted as all being on screen at the same moment, which
+     is what the floor below was set to hold. The lobby now switches
+     between two views, so the chart form and the room board are never up
+     together. The geometry is left alone: that pair is legal beside each
+     other as it stands, and retuning the floor to one piece of slack
+     would buy nothing a captain can see. A new Lobby surface still has to
+     earn its rung here.
+
+     The rail's chat carries two parts under one head, the harbor square
+     and the private threads, and they share the rung the private threads
+     already held: one panel, one head, one hue. The square did not take a
+     rung of its own, and there was none going spare to take. */
   {
     name: "brand",
     hue: 49.4,
@@ -112,7 +125,12 @@ const WIDGETS: Widget[] = [
     what: "Chart a new harbor, and the Waters selector",
   },
   { name: "quickstart", hue: 344.6, screens: [LOBBY], what: "Quick Start" },
-  { name: "messages", hue: 156.8, screens: [LOBBY], what: "Direct Messages" },
+  {
+    name: "messages",
+    hue: 156.8,
+    screens: [LOBBY],
+    what: "Chat, the harbor square and Direct Messages",
+  },
   { name: "activity", hue: 290.9, screens: [LOBBY], what: "Harbor Activity" },
   {
     name: "guide",
@@ -186,21 +204,33 @@ const WIDGETS: Widget[] = [
   { name: "chat", hue: 240, screens: ["session"], what: "Chat" },
   { name: "ledger", hue: 304, screens: ["session"], what: "Ledger" },
 
-  /* The phases. Each key of PHASE_ACCENTS gets its own hue. A phase
-     carries only its own phase tag, never "session", because two phases
-     can never be on screen at once and several of them lean on that. */
-  { name: "welcome", hue: 68, screens: ["phase:0"], what: "Welcome" },
-  { name: "purchase", hue: 154, screens: ["phase:1"], what: "Purchase" },
-  { name: "orders", hue: 282, screens: ["phase:2"], what: "Orders" },
-  { name: "settlement", hue: 261, screens: ["phase:3"], what: "Settlement" },
-  { name: "shipyard", hue: 90, screens: ["phase:4"], what: "Shipyard" },
-  { name: "boon", hue: 325, screens: ["phase:5"], what: "Boon Draft" },
-  { name: "barter", hue: 218, screens: ["phase:barter"], what: "Barter" },
+  /* The phases. Each key of PHASE_FACES gets its own hue, and the screen
+     string is that phase's own, so a phase carries only its own phase tag
+     and never "session": two phases can never be on screen at once and
+     several of them lean on that.
+
+     Named for the six phases of the leg plus the pier and the four
+     personal and terminal states, which is the vocabulary [B1] put in
+     place. There is no artisan entry: the bench is the second station of
+     the market rather than a phase of its own, so it wears the market's
+     hue and needs no hue that could collide with the panels it opens
+     beside. */
+  { name: "harbor", hue: 68, screens: ["phase:harbor"], what: "The pier" },
   {
-    name: "workers",
-    hue: 347,
-    screens: ["phase:workers"],
-    what: "Worker Management",
+    name: "dawn",
+    hue: 325,
+    screens: ["phase:dawn"],
+    what: "Dawn, the boon draft",
+  },
+  { name: "market", hue: 154, screens: ["phase:market"], what: "Market" },
+  { name: "orders", hue: 282, screens: ["phase:orders"], what: "Orders" },
+  { name: "parley", hue: 218, screens: ["phase:parley"], what: "Parley" },
+  { name: "resolve", hue: 261, screens: ["phase:resolve"], what: "Resolve" },
+  {
+    name: "dusk",
+    hue: 90,
+    screens: ["phase:dusk"],
+    what: "Dusk, the shipyard",
   },
   {
     name: "module-draft",
@@ -226,19 +256,29 @@ const WIDGETS: Widget[] = [
      Where a hue repeats, the two never share a screen. The Rumor Board
      moved to the Barter end of the wheel when the check found it 11
      degrees from the Orders panel it opens over. */
-  { name: "advisor", hue: 197, screens: ["phase:1"], what: "Trade Advisor" },
-  { name: "depth", hue: 347, screens: ["phase:1"], what: "Market Depth" },
-  { name: "pulse", hue: 90, screens: ["phase:1"], what: "Market Pulse" },
+  {
+    name: "advisor",
+    hue: 197,
+    screens: ["phase:market"],
+    what: "Trade Advisor",
+  },
+  {
+    name: "depth",
+    hue: 347,
+    screens: ["phase:market"],
+    what: "Market Depth",
+  },
+  { name: "pulse", hue: 90, screens: ["phase:market"], what: "Market Pulse" },
   {
     name: "planner",
     hue: 132,
-    screens: ["phase:2"],
+    screens: ["phase:orders"],
     what: "Fulfillment Planner",
   },
   {
     name: "modules",
     hue: 261,
-    screens: ["phase:4"],
+    screens: ["phase:dusk"],
     what: "Module list on the Shipyard",
   },
   {
@@ -247,7 +287,25 @@ const WIDGETS: Widget[] = [
     screens: ["shortcuts"],
     what: "Keyboard Shortcuts",
   },
-  { name: "rumors", hue: 218, screens: ["phase:2"], what: "Rumor Board" },
+  {
+    name: "rumors",
+    hue: 218,
+    screens: ["phase:orders"],
+    what: "Rumor Board",
+  },
+  /* Standing Orders is a dialog of the captain's own, opened from the
+     control panel in any phase, so it answers to a screen of its own the
+     way every other dialog does. 208 was chosen for what is behind it
+     rather than for what is beside it in this table: it clears Members
+     (175) by 33 degrees and Chat (240) by 32, and those two are the
+     session surfaces a captain is actually looking past when this is
+     open. */
+  {
+    name: "standing",
+    hue: 208,
+    screens: ["dlg:standing"],
+    what: "Standing Orders",
+  },
 
   /* The operator console sits at /admin, which is a route of its own
      rather than a panel inside a voyage, so nothing shares its screen

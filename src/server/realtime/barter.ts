@@ -11,8 +11,8 @@
 // their own client, this just makes sure only one captain can ever
 // claim a given offer.
 //
-// One board, two surfaces. The Captain's Exchange in the Bartering
-// phase posts exchange offers, which are open to every captain at every
+// One board, two surfaces. The Captain's Exchange at the Parley
+// posts exchange offers, which are open to every captain at every
 // Renown level and are never rationed. A chat composer posts flexible
 // offers, which are the earned extra: gated at a Renown level, and only
 // so many of one captain's own flexible offers may ever be taken. Each

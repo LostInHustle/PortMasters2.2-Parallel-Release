@@ -13,11 +13,15 @@ import {
   Trophy,
   Crown,
   SkullIcon,
+  Anchor,
   VolumeX,
   Volume2,
   Eye,
+  Flag,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import type { PlayerReportAck } from "@/types/realtime";
 import {
   Popover,
   PopoverContent,
@@ -28,6 +32,7 @@ import {
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
 import { bandFor, canSeeDetail } from "@/lib/game/engine";
+import { seatMarks } from "@/lib/seatMarks";
 
 /**
  * Live roster of room members, collapsed down to what matters at a glance:
@@ -69,6 +74,14 @@ export function MembersPanel({
     initialMembers,
   );
   const [systemNotes, setSystemNotes] = useState<string[]>([]);
+  // [J2: the mute and the report] The captains this one has reported in
+  // this harbor, held here so the flag settles on the row it was raised
+  // against. The server is the authority on the limit (one report per pair
+  // per voyage, held by the table's own constraint); this is only what the
+  // button shows, and a duplicate answer from the server lands in the same
+  // set as a fresh one, because the captain's state afterwards is the same
+  // either way.
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
   // Named viewerIsHost, not isHost, so it never shadows the per row "is this
   // row the host" check further down.
   const viewerIsHost = me.id === hostId;
@@ -107,6 +120,32 @@ export function MembersPanel({
     };
   }, [socket, roomId]);
 
+  // The one frame a report produces. The target is told nothing and the
+  // harbor is told nothing, so this is the whole of what a report sends
+  // back, and it is settled into the row it names rather than into a
+  // running count: a captain reports a captain, not a game.
+  useEffect(() => {
+    if (!socket) return;
+    const onFiled = (data: PlayerReportAck) => {
+      if (data.roomId !== roomId) return;
+      setReportedIds((prev) => {
+        if (prev.has(data.targetUserId)) return prev;
+        const next = new Set(prev);
+        next.add(data.targetUserId);
+        return next;
+      });
+      if (data.alreadyFiled) {
+        toast("You have already reported this captain this voyage.");
+      } else {
+        toast.success("Report filed. It goes on the record for this voyage.");
+      }
+    };
+    socket.on("player:report:filed", onFiled);
+    return () => {
+      socket.off("player:report:filed", onFiled);
+    };
+  }, [socket, roomId]);
+
   // Sort: me first, then by reputation desc, then gold desc.
   const sorted = [...members].sort((a, b) => {
     if (a.id === me.id) return -1;
@@ -133,7 +172,13 @@ export function MembersPanel({
           const st = statuses[m.id];
           const isMe = m.id === me.id;
           const isHost = m.id === hostId;
-          const isBankrupt = st?.phase === "bankruptcy";
+          // [H7: Maroon and the Harbormaster] The two marks a failed
+          // voyage leaves on a seat, read through the one place that
+          // states the rule (see seatMarks). Both are read from the
+          // broadcast status for the reason the bankruptcy mark always
+          // was: in Ocean Gambit a failed seat sails on, so the phase
+          // alone would badge nobody.
+          const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
           const isMuted = mutedUserIds.has(m.id);
           // [MANIFEST: Partial Sight] The target's Renown level arrives
           // with the roster status when the server reports it. If it is
@@ -202,6 +247,14 @@ export function MembersPanel({
                   </Pill>
                 ) : (
                   <>
+                    {/* A marooned captain still has real books, so the
+                        gold and reputation pills stay; the badge says what
+                        happened to the ship, not to the purse. */}
+                    {isMarooned && (
+                      <Pill tone="alarm">
+                        <Anchor className="h-3 w-3" /> Ashore
+                      </Pill>
+                    )}
                     <Pill tone="gold">
                       <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
                     </Pill>
@@ -246,6 +299,41 @@ export function MembersPanel({
                     ) : (
                       <VolumeX className="h-3.5 w-3.5" />
                     )}
+                  </button>
+                )}
+
+                {/* [J2: the mute and the report] Every captain on every
+                    other captain's row, host or not, because this is the
+                    remedy for a harbor somebody else is running and a mode
+                    that seats strangers needs one. It settles once it has
+                    been used, since the server writes one row per pair per
+                    voyage and a second raise would only earn a notice that
+                    it was already on the record. */}
+                {!isMe && (
+                  <button
+                    type="button"
+                    disabled={reportedIds.has(m.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      socket?.emit("player:report", {
+                        roomId,
+                        targetUserId: m.id,
+                      });
+                    }}
+                    aria-label={`Report ${m.displayName}`}
+                    title={
+                      reportedIds.has(m.id)
+                        ? "You have reported this captain this voyage"
+                        : `Report ${m.displayName}`
+                    }
+                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <Flag
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        reportedIds.has(m.id) && "fill-current text-alarm",
+                      )}
+                    />
                   </button>
                 )}
               </div>

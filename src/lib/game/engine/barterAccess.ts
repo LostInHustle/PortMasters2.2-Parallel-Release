@@ -2,7 +2,7 @@
 // Who may barter flexibly, and how often.
 //
 // Two surfaces reach the offer board and they are not held to the same
-// rule. The Captain's Exchange, the board the Bartering phase draws, is
+// rule. The Captain's Exchange, the board the Parley draws, is
 // the standing way to trade: it is open to every captain from their
 // first voyage and nothing in this module touches it. Flexible bartering
 // is the extra, the composer a chat carries, which puts a swap in front

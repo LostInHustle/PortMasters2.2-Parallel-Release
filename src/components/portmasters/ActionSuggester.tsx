@@ -25,7 +25,7 @@ import { TONE_WASH } from "./shared";
  * disagrees can close the panel and play their own move.
  *
  * The suggester is intentionally conservative. It never recommends
- * spending the last Gold on hand before Phase 3, never recommends
+ * spending the last Gold on hand before Resolve, never recommends
  * hiring a worker without at least two rounds of wages in reserve,
  * and always flags the pirate escort decision with the math.
  */
@@ -128,25 +128,32 @@ export function ActionSuggester({ game }: { game: GameState }) {
 /**
  * The core analyzer. Given the current game state, returns the single
  * best recommendation for the active phase, or null if there is
- * nothing to suggest (welcome, barter, module draft, etc).
+ * nothing to suggest (the pier, a module draft, the two terminals, and
+ * the phases that are other captains rather than ledgers).
  */
 function analyzePhase(game: GameState): Suggestion | null {
   const phase = game.phase;
 
   switch (phase) {
-    case 5: // Boon Draft
+    case "dawn":
       return analyzeBoonDraft(game);
-    case 1: // Purchase
-      return analyzePurchase(game);
-    case "barter":
-      return null; // Barter is a social phase, no single best move
-    case "worker_mgmt":
-      return analyzeWorkerMgmt(game);
-    case 2: // Orders
+    // Market is two stations and the advice follows them in order: the port
+    // board speaks first, and it answers null for itself once every card on
+    // it has been bought, which is what hands the bench its turn. Which
+    // station a captain is standing at is container state (see
+    // phases/Market.tsx) and deliberately not on the state, so this reads
+    // what the phase still has left to do rather than where they clicked.
+    case "market":
+      return analyzePurchase(game) ?? analyzeWorkerMgmt(game);
+    case "parley":
+      // The table is not a ledger. The exchange, the audit vote and the
+      // maroon are all other captains, so there is no best move to name.
+      return null;
+    case "orders":
       return analyzeOrders(game);
-    case 3: // Settlement
+    case "resolve":
       return analyzeSettlement(game);
-    case 4: // Shipyard
+    case "dusk":
       return analyzeShipyard(game);
     default:
       return null;
@@ -167,7 +174,7 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
     return {
       icon: "💰",
       title: "Take the Emergency Loan",
-      body: `You have ${game.money} Gold. The Emergency Loan gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Phase 3.`,
+      body: `You have ${game.money} Gold. The Emergency Loan gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Resolve.`,
       tone: "alarm",
     };
   }
@@ -234,7 +241,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
     return {
       icon: "⚠️",
       title: "Skip buying this round",
-      body: `The best deal costs ${finalCost} Gold but you only have ${game.money}. Save your Gold for Phase 3 bills. You can still barter for goods you need.`,
+      body: `The best deal costs ${finalCost} Gold but you only have ${game.money}. Save your Gold for the Resolve bills. You can still barter for goods you need.`,
       tone: "alarm",
     };
   }
@@ -248,7 +255,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
     return {
       icon: "🔮",
       title: "Buy a Broker's Rumor",
-      body: `You have ${game.money} Gold. Spending ${intelCost} Gold on a rumor guarantees a matching order in Phase 2, then buying the ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit sets up a profitable trade.`,
+      body: `You have ${game.money} Gold. Spending ${intelCost} Gold on a rumor guarantees a matching order in Orders, then buying the ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit sets up a profitable trade.`,
       tone: "intel",
     };
   }
@@ -275,7 +282,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
       return {
         icon: "👩\u200d🔧",
         title: "Hire a Weaver",
-        body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production starts next round, so hire now to get goods by Phase 3.`,
+        body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production starts next round, so hire now to get goods by Resolve.`,
         tone: "gain",
       };
     }
@@ -315,7 +322,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
             return {
               icon: "🔨",
               title: `Assign task: ${product}`,
-              body: `Your ${type} is idle and you have the materials to make ${product}. Assign the task now so production lands at Phase 3 next round. Materials: ${Object.entries(
+              body: `Your ${type} is idle and you have the materials to make ${product}. Assign the task now so production lands at Resolve next round. Materials: ${Object.entries(
                 recipe.materials,
               )
                 .map(([m, q]) => `${m} x${q}`)
@@ -443,7 +450,7 @@ function analyzeSettlement(game: GameState): Suggestion | null {
     return {
       icon: "✅",
       title: "Settle your bills",
-      body: `You have ${game.money} Gold, enough to cover the estimated ${totalDue} Gold in wages and maintenance. Settle and continue to the Shipyard.`,
+      body: `You have ${game.money} Gold, enough to cover the estimated ${totalDue} Gold in wages and maintenance. Settle your bills and move on to Dusk.`,
       tone: "gain",
     };
   }
@@ -473,7 +480,7 @@ function analyzeShipyard(game: GameState): Suggestion | null {
     return {
       icon: "⏭️",
       title: "Skip the shipyard",
-      body: `Ship upgrade costs ${cost} Gold but you only have ${game.money}. Save the Gold for Phase 3 bills and continue the voyage.`,
+      body: `Ship upgrade costs ${cost} Gold but you only have ${game.money}. Save the Gold for the Resolve bills and continue the voyage.`,
       tone: "warn",
     };
   }

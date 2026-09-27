@@ -6,12 +6,12 @@ This file began as the step by step build plan for the project, and that plan ha
 
 Four layers, and a change should belong to exactly one of them.
 
-| Layer            | Lives in                                                 | May depend on                                      |
-| ---------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| Rules engine     | `src/lib/game`                                           | Nothing. No React, no Prisma, no sockets           |
-| Shared contracts | `src/types`, `src/lib/game/checkpoint.ts`                | Nothing at runtime. Types and constants only       |
-| Server           | `src/server`, `src/app/api`, `server.ts`                 | The engine, the shared contracts, Prisma           |
-| Interface        | `src/components`, `src/lib/use-*.ts`, `src/app/page.tsx` | The engine, the shared contracts, the REST helpers |
+| Layer            | Lives in                                                            | May depend on                                      |
+| ---------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| Rules engine     | `src/lib/game`                                                      | Nothing. No React, no Prisma, no sockets           |
+| Shared contracts | `src/types`, `src/lib/game/phases.ts`, `src/lib/game/checkpoint.ts` | Nothing at runtime. Types and constants only       |
+| Server           | `src/server`, `src/app/api`, `server.ts`                            | The engine, the shared contracts, Prisma           |
+| Interface        | `src/components`, `src/lib/use-*.ts`, `src/app/page.tsx`            | The engine, the shared contracts, the REST helpers |
 
 The engine is deliberately the bottom layer. Everything above it may call it; it may call nothing. That is what keeps a voyage reproducible: the same seed and the same inputs produce the same result on every machine, with no database and no server in the picture.
 
@@ -28,15 +28,21 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 **The engine stays pure.** No `Date.now()`, no `Math.random()`, no `fetch`, no database handle anywhere under `src/lib/game`. Randomness goes through the seeded generator so a voyage replays identically.
 
-**The phase order is single sourced.** `CHECKPOINT_PHASE_ORDER` in `src/lib/game/checkpoint.ts` is the one definition of the synchronized order, and both the ready check and the interface read it from there. A second copy will drift.
+**The lap is single sourced, and it belongs to the mode.** A voyage's synchronized order is `checkpointPhaseOrder` on the mode record in `src/lib/game/mode.ts`, because the two modes walk the same six phases in different orders and an order is a property of a voyage. `src/lib/game/checkpoint.ts` is the only place it is read (`lapPhases`, `lapSuccessor`, `openingPhase`, `isGatedPhase`, `checkpointRank`, `closesRound`), and both the ready check and the interface read it from there. A second copy will drift, and one already did: the phase after whichever phase a captain was on used to be written into the engine once per transition, which is seven copies of one order and seven chances for a mode to stop being a mode.
+
+**A phase is described once.** `PHASE_FACES` in `src/lib/game/phases.ts` is one record per phase: its label, its icon, its fill and whether it is one of the leg's six. The rail, the briefing charts and every phase panel read that table rather than keeping one of their own, and `normalizePhase` in the same file is what places a phase value written before [B1] where it belongs now (see `LEGACY_PHASES` there). Add a phase to the union and it needs an entry; a phase the table does not carry is a panel no checkpoint can reach.
 
 **Every read of saved state is defensive.** A game state is JSON that a previous version of the game wrote. Read fields through the normalize helpers so a voyage saved before a field existed costs a captain that field, not the whole voyage.
 
 **The ready check gates the room, not the captain.** Nobody advances a phase until every captain still active has readied. Any new phase has to register with the checkpoint protocol or the harbor will wait forever.
 
+**The clock is the server's, and it announces rather than moves.** Since [B2] a seat also ends when its budget runs out, and that budget is the `seconds` field on the phase's own record in `PHASE_FACES`. The timer behind it lives in `src/server/realtime/checkpoint.ts` and is the server's business alone; what crosses the wire is the deadline, on `phase:ready_update` as `phaseEndsAt` and `phaseSeconds`. It must not ride the game state: a clock read folded into the state is a hidden input, and the engine's replay property is exactly the thing that depends on there being none. The fire emits the same `phase:advance` a unanimous ready set emits and never touches the checkpoint, so the two ways a seat ends are one frame by design (see `announceAdvance`), and a captain who had not acted leaves through `autoCommit` in `src/lib/game/engine/lifecycle.ts`, which stays pure and takes no clock.
+
 **The Ledger Integrity Pass runs on load.** It is what makes a hand edited save visible instead of silently rewarded. A new persisted field that the pass does not know about should be added to it rather than skipped.
 
 **One venture per voyage per room.** The convoy rule is room wide on purpose, and the check belongs on the server so two captains cannot both claim the same voyage.
+
+**A new private path repeats the private information review.** A new private channel, a new persisted secret, a new broadcast payload, or a new path that trusts a client repeats the review in `docs/SECURITY_REVIEW.md` before it repeats the closed test, and `npm run check:private` is the part of that a command can hold. The reason is written there: a secret that arrives by a second path is a leak nobody reviewed, and nothing else in the toolchain would notice one.
 
 ## Changing the interface
 
@@ -51,14 +57,17 @@ Two habits worth keeping:
 ## Verifying a change
 
 ```bash
-npm run typecheck   # every type error, including the ones a build would skip
+npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
-npm run build       # type errors fail the build on purpose
-npm run dev         # then, in a second terminal:
+npm run check:private    # no second path to a secret the game hides
+npm run build            # type errors fail the build on purpose
+npm run dev              # then, in a second terminal:
 npm run test:smoke
 ```
 
 The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
+
+Before a run that involves players who are not the authors, `npm run check:closed-test` is the first command: it refuses to bless anything but a local SQLite file whose name begins with `closed-test`, so the invitations go out from somebody who has just read the database's name and a count of what is already inside it.
 
 ## Deploying
 

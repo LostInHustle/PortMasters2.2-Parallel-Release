@@ -24,8 +24,12 @@ import {
   type GameState,
 } from "@/lib/game/types";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
+import { normalizeOrderFills } from "@/lib/game/audit";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
+import { normalizePortShift } from "@/lib/game/maroon";
+import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
+import { normalizeStandingOrders } from "@/lib/game/standing";
 
 // The most log lines a session keeps around at once (see the APPLY case
 // below, the only place this is enforced). Named rather than written out
@@ -100,8 +104,17 @@ function reducer(state: SessionState, action: Action): SessionState {
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
       // the room's checkpoint already is, instead of always at round 1.
+      // The phase is normalized before it is compared, because this is a
+      // room row read off the wire and a voyage that was already sailing
+      // when the six phase leg landed has one of the older names in it: read
+      // raw, that name would not match the pier and a captain would be
+      // snapped onto a checkpoint they were already standing on.
       const cp = action.checkpoint;
-      if (cp && action.ctx && (cp.round > 1 || cp.phase !== "0")) {
+      if (
+        cp &&
+        action.ctx &&
+        (cp.round > 1 || normalizePhase(cp.phase) !== ENTRY_PHASE)
+      ) {
         snapToCheckpoint(g, action.ctx, cp.round, cp.phase, logs);
       }
       return { ...state, game: g, logs, newLines: [], loaded: true };
@@ -149,7 +162,13 @@ export function useGameSession(
   // gives every captain their own market, orders, and Broker intel instead of
   // the room wide identical economy this used to derive from roomId alone.
   const ctx: GameContext = useMemo(
-    () => ({ seedBase: userId ? `${roomId}:${userId}` : roomId }),
+    () => ({
+      seedBase: userId ? `${roomId}:${userId}` : roomId,
+      // The same room, without the captain. Only the public objective seeds
+      // from this, because it is the one draw the whole harbor has to agree
+      // on rather than one each.
+      harborId: roomId,
+    }),
     [roomId, userId],
   );
   const [state, dispatch] = useReducer(reducer, {
@@ -166,6 +185,25 @@ export function useGameSession(
   // takes this as a parameter so its own reset stays consistent with
   // whatever a fresh join would grant).
   const [startingGoldBonus, setStartingGoldBonus] = useState(0);
+  // [H5: the quota rung] How many captains the voyage now under way was
+  // dealt to, as the room pinned it at departure, stamped with the room it
+  // belongs to exactly as the private log and the commission board are. It
+  // is the second input to the public commission (see ./game/objectives.ts)
+  // and the only fact this hook holds that a captain cannot work out for
+  // themselves: membership can change mid voyage, so the size the quotas
+  // were scaled to has to be read from the room rather than counted off a
+  // roster.
+  //
+  // Null is a real state and not a synonym for zero: zero means the room has
+  // no voyage pinned, and nothing may be handed over against a board while
+  // the number that decides its quotas is unknown. A stamp from another
+  // harbor reads as null rather than as a value, which is also what makes a
+  // room change safe without an effect having to clear it.
+  const [seatPin, setSeatPin] = useState<{
+    roomId: string;
+    seats: number;
+  } | null>(null);
+  const voyageSeats = seatPin?.roomId === roomId ? seatPin.seats : null;
   // The captain's pledged Great House, remembered across loads. The two
   // fallback paths below fire precisely when the captain's own data could
   // not be read, and a voyage seeded Houseless would quietly cost them a
@@ -197,6 +235,14 @@ export function useGameSession(
     const timeoutId = setTimeout(() => {
       if (!alive) return;
       loadTimedOut = true;
+      // A room that never answered tells this captain nothing about the
+      // fleet's size, and the reading that keeps them playing is the one
+      // every client had before the rung existed: no pin, the founding
+      // board. Leaving it unknown instead would shut the delivery button
+      // for the rest of the voyage, and a captain handing over what a four
+      // seat commission asks for has still contributed something to a
+      // wider one.
+      setSeatPin({ roomId, seats: 0 });
       dispatch({
         type: "START_FRESH",
         checkpoint: null,
@@ -220,6 +266,12 @@ export function useGameSession(
             // to disagree: the response is the room answering live, the
             // argument is what the lobby said a moment before the request.
             mode: apiMode,
+            // The seat count this voyage was pinned to, which is the one
+            // room fact on this response that nothing else can substitute
+            // for. A response without it is a room with no voyage pinned,
+            // which is the founding board and the reading every client had
+            // before the rung existed.
+            seats: roomSeats,
           },
           legacyResult,
         ] = await Promise.all([
@@ -231,6 +283,14 @@ export function useGameSession(
         ]);
         if (!alive || loadTimedOut) return;
         clearTimeout(timeoutId);
+        // Both halves of the room's answer land in one render, this batch
+        // included, so the commission a captain draws for the voyage they
+        // just restored is drawn at the table size that voyage was dealt
+        // to rather than one render later.
+        setSeatPin({
+          roomId,
+          seats: typeof roomSeats === "number" ? roomSeats : 0,
+        });
         const goldBonus = legacyResult
           ? renownStartingGoldBonus(legacyResult.legacy.renownLevel)
           : 0;
@@ -276,6 +336,20 @@ export function useGameSession(
           game.housePerks = game.housePerks ?? noHousePerks();
           game.houseId = game.houseId ?? null;
           game.priceHistory = game.priceHistory ?? {};
+          // A voyage saved before the fleet commission existed carries
+          // neither field, and both the panel and the report to the harbor
+          // read them, so an unhealed save would turn a missing key into a
+          // crash on the first render.
+          game.objectiveDelivered = game.objectiveDelivered ?? {};
+          game.objectiveTrace = game.objectiveTrace ?? [];
+          // [H6: the Manifest Audit] A save written before the audit existed
+          // carries no manifest, and the engine pushes onto this array
+          // unconditionally, so without the heal the first order a captain
+          // filled after loading an old save would throw. The normalizer
+          // also bounds the list and throws away anything that could not be
+          // a fulfillment, since the record is read back out to a whole
+          // room rather than only by the captain who wrote it.
+          game.orderFills = normalizeOrderFills(game.orderFills);
           // Guarantees a key for every catalogued good and scrubs any value a
           // pre catalogue save poisoned with NaN (stored as null by JSON), so
           // a damaged hold heals on load instead of staying broken forever.
@@ -289,6 +363,26 @@ export function useGameSession(
           game.debts = game.debts ?? [];
           game.loansGiven = game.loansGiven ?? [];
           game.defaultedDebt = game.defaultedDebt ?? false;
+          // [H7: Maroon and the Harbormaster] The two marks a failed seat
+          // carries, read strictly rather than coalesced: they are booleans
+          // a save can only have written itself, and a damaged one would
+          // read as a truthy string into the verdict and the Harbormaster's
+          // power. Anything that is not exactly true is not a failure.
+          game.bankrupt = game.bankrupt === true;
+          game.marooned = game.marooned === true;
+          // The port a Harbormaster leaned, read through the same normalizer
+          // the server's own call validates against, so a save cannot hand
+          // the pricing function a port that is not a port or a direction
+          // that is not a direction.
+          game.portShift = normalizePortShift(game.portShift);
+          // [B3: standing orders] A voyage saved before the record existed
+          // carries no set at all, and the engine reads it unconditionally
+          // the moment the room's clock plays a seat, so an unhealed save
+          // would hand the evaluation undefined the first time its captain
+          // walked away from the table. The normalizer answers with the
+          // default set, which is the shape an old save was already sailing:
+          // the switch on and every seat left at the engine's own default.
+          game.standingOrders = normalizeStandingOrders(game.standingOrders);
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.
@@ -303,6 +397,11 @@ export function useGameSession(
           // score is not merely wrong, it reads as impossible to the Ledger
           // Integrity Pass and would cost an innocent captain their Renown.
           game.helperReputationEarned = game.helperReputationEarned ?? 0;
+          // The same arithmetic and the same heal for the peer ledger a
+          // Broker's card is measured on: a save written before it existed
+          // carries no tally at all, and the first trade added to undefined
+          // is NaN, which the Ledger Integrity Pass reads as impossible.
+          game.peerTradeProfit = game.peerTradeProfit ?? 0;
           // Old saves predate per voyage seeding; default their epoch to 0.
           // Their already generated cards restore from the blob untouched, so
           // only a future round would reseed, which is fine.
@@ -343,6 +442,11 @@ export function useGameSession(
       } catch {
         if (alive && !loadTimedOut) {
           clearTimeout(timeoutId);
+          // Same reading as the timeout above, for the same reason: a
+          // request that failed carries no fleet size, so this captain
+          // draws the founding board and keeps a working hand rather than
+          // holding a commission they are forbidden to touch.
+          setSeatPin({ roomId, seats: 0 });
           // Include ctx so a fresh game is still seeded with the room's
           // deterministic economy, and include the room's last known
           // checkpoint so a captain who had a network error doesn't land
@@ -380,6 +484,13 @@ export function useGameSession(
   // captain reads as Renown level zero, the trust check can never pass,
   // and the peek stays hidden for everyone no matter how established the
   // two captains are.
+  //
+  // [H7: Maroon and the Harbormaster] bankrupt and marooned ride along for
+  // the same reason the phase does: the roster reads them to mark a
+  // captain, and in the mode that keeps a failed seat sailing the phase
+  // says nothing about it (see GameState.bankrupt). The server reads the
+  // same two fields, which is how it refuses to maroon a captain the
+  // harbor has already written off.
   const buildStatus = useCallback(
     () => ({
       roomId,
@@ -391,6 +502,8 @@ export function useGameSession(
       shipLevel: state.game.shipLevel,
       gameOver: state.game.gameOver,
       renownLevel: state.game.renownLevel,
+      bankrupt: state.game.bankrupt,
+      marooned: state.game.marooned,
     }),
     [roomId, state.game],
   );
@@ -476,11 +589,46 @@ export function useGameSession(
     };
   }, [roomId]);
 
+  // The voyage's own seat count, over the wire.
+  //
+  // The start frame is what moves a lobby into a voyage, so the size the
+  // voyage was dealt to has to arrive on the same frame: the commission's
+  // quotas are a function of it, and a captain drawing the board from a
+  // count that is one departure out of date would be working a different
+  // commission than the one the server clamps their report against. The
+  // restart is the other half of the same fact, because a restarted voyage
+  // has no pin until the next departure writes one.
+  //
+  // A frame without a usable number reads as no pin rather than as unknown,
+  // which is the one direction that cannot wedge a hand shut: a client that
+  // hears "we have set sail" and cannot scale the commission is better off
+  // working the founding board than refusing to work at all.
+  useEffect(() => {
+    if (!enabled || !socket) return;
+    const onStarted = (data: { roomId?: string; seats?: unknown }) => {
+      if (data?.roomId !== roomId) return;
+      setSeatPin({
+        roomId,
+        seats: typeof data.seats === "number" ? data.seats : 0,
+      });
+    };
+    const onRestarted = (data: { roomId?: string }) => {
+      if (data?.roomId !== roomId) return;
+      setSeatPin({ roomId, seats: 0 });
+    };
+    socket.on("room:started", onStarted);
+    socket.on("room:restarted", onRestarted);
+    return () => {
+      socket.off("room:started", onStarted);
+      socket.off("room:restarted", onRestarted);
+    };
+  }, [enabled, socket, roomId]);
+
   const act = useCallback(
     (fn: (g: GameState, logs: string[]) => void) =>
       dispatch({ type: "APPLY", fn }),
     [],
   );
 
-  return { state, act, ctx, flush, startingGoldBonus };
+  return { state, act, ctx, flush, startingGoldBonus, seats: voyageSeats };
 }

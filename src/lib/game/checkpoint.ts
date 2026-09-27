@@ -6,7 +6,7 @@
 // (src/server/realtime/checkpoint.ts) import from here so a change to
 // the synchronized phase order lands in one place rather than two. The
 // phases listed for a mode are the only ones the ready check protocol
-// gates; sub states like module drafting and terminal ones like
+// gates; personal sub states like module drafting and terminal ones like
 // bankruptcy and endgame are personal and never become a room
 // checkpoint.
 //
@@ -14,9 +14,19 @@
 // lives in ./mode.ts beside every other thing that differs between one
 // voyage and another, and callers pass the mode in. See that file for
 // why Classic and Ocean Gambit do not share a lap.
+//
+// [B1: the six phase leg, as data] The lap is now the six phases the
+// design names, and it is the same six names in both modes: what differs
+// between the modes is the order, which is the whole reason the order
+// lives on the mode record. A lapped phase is a phase of the leg plus the
+// pier the lap opens at, and nothing else is a checkpoint. Two of the
+// engine's older checkpoints, bartering and artisan management, are work
+// inside Parley and Market now rather than steps the room waits on.
 // =====================================================================
 
 import { modeConfig } from "./mode";
+import { normalizePhase } from "./phases";
+import type { Phase } from "./types";
 
 // Where a phase sits on a mode's lap, and how long that lap is.
 //
@@ -31,7 +41,7 @@ import { modeConfig } from "./mode";
 // room checkpoints, and each caller below decides for itself what that
 // means. Keeping the sentinel visible rather than folding it into a null
 // here is what lets closesRound give a plain yes or no.
-function lapSeat(mode: unknown, phase: string) {
+function lapSeat(mode: unknown, phase: Phase) {
   const order = modeConfig(mode).checkpointPhaseOrder;
   return { order, seat: order.indexOf(phase), count: order.length };
 }
@@ -44,24 +54,44 @@ function lapSeat(mode: unknown, phase: string) {
 // itself, which is the same fact stated in a fourth place and one more
 // caller assuming a lap is something you can filter. Exposed here so that
 // stays a fact about this module.
-export function lapPhases(mode: unknown): readonly string[] {
+export function lapPhases(mode: unknown): readonly Phase[] {
   return modeConfig(mode).checkpointPhaseOrder;
 }
 
 // The phase a voyage opens on for this mode.
 //
-// Every lap begins at the harbor, which is a lobby rather than a step a
-// captain takes, so the entry after it is where a round actually starts.
-// That is the boon draft today in both modes, and it is read rather than
-// named so it stays a property of the lap.
+// Every lap begins at the pier, which is a lobby rather than a step a
+// captain takes, so the first phase after it is where a round actually
+// starts. That is the boon draft, which the six phase leg calls Dawn, in
+// both modes today, and it is read off the lap rather than named so it
+// stays a property of the lap.
+//
+// Read as "the first entry that is leg work" rather than as "the second
+// entry", which is what it used to be: that only ever worked because both
+// laps happened to list the pier first, and a lap that opened anywhere
+// else would have opened the room on a phase it does not gate.
 //
 // The server used to write "5" itself when it marked a room started,
 // which was one more place that knew where the boon draft sits and the
 // same trap the round close had: a mode opening somewhere else would have
 // opened correctly in the engine and wrongly on the server, and the two
 // would have disagreed about a checkpoint from the very first broadcast.
-export function openingPhase(mode: unknown): string {
-  return lapPhases(mode)[1];
+export function openingPhase(mode: unknown): Phase {
+  const order = lapPhases(mode);
+  return order.find((phase) => phase !== "harbor") ?? order[0];
+}
+
+// Whether the ready check gates this phase for this mode.
+//
+// The pier is the one place on the lap nobody readies out of: the host
+// sets sail from there, and the room start is a host action rather than a
+// vote. Every other lapped phase waits for the room. Read from the lap
+// rather than from a comparison against the pier by name, so a mode that
+// opens its lap somewhere else is described by its own record rather than
+// special cased here.
+export function isGatedPhase(mode: unknown, phase: unknown): boolean {
+  const p = normalizePhase(phase);
+  return p !== "harbor" && lapPhases(mode).includes(p);
 }
 
 // A single comparable integer for a checkpoint, used to detect when the
@@ -78,21 +108,11 @@ export function openingPhase(mode: unknown): string {
 export function checkpointRank(
   mode: unknown,
   round: number,
-  phase: string,
+  phase: Phase,
 ): number | null {
   const { seat, count } = lapSeat(mode, phase);
   if (seat === -1) return null;
   return round * count + seat;
-}
-
-// Coerces a phase value to its comparable string form. The Phase
-// union in the engine mixes numbers (0, 1, 2, 3, 4, 5) and strings
-// ("barter", "worker_mgmt", "module_draft", "module_swap",
-// "bankruptcy", "endgame"); this collapses them all to a string so
-// checkpointRank can compare apples to apples without each caller
-// repeating the String() cast.
-export function parsePhase(phase: number | string): string {
-  return String(phase);
 }
 
 // The phase this mode's lap runs next, or null for a phase the lap does not
@@ -107,7 +127,7 @@ export function parsePhase(phase: number | string): string {
 // chances for a mode to stop being a mode, because a transition that names its
 // own successor cannot be told to go anywhere else. Reading the successor here
 // instead is what makes two voyages able to run different legs at all.
-export function lapSuccessor(mode: unknown, phase: string): string | null {
+export function lapSuccessor(mode: unknown, phase: Phase): Phase | null {
   const { order, seat, count } = lapSeat(mode, phase);
   if (seat === -1) return null;
   return order[(seat + 1) % count];
@@ -119,12 +139,13 @@ export function lapSuccessor(mode: unknown, phase: string): string | null {
 // the next round, so it is the one phase with no single successor to step to.
 // Asking the lap rather than naming the phase keeps that a property of the
 // mode instead of a fact about the number four, which is what lets a longer
-// leg put its own closing phase at the end and still settle correctly.
+// leg put its own closing phase at the end and still settle correctly. The
+// six phase leg calls that phase Dusk, and both modes close there.
 //
 // Phrased as "it is on the lap, and it is the last one" rather than as a bare
 // index comparison so that a mode with an empty lap answers no rather than
 // claiming every phase closes the round.
-export function closesRound(mode: unknown, phase: string): boolean {
+export function closesRound(mode: unknown, phase: Phase): boolean {
   const { seat, count } = lapSeat(mode, phase);
   return seat !== -1 && seat === count - 1;
 }

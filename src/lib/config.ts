@@ -20,6 +20,26 @@ const DEFAULT_PORT = 8080;
 // the same wifi needs. Set HOST=127.0.0.1 to keep it on this machine.
 const DEFAULT_HOST = "0.0.0.0";
 
+// The share of voyages the telemetry spine records, as a fraction of one.
+// The plan asks for sampling to be configuration from the first day
+// rather than bolted on later, on the grounds that volume is the only
+// thing about telemetry that ever needs turning down. 1 records every
+// voyage, which is the default because a table this small has no volume
+// problem yet, and 0 records none, which is the switch for a machine that
+// is expected to be under load.
+const DEFAULT_TELEMETRY_SAMPLE_RATE = 1;
+
+// [B2: hard timers, the server as timekeeper] The multiplier on every
+// phase's authored budget, as a positive fraction of one. 1 runs the
+// budgets the phases are written with (see PHASE_FACES in
+// src/lib/game/phases.ts), which is the default because a table of
+// captains is the thing the clock is for; a smaller number shortens every
+// phase, which is what a practice table, a demo and a test run want; 0
+// switches the clock off entirely and leaves the room on manual advance,
+// which is the rollback the slice's plan asks for. Nothing about the clock
+// is written down, so the switch costs no migration in either direction.
+const DEFAULT_PHASE_CLOCK_SCALE = 1;
+
 const ServerConfigSchema = z.object({
   nodeEnv: z.enum(["development", "production", "test"]),
   isProduction: z.boolean(),
@@ -29,6 +49,32 @@ const ServerConfigSchema = z.object({
     .min(1, "PORT must be a whole number between 1 and 65535.")
     .max(65535, "PORT must be a whole number between 1 and 65535."),
   host: z.string().min(1, "HOST must not be empty."),
+  telemetrySampleRate: z
+    .number({
+      error:
+        "TELEMETRY_SAMPLE_RATE must be a number between 0 and 1: the share of voyages recorded.",
+    })
+    .min(
+      0,
+      "TELEMETRY_SAMPLE_RATE must be a number between 0 and 1: the share of voyages recorded.",
+    )
+    .max(
+      1,
+      "TELEMETRY_SAMPLE_RATE must be a number between 0 and 1: the share of voyages recorded.",
+    ),
+  phaseClockScale: z
+    .number({
+      error:
+        "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
+    })
+    .min(
+      0,
+      "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
+    )
+    .max(
+      10,
+      "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
+    ),
   databaseUrl: z
     .string()
     .min(1, "DATABASE_URL must be set.")
@@ -70,11 +116,34 @@ export function loadServerConfig(
     port = Number(rawPort);
   }
 
+  // Read the same way PORT is: an empty value means the default rather
+  // than zero, and a value that is not a number fails the schema below
+  // instead of quietly becoming NaN.
+  const rawSampleRate = env.TELEMETRY_SAMPLE_RATE?.trim();
+  let telemetrySampleRate: number = DEFAULT_TELEMETRY_SAMPLE_RATE;
+  if (rawSampleRate) {
+    telemetrySampleRate = Number(rawSampleRate);
+  }
+
+  // Read the same way again: empty means the default, and a value that is
+  // not a number fails the schema rather than becoming NaN. "off" is
+  // accepted because the switch reads as a switch at a terminal, and it
+  // means the same thing zero does.
+  const rawClock = env.PHASE_CLOCK?.trim().toLowerCase();
+  let phaseClockScale: number = DEFAULT_PHASE_CLOCK_SCALE;
+  if (rawClock === "off") {
+    phaseClockScale = 0;
+  } else if (rawClock) {
+    phaseClockScale = Number(rawClock);
+  }
+
   const candidate = {
     nodeEnv,
     isProduction: nodeEnv === "production",
     port,
     host: env.HOST?.trim() || DEFAULT_HOST,
+    telemetrySampleRate,
+    phaseClockScale,
     databaseUrl: env.DATABASE_URL?.trim() || "",
   };
 

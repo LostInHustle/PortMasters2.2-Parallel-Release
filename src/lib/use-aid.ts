@@ -31,7 +31,7 @@ export type RedirectedLoanClosed = {
 };
 
 /**
- * Phase 3's shared "I'm short, can someone help" board: a thin relay
+ * Resolve's shared "I'm short, can someone help" board: a thin relay
  * around the aid:* socket events, kept separate from GameState the same
  * way useBarter is, since an open request is real room wide state no
  * single client's deterministic engine can compute on its own. This hook

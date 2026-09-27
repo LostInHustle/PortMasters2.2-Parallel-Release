@@ -236,8 +236,14 @@ export function payWages(
   logs.push(
     `⚠️ Insufficient funds! Needed: ${total} Gold, Have: ${state.money} Gold`,
   );
-  logs.push("💥 Could not pay wages, workers strike...");
-  logs.push("💥 Reputation collapsed, forced bankruptcy!");
+  // Both lines stopped short of promising what happens next. They used to
+  // say the workers struck and the voyage was over, which was true for as
+  // long as insolvency ended a voyage; in the mode that keeps the seat
+  // sailing, the crew is left unpaid and the voyage is not over at all.
+  // What the failure costs is decided in ./seats, which is the one place
+  // that knows which mode this is.
+  logs.push("💥 Could not pay wages, the crew is left unpaid.");
+  logs.push("💥 Reputation collapsed: a bankruptcy is recorded.");
   return "bankruptcy";
 }
 
@@ -261,7 +267,9 @@ export function payMaintenance(
     state.roundCosts += paid;
     state.totalCosts += paid;
     logs.push(`⚠️ Forced payment of ${paid} Gold (Needed ${cost} Gold)`);
-    logs.push("⚠️ Funds depleted! Cannot continue sailing...");
+    // See the note on the wage failure above: this line used to end the
+    // voyage in words, which is only half of what it now means.
+    logs.push("⚠️ Funds depleted: the maintenance fee goes unpaid.");
     return "bankruptcy";
   }
   return "bankruptcy";

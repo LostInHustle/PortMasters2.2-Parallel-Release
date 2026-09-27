@@ -1,34 +1,48 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants";
 import { nextPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
-import { Handshake, X } from "lucide-react";
+import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
+import { AuditVoteCard } from "../AuditPanel";
+import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
-import { ReadyFooter, type PhasePanelProps } from "./PhaseShared";
+import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
-export function BarterPhase({
+// The Parley panel: the Captain's Exchange, and with it the two votes the
+// table carries. Named for the phase it is (see @/lib/game/phases), the
+// same way Market.tsx and Orders.tsx are, rather than for bartering, which
+// is the activity half this screen shares with a chat composer and not the
+// seat the room waits on.
+export function Parley({
   game,
   ctx,
   act,
   barter,
+  audit,
+  maroon,
   phaseSync,
   members,
   colorFor,
   me,
+  roster,
 }: Pick<
   PhasePanelProps,
   | "game"
   | "ctx"
   | "act"
   | "barter"
+  | "audit"
+  | "maroon"
   | "phaseSync"
   | "members"
   | "colorFor"
   | "me"
+  | "roster"
 >) {
   // The board's own composer. It shares useOfferDraft with the one a chat
   // opens, so both surfaces agree on what counts as postable, and it draws
@@ -43,13 +57,36 @@ export function BarterPhase({
   const draft = useOfferDraft(game, barter, act, false);
   const otherMembers = members.filter((m) => m.id !== me.id);
 
+  // [H6: the Manifest Audit] The leg this screen is on ends the moment the
+  // vote carries, so the captain reads the finding on the strip above and
+  // this phase, which the audit just spent, closes behind it.
+  //
+  // It closes the way every phase closes: by marking ready. That is the
+  // whole reason this belongs in the component rather than in the realtime
+  // layer. A server that emptied the checkpoint's ready set on the room's
+  // behalf would move the checkpoint while every client sat waiting to be
+  // told to move, which is a room stuck forever; here each client runs the
+  // one transition it already knows, and the room advances through the
+  // protocol it was already using.
+  //
+  // The guards are the ones that keep a stale finding from spending a
+  // later leg: the reveal carries the leg it was made in, so a captain who
+  // reloads in leg seven is shown the finding without being pushed out of
+  // a Parley the harbor never voted to end.
+  const revealedRound = audit.reveal?.round;
+  useEffect(() => {
+    if (revealedRound === undefined) return;
+    if (game.phase !== "parley" || game.currentRound !== revealedRound) return;
+    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
+  }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
+
   const selectClass =
     "h-9 rounded-md border border-input bg-transparent px-2 text-sm";
 
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-        <Handshake className="h-5 w-5 text-barter" />
+        <Handshake className="h-5 w-5 text-parley" />
         <Term term="Barter">Captain's Exchange</Term>
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
@@ -59,7 +96,7 @@ export function BarterPhase({
         as well as from here.
       </p>
 
-      <div className="rounded-xl border border-barter/15 bg-barter/[0.03] p-4 mb-4">
+      <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-3 text-sm">
           📤 Post an Offer
         </h3>
@@ -105,7 +142,7 @@ export function BarterPhase({
             ))}
           </select>
           <Button
-            className={cn("rounded-lg", draft.canPost && "pm-grad-barter")}
+            className={cn("rounded-lg", draft.canPost && "pm-grad-parley")}
             variant={draft.canPost ? "default" : "secondary"}
             disabled={!draft.canPost}
             onClick={() => draft.submit()}
@@ -148,13 +185,29 @@ export function BarterPhase({
         )}
       </div>
 
+      {/* [H7: Maroon and the Harbormaster] The console sits above the two
+          votes because it belongs to one captain and it is the reason this
+          screen is open for them: everything under it is the table's
+          business, and this is theirs. It renders nothing at all for a
+          captain the harbor has not put ashore. */}
+      <HarbormasterConsole game={game} maroon={maroon} />
+
+      <AuditVoteCard game={game} members={members} me={me} audit={audit} />
+
+      <MaroonVoteCard
+        game={game}
+        members={members}
+        me={me}
+        maroon={maroon}
+        statuses={roster?.statuses}
+      />
+
       {barter.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-4 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {barter.error}</span>
-          <button onClick={barter.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={barter.error}
+          onDismiss={barter.clearError}
+          className="mb-4"
+        />
       )}
 
       <div className="rounded-xl border border-ship/15 bg-ship/[0.03] p-4 mb-4">

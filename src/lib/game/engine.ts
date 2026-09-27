@@ -92,15 +92,16 @@ export {
   type PriceBreakdown,
 } from "./engine/pricing";
 
-// ========== Phase 1: the port market ==========
+// ========== Market: the port board ==========
 export {
   applyHarborPulse,
+  applyPortShift,
   applyTidewatchSurge,
   purchaseCard,
   tallyPurchasesByResource,
 } from "./engine/market";
 
-// ========== Phase 2: the trade manifest ==========
+// ========== Orders: the trade manifest ==========
 export {
   callBrokersFavor,
   claimWordOnTheDocksReward,
@@ -108,7 +109,16 @@ export {
   purchaseIntel,
 } from "./engine/orders";
 
-// ========== Bartering ==========
+// ========== The fleet commission ==========
+// The Ocean Gambit objective. Lives out here rather than in the Orders
+// block above because the deck it delivers against is the mode's, not the
+// manifest's, even though it opens in the manifest phase.
+export {
+  deliverToObjective,
+  OBJECTIVE_DELIVERY_PHASE,
+} from "./engine/objectives";
+
+// ========== Parley: the trade table ==========
 export {
   acceptBarterOffer,
   postBarterOffer,
@@ -129,6 +139,15 @@ export {
 
 // ========== Artisans ==========
 export { assignTask, fireWorker, hireWorker } from "./engine/workers";
+
+// ========== A seat that failed ==========
+// [H7: Maroon and the Harbormaster] The harbor's two ways of writing a
+// captain off. Both are reached by name from a socket handler rather than
+// from a button, which is why they are here rather than staying private to
+// ./engine/seats: the maroon arrives as a broadcast the client has to
+// apply, and the bankruptcy is applied by the settlement the client is
+// already running.
+export { failSeat, maroonSeat } from "./engine/seats";
 
 // ========== Boons and ship modules ==========
 export {
@@ -172,21 +191,28 @@ export {
 } from "./engine/convoyState";
 
 // ========== Voyage lifecycle and phase orchestration ==========
-// The departures are deliberately not forwarded. completePhase2,
+// The departures are deliberately not forwarded. completeOrders,
 // finishSettlement and skipUpgrade used to be here because the panels
 // called them directly, which is what gave the engine a second route
 // around the lap. Every panel reaches the spine through nextPhase or
 // lockInBoon now, so those three are private to ./engine/lifecycle.ts.
 //
 // The same goes for the per phase enter and complete steps further up
-// this file: completePhase1, startPhase2, completeBarterPhase and
-// selectBoon are each called by ./engine/lifecycle.ts and nothing else,
-// and it reaches them through their own submodules rather than through
-// here. Re-exporting a step whose only caller is the spine is what made
-// the second route possible in the first place, so they stay off the
-// public surface. A caller outside ./engine/ advances a voyage with
-// nextPhase and never by naming a step.
+// this file: completeMarket, startOrders, completeParley and selectBoon
+// are each called by ./engine/lifecycle.ts and nothing else, and it
+// reaches them through their own submodules rather than through here.
+// Re-exporting a step whose only caller is the spine is what made the
+// second route possible in the first place, so they stay off the public
+// surface. A caller outside ./engine/ advances a voyage with nextPhase
+// and never by naming a step.
+//
+// autoCommit is here beside nextPhase rather than among the private steps,
+// because it is not a step either: it is the whole of a departure, the one a
+// client runs when the room's clock ran out on a captain who was holding
+// nothing (see [B2] in ./engine/lifecycle.ts). Its one caller is the phase
+// sync hook.
 export {
+  autoCommit,
   lockInBoon,
   nextPhase,
   phaseLabel,

@@ -12,6 +12,14 @@ import {
   type Difficulty,
   type DifficultyConfig,
 } from "./difficulty";
+// The two pieces of copy below state how long the voyage runs, and that is
+// the mode's number rather than the tier's alone: a mode whose length is
+// pinned sails the same legs on every tier (see voyageLegs in ./mode), so
+// the tier's ladder would have the guide quoting a voyage the captain is
+// not sailing. Read through the one selector, which returns the tier's own
+// ladder for the founding mode and so leaves its copy byte for byte what it
+// was.
+import { voyageRoundsFor, type GameMode } from "./mode";
 
 // Single source of truth for the project's display name. Every screen,
 // log line, and metadata tag that shows the game's name should pull from
@@ -415,11 +423,15 @@ export const AID_REPUTATION_PER_GOLD = 1 / 5;
 const HELPER_REPUTATION_BASE = 48;
 const HELPER_REPUTATION_PER_ROUND = 6;
 
-export function helperReputationCapFor(difficulty: unknown): number {
-  return (
-    HELPER_REPUTATION_BASE +
-    HELPER_REPUTATION_PER_ROUND * difficultyConfig(difficulty).rounds
-  );
+// The cap takes the voyage's own length rather than the room's tier, and
+// the caller passes the length the voyage was pinned to (GameState.maxRounds
+// through ./engine/aid). Reading the tier here was right while a tier and a
+// voyage were the same number of rounds and wrong the moment they were not:
+// a Gambit voyage is twelve legs on every tier, so a tier read would hand a
+// Fair Winds crew the cap of an eight round voyage and cut them off at
+// eighty percent of what they had honestly earned.
+export function helperReputationCapFor(voyageRounds: number): number {
+  return HELPER_REPUTATION_BASE + HELPER_REPUTATION_PER_ROUND * voyageRounds;
 }
 
 export type Boon = {
@@ -705,7 +717,7 @@ export function merchantRatingForScore(score: number): MerchantRating {
 }
 
 // Broker's Favor: a Renown gated, once per voyage skill a captain invokes in
-// Phase 2 to summon one extra guaranteed trade order for a chosen quantity of
+// Orders to summon one extra guaranteed trade order for a chosen quantity of
 // a good they are already holding, so a hold full of otherwise unsellable
 // stock still has a buyer. Unlocks at Renown Level 5 (the Trade Officer
 // tier, see src/lib/game/legacy.ts). A captain may ask for any quantity up
@@ -731,7 +743,7 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // is visible, all of which stay entirely the host's choice (see
 // difficulty.ts). Once every active captain's own reported Reputation
 // (GameState.score) sums past this, room wide, the harbor takes notice of a
-// bustling crew and every captain's Phase 1 board gets one extra card for
+// bustling crew and every captain's Market board gets one extra card for
 // the rest of the voyage. A one time, one direction flip per voyage, purely
 // additive on top of whatever the difficulty tier's own charter schedule is
 // already doing, and never subtracted back out. See the game:status handler
@@ -801,57 +813,65 @@ function escortPct(cfg: DifficultyConfig): string {
 }
 
 export function tutorialSteps(
+  mode: GameMode,
   difficulty: Difficulty,
 ): { title: string; content: string }[] {
   const cfg = difficultyConfig(difficulty);
+  const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
   return [
     {
       title: "⚓ Welcome aboard",
-      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${cfg.rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
+      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
 <p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the four things that catch new players out most.</p>
 <p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
     },
     {
       title: "🏆 What you're playing for",
-      content: `<p>After ${cfg.rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
+      content: `<p>After ${rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
 <p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
 <p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
       title: "🔄 How a voyage works",
-      content: `<p>Each of the ${cfg.rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
+      // The count is the voyage's, read from the mode, while the cards
+      // below are still the founding mode's four phases drawn by hand.
+      // Making the cards follow the mode as well means rendering the
+      // briefing record here rather than keeping a second copy of the lap,
+      // which is a change this feature does not own: the count is the
+      // number this feature moved, so the count is what moves here.
+      content: `<p>Each of the ${rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0">
-  <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--gain);color:var(--foreground)"><strong>1️⃣ Buy</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Stock up at port markets</span></div>
-  <div style="background:color-mix(in oklch, var(--w-barter) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-barter);color:var(--foreground)"><strong>🤝 Barter</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Swap goods with other captains</span></div>
-  <div style="background:color-mix(in oklch, var(--w-orders) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-orders);color:var(--foreground)"><strong>2️⃣ Trade</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Sell to waiting buyers</span></div>
-  <div style="background:color-mix(in oklch, var(--w-settlement) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-settlement);color:var(--foreground)"><strong>3️⃣ Settle</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Production lands, bills come due</span></div>
-  <div style="background:color-mix(in oklch, var(--w-shipyard) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-shipyard);color:var(--foreground)"><strong>4️⃣ Upgrade</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Improve your ship</span></div>
+  <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--gain);color:var(--foreground)"><strong>📦 Market</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Stock up at port markets</span></div>
+  <div style="background:color-mix(in oklch, var(--w-parley) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-parley);color:var(--foreground)"><strong>🤝 Parley</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Swap goods with other captains</span></div>
+  <div style="background:color-mix(in oklch, var(--w-orders) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-orders);color:var(--foreground)"><strong>📜 Orders</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Sell to waiting buyers</span></div>
+  <div style="background:color-mix(in oklch, var(--w-resolve) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-resolve);color:var(--foreground)"><strong>💸 Resolve</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Production lands, bills come due</span></div>
+  <div style="background:color-mix(in oklch, var(--w-dusk) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-dusk);color:var(--foreground)"><strong>🚢 Dusk</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Improve your ship</span></div>
 </div>
-<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking.</p>`,
+<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0">A round opens at Dawn, with the Boon you draft for it, and the five phases above follow in the order your voyage runs them. <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking.</p>`,
     },
     {
-      title: "🏪 Phase 1: Buying",
-      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every voyage. Buy now, barter if you need to, then sell in Phase 2. That is the core loop.</p>
-<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Phase 2 opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>
+      title: "🏪 Market: Buying",
+      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every voyage. Buy now, then barter at Parley and sell at Orders. That is the core loop.</p>
+<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   💡 For the first two or three voyages, stick to raw materials. They sell the same voyage you buy them. No waiting and no risk.
 </div>`,
     },
     {
-      title: "🤝 Bartering",
-      content: `<p>Right after buying, there's a short window where captains can trade directly with each other instead of through the market. Post an offer, like Hemp you don't need for Silk you do, and any other captain in the harbor can take it with one click.</p>
-<p>It is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
+      title: "🤝 Parley: Bartering",
+      content: `<p>The Parley is a short window where captains trade directly with each other instead of through the market. Post an offer, like Hemp you don't need for Silk you do, and any other captain in the harbor can take it with one click.</p>
+<p>Where it falls in the round depends on the voyage: some run it right after Market, some right after Orders, and the rail across the top of the board always shows which. Either way, it is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   A few ground rules: you can't offer an item for itself, both amounts have to be whole numbers of at least one, and you can never offer more than you currently have. The moment you post an offer, that amount is set aside until someone takes it or you cancel it.
 </div>
 <p style="font-size:13px;color:var(--muted-foreground);margin-top:8px">Nobody has to barter. If nothing on the board interests you, or nobody is offering anything, just move on to the next phase.</p>`,
     },
     {
-      title: "📋 Phase 2: Filling orders",
+      title: "📋 Orders: Filling trade orders",
       content: `<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the shipping fee. Your take is whatever is left after fees and tax.</p>
-<p>You can fill as many orders as your cargo allows in a single phase.</p>
+<p>You can fill as many orders as your cargo allows while Orders is open.</p>
 <div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   📌 <strong>Finished goods</strong> (Fabric, Silk Garment, Sachet) pay two to three times more than raw materials. The catch is they need artisans, and artisans take a full voyage to deliver. That is covered next.
 </div>
@@ -859,14 +879,14 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
     },
     {
       title: "⚠️ The artisan trap",
-      content: `<p>Artisans turn raw materials into high value finished goods and collect wages at each Phase 3. That part is simple. What catches most new players is this:</p>
+      content: `<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new players is this:</p>
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>The goods are ready next voyage, not this one.
 </div>
 <p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
-      title: "🏴‍☠️ Pirates at Phase 3",
+      title: "🏴‍☠️ Pirates at Resolve",
       content: `<p>Before the bills below come due each voyage, ${raidCopy(cfg).toLowerCase()} Pirates find your ship and take every coin you're carrying.</p>
 <p>You get one choice before that roll happens: hire an escort for ${escortPct(cfg)} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>
 ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.</p>` : ""}
@@ -875,7 +895,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
 </div>`,
     },
     {
-      title: "💸 Phase 3: Settlement",
+      title: "Resolve: Settlement",
       content: `<p>Once the pirates are dealt with, two bills come due:</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">
   <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
@@ -883,7 +903,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
     <strong>Ship Maintenance</strong><br>
     <span style="font-size:12px;color:var(--muted-foreground)">15 to 22 Gold each round, set by the waters you sail</span>
   </div>
-  <div style="background:color-mix(in oklch, var(--w-workers) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
+  <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">👥</div>
     <strong>Artisan Wages</strong><br>
     <span style="font-size:12px;color:var(--muted-foreground)">8 to 20 Gold per person per voyage</span>
@@ -897,9 +917,9 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
       content: `<p>Keep these points in mind as you play:</p>
 <ul style="padding-left:18px;line-height:2.1;font-size:14px">
   <li>Start with raw material orders. Fast money, no complications.</li>
-  <li>Always keep at least <strong>30 Gold above</strong> what Phase 3 will cost you.</li>
+  <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>
   <li>Hire artisans only when you can cover <strong>two full voyages of wages</strong>.</li>
-  <li>Phase 4 ship upgrades compound quickly. Do not skip them.</li>
+  <li>Dusk ship upgrades compound quickly. Do not skip them.</li>
   <li>Caught short by pirates or a bad round? Ask the harbor for a loan before you assume the voyage is over.</li>
   <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>
   <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your run &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
@@ -911,8 +931,9 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   ];
 }
 
-export function guideText(difficulty: Difficulty): string {
+export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
+  const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
   return `⚓ ${APP_NAME}: Rules
 
@@ -920,7 +941,7 @@ export function guideText(difficulty: Difficulty): string {
 ${cfg.summary}
 
 🚢 Objective:
-Travel ${cfg.rounds} voyages, accumulate wealth and reputation!
+Travel ${rounds} voyages, accumulate wealth and reputation!
 
 📦 Goods System:
 Raw Materials: Hemp(3 to 6💰), Silk(6 to 10💰), Tea(10 to 14💰)
@@ -936,25 +957,25 @@ Finished Goods: Linen Clothes(30 to 42💰), Cotton Clothes(50 to 65💰), Broca
 • Income Tax: 10% on voyage net profit
 
 🔮 Broker's Whisper:
-• Phase 1: Click "Broker's Rumor Board" to open the window
-• Spend 5 Gold to buy a "rumor" about Phase 2 demand
+• Market: Click "Broker's Rumor Board" to open the window
+• Spend 5 Gold to buy a "rumor" about Orders demand
 • Revealed intel guarantees matching orders will appear
 • A rumor is always true and always delivered, on every tier${cfg.brokerCorruption ? `\n• Here a broker may still be corrupt: you get the true rumor, but your position leaks and this round's raid risk rises, and the log tells you when` : ""}
 
-🤝 Bartering:
-• Right after Phase 1, before Phase 2 opens: trade directly with the other captains in your harbor
+🤝 Parley (Bartering):
+• Trade directly with the other captains in your harbor while the Parley is open, whether it falls before or after Orders on your voyage
 • Post what you have and what you want for it; anyone can accept it with one click
 • An offer can't be an item for itself, and both amounts must be whole numbers of at least 1
 • You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it
 • Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it
 
 🔧 Ship Modules (NEW!):
-• Phase 4: Upgrade your ship to unlock Module Slots
+• Dusk: Upgrade your ship to unlock Module Slots
 • Draft powerful modules to create unique synergies
 • Swap modules to adapt to your current run!
 
 🏴‍☠️ Pirates and Escorts:
-• Phase 3: ${raidCopy(cfg)} Pirates take every Gold coin you carry.
+• Resolve: ${raidCopy(cfg)} Pirates take every Gold coin you carry.
 • Hire an escort for ${escortPct(cfg)} of current Gold to sail safe
 • Decide before the pirate roll happens that round${mandates.length ? `\n\n📜 Imperial Mandates:\n• On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions one large order at a fixed reward\n• A mandate is the only order exempt from VAT\n• Every captain in the harbor is dealt the same mandate, so it is a race` : ""}
 
@@ -1000,11 +1021,12 @@ Captain's Legacy:
 • Check your current Renown level, title, and Sea Master crowns any time from the Lobby
 
 🌊 Voyage Phases:
-1. Port Purchase: buy resources at ports (plus Broker rumors)
-   ↳ Bartering window opens right after, before Trade Transaction
-2. Trade Transaction: complete orders
-3. Settlement: pirates may strike first, then wages and maintenance come due (ask for a loan if you're short)
-4. Upgrade: improve ships and install modules
+• Dawn: draft a Boon for the coming round
+• Market: buy resources at ports (plus Broker rumors), and set your artisans to work
+• Orders: complete trade orders
+• Parley: barter with the other captains, which your voyage runs right after Market or right after Orders
+• Resolve: pirates may strike first, then wages and maintenance come due (ask for a loan if you're short)
+• Dusk: improve ships and install modules
 
 ⌨️ Shortcuts:
 • Ctrl+S: Save Game
@@ -1016,8 +1038,12 @@ Captain's Legacy:
 ⚓ Bon Voyage and Good Luck!`;
 }
 
-export function tipsText(difficulty: Difficulty): string {
-  const cfg = difficultyConfig(difficulty);
+// The advice below is difficulty blind except for the one line about a
+// loan running out: it names the round the harbor settles a debt on its
+// own, and that round is the voyage's last one, which is the voyage's
+// length rather than the tier's on a mode that pins one.
+export function tipsText(mode: GameMode, difficulty: Difficulty): string {
+  const rounds = voyageRoundsFor(mode, difficulty);
   return `⚓ Avoiding Bankruptcy Strategies:
 
 💰 Financial Management:
@@ -1033,7 +1059,7 @@ export function tipsText(difficulty: Difficulty): string {
 
 🔮 Broker's Whisper Strategy:
 1. Buy rumors early if you have spare gold
-2. Hoard revealed items to guarantee Phase 2 profits
+2. Hoard revealed items to guarantee Orders profits
 3. Balance intel purchases with other investments
 
 🛒 Buying Strategy:
@@ -1062,7 +1088,7 @@ export function tipsText(difficulty: Difficulty): string {
 3. Sailing without one is a fair bet when you have little to lose anyway
 
 🆘 Borrowing and Lending:
-1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round ${cfg.rounds}
+1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round ${rounds}
 2. Lending Gold raises your own reputation, so helping a captain who can clearly repay you is rarely a bad trade
 3. Watch how much you've lent out across the voyage; it's still your Gold until it's actually repaid
 

@@ -21,6 +21,7 @@
 import { PRODUCT_PRICES, WORD_ON_THE_DOCKS_REWARD } from "./constants";
 import { DIFFICULTIES } from "./difficulty";
 import { WIDEST_BROKERS_FAVOR_PAYOUT_CAP } from "./engine";
+import { widestObjectivePayout } from "./objectives";
 
 // ========== Deriving the ceiling ==========
 // Every number below is read from the live game data rather than written
@@ -61,18 +62,63 @@ const WIDEST_ORDER_BOARD =
 // under the Broker's Age a favor genuinely pays out past the founding cap,
 // and a captain who collected one must not read as impossible a fortnight
 // later when the Age has moved on.
+//
+// The commission term is the one that is not an order: in Ocean Gambit the
+// Emperor buys goods out of the hold for Gold, so it is a real income
+// source and a save that collected one is a save this pass has to find
+// plausible. It is read from the deck rather than written down, so a deck
+// that grows a richer commission cannot leave this ceiling behind, and it
+// is the whole payout rather than a per round share because nothing caps
+// how much of a commission one round can hand over.
 const MAX_PLAUSIBLE_GOLD_PER_ROUND =
   DEAREST_PRODUCT *
     MAX_ORDER_QUANTITY *
     MODIFIER_STACK_CEILING *
     WIDEST_ORDER_BOARD +
   WIDEST_BROKERS_FAVOR_PAYOUT_CAP +
-  WORD_ON_THE_DOCKS_REWARD;
+  WORD_ON_THE_DOCKS_REWARD +
+  widestObjectivePayout();
 
 // Reputation per completed order is floor(reward - transport), so it can
 // never outrun the Gold ceiling above. Lending and backing add a little on
 // top, both a fraction of Gold already counted, so the same number serves.
 const MAX_PLAUSIBLE_SCORE_PER_ROUND = MAX_PLAUSIBLE_GOLD_PER_ROUND;
+
+// [H4: the Broker] The peer ledger is cumulative volume rather than a
+// balance, so it is not bounded by one captain's income the way money and
+// score are. Coin only ever moves between captains, and every captain in a
+// harbor can pay the same one, so the most a single captain can net in a
+// round is the whole harbor's income for that round.
+//
+// Nothing in this tree caps how many captains a harbor holds, so the
+// multiplier is a judgement rather than a read: the mode is authored for
+// six captains, and eight is headroom over the largest authored table. It
+// is deliberately generous, for the reason the rest of this file is: a
+// ceiling that is too low is the one mistake here that costs an honest
+// captain their Renown, and a Broker who genuinely out earns the other
+// seven is not the problem this guard is for.
+//
+// A negative tally is honestly reachable (a captain who pays more coin out
+// in trade than they take in) and is not flagged, the same way the two
+// fields above are not: see the note on checkSave.
+const PEER_TRADE_TABLE_HEADROOM = 8;
+const MAX_PLAUSIBLE_PEER_TRADE_PROFIT_PER_ROUND =
+  MAX_PLAUSIBLE_GOLD_PER_ROUND * PEER_TRADE_TABLE_HEADROOM;
+
+// [H6: the Manifest Audit] The manifest is a list of orders a captain
+// filled, so the most of it one round could produce is the widest board a
+// round can deal, and that is what its length is judged on. What that
+// catches is a save claiming a manifest no voyage could have produced,
+// which is the only thing a length can be wrong about.
+//
+// The real bound is tighter than the ceiling below, and deliberately not
+// what is checked here: the engine trims the list to the audit's window on
+// every push and the load normalizer trims it again, so an honest save
+// never carries more than five lines however long the voyage runs. Judging
+// it against that exact number would mean an honest captain losing their
+// Renown the first time a charter widened the record without widening this
+// pass, which is the trade this file makes every time.
+const MAX_PLAUSIBLE_ORDER_FILLS_PER_ROUND = WIDEST_ORDER_BOARD;
 
 // Room to be wrong. A captain begins with a stake plus a Renown bonus, and
 // a room's round can advance while a save is still in flight, so the
@@ -94,8 +140,8 @@ const STARTING_ALLOWANCE = 500;
 // anyone looking. A high ceiling makes a false positive unlikely from above
 // and says nothing about every other assumption in here, so treat the rules
 // below as the thing to re examine, not this paragraph.
-function plausibleCeiling(perRound: number, roundsElapsed: number) {
-  const rounds = Math.max(1, Math.floor(roundsElapsed));
+function plausibleCeiling(perRound: number, roundsAllowed: number) {
+  const rounds = Math.max(1, Math.floor(roundsAllowed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
 }
 
@@ -118,30 +164,83 @@ const SUSPECT_FRACTION = 10;
 type IntegritySeverity = "ok" | "suspect" | "impossible";
 
 // ========== Reading a save ==========
-// Both fields are optional, and that is the point. An earlier version
-// required both and returned null if either was missing or the wrong type,
-// which meant a save could skip the guard entirely simply by leaving one of
-// them out: { money: 9999999 } with no score was never judged at all, and the
-// forged Gold was written exactly as sent. Whatever is readable is judged;
-// whatever is not is passed over.
-type SaveSnapshot = { money?: number; score?: number };
+// Every field is optional, and that is the point. An earlier version
+// required all of them and returned null if any was missing or the wrong
+// type, which meant a save could skip the guard entirely simply by leaving
+// one of them out: { money: 9999999 } with no score was never judged at all,
+// and the forged Gold was written exactly as sent. Whatever is readable is
+// judged; whatever is not is passed over.
+type SaveSnapshot = {
+  money?: number;
+  score?: number;
+  peerTradeProfit?: number;
+  // [H6: the Manifest Audit] How many manifest lines the save carries,
+  // not the lines themselves. This pass judges numbers only, and what it
+  // can honestly say about a manifest is whether a voyage could have
+  // produced one that long. Its contents are not this file's business:
+  // the shape of an honest line is enforced where the lines are read (see
+  // normalizeOrderFills), and the reveal's sample is capped by the window
+  // it draws from, so a doctored entry cannot widen what a room is shown.
+  orderFills?: number;
+};
+
+// [H7: Maroon and the Harbormaster] Two fields this pass deliberately does
+// NOT carry, and the reason is worth writing down where the question gets
+// asked. A save also holds the harbor's marks now, `bankrupt` and
+// `marooned`, and neither is scored above for one shared reason: this
+// guard's whole method is to bound a number from above, and a mark is not
+// a number. There is no ceiling a boolean could cross, and the direction
+// a cheater would want to lie in is the one this pass was never built to
+// see, since claiming either mark falsely costs the claimant their ship
+// and their crownability rather than winning them anything.
+//
+// The lie that does pay, staying solvent on paper after the harbor
+// recorded a bankruptcy, is not falsifiable from here at all: the server
+// never runs the books, so the only witness to a captain's insolvency is
+// the same client that would be lying. It is bounded socially instead, by
+// the roster badge every captain in the room can read and by the
+// standings the conclusion prints, which is the same bound the mode puts
+// on everything else the table is trusted to police. Left out of this
+// file rather than half done in it, since a check that could only ever
+// catch the honest is worse than the sentence explaining why there is
+// none.
+
+// [B3: standing orders] A third field this pass does not carry, for the
+// same reason the two above it are not carried: a policy is not a number,
+// and there is no ceiling one could cross. What keeps the record safe is
+// already somewhere else, and it is worth naming here because this is
+// where the question gets asked. The record is read back through
+// normalizeStandingOrders, which drops every value the vocabulary does not
+// name, bounds the shopping list by the goods the tree can price, and
+// answers with the default record rather than with null for anything it
+// cannot read (see src/lib/game/standing.ts). The evaluation then walks
+// into the same engine functions the buttons do, so the most a doctored
+// record could do is take a boon that was on the board, buy a card that
+// was on the board at its printed price, or fill an order the hold already
+// covered. None of those produces anything the voyage did not have, which
+// is what separates this field from the four above it: a lie here costs
+// the liar their own decisions rather than winning them anything, so it is
+// left to the normalizer rather than half bounded in this file.
 
 // A save is a free form JSON blob written by a client, so every field here is
 // treated as untrusted input rather than as a number. Null is returned only
 // when the payload is not an object at all, since there is then nothing to
 // read; a payload that is an object always yields a snapshot, carrying
-// whichever of the two fields were readable and omitting the rest.
+// whichever fields were readable and omitting the rest.
 export function snapshotFromSave(data: unknown): SaveSnapshot | null {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as Record<string, unknown>;
   const snapshot: SaveSnapshot = {};
   if (typeof d.money === "number") snapshot.money = d.money;
   if (typeof d.score === "number") snapshot.score = d.score;
+  if (typeof d.peerTradeProfit === "number")
+    snapshot.peerTradeProfit = d.peerTradeProfit;
+  if (Array.isArray(d.orderFills)) snapshot.orderFills = d.orderFills.length;
   return snapshot;
 }
 
 type IntegrityFinding = {
-  field: "money" | "score";
+  field: "money" | "score" | "peerTradeProfit" | "orderFills";
   value: number;
   // The threshold this value actually crossed, which is the suspect one for a
   // suspect finding and the ceiling itself for an impossible one. Reporting
@@ -174,13 +273,38 @@ type IntegrityVerdict = {
 // moves Reputation down by the difference. An unlucky honest captain can
 // finish a round in the red, and flagging that cost them their Renown for
 // playing badly. Nothing is gained by forging a negative number anyway.
+//
+// The peer ledger is judged here for the same reason money and score are:
+// it is a figure a card is measured on, and the Broker is the one role
+// that wins alone, so an inflatable tally would be the cheapest win in the
+// mode. Its ceiling is derived separately (see the constant above), since
+// what it counts is volume rather than a balance.
+//
+// The manifest is judged here because it is the one record in the mode a
+// room reads and believes (see H6: the Manifest Audit), so a save that
+// could stuff it would be a save that could lie to a whole table at once.
+// Its entry reads the list's length rather than any number in it, for the
+// reason the constant above gives.
+//
+// The second argument is the rounds the figures below were allowed to be
+// earned over, which is the ceiling's whole unit. Mid voyage that is how
+// far the room has actually got, which is what a live save is filed
+// against; at the close it is the voyage's own length, since no captain
+// can have earned anything in a round the voyage never ran. Both readings
+// are upper bounds on the same thing, which is why they share one
+// parameter, and it is named for what it allows rather than for what has
+// elapsed so that the finish line's reading is not the odd one out. That
+// number is the voyage's own on a mode that pins its length (see
+// voyageRoundsFor in ./mode): reading the tier instead judged an honest
+// twelve leg Gambit voyage against the eight round ceiling its tier would
+// have run, which is a false forgery rather than a strict check.
 export function checkSave(
   snapshot: SaveSnapshot,
-  roundsElapsed: number,
+  roundsAllowed: number,
 ): IntegrityVerdict {
   const findings: IntegrityFinding[] = [];
   const checks: {
-    field: "money" | "score";
+    field: IntegrityFinding["field"];
     value: number | undefined;
     perRound: number;
   }[] = [
@@ -194,13 +318,23 @@ export function checkSave(
       value: snapshot.score,
       perRound: MAX_PLAUSIBLE_SCORE_PER_ROUND,
     },
+    {
+      field: "peerTradeProfit",
+      value: snapshot.peerTradeProfit,
+      perRound: MAX_PLAUSIBLE_PEER_TRADE_PROFIT_PER_ROUND,
+    },
+    {
+      field: "orderFills",
+      value: snapshot.orderFills,
+      perRound: MAX_PLAUSIBLE_ORDER_FILLS_PER_ROUND,
+    },
   ];
   let severity: IntegritySeverity = "ok";
   for (const c of checks) {
     // A field the save never carried is passed over rather than treated as
     // zero, so an absent field is neither judged nor a way around the guard.
     if (c.value === undefined) continue;
-    const ceiling = plausibleCeiling(c.perRound, roundsElapsed);
+    const ceiling = plausibleCeiling(c.perRound, roundsAllowed);
     const broken = !Number.isFinite(c.value);
     if (broken || c.value > ceiling) {
       severity = "impossible";

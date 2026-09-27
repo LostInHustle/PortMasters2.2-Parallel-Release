@@ -2,7 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import type { GameState } from "@/lib/game/types";
+import type { PhaseClock } from "@/lib/phase-clock";
 import { phaseLabel } from "@/lib/game/engine";
+import { isGatedPhase } from "@/lib/game/checkpoint";
+import { standingOrdersLive } from "@/lib/game/standing";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
@@ -12,6 +15,7 @@ import {
   ChevronRight,
   Loader2,
   Cloud,
+  ScrollText,
 } from "lucide-react";
 import { ActionSuggester } from "../ActionSuggester";
 
@@ -27,6 +31,8 @@ export function GameControlPanel({
   waiting,
   readyCount,
   requiredCount,
+  clock,
+  onStandingOrders,
   onCancelReady,
 }: {
   game: GameState;
@@ -35,13 +41,29 @@ export function GameControlPanel({
   onSetSail: () => void;
   onNextPhase: () => void;
   onGuide: () => void;
+  /**
+   * [B3: standing orders] Opens the captain's own form. It is not host
+   * gated and not phase gated, because the record belongs to the captain
+   * rather than to the voyage: it can be written at the pier before the
+   * first round and changed mid Market while the clock is running.
+   */
+  onStandingOrders: () => void;
   onSave: () => void;
   onRestart: () => void;
   waiting: boolean;
   readyCount: number;
   requiredCount: number;
+  /**
+   * [B2: hard timers, the server as timekeeper] The room's clock while one is
+   * running, so the wait says how long it is worth. Optional: a bar drawn
+   * before the first ready state arrives, or in a room with the clock
+   * switched off, has no countdown to show and says so by passing nothing.
+   */
+  clock?: PhaseClock | null;
   onCancelReady: () => void;
 }) {
+  const ordersLive = standingOrdersLive(game.standingOrders);
+
   // Both conditions are the same fact read twice: waiting is only ever set
   // on the recurring Next Phase transition, so the button wears the quiet
   // variant whenever it is not the one to press.
@@ -54,7 +76,7 @@ export function GameControlPanel({
     startText = "⚠️ Game Over";
     startDisabled = true;
     nextDisabled = true;
-  } else if (game.phase === 0) {
+  } else if (game.phase === "harbor") {
     // Starting the voyage is a one shot host action, not a per player
     // ready vote, so there's no "waiting" state for this button. It's
     // either disabled (not host, or not enough captains yet) or armed.
@@ -72,11 +94,20 @@ export function GameControlPanel({
       startDisabled = false;
     }
     nextDisabled = true;
-  } else if (game.phase === 5) {
+  } else if (game.phase === "dawn") {
     startText = "🧭 Drafting Boon...";
     startDisabled = true;
     nextDisabled = true;
-  } else if ([1, 2, 3, 4, "barter", "worker_mgmt"].includes(game.phase)) {
+  } else if (isGatedPhase(game.mode, game.phase)) {
+    // Every phase the ready check gates, which is every phase of the leg
+    // except the draft: Dawn is handled by the branch above, so it cannot
+    // reach here, because a boon is locked in by choosing one rather than by
+    // confirming anything (see lockInBoon in the engine's lifecycle). Read
+    // off the room's lap rather than listed, so the button offers exactly
+    // the moves the room will actually wait for: a phase added to a lap is a
+    // Next Phase step the day it lands, and a phase a mode does not run is
+    // not a step at all, which it would be if this asked whether the phase
+    // is leg work instead.
     startText = "🚢 On Voyage...";
     startDisabled = true;
     nextText = "⏭️ Next Phase";
@@ -88,10 +119,16 @@ export function GameControlPanel({
   }
 
   // The ready vote "waiting" state only ever applies to the recurring
-  // Next Phase transitions (phase 0's Start Game is handled above on its
+  // Next Phase transitions (setting sail is handled above on its
   // own terms), so it always routes to that button.
+  //
+  // [B2: hard timers, the server as timekeeper] The clock joins the count
+  // here, because this bar is the one thing on screen in every phase: a
+  // captain waiting on the crew reads both numbers in the same place, and the
+  // one that is moving is the one that ends the wait.
   if (waiting) {
     nextText = `⏳ Waiting… (${readyCount}/${requiredCount} ready)`;
+    if (clock) nextText += ` · ${clock.label}`;
     nextDisabled = false;
   }
 
@@ -131,6 +168,28 @@ export function GameControlPanel({
           {saving ? "Saving…" : "Saved"}
           <span className="text-muted-foreground">· {phaseLabel(game)}</span>
         </span>
+        {/* [B3: standing orders] Lit only when the set would actually do
+            something, which is the switch and at least one instruction
+            under it (see standingOrdersLive). A captain who turned the
+            switch on and wrote nothing is sailing the default voyage, and
+            a button that glowed for them would be promising a seat that
+            nothing is going to play. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "rounded-lg",
+            ordersLive && "text-standing hover:text-standing",
+          )}
+          title={
+            ordersLive
+              ? "Standing orders are written and on"
+              : "Write what your seat should do when the clock plays it"
+          }
+          onClick={onStandingOrders}
+        >
+          <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
+        </Button>
         <Button
           variant="ghost"
           size="sm"

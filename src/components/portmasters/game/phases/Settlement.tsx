@@ -16,9 +16,8 @@ import {
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { useLiveAmount } from "@/lib/use-live-amount";
-import { AlertTriangle, HandCoins, ShieldCheck, Skull, X } from "lucide-react";
-import { ReadyBar } from "../ReadyBar";
-import { type PhasePanelProps } from "./PhaseShared";
+import { AlertTriangle, HandCoins, ShieldCheck, Skull } from "lucide-react";
+import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 function PirateAttack({
   game,
@@ -44,7 +43,7 @@ function PirateAttack({
   return (
     <div className="max-w-xl mx-auto text-center py-4">
       <div className="text-5xl mb-2">🏴‍☠️</div>
-      <div className="text-2xl font-bold mb-1 font-display text-settlement pm-brush">
+      <div className="text-2xl font-bold mb-1 font-display text-resolve pm-brush">
         Pirate Waters Ahead
       </div>
       <div className="mb-5 space-y-2">
@@ -120,7 +119,7 @@ function PirateAttack({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
         <Button
           size="lg"
-          className="pm-grad-settlement rounded-xl h-14"
+          className="pm-grad-resolve rounded-xl h-14"
           onClick={() => act((g, l) => hireEscort(g, l))}
         >
           <ShieldCheck className="h-5 w-5 mr-2" /> Hire Escort ({escortFee}{" "}
@@ -220,14 +219,14 @@ function SettlementBills({
     ? `💸 Settle Bills: ${totalDue} Gold`
     : `Force Payment and Risk Bankruptcy (${game.money}/${totalDue} Gold)`;
   const settleClassName = canAfford
-    ? "pm-grad-settlement h-12 px-8"
+    ? "pm-grad-resolve h-12 px-8"
     : "bg-alarm text-background h-12 px-8 font-semibold";
   const settleIcon = canAfford ? null : <AlertTriangle className="h-4 w-4" />;
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-2xl font-bold text-center mb-4 font-display text-settlement pm-brush">
-        🔧 Phase 3: Round Settlement
+      <div className="text-2xl font-bold text-center mb-4 font-display text-resolve pm-brush">
+        💸 Resolve: Round Settlement
       </div>
 
       {game.pirateAttackResolved && (
@@ -269,7 +268,7 @@ function SettlementBills({
         </div>
       </div>
 
-      <div className="rounded-xl bg-settlement/[0.03] border border-settlement/15 p-3.5 my-3.5">
+      <div className="rounded-xl bg-resolve/[0.03] border border-resolve/15 p-3.5 my-3.5">
         <h3 className="font-semibold mb-2">💹 Balance Summary</h3>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Current Funds</span>
@@ -328,7 +327,7 @@ function SettlementBills({
               </span>
               <Button
                 size="sm"
-                className="pm-grad-settlement rounded-lg"
+                className="pm-grad-resolve rounded-lg"
                 onClick={() => aid.post(requestAmount)}
               >
                 🆘 Request Help
@@ -338,7 +337,7 @@ function SettlementBills({
           <p className="text-[11px] text-muted-foreground mt-2">
             A loan transfers instantly if someone helps. Repay it any time
             before the voyage ends, or it is deducted automatically at Round{" "}
-            {difficultyConfig(game.difficulty).rounds} and handed to them.
+            {game.maxRounds} and handed to them.
           </p>
         </div>
       )}
@@ -366,7 +365,7 @@ function SettlementBills({
                     size="sm"
                     className={cn(
                       "h-7 px-2.5 text-[10px] rounded shrink-0",
-                      canHelp && "pm-grad-settlement",
+                      canHelp && "pm-grad-resolve",
                     )}
                     variant={canHelp ? "default" : "secondary"}
                     disabled={!canHelp}
@@ -420,7 +419,7 @@ function SettlementBills({
                       size="sm"
                       className={cn(
                         "h-7 px-2.5 text-[10px] rounded shrink-0",
-                        canBack && "pm-grad-settlement",
+                        canBack && "pm-grad-resolve",
                       )}
                       variant={canBack ? "default" : "secondary"}
                       disabled={!canBack}
@@ -442,58 +441,33 @@ function SettlementBills({
       )}
 
       {backing.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {backing.error}</span>
-          <button onClick={backing.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={backing.error}
+          onDismiss={backing.clearError}
+          className="mb-3.5"
+        />
       )}
 
       {aid.error && (
-        <div className="rounded-lg bg-alarm/5 border border-alarm/25 px-3.5 py-2 mb-3.5 text-xs text-alarm flex items-center justify-between">
-          <span>⚠️ {aid.error}</span>
-          <button onClick={aid.clearError} aria-label="Dismiss error">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <PhaseError
+          message={aid.error}
+          onDismiss={aid.clearError}
+          className="mb-3.5"
+        />
       )}
 
-      {/* The destructive Force Pay variant needs an inline icon, which the
-          shared ReadyFooter does not accept (its idleLabel is a plain
-          string). Rather than widen the shared footer's API for one screen,
-          we inline the same waiting/idle structure here so the AlertTriangle
-          button stays visually distinct from the Settle Bills button on the
-          calm path. */}
-      {phaseSync.waiting ? (
-        <div className="mt-5 space-y-3 text-center">
-          <div className="text-sm font-medium text-warn">
-            Waiting for the rest of the crew
-          </div>
-          <ReadyBar
-            ready={phaseSync.ready}
-            members={members}
-            className="justify-center"
-          />
-          <Button
-            variant="secondary"
-            className="rounded-xl"
-            onClick={phaseSync.cancelReady}
-          >
-            Not ready yet
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-5 text-center">
-          <Button
-            className={cn("rounded-xl px-6", settleClassName)}
-            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
-          >
+      <ReadyFooter
+        phaseSync={phaseSync}
+        members={members}
+        idleLabel={
+          <>
             {settleIcon}
             <span className="ml-1.5">{settleLabel}</span>
-          </Button>
-        </div>
-      )}
+          </>
+        }
+        idleClassName={settleClassName}
+        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+      />
     </div>
   );
 }

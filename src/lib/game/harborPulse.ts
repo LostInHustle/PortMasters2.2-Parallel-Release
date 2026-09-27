@@ -12,7 +12,7 @@
 // tallied as it arrives in src/server/realtime/index.ts (through
 // addPulseReport in ./pulse), and the pulse is then computed exactly once
 // by maybeAdvance in src/server/realtime/checkpoint.ts, at the moment the
-// room advances into the next round's Phase 1. This module only owns the
+// room advances into the next round's Market. This module only owns the
 // formula itself.
 // =====================================================================
 

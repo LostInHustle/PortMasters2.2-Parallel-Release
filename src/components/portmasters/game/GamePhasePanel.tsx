@@ -2,16 +2,16 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import type { Phase } from "@/lib/game/types";
-import type { VoyageResult } from "@/types/realtime";
+import { phaseFace } from "@/lib/game/phases";
+import type { VoyageResult, VoyageReveal } from "@/types/realtime";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
-import { Purchase } from "./phases/Purchase";
-import { BarterPhase } from "./phases/BarterPhase";
-import { WorkerMgmt } from "./phases/WorkerMgmt";
+import { Market } from "./phases/Market";
+import { Parley } from "./phases/Parley";
 import { Orders } from "./phases/Orders";
 import { Settlement } from "./phases/Settlement";
 import { Shipyard, ModuleDraft, ModuleSwap } from "./phases/Shipyard";
+import { VoyageLogPanel } from "./VoyageLogPanel";
 import { Bankruptcy } from "./phases/Bankruptcy";
 import { Endgame } from "./phases/Endgame";
 import type { PhasePanelProps } from "./phases/PhaseShared";
@@ -43,23 +43,29 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  */
 
 // Everything a phase panel takes lives in PhaseShared, and every panel
-// imports it from there. This type adds the four things the dispatcher
-// alone decides: which overlay is open, whether the voyage has concluded,
-// and the two Endgame extras it forwards rather than renders itself.
+// imports it from there. This type adds the things the dispatcher alone
+// decides: which overlay is open, whether the voyage has concluded, and
+// the Endgame extras it forwards rather than renders itself. The reveal
+// arrives the same way the standings do, from the parent rather than from
+// a hook, because the frame carrying it is the conclusion's own and both
+// halves of it are read off the same handler.
 type Props = PhasePanelProps & {
   onTutorialOpen?: () => void;
   voyageResult?: VoyageResult | null;
+  reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
 };
 
 export function GamePhasePanel(props: Props) {
   const { game } = props;
-  const phaseKey = String(game.phase);
-  // A phase specific accent gradient strip at the top of the panel.
-  // Each phase gets its own colour so the transition between phases is
-  // visually distinct even before the content swaps in.
-  const accentGradient = PHASE_ACCENTS[game.phase];
+  // The phase's own accent, read from its face in @/lib/game/phases, which
+  // is the one table that describes a phase. This file used to hold a
+  // second copy of that fact: a Record<Phase, string> of gradients whose
+  // keys were the union written out a second time, so a phase renamed in
+  // the engine left a stale key here and a panel wearing the wrong colour.
+  // There is nowhere left for the two to disagree.
+  const accentGradient = phaseFace(game.phase).gradient;
   return (
     <div className="pm-glass relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[520px]">
       {/* Phase accent strip */}
@@ -70,7 +76,7 @@ export function GamePhasePanel(props: Props) {
       />
       <AnimatePresence mode="sync">
         <motion.div
-          key={`${phaseKey}:${game.currentRound}`}
+          key={`${game.phase}:${game.currentRound}`}
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -84,39 +90,17 @@ export function GamePhasePanel(props: Props) {
 }
 
 /* The accent strip along the top of the panel, one colour per phase.
-   Twelve keys, twelve colours, where there used to be seven between
-   them: welcome and orders both wore the same blue, so did boon draft,
-   shipyard and module draft, and settlement and bankruptcy, and a
-   captain crossing from one phase into its twin had no accent to tell
-   them the panel had changed.
-
-   The key is the phase value as the engine sends it, which is why two of
-   them are spelled with an underscore and the rest are numbers.
+   The colours live in the phase's own face (see @/lib/game/phases) and
+   in src/app/palette.css behind them, so what is left here is the
+   lookup. The table that used to sit here held twelve keys and the
+   gradients to go with them; it was the second copy of a fact the face
+   table owns.
 
    Two pairs do share a hue, and neither pair can ever be on screen
-   together: bankruptcy wears the Boon Draft colour because a voyage that
-   ends there never reaches another boon, and endgame wears the Module
-   Draft colour because a crowned voyage has drafted its last module.
-
-   Keyed by the Phase union rather than by string, and read with the
-   phase value itself rather than with the widened string form. Both of
-   those are load bearing: a phase added to the union without a colour
-   now fails the build here, and the lookup can no longer come back
-   undefined, so it needs no fallback colour. */
-const PHASE_ACCENTS: Record<Phase, string> = {
-  "0": "pm-grad-welcome",
-  "1": "pm-grad-purchase",
-  "2": "pm-grad-orders",
-  "3": "pm-grad-settlement",
-  "4": "pm-grad-shipyard",
-  "5": "pm-grad-boon",
-  barter: "pm-grad-barter",
-  worker_mgmt: "pm-grad-workers",
-  module_draft: "pm-grad-module-draft",
-  module_swap: "pm-grad-module-swap",
-  bankruptcy: "pm-grad-bankruptcy",
-  endgame: "pm-grad-endgame",
-};
+   together: bankruptcy wears Dawn's hue because a voyage that ends there
+   never reaches another boon draft, and endgame wears the Module Draft
+   hue because a crowned voyage has drafted its last module. Those two
+   pairings are checked, not just asserted: see the palette check. */
 
 // The single switch that maps a phase value to its panel. Pulled out of
 // GamePhasePanel so the AnimatePresence subtree above stays one element
@@ -137,6 +121,10 @@ function ActivePhase(props: Props) {
     barter,
     aid,
     backing,
+    audit,
+    maroon,
+    voyageLog,
+    privateLog,
     me,
     members,
     room,
@@ -144,6 +132,7 @@ function ActivePhase(props: Props) {
     onRumorBoardOpen,
     onTutorialOpen,
     voyageResult,
+    reveal,
     myLegacy,
     onRestart,
     roster,
@@ -151,7 +140,7 @@ function ActivePhase(props: Props) {
   const p = game.phase;
 
   switch (p) {
-    case 0:
+    case "harbor":
       return (
         <Welcome
           game={game}
@@ -162,7 +151,7 @@ function ActivePhase(props: Props) {
           onTutorialOpen={onTutorialOpen}
         />
       );
-    case 5:
+    case "dawn":
       return (
         <BoonDraft
           game={game}
@@ -172,9 +161,9 @@ function ActivePhase(props: Props) {
           members={members}
         />
       );
-    case 1:
+    case "market":
       return (
-        <Purchase
+        <Market
           game={game}
           ctx={ctx}
           act={act}
@@ -184,31 +173,23 @@ function ActivePhase(props: Props) {
           onRumorBoardOpen={onRumorBoardOpen}
         />
       );
-    case "barter":
+    case "parley":
       return (
-        <BarterPhase
+        <Parley
           game={game}
           ctx={ctx}
           act={act}
           barter={barter}
+          audit={audit}
+          maroon={maroon}
           me={me}
           phaseSync={phaseSync}
           members={members}
           colorFor={colorFor}
+          roster={roster}
         />
       );
-    case "worker_mgmt":
-      return (
-        <WorkerMgmt
-          game={game}
-          ctx={ctx}
-          act={act}
-          phaseSync={phaseSync}
-          members={members}
-          colorFor={colorFor}
-        />
-      );
-    case 2:
+    case "orders":
       return (
         <Orders
           game={game}
@@ -219,7 +200,7 @@ function ActivePhase(props: Props) {
           colorFor={colorFor}
         />
       );
-    case 3:
+    case "resolve":
       return (
         <Settlement
           game={game}
@@ -232,15 +213,25 @@ function ActivePhase(props: Props) {
           members={members}
         />
       );
-    case 4:
+    case "dusk":
       return (
-        <Shipyard
-          game={game}
-          ctx={ctx}
-          act={act}
-          phaseSync={phaseSync}
-          members={members}
-        />
+        // [B4: the log surfaces] Dusk carries both logs under the yard.
+        // They are one screen because they answer one question, which is
+        // what happened while this captain was not looking, and the
+        // shipyard is where a leg ends and a captain has the time to read
+        // it. The wrapper is a plain block rather than a card: the panel
+        // is already inside the phase frame, and a card in a card reads as
+        // a mistake.
+        <div className="space-y-4">
+          <Shipyard
+            game={game}
+            ctx={ctx}
+            act={act}
+            phaseSync={phaseSync}
+            members={members}
+          />
+          <VoyageLogPanel log={voyageLog} privateLog={privateLog} />
+        </div>
       );
     case "module_draft":
       return <ModuleDraft game={game} act={act} />;
@@ -263,6 +254,7 @@ function ActivePhase(props: Props) {
           me={me}
           room={room}
           voyageResult={voyageResult}
+          reveal={reveal}
           myLegacy={myLegacy}
           onRestart={onRestart}
         />
