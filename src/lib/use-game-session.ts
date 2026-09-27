@@ -29,6 +29,11 @@ import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { normalizePortShift } from "@/lib/game/maroon";
 import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
+import {
+  normalizeLarder,
+  normalizeLarderFedRound,
+  onShortRations,
+} from "@/lib/game/larder";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 
 // The most log lines a session keeps around at once (see the APPLY case
@@ -383,6 +388,15 @@ export function useGameSession(
           // default set, which is the shape an old save was already sailing:
           // the switch on and every seat left at the engine's own default.
           game.standingOrders = normalizeStandingOrders(game.standingOrders);
+          // [C1: the Larder and Short Rations] The provisions a save was
+          // carrying, healed the way every other saved field is. A voyage
+          // saved before this layer existed holds no Larder and no stamp, so
+          // it lands on a full hold and a leg no voyage has: an old save
+          // loads provisioned, and the first Dawn after it loads is the
+          // crew's first meal. A damaged number heals the same way rather
+          // than putting a captain on short rations for a leg nobody played.
+          game.larder = normalizeLarder(game.larder);
+          game.larderFedRound = normalizeLarderFedRound(game.larderFedRound);
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.
@@ -504,6 +518,12 @@ export function useGameSession(
       renownLevel: state.game.renownLevel,
       bankrupt: state.game.bankrupt,
       marooned: state.game.marooned,
+      // [C1: the Larder and Short Rations] The fleet can see a hungry crew.
+      // The plan asks for the shortage to be public, and this is the frame
+      // the room already broadcasts: onShortRations answers false with the
+      // layer switched off, so a base game voyage reports undefined here
+      // and no badge is drawn anywhere.
+      shortRations: onShortRations(state.game) || undefined,
     }),
     [roomId, state.game],
   );

@@ -667,6 +667,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // neither.
         bankrupt?: boolean;
         marooned?: boolean;
+        // [C1: the Larder and Short Rations] Whether this captain's crew is
+        // going hungry. Reported by the captain's own client for the reason
+        // bankrupt and marooned are: the Larder lives in the browser's
+        // GameState, so the browser is the only side that can read it.
+        shortRations?: boolean;
       }) => {
         const s = requireAuth(socket);
         if (!s) return;
@@ -724,6 +729,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
           // and anything else reads as neither at every reader.
           bankrupt: payload?.bankrupt === true ? true : undefined,
           marooned: payload?.marooned === true ? true : undefined,
+          // [C1: the Larder and Short Rations] The same allow list treatment
+          // as the two marks above, and for the same reason: this is a
+          // cached value rebroadcast to every captain in the room, so only
+          // an explicit true is a hungry crew and anything else reads as a
+          // fed one at every reader.
+          shortRations: payload?.shortRations === true ? true : undefined,
           at: Date.now(),
         };
         rememberStatus(roomId, broadcast);

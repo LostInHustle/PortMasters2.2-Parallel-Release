@@ -61,6 +61,7 @@
   --color-advisor: var(--w-advisor);
   --color-depth: var(--w-depth);
   --color-pulse: var(--w-pulse);
+  --color-larder: var(--w-larder);
   --color-planner: var(--w-planner);
   --color-dawn: var(--w-dawn);
   --color-modules: var(--w-modules);
@@ -289,6 +290,8 @@
   --w-depth: oklch(0.53 0.13 347);
   /* Market Pulse: which way prices have moved. */
   --w-pulse: oklch(0.53 0.13 90);
+  /* The Larder: what the crew eats, and buying more of it. */
+  --w-larder: oklch(0.53 0.13 270);
   /* Fulfillment Planner: which orders are worth filling. */
   --w-planner: oklch(0.53 0.13 132);
   /* Module list: what the ship already carries. */
@@ -447,6 +450,7 @@
   --w-advisor: oklch(0.76 0.12 197);
   --w-depth: oklch(0.76 0.12 347);
   --w-pulse: oklch(0.76 0.12 90);
+  --w-larder: oklch(0.76 0.12 270);
   --w-planner: oklch(0.76 0.12 132);
   --w-modules: oklch(0.76 0.12 261);
   /* Every other widget is given a night value. Brand was the one that

@@ -37,11 +37,15 @@ import {
   BOONS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
   ITEMS,
+  LARDER_MAX,
+  LARDER_START,
   MAX_SHIP_LEVEL,
   MODULES,
   PORTS_TIER2,
   PRODUCTS_TIER0,
+  RATION_PRICE,
   RESOURCES_TIER0,
+  SHORT_RATIONS_YIELD,
   STARTING_STOCK,
   guideText,
   tipsText,
@@ -155,10 +159,23 @@ import {
 } from "@/lib/game/victory";
 import {
   createInitialGameState,
+  flatWorkerRoster,
+  type GameContext,
   type GameState,
   type OrderFill,
   type Phase,
 } from "@/lib/game/types";
+import {
+  crewSize,
+  feedCrew,
+  larderRoomLegs,
+  normalizeLarder,
+  normalizeLarderFedRound,
+  onShortRations,
+  provisionCrew,
+  shortRationsYield,
+  survivalLayerOn,
+} from "@/lib/game/larder";
 import type {
   AuditReveal,
   MaroonResult,
@@ -169,10 +186,13 @@ import type {
 import {
   acceptBarterOffer,
   applyPortShift,
+  assignTask,
   autoCommit,
   failSeat,
   handleModuleSelect,
+  hireWorker,
   maroonSeat,
+  nextPhase,
   postBarterOffer,
   purchaseCard,
   refundBarterOffer,
@@ -7044,6 +7064,18 @@ async function main(): Promise<void> {
     // and that is a security property rather than a shape preference: the
     // same save holds this captain's Gold, their hold and their card, so
     // the check is that none of it came out with the manifest.
+    //
+    // [C1: the Larder and Short Rations] `larder` came out of this list
+    // when C1 landed, and the change is worth reading closely because
+    // pulling a word out of a sweep is exactly how a real leak would be
+    // smuggled past one. The plan's audit clause names the Larder: the
+    // reveal is two fulfillments plus the audited captain's current Larder,
+    // and never the card, the Gold or the hold. So the word belongs in the
+    // reveal and it is asserted below, positively and by shape, rather than
+    // deleted and forgotten. Every other private word stays forbidden, and
+    // the key list under this one is still exact, so a third field arriving
+    // in the reveal is a failure whether or not anyone remembered to add
+    // its name here.
     const auditBody = JSON.stringify({
       round: revealFrames[0]?.reveal?.round,
       target: revealFrames[0]?.reveal?.target,
@@ -7063,7 +7095,6 @@ async function main(): Promise<void> {
       "gold",
       "purse",
       "hold",
-      "larder",
       "inventory",
       "money",
       "score",
@@ -7073,13 +7104,33 @@ async function main(): Promise<void> {
       "the reveal carries no alignment, no card, no Gold and no hold, word for word",
     );
     const auditRevealFrame = revealFrames[0]?.reveal;
+    // The reveal's whole field list, one of exactly two shapes and never a
+    // third. Which one depends on the provisions layer, which is read from
+    // the frame itself rather than from this process's environment: the
+    // harness and the server it is pointed at are two processes, and a
+    // suite that assumed they shared a switch would pass here while lying
+    // about a live deployment.
+    const hasLarder = auditRevealFrame?.larder !== undefined;
     check(
       Object.keys(auditRevealFrame ?? {})
         .sort()
-        .join(",") === "fulfillments,roomId,round,target" &&
-        Object.keys(auditRevealFrame?.target ?? {})
-          .sort()
-          .join(",") === "name,userId" &&
+        .join(",") ===
+        (hasLarder
+          ? "fulfillments,larder,roomId,round,target"
+          : "fulfillments,roomId,round,target"),
+      "the reveal's fields are the plan's allow list and nothing else, with the Larder on it when the provisions layer is on",
+    );
+    check(
+      !hasLarder ||
+        (Number.isInteger(auditRevealFrame?.larder) &&
+          (auditRevealFrame?.larder ?? -1) >= 0 &&
+          (auditRevealFrame?.larder ?? -1) <= LARDER_MAX),
+      "and the one number the reveal was always meant to open is a whole count inside the hold's own ends",
+    );
+    check(
+      Object.keys(auditRevealFrame?.target ?? {})
+        .sort()
+        .join(",") === "name,userId" &&
         Object.keys(auditRevealFrame?.fulfillments?.[0] ?? {})
           .sort()
           .join(",") === "items,port,reward,round" &&
@@ -10523,6 +10574,341 @@ async function main(): Promise<void> {
             row.rounds === 12 && row.seats === 4 && row.mode === "ocean_gambit",
         ),
       "and every chronicle row the voyage writes names the twelve legs and the four seats together, which is the pair a later reader groups the four seat band by",
+    );
+
+    // ---- The Larder, and the crew that eats from it ----
+    // [C1: the Larder and Short Rations] The crew is the artisan roster and
+    // the Larder is what it eats: one ration a head a leg, bought at the
+    // market, and a shortage when the count reaches zero. Three things are
+    // checked here and they are worth naming before the first assertion.
+    //
+    // The switch is read from both sides inside one run, which is the whole
+    // reason survivalLayerOn is not cached. Rollback is the plan's own test
+    // of this layer: with the flag off a captain eats nothing, nothing is
+    // slower and nothing is drawn, and a suite that could only hold one
+    // value would be checking a build the operator is not necessarily
+    // running.
+    //
+    // The reduction is checked through the engine's own settlement rather
+    // than beside it. Walking the lap from Orders into Resolve is what
+    // every captain does every leg, so if the slowdown only worked when
+    // processProduction was called directly, this is where that shows.
+    //
+    // The buy is checked against both ceilings, because the hold's room and
+    // the purse are two different reasons a purchase stops and a store that
+    // confused them would sell a captain rations they cannot carry.
+    //
+    // Everything captain facing that this block produces is dash checked at
+    // the end of it, in one place, for the reason the manifest line above
+    // is: the house rule covers every string a captain reads, and the log
+    // lines this feature writes are read by the table.
+    const survivalEnvWas = process.env.NEXT_PUBLIC_SURVIVAL;
+    // Sets the switch around a read and always puts the environment back,
+    // including when the read throws: a leaked environment value would make
+    // every check after this one read a layer the operator did not ask for.
+    const withSurvival = <T>(value: string | undefined, read: () => T): T => {
+      if (value === undefined) delete process.env.NEXT_PUBLIC_SURVIVAL;
+      else process.env.NEXT_PUBLIC_SURVIVAL = value;
+      try {
+        return read();
+      } finally {
+        if (survivalEnvWas === undefined)
+          delete process.env.NEXT_PUBLIC_SURVIVAL;
+        else process.env.NEXT_PUBLIC_SURVIVAL = survivalEnvWas;
+      }
+    };
+
+    check(
+      [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+        withSurvival(value, survivalLayerOn),
+      ) &&
+        ["off", "0", "OFF", " off ", "Off"].every(
+          (value) => !withSurvival(value, survivalLayerOn),
+        ),
+      "the provisions layer is on for every value except the word off and the digit zero, so a typo in the switch leaves the game playable rather than quietly deleting a system",
+    );
+
+    // Held on for every rule below, so this block reads the same rules
+    // whatever the operator set at the door.
+    const larderLines: string[] = [];
+    withSurvival("1", () => {
+      const larderCrew = createInitialGameState();
+      larderCrew.money = 1000;
+      check(
+        crewSize(larderCrew) === 0 && !onShortRations(larderCrew),
+        "a fresh captain has nobody aboard, and an empty larder over an empty roster is not a shortage: there is nobody going without",
+      );
+      hireWorker(larderCrew, "weaver", larderLines);
+      hireWorker(larderCrew, "weaver", larderLines);
+      check(
+        crewSize(larderCrew) === 2 &&
+          flatWorkerRoster(larderCrew).length === crewSize(larderCrew) &&
+          larderCrew.workers.weaver.length === 2,
+        "hiring artisans is what puts a crew aboard, counted through the one helper that flattens the roster rather than in a second place that could disagree with it",
+      );
+
+      // Eating, once a leg. The stamp is what makes "once" true rather than
+      // hopeful, and the check is written as a second call in the same leg
+      // because that is the shape of the defect it prevents: a leg opens
+      // through more than one path, and charging a captain twice for one
+      // leg is silent in every screen.
+      larderCrew.larder = 10;
+      larderCrew.currentRound = 3;
+      feedCrew(larderCrew, larderLines);
+      feedCrew(larderCrew, larderLines);
+      const ateOnce =
+        larderCrew.larder === 8 && larderCrew.larderFedRound === 3;
+      larderCrew.currentRound = 4;
+      feedCrew(larderCrew, larderLines);
+      check(
+        ateOnce && larderCrew.larder === 6 && larderCrew.larderFedRound === 4,
+        "the crew eats one ration a head and the leg is stamped, so a second call in the same leg eats nothing more while the next leg eats again",
+      );
+
+      // The floor, and the line that says so. A larder the crew emptied
+      // reads as empty rather than in debt, and the leg the shortage begins
+      // is the one that says it.
+      larderCrew.larder = 1;
+      larderCrew.currentRound = 5;
+      const shortLines: string[] = [];
+      feedCrew(larderCrew, shortLines);
+      larderLines.push(...shortLines);
+      check(
+        larderCrew.larder === 0 &&
+          onShortRations(larderCrew) &&
+          shortLines.length === 1 &&
+          shortLines[0].includes("Short rations") &&
+          shortLines[0].includes(`${Math.round(SHORT_RATIONS_YIELD * 100)}%`) &&
+          !CARRIES_A_DASH.test(shortLines[0]),
+        "a larder the crew empties reads as empty rather than in debt, and the leg announces the shortage at the pace the rule actually applies",
+      );
+
+      check(
+        shortRationsYield(6) === 3 &&
+          shortRationsYield(4) === 2 &&
+          shortRationsYield(3) === 1 &&
+          shortRationsYield(2) === 1 &&
+          shortRationsYield(1) === 1 &&
+          shortRationsYield(0) === 1,
+        "a hungry crew works at half pace, floored at one item, because a task spends its recipe when it is assigned and a yield that rounded away to nothing would take the goods and return silence",
+      );
+
+      // The reduction through the engine's own lap. Three workshops walked
+      // from Orders into Resolve with the same artisan and the same
+      // materials, so the only difference between any two holds is the one
+      // being read: the larder for the first pair, and the module for the
+      // second. The third is hungry as well as equipped, because what it
+      // settles is that the module's bonus is applied before the shortage
+      // takes its share rather than after, and a fed workshop would settle
+      // nothing about the order the two run in.
+      const larderCtx: GameContext = {
+        seedBase: `smoke:larder:${suffix}`,
+        harborId: `smoke-larder-${suffix}`,
+      };
+      const shops: Array<{ state: GameState; label: string }> = [];
+      for (const label of ["fed", "hungry", "workshop"]) {
+        const state = createInitialGameState();
+        state.money = 1000;
+        hireWorker(state, "weaver", []);
+        state.workers.weaver[0].isSkilled = true;
+        if (label === "workshop") {
+          const workshop = MODULES.find((m) => m.id === "artisans_workshop");
+          if (workshop) state.equippedModules.push(workshop);
+        }
+        assignTask(state, "weaver", "Linen Clothes", []);
+        state.phase = "orders";
+        // Every workshop but the fed one goes into the leg with an empty
+        // larder, so the shortage is the state under test rather than a
+        // side effect of how much the crew happened to have.
+        state.larder = label === "fed" ? LARDER_START : 0;
+        shops.push({ state, label });
+      }
+      const before = shops.map(
+        (shop) => shop.state.inventory["Linen Clothes"] ?? 0,
+      );
+      for (const shop of shops) nextPhase(shop.state, larderCtx, []);
+      const made = shops.map(
+        (shop, index) =>
+          (shop.state.inventory["Linen Clothes"] ?? 0) - before[index],
+      );
+      check(
+        made[0] === 2 && made[1] === 1,
+        "walking the lap into Resolve makes a skilled artisan's two goods while the crew is fed and one while it is not, so the plan's slower crafting lands through the engine every captain already walks rather than beside it",
+      );
+      check(
+        made[2] === 1,
+        "and an Artisan's Workshop's third good is halved to one as well, so the module's bonus is applied before the shortage takes its share rather than after",
+      );
+
+      // Buying. Two ceilings and a floor, each read on its own state so one
+      // cannot be mistaken for another.
+      const buyer = createInitialGameState();
+      buyer.money = 1000;
+      hireWorker(buyer, "weaver", []);
+      hireWorker(buyer, "weaver", []);
+      // Emptied first, because a fresh voyage is handed a full opening hold
+      // (see LARDER_START) and what this check is about is what a purchase
+      // adds to it rather than what it was already carrying.
+      buyer.larder = 0;
+      const buyLines: string[] = [];
+      const boughtLegs = provisionCrew(buyer, 2, buyLines);
+      check(
+        boughtLegs === 2 &&
+          buyer.larder === 4 &&
+          buyer.money === 1000 - 4 * RATION_PRICE &&
+          buyer.roundCosts === 4 * RATION_PRICE &&
+          buyer.totalCosts === 4 * RATION_PRICE &&
+          larderRoomLegs(buyer) === 28,
+        "provisioning buys a leg at a time for the crew aboard, and what it spends is booked where every other purchase is booked",
+      );
+      const filledRoom = larderRoomLegs(buyer);
+      const filledLegs = provisionCrew(buyer, 999, buyLines);
+      check(
+        filledLegs === filledRoom &&
+          buyer.larder === LARDER_MAX &&
+          provisionCrew(buyer, 1, buyLines) === 0 &&
+          buyLines[buyLines.length - 1] === "🧺 The larder is full.",
+        "a request past the hold's room fills it and stops there, and a full larder says so rather than taking a press and returning nothing",
+      );
+
+      const thin = createInitialGameState();
+      thin.money = 100;
+      hireWorker(thin, "weaver", []);
+      thin.money = 1;
+      const thinLines: string[] = [];
+      check(
+        provisionCrew(thin, 1, thinLines) === 0 && thin.money === 1,
+        "and a purse that cannot cover one leg of rations buys nothing rather than going into debt for it",
+      );
+      const crewless = createInitialGameState();
+      crewless.money = 100;
+      const crewlessLines: string[] = [];
+      check(
+        provisionCrew(crewless, 1, crewlessLines) === 0 &&
+          larderRoomLegs(crewless) === 0 &&
+          crewlessLines.length === 1,
+        "while a captain with nobody aboard has nothing to provision and no room to measure, which is the same answer those two cases already give a buyer",
+      );
+
+      // Every line this block produced, gathered here rather than threaded
+      // through each check, since the dash rule is about the whole set.
+      larderLines.push(...buyLines, ...thinLines, ...crewlessLines);
+
+      // A save read back.
+      check(
+        normalizeLarder(undefined) === LARDER_START &&
+          normalizeLarder("seven") === LARDER_START &&
+          normalizeLarder(NaN) === LARDER_START &&
+          normalizeLarder(7.8) === 7 &&
+          normalizeLarder(-4) === 0 &&
+          normalizeLarder(LARDER_MAX + 90) === LARDER_MAX &&
+          normalizeLarderFedRound(undefined) === 0 &&
+          normalizeLarderFedRound(-2) === 0 &&
+          normalizeLarderFedRound(2.5) === 2,
+        "a save this build cannot read heals to a full hold rather than to a hungry one, a count outside the hold's ends is clamped rather than dropped, and a missing leg stamp lands on a leg no voyage has",
+      );
+    });
+
+    // The other side of the switch, read on its own so the check above can
+    // stay about the rules rather than about the flag.
+    check(
+      withSurvival("off", () => {
+        const dark = createInitialGameState();
+        dark.money = 100;
+        hireWorker(dark, "weaver", []);
+        dark.larder = 0;
+        const darkLines: string[] = [];
+        feedCrew(dark, darkLines);
+        const boughtNothing = provisionCrew(dark, 3, darkLines) === 0;
+        return (
+          !survivalLayerOn() &&
+          !onShortRations(dark) &&
+          dark.larder === 0 &&
+          dark.larderFedRound === 0 &&
+          dark.money === 100 &&
+          boughtNothing &&
+          darkLines.length === 0
+        );
+      }),
+      "with the switch off nothing is eaten, nothing is bought, no leg is stamped and no shortage is claimed, so the base game is exactly as it was",
+    );
+
+    // The fleet sees a hungry crew. The plan asks for the state to be
+    // publicly visible and its implementation clause says the visibility
+    // rides the status broadcast the room already carries, so what is
+    // checked here is the frame every captain is already listening to
+    // rather than a channel built for this. A fed crew reports no mark at
+    // all, which is the allow list read run the other way: only an
+    // explicit true is a hungry crew, so a client that never had a larder
+    // reads as fed rather than as unknown.
+    const larderHome = await signUp("lard_h");
+    extraAccounts.push(larderHome);
+    const larderRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: larderHome.cookie,
+        body: JSON.stringify({
+          name: `Smoke larder ${suffix}`,
+          isPublic: false,
+        }),
+      },
+    );
+    if (larderRoom.status !== 200) {
+      throw new Error("No harbor to report a hungry crew in.");
+    }
+    const larderRoomId = larderRoom.body.room.id;
+    const larderSocket = await openAuthedSocket(larderHome);
+    sockets.push(larderSocket);
+    const larderSeated = waitForEvent<WireHistory>(
+      larderSocket,
+      "chat:history",
+      (payload) => payload?.roomId === larderRoomId,
+    );
+    larderSocket.emit("room:join", { roomId: larderRoomId });
+    await larderSeated;
+
+    const larderFrames: Array<{ shortRations?: boolean }> = [];
+    larderSocket.on(
+      "game:status",
+      (payload: { user?: { id?: string }; shortRations?: boolean }) => {
+        if (payload?.user?.id !== larderHome.id) return;
+        larderFrames.push(payload);
+      },
+    );
+    const reportLarder = (shortRations: boolean) => {
+      larderSocket.emit("game:status", {
+        roomId: larderRoomId,
+        round: 1,
+        phase: "market",
+        phaseLabel: "Market",
+        gold: 100,
+        reputation: 0,
+        shipLevel: 0,
+        gameOver: false,
+        shortRations,
+      });
+    };
+    reportLarder(true);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    reportLarder(false);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    check(
+      larderFrames.length === 2 &&
+        larderFrames[0].shortRations === true &&
+        larderFrames[1].shortRations === undefined,
+      "a hungry crew reaches the fleet on the status frame every captain already listens to, and a fed one reports no mark at all",
+    );
+
+    // Every string this feature puts in front of a captain, read with the
+    // same rule the manifest line above is read with. The house rule covers
+    // every string a captain reads, and it is built out of code points at
+    // the top of this file so that the check is never where the dashes are
+    // kept.
+    check(
+      larderLines.length > 0 &&
+        larderLines.every((line) => !CARRIES_A_DASH.test(line)),
+      "and every line the larder writes for a captain is free of dashes, the same rule every other string in the game is held to",
     );
 
     console.log("\nSigning out");

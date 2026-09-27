@@ -222,6 +222,28 @@ type SaveSnapshot = {
 // the liar their own decisions rather than winning them anything, so it is
 // left to the normalizer rather than half bounded in this file.
 
+// [C1: the Larder and Short Rations] A fourth field this pass does not
+// carry, and it is the first one whose reason is neither of the two above.
+// The Larder IS a number, so "a mark is not a number" does not apply, and
+// forging it DOES pay a little, so "a lie here costs the liar nothing" does
+// not apply either. What makes it unbounded is that it has nowhere to
+// accumulate: it is a stock rather than a balance, its legal range is zero
+// to LARDER_MAX (sixty), and its ceiling is in the same place as its
+// opening hold. Every value a forged save could claim is therefore also a
+// value an honest captain can hold, reached in one purchase of ten legs'
+// worth, so there is no threshold that separates the two. A check could
+// only be drawn below the ceiling, and the captains it would flag would be
+// the ones who had just done the sensible thing and filled the larder
+// before a long run.
+//
+// What bounds it instead is where it is read. normalizeLarder clamps any
+// save to the hold's two ends on load and floors the fraction, so the most
+// a doctored save can hand its owner is a full larder they did not buy,
+// worth at most sixty rations' price once. That is a smaller prize than the
+// one this file was built to deny, and it is a prize no ceiling could have
+// denied, so it is left to the normalizer with the sentence written down
+// where the question gets asked rather than half bounded in here.
+//
 // A save is a free form JSON blob written by a client, so every field here is
 // treated as untrusted input rather than as a number. Null is returned only
 // when the payload is not an object at all, since there is then nothing to

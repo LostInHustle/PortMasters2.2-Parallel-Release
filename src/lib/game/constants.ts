@@ -665,6 +665,37 @@ export const SHIP_DISCOUNT_PER_LEVEL = 5;
 // separately.
 export const MAX_SHIP_LEVEL = 3;
 
+// [C1: the Larder and Short Rations] The provisions layer's four numbers,
+// kept here rather than in the Larder's own module for the reason every
+// other number in this file is kept here: a reader looking for what a
+// ration costs finds it beside every other price in the game, and a balance
+// pass edits them knowing they are prices rather than rules. The rules that
+// read them live in ./larder.
+//
+// The plan names none of these. It says the crew eats, that the Larder is a
+// plain number, and that a shortage costs cargo capacity and slows crafting,
+// and it leaves every magnitude to the build. So these are the opening tune,
+// which is exactly the shape [B2] left its own clocks in: one place to edit,
+// and a comment saying so rather than a number pretending to be derived.
+//
+// They are set against the ladder the rest of the economy already runs on.
+// An easy voyage is eight legs with a fifteen Gold maintenance fee a leg and
+// wages from eight Gold a head, so a ration at two Gold is a real line
+// without being the line that decides a voyage, and a hold of twelve is
+// three artisans fed for the whole of a short voyage or one artisan fed for
+// as long as any voyage lasts.
+export const RATION_PRICE = 2;
+export const LARDER_START = 12;
+export const LARDER_MAX = 60;
+
+// What a short rationed crew's work comes to, as a fraction of its own
+// output. The plan says the shortage slows crafting and gives no number, so
+// this is the tune; what it is not is a second place the plan's quarter
+// could be spent, because that quarter belongs to the capacity clause the
+// same sentence carries and capacity is C4's (see ./larder for where it
+// lands instead).
+export const SHORT_RATIONS_YIELD = 0.5;
+
 export const MODULES: Module[] = [
   ...MODULES_TIER0,
   ...MODULES_TIER1,

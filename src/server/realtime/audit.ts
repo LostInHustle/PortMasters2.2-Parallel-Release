@@ -39,6 +39,7 @@ import {
   drawAudit,
   normalizeOrderFills,
 } from "@/lib/game/audit";
+import { normalizeLarder, survivalLayerOn } from "@/lib/game/larder";
 import { normalizeMode } from "@/lib/game/mode";
 import type { AuditReveal, AuditTally } from "@/types/realtime";
 import { activeRosterSet } from "./checkpoint";
@@ -125,9 +126,19 @@ async function auditRoomEpoch(roomId: string): Promise<number | null> {
 //
 // Every field here is copied rather than referenced, and the lines are
 // built by drawAudit out of normalized entries, so what leaves this
-// function is a fresh payload with the reveal's four fields in it and
+// function is a fresh payload with the reveal's own fields in it and
 // nothing else of the save's. A captain's hold and purse are in that same
 // blob, and they do not come out of it.
+//
+// [C1: the Larder and Short Rations] The Larder is the one field that is
+// read straight off the save rather than sampled, because the plan's audit
+// clause names it: two fulfillments plus the captain's current Larder, and
+// never the card, the Gold or the hold. It arrives through the same
+// normalizer the load path uses, so the number the room is shown is the
+// number that captain is playing with rather than whatever a doctored save
+// claims, and it is left off entirely when the provisions layer is
+// switched off, since a voyage with the switch off carries a Larder that
+// no rule moves.
 async function revealFor(
   roomId: string,
   voyageEpoch: number,
@@ -152,6 +163,7 @@ async function revealFor(
       auditSeed(roomId, voyageEpoch, round, targetUserId),
       normalizeOrderFills(save?.orderFills),
     ),
+    larder: survivalLayerOn() ? normalizeLarder(save?.larder) : undefined,
   };
 }
 

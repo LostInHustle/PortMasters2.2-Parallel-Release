@@ -82,9 +82,27 @@ export interface TelemetryPayloads {
   // Two of the proposal's market numbers are deliberately not here. Median
   // hold utilization needs a hold with a size, and this tree's hold is
   // unbounded: a denominator invented for it would be a percentage of
-  // nothing, which is the same reason the audit refuses to show a Larder
-  // that C4 has not built yet. Chandler share and Bale usage are Epic G's,
-  // and the survival family they belong to has no source at all.
+  // nothing. Chandler share and Bale usage are Epic G's, and they are
+  // absent for that reason rather than because nobody got to them.
+  //
+  // This paragraph used to explain the hold's absence by pointing at the
+  // audit's, which it described as refusing to print a Larder that C4 had
+  // not built. Both halves of that were wrong and the correction is worth
+  // the two lines: the Larder is C1's rather than C4's, and C1 has now
+  // landed it, so the audit prints one and the analogy has nothing left to
+  // stand on. The hold's reason is the hold's own, as written above.
+  //
+  // The survival family is undeclared above, and this is where that is
+  // answered rather than left as a gap for a reader to guess at. Four
+  // numbers belong to it: short rationed legs, crew losses, frostbite, and
+  // the Supply Barge's share of food spending. The first now has a source,
+  // because C1 landed and a shortage can really happen, so an event could
+  // be written for it. What has not landed is the reason to write one:
+  // nothing in this build reads the family, C1's own evaluation watches
+  // what the room says in the leg after a captain visibly goes hungry
+  // rather than a stored count of it, and a family declared ahead of the
+  // events that would fill it is a schema with no rows in it. It arrives
+  // with the epic that measures it.
   leg_report: {
     leg: number;
     actor: string;

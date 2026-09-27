@@ -233,6 +233,26 @@ export type AuditReveal = {
    */
   target: { userId: string; name: string };
   fulfillments: OrderFill[];
+  /**
+   * [C1: the Larder and Short Rations] The audited captain's Larder, which
+   * the plan's audit clause opens alongside the sample.
+   *
+   * It is on this frame and on no other, and that is the design rather than
+   * an accident of where it was easy to read. The Larder count travels to
+   * the server in the captain's own save, so the reveal can read it without
+   * the room being handed it continuously: what the fleet sees all voyage
+   * is whether a crew is hungry (see GameStatusUpdate.shortRations, which
+   * the plan does ask to be public), and the count itself is opened by the
+   * majority that voted for it. Servering it on the status frame instead
+   * would have made this clause a number the room already had.
+   *
+   * Undefined when the provisions layer is switched off, for the same
+   * reason the badge above is: a voyage with the switch off carries a
+   * Larder field that no rule moves, and printing it would put a number in
+   * front of the table that means nothing. A reader draws the line on a
+   * number and never on a placeholder.
+   */
+  larder?: number;
 };
 
 // =====================================================================
@@ -385,6 +405,15 @@ export type PlayerReportAck = {
 // either, reads as neither: the roster badges a captain only on an
 // explicit true, and the server refuses to maroon a captain it has been
 // told is already written off.
+//
+// [C1: the Larder and Short Rations] shortRations rides the same frame and
+// for the same kind of reason. The plan asks for the shortage to be
+// visible to the fleet and not only to the captain feeling it, and a
+// captain's own books are the only place this engine can read it from: the
+// Larder lives in the browser's GameState, so the browser is what reports
+// it, exactly as it reports gold and reputation. Optional, like the two
+// marks above, so a client that predates this slice reads as a fed crew
+// rather than as a hungry one, and only an explicit true draws a badge.
 export type GameStatusUpdate = {
   roomId: string;
   user: PublicUser;
@@ -399,6 +428,7 @@ export type GameStatusUpdate = {
   renownLevel?: number;
   bankrupt?: boolean;
   marooned?: boolean;
+  shortRations?: boolean;
 };
 
 // An open barter offer. The optional targetUserId fields are set only

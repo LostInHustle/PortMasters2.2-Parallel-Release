@@ -3,6 +3,7 @@
 // =====================================================================
 import {
   ITEMS,
+  LARDER_START,
   STARTING_STOCK,
   WORKER_TYPE_IDS,
   type Boon,
@@ -236,6 +237,15 @@ export type GameState = {
   // roster normalizer below fills in whatever key a save predates. This
   // replaced the three separate weavers / masterWeavers / sachetMakers arrays.
   workers: Record<WorkerTypeId, Worker[]>;
+  // [C1: the Larder and Short Rations] The rations aboard, and the leg the
+  // crew was last fed in. Both live on the voyage beside the roster whose
+  // mouths they feed, because they are the same kind of fact: a number about
+  // this voyage rather than about the captain, healed on load by the same
+  // pair of readers every other saved field has (see ./larder). A Larder of
+  // zero aboard a ship with a crew aboard is the shortage, and the stamp is
+  // what makes the eating once a leg rather than once per path into Dawn.
+  larder: number;
+  larderFedRound: number;
   fixedCost: number;
   shipLevel: number;
   shipUpgradeCost: number[];
@@ -618,6 +628,11 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     roundRevenue: 0,
     roundCosts: 0,
     workers: emptyWorkerRoster(),
+    // A voyage leaves the pier provisioned and has fed nobody yet, so the
+    // first Dawn after it sets sail is the crew's first meal. See ./larder
+    // for why the stamp starts at a leg no voyage has rather than at one.
+    larder: LARDER_START,
+    larderFedRound: 0,
     fixedCost: cfg.maintenance,
     shipLevel: 0,
     shipUpgradeCost: [15, 25, 40],

@@ -19,6 +19,7 @@ import {
   Eye,
   Flag,
   Loader2,
+  Utensils,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { PlayerReportAck } from "@/types/realtime";
@@ -254,6 +255,25 @@ export function MembersPanel({
                       <Pill tone="alarm">
                         <Anchor className="h-3 w-3" /> Ashore
                       </Pill>
+                    )}
+                    {/* [C1: the Larder and Short Rations] The plan asks for
+                        the shortage to be visible to the fleet, not just to
+                        the captain living it, and this is the board the
+                        fleet reads. It wears the meaning red rather than
+                        the Larder's own hue: the Larder's colour names the
+                        panel on the Market screen, while a status is drawn
+                        from the meaning half of the palette wherever it
+                        appears (see Pill). Not folded into seatMarks, which
+                        is about the two marks that write a seat off: a
+                        hungry captain is neither of those, and a badge that
+                        rode writtenOff would quietly take them out of the
+                        running for a vote they are still entitled to. */}
+                    {st?.shortRations && (
+                      <span title="Going hungry: the crew is on short rations and working at a slower pace">
+                        <Pill tone="alarm">
+                          <Utensils className="h-3 w-3" /> Short Rations
+                        </Pill>
+                      </span>
                     )}
                     <Pill tone="gold">
                       <Coins className="h-3 w-3" /> {st ? st.gold : "…"}

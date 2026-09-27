@@ -22,6 +22,7 @@ import {
   workerType,
   type WorkerTypeId,
 } from "../constants";
+import { onShortRations, shortRationsYield } from "../larder";
 import type { GameState } from "../types";
 import { hasModule } from "./core";
 import { getHireCost } from "./pricing";
@@ -155,21 +156,38 @@ export function processProduction(state: GameState, logs: string[]) {
     list: state.workers[w.id] ?? [],
     name: w.label,
   }));
+  // [C1: the Larder and Short Rations] Read once, outside both loops,
+  // because it is one fact about the captain rather than one per artisan:
+  // the ship either went hungry this leg or it did not. The line below is
+  // said once for the same reason, so the smaller numbers that follow it
+  // have an explanation above them instead of a note on every row.
+  const short = onShortRations(state);
+  if (short)
+    logs.push(
+      "⚠️ The crew is on short rations, so every artisan works the leg at a slower pace.",
+    );
   for (const { list, name } of allLists) {
     for (const w of list) {
       if (w.task) {
         let base = w.isSkilled ? 2 : 1;
         let amt = base + bonus;
         if (hasModule(state, "artisans_workshop")) amt += 1;
+        if (short) amt = shortRationsYield(amt);
         state.inventory[w.task] = (state.inventory[w.task] || 0) + amt;
         w.producedCount = (w.producedCount || 0) + amt;
         if (amt > base)
           logs.push(
             `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
           );
+        // Reads its own amount rather than the 2 this branch used to spell
+        // out. That was true for as long as a skilled artisan's output could
+        // only be 2 or more, and the short rations reduction above is what
+        // ended that: a hungry crew's skilled hand makes 1, and a line
+        // promising 2 over a hold that gained 1 is the ledger lying about
+        // work the captain can count.
         else if (w.isSkilled)
           logs.push(
-            `✅ Skilled ${name} finished 2× ${ICONS[w.task]}${w.task}!`,
+            `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}!`,
           );
         else logs.push(`✅ ${name} finished ${ICONS[w.task]}${w.task}!`);
         if (w.producedCount >= 2 && !w.isSkilled) {

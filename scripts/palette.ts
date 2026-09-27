@@ -269,6 +269,20 @@ const WIDGETS: Widget[] = [
     what: "Market Depth",
   },
   { name: "pulse", hue: 90, screens: ["phase:market"], what: "Market Pulse" },
+  /* [C1: the Larder and Short Rations] The provisions panel is the fourth
+     thing to open inside the Market, and it had to find a rung on a screen
+     that already carries four: the phase tag at 154, the Advisor at 197,
+     the Depth at 347 and the Pulse at 90, plus the five session surfaces a
+     captain is looking past. 270 is the one wide gap left, and it is wide
+     in both directions: Ledger at 304 is its nearest session neighbour at
+     34 degrees and Chat at 240 is next at 30, where the floor is twenty.
+     Everything else on the screen is further off than those two. */
+  {
+    name: "larder",
+    hue: 270,
+    screens: ["phase:market"],
+    what: "The Larder, and the provisions it buys",
+  },
   {
     name: "planner",
     hue: 132,

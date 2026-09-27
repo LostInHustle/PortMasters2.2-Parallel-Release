@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ITEMS } from "@/lib/game/constants";
+import { ITEMS, LARDER_MAX, RATION_PRICE } from "@/lib/game/constants";
 import {
   basePriceRange,
   priceRatio,
@@ -10,6 +10,13 @@ import {
   getCardFinalCost,
   purchaseCard,
 } from "@/lib/game/engine";
+import {
+  crewSize,
+  larderRoomLegs,
+  onShortRations,
+  provisionCrew,
+  survivalLayerOn,
+} from "@/lib/game/larder";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
@@ -19,6 +26,7 @@ import {
   TrendingUp,
   ArrowUp,
   ArrowDown,
+  Utensils,
 } from "lucide-react";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
@@ -401,6 +409,124 @@ function MarketDepth({
   );
 }
 
+/**
+ * Provisions. The Larder, and the rations that fill it.
+ *
+ * The crew is the artisan roster, and this is where it eats. The panel sits
+ * on the market board rather than in a corner of its own because a ration
+ * is bought like anything else here, and it sits above the cards rather
+ * than under them so the cost of feeding the crew is read before the purse
+ * goes into goods: a captain who fills the hold and only then finds they
+ * cannot feed the people who will work it was ordered into that mistake by
+ * the screen rather than by a decision they made.
+ *
+ * It buys in legs, and a leg is the whole unit: the same one the crew eats
+ * one of at each Dawn, and the same one this phase is. Asking for a leg the
+ * larder has no room for or the purse cannot cover buys as much of it as it
+ * can rather than refusing outright (see provisionCrew), so the buttons
+ * below describe what is about to happen instead of gating on it. The one
+ * case that is refused is a purchase that would come to nothing, and that
+ * is written on the button rather than left as a click with no answer.
+ *
+ * Runs only when the layer is on. With the switch off the panel is not
+ * drawn at all, the larder is not read and no button is offered, which is
+ * the base game.
+ */
+function Provisions({ game, act }: Pick<PhasePanelProps, "game" | "act">) {
+  if (!survivalLayerOn()) return null;
+  const crew = crewSize(game);
+  const room = larderRoomLegs(game);
+  const legCost = crew * RATION_PRICE;
+  // What a press of each button would actually buy, held to the same two
+  // ceilings provisionCrew applies, so the cost printed on the button is
+  // the cost the captain is charged.
+  const affordable = legCost > 0 ? Math.floor(game.money / legCost) : 0;
+  const oneLeg = Math.min(1, room, affordable);
+  const fillLegs = Math.min(room, affordable);
+  const short = onShortRations(game);
+
+  return (
+    <div className="rounded-xl border border-larder/15 bg-larder/[0.03] px-3.5 py-2.5 mb-3.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-larder mb-1.5">
+        <Utensils className="h-3.5 w-3.5" />
+        Provisions
+        <span className="font-normal text-muted-foreground ml-1">
+          one ration a head, eaten at each Dawn
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-[11px]">
+          <span className="text-muted-foreground">Larder </span>
+          <span
+            className={cn("font-bold", short ? "text-alarm" : "text-larder")}
+          >
+            {game.larder}
+          </span>
+          <span className="text-muted-foreground"> / {LARDER_MAX}</span>
+        </span>
+        <span className="text-[11px]">
+          <span className="text-muted-foreground">Crew </span>
+          <span className="font-bold">{crew}</span>
+        </span>
+        {crew > 0 && (
+          <span className="text-[11px] text-muted-foreground">
+            a leg of rations costs{" "}
+            <span className="font-bold text-foreground">{legCost}</span> Gold
+          </span>
+        )}
+      </div>
+      {short && (
+        <div className="mt-1.5 text-[10px] text-alarm">
+          ⚠️ The larder is empty and the crew is working hungry: every artisan
+          produces less until this is filled.
+        </div>
+      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {/* The buttons wear the theme's own primary rather than the market
+            fill the card buttons below wear. A fill is a widget claiming a
+            rung, and this panel already has one of its own: painting its
+            controls in the phase's green would say the Larder is part of
+            the market board rather than the fourth panel on it. */}
+        <Button
+          size="sm"
+          className="rounded-lg"
+          variant={oneLeg > 0 ? "default" : "secondary"}
+          disabled={oneLeg <= 0}
+          onClick={() => act((g, l) => provisionCrew(g, 1, l))}
+        >
+          🧺 Buy {oneLeg > 0 ? `1 Leg (${legCost}💰)` : "Rations"}
+        </Button>
+        <Button
+          size="sm"
+          className="rounded-lg"
+          variant={fillLegs > 1 ? "default" : "secondary"}
+          disabled={fillLegs <= 1}
+          onClick={() => act((g, l) => provisionCrew(g, fillLegs, l))}
+        >
+          🧺 Fill the Larder
+          {fillLegs > 1 ? ` (${fillLegs} Legs, ${fillLegs * legCost}💰)` : ""}
+        </Button>
+      </div>
+      {crew === 0 && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          No crew aboard, so there is nobody to feed. Hire artisans and the
+          larder starts to matter.
+        </div>
+      )}
+      {crew > 0 && room === 0 && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          The larder is full, so there is nothing more to buy here.
+        </div>
+      )}
+      {crew > 0 && room > 0 && fillLegs === 0 && (
+        <div className="mt-1.5 text-[10px] text-alarm">
+          Not enough Gold for a leg of rations.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Purchase({
   game,
   act,
@@ -459,6 +585,7 @@ export function Purchase({
       <TradeAdvisor game={game} colorFor={resolveColor} />
       <MarketPulse game={game} />
       <MarketDepth game={game} colorFor={resolveColor} />
+      <Provisions game={game} act={act} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {
           const finalCost = getCardFinalCost(game, c);

@@ -5,7 +5,7 @@ import type { PublicUser } from "@/lib/api";
 import { useRoomRoster } from "@/lib/use-room-roster";
 import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
-import { Coins, Trophy, SkullIcon, Anchor } from "lucide-react";
+import { Coins, Trophy, SkullIcon, Anchor, Utensils } from "lucide-react";
 import { seatMarks } from "@/lib/seatMarks";
 
 /**
@@ -73,6 +73,19 @@ export function FleetTicker({
                   title="Put ashore by a vote of the harbor"
                 >
                   <Anchor className="h-3 w-3" />
+                </span>
+              )}
+              {/* [C1: the Larder and Short Rations] The hungry crew, in the
+                  same red the roster uses and for the same reason: a
+                  shortage is a status, and a status draws from the meaning
+                  half of the palette. An icon alone, because this strip is
+                  read at a glance and the title carries the sentence. */}
+              {st?.shortRations && (
+                <span
+                  className="flex items-center text-alarm"
+                  title="Going hungry: the crew is on short rations and working at a slower pace"
+                >
+                  <Utensils className="h-3 w-3" />
                 </span>
               )}
               {isBankrupt ? (

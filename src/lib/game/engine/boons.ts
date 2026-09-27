@@ -27,6 +27,7 @@ import {
   type Boon,
   type Module,
 } from "../constants";
+import { feedCrew } from "../larder";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
 import type { GameState } from "../types";
@@ -171,6 +172,15 @@ function equipModule(
 
 export function startBoonDrafting(state: GameState, logs: string[]) {
   state.phase = "dawn";
+  // [C1: the Larder and Short Rations] The crew eats at the top of the leg,
+  // and this is the one function every leg opens through: the host's start
+  // reaches it from the departure, the round that rolls over reaches it from
+  // endRound, and a client catching up to the room reaches it through
+  // enterPhase. Putting the meal here rather than at any of those three is
+  // what makes it once a leg by construction; the stamp the meal itself
+  // keeps is what makes it once a leg anyway, since two of those paths can
+  // meet on one client for one Dawn (see feedCrew in ../larder).
+  feedCrew(state, logs);
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;

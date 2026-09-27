@@ -10,6 +10,7 @@ import {
   SHIP_DISCOUNT_PER_LEVEL,
 } from "@/lib/game/constants";
 import { basePriceRange, getHireCost } from "@/lib/game/engine";
+import { onShortRations, survivalLayerOn } from "@/lib/game/larder";
 import {
   computeVentureDeadlineBounds,
   ventureAlreadySpentReason,
@@ -78,6 +79,12 @@ export function GameStatusPanel({
   const resolveColor = itemColorResolver(colorFor);
   const discount = game.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
+  // [C1: the Larder and Short Rations] Read once for the two decisions
+  // below, since it is the same answer to both: whether the layer is
+  // running decides whether the stat exists at all, and if it is running,
+  // whether the crew is short decides what colour the number wears.
+  const larderOn = survivalLayerOn();
+  const shortRations = larderOn && onShortRations(game);
 
   // Summed across the whole unlocked roster, not the three founding types.
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
@@ -154,7 +161,12 @@ export function GameStatusPanel({
             {cfg.icon} {cfg.name}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div
+          className={cn(
+            "grid gap-1.5",
+            larderOn ? "grid-cols-4" : "grid-cols-3",
+          )}
+        >
           <Stat
             label="Funds"
             value={`${game.money}`}
@@ -176,6 +188,21 @@ export function GameStatusPanel({
               label="Ship"
               value={`Lv ${game.shipLevel}`}
               className="text-sea"
+            />
+          )}
+          {/* [C1: the Larder and Short Rations] Drawn only when the layer
+              is running, so a voyage with the switch off shows the same
+              three columns at the same width it always had rather than a
+              fourth cell reporting a number no rule moves. The colour is
+              the whole readout: the Larder's own hue while there is food
+              aboard, the meaning red the moment the crew is going without,
+              which is the hunger the captain is meant to notice from here
+              rather than only from a log line they may have scrolled past. */}
+          {larderOn && (
+            <Stat
+              label="Larder"
+              value={`${game.larder}`}
+              className={cn(shortRations ? "text-alarm" : "text-larder")}
             />
           )}
         </div>
