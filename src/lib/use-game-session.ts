@@ -28,6 +28,8 @@ import { normalizeOrderFills } from "@/lib/game/audit";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { normalizePortShift } from "@/lib/game/maroon";
+import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
+import { normalizeStandingOrders } from "@/lib/game/standing";
 
 // The most log lines a session keeps around at once (see the APPLY case
 // below, the only place this is enforced). Named rather than written out
@@ -102,8 +104,17 @@ function reducer(state: SessionState, action: Action): SessionState {
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
       // the room's checkpoint already is, instead of always at round 1.
+      // The phase is normalized before it is compared, because this is a
+      // room row read off the wire and a voyage that was already sailing
+      // when the six phase leg landed has one of the older names in it: read
+      // raw, that name would not match the pier and a captain would be
+      // snapped onto a checkpoint they were already standing on.
       const cp = action.checkpoint;
-      if (cp && action.ctx && (cp.round > 1 || cp.phase !== "0")) {
+      if (
+        cp &&
+        action.ctx &&
+        (cp.round > 1 || normalizePhase(cp.phase) !== ENTRY_PHASE)
+      ) {
         snapToCheckpoint(g, action.ctx, cp.round, cp.phase, logs);
       }
       return { ...state, game: g, logs, newLines: [], loaded: true };
@@ -364,6 +375,14 @@ export function useGameSession(
           // the pricing function a port that is not a port or a direction
           // that is not a direction.
           game.portShift = normalizePortShift(game.portShift);
+          // [B3: standing orders] A voyage saved before the record existed
+          // carries no set at all, and the engine reads it unconditionally
+          // the moment the room's clock plays a seat, so an unhealed save
+          // would hand the evaluation undefined the first time its captain
+          // walked away from the table. The normalizer answers with the
+          // default set, which is the shape an old save was already sailing:
+          // the switch on and every seat left at the engine's own default.
+          game.standingOrders = normalizeStandingOrders(game.standingOrders);
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.

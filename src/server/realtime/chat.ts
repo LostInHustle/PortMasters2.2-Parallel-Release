@@ -1,17 +1,21 @@
 // =====================================================================
 // Realtime layer: room chat, direct messages, muting, and the roster
-// broadcast.
+// frame.
 //
 // emitRoomMembers reads the room's current host fresh from the database
 // every time rather than cached, since host changes are rare and this
 // only fires on join/leave/disconnect, never on the hot game action
-// path. mutedUserIds rides along on the same broadcast every client
-// already listens to for the roster itself, so muting someone needs no
-// separate client subscription.
+// path. mutedUserIds rides along on the roster frame every captain
+// already listens to, so muting someone needs no separate client
+// subscription, and the field survived that frame changing from a room
+// broadcast to one delivery per captain without one: what changed is who
+// the frame is addressed to, not what a client subscribes to (see
+// emitRoomMembers).
 //
 // [MANIFEST 14: Harbor Watch] Who the host has muted from room chat
-// this voyage, in memory only. Cleared on room:restart and on room
-// deletion, alongside every other per voyage structure.
+// this voyage, in memory only. Cleared at departure, on room:restart and
+// on room deletion, alongside every other per voyage structure: a mute is
+// a judgement about a table, so a new table starts with none.
 //
 // A conversation held inside a voyage is held here in memory and nowhere
 // else. Both logs below are keyed by room and die with the room they
@@ -27,8 +31,8 @@
 // =====================================================================
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import type { PublicUser } from "@/types/realtime";
-import { roomMembers } from "./presence";
+import type { PublicUser, RoomMembersPayload } from "@/types/realtime";
+import { emitToUser, roomMembers } from "./presence";
 
 const roomMutedUsers = new Map<string, Set<string>>();
 
@@ -140,6 +144,26 @@ export function clearSessionChat(roomId: string): boolean {
 // Includes the room's current host so a reassigned host (the original
 // one left before anyone else did) sees the Start Game control without
 // needing to refresh.
+//
+// [J2: the mute and the report] One frame per captain rather than one for
+// the room, because what rides on it is the mute list and the roster is
+// the wrong audience for that. A mute is the host's judgement of one
+// captain, and broadcasting it tells every captain in the harbor who has
+// been silenced and, by inference, who has been making trouble: in a mode
+// built on reading other captains, that is information a player can act
+// on, which is exactly what it must not be. So each captain is handed the
+// part of the list that is theirs: the host, who set it, is handed all of
+// it and can lift it from the same panel; a muted captain is handed their
+// own id, because being silenced is their own state and a captain who is
+// never told would only find out by talking into a room that cannot hear
+// them; every other captain is handed an empty list. Both readers of the
+// field already mean "the captains I can see are muted" rather than "the
+// room's mute list" (src/lib/use-room-roster.ts, and the two panels that
+// read it), so this narrowed the meaning to what it had to be rather than
+// changing it: nothing on either side of the wire changed shape.
+//
+// The roster itself is the same list for everyone, and it stays that way:
+// who is aboard is public.
 export async function emitRoomMembers(
   io: Server,
   roomId: string,
@@ -149,12 +173,32 @@ export async function emitRoomMembers(
     where: { id: roomId },
     select: { hostId: true },
   });
-  io.to(`room:${roomId}`).emit("room:members", {
-    roomId,
-    members,
-    hostId: room?.hostId ?? null,
-    mutedUserIds: Array.from(roomMutedUsers.get(roomId) ?? []),
-  });
+  const hostId = room?.hostId ?? null;
+  const muted = roomMutedUsers.get(roomId);
+  for (const member of members) {
+    // What this captain may see of the list: all of it if they set it,
+    // their own row if it names them, nothing otherwise.
+    const mutedUserIds =
+      member.id === hostId
+        ? Array.from(muted ?? [])
+        : muted?.has(member.id)
+          ? [member.id]
+          : [];
+    // Annotated with the shared shape, so what leaves here is held to what
+    // the two client readers are declared to receive rather than to what
+    // this function happens to build.
+    const payload: RoomMembersPayload = {
+      roomId,
+      members,
+      hostId,
+      mutedUserIds,
+    };
+    // Through emitToUser rather than io.to(`room:...`), which is what makes
+    // the field above per captain: the one helper that addresses a captain
+    // by name, on every socket they are holding, and the reason the private
+    // scan can hold this list to a per recipient delivery.
+    emitToUser(io, member.id, "room:members", payload);
+  }
 }
 
 export function muteUser(roomId: string, userId: string): void {

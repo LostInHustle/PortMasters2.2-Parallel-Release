@@ -171,6 +171,10 @@ Solo practice is built in as well. A captain can set sail alone, which is the ea
 
 **Seeing the captains you sail with.** A captain at Renown level 5 or above sees the detail of any captain at level 3 or above: what is in their hold and roughly how much Gold they carry. Below either level, only the headline numbers show. Holds are shown as a band rather than an exact count, so a partner can tell a few from a haul without reading your ledger.
 
+**Standing orders.** A captain who has to step away can write down what their seat should do when a phase's clock runs out without them: which boon to take at the draft, the most they will pay for each good on the market board, whether to fill the trade board's orders their hold already covers, and whether to buy the next hull at the shipyard. The set is kept with the voyage and the table does not see it, and every seat an order plays signs the ledger once, so a captain who comes back can read what happened while they were gone. The switch turns the whole thing off without erasing a word of it, and a voyage whose captain never opens the form sails exactly the way it did before the form existed.
+
+**The voyage log.** Dusk shows a captain what happened while they were not looking, in two columns. The left one is the harbor's own log, written by the server and read by everyone in the room: the voyage leaving the dock, each seat the harbor weighs anchor for, offers posted, filled and lapsed, seats the tide ran out on, and captains who left the harbor. The right one is what was addressed to this captain alone, which is where the dealt alignment card arrives and where anything else the table is hiding will land. The log is kept for as long as the voyage is, so a captain who reloads mid voyage can be handed the legs they missed, and it is bounded, so a twelve leg voyage never grows a screen without a ceiling.
+
 ## The 2.2 build and the one before it
 
 This is PortMasters 2.2 Parallel Release, a build of its own rather than a patched copy of the one before it. That earlier build is [PortMasters 2 Parallel Release](https://github.com/LostInHustle/PortMasters2-Parallel-Release), which is where the multiplayer game as it exists today was designed. If you have sailed that one, nothing you learned there is wrong here.
@@ -180,9 +184,9 @@ Every system of the earlier build is still here and still working the same way, 
 |                        | The earlier build | PortMasters 2.2 Parallel Release |
 | ---------------------- | ----------------- | -------------------------------- |
 | Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 25 modules                       |
-| Interface components   | 29                | 65                               |
-| Database models        | 10                | 14                               |
+| Realtime layer         | one long file     | 26 modules                       |
+| Interface components   | 29                | 67                               |
+| Database models        | 10                | 15                               |
 | The port it answers on | 2232              | 8080                             |
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
@@ -191,7 +195,7 @@ The interface and the realtime layer were both rebuilt around the new systems, a
 
 ## Configuration
 
-The server reads five environment variables. Four of them configure the process at boot, and the fifth gates the operator account.
+The server reads six environment variables. Five of them configure the process at boot, and the sixth gates the operator account.
 
 | Variable                | Value in `.env.example` | What it does                                                                                               |
 | ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -200,10 +204,13 @@ The server reads five environment variables. Four of them configure the process 
 | `HOST`                  | `0.0.0.0`               | The address to bind. Use `127.0.0.1` to keep the game on this machine only                                 |
 | `ADMIN_SETUP_CODE`      | a placeholder           | The one code that admits an operator account through `/admin`. Empty refuses every attempt                 |
 | `TELEMETRY_SAMPLE_RATE` | `1`                     | The share of voyages recorded for balance analysis, as a fraction of one. `1` is every voyage, `0` is none |
+| `PHASE_CLOCK`           | `1`                     | A multiplier on the length of every phase of a round, from `0` to `10`. `0`, or `off`, turns the clock off |
 
 `DATABASE_URL` has no fallback and the server will not start without it, so copy `.env.example` to `.env` before the first run. The operator code fails closed, so an installation that never sets a real one has no way in at all, which is the safe direction for that particular door.
 
 `TELEMETRY_SAMPLE_RATE` is the one setting a live game reads without any captain noticing. A voyage that ends leaves one row describing what happened in it, which is where any later reading of the numbers is taken from, and this is the share of voyages that leave one. It is a fraction of one, so `0.25` records a quarter of them, and the decision is drawn once per voyage and held for its whole life rather than made per event, so a recorded voyage is recorded from its first leg to its last. Leave it unset and every voyage is recorded, which is the default because a game this size has no volume problem yet. Nothing in a voyage waits on that write, and no rule of the game reads a record back, so turning it down or off changes what the harbor remembers and never how it plays.
+
+`PHASE_CLOCK` is the one setting that changes how a table feels rather than what it remembers. A phase of a round is a stretch of real time, and each one has a length the game was designed with: a boon draft is twenty five seconds, the market and the parley are three minutes each, orders are two, resolve is ninety seconds and dusk is a minute. This multiplies all six at once, so `2` gives every harbor twice the time in every phase and `0.5` gives it half, and the lengths themselves stay where they belong, which is on the phase's own record in the code. `0`, or the word `off`, is the clock switched off: no phase ends on its own, and every phase ends only when every captain has readied, which is how the game played before the clock existed. Nothing durable is written differently either way, because a deadline is published to the table as it runs and never stored, so this can be changed and changed back without a migration. Leave it unset for `1`.
 
 An environment variable that is already set always wins over the file, which is the order a hosting platform expects. Point `ENV_FILE` at a different file to read from that one instead, which is how two servers run side by side from a single checkout without editing anything back and forth.
 

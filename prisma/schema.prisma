@@ -421,3 +421,52 @@ model VoyageTelemetry {
   @@index([roomId])
   @@index([endedAt])
 }
+
+// [J2: the mute and the report] One captain's report of another, filed from
+// the harbor roster and read later by a person rather than by the game.
+//
+// Three bare strings with no relations on them, and the reasons are written
+// down because the shape looks like an oversight next to every other room
+// scoped row in this schema.
+//
+// The room is bare for the reason VoyageTelemetry's is: a harbor is deleted
+// the moment its last member leaves, which is the ordinary end of an
+// ordinary voyage, and a report filed during that voyage is exactly the one
+// worth keeping. A cascade would erase the report along with the lobby
+// nobody is sitting in anymore.
+//
+// The two captains are bare for a second reason on top of that. A report
+// names an account, and an account can be erased by the operator. A cascade
+// would take the report with it, which is right for the account being
+// erased and wrong for the captain who filed it, since what they wrote down
+// is also a fact about them. So the purge deletes the reports that name the
+// account it is erasing, by hand (see purgeResolved in
+// src/server/realtime/admin.ts), and leaves every other report standing.
+//
+// voyageEpoch is the voyage the report belongs to, read from the room at
+// the moment it was filed. In a lobby that is the voyage about to sail from
+// it, and a lobby report and a report filed in the voyage that follows are
+// one row rather than two, which is honest: they are the same harbor
+// session and the same pair of captains.
+//
+// No reason field, deliberately. The plan puts a moderation console after
+// this feature, and a free text field either side of a wire is a field
+// nobody has read the private information review for. What the row carries
+// is who, about whom, in which voyage, and when, which is what a person
+// opening a conversation needs and what a later reader can trust.
+model Report {
+  id           String   @id @default(cuid())
+  roomId       String
+  voyageEpoch  Int
+  reporterId   String
+  targetUserId String
+  createdAt    DateTime @default(now())
+
+  // One report per pair per voyage, enforced here rather than in a map: the
+  // file is a client frame, a client can repeat it, and the handler must
+  // not have to remember what it has already been told.
+  @@unique([reporterId, targetUserId, roomId, voyageEpoch])
+  @@index([roomId])
+  @@index([targetUserId])
+  @@index([createdAt])
+}

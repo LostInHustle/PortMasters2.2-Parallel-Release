@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { phaseFace } from "@/lib/game/phases";
 import type { RoundLeg } from "@/lib/game/mode";
 
 /**
@@ -47,6 +48,11 @@ export function RoundFlow({
       <ol>
         {legs.map((leg, index) => {
           const open = index === focused;
+          // A leg stands for the phase the engine walks, and what a phase is
+          // called, wears and shows is the phase's own business (see
+          // PHASE_FACES). The mode record says what a phase decides; it does
+          // not say what to call it a second time.
+          const face = phaseFace(leg.phase);
           return (
             <li key={leg.phase}>
               <button
@@ -61,14 +67,14 @@ export function RoundFlow({
                 <span
                   className={cn(
                     "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold",
-                    leg.gradient,
+                    face.gradient,
                   )}
                 >
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="font-semibold">
-                    {leg.icon} {leg.label}
+                    {face.icon} {face.label}
                   </span>
                   <span className="block text-[11px] leading-snug text-muted-foreground">
                     {leg.body}

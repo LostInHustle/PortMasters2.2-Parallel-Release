@@ -17,8 +17,11 @@ import {
   VolumeX,
   Volume2,
   Eye,
+  Flag,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import type { PlayerReportAck } from "@/types/realtime";
 import {
   Popover,
   PopoverContent,
@@ -71,6 +74,14 @@ export function MembersPanel({
     initialMembers,
   );
   const [systemNotes, setSystemNotes] = useState<string[]>([]);
+  // [J2: the mute and the report] The captains this one has reported in
+  // this harbor, held here so the flag settles on the row it was raised
+  // against. The server is the authority on the limit (one report per pair
+  // per voyage, held by the table's own constraint); this is only what the
+  // button shows, and a duplicate answer from the server lands in the same
+  // set as a fresh one, because the captain's state afterwards is the same
+  // either way.
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
   // Named viewerIsHost, not isHost, so it never shadows the per row "is this
   // row the host" check further down.
   const viewerIsHost = me.id === hostId;
@@ -106,6 +117,32 @@ export function MembersPanel({
       // room scoped event with no error and no recovery short of a full
       // reload.
       socket.off("room:system", onSystem);
+    };
+  }, [socket, roomId]);
+
+  // The one frame a report produces. The target is told nothing and the
+  // harbor is told nothing, so this is the whole of what a report sends
+  // back, and it is settled into the row it names rather than into a
+  // running count: a captain reports a captain, not a game.
+  useEffect(() => {
+    if (!socket) return;
+    const onFiled = (data: PlayerReportAck) => {
+      if (data.roomId !== roomId) return;
+      setReportedIds((prev) => {
+        if (prev.has(data.targetUserId)) return prev;
+        const next = new Set(prev);
+        next.add(data.targetUserId);
+        return next;
+      });
+      if (data.alreadyFiled) {
+        toast("You have already reported this captain this voyage.");
+      } else {
+        toast.success("Report filed. It goes on the record for this voyage.");
+      }
+    };
+    socket.on("player:report:filed", onFiled);
+    return () => {
+      socket.off("player:report:filed", onFiled);
     };
   }, [socket, roomId]);
 
@@ -262,6 +299,41 @@ export function MembersPanel({
                     ) : (
                       <VolumeX className="h-3.5 w-3.5" />
                     )}
+                  </button>
+                )}
+
+                {/* [J2: the mute and the report] Every captain on every
+                    other captain's row, host or not, because this is the
+                    remedy for a harbor somebody else is running and a mode
+                    that seats strangers needs one. It settles once it has
+                    been used, since the server writes one row per pair per
+                    voyage and a second raise would only earn a notice that
+                    it was already on the record. */}
+                {!isMe && (
+                  <button
+                    type="button"
+                    disabled={reportedIds.has(m.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      socket?.emit("player:report", {
+                        roomId,
+                        targetUserId: m.id,
+                      });
+                    }}
+                    aria-label={`Report ${m.displayName}`}
+                    title={
+                      reportedIds.has(m.id)
+                        ? "You have reported this captain this voyage"
+                        : `Report ${m.displayName}`
+                    }
+                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <Flag
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        reportedIds.has(m.id) && "fill-current text-alarm",
+                      )}
+                    />
                   </button>
                 )}
               </div>

@@ -11,7 +11,7 @@
  * which fields are secret, ESLint does not read payloads, and the smoke
  * suite only sweeps the harbors it happens to sail.
  *
- * Five rules. Each one names a single path and fails when a second
+ * Six rules. Each one names a single path and fails when a second
  * appears, and each one is worth a sentence about what it cannot catch,
  * because a gate that reads as stronger than it is is worse than none.
  *
@@ -32,6 +32,12 @@
  *   5. The tutorial's one dangerouslySetInnerHTML site. Its string is
  *      authored copy and the only values in it are constants, so the
  *      rule is that no second such site appears in the tree.
+ *   6. The roster frame, which is the only thing that carries the mute
+ *      list, addressed one captain at a time. A mute is the host's
+ *      judgement of one captain, so a roster frame sent to a room is that
+ *      judgement told to the room. What it cannot catch is the event name
+ *      retyped at the emit or reached through a variable holding it, which
+ *      is why the name is written out in full where it is sent.
  *
  * Rules 1 to 4 are about the server and the client's one hook. They say
  * nothing about the save path, which the review reads by hand and which
@@ -91,6 +97,13 @@ const SECRET_TOKENS: { label: string; pattern: RegExp }[] = [
    purpose: today no broadcast does, and the first exception has to be an
    edit here plus the sentence in the review explaining it. */
 const SECRET_PAYLOAD_SITES: string[] = [];
+
+/* Rule 6. The frame that carries the mute list, and the emitters that may
+   deliver it. Read off the event name rather than off the mute field,
+   because the defect this guards is not a payload that mentions the list:
+   it is the frame losing the captain it was addressed to. */
+const ROSTER_FRAME_EVENT = '"room:members"';
+const PER_RECIPIENT_EMITTERS = ["emitToUser(", "emitPrivate("];
 
 /* The scanner's own file. It holds the rule table above and the doc
    comments that describe it, so it names every token and every excluded
@@ -221,6 +234,31 @@ for (const file of scannedFiles) {
   });
 }
 
+// ========== Rule 6: the roster frame goes to one captain ==========
+for (const file of scannedFiles) {
+  const relativePath = rel(file);
+  if (!relativePath.startsWith("src/")) continue;
+  const text = lines(file);
+  text.forEach((line, index) => {
+    if (!line.includes(ROSTER_FRAME_EVENT)) return;
+    const statement = gather(text, index);
+    // A listener rather than a delivery: the client's own subscription
+    // names the event and sends nothing.
+    if (!statement.includes(".emit(")) return;
+    if (PER_RECIPIENT_EMITTERS.some((name) => statement.includes(name))) {
+      return;
+    }
+    problems.push({
+      file: relativePath,
+      line: index + 1,
+      message:
+        `delivers ${ROSTER_FRAME_EVENT} to a room. The mute list rides that frame and a mute is the` +
+        " host's judgement of one captain, so it goes out through emitToUser or emitPrivate" +
+        " (see PER_RECIPIENT_EMITTERS in this script) and never to a room channel.",
+    });
+  });
+}
+
 function gather(text: readonly string[], from: number): string {
   let out = "";
   let depth = 0;
@@ -242,7 +280,7 @@ function gather(text: readonly string[], from: number): string {
 
 const scanned = `${files.length} files scanned`;
 if (problems.length === 0) {
-  console.log(`The private paths hold. ${scanned}, five rules, no finding.`);
+  console.log(`The private paths hold. ${scanned}, six rules, no finding.`);
   process.exit(0);
 }
 

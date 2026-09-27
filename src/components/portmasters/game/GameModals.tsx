@@ -268,7 +268,7 @@ export function RumorBoardModal({
             Broker's Rumor Board
           </DialogTitle>
           <DialogDescription>
-            Spend gold to reveal Phase 2 demand rumors!
+            Spend gold to reveal what Orders will ask for!
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center my-2">

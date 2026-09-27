@@ -29,6 +29,17 @@ const DEFAULT_HOST = "0.0.0.0";
 // is expected to be under load.
 const DEFAULT_TELEMETRY_SAMPLE_RATE = 1;
 
+// [B2: hard timers, the server as timekeeper] The multiplier on every
+// phase's authored budget, as a positive fraction of one. 1 runs the
+// budgets the phases are written with (see PHASE_FACES in
+// src/lib/game/phases.ts), which is the default because a table of
+// captains is the thing the clock is for; a smaller number shortens every
+// phase, which is what a practice table, a demo and a test run want; 0
+// switches the clock off entirely and leaves the room on manual advance,
+// which is the rollback the slice's plan asks for. Nothing about the clock
+// is written down, so the switch costs no migration in either direction.
+const DEFAULT_PHASE_CLOCK_SCALE = 1;
+
 const ServerConfigSchema = z.object({
   nodeEnv: z.enum(["development", "production", "test"]),
   isProduction: z.boolean(),
@@ -50,6 +61,19 @@ const ServerConfigSchema = z.object({
     .max(
       1,
       "TELEMETRY_SAMPLE_RATE must be a number between 0 and 1: the share of voyages recorded.",
+    ),
+  phaseClockScale: z
+    .number({
+      error:
+        "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
+    })
+    .min(
+      0,
+      "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
+    )
+    .max(
+      10,
+      "PHASE_CLOCK must be a number between 0 and 10: the multiplier on every phase's length, where 0 turns the clock off.",
     ),
   databaseUrl: z
     .string()
@@ -101,12 +125,25 @@ export function loadServerConfig(
     telemetrySampleRate = Number(rawSampleRate);
   }
 
+  // Read the same way again: empty means the default, and a value that is
+  // not a number fails the schema rather than becoming NaN. "off" is
+  // accepted because the switch reads as a switch at a terminal, and it
+  // means the same thing zero does.
+  const rawClock = env.PHASE_CLOCK?.trim().toLowerCase();
+  let phaseClockScale: number = DEFAULT_PHASE_CLOCK_SCALE;
+  if (rawClock === "off") {
+    phaseClockScale = 0;
+  } else if (rawClock) {
+    phaseClockScale = Number(rawClock);
+  }
+
   const candidate = {
     nodeEnv,
     isProduction: nodeEnv === "production",
     port,
     host: env.HOST?.trim() || DEFAULT_HOST,
     telemetrySampleRate,
+    phaseClockScale,
     databaseUrl: env.DATABASE_URL?.trim() || "",
   };
 

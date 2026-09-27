@@ -25,7 +25,7 @@ const ESCORT_ENTRY = `Guarantees safe passage from that round's pirate attack, f
 // theirs at the midpoint raise it to a different figure, so the one sentence
 // that used to carry all three was three chances to go stale at once. Built
 // from the same table the escort entry above reads.
-const PIRATE_ENTRY = `A roll at Phase 3, before wages and maintenance come due, that can take every Gold coin you're carrying. The charter sets the odds: ${Object.values(
+const PIRATE_ENTRY = `A roll at Resolve, before wages and maintenance come due, that can take every Gold coin you're carrying. The charter sets the odds: ${Object.values(
   DIFFICULTIES,
 )
   .map((c) =>
@@ -55,7 +55,7 @@ export const GLOSSARY: Record<string, string> = {
 
   // Workers
   Weaver:
-    "Makes Linen Clothes or Cotton Clothes. Costs a wage every round, paid at Phase 3, whether or not they're working.",
+    "Makes Linen Clothes or Cotton Clothes. Costs a wage every round, paid at Resolve, whether or not they're working.",
   "Master Weaver":
     "Makes Linen Clothes, Cotton Clothes, or Brocade. Pricier than a Weaver, and the only one who can make Brocade.",
   "Sachet Maker":
@@ -66,19 +66,19 @@ export const GLOSSARY: Record<string, string> = {
     "Your score for the voyage, roughly your accumulated trading profit. Highest reputation on the voyage's final round wins.",
   Gold: "Your spendable funds. Hit zero with bills still due and the voyage ends in bankruptcy.",
   VAT: `A ${Math.round(VAT_RATE * 100)}% tax on the profit margin of finished good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.`,
-  "Income Tax": `A ${Math.round(INCOME_TAX_RATE * 100)}% tax on your net profit for the round, charged at Phase 3 settlement after everything else is paid.`,
+  "Income Tax": `A ${Math.round(INCOME_TAX_RATE * 100)}% tax on your net profit for the round, charged at Resolve after everything else is paid.`,
   Freight:
     "The shipping fee for completing a trade order, based on how many items you're moving. Reduced by your ship level and certain boons or modules.",
   Maintenance:
-    "A fixed per round upkeep fee for your ship, due at Phase 3 regardless of how the round went.",
+    "A fixed per round upkeep fee for your ship, due at Resolve regardless of how the round went.",
   "Ship Level":
-    "Raises your module slots and gives a flat discount on freight costs. Upgraded from the Shipyard in Phase 4.",
+    "Raises your module slots and gives a flat discount on freight costs. Upgraded from the Shipyard at Dusk.",
   Wages:
-    "What your hired artisans cost per round, paid at Phase 3 whether they produced anything or not.",
+    "What your hired artisans cost per round, paid at Resolve whether they produced anything or not.",
   Boon: "A one round bonus you draft at the start of each voyage. It's picked personally, so your three choices differ from everyone else's.",
   Module:
     "A permanent ship upgrade, drafted from the Shipyard once you have a free slot. Stays equipped until you swap it out.",
-  Barter: `Trade directly with another captain instead of through the market, on the Captain's Exchange during the Bartering phase or from the harbor chat once you reach Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}. Post what you have for what you want; the offered amount is set aside the moment you post it, and comes back to you if it's canceled, if nobody takes it, or if a flexible offer of yours is taken and this one is retired with it.`,
+  Barter: `Trade directly with another captain instead of through the market, on the Captain's Exchange during the Parley or from the harbor chat once you reach Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}. Post what you have for what you want; the offered amount is set aside the moment you post it, and comes back to you if it's canceled, if nobody takes it, or if a flexible offer of yours is taken and this one is retired with it.`,
   "Pirate Attack": PIRATE_ENTRY,
   Escort: ESCORT_ENTRY,
   "Financial Aid":

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { lapPhases } from "@/lib/game/checkpoint";
 import { ICONS, RECIPES } from "@/lib/game/constants";
 import {
   assignTask,
@@ -9,12 +10,13 @@ import {
   hireWorker,
   nextPhase,
 } from "@/lib/game/engine";
+import { isLegPhase, phaseFace } from "@/lib/game/phases";
 import {
   unlockedProducts,
   unlockedResources,
   unlockedWorkerTypes,
 } from "@/lib/game/pools";
-import type { GameState, Worker } from "@/lib/game/types";
+import type { GameState, LegPhase, Worker } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Term } from "../../Term";
@@ -30,6 +32,25 @@ function artisanTint(id: string) {
   return `pm-artisan pm-artisan-${id}`;
 }
 
+// What the round does with what this bench sets going, in the words this
+// panel uses for it. One note per phase of the leg rather than one per tile,
+// because the strip below draws whichever phases this voyage still has in
+// front of it and both modes dock here: written for the four it used to
+// draw, the strip would have had nothing to say about the fifth, and a
+// missing note is a tile a captain has to guess at.
+//
+// These are not the phase's face. A face says what a phase is called; this
+// says what the phase does to a hold, and it belongs to the bench that
+// promised the work rather than to the phase.
+const CYCLE_NOTE: Record<LegPhase, string> = {
+  dawn: "Draft a boon",
+  market: "Assign tasks, consume materials",
+  orders: "Trade orders",
+  parley: "Barter with the harbor",
+  resolve: "Goods produced, wages paid",
+  dusk: "Shipyard and modules",
+};
+
 function WorkerList({
   type,
   icon,
@@ -44,7 +65,7 @@ function WorkerList({
   list: Worker[];
   name: string;
   tasks: string[];
-  /** The wage Phase 3 charges for this artisan, discounts already applied.
+  /** The wage Resolve charges for this artisan, discounts already applied.
       Passed in rather than looked up here, because the display used to read
       the raw WAGES table while fireWorker charged getHireCost. */
   cost: number;
@@ -111,6 +132,11 @@ function WorkerList({
   );
 }
 
+// The artisan bench: the second station of the Market phase, where a
+// captain hires, dismisses and sets tasks (see phases/Market.tsx for why the
+// two stations are one phase and why the ready vote lives here rather than
+// on the port board). Titled for the station rather than for the work, so
+// the strip above it and the panel below it call this place the same thing.
 export function WorkerMgmt({
   game,
   ctx,
@@ -150,50 +176,57 @@ export function WorkerMgmt({
   );
   const totalWages = roster.reduce((sum, r) => sum + r.due, 0);
   const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
+  // The rest of this voyage's round, from this phase to the one that closes
+  // it, off the room's own lap (see src/lib/game/checkpoint.ts and
+  // src/lib/game/mode.ts). The two modes run Market, Orders and Parley in
+  // different orders, so a strip written out here would walk one mode
+  // through the other mode's round.
+  const lap = lapPhases(game.mode).filter(isLegPhase);
+  const seat = lap.indexOf("market");
+  const cycle = seat === -1 ? lap : lap.slice(seat);
+  // The phase the wage bill lands in, named through its face rather than
+  // typed into the sentence below, so the note and the tile above it cannot
+  // come apart.
+  const duePhase = phaseFace("resolve").label;
 
   return (
     <div className="max-w-3xl mx-auto">
       <div className="text-2xl font-bold text-center mb-1">
-        👥 Artisan Management
+        👥 Artisan Bench
       </div>
       <p className="text-center text-sm text-muted-foreground mb-4">
         💰 Current Funds: {game.money} Gold | 📦 See Inventory on the left
       </p>
 
-      <div className="rounded-xl bg-workers/[0.06] border border-workers/20 p-3.5 mb-4 text-xs">
+      <div className="rounded-xl bg-market/[0.06] border border-market/20 p-3.5 mb-4 text-xs">
         <strong>⏱️ Production Cycle: What Happens When</strong>
-        {/* Four steps of the round, each wearing the colour of the phase
-            it names, so the tiles are a map of the round rather than four
-            unrelated swatches. They used to share three paints between
-            them, none of which said which phase it stood for. */}
-        <div className="grid grid-cols-4 gap-1.5 mt-2 text-center">
-          <div className="pm-grad-workers rounded-md py-1.5">
-            <div>📋 Now</div>
-            <div className="text-[9px] opacity-90">
-              Assign task
-              <br />
-              consume materials
-            </div>
-          </div>
-          <div className="pm-grad-orders rounded-md py-1.5">
-            <div>🤝 Phase 2</div>
-            <div className="text-[9px] opacity-90">Trade orders</div>
-          </div>
-          <div className="pm-grad-settlement rounded-md py-1.5">
-            <div>✅ Phase 3</div>
-            <div className="text-[9px] opacity-90">
-              Items produced
-              <br />+ wages paid
-            </div>
-          </div>
-          <div className="pm-grad-shipyard rounded-md py-1.5">
-            <div>🚢 Phase 4</div>
-            <div className="text-[9px] opacity-90">Shipyard</div>
-          </div>
+        {/* One tile per phase the round still has in front of it, each
+            wearing the colour of the phase it names, so the strip is a map
+            of this voyage's round rather than four unrelated swatches. It
+            used to be four tiles numbered one to four, which was the old
+            numbered vocabulary, in one mode's order, on a strip both modes
+            dock at. */}
+        <div className="flex gap-1.5 mt-2 text-center">
+          {cycle.map((p, i) => {
+            const face = phaseFace(p);
+            return (
+              <div
+                key={p}
+                className={cn(
+                  "flex-1 rounded-md py-1.5",
+                  face.gradient,
+                  i === 0 && "ring-1 ring-foreground/25",
+                )}
+              >
+                <div>{i === 0 ? "📋 Now" : `${face.icon} ${face.label}`}</div>
+                <div className="text-[9px] opacity-90">{CYCLE_NOTE[p]}</div>
+              </div>
+            );
+          })}
         </div>
         <div className="mt-2 text-gain">
           💡 Materials consumed <strong>now</strong>. Finished goods and wage
-          deductions happen at <strong>Phase 3</strong>, not instantly.
+          deductions happen at <strong>{duePhase}</strong>, not instantly.
         </div>
       </div>
 
@@ -237,7 +270,7 @@ export function WorkerMgmt({
       {nW > 0 && (
         <div className="rounded-xl bg-due/[0.06] border border-due/20 p-3.5 mb-4">
           <h3 className="text-center font-semibold mb-2 text-due">
-            💰 Pending Payroll: Deducted at Phase 3
+            💰 Pending Payroll: Deducted at {duePhase}
           </h3>
           <div className="text-xs space-y-0.5">
             {roster
@@ -312,7 +345,7 @@ export function WorkerMgmt({
         </div>
       )}
 
-      <div className="rounded-xl border border-workers/15 bg-workers/[0.03] p-4 mb-4">
+      <div className="rounded-xl border border-market/15 bg-market/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-2">🔨 Hire Workers</h3>
         <div className="text-xs space-y-1 mb-3">
           {roster.map((r) => (
@@ -357,7 +390,7 @@ export function WorkerMgmt({
       </div>
 
       {nW > 0 ? (
-        <div className="rounded-xl border border-workers/15 bg-workers/[0.03] p-4 mb-4">
+        <div className="rounded-xl border border-market/15 bg-market/[0.03] p-4 mb-4">
           <h3 className="text-center font-semibold mb-2">
             👥 Worker Status & Tasks
           </h3>
@@ -379,7 +412,7 @@ export function WorkerMgmt({
       <ReadyFooter
         phaseSync={phaseSync}
         members={members}
-        idleLabel="✅ Complete Management, Set Sail"
+        idleLabel="✅ Complete Market, Continue"
         onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
       />
     </div>

@@ -416,6 +416,19 @@ async function purgeResolved(
   if (hosted.length) {
     await db.voyageTelemetry.deleteMany({ where: { roomId: { in: hosted } } });
   }
+  // [J2: the mute and the report] The reports this account was named in go
+  // with it, on either side. The rule is the one the telemetry block above
+  // states: the operator is erasing an account, and a row that names it is
+  // part of the account. A report names two captains rather than one, so
+  // the rule is applied to both sides of it, and the cost is deliberate:
+  // a report against a captain whose account is then erased is not left
+  // standing as evidence about somebody who no longer exists. The reports
+  // a purge leaves alone are the ones it should: the rows filed in a
+  // harbor the account happened to host, between two captains who are both
+  // still here, name neither the account nor anything about it.
+  await db.report.deleteMany({
+    where: { OR: [{ reporterId: target.id }, { targetUserId: target.id }] },
+  });
   for (const roomId of hosted) {
     io.to(`room:${roomId}`).emit("room:closed", {
       roomId,

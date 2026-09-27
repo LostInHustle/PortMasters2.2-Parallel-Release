@@ -14,7 +14,7 @@ import { unlockedProducts, unlockedResources } from "@/lib/game/pools";
  * exact step by step breakdown for a specific market card or trade order
  * (PriceBreakdownTooltip), and a general "what does this usually cost"
  * range for any raw material or product, on or off the current market
- * (ExpectedPriceTooltip, buying phase only, see the Term usages in
+ * (ExpectedPriceTooltip, Market only, see the Term usages in
  * GameStatusPanel and GamePhasePanel).
  */
 export function PriceBreakdownTooltip({
@@ -69,16 +69,16 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
   );
 }
 
-// During the buying phase, a hover over any raw material or product name
+// During Market, a hover over any raw material or product name
 // shows its glossary blurb plus the expected price, so the preview is
 // available everywhere that name shows up (the cargo hold sidebar, the
 // market reference strip, the cards themselves), not just where a price
-// already happens to be printed. Outside the buying phase this returns
+// already happens to be printed. Outside Market this returns
 // undefined and the caller's <Term> falls back to its normal glossary
-// lookup, since the user only wants this for the buying phase. Actual
+// lookup, since the user only wants this while the board is open. Actual
 // demand and prices later in the voyage can vary.
 export function priceAwareTermContent(game: GameState, itemType: string) {
-  if (game.phase !== 1) return undefined;
+  if (game.phase !== "market") return undefined;
   // Gated on what this voyage has actually unlocked, not the whole catalogue.
   // Quoting a market price for a good no charter has opened advertises
   // something the captain cannot buy, and the figure would be meaningless

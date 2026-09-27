@@ -44,10 +44,11 @@ export function AuditVoteCard({
 
   // Three states, and the panel is worth showing in all of them: a mode
   // whose headline mechanic nobody has heard of is a mechanic nobody uses.
-  // Before leg five it explains itself, during it offers the vote, and
-  // after the audit is spent it says so rather than going quiet.
+  // Before the rung it explains itself, at the Parley of a rung round it
+  // offers the vote, and after the audit is spent it says so rather than
+  // going quiet.
   if (normalizeMode(game.mode) !== "ocean_gambit") return null;
-  if (game.phase !== "barter") return null;
+  if (game.phase !== "parley") return null;
   const spent = audit.reveal !== null;
   const open = game.currentRound >= AUDIT_FROM_ROUND;
   const rows = tallyRows(audit.votes, members);

@@ -23,7 +23,7 @@ import { objectiveTaking, type Objective } from "../objectives";
 // lap in ../mode.ts), so delivery lands right before the social window
 // opens: the captains who have just spent goods are the ones with
 // something to say about it afterwards. One constant if it moves.
-export const OBJECTIVE_DELIVERY_PHASE: Phase = 2;
+export const OBJECTIVE_DELIVERY_PHASE: Phase = "orders";
 
 /**
  * Hands over as much of the commission as this captain is holding, and

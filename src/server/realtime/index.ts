@@ -45,6 +45,8 @@ import {
 } from "@/lib/game/convoy";
 import { voyageRoundsFor } from "@/lib/game/mode";
 import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
+import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
+import type { Phase } from "@/lib/game/types";
 import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
@@ -92,6 +94,8 @@ import {
   readyStatePayload,
   broadcastReadyState,
   maybeAdvance,
+  armPhaseClock,
+  disarmPhaseClock,
   checkpointRank,
   openingPhase,
 } from "./checkpoint";
@@ -173,10 +177,23 @@ import {
   closeVoyageTelemetry,
   dropVoyageTelemetry,
   noteCaptainLeft,
+  noteCaptainMuted,
   noteLegAdvanced,
   noteLegReport,
   noteTelemetry,
 } from "./telemetry";
+// [B4: the log surfaces] The room's own log, which is a product surface
+// rather than a measurement and is therefore opened by every voyage the
+// spine above may or may not be recording.
+import {
+  clearVoyageLog,
+  noteVoyageLog,
+  noteVoyageLogAdvance,
+  noteVoyageLogDeparture,
+  openVoyageLog,
+  sendVoyageLogHistory,
+} from "./voyage-log";
+import { guardInbound } from "./inbound-limit";
 import { setDocksWinner, hasDocksWinner, clearDocksWinner } from "./docks";
 import { combinedReputation, hasSurged, markSurged, clearSurge } from "./surge";
 import { joinQueue, leaveQueue, matchQueuedCaptains } from "./quickstart";
@@ -195,16 +212,9 @@ import {
   type BulkPayload,
 } from "./admin";
 
-// ========== Cross module room teardown ==========
-// Called when a room is deleted after its last member departs. Tears
-// down every per room structure so a future room (with a different id)
-// doesn't inherit stale data from a room that no longer exists.
-// Deliberately not through the individual clear* helpers that broadcast:
-// the room row is already gone, the Loan rows went with it on cascade,
-// and there is nobody left in the channel to broadcast an empty board to.
 // ========== Flexible bartering gate ==========
 // This gate stands in front of flexible bartering alone, the composer a
-// chat carries. The Captain's Exchange in the Bartering phase reads
+// chat carries. The Captain's Exchange in the Parley phase reads
 // nothing here: it is open to every captain at every Renown level, and
 // every branch that would have consulted a level for it is gone.
 //
@@ -310,8 +320,41 @@ function flexibleSpentReason(): string {
   return "Every flexible trade this voyage allows you has already been taken. You can still use the Captain's Exchange and accept any offer.";
 }
 
+// [J2: the mute and the report] Whether a write failed because the row it
+// tried to write was already there.
+//
+// Read off the error's own code rather than through the class Prisma
+// throws, and that is a deliberate shape rather than laziness: the client
+// is imported in exactly one place in this tree (the singleton in
+// src/lib/db.ts), and every module above it works through the handle
+// rather than through the library's types. Reaching past that for one
+// error class would put a second dependency on the generated client into
+// the composition root. What the code means is stable and documented
+// (P2002 is a unique constraint violation), and a value that is not it is
+// treated as the failure it is.
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+// ========== Cross module room teardown ==========
+// Called when a room is deleted after its last member departs. Tears
+// down every per room structure so a future room (with a different id)
+// doesn't inherit stale data from a room that no longer exists.
+// Deliberately not through the individual clear* helpers that broadcast:
+// the room row is already gone, the Loan rows went with it on cascade,
+// and there is nobody left in the channel to broadcast an empty board to.
 function clearRoomAllMaps(roomId: string): void {
   roomCheckpoints.delete(roomId);
+  // [B2: hard timers, the server as timekeeper] The room's clock, which is
+  // an in process timer for a room that no longer exists. It is disarmed
+  // rather than dropped, because the deadline lives on the checkpoint this
+  // function just deleted and a timer whose seat is gone has nothing left to
+  // fire at.
+  disarmPhaseClock(roomId);
   clearRoomStatuses(roomId);
   clearBarterSilent(roomId);
   clearFlexibleAccepted(roomId);
@@ -330,6 +373,10 @@ function clearRoomAllMaps(roomId: string): void {
   // The detail questions waiting on captains in this harbor, which are
   // questions about a room that no longer exists.
   forgetDetailRequests(roomId);
+  // [B4: the log surfaces] And the voyage's log, which belongs to the room
+  // that held it. Dropped rather than written down, because a log is a
+  // surface a table reads while it sails and there is no table left.
+  clearVoyageLog(roomId);
   // [I1: the telemetry spine] And the voyage the spine was holding, which
   // is dropped and not written, because every caller that reaches this
   // function with a voyage still open has already written it. The reaper
@@ -409,6 +456,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
       roomId: null,
       authed: false,
     });
+
+    // [J2: the mute and the report] The socket's own frame budget, put in
+    // front of every handler below. It goes here, before the auto
+    // authentication on the next line, so that not even the auth frame can
+    // arrive uncounted: the middleware runs per incoming packet, and a
+    // packet it does not pass on is a packet no handler sees.
+    guardInbound(socket);
 
     // Auto authenticate from the handshake cookie (sent with credentials).
     void authenticate(socket, io);
@@ -577,6 +631,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
       // accumulator, and it ignores anyone the voyage never counted as a
       // captain, so a spectator's exit costs the record nothing.
       noteCaptainLeft(roomId, s.userId);
+      // [B4: the log surfaces] The same departure, into the room's log,
+      // which is the other place a captain's exit is worth a line: the
+      // system message above scrolls away with the conversation, and a
+      // table that lost a seat read why at Dusk. The log refuses a seat
+      // it has already recorded, so the reap below cannot print this
+      // twice.
+      noteVoyageLogDeparture(io, roomId, s.userId, s.user.displayName);
       io.to(`room:${roomId}`).emit("room:system", {
         roomId,
         content: `${s.user.displayName} left the harbor`,
@@ -592,7 +653,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       async (payload: {
         roomId?: string;
         round?: number;
-        phase?: number | string;
+        phase?: Phase;
         phaseLabel?: string;
         gold?: number;
         reputation?: number;
@@ -631,7 +692,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
           roomId,
           user: s.user,
           round: payload?.round ?? 0,
-          phase: payload?.phase ?? 0,
+          // Normalized rather than passed through, because this value is
+          // cached and rebroadcast to every other captain in the room: it is
+          // read by the roster, by the active roster the ready check waits
+          // for, and by the phase report below, and all three need a phase
+          // rather than whatever a socket happened to send. A client reports
+          // its own phase, so a frame naming a value no lap contains is
+          // placed at the pier, which is the one phase that means "not
+          // sailing yet" rather than a phase nobody is standing in.
+          phase: normalizePhase(payload?.phase),
           phaseLabel: payload?.phaseLabel ?? "",
           gold: payload?.gold ?? 0,
           reputation: payload?.reputation ?? 0,
@@ -690,7 +759,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           );
         }
         const cp = await getCheckpoint(roomId);
-        const phaseStr = String(broadcast.phase);
+        const phase = broadcast.phase;
         // Both ranks are read in the room's own lap, which the server can
         // name because it just loaded the row. A rank is an index within one
         // mode's phase order, so comparing a report against the checkpoint
@@ -698,7 +767,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // just vanished leaves this undefined, which resolves to the founding
         // mode; the guard below refuses to move the checkpoint for a room
         // that is gone anyway, so that rank is never acted on.
-        const newRank = checkpointRank(room?.mode, broadcast.round, phaseStr);
+        const newRank = checkpointRank(room?.mode, broadcast.round, phase);
         const curRank = checkpointRank(room?.mode, cp.round, cp.phase);
         if (
           room?.started &&
@@ -706,9 +775,16 @@ export function attachRealtime(httpServer: HttpServer): Server {
           (curRank === null || newRank > curRank)
         ) {
           cp.round = broadcast.round;
-          cp.phase = phaseStr;
+          cp.phase = phase;
           cp.readyUserIds.clear();
           cp.advancing = false;
+          // [B2: hard timers, the server as timekeeper] The clock for the
+          // seat just entered. Armed from the report rather than from the
+          // timer, so the room's deadline is always the one its own
+          // checkpoint publishes, and armed before the broadcast below so
+          // the two go out together: a client that drew the countdown and a
+          // client that drew the seat would otherwise disagree for a frame.
+          armPhaseClock(io, roomId, cp);
           await db.room
             .update({
               where: { id: roomId },
@@ -722,8 +798,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
           // captain re reporting the checkpoint they are already standing
           // at cannot fill a record with the same leg twice.
           noteLegAdvanced(roomId, cp.round);
-          if (cp.phase !== "barter") {
-            // [I1: the telemetry spine] Leaving the bartering phase hands
+          // [B4: the log surfaces] And the same move, into the room's log,
+          // which is where every line below is stamped from now on. The
+          // note writes the line for the seat being entered and moves the
+          // log's own leg with it, so a captain reading at Dusk sees the
+          // anchor line and then everything that happened under it.
+          noteVoyageLogAdvance(io, roomId, cp.round, cp.phase);
+          if (cp.phase !== "parley") {
+            // [I1: the telemetry spine] Leaving the Parley phase hands
             // every standing offer back to its poster, and that is the
             // plan's expired line: read before the sweep, because after it
             // there is no board left to count. Goods are the escrowed
@@ -734,11 +816,37 @@ export function attachRealtime(httpServer: HttpServer): Server {
               noteTelemetry(roomId, "offer_expired", {
                 goods: swept.reduce((sum, o) => sum + o.offerAmount, 0),
               });
+              // [B4: the log surfaces] The plan's expired line, one entry
+              // per offer rather than one for the sweep, because a captain
+              // reading back wants to know whose offer lapsed and what was
+              // in it. The record above stays a single count of goods: a
+              // measurement is a sum, and a surface a captain reads is a
+              // list of things that happened.
+              for (const expired of swept) {
+                noteVoyageLog(io, roomId, {
+                  kind: "offer_expired",
+                  captain: expired.fromName,
+                  offerItem: expired.offerItem,
+                  offerAmount: expired.offerAmount,
+                });
+              }
             }
             clearBarter(io, roomId);
           }
-          if (cp.phase !== "3") clearAid(io, roomId);
+          if (cp.phase !== "resolve") clearAid(io, roomId);
         }
+        // [B2: hard timers, the server as timekeeper] The seat a room is
+        // standing at with no clock behind it. Two cases reach this: a
+        // checkpoint a restarted server hydrated from the room's own row,
+        // which holds a seat rather than a moment, and a harbor whose last
+        // socket left, where the clock was stopped rather than left to fire
+        // at an empty room. Both are the same room from here, one captain
+        // standing at a seat nobody is timing, and this is the first report
+        // that says somebody is there to be moved. A seat with no budget of
+        // its own (the pier, the phases that are not steps of the leg) and a
+        // server with the clock switched off both come back with the
+        // deadline still null, which is what keeps this a no-op for them.
+        if (room?.started && cp.endsAt === null) armPhaseClock(io, roomId, cp);
         await broadcastReadyState(io, roomId, cp);
         await maybeAdvance(io, roomId);
         if (broadcast.gameOver) await maybeConcludeVoyage(io, roomId);
@@ -748,23 +856,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // ========== Phase / round ready check ==========
     socket.on(
       "phase:ready",
-      async (payload: {
-        roomId?: string;
-        round?: number;
-        phase?: string | number;
-      }) => {
+      async (payload: { roomId?: string; round?: number; phase?: Phase }) => {
         const s = requireAuth(socket);
         if (!s) return;
         const roomId = payload?.roomId ?? s.roomId;
         if (!roomId || roomId !== s.roomId) return;
         const cp = await getCheckpoint(roomId);
-        // Phase 0 is the pre game lobby. It only ever moves forward
+        // The pier is the pre game lobby. It only ever moves forward
         // through the host's room:start, never through a per player
         // ready vote.
-        if (cp.phase === "0") return;
+        if (cp.phase === "harbor") return;
         if (
           payload?.round !== cp.round ||
-          String(payload?.phase) !== cp.phase
+          normalizePhase(payload?.phase) !== cp.phase
         ) {
           io.to(socket.id).emit(
             "phase:ready_update",
@@ -884,7 +988,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!targetUserId) return;
         void (async () => {
           const cp = await getCheckpoint(roomId);
-          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          if (cp.phase !== "parley" || cp.round !== payload?.round) return;
           await recordAuditVote(io, roomId, s.userId, cp.round, targetUserId);
         })();
       },
@@ -909,7 +1013,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (!targetUserId) return;
         void (async () => {
           const cp = await getCheckpoint(roomId);
-          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          if (cp.phase !== "parley" || cp.round !== payload?.round) return;
           await recordMaroonVote(io, roomId, s.userId, cp.round, targetUserId);
         })();
       },
@@ -934,7 +1038,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (typeof payload?.port !== "string" || !payload.port) return;
         void (async () => {
           const cp = await getCheckpoint(roomId);
-          if (cp.phase !== "barter" || cp.round !== payload?.round) return;
+          if (cp.phase !== "parley" || cp.round !== payload?.round) return;
           await recordPortShift(
             io,
             roomId,
@@ -1255,18 +1359,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // carries both surfaces and nothing in the frame itself tells
         // them apart. So the claim is pinned down rather than taken on
         // faith: an offer that says it is an exchange offer is only
-        // accepted while the room is actually sitting in the Bartering
+        // accepted while the room is actually sitting in the Parley
         // phase, which is the only time the Captain's Exchange is on
         // screen. A chat composer claiming to be the exchange board to
         // slip past the gate is therefore refused rather than believed,
         // and during the phase there is nothing to gain by claiming it,
         // since the exchange is open to everyone anyway.
         const flexible = payload?.flexible === true;
-        if (!flexible && (await getCheckpoint(roomId)).phase !== "barter") {
+        if (!flexible && (await getCheckpoint(roomId)).phase !== "parley") {
           socket.emit("barter:error", {
             roomId,
             error:
-              "The Captain's Exchange is only open during the Bartering phase.",
+              "The Captain's Exchange is only open during the Parley phase.",
           });
           return;
         }
@@ -1355,6 +1459,18 @@ export function attachRealtime(httpServer: HttpServer): Server {
         noteTelemetry(roomId, "offer_posted", {
           actor: s.userId,
           goods: offer.offerAmount,
+        });
+        // [B4: the log surfaces] And the room's own line for it. The whole
+        // trade travels rather than only the side that was escrowed,
+        // because a captain reading the log is asking what was on offer
+        // and not how much of it the board was holding.
+        noteVoyageLog(io, roomId, {
+          kind: "offer_posted",
+          captain: offer.fromName,
+          offerItem: offer.offerItem,
+          offerAmount: offer.offerAmount,
+          requestItem: offer.requestItem,
+          requestAmount: offer.requestAmount,
         });
         broadcastBarter(io, roomId);
       },
@@ -1490,9 +1606,42 @@ export function attachRealtime(httpServer: HttpServer): Server {
           actor: s.userId,
           goods: offer.offerAmount,
         });
+        // [B4: the log surfaces] The room's line for the same settlement,
+        // naming both captains: the record above counts an offer taken off
+        // the board, and this says who took it from whom, which is the
+        // thing a table talks about afterwards.
+        noteVoyageLog(io, roomId, {
+          kind: "offer_filled",
+          captain: offer.fromName,
+          taker: fulfilled.accepterName,
+          offerItem: offer.offerItem,
+          offerAmount: offer.offerAmount,
+          requestItem: offer.requestItem,
+          requestAmount: offer.requestAmount,
+        });
         broadcastBarter(io, roomId);
       },
     );
+
+    // ========== The voyage log ==========
+    //
+    // [B4: the log surfaces] The one request the log takes from a client.
+    // A captain who arrives at Dusk asks for the voyage so far, and the
+    // answer goes back to that socket rather than to the room: the room is
+    // already holding its own copy, and a broadcast here would put the
+    // whole log on every captain's screen once per request.
+    //
+    // It is asked for by the surface that draws it rather than sent on
+    // arrival, which is why this is a request at all: the five state
+    // requests a captain's own hooks make on mounting all cost a frame on
+    // every room load, and a log nobody is looking at is not worth one.
+    socket.on("voyage:log:request", (payload: { roomId?: string }) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      sendVoyageLogHistory(socket, roomId);
+    });
 
     // ========== Financial aid ==========
     socket.on("aid:state:request", (payload: { roomId?: string }) => {
@@ -1945,7 +2094,30 @@ export function attachRealtime(httpServer: HttpServer): Server {
           return;
         }
         if (targetUserId === room.hostId) return;
+        // [J2: the mute and the report] The target has to be a captain
+        // actually standing in this harbor. Without this the host could
+        // name any account in the tree and silence it in a room it is not
+        // in, which is a mute that does nothing visible to the captain it
+        // was aimed at and a mute list that grows an entry per stranger.
+        // Read off live presence rather than the membership table, because
+        // this is a frame about the harbor as it is now: a captain whose
+        // seat has been given up has no client to be silenced.
+        if (!roomMembers(roomId).some((m) => m.id === targetUserId)) {
+          socket.emit("room:error", {
+            roomId,
+            error: "That captain is not in this harbor.",
+          });
+          return;
+        }
         muteUser(roomId, targetUserId);
+        // [J2] The record of the act, written where the mute is applied and
+        // before the room is handed the new list, so the record and the
+        // harbor cannot disagree about whether it happened.
+        noteTelemetry(roomId, "mute_set", {
+          actor: s.userId,
+          target: targetUserId,
+        });
+        noteCaptainMuted(roomId, targetUserId);
         await emitRoomMembers(io, roomId);
       },
     );
@@ -1964,7 +2136,114 @@ export function attachRealtime(httpServer: HttpServer): Server {
         });
         if (!room || room.hostId !== s.userId) return;
         if (!unmuteUser(roomId, targetUserId)) return;
+        // [J2] The other half of the pair, and the reason both halves are
+        // recorded: a reader asking whether a muted captain was still
+        // silenced when the voyage ended reads the last of these two for
+        // them, which the sticky mark on their line cannot answer.
+        noteTelemetry(roomId, "mute_cleared", {
+          actor: s.userId,
+          target: targetUserId,
+        });
         await emitRoomMembers(io, roomId);
+      },
+    );
+
+    // [J2: the mute and the report] A captain's report of another, filed
+    // from the harbor roster and answered to the captain who filed it.
+    //
+    // It sits beside the mute because it is the same surface with a longer
+    // reach: the mute is the host's own remedy for a harbor they are
+    // running, and this is any captain's remedy for a harbor they are only
+    // sitting in, which is what a mode that seats strangers needs. What it
+    // leaves behind is a row rather than a state: the plan puts a
+    // moderation console after this feature, so the reading half of this
+    // arrives later, and until it does the record is the whole of it.
+    //
+    // The target is told nothing, and neither is the harbor. A report a
+    // captain knows about is a report that can be played against the
+    // captain who filed it, which is the one thing this must not become.
+    // The filer is answered so the button can settle and so a captain who
+    // is not certain their tap landed is not left wondering, and the
+    // answer says which of the two things happened rather than one
+    // sentence that means both.
+    socket.on(
+      "player:report",
+      async (payload: { roomId?: string; targetUserId?: string }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const targetUserId = payload?.targetUserId;
+        if (!roomId || roomId !== s.roomId || !targetUserId) return;
+        if (targetUserId === s.userId) {
+          socket.emit("room:error", {
+            roomId,
+            error: "You can't report yourself.",
+          });
+          return;
+        }
+        // Seated, for the same reason the mute requires it: a report is
+        // about a voyage the two captains are both in, and a frame naming
+        // an account that is not here is a frame about nobody.
+        if (!roomMembers(roomId).some((m) => m.id === targetUserId)) {
+          socket.emit("room:error", {
+            roomId,
+            error: "That captain is not in this harbor.",
+          });
+          return;
+        }
+        const room = await db.room.findUnique({
+          where: { id: roomId },
+          select: { voyageEpoch: true },
+        });
+        if (!room) return;
+        try {
+          await db.report.create({
+            data: {
+              roomId,
+              voyageEpoch: room.voyageEpoch,
+              reporterId: s.userId,
+              targetUserId,
+            },
+          });
+        } catch (error) {
+          // A second report of the same captain in the same voyage is the
+          // unique constraint doing its job, and it is an answer rather
+          // than a failure: the row that matters is already there, which is
+          // what the filer is told. Anything else is a write that did not
+          // land, and that is reported as the failure it is rather than
+          // dressed up as a duplicate.
+          if (!isUniqueViolation(error)) {
+            console.warn(
+              `[report] could not file a report for room ${roomId}:`,
+              error,
+            );
+            socket.emit("room:error", {
+              roomId,
+              error: "That report could not be filed. Try again in a moment.",
+            });
+            return;
+          }
+          socket.emit("player:report:filed", {
+            roomId,
+            targetUserId,
+            alreadyFiled: true,
+          });
+          return;
+        }
+        // [J2] Recorded after the row is written rather than before, which
+        // is the other way round from the mute: the mute is a state the
+        // record annotates, and this is a row the record accounts for, so
+        // an event for a report that failed to store would be the record
+        // claiming something the database does not hold.
+        noteTelemetry(roomId, "report_filed", {
+          actor: s.userId,
+          target: targetUserId,
+        });
+        socket.emit("player:report:filed", {
+          roomId,
+          targetUserId,
+          alreadyFiled: false,
+        });
       },
     );
 
@@ -2042,6 +2321,19 @@ export function attachRealtime(httpServer: HttpServer): Server {
             voyageSeats: roster.length,
           },
         });
+        // [J2: the mute and the report] A voyage leaves the dock with an
+        // empty mute list, whatever the lobby was carrying. This is the
+        // clear that was missing, and its absence was the whole of the
+        // defect: mutes were dropped at restart and at teardown, so a
+        // silence the host set before departure rode into the voyage, and
+        // a mute that outlives the table it was set at is not the per
+        // voyage mute the plan asks for. It goes here rather than beside
+        // the other two clears because a voyage has exactly one beginning
+        // and the other two are not it: restart reopens a harbor that has
+        // been sailed, and teardown ends one. A host who mutes in the
+        // lobby and starts a voyage has made a judgement about a lobby.
+        // If it is still true in the voyage, it can be made again.
+        if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
         // [I1: the telemetry spine] The voyage is under way, so the spine
         // opens on it. Here rather than at the end of the handler because
         // the record's header is read from the row above and the roster
@@ -2055,6 +2347,24 @@ export function attachRealtime(httpServer: HttpServer): Server {
         cp.phase = opening;
         cp.readyUserIds.clear();
         cp.advancing = false;
+        // [B4: the log surfaces] The voyage's log opens with it, and it
+        // opens on the leg and the seat the checkpoint was just pinned to
+        // rather than on a leg of its own choosing. Placed here, after the
+        // round is set and before anything is broadcast, so the first line
+        // a captain can read belongs to the voyage it is about and no
+        // captain hears about a seat before the log they will read it in
+        // exists. The seat travels with the round because this is the one
+        // move into a seat that no report makes: the anchor line for the
+        // phase the voyage opens in is written by the same note that writes
+        // every other one, so the log's spine has no gap at its first link.
+        openVoyageLog(io, roomId, cp.round, cp.phase);
+        // [B2: hard timers, the server as timekeeper] The voyage's first
+        // clock. A departure is the one seat that is never entered by a
+        // report, so this is the one place the clock is armed from something
+        // other than the checkpoint moving, and it is armed here rather than
+        // on the room:started frame below so no captain can be standing in a
+        // seat before the server is timing it.
+        armPhaseClock(io, roomId, cp);
         // The seat count rides the start broadcast because the commission a
         // client draws is a function of it: this frame is what moves a
         // lobby into a voyage, so a client that hears it can draw the right
@@ -2104,7 +2414,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           data: {
             started: false,
             currentRound: 1,
-            currentPhase: "0",
+            currentPhase: ENTRY_PHASE,
             voyageEpoch: { increment: 1 },
             // The pin belongs to the voyage that just ended. Clearing it
             // here rather than at the next departure keeps "0 means no
@@ -2120,6 +2430,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         // below, and the next departure deals a fresh hand.
         await clearAlignments(roomId);
         roomCheckpoints.delete(roomId);
+        // [B2: hard timers, the server as timekeeper] The clock the ended
+        // voyage was running, stopped with the seat it belonged to. A
+        // reopened harbor is the pier, and the pier has no clock: leaving
+        // this timer alive would have it fire into a lobby nobody is
+        // standing in a phase of.
+        disarmPhaseClock(roomId);
         clearRoomStatuses(roomId);
         clearBarter(io, roomId);
         // A restarted voyage is a new voyage, so the flexible allowance
@@ -2162,6 +2478,12 @@ export function attachRealtime(httpServer: HttpServer): Server {
         if (clearSessionChat(roomId))
           io.to(`room:${roomId}`).emit("chat:cleared", { roomId });
         if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
+        // [B4: the log surfaces] A restarted voyage is a new voyage, so the
+        // log that belonged to the old one goes with the conversation above.
+        // Clients drop their own copy on the frame below, which is the same
+        // signal the chat clear rides, so the two ends cannot disagree
+        // about which voyage they are keeping.
+        clearVoyageLog(roomId);
         // [I1: the telemetry spine] The voyage that was under way stops
         // here, and it stops by the host's hand rather than by an ending,
         // which is the outcome this record carries. Written before the

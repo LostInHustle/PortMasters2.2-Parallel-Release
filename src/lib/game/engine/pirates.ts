@@ -1,5 +1,5 @@
 // =====================================================================
-// The one risk the settlement phase turns on: whether raiders find the
+// The one risk Resolve turns on: whether raiders find the
 // hold this round, and the escort a captain can buy to rule that out.
 //
 // Both are resolved by the same one shot latch, state.pirateAttackResolved,

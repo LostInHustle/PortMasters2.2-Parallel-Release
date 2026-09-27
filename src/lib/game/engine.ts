@@ -92,7 +92,7 @@ export {
   type PriceBreakdown,
 } from "./engine/pricing";
 
-// ========== Phase 1: the port market ==========
+// ========== Market: the port board ==========
 export {
   applyHarborPulse,
   applyPortShift,
@@ -101,7 +101,7 @@ export {
   tallyPurchasesByResource,
 } from "./engine/market";
 
-// ========== Phase 2: the trade manifest ==========
+// ========== Orders: the trade manifest ==========
 export {
   callBrokersFavor,
   claimWordOnTheDocksReward,
@@ -110,7 +110,7 @@ export {
 } from "./engine/orders";
 
 // ========== The fleet commission ==========
-// The Ocean Gambit objective. Lives out here rather than in the phase 2
+// The Ocean Gambit objective. Lives out here rather than in the Orders
 // block above because the deck it delivers against is the mode's, not the
 // manifest's, even though it opens in the manifest phase.
 export {
@@ -118,7 +118,7 @@ export {
   OBJECTIVE_DELIVERY_PHASE,
 } from "./engine/objectives";
 
-// ========== Bartering ==========
+// ========== Parley: the trade table ==========
 export {
   acceptBarterOffer,
   postBarterOffer,
@@ -191,21 +191,28 @@ export {
 } from "./engine/convoyState";
 
 // ========== Voyage lifecycle and phase orchestration ==========
-// The departures are deliberately not forwarded. completePhase2,
+// The departures are deliberately not forwarded. completeOrders,
 // finishSettlement and skipUpgrade used to be here because the panels
 // called them directly, which is what gave the engine a second route
 // around the lap. Every panel reaches the spine through nextPhase or
 // lockInBoon now, so those three are private to ./engine/lifecycle.ts.
 //
 // The same goes for the per phase enter and complete steps further up
-// this file: completePhase1, startPhase2, completeBarterPhase and
-// selectBoon are each called by ./engine/lifecycle.ts and nothing else,
-// and it reaches them through their own submodules rather than through
-// here. Re-exporting a step whose only caller is the spine is what made
-// the second route possible in the first place, so they stay off the
-// public surface. A caller outside ./engine/ advances a voyage with
-// nextPhase and never by naming a step.
+// this file: completeMarket, startOrders, completeParley and selectBoon
+// are each called by ./engine/lifecycle.ts and nothing else, and it
+// reaches them through their own submodules rather than through here.
+// Re-exporting a step whose only caller is the spine is what made the
+// second route possible in the first place, so they stay off the public
+// surface. A caller outside ./engine/ advances a voyage with nextPhase
+// and never by naming a step.
+//
+// autoCommit is here beside nextPhase rather than among the private steps,
+// because it is not a step either: it is the whole of a departure, the one a
+// client runs when the room's clock ran out on a captain who was holding
+// nothing (see [B2] in ./engine/lifecycle.ts). Its one caller is the phase
+// sync hook.
 export {
+  autoCommit,
   lockInBoon,
   nextPhase,
   phaseLabel,

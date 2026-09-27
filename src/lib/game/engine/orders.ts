@@ -1,5 +1,5 @@
 // =====================================================================
-// Phase 2, the trade manifest: the orders a captain can fill, what
+// Orders, the trade manifest: the orders a captain can fill, what
 // filling one actually pays, and the two ways an order can be conjured
 // outside the ordinary draw (an Imperial Mandate, or calling in the
 // Broker's Favor).
@@ -15,7 +15,7 @@
 // would make that ordering implicit rather than obvious, so it stays as
 // one readable top to bottom settlement.
 //
-// The order generators come from ./market: Phase 1 and Phase 2 draw from
+// The order generators come from ./market: Market and Orders draw from
 // the same seeded deck, so there is exactly one implementation of them.
 // =====================================================================
 import {
@@ -41,7 +41,7 @@ import {
   unlockedPorts,
 } from "../pools";
 import { createRng, type Rng } from "../rng";
-import type { GameContext, GameState } from "../types";
+import type { GameContext, GameState, OrderCard } from "../types";
 import { hasModule } from "./core";
 import {
   genMixedOrder,
@@ -56,6 +56,33 @@ import {
   getIntelCost,
 } from "./pricing";
 
+// The hold's own guard on an order, as one function rather than a loop
+// written at every caller. There are two callers now: an order a captain
+// presses, and an order a captain's standing orders press for them (see
+// [B3] workStandingOrders in ./standing). The second one has to judge the
+// board before it acts, and a second copy of this rule is exactly how a
+// captain's orders would come to fill an order their own hands could not.
+//
+// It answers with the good that is short rather than a bare boolean,
+// because the refusal below is worth saying out loud and naming the good
+// is the whole of what makes it useful. canFillOrder is the same answer
+// read as a yes or no, and stays the module's own reading rather than
+// being lifted out of it: nothing outside this file needs to know which
+// good was short, only whether the hold covers the order.
+function orderShortfall(
+  state: GameState,
+  order: OrderCard,
+): OrderCard["resources"][number] | null {
+  for (const r of order.resources) {
+    if ((state.inventory[r.type] || 0) < (r.required ?? 0)) return r;
+  }
+  return null;
+}
+
+export function canFillOrder(state: GameState, order: OrderCard): boolean {
+  return orderShortfall(state, order) === null;
+}
+
 export function completeOrder(
   state: GameState,
   orderId: number,
@@ -64,11 +91,10 @@ export function completeOrder(
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
   if (state.completedOrders.includes(order.id)) return;
-  for (const r of order.resources) {
-    if ((state.inventory[r.type] || 0) < r.required!) {
-      logs.push(`❌ Inventory short! Need ${r.type}×${r.required}`);
-      return;
-    }
+  const short = orderShortfall(state, order);
+  if (short) {
+    logs.push(`❌ Inventory short! Need ${short.type}×${short.required}`);
+    return;
   }
   // Silk, and everything made from it, read off SILK_GOODS rather than a
   // list written out here. The list this replaces had gone stale against
@@ -232,7 +258,7 @@ export function claimWordOnTheDocksReward(state: GameState, logs: string[]) {
 // GameState and BROKERS_FAVOR_UNLOCK_LEVEL). Appends one extra standard trade
 // order for a chosen quantity of a good this captain is currently holding,
 // so a hold full of otherwise unsellable stock still has a guaranteed buyer.
-// Like the paid Broker's Whisper guarantee in startPhase2, it draws with
+// Like the paid Broker's Whisper guarantee in startOrders, it draws with
 // this captain's own Math.random and only appends to their own
 // customerCards, so it can never shift the shared, room wide market anyone
 // else sees. Quantity is capped at the captain's own hold rather than the
@@ -246,7 +272,7 @@ export function callBrokersFavor(
   quantity: number,
   logs: string[],
 ) {
-  if (state.phase !== 2) return;
+  if (state.phase !== "orders") return;
   if (state.renownLevel < BROKERS_FAVOR_UNLOCK_LEVEL) {
     logs.push(
       `❌ Broker's Favor unlocks at Renown Level ${BROKERS_FAVOR_UNLOCK_LEVEL}`,
@@ -336,16 +362,16 @@ export function purchaseIntel(state: GameState, logs: string[]) {
   }
 }
 
-export function startPhase2(
+export function startOrders(
   state: GameState,
   ctx: GameContext,
   logs: string[],
 ) {
-  state.phase = 2;
+  state.phase = "orders";
   state.orderCount = 0;
   state.completedOrders = [];
   logs.push(
-    `\n🤝=== Round ${state.currentRound} · Phase 2: Trade Transaction ===`,
+    `\n🤝=== Round ${state.currentRound} · Orders: Trade Transaction ===`,
   );
   // [ONLINE] Deterministic trade orders: this captain's seed, this voyage,
   // this round. The loop below reads nothing captain specific, so what

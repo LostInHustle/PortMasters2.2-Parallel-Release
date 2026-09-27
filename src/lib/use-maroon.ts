@@ -138,7 +138,7 @@ export function useMaroon(
     !!socket &&
     !!roomId &&
     rung !== null &&
-    game.phase === "barter" &&
+    game.phase === "parley" &&
     game.currentRound >= rung;
 
   const canVote = atTable && !applied && !myVote;
@@ -169,7 +169,7 @@ export function useMaroon(
     rung !== null &&
     game.currentRound >= rung &&
     game.currentRound < game.maxRounds &&
-    game.phase === "barter";
+    game.phase === "parley";
   const ports = canShift
     ? unlockedPorts(game.difficulty, game.currentRound + 1)
     : [];

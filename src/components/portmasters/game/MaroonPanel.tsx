@@ -60,7 +60,7 @@ export function MaroonVoteCard({
   // during it offers the vote, and once the vote has carried it says so
   // rather than going quiet.
   const rung = modeConfig(game.mode).maroonFrom;
-  if (rung === null || game.phase !== "barter") return null;
+  if (rung === null || game.phase !== "parley") return null;
   const spent = maroon.result !== null;
   const open = game.currentRound >= rung;
   const rows = tallyRows(maroon.votes, members);

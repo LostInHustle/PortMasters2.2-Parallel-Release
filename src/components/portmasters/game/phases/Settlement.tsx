@@ -43,7 +43,7 @@ function PirateAttack({
   return (
     <div className="max-w-xl mx-auto text-center py-4">
       <div className="text-5xl mb-2">🏴‍☠️</div>
-      <div className="text-2xl font-bold mb-1 font-display text-settlement pm-brush">
+      <div className="text-2xl font-bold mb-1 font-display text-resolve pm-brush">
         Pirate Waters Ahead
       </div>
       <div className="mb-5 space-y-2">
@@ -119,7 +119,7 @@ function PirateAttack({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
         <Button
           size="lg"
-          className="pm-grad-settlement rounded-xl h-14"
+          className="pm-grad-resolve rounded-xl h-14"
           onClick={() => act((g, l) => hireEscort(g, l))}
         >
           <ShieldCheck className="h-5 w-5 mr-2" /> Hire Escort ({escortFee}{" "}
@@ -219,14 +219,14 @@ function SettlementBills({
     ? `💸 Settle Bills: ${totalDue} Gold`
     : `Force Payment and Risk Bankruptcy (${game.money}/${totalDue} Gold)`;
   const settleClassName = canAfford
-    ? "pm-grad-settlement h-12 px-8"
+    ? "pm-grad-resolve h-12 px-8"
     : "bg-alarm text-background h-12 px-8 font-semibold";
   const settleIcon = canAfford ? null : <AlertTriangle className="h-4 w-4" />;
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-2xl font-bold text-center mb-4 font-display text-settlement pm-brush">
-        🔧 Phase 3: Round Settlement
+      <div className="text-2xl font-bold text-center mb-4 font-display text-resolve pm-brush">
+        💸 Resolve: Round Settlement
       </div>
 
       {game.pirateAttackResolved && (
@@ -268,7 +268,7 @@ function SettlementBills({
         </div>
       </div>
 
-      <div className="rounded-xl bg-settlement/[0.03] border border-settlement/15 p-3.5 my-3.5">
+      <div className="rounded-xl bg-resolve/[0.03] border border-resolve/15 p-3.5 my-3.5">
         <h3 className="font-semibold mb-2">💹 Balance Summary</h3>
         <div className="flex justify-between text-[13px] py-0.5">
           <span>Current Funds</span>
@@ -327,7 +327,7 @@ function SettlementBills({
               </span>
               <Button
                 size="sm"
-                className="pm-grad-settlement rounded-lg"
+                className="pm-grad-resolve rounded-lg"
                 onClick={() => aid.post(requestAmount)}
               >
                 🆘 Request Help
@@ -365,7 +365,7 @@ function SettlementBills({
                     size="sm"
                     className={cn(
                       "h-7 px-2.5 text-[10px] rounded shrink-0",
-                      canHelp && "pm-grad-settlement",
+                      canHelp && "pm-grad-resolve",
                     )}
                     variant={canHelp ? "default" : "secondary"}
                     disabled={!canHelp}
@@ -419,7 +419,7 @@ function SettlementBills({
                       size="sm"
                       className={cn(
                         "h-7 px-2.5 text-[10px] rounded shrink-0",
-                        canBack && "pm-grad-settlement",
+                        canBack && "pm-grad-resolve",
                       )}
                       variant={canBack ? "default" : "secondary"}
                       disabled={!canBack}

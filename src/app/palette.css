@@ -48,13 +48,12 @@
   --color-members: var(--w-members);
   --color-chat: var(--w-chat);
   --color-ledger: var(--w-ledger);
-  --color-welcome: var(--w-welcome);
-  --color-purchase: var(--w-purchase);
+  --color-harbor: var(--w-harbor);
+  --color-market: var(--w-market);
   --color-orders: var(--w-orders);
-  --color-barter: var(--w-barter);
-  --color-workers: var(--w-workers);
-  --color-shipyard: var(--w-shipyard);
-  --color-settlement: var(--w-settlement);
+  --color-parley: var(--w-parley);
+  --color-dusk: var(--w-dusk);
+  --color-resolve: var(--w-resolve);
   --color-endgame: var(--w-endgame);
   --color-bankruptcy: var(--w-bankruptcy);
   --color-module-draft: var(--w-module-draft);
@@ -63,11 +62,12 @@
   --color-depth: var(--w-depth);
   --color-pulse: var(--w-pulse);
   --color-planner: var(--w-planner);
-  --color-boon: var(--w-boon);
+  --color-dawn: var(--w-dawn);
   --color-modules: var(--w-modules);
   --color-brand: var(--w-brand);
   --color-shortcuts: var(--w-shortcuts);
   --color-rumors: var(--w-rumors);
+  --color-standing: var(--w-standing);
   --color-charter-fill: var(--w-charter-fill);
   --color-harbors-fill: var(--w-harbors-fill);
   --color-captains-fill: var(--w-captains-fill);
@@ -87,13 +87,12 @@
   --color-members-fill: var(--w-members-fill);
   --color-chat-fill: var(--w-chat-fill);
   --color-ledger-fill: var(--w-ledger-fill);
-  --color-welcome-fill: var(--w-welcome-fill);
-  --color-purchase-fill: var(--w-purchase-fill);
+  --color-harbor-fill: var(--w-harbor-fill);
+  --color-market-fill: var(--w-market-fill);
   --color-orders-fill: var(--w-orders-fill);
-  --color-barter-fill: var(--w-barter-fill);
-  --color-workers-fill: var(--w-workers-fill);
-  --color-shipyard-fill: var(--w-shipyard-fill);
-  --color-settlement-fill: var(--w-settlement-fill);
+  --color-parley-fill: var(--w-parley-fill);
+  --color-dusk-fill: var(--w-dusk-fill);
+  --color-resolve-fill: var(--w-resolve-fill);
   --color-endgame-fill: var(--w-endgame-fill);
   --color-bankruptcy-fill: var(--w-bankruptcy-fill);
   --color-module-draft-fill: var(--w-module-draft-fill);
@@ -102,11 +101,12 @@
   --color-depth-fill: var(--w-depth-fill);
   --color-pulse-fill: var(--w-pulse-fill);
   --color-planner-fill: var(--w-planner-fill);
-  --color-boon-fill: var(--w-boon-fill);
+  --color-dawn-fill: var(--w-dawn-fill);
   --color-modules-fill: var(--w-modules-fill);
   --color-brand-fill: var(--w-brand-fill);
   --color-shortcuts-fill: var(--w-shortcuts-fill);
   --color-rumors-fill: var(--w-rumors-fill);
+  --color-standing-fill: var(--w-standing-fill);
   --color-gain: var(--gain);
   --color-alarm: var(--alarm);
   --color-warn: var(--warn);
@@ -232,39 +232,47 @@
   /* === The phases === */
 
   /*
-     Twelve keys, twelve hues. That many can never run at once, which is
+     Eleven keys, eleven hues. That many can never run at once, which is
      why a pair here may share a hue and never be seen together.
+
+     The six of the leg come first, in the order the design names them,
+     because that is the order a reader of this file is looking for them
+     in. The shipyard's two sub states and the two terminals follow.
   */
-  /* Welcome: the voyage opens. */
-  --w-welcome: oklch(0.53 0.13 68);
-  /* Purchase: buying at port. */
-  --w-purchase: oklch(0.53 0.13 154);
+  /* Harbor: the pier, before the leg begins. */
+  --w-harbor: oklch(0.53 0.13 68);
+  /* Dawn: the boon draft that opens a round. */
+  --w-dawn: oklch(0.53 0.13 325);
+  /* Market: buying at port, and setting the artisan bench to work. The
+     bench is the second station of this phase rather than a station of its
+     own since [B1], which is why there is no separate artisan hue. */
+  --w-market: oklch(0.53 0.13 154);
   /* Orders: filling what was asked for. */
   --w-orders: oklch(0.53 0.13 282);
-  /* Barter: captain to captain trade. */
-  --w-barter: oklch(0.53 0.13 218);
-  /* Worker Management: artisans and their wages. */
-  --w-workers: oklch(0.53 0.13 347);
-  /* Shipyard: the ship itself. */
-  --w-shipyard: oklch(0.53 0.13 90);
-  /* Settlement: bills, risk and the reckoning. */
-  --w-settlement: oklch(0.53 0.13 261);
+  /* Parley: the captain to captain table. */
+  --w-parley: oklch(0.53 0.13 218);
+  /* Resolve: bills, risk and the reckoning. */
+  --w-resolve: oklch(0.53 0.13 261);
+  /* Dusk: the shipyard, and the round closing. */
+  --w-dusk: oklch(0.53 0.13 90);
   /* Endgame: the voyage closes. */
   --w-endgame: oklch(0.53 0.13 132);
-  /* Bankruptcy: a fleet lost. */
+  /* Bankruptcy: a fleet lost. It wears Dawn's hue, the two of which can
+     never be on screen together: a voyage that ends here never reaches
+     another boon draft. */
   --w-bankruptcy: oklch(0.53 0.13 325);
   /* Module Draft: choosing what to bolt on. */
   --w-module-draft: oklch(0.53 0.13 132);
   /* Module Swap: changing what is already there. */
   --w-module-swap: oklch(0.53 0.13 347);
 
-  --w-welcome-fill: oklch(0.55 0.15 68);
-  --w-purchase-fill: oklch(0.55 0.15 154);
+  --w-harbor-fill: oklch(0.55 0.15 68);
+  --w-dawn-fill: oklch(0.55 0.15 325);
+  --w-market-fill: oklch(0.55 0.15 154);
   --w-orders-fill: oklch(0.55 0.15 282);
-  --w-barter-fill: oklch(0.55 0.15 218);
-  --w-workers-fill: oklch(0.55 0.15 347);
-  --w-shipyard-fill: oklch(0.55 0.15 90);
-  --w-settlement-fill: oklch(0.55 0.15 261);
+  --w-parley-fill: oklch(0.55 0.15 218);
+  --w-resolve-fill: oklch(0.55 0.15 261);
+  --w-dusk-fill: oklch(0.55 0.15 90);
   --w-endgame-fill: oklch(0.55 0.15 132);
   --w-bankruptcy-fill: oklch(0.55 0.15 325);
   --w-module-draft-fill: oklch(0.55 0.15 132);
@@ -283,8 +291,6 @@
   --w-pulse: oklch(0.53 0.13 90);
   /* Fulfillment Planner: which orders are worth filling. */
   --w-planner: oklch(0.53 0.13 132);
-  /* Boon Draft: the boon chosen for the voyage. */
-  --w-boon: oklch(0.53 0.13 325);
   /* Module list: what the ship already carries. */
   --w-modules: oklch(0.53 0.13 261);
   --w-brand: oklch(0.53 0.13 49.4);
@@ -292,16 +298,23 @@
   --w-shortcuts: oklch(0.53 0.13 218);
   /* Rumor Board: what is being whispered. */
   --w-rumors: oklch(0.53 0.13 218);
+  /* Standing Orders: what a seat does when nobody is standing at it. It
+     answers to its own dialog screen, so the only hue it is measured
+     against is the red that means danger, which it clears by 169
+     degrees. 208 is where it sits rather than anywhere else on the
+     wheel because that is 33 degrees from Members and 32 from Chat,
+     the two session surfaces a captain sees behind this dialog. */
+  --w-standing: oklch(0.53 0.13 208);
 
   --w-advisor-fill: oklch(0.55 0.15 197);
   --w-depth-fill: oklch(0.55 0.15 347);
   --w-pulse-fill: oklch(0.55 0.15 90);
   --w-planner-fill: oklch(0.55 0.15 132);
-  --w-boon-fill: oklch(0.55 0.15 325);
   --w-modules-fill: oklch(0.55 0.15 261);
   --w-brand-fill: oklch(0.55 0.15 49.4);
   --w-shortcuts-fill: oklch(0.55 0.15 218);
   --w-rumors-fill: oklch(0.55 0.15 218);
+  --w-standing-fill: oklch(0.55 0.15 208);
 
   /* === The operator console === */
 
@@ -420,13 +433,13 @@
   --w-members: oklch(0.76 0.12 175);
   --w-chat: oklch(0.76 0.12 240);
   --w-ledger: oklch(0.76 0.12 304);
-  --w-welcome: oklch(0.76 0.12 68);
-  --w-purchase: oklch(0.76 0.12 154);
+  --w-harbor: oklch(0.76 0.12 68);
+  --w-dawn: oklch(0.76 0.12 325);
+  --w-market: oklch(0.76 0.12 154);
   --w-orders: oklch(0.76 0.12 282);
-  --w-barter: oklch(0.76 0.12 218);
-  --w-workers: oklch(0.76 0.12 347);
-  --w-shipyard: oklch(0.76 0.12 90);
-  --w-settlement: oklch(0.76 0.12 261);
+  --w-parley: oklch(0.76 0.12 218);
+  --w-resolve: oklch(0.76 0.12 261);
+  --w-dusk: oklch(0.76 0.12 90);
   --w-endgame: oklch(0.76 0.12 132);
   --w-bankruptcy: oklch(0.76 0.12 325);
   --w-module-draft: oklch(0.76 0.12 132);
@@ -435,7 +448,6 @@
   --w-depth: oklch(0.76 0.12 347);
   --w-pulse: oklch(0.76 0.12 90);
   --w-planner: oklch(0.76 0.12 132);
-  --w-boon: oklch(0.76 0.12 325);
   --w-modules: oklch(0.76 0.12 261);
   /* Every other widget is given a night value. Brand was the one that
      was missed, so after dark it kept its daylight lightness and sat at
@@ -443,6 +455,7 @@
   --w-brand: oklch(0.76 0.12 49.4);
   --w-shortcuts: oklch(0.76 0.12 218);
   --w-rumors: oklch(0.76 0.12 218);
+  --w-standing: oklch(0.76 0.12 208);
   --w-admin: oklch(0.76 0.12 226);
 
   --gain: oklch(0.76 0.15 163);

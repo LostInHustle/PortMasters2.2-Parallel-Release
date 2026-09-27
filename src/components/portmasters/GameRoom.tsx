@@ -8,7 +8,11 @@ import {
   type PublicUser,
   type RoomDetail,
 } from "@/lib/api";
-import type { VoyageResult, VoyageReveal } from "@/types/realtime";
+import type {
+  RoomMembersPayload,
+  VoyageResult,
+  VoyageReveal,
+} from "@/types/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
@@ -16,6 +20,7 @@ import {
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
+import { normalizeStandingOrders } from "@/lib/game/standing";
 import { useRealtime } from "@/lib/use-realtime";
 import { useGameSession } from "@/lib/use-game-session";
 import { usePhaseSync } from "@/lib/use-phase-sync";
@@ -24,6 +29,7 @@ import {
   type PlayerDetailData,
 } from "@/lib/use-player-detail";
 import { usePrivateLog } from "@/lib/use-private-log";
+import { useVoyageLog } from "@/lib/use-voyage-log";
 import { useObjective } from "@/lib/use-objective";
 import { useLegReport } from "@/lib/use-leg-report";
 import { useAudit } from "@/lib/use-audit";
@@ -52,6 +58,7 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
+import { StandingOrdersModal } from "./game/StandingOrdersModal";
 import { ObjectivePanel } from "./game/ObjectivePanel";
 import { AuditRevealStrip } from "./game/AuditPanel";
 import { MaroonResultStrip, PortShiftStrip } from "./game/MaroonPanel";
@@ -165,6 +172,9 @@ export function GameRoom({
     socket,
     state.game,
     act,
+    // The voyage's own seed identity, which the engine's autoCommit needs to
+    // leave a seat on the clock's behalf (see [B2] in @/lib/use-phase-sync).
+    ctx,
     authed,
     me.id,
     startingGoldBonus,
@@ -610,6 +620,11 @@ export function GameRoom({
   // Whatever this voyage has told this captain and no one else. Empty in
   // every Classic harbor, because nothing is ever sent there.
   const privateLog = usePrivateLog(socket, room.id);
+  // [B4: the log surfaces] The room's own log, which is the other half of
+  // the same pair and is read beside it at Dusk. It subscribes here, where
+  // the socket is, but it asks the server for nothing until the screen
+  // that draws it says so.
+  const voyageLog = useVoyageLog(socket, room.id);
   // The other half of that contrast: the one thing this voyage tells
   // everyone. No objective is drawn in Classic, so the hook stays inert
   // and the panel renders nothing there. The fleet's size goes with it,
@@ -642,6 +657,8 @@ export function GameRoom({
   const [tutOpen, setTutOpen] = useState(false);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  // [B3: standing orders] The captain's own record, edited in place.
+  const [standingOpen, setStandingOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
@@ -666,12 +683,11 @@ export function GameRoom({
   const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
   useEffect(() => {
     if (!socket) return;
-    const onMembers = (data: {
-      roomId: string;
-      members?: Array<PublicUser & { joinedAt?: string }>;
-      hostId: string | null;
-      mutedUserIds?: string[];
-    }) => {
+    // Read defensively, field by field, even though the server always
+    // writes all three: this is a wire frame, and a client that has
+    // reloaded into a slightly older bundle should read the part it can
+    // rather than drop the whole roster over a field it does not expect.
+    const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== room.id) return;
       if (data.hostId) setHostId(data.hostId);
       if (data.members) setMembers(data.members);
@@ -848,7 +864,7 @@ export function GameRoom({
       typeof window !== "undefined"
         ? localStorage.getItem(TUTORIAL_SEEN_KEY)
         : null;
-    if (!seen && state.loaded && state.game.phase === 0) {
+    if (!seen && state.loaded && state.game.phase === "harbor") {
       autoTutorialFired.current = true;
       const t = setTimeout(() => setTutOpen(true), 600);
       return () => clearTimeout(t);
@@ -1176,6 +1192,8 @@ export function GameRoom({
               backing={backing}
               audit={audit}
               maroon={maroon}
+              voyageLog={voyageLog}
+              privateLog={privateLog}
               me={me}
               room={{
                 id: room.id,
@@ -1204,6 +1222,8 @@ export function GameRoom({
               waiting={phaseSync.waiting}
               readyCount={phaseSync.readyCount}
               requiredCount={phaseSync.requiredCount}
+              clock={phaseSync.phaseClock}
+              onStandingOrders={() => setStandingOpen(true)}
               onCancelReady={phaseSync.cancelReady}
             />
             {/* The captain's own card, below the controls, where it
@@ -1373,6 +1393,22 @@ export function GameRoom({
         onOpenChange={handleTutorialOpenChange}
         mode={state.game.mode}
         difficulty={state.game.difficulty}
+      />
+      {/* [B3: standing orders] The form writes the record the way the
+          load heal does, through the normalizer, rather than trusting
+          what the controls composed. The controls can only build the
+          closed vocabulary, so this is not a guard against them: it is
+          what keeps one shape of the record on the voyage whether it
+          arrived from a form, from a save, or from a restart. */}
+      <StandingOrdersModal
+        open={standingOpen}
+        onOpenChange={setStandingOpen}
+        game={state.game}
+        onChange={(orders) =>
+          act((g) => {
+            g.standingOrders = normalizeStandingOrders(orders);
+          })
+        }
       />
       <RestartConfirmModal
         open={restartConfirmOpen}

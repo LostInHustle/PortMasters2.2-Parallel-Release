@@ -13,7 +13,12 @@ import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
-export function BarterPhase({
+// The Parley panel: the Captain's Exchange, and with it the two votes the
+// table carries. Named for the phase it is (see @/lib/game/phases), the
+// same way Market.tsx and Orders.tsx are, rather than for bartering, which
+// is the activity half this screen shares with a chat composer and not the
+// seat the room waits on.
+export function Parley({
   game,
   ctx,
   act,
@@ -71,7 +76,7 @@ export function BarterPhase({
   const revealedRound = audit.reveal?.round;
   useEffect(() => {
     if (revealedRound === undefined) return;
-    if (game.phase !== "barter" || game.currentRound !== revealedRound) return;
+    if (game.phase !== "parley" || game.currentRound !== revealedRound) return;
     phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
   }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
 
@@ -81,7 +86,7 @@ export function BarterPhase({
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
-        <Handshake className="h-5 w-5 text-barter" />
+        <Handshake className="h-5 w-5 text-parley" />
         <Term term="Barter">Captain's Exchange</Term>
       </h2>
       <p className="text-sm text-muted-foreground mb-4">
@@ -91,7 +96,7 @@ export function BarterPhase({
         as well as from here.
       </p>
 
-      <div className="rounded-xl border border-barter/15 bg-barter/[0.03] p-4 mb-4">
+      <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
         <h3 className="text-center font-semibold mb-3 text-sm">
           📤 Post an Offer
         </h3>
@@ -137,7 +142,7 @@ export function BarterPhase({
             ))}
           </select>
           <Button
-            className={cn("rounded-lg", draft.canPost && "pm-grad-barter")}
+            className={cn("rounded-lg", draft.canPost && "pm-grad-parley")}
             variant={draft.canPost ? "default" : "secondary"}
             disabled={!draft.canPost}
             onClick={() => draft.submit()}

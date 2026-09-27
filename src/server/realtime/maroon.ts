@@ -37,6 +37,7 @@ import { unlockedPorts } from "@/lib/game/pools";
 import { activeRosterSet } from "./checkpoint";
 import { roomStatuses } from "./status";
 import { noteCaptainMarooned, noteTelemetry } from "./telemetry";
+import { noteVoyageLog } from "./voyage-log";
 import type {
   MaroonResult,
   MaroonTally,
@@ -222,6 +223,16 @@ export async function recordMaroonVote(
   // outlives a voyage that ends by a wipe or by the harbor emptying, which
   // are the two endings with no conclusion to read it from.
   noteCaptainMarooned(roomId, carried);
+  // [B4: the log surfaces] The room's line for the same vote, written
+  // before the result goes out so the log never trails the screen it
+  // explains. It names the captain off the result above rather than off a
+  // second lookup, which is the same discipline the audit's line keeps: a
+  // log that named a captain the frame beside it did not is a log that
+  // read the roster twice and got two answers.
+  noteVoyageLog(io, roomId, {
+    kind: "maroon_carried",
+    target: result.target.name,
+  });
   // The nominations die with the vote they carried: the room's answer is
   // the result now, and leaving the tally standing would put the count
   // that got there on the same screen as the thing it did.

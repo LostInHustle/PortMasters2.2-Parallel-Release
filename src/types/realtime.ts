@@ -13,7 +13,8 @@ import type { Difficulty } from "@/lib/game/difficulty";
 import type { GambitRole } from "@/lib/game/gambit";
 import type { HouseId } from "@/lib/game/legacy";
 import type { Objective } from "@/lib/game/objectives";
-import type { ObjectiveTraceEntry, OrderFill } from "@/lib/game/types";
+import type { ObjectiveTraceEntry, OrderFill, Phase } from "@/lib/game/types";
+import type { VoyageLogEntry } from "@/lib/game/voyage-log";
 
 // The public projection of a user account: what every other captain is
 // allowed to know about anyone, never the password hash or the email.
@@ -86,6 +87,37 @@ export type PrivateEntry = {
 export type PrivateEntryDelivery = {
   roomId: string;
   entry: PrivateEntry;
+};
+
+// =====================================================================
+// [B4: the log surfaces] The room's log.
+//
+// The public half of the pair above, and the contrast is the point: the
+// private channel is addressed to one captain and to nobody else, and a
+// line below goes to every socket in the room. Nothing here may carry a
+// hidden thing, which is why an entry's only field beyond its kind is the
+// sentence the server wrote: whatever is printed in a line is public the
+// moment it is sent, so there is no shape here for a secret to travel in.
+//
+// The text travels with the entry for the same reason the private entry's
+// does. The server writes the line and the surface prints what it was
+// sent rather than assembling the sentence out of fields on this side of
+// the wire, so one line cannot read two ways on two screens.
+// =====================================================================
+
+export type VoyageLogDelivery = {
+  roomId: string;
+  entry: VoyageLogEntry;
+};
+
+// The whole log, to the one socket that asked for it. The round rides
+// along because the client groups the lines by leg, and the leg a voyage
+// is standing in is the server's fact rather than something a client can
+// work out from the lines it happens to be holding.
+export type VoyageLogHistory = {
+  roomId: string;
+  round: number;
+  entries: VoyageLogEntry[];
 };
 
 // =====================================================================
@@ -293,9 +325,54 @@ export type PortShiftNotice = {
   by: { userId: string; name: string };
 };
 
+// =====================================================================
+// [J2: the mute and the report] The moderation surface on the wire.
+//
+// Two shapes, one each way. The roster frame carries the mute list, and
+// the answer to a report travels back to the captain who filed it.
+//
+// The roster frame is declared here rather than typed inline at each of
+// its readers, because the meaning of one of its fields narrowed and a
+// narrowed meaning that lives in three places is a meaning that will drift
+// back: mutedUserIds is what THIS recipient may see, not the room's list.
+// The server builds the shape, so annotating the payload there is what
+// holds it to this declaration, and both client readers take the type from
+// here rather than restating it.
+// =====================================================================
+
+export type RoomMembersPayload = {
+  roomId: string;
+  members: RoomMemberLive[];
+  /** The room's current host, or null when the row has gone. Read so a
+      reassigned host sees the Start Game control without a refresh. */
+  hostId: string | null;
+  /** The captains this recipient may see as muted. The host is handed the
+      whole list, a muted captain is handed their own id, and every other
+      captain is handed an empty list: a mute is the host's judgement of
+      one captain, and the room is the wrong audience for it. Optional
+      because a reader treats a wire field defensively whatever the writer
+      intended, which is the same rule every other payload read follows. */
+  mutedUserIds?: string[];
+};
+
+/** The answer a filed report gets, delivered to the captain who filed it
+ *  and to nobody else. It carries no reason and no free text: the row
+ *  holds who, about whom and in which voyage, and this exists so the
+ *  button can settle rather than to explain anything. */
+export type PlayerReportAck = {
+  roomId: string;
+  targetUserId: string;
+  /** True when this captain had already reported this captain this
+      voyage, so nothing new was written. */
+  alreadyFiled: boolean;
+};
+
 // One captain's last reported status, broadcast on the game:status
-// channel. The phase is a number or string because the Phase union has
-// both, and the server keeps it as a string for comparison.
+// channel. The phase is the engine's own Phase rather than a loose number
+// or string, so every reader of this frame gets the phase union the engine
+// and the interface both use: the server normalizes whatever a client sends
+// before it is cached or rebroadcast, which means a frame read from here is
+// already a phase rather than something each reader has to place.
 //
 // renownLevel is optional because the server does not always populate it;
 // when it is present, the Partial Sight peek button in MembersPanel can
@@ -312,7 +389,7 @@ export type GameStatusUpdate = {
   roomId: string;
   user: PublicUser;
   round: number;
-  phase: number | string;
+  phase: Phase;
   phaseLabel: string;
   gold: number;
   reputation: number;

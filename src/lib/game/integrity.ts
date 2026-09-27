@@ -205,6 +205,23 @@ type SaveSnapshot = {
 // catch the honest is worse than the sentence explaining why there is
 // none.
 
+// [B3: standing orders] A third field this pass does not carry, for the
+// same reason the two above it are not carried: a policy is not a number,
+// and there is no ceiling one could cross. What keeps the record safe is
+// already somewhere else, and it is worth naming here because this is
+// where the question gets asked. The record is read back through
+// normalizeStandingOrders, which drops every value the vocabulary does not
+// name, bounds the shopping list by the goods the tree can price, and
+// answers with the default record rather than with null for anything it
+// cannot read (see src/lib/game/standing.ts). The evaluation then walks
+// into the same engine functions the buttons do, so the most a doctored
+// record could do is take a boon that was on the board, buy a card that
+// was on the board at its printed price, or fill an order the hold already
+// covered. None of those produces anything the voyage did not have, which
+// is what separates this field from the four above it: a lie here costs
+// the liar their own decisions rather than winning them anything, so it is
+// left to the normalizer rather than half bounded in this file.
+
 // A save is a free form JSON blob written by a client, so every field here is
 // treated as untrusted input rather than as a number. Null is returned only
 // when the payload is not an object at all, since there is then nothing to

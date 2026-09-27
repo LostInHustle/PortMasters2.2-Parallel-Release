@@ -190,7 +190,7 @@ export function settleBarterTrade(
 // this departure does now: settling the board is no longer part of it, and
 // where the phase leads belongs to the lap. The signature used to carry the
 // whole game state, and dropping it is the honest reading of what is left.
-export function completeBarterPhase(logs: string[]) {
+export function completeParley(logs: string[]) {
   logs.push("⏭️ Bartering ended");
   // The successor is not named here on purpose. The trade board sits between
   // the same two phases in the founding mode, but the experimental one runs

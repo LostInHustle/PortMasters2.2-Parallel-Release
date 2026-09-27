@@ -115,7 +115,7 @@ export function useAudit(
     !!socket &&
     !!roomId &&
     normalizeMode(game.mode) === "ocean_gambit" &&
-    game.phase === "barter" &&
+    game.phase === "parley" &&
     game.currentRound >= AUDIT_FROM_ROUND &&
     !thisReveal &&
     !myVote;

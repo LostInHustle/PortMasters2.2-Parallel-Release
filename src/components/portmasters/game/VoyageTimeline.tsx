@@ -3,12 +3,13 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { lapPhases } from "@/lib/game/checkpoint";
+import { isLegPhase, phaseFace } from "@/lib/game/phases";
 import type { GameMode } from "@/lib/game/mode";
-import type { Phase } from "@/lib/game/types";
+import type { LegPhase, Phase } from "@/lib/game/types";
 
 /**
  * Voyage Progress Timeline. A compact horizontal strip showing the
- * checkpoint phases of a round and which one is active right now.
+ * phases of a round and which one is active right now.
  *
  * The phases cycle, and where they cycle TO is not written here. The
  * order is the room's mode (see src/lib/game/mode.ts), the same lap the
@@ -20,40 +21,32 @@ import type { Phase } from "@/lib/game/types";
  * nothing in the engine would have been wrong. Only the picture of it
  * would have been.
  *
+ * The names and glyphs come from the phase's own face for the same
+ * reason ([B1]: this file used to hold a label table, the dispatcher
+ * held a gradient table, and a mode's briefing chart held a third). What
+ * is left here is the drawing.
+ *
  * Personal sub states (module_draft, module_swap) and terminals
- * (bankruptcy, endgame) are folded into their parent phase for the
+ * (bankruptcy, endgame) are folded into their parent step for the
  * timeline display, since they never become room checkpoints.
  */
 
-// What each checkpoint phase is called. Only the names live here now; the
-// order they are drawn in comes from the mode's lap. A phase the lap lists
-// but this table does not is one the rail leaves out, which is how the
-// harbor stays off it: waiting to set sail is not a step a captain takes.
-const PHASE_LABELS: Record<
-  string,
-  { label: string; icon: string; short: string }
-> = {
-  "5": { label: "Boon Draft", icon: "🧭", short: "Boon" },
-  "1": { label: "Purchase", icon: "📦", short: "Buy" },
-  barter: { label: "Barter", icon: "🤝", short: "Barter" },
-  worker_mgmt: { label: "Artisans", icon: "👥", short: "Work" },
-  "2": { label: "Orders", icon: "📜", short: "Orders" },
-  "3": { label: "Settlement", icon: "💸", short: "Settle" },
-  "4": { label: "Shipyard", icon: "🚢", short: "Yard" },
-};
-
-function normalizePhase(phase: Phase): string {
+// Which step of the rail a captain is standing on.
+//
+// A phase of the leg is its own step. The shipyard's two sub states are work
+// done inside Dusk, which is why they fold there rather than drawing a step
+// of their own for something the room is not waiting on. The pier is not a
+// step of the leg at all, and the two terminals have left the leg behind:
+// both answer null, which the rail draws as "no step is lit" (and, for the
+// terminals, as the closing banner instead of the strip).
+function railStep(phase: Phase): LegPhase | null {
+  if (isLegPhase(phase)) return phase;
   switch (phase) {
-    case 0:
-      return "5"; // welcome folds into boon draft
     case "module_draft":
     case "module_swap":
-      return "4"; // shipyard sub states fold into shipyard
-    case "bankruptcy":
-    case "endgame":
-      return "end"; // terminal
+      return "dusk";
     default:
-      return String(phase);
+      return null;
   }
 }
 
@@ -70,15 +63,22 @@ export function VoyageTimeline({
   mode: GameMode;
   className?: string;
 }) {
-  // The lap, minus whatever has no face in the table above. Reading the rule
-  // off the table rather than off a second list of exclusions is what keeps
-  // the harbor off the rail without naming it twice.
+  // The lap, minus the pier: the rail draws the steps of the leg, and the
+  // harbor is where a voyage waits rather than a step anybody takes. Read
+  // off the leg flag on each phase's face rather than off a second list of
+  // exclusions, so a phase that stops being leg work stops being drawn.
   const steps = lapPhases(mode)
-    .filter((key) => PHASE_LABELS[key] !== undefined)
-    .map((key) => ({ key, ...PHASE_LABELS[key] }));
-  const currentKey = normalizePhase(phase);
-  const currentIndex = steps.findIndex((p) => p.key === currentKey);
-  const isTerminal = currentKey === "end";
+    .filter((phase) => isLegPhase(phase))
+    .map((phase) => ({ phase, ...phaseFace(phase) }));
+  const currentKey = railStep(phase);
+  const currentIndex = steps.findIndex((p) => p.phase === currentKey);
+  // The two phases that end the voyage, named rather than folded: the rail
+  // reads "no step is lit" for the pier as well, and the pier is not a
+  // voyage ending. Terminal-ness belongs to the phase, not to the rail.
+  const isTerminal = phase === "bankruptcy" || phase === "endgame";
+  // The closing banner wears the terminal phase's own face, drawn above
+  // rather than on a step, since a terminal phase has no step to sit on.
+  const terminalFace = phaseFace(phase);
   const voyageProgress = Math.min(100, (currentRound / maxRounds) * 100);
 
   return (
@@ -110,7 +110,7 @@ export function VoyageTimeline({
             const isUpcoming = currentIndex >= 0 && i > currentIndex;
             return (
               <div
-                key={p.key}
+                key={p.phase}
                 className="flex flex-1 flex-col items-center gap-0.5"
               >
                 <motion.div
@@ -155,7 +155,7 @@ export function VoyageTimeline({
             phase === "bankruptcy" ? "bg-alarm/5 text-alarm" : "pm-grad-voyage",
           )}
         >
-          {phase === "bankruptcy" ? "💥 Bankrupt" : "🏆 Voyage Complete"}
+          {terminalFace.icon} {terminalFace.label}
         </div>
       )}
     </div>

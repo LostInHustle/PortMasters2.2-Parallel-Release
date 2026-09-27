@@ -34,7 +34,10 @@ import "@/server/env";
 import { loadServerConfig } from "@/lib/config";
 import { db } from "@/lib/db";
 import {
+  BOONS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
+  ITEMS,
+  MAX_SHIP_LEVEL,
   MODULES,
   PORTS_TIER2,
   PRODUCTS_TIER0,
@@ -114,7 +117,21 @@ import {
   unlockForPhrase,
   unlockLineFor,
 } from "@/lib/unlock";
-import { lapPhases } from "@/lib/game/checkpoint";
+import {
+  closesRound,
+  isGatedPhase,
+  lapPhases,
+  lapSuccessor,
+  openingPhase,
+} from "@/lib/game/checkpoint";
+import {
+  ENTRY_PHASE,
+  LEG_PHASE_ORDER,
+  PHASE_FACES,
+  isLegPhase,
+  normalizePhase,
+  phaseFace,
+} from "@/lib/game/phases";
 import {
   MAROON_SHARE,
   PORT_SHIFT_FRACTION,
@@ -140,26 +157,57 @@ import {
   createInitialGameState,
   type GameState,
   type OrderFill,
+  type Phase,
 } from "@/lib/game/types";
 import type {
   AuditReveal,
   MaroonResult,
+  PlayerReportAck,
   PortShiftNotice,
+  RoomMembersPayload,
 } from "@/types/realtime";
 import {
   acceptBarterOffer,
   applyPortShift,
+  autoCommit,
   failSeat,
   handleModuleSelect,
   maroonSeat,
   postBarterOffer,
+  purchaseCard,
   refundBarterOffer,
+  restartGame,
   settleBarterTrade,
   snapToCheckpoint,
+  tallyPurchasesByResource,
 } from "@/lib/game/engine";
+// The record a captain writes and the few readings of it the panel and the
+// engine share. Imported beside the engine for the same reason the checks
+// below sit where they do: what the record means and what the engine does
+// with it are one subject.
+import {
+  MAX_STANDING_BUYS,
+  defaultStandingOrders,
+  normalizeStandingOrders,
+  standingBoon,
+  standingOrdersLive,
+  type StandingOrders,
+} from "@/lib/game/standing";
+import {
+  VOYAGE_LOG_CAP,
+  VOYAGE_LOG_KINDS,
+  appendVoyageLog,
+  normalizeVoyageLog,
+  normalizeVoyageLogEntry,
+  voyageLogEntry,
+  voyageLogLine,
+  type VoyageLogEntry,
+  type VoyageLogFacts,
+  type VoyageLogKind,
+} from "@/lib/game/voyage-log";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { io as connect, type Socket } from "socket.io-client";
 
@@ -301,6 +349,21 @@ const failures: string[] = [];
 const CARRIES_A_DASH = new RegExp(
   `[${String.fromCharCode(0x2013, 0x2014)}]|-{2}`,
 );
+
+/**
+ * The same rule, read off a file rather than off a claim about it. Whole
+ * files rather than the strings a captain reads, because the directive
+ * asks the comments to hold it too, and every file named here is read by
+ * whoever maintains the record next.
+ *
+ * The path is relative to this script's own directory rather than to the
+ * working directory, so the check holds wherever the suite is run from.
+ */
+function carriesADash(relative: string): boolean {
+  return CARRIES_A_DASH.test(
+    readFileSync(join(import.meta.dirname, "..", relative), "utf8"),
+  );
+}
 
 // [H9: the unlock code] The phrase every sealed harbor in this file is
 // opened with, read out of the table rather than typed here. A suite that
@@ -641,6 +704,11 @@ async function main(): Promise<void> {
   const extraAccounts: Captain[] = [];
   let roomId: string | null = null;
   let quickStartRoomId: string | null = null;
+  // Harbors opened for the one walk that sails a voyage rather than
+  // probing a route. They are this run's, so cleanup deletes them, and
+  // they are listed here rather than reused from the slots above because
+  // that walk needs a room whose whole voyage it drives itself.
+  const lapRoomIds: string[] = [];
   const sockets: Socket[] = [];
 
   // Every harbor that already exists before this run starts. Cleanup only
@@ -942,6 +1010,7 @@ async function main(): Promise<void> {
     const seenStatus = waitForEvent<{
       user: { id: string };
       round: number;
+      phase: string;
       phaseLabel: string;
       gold: number;
       reputation: number;
@@ -949,6 +1018,14 @@ async function main(): Promise<void> {
       renownLevel?: number;
     }>(guestSocket, "game:status", (payload) => payload?.user?.id === hostId);
 
+    // The phase is sent in the numbering this engine used before the six
+    // phase leg landed, which is what a client still running the older
+    // build reports, and it is sent on purpose: the room caches and
+    // rebroadcasts this frame to every captain, so the value it holds is
+    // read by the roster, by the active roster the ready check waits on and
+    // by the phase report. Placed rather than passed through, it reaches the
+    // room as the market; passed through, it would be a roster disagreeing
+    // with the voyage for every captain looking at it.
     hostSocket.emit("game:status", {
       roomId,
       round: 3,
@@ -970,7 +1047,14 @@ async function main(): Promise<void> {
     check(status?.gold === 777, "the gold travels intact");
     check(status?.reputation === 42, "the reputation travels intact");
     check(status?.round === 3, "the round travels intact");
-    check(status?.phaseLabel === "Purchase", "the phase label travels intact");
+    check(
+      status?.phase === "market",
+      "and a phase reported in the older numbering reaches the room under its name",
+    );
+    check(
+      status?.phaseLabel === "Purchase",
+      "while the label a client puts on itself is passed through as sent",
+    );
     // The roster gates the Partial Sight peek on both captains' Renown
     // levels, so a status without one hides that peek from everybody.
     check(
@@ -1274,6 +1358,289 @@ async function main(): Promise<void> {
       "a thread between two other captains is not handed to them",
     );
 
+    console.log("\nThe mute and the report");
+    // The moderation surface, and the one part of this suite that is read
+    // adversarially rather than happily. Both claims under test are about
+    // what a captain is NOT told: the room is not told who the host
+    // silenced, and the captain a report names is told nothing at all.
+    // Neither can be checked by waiting for a frame that arrives, so every
+    // socket records everything it hears from here on and the claims are
+    // read off the record.
+    // The two ids this section names, held as consts because every use of
+    // them below is inside a callback the waiters own, and a captain read
+    // out of the enclosing scope is a captain TypeScript cannot narrow.
+    // The host's id is already a string in this scope.
+    const guestCaptainId = guest.id;
+    const thirdCaptainId = third.id;
+    const frameLog: Record<string, Array<{ event: string; text: string }>> = {
+      host: [],
+      guest: [],
+      third: [],
+    };
+    for (const [who, socket] of [
+      ["host", hostSocket],
+      ["guest", guestSocket],
+      ["third", thirdSocket],
+    ] as const) {
+      socket.onAny((event: string, ...args: unknown[]) => {
+        frameLog[who].push({ event, text: JSON.stringify(args) });
+      });
+    }
+
+    const hostMuted = waitForEvent<RoomMembersPayload>(
+      hostSocket,
+      "room:members",
+      (payload) => (payload?.mutedUserIds ?? []).includes(thirdCaptainId),
+    );
+    const thirdMuted = waitForEvent<RoomMembersPayload>(
+      thirdSocket,
+      "room:members",
+      (payload) => (payload?.mutedUserIds ?? []).length > 0,
+    );
+    const guestTold = waitForEvent<RoomMembersPayload>(
+      guestSocket,
+      "room:members",
+      () => true,
+    );
+    hostSocket.emit("chat:mute", { roomId, targetUserId: thirdCaptainId });
+    check((await hostMuted) !== null, "the host is handed the list they set");
+    const thirdHears = await thirdMuted;
+    check(
+      thirdHears?.mutedUserIds?.length === 1 &&
+        thirdHears.mutedUserIds[0] === thirdCaptainId,
+      "the captain who was silenced is handed their own row of it, since it is their own state",
+    );
+    const guestHears = await guestTold;
+    check(
+      (guestHears?.mutedUserIds ?? []).length === 0,
+      "and a captain who is neither is handed nothing: a mute is not the room's news",
+    );
+
+    const heardMuted = waitForEvent<{ roomId: string }>(
+      thirdSocket,
+      "chat:muted",
+      (payload) => payload?.roomId === roomId,
+    );
+    const mutedLine = "the harbor should not hear this line";
+    thirdSocket.emit("chat:room", { roomId, content: mutedLine });
+    check(
+      (await heardMuted) !== null,
+      "a silenced captain is told their line did not land",
+    );
+    check(
+      !frameLog.host.some(
+        (frame) =>
+          frame.event === "chat:room" && frame.text.includes(mutedLine),
+      ),
+      "and the harbor does not hear it",
+    );
+
+    const liftedLine = "and it reaches them again once the host relents";
+    const hostHearsAgain = waitForEvent<{ message: WireMessage }>(
+      hostSocket,
+      "chat:room",
+      (payload) => payload?.message?.content === liftedLine,
+    );
+    const thirdLifted = waitForEvent<RoomMembersPayload>(
+      thirdSocket,
+      "room:members",
+      (payload) => (payload?.mutedUserIds ?? []).length === 0,
+    );
+    hostSocket.emit("chat:unmute", { roomId, targetUserId: thirdCaptainId });
+    check(
+      (await thirdLifted) !== null,
+      "unmuting is handed back to the captain it concerned",
+    );
+    thirdSocket.emit("chat:room", { roomId, content: liftedLine });
+    check(
+      (await hostHearsAgain) !== null,
+      "and their next line reaches the room",
+    );
+
+    const strangerMute = waitForEvent<{ roomId: string; error: string }>(
+      hostSocket,
+      "room:error",
+      (payload) => payload?.roomId === roomId,
+    );
+    hostSocket.emit("chat:mute", {
+      roomId,
+      targetUserId: "an-account-that-is-not-in-this-harbor",
+    });
+    check(
+      (await strangerMute)?.error === "That captain is not in this harbor.",
+      "a mute aimed at an account that is not in the harbor is refused rather than remembered",
+    );
+
+    // The report. It writes one row per pair per voyage, answers the
+    // captain who filed it, and reaches nobody else: not the captain it
+    // names, who would otherwise be handed something to hold against the
+    // captain who filed it, and not the harbor either.
+    const filedAck = waitForEvent<PlayerReportAck>(
+      guestSocket,
+      "player:report:filed",
+      (payload) => payload?.targetUserId === hostId,
+    );
+    guestSocket.emit("player:report", { roomId, targetUserId: hostId });
+    const filed = await filedAck;
+    check(
+      filed?.alreadyFiled === false,
+      "a report is filed and answered to the captain who filed it",
+    );
+    const filedRows = await db.report.count({
+      where: { roomId, reporterId: guestCaptainId, targetUserId: hostId },
+    });
+    check(
+      filedRows === 1,
+      "and is written down once, against the harbor it happened in",
+    );
+
+    const repeatedAck = waitForEvent<PlayerReportAck>(
+      guestSocket,
+      "player:report:filed",
+      (payload) => payload?.targetUserId === hostId,
+    );
+    guestSocket.emit("player:report", { roomId, targetUserId: hostId });
+    check(
+      (await repeatedAck)?.alreadyFiled === true,
+      "a second report of the same captain in the same voyage is answered as already on the record",
+    );
+    check(
+      (await db.report.count({
+        where: { roomId, reporterId: guestCaptainId, targetUserId: hostId },
+      })) === 1,
+      "and the row is not written twice",
+    );
+
+    const selfReport = waitForEvent<{ roomId: string; error: string }>(
+      guestSocket,
+      "room:error",
+      (payload) => payload?.roomId === roomId,
+    );
+    guestSocket.emit("player:report", { roomId, targetUserId: guestCaptainId });
+    check(
+      (await selfReport)?.error === "You can't report yourself.",
+      "a captain cannot report themselves",
+    );
+    const strangerReport = waitForEvent<{ roomId: string; error: string }>(
+      guestSocket,
+      "room:error",
+      (payload) => payload?.roomId === roomId,
+    );
+    guestSocket.emit("player:report", {
+      roomId,
+      targetUserId: "an-account-that-is-not-in-this-harbor",
+    });
+    check(
+      (await strangerReport)?.error === "That captain is not in this harbor.",
+      "and cannot report an account that is not in the harbor",
+    );
+
+    // What the captain the report named was told, and what the rest of the
+    // harbor was told: nothing, on either count. Read off the event names,
+    // because a frame about a report would have to be about a report:
+    // there is no channel it could travel on where it would not say so.
+    check(
+      !frameLog.host.some((frame) => frame.event.includes("report")) &&
+        !frameLog.third.some((frame) => frame.event.includes("report")),
+      "the captain a report names, and every other captain in the harbor, are told nothing about it",
+    );
+
+    console.log("\nThe inbound budget");
+    // [J2: the mute and the report] The one thing in the realtime layer
+    // that decides whether to read a frame. It is checked here rather than
+    // in a unit test because what it has to be true of is the app's own
+    // client: the budget was read off that client's cadences, and the way
+    // to know it is set above them is to run the frames the app itself
+    // sends and watch them all land.
+    //
+    // The budget's own numbers are deliberately not in this file. What is
+    // asserted is the shape: a burst the size of the client's tightest loop
+    // is answered rather than refused, a flood far above any cadence a
+    // captain can produce is cut, the captain behind it is told once, the
+    // budget refills, and one socket's flood is not the captain on the
+    // next socket's problem.
+    //
+    // One trap, learned from this probe failing its first full run:
+    // presence:update is both the answer to this frame and the news a
+    // connect broadcasts to every socket in the tree, so a count of it
+    // read on a socket that is only listening counts other captains' news
+    // as this captain's answers. The flood is therefore counted on the
+    // socket it came from, where it is the loudest thing happening, and
+    // the bystanding captain is counted as a difference across their own
+    // frames rather than as a total, after a quiet moment that lets the
+    // connect this probe caused finish reaching them.
+    const floodSocket = await openAuthedSocket(third);
+    sockets.push(floodSocket);
+    let floodAnswered = 0;
+    let floodNotices = 0;
+    let politeAnswered = 0;
+    floodSocket.on("presence:update", () => {
+      floodAnswered += 1;
+    });
+    floodSocket.on("room:error", (payload: { error?: string }) => {
+      if (
+        payload?.error ===
+        "Too many actions at once. Give the harbor a moment, then try again."
+      ) {
+        floodNotices += 1;
+      }
+    });
+    guestSocket.on("presence:update", () => {
+      politeAnswered += 1;
+    });
+
+    // Long enough for the new socket's arrival to have reached every other
+    // socket and for every bucket in the harbor to refill past the twelve
+    // frames below even from empty, so what follows measures the flood
+    // rather than the frames this voyage has been sending all along.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const politeBefore = politeAnswered;
+    const floodBefore = floodAnswered;
+    const FLOOD_FRAMES = 200;
+    const POLITE_FRAMES = 12;
+    for (let i = 0; i < FLOOD_FRAMES; i++) floodSocket.emit("presence:request");
+    for (let i = 0; i < POLITE_FRAMES; i++)
+      guestSocket.emit("presence:request");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const flooded = floodAnswered - floodBefore;
+    const politeAnsweredHere = politeAnswered - politeBefore;
+
+    check(
+      flooded > 0 && flooded < FLOOD_FRAMES,
+      `a flood of ${FLOOD_FRAMES} frames is cut rather than answered in full (${flooded} were answered)`,
+    );
+    check(
+      flooded >= POLITE_FRAMES,
+      "and its first frames, which are a cadence this app really sends, are answered rather than refused",
+    );
+    check(
+      floodNotices === 1,
+      "the captain behind it is told once, rather than once per frame",
+    );
+    check(
+      politeAnsweredHere === POLITE_FRAMES,
+      `one socket's flood is not the captain on the next socket's problem (they heard ${politeAnsweredHere} of ${POLITE_FRAMES})`,
+    );
+
+    // And the budget is a rate rather than a ban: a frame sent after the
+    // refill window is answered again, which is what keeps a human who has
+    // somehow reached the ceiling from being locked out of the harbor.
+    const beforeRefill = floodAnswered;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    floodSocket.emit("presence:request");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    check(
+      floodAnswered > beforeRefill,
+      "and the socket is answered again once the budget refills",
+    );
+
+    // Closed here rather than left to the end of the run. A captain with a
+    // second live socket is not a captain who has gone quiet, and the
+    // bartering section below leans on the third captain having gone quiet:
+    // their offer cannot be taken once they are unreachable. Leaving this
+    // socket open is what made this probe's first full run fail there.
+    floodSocket.close();
+
     console.log("\nBartering from anywhere");
     // Flexible bartering is the chat surface, and the only one of the two
     // that is earned. Every captain this run made is brand new, so the
@@ -1308,10 +1675,10 @@ async function main(): Promise<void> {
     // The same captain, the same lack of Renown, posting an exchange
     // offer. The Captain's Exchange is not Renown gated at all, so what
     // turns this one away is only that the room is not sitting in the
-    // Bartering phase, which is the one time that board is on screen.
-    // That check is what stops a chat composer claiming to be the
-    // exchange board to slip past the gate above, and it is why the claim
-    // is pinned here rather than taken on faith.
+    // Parley, which is the one time that board is on screen. That check is
+    // what stops a chat composer claiming to be the exchange board to slip
+    // past the gate above, and it is why the claim is pinned here rather
+    // than taken on faith.
     const exchangeRefusal = waitForEvent<{ error?: string }>(
       hostSocket,
       "barter:error",
@@ -1328,10 +1695,14 @@ async function main(): Promise<void> {
     const refusedOutsidePhase = await exchangeRefusal;
     check(
       refusedOutsidePhase !== null,
-      "an exchange offer cannot be posted outside the Bartering phase",
+      "an exchange offer cannot be posted outside the Parley",
     );
+    // Read off the phase's own face rather than typed here, so the refusal
+    // and the word the rail prints for that phase cannot come apart: this
+    // check caught the two disagreeing once already, when the server began
+    // naming the Parley and this file was still looking for the old name.
     check(
-      Boolean(refusedOutsidePhase?.error?.includes("Bartering phase")),
+      Boolean(refusedOutsidePhase?.error?.includes(phaseFace("parley").label)),
       "and the refusal names the phase that opens it",
     );
 
@@ -1597,17 +1968,41 @@ async function main(): Promise<void> {
       where: { userId: guest.id },
       data: { renownLevel: 1, renownXP: 0 },
     });
-    // The exchange only opens while the room is actually in the
-    // Bartering phase, and the checkpoint only follows a report from a
-    // voyage that has set sail, so both of those have to happen before
-    // the board will take one.
+    // [J2: the mute and the report] A mute belongs to the table it was set
+    // at, so setting sail lifts it. The host silences the guest here, with
+    // the harbor still in the lobby, and the frame the departure sends is
+    // what says the silence did not come along. The guest rather than the
+    // third captain, who has just given up their seat: a mute can only be
+    // aimed at a captain who is standing in the harbor.
+    const mutedInLobby = waitForEvent<RoomMembersPayload>(
+      guestSocket,
+      "room:members",
+      (payload) => (payload?.mutedUserIds ?? []).includes(guestId),
+    );
+    hostSocket.emit("chat:mute", { roomId, targetUserId: guest.id });
+    check(
+      (await mutedInLobby) !== null,
+      "the host can silence a captain in the lobby",
+    );
+    const liftedAtDeparture = waitForEvent<RoomMembersPayload>(
+      guestSocket,
+      "room:members",
+      (payload) => (payload?.mutedUserIds ?? []).length === 0,
+    );
+    // The exchange only opens while the room is actually in the Parley,
+    // and the checkpoint only follows a report from a voyage that has set
+    // sail, so both of those have to happen before the board will take one.
     hostSocket.emit("room:start", { roomId });
+    check(
+      (await liftedAtDeparture) !== null,
+      "and the voyage lifts it, because a mute is a judgement about a table rather than about a captain",
+    );
     await new Promise((resolve) => setTimeout(resolve, 500));
     hostSocket.emit("game:status", {
       roomId,
       round: 1,
-      phase: "barter",
-      phaseLabel: "Bartering",
+      phase: "parley",
+      phaseLabel: "Parley",
       gold: 0,
       reputation: 0,
       shipLevel: 0,
@@ -3212,10 +3607,11 @@ async function main(): Promise<void> {
     // printed a fourth number of its own that matched neither.
     //
     // A mode briefs in one of two shapes, and each is held to the lap
-    // from the side it can be held from. A line is prose, and it names its
-    // own legs, so what can be checked is its arithmetic. A chart is data,
-    // and every leg names the checkpoint it is, so what can be checked is
-    // that the legs are the mode's own lap.
+    // from the side it can be held from. A line is prose, so it is read
+    // through its words: every leg of the mode's own lap has to be named
+    // by some step of the sentence, and the steps have to run in the order
+    // the engine walks them. A chart is data, so it is read through the
+    // checkpoints it names. Both claims are the same claim about the lap.
 
     // The house rule for every string a mode hands a captain, read with the
     // one rule a regex can hold this file to.
@@ -3228,13 +3624,20 @@ async function main(): Promise<void> {
         ...(briefing.kind === "line"
           ? [briefing.text]
           : [
-              ...briefing.legs.flatMap((leg) => [
-                leg.icon,
-                leg.gradient,
-                leg.label,
-                leg.body,
-                leg.setsUp,
-              ]),
+              ...briefing.legs.flatMap((leg) => {
+                // A chart prints the phase's own face over each leg (see
+                // PHASE_FACES), so the words a mode hands a captain are those
+                // plus what the mode itself says the leg decides.
+                const face = phaseFace(leg.phase);
+                return [
+                  face.icon,
+                  face.gradient,
+                  face.label,
+                  face.short,
+                  leg.body,
+                  leg.setsUp,
+                ];
+              }),
               briefing.closes,
             ]),
       ];
@@ -3259,20 +3662,29 @@ async function main(): Promise<void> {
       const { briefing } = MODES[mode];
       return briefing.kind === "line"
         ? briefing.text.split("→").map((step) => step.trim())
-        : briefing.legs.map((leg) => leg.label);
+        : briefing.legs.map((leg) => phaseFace(leg.phase).label);
     };
 
-    // A line's own arithmetic, which is the check the old one would have
-    // failed: one number per leg, running from one, with no gap, no repeat
-    // and nothing left unnumbered.
+    // A line's own arithmetic, which the numbers used to carry and which
+    // B1 moved onto the names: with the numerals retired, a sentence about
+    // the shape of a round is held to the same claim the chart is, read
+    // through its words. Each step must name one leg of the mode's own lap,
+    // in the order the engine walks them, and the words are the faces
+    // rather than typed here, so a phase renamed in the table renames the
+    // check with it. An icon and a colon are the only things a step may
+    // put in front of the name, which is what keeps this from passing on a
+    // sentence that names the right legs in the wrong order.
     for (const mode of MODE_ORDER) {
       const { briefing } = MODES[mode];
       if (briefing.kind !== "line") continue;
-      const steps = briefing.text.split("→").map((step) => step.trim());
-      const counted = steps.map((_, index) => String(index + 1)).join("");
+      const steps = briefingOrder(mode);
+      const lap = lapPhases(mode).filter(isLegPhase);
       check(
-        steps.map((step) => step[0] ?? "").join("") === counted,
-        `the ${MODES[mode].badge} briefing numbers every leg it lists, once each and in order`,
+        steps.length === lap.length &&
+          lap.every((phase, index) =>
+            steps[index].includes(phaseFace(phase).label),
+          ),
+        `the ${MODES[mode].badge} briefing walks its own lap once each, in the order the engine walks it`,
       );
     }
 
@@ -3287,7 +3699,7 @@ async function main(): Promise<void> {
       const { briefing } = MODES[mode];
       if (briefing.kind !== "flow") continue;
       const legs = briefing.legs.map((leg) => leg.phase);
-      const lap = lapPhases(mode).filter((phase) => phase !== "0");
+      const lap = lapPhases(mode).filter(isLegPhase);
       check(
         legs.length === lap.length &&
           legs.every((phase, index) => phase === lap[index]),
@@ -3308,16 +3720,1940 @@ async function main(): Promise<void> {
     // ran the right one, and nothing else in this file would notice.
     for (const mode of MODE_ORDER) {
       const lap = lapPhases(mode);
-      const ordersFirstOnTheLap = lap.indexOf("2") < lap.indexOf("barter");
-      const words = briefingOrder(mode).join(" ");
+      const ordersFirstOnTheLap = lap.indexOf("orders") < lap.indexOf("parley");
+      // Probed by the label the briefing actually prints, so the check
+      // follows a phase renamed in the face table rather than pinning the
+      // old word here. Read as "the step that names this phase" rather than
+      // as equality with the whole step, because the two shapes say
+      // different amounts: a chart's leg is the name alone, while a line's
+      // step is an icon, the name and a phrase about it, and this check is
+      // about which comes first rather than about how much each one says.
+      // What is asserted is the order, which is what the two modes disagree
+      // about.
+      const words = briefingOrder(mode);
+      const stepFor = (phase: Phase) => {
+        const label = phaseFace(phase).label;
+        return words.findIndex((word) => word.includes(label));
+      };
+      const parleyAt = stepFor("parley");
+      const ordersAt = stepFor("orders");
       check(
-        words.includes("Barter") &&
-          words.includes("Trade Orders") &&
-          ordersFirstOnTheLap ===
-            words.indexOf("Trade Orders") < words.indexOf("Barter"),
+        ordersAt !== -1 &&
+          parleyAt !== -1 &&
+          ordersFirstOnTheLap === ordersAt < parleyAt,
         `the ${MODES[mode].badge} briefing runs its manifest and its table in the order its lap does`,
       );
     }
+
+    console.log("\nThe leg clock");
+    // [B1: the six phase leg, as data] What the release changed, held to
+    // what it has to be rather than to what it was. Three separate claims
+    // have to hold at once, and the compiler cannot see any of them: the
+    // modes run the same six phases in different orders, the ready check
+    // gates those six and nothing else, and a voyage that was already
+    // sailing when this landed is placed where it was rather than dropped.
+    //
+    // Everything below reads the same two modules the engine and the room
+    // read (./checkpoint and ./phases) rather than restating them, which is
+    // the point: a lap written out here a second time would pass every
+    // check in this section while the room walked a different one.
+    for (const mode of MODE_ORDER) {
+      const badge = MODES[mode].badge;
+      const lap = lapPhases(mode);
+      const legs = lap.filter(isLegPhase);
+      check(
+        lap[0] === ENTRY_PHASE &&
+          legs.length === LEG_PHASE_ORDER.length &&
+          LEG_PHASE_ORDER.every((phase) => legs.includes(phase)),
+        `the ${badge} lap opens at the pier and visits every phase of the leg, once each`,
+      );
+      check(
+        lap.filter((phase) => !isLegPhase(phase)).length === 1,
+        "and carries nothing on it that is not a phase of the leg",
+      );
+      // Where a round actually opens, which is not the pier: the lap opens
+      // there so the room has a lobby, and the first leg phase is what the
+      // host's Set Sail opens the round at. Read as "the first entry that is
+      // leg work" rather than as "the second entry", so a lap that listed
+      // its phases in another order would still open correctly.
+      check(
+        openingPhase(mode) === lap[1] && isGatedPhase(mode, openingPhase(mode)),
+        `the ${badge} round opens at the first phase of the leg, which is a seat the room waits on`,
+      );
+      // The room waits where the lap says it waits, which is every phase of
+      // the leg and the pier nowhere in it. Bartering and artisan management
+      // used to be checkpoints of their own; neither names a lap seat now,
+      // so neither is a place the harbor can be made to wait.
+      const gated = (Object.keys(PHASE_FACES) as Phase[]).filter((phase) =>
+        isGatedPhase(mode, phase),
+      );
+      check(
+        gated.length === LEG_PHASE_ORDER.length &&
+          LEG_PHASE_ORDER.every((phase) => gated.includes(phase)),
+        `the ${badge} ready check gates the six phases of the leg and nothing else`,
+      );
+      // Where a round closes, which is a property of the lap rather than of
+      // a phase name: the last entry settles the books, and a lap that
+      // closed anywhere else would run out of phases without settling.
+      check(
+        lap.filter((phase) => closesRound(mode, phase)).length === 1 &&
+          closesRound(mode, lap[lap.length - 1]),
+        `the ${badge} lap closes the round at its own last phase and nowhere else`,
+      );
+      check(
+        lapSuccessor(mode, lap[lap.length - 1]) === ENTRY_PHASE,
+        "and hands the closed round back to the pier it opened from",
+      );
+    }
+
+    // Every phase value this engine has ever persisted, and where a voyage
+    // that is already sailing is placed when it loads one. The six landed
+    // together with [B1] and renamed the whole vocabulary, so a save written
+    // the day before holds one of these, and a save that cannot be placed is
+    // a voyage that cannot be resumed. This is the release's rollback
+    // clause read forwards: the engine may run the new names, but it has to
+    // keep understanding the old ones.
+    const persistedBefore: [string, Phase][] = [
+      ["0", "harbor"],
+      ["5", "dawn"],
+      ["1", "market"],
+      ["2", "orders"],
+      ["3", "resolve"],
+      ["4", "dusk"],
+      ["barter", "parley"],
+      ["worker_mgmt", "market"],
+    ];
+    check(
+      persistedBefore.every(
+        ([written, placed]) => normalizePhase(written) === placed,
+      ),
+      "every phase value an older build wrote is placed at the phase it means now",
+    );
+    check(
+      LEG_PHASE_ORDER.every((phase) => normalizePhase(phase) === phase),
+      "and a phase named the way this build names it is left where it is",
+    );
+    check(
+      normalizePhase("sail") === ENTRY_PHASE &&
+        normalizePhase(undefined) === ENTRY_PHASE &&
+        normalizePhase(7) === ENTRY_PHASE,
+      "while a value no build ever wrote is placed at the pier rather than in a phase no lap contains",
+    );
+
+    // Every phase a captain can be standing in has a face, because the rail
+    // and the panel read it off the phase rather than off a table of their
+    // own, and an empty one would render as a blank cell rather than as an
+    // error. The dash rule is the house rule for a string a captain reads,
+    // held here for the same reason it is held over the mode copy above.
+    const faces = Object.keys(PHASE_FACES) as Phase[];
+    check(
+      faces.every((phase) => {
+        const face = phaseFace(phase);
+        return (
+          face.label.trim().length > 0 &&
+          face.short.trim().length > 0 &&
+          face.icon.trim().length > 0 &&
+          face.gradient.trim().length > 0
+        );
+      }),
+      "every phase wears a name, a short name, a glyph and an accent",
+    );
+    check(
+      faces
+        .flatMap((phase) => {
+          const face = phaseFace(phase);
+          return [face.label, face.short];
+        })
+        .every((line) => !CARRIES_A_DASH.test(line)),
+      "and none of the words a captain reads on one carries an en dash, an em dash or a doubled hyphen",
+    );
+
+    console.log("\nA voyage end to end on the six phase leg");
+    // [B1: the six phase leg, as data] The plan's evaluation for this slice,
+    // read over live sockets rather than off the tables. A whole voyage has
+    // to reach every seat of the lap, and both captains have to be told the
+    // same checkpoint at every transition. What this catches that no data
+    // check can is a phase that does not register with the checkpoint
+    // protocol at all: the room sits at it forever, and that shows up here
+    // as a harbor that never arrived rather than as one that is quietly
+    // wrong.
+    //
+    // Classic sails its whole voyage, which is the run the evaluation names.
+    // Gambit sails one full round: enough to prove its own order drives the
+    // same protocol, without spending twelve rounds of wall clock on a lap
+    // the leg clock section above already holds to the data. Between them,
+    // every seat of both laps is walked by the room itself.
+    //
+    // Each captain here is brand new and holds exactly one socket, which
+    // matters rather than being tidy: the status handler ignores a frame
+    // from any socket that is not its captain's newest, so a captain with an
+    // older live socket would have every report dropped and the walk would
+    // stall for a reason that has nothing to do with the lap. The tag is the
+    // short half of the two usernames, which are capped well below what a
+    // label like the one the checks print would fit in.
+    type LapStep = { round: number; phase: Phase };
+    type LapFrame = LapStep & {
+      event: "phase:ready_update" | "phase:advance";
+      required?: string[];
+    };
+    const sailTheLap = async (
+      label: string,
+      tag: string,
+      mode: GameMode,
+      rounds: number,
+      unlock?: string,
+    ) => {
+      const opening = await signUp(`${tag}a`);
+      const crewmate = await signUp(`${tag}b`);
+      extraAccounts.push(opening, crewmate);
+      const opened = await call<{ room: { id: string; code: string } }>(
+        "/api/rooms",
+        {
+          method: "POST",
+          cookie: opening.cookie,
+          body: JSON.stringify({
+            name: `Smoke ${label} lap ${suffix}`,
+            isPublic: false,
+            mode,
+            ...(unlock ? { unlock } : {}),
+          }),
+        },
+      );
+      if (opened.status !== 200) {
+        throw new Error(`No ${label} harbor to sail a lap in, stopping here.`);
+      }
+      const room = opened.body.room.id;
+      lapRoomIds.push(room);
+      const joined = await call<{ room: { id: string } }>("/api/rooms/join", {
+        method: "POST",
+        cookie: crewmate.cookie,
+        body: JSON.stringify({ code: opened.body.room.code }),
+      });
+      check(
+        joined.status === 200,
+        `the second captain joins the ${label} harbor`,
+      );
+
+      const crew: Array<{
+        captain: Captain;
+        socket: Socket;
+        frames: LapFrame[];
+      }> = [];
+      for (const captain of [opening, crewmate]) {
+        const socket = await openAuthedSocket(captain);
+        sockets.push(socket);
+        const frames: LapFrame[] = [];
+        const record =
+          (event: LapFrame["event"]) =>
+          (payload: {
+            roomId?: string;
+            round?: number;
+            phase?: Phase;
+            requiredUserIds?: string[];
+          }) => {
+            if (payload?.roomId !== room) return;
+            frames.push({
+              event,
+              round: payload.round ?? 0,
+              phase: normalizePhase(payload.phase),
+              required: payload.requiredUserIds,
+            });
+          };
+        socket.on("phase:ready_update", record("phase:ready_update"));
+        socket.on("phase:advance", record("phase:advance"));
+        const aboard = waitForEvent<WireHistory>(
+          socket,
+          "chat:history",
+          (payload) => payload?.roomId === room,
+        );
+        socket.emit("room:join", { roomId: room });
+        await aboard;
+        crew.push({ captain, socket, frames });
+      }
+
+      const departures = crew.map((seat) =>
+        waitForEvent<{ roomId?: string }>(
+          seat.socket,
+          "room:started",
+          (payload) => payload?.roomId === room,
+        ),
+      );
+      crew[0].socket.emit("room:start", { roomId: room });
+      await Promise.all(departures);
+
+      // The run this walk is here to make, written out of the mode's own
+      // lap: every seat of the round, repeated for as many rounds as the
+      // voyage is long. Nothing about the order is typed in below, so a lap
+      // that changed order would change what the room is expected to walk.
+      const lap = lapPhases(mode).filter(isLegPhase);
+      const expected: LapStep[] = [];
+      for (let round = 1; round <= rounds; round++) {
+        for (const phase of lap) expected.push({ round, phase });
+      }
+
+      const send = (seat: (typeof crew)[number], step: LapStep) => {
+        seat.socket.emit("game:status", {
+          roomId: room,
+          round: step.round,
+          phase: step.phase,
+          phaseLabel: phaseFace(step.phase).label,
+          gold: 100,
+          reputation: 10,
+          shipLevel: 0,
+          gameOver: false,
+          renownLevel: 3,
+        });
+      };
+      const ready = (seat: (typeof crew)[number], step: LapStep) => {
+        seat.socket.emit("phase:ready", {
+          roomId: room,
+          round: step.round,
+          phase: step.phase,
+        });
+      };
+      // The room's whole protocol, in the order a client runs it: stand
+      // where you are, hear the room standing there too, then say you are
+      // done. The middle step is not politeness. A ready vote is judged
+      // against the checkpoint the server is holding, so a vote that
+      // overtakes the report which put the room at this seat is refused as
+      // out of step: the harbor would be short a vote, and the walk would
+      // have stalled on its own haste rather than on anything the lap does.
+      const stand = async (step: LapStep) => {
+        for (const seat of crew) send(seat, step);
+        for (let waited = 0; waited < 15000; waited += 50) {
+          if (
+            crew.every((seat) =>
+              seat.frames.some(
+                (frame) =>
+                  frame.event === "phase:ready_update" &&
+                  frame.round === step.round &&
+                  frame.phase === step.phase,
+              ),
+            )
+          ) {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+      };
+      const arrived = async (step: LapStep) => {
+        for (let waited = 0; waited < 15000; waited += 50) {
+          if (
+            crew.every((seat) =>
+              seat.frames.some(
+                (frame) =>
+                  frame.event === "phase:advance" &&
+                  frame.round === step.round &&
+                  frame.phase === step.phase,
+              ),
+            )
+          ) {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+      };
+
+      // The claim the ready check makes, held once at the voyage's first
+      // seat: a vote from one captain alone does not move the room. Without
+      // this the walk would pass on a build that advanced the harbor on any
+      // vote at all, since every later step sends both. The voyage opens
+      // with the room already standing at this seat, because room:start put
+      // it there and said so, so the frame this waits on is already
+      // recorded rather than still to come.
+      const first = expected[0];
+      const standing = await stand(first);
+      ready(crew[0], first);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      check(
+        !crew.some((seat) =>
+          seat.frames.some((f) => f.event === "phase:advance"),
+        ),
+        `one captain's ready vote does not move the ${label} harbor on its own`,
+      );
+      ready(crew[1], first);
+      let reached = 0;
+      if (standing && (await arrived(first))) reached = 1;
+      // The rest of the voyage is those two steps repeated, once per seat of
+      // the lap, for as long as the voyage runs.
+      //
+      // Paced, because the harbor has a budget for what it will read. The
+      // inbound budget (see src/server/realtime/inbound-limit.ts) earns a
+      // socket ten frames a second back on top of its burst of thirty, and
+      // one step here costs each seat two frames, the report that moves the
+      // room and the vote that releases it. A walk that steps as fast as
+      // the server answers runs at twice the rate the budget pays out: it
+      // drains the burst, and every frame after that is refused without a
+      // word, which on this side of the wire looks exactly like a lap that
+      // stopped advancing. A third of a second a step holds the walk under
+      // seven frames a second a seat, which is inside the budget a shipped
+      // client lives inside too.
+      const pace = () => new Promise((resolve) => setTimeout(resolve, 300));
+      for (const step of expected.slice(1)) {
+        await pace();
+        if (!(await stand(step))) break;
+        ready(crew[0], step);
+        ready(crew[1], step);
+        if (!(await arrived(step))) break;
+        reached++;
+      }
+      check(
+        reached === expected.length,
+        `the ${label} harbor reached every seat of its lap (the walk reached ${reached} of ${expected.length})`,
+      );
+
+      // Where the room went, as the two captains heard it. The advance frames
+      // are the server naming the checkpoint the room is leaving, once per
+      // transition, so the sequence they form is the voyage's shape.
+      const walked = (seat: (typeof crew)[number]) =>
+        seat.frames
+          .filter((frame) => frame.event === "phase:advance")
+          .map((frame) => `${frame.round}:${frame.phase}`);
+      const want = expected.map((step) => `${step.round}:${step.phase}`);
+      check(
+        walked(crew[0]).join(" ") === want.join(" "),
+        `and walked it in the mode's own order, round after round (${walked(crew[0]).slice(0, 7).join(" ")}...)`,
+      );
+      check(
+        walked(crew[1]).join(" ") === want.join(" "),
+        "with the second captain told the same thing at every one of them",
+      );
+      // Not just the same phase, the same frames: every broadcast the room
+      // made, in the order it made them. Two clients that agree on the
+      // phase but heard a different number of transitions would mean one of
+      // them was being carried by a catch up path rather than by the room,
+      // which is the failure the rollback clause of [B1] is about.
+      check(
+        JSON.stringify(crew[0].frames) === JSON.stringify(crew[1].frames),
+        `both captains heard the same ${label} frames, in the same order, for the whole voyage`,
+      );
+      // And the room waited for both of them at every seat rather than
+      // advancing around a captain it had stopped counting.
+      const requiredBoth = crew[0].frames
+        .filter((frame) => frame.event === "phase:ready_update")
+        .every(
+          (frame) =>
+            frame.required?.length === 2 &&
+            frame.required.includes(opening.id) &&
+            frame.required.includes(crewmate.id),
+        );
+      check(
+        requiredBoth,
+        `every ${label} transition waited for a full crew of two`,
+      );
+
+      // The terminal is not a seat. A voyage that has finished reports
+      // endgame, which no lap lists, so the room's checkpoint stays on the
+      // last phase it actually walked rather than following a captain onto a
+      // screen the rest of the harbor is not standing on.
+      const last = expected[expected.length - 1];
+      crew[0].socket.emit("game:status", {
+        roomId: room,
+        round: last.round,
+        phase: "endgame" as Phase,
+        phaseLabel: phaseFace("endgame").label,
+        gold: 100,
+        reputation: 10,
+        shipLevel: 0,
+        gameOver: true,
+        renownLevel: 3,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const settled = await db.room.findUnique({
+        where: { id: room },
+        select: { currentRound: true, currentPhase: true },
+      });
+      check(
+        settled?.currentRound === last.round &&
+          normalizePhase(settled?.currentPhase) === last.phase,
+        `and a finished ${label} voyage leaves the room where the lap last stood rather than on the endgame screen`,
+      );
+    };
+
+    await sailTheLap(
+      "Classic",
+      "lapc",
+      "classic",
+      voyageRoundsFor("classic", "fair_winds"),
+    );
+    await sailTheLap("Gambit", "lapg", "ocean_gambit", 1, LEDGER_PHRASE);
+
+    console.log("\nThe harbor clock");
+    // [B2: hard timers, the server as timekeeper] A leg is a segment of real
+    // time, and a table is not held hostage to a captain who closed a
+    // laptop. Three harbors go through one window at once, because the
+    // window is real time and a fact each would otherwise cost a minute of
+    // it. What they differ in is who is still sitting in the room when the
+    // clock runs out:
+    //
+    //   A: two captains, both aboard and neither doing anything, so the
+    //      clock is the only thing in the room that can end the leg.
+    //   B: two captains and one of them gone, so the harbor is not hostage
+    //      to the laptop that closed.
+    //   Q: nobody at all, because an empty room is not a table waiting on a
+    //      straggler and its clock does not move it.
+    //
+    // What only this section can hold is that the expiry announces the same
+    // advance a unanimous ready set announces. The captains here are raw
+    // sockets with no engine behind them, so the frame is all this side of
+    // the wire can see; the auto commit that frame draws out of a client is
+    // held by the browser check, where a page that never clicks still leaves
+    // the leg.
+    //
+    // The budget is read from the phase table and the server's own scale
+    // rather than typed in, for the same reason the lap walk reads the lap
+    // rather than restating it. Deliberately read as the two inputs rather
+    // than through the server's own helper: a budget this section shared
+    // with the code under test would move with it, and a clock that fired at
+    // the wrong moment would pass.
+    if (loadServerConfig().phaseClockScale <= 0) {
+      throw new Error(
+        "The clock checks need the server under test to be timing its legs, so PHASE_CLOCK must be a number above zero.\n" +
+          "Start the server and this script with the same value, or run them in the same shell.",
+      );
+    }
+    const clockSeconds = (phase: Phase) =>
+      Math.max(
+        1,
+        Math.round(
+          (phaseFace(phase).seconds ?? 0) * loadServerConfig().phaseClockScale,
+        ),
+      );
+    const dawnSeconds = clockSeconds("dawn");
+    const marketSeconds = clockSeconds("market");
+    // The empty harbor is judged on the clock's own branch rather than on a
+    // room whose last seat was reaped, and those two are only
+    // distinguishable while the budget runs out first. A closed socket is
+    // reclaimed after thirty seconds (DEPARTURE_GRACE_MS in
+    // ./src/server/realtime/presence.ts), and a room whose last seat is
+    // taken is deleted with its voyage closed, which ends a clock for a
+    // reason that has nothing to do with this slice.
+    const GRACE_SECONDS = 30;
+    if (dawnSeconds >= GRACE_SECONDS) {
+      throw new Error(
+        `The clock checks need a phase budget shorter than the ${GRACE_SECONDS} second departure grace, so a room nobody is sitting in is still a room when its clock runs out.\n` +
+          `This run reads PHASE_CLOCK=${loadServerConfig().phaseClockScale}, which puts Dawn at ${dawnSeconds} seconds.`,
+      );
+    }
+
+    // Enough of a frame to make a claim about it: the two numbers a
+    // countdown is drawn from, and the tally a seat was left with. Named
+    // only by the fields the checks below read, so nothing here can quietly
+    // depend on something the server never promised.
+    type ClockFrame = {
+      event: "phase:advance" | "phase:ready_update" | "room:system";
+      round?: number;
+      phase?: Phase;
+      endsAt?: number | null;
+      seconds?: number | null;
+      content?: string;
+    };
+
+    // One chartered harbor, seated and under way, with every frame of its
+    // clock recorded as it arrives. The same shape the lap walk uses to get
+    // a voyage sailing, since a harbor reaches the clock the way it reaches
+    // anything else: by being started.
+    const openClockRoom = async (label: string, tag: string, seats: number) => {
+      const captains: Captain[] = [];
+      for (let seat = 0; seat < seats; seat++) {
+        captains.push(await signUp(`${tag}${seat}`));
+      }
+      extraAccounts.push(...captains);
+      const opened = await call<{ room: { id: string; code: string } }>(
+        "/api/rooms",
+        {
+          method: "POST",
+          cookie: captains[0].cookie,
+          body: JSON.stringify({
+            name: `Smoke clock ${label} ${suffix}`,
+            isPublic: false,
+            mode: "classic",
+          }),
+        },
+      );
+      if (opened.status !== 200) {
+        throw new Error(`No ${label} harbor to run a clock in, stopping here.`);
+      }
+      const roomId = opened.body.room.id;
+      lapRoomIds.push(roomId);
+      for (const captain of captains.slice(1)) {
+        const seated = await call("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: opened.body.room.code }),
+        });
+        if (seated.status !== 200) {
+          throw new Error(`A captain could not sit in the ${label} harbor.`);
+        }
+      }
+      const crew: Array<{
+        captain: Captain;
+        socket: Socket;
+        frames: ClockFrame[];
+      }> = [];
+      for (const captain of captains) {
+        const socket = await openAuthedSocket(captain);
+        sockets.push(socket);
+        const frames: ClockFrame[] = [];
+        socket.on(
+          "phase:advance",
+          (payload: { roomId?: string; round?: number; phase?: Phase }) => {
+            if (payload?.roomId !== roomId) return;
+            frames.push({
+              event: "phase:advance",
+              round: payload.round,
+              phase: normalizePhase(payload.phase),
+            });
+          },
+        );
+        socket.on(
+          "phase:ready_update",
+          (payload: {
+            roomId?: string;
+            round?: number;
+            phase?: Phase;
+            phaseEndsAt?: number | null;
+            phaseSeconds?: number | null;
+          }) => {
+            if (payload?.roomId !== roomId) return;
+            frames.push({
+              event: "phase:ready_update",
+              round: payload.round,
+              phase: normalizePhase(payload.phase),
+              endsAt: payload.phaseEndsAt ?? null,
+              seconds: payload.phaseSeconds ?? null,
+            });
+          },
+        );
+        socket.on(
+          "room:system",
+          (payload: { roomId?: string; content?: string }) => {
+            if (payload?.roomId !== roomId) return;
+            frames.push({
+              event: "room:system",
+              content: payload.content ?? "",
+            });
+          },
+        );
+        const aboard = waitForEvent<WireHistory>(
+          socket,
+          "chat:history",
+          (payload) => payload?.roomId === roomId,
+        );
+        socket.emit("room:join", { roomId });
+        await aboard;
+        crew.push({ captain, socket, frames });
+      }
+      const departures = crew.map((seat) =>
+        waitForEvent<{ roomId?: string }>(
+          seat.socket,
+          "room:started",
+          (payload) => payload?.roomId === roomId,
+        ),
+      );
+      crew[0].socket.emit("room:start", { roomId });
+      await Promise.all(departures);
+      return { roomId, crew, sailedAt: Date.now() };
+    };
+
+    // Waits for a frame a socket has already recorded rather than for the
+    // next one to arrive, because the clock's frames can land between two
+    // steps of this file and a listener registered after the fact would
+    // wait out its window on news it had already missed.
+    const waitForFrame = async (
+      seat: { frames: ClockFrame[] },
+      match: (frame: ClockFrame) => boolean,
+      windowMs: number,
+    ): Promise<ClockFrame | null> => {
+      for (let waited = 0; waited < windowMs; waited += 250) {
+        const found = seat.frames.find(match);
+        if (found) return found;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      return seat.frames.find(match) ?? null;
+    };
+
+    // The voyage a room left behind, read the way a later reader reads it,
+    // or null if none was ever written.
+    const clockRecord = async (roomId: string) => {
+      for (let waited = 0; waited < 25000; waited += 250) {
+        const row = await db.voyageTelemetry.findFirst({
+          where: { roomId },
+          select: { outcome: true, record: true },
+        });
+        if (row) {
+          return { outcome: row.outcome, record: readStoredRecord(row.record) };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      return null;
+    };
+
+    const clockA = await openClockRoom("A", "clka", 2);
+    const clockB = await openClockRoom("B", "clkb", 2);
+    const clockQ = await openClockRoom("Q", "clkq", 1);
+    // The two absences a clock has to survive: a captain who closed the tab
+    // (B's crewmate) and a harbor with nobody left in it at all (Q's only
+    // captain). Both are a socket closing, and neither is a vote.
+    clockB.crew[1].socket.close();
+    clockQ.crew[0].socket.close();
+
+    // The wire first, while the room is still standing at the seat it
+    // opened at: both halves of what a countdown is drawn from, checked
+    // together, because a moment drawn on one client and a budget drawn on
+    // another is the frame disagreeing with itself. The gap allowed is the
+    // two seconds it takes the departure frame to reach this side.
+    //
+    // The frame read is the first one standing at a seat of the leg rather
+    // than the first one on the socket, and the difference is not a detail:
+    // joining a room hands the joiner the room's ready state as it stands
+    // (src/server/realtime/index.ts:530), so a captain who walks into a
+    // lobby is told about the pier first. That frame is the other half of
+    // this pair rather than an obstacle to it, since the pier is the seat
+    // with no clock, and a field that reads null there is the design: an
+    // absence rather than a zero, which no client can draw as a countdown
+    // that has already run out.
+    const readyStates = clockA.crew[0].frames.filter(
+      (frame) => frame.event === "phase:ready_update",
+    );
+    const pier = readyStates.find((frame) => frame.phase === "harbor");
+    const opening = readyStates.find((frame) => frame.phase !== "harbor");
+    check(
+      pier !== undefined && pier.endsAt === null && pier.seconds === null,
+      "the pier a harbor waits at publishes no clock at all, rather than a countdown of zero",
+    );
+    check(
+      opening?.phase === "dawn" &&
+        opening.seconds === dawnSeconds &&
+        typeof opening.endsAt === "number" &&
+        opening.endsAt > clockA.sailedAt &&
+        opening.endsAt <= clockA.sailedAt + dawnSeconds * 1000 + 2000,
+      `the seat a voyage opens at publishes both halves of its countdown (${dawnSeconds}s of Dawn)`,
+    );
+
+    // The long wait, and the only one this section spends: every clock
+    // above was armed within a couple of seconds of the others, so the
+    // window A needs covers all three. The settle afterwards is for B, whose
+    // clock was armed a second or two later than A's and has to be given
+    // that much again before its silence is a fact.
+    const windowMs = (dawnSeconds + 20) * 1000;
+    const advancedA = await waitForFrame(
+      clockA.crew[0],
+      (frame) => frame.event === "phase:advance",
+      windowMs,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    check(
+      advancedA?.round === 1 && advancedA?.phase === "dawn",
+      "a harbor nobody has voted in is moved on by the clock it was given",
+    );
+    check(
+      clockA.crew.every((seat) =>
+        seat.frames.some(
+          (frame) =>
+            frame.event === "phase:advance" &&
+            frame.round === 1 &&
+            frame.phase === "dawn",
+        ),
+      ),
+      "and both of its captains were told what the room was doing",
+    );
+    check(
+      clockA.crew[0].frames.some(
+        (frame) =>
+          frame.event === "room:system" &&
+          (frame.content ?? "").includes("tide has run out"),
+      ),
+      "with the harbor saying why, on the channel it says everything else on",
+    );
+    check(
+      clockB.crew[0].frames.some(
+        (frame) =>
+          frame.event === "phase:advance" &&
+          frame.round === 1 &&
+          frame.phase === "dawn",
+      ),
+      "a captain who closed a laptop mid leg does not hold the harbor to their socket",
+    );
+    // And the announcement is an announcement rather than a move. The
+    // server still runs no game rules: the room's row is where the last
+    // report put it, and a client that hears the frame is the one that
+    // takes the room forward.
+    const fired = await db.room.findUnique({
+      where: { id: clockA.roomId },
+      select: { currentRound: true, currentPhase: true },
+    });
+    check(
+      fired?.currentRound === 1 &&
+        normalizePhase(fired?.currentPhase) === "dawn",
+      "the clock moved the room's captains without moving its checkpoint",
+    );
+    // The other half of spending the deadline: the seat is timed once, and
+    // the next sign of life arms a fresh budget for the seat the room is
+    // actually standing at. This is the path a returning captain takes,
+    // since the report that moves the checkpoint is the same report that
+    // puts the room back on the clock.
+    clockA.crew[0].socket.emit("game:status", {
+      roomId: clockA.roomId,
+      round: 1,
+      phase: "market" as Phase,
+      phaseLabel: phaseFace("market").label,
+      gold: 100,
+      reputation: 10,
+      shipLevel: 0,
+      gameOver: false,
+      renownLevel: 3,
+    });
+    const rearmed = await waitForFrame(
+      clockA.crew[0],
+      (frame) =>
+        frame.event === "phase:ready_update" &&
+        frame.round === 1 &&
+        frame.phase === "market",
+      8000,
+    );
+    check(
+      rearmed?.seconds === marketSeconds &&
+        typeof rearmed.endsAt === "number" &&
+        rearmed.endsAt > Date.now() &&
+        rearmed.endsAt <= Date.now() + marketSeconds * 1000,
+      `and the first report after it puts the room back on the clock (${marketSeconds}s of Market)`,
+    );
+
+    // The empty harbor, read off the voyage it leaves behind. It is closed
+    // as an emptied one when its last seat is reclaimed, which is the only
+    // record a harbor nobody is sitting in can have, and the leg its clock
+    // ran out on is not in it: the tally rides the spine the moment the
+    // clock fires, so a room that had been moved would be readable here.
+    const abandoned = await clockRecord(clockQ.roomId);
+    check(
+      abandoned?.outcome === "emptied",
+      "a harbor abandoned by its last captain closes its voyage as an emptied one",
+    );
+    check(
+      (abandoned?.record?.events ?? []).every(
+        (event) => event.name !== "leg_timed_out",
+      ),
+      "and no leg of it was timed out, because a room nobody is sitting in is not moved by its clock",
+    );
+
+    // Room A's own record, flushed the way a host flushes one: restarting
+    // the voyage the clock just moved, which closes the record as restarted
+    // and leaves it readable.
+    clockA.crew[0].socket.emit("room:restart", { roomId: clockA.roomId });
+    await waitForEvent<{ roomId?: string }>(
+      clockA.crew[0].socket,
+      "room:restarted",
+      (payload) => payload?.roomId === clockA.roomId,
+    );
+    const timedOut = await clockRecord(clockA.roomId);
+    const tally = (timedOut?.record?.events ?? []).find(
+      (event) => event.name === "leg_timed_out",
+    );
+    check(
+      tally?.name === "leg_timed_out" &&
+        tally.leg === 1 &&
+        tally.ready === 0 &&
+        tally.required === 2,
+      "the leg the clock ended is on the record with the room it found (0 of 2 ready)",
+    );
+
+    console.log("\nStanding orders");
+    // [B3: standing orders] The evaluation for this slice, and the one the
+    // plan asks to be testable with no server: what the room's clock plays
+    // for a captain who is not standing at their seat is a pure engine
+    // function taking a state and a record. Every check below drives it
+    // through the entry point the clock itself uses, autoCommit, so what is
+    // held to is the seat rather than a copy of the seat. Nothing in this
+    // section opens a socket.
+    //
+    // The first checks are about the record itself, because the record is
+    // what makes this a change to the engine at all. A set a captain wrote
+    // and a set somebody tampered with arrive through the same reader, and
+    // the reader's whole job is that the second can only ever do what the
+    // first could have done by hand.
+    //
+    // The boards below are dealt by snapToCheckpoint rather than written out
+    // here, for the reason the lap walk reads the lap rather than restating
+    // it: a fixture market would pass every check in this section while the
+    // real one dealt something else. Where a check needs the board to
+    // discriminate, the expectation is computed from the board it was dealt
+    // rather than from a number chosen here, so the checks hold on any seed.
+    const quiet = defaultStandingOrders();
+    const sameOrders = (a: StandingOrders, b: StandingOrders) =>
+      a.enabled === b.enabled &&
+      a.boon === b.boon &&
+      a.fill === b.fill &&
+      a.shipyard === b.shipyard &&
+      a.buy.length === b.buy.length &&
+      a.buy.every(
+        (line, i) =>
+          line.good === b.buy[i].good && line.maxPrice === b.buy[i].maxPrice,
+      );
+    const sameIds = (a: readonly number[], b: readonly number[]) =>
+      a.length === b.length && a.every((id, i) => id === b[i]);
+    const sameTally = (
+      a: Record<string, number>,
+      b: Record<string, number>,
+    ) => {
+      const ka = Object.keys(a).sort();
+      const kb = Object.keys(b).sort();
+      return (
+        ka.length === kb.length &&
+        ka.every((key, i) => key === kb[i] && a[key] === b[key])
+      );
+    };
+    const sumTally = (a: Record<string, number>, b: Record<string, number>) => {
+      const out: Record<string, number> = { ...a };
+      for (const [key, value] of Object.entries(b))
+        out[key] = (out[key] ?? 0) + value;
+      return out;
+    };
+    const standingCtx = {
+      seedBase: "standing-orders:captain-a",
+      harborId: "standing-orders",
+    };
+    // A fresh voyage stopped at one phase of round one, on the widest tier
+    // the tree deals so the two boards below are wide enough to say
+    // something about the lots and the orders that were left behind.
+    const deal = (phase: Phase) => {
+      const state = createInitialGameState({
+        mode: "ocean_gambit",
+        difficulty: "monsoon",
+      });
+      snapToCheckpoint(state, standingCtx, 1, phase, []);
+      return state;
+    };
+    const deepPurse = (state: GameState) => {
+      state.money = 100000;
+      return state;
+    };
+    const took = (logs: string[], needle: string) =>
+      logs.some((line) => line.includes(needle));
+
+    // The record itself, and what a captain who wrote nothing holds.
+    check(
+      quiet.enabled &&
+        quiet.boon === null &&
+        quiet.buy.length === 0 &&
+        quiet.fill === "none" &&
+        quiet.shipyard === "continue",
+      "a captain who wrote nothing holds the switch on and no instruction under it, which is the seat every default already played",
+    );
+    check(
+      !standingOrdersLive(quiet),
+      "and a switch that is on over an empty set is a seat nothing is going to play, rather than a lit button promising one",
+    );
+    const garbage = [
+      undefined,
+      null,
+      42,
+      "orders",
+      [],
+      { enabled: "yes", boon: 7, fill: "some", shipyard: "scrap", buy: "Hemp" },
+    ];
+    check(
+      garbage.every((raw) => sameOrders(normalizeStandingOrders(raw), quiet)),
+      "and anything the vocabulary does not name is read back as that same record rather than trusted",
+    );
+    const goods = ITEMS;
+    const littered = normalizeStandingOrders({
+      enabled: true,
+      buy: [
+        { good: goods[0], maxPrice: 4.7 },
+        { good: goods[0], maxPrice: 9 },
+        { good: "Unobtainium", maxPrice: 5 },
+        { good: goods[1], maxPrice: -3 },
+        { good: goods[1], maxPrice: "12" },
+        { good: goods[2], maxPrice: Number.NaN },
+        { good: goods[3], maxPrice: Number.POSITIVE_INFINITY },
+      ],
+    });
+    check(
+      littered.buy.length === 1 &&
+        littered.buy[0].good === goods[0] &&
+        littered.buy[0].maxPrice === 4,
+      "a shopping list keeps the first line for each good the tree can price, floors the price, and drops every line that is not a price",
+    );
+    const everyGood = normalizeStandingOrders({
+      buy: goods.flatMap((good) => [
+        { good, maxPrice: 1 },
+        { good, maxPrice: 2 },
+      ]),
+    });
+    check(
+      MAX_STANDING_BUYS === goods.length &&
+        everyGood.buy.length === MAX_STANDING_BUYS &&
+        everyGood.buy.every((line) => line.maxPrice === 1),
+      `and one line per good is the whole of what a list can say, however long the list it was read from was (${goods.length} goods)`,
+    );
+    // A set the captain wrote and then switched off is the rollback the
+    // plan asks for, and it is measured against this one record below.
+    const ordersWritten: StandingOrders = {
+      ...quiet,
+      boon: BOONS[0].id,
+      buy: [{ good: goods[0], maxPrice: 9 }],
+      fill: "all",
+      shipyard: "upgrade",
+    };
+    const switchedOff = normalizeStandingOrders({
+      ...ordersWritten,
+      enabled: false,
+    });
+    check(
+      !switchedOff.enabled &&
+        switchedOff.boon === BOONS[0].id &&
+        switchedOff.buy.length === 1 &&
+        switchedOff.fill === "all" &&
+        switchedOff.shipyard === "upgrade",
+      "while the switch off keeps the set it was written with, because erasing it would punish a captain for a rollback they may take back",
+    );
+    check(
+      standingBoon(ordersWritten)?.id === BOONS[0].id &&
+        standingBoon(quiet) === null &&
+        standingBoon({ ...quiet, boon: "no_such_boon" }) === null,
+      "and a written boon is read as the catalogue entry it names, or as nothing at all when it names nothing the tree still ships",
+    );
+
+    // Dawn, the one seat whose work is a choice rather than a press. The
+    // draft is the one board in the leg drawn with live randomness rather
+    // than from the captain's seed, so every fixture below reads the hand
+    // the state under test was actually dealt rather than a hand taken
+    // from some other state and hoped for.
+    const orderedDawn = deal("dawn");
+    const writtenPick = orderedDawn.boonChoices[1];
+    const firstOffer = orderedDawn.boonChoices[0];
+    if (!writtenPick || !firstOffer)
+      throw new Error(
+        "The standing order checks need a draft holding more than one boon on it, or the written choice cannot be told apart from the board's own first offer.",
+      );
+    orderedDawn.standingOrders = { ...quiet, boon: writtenPick.id };
+    const orderedDawnLogs: string[] = [];
+    autoCommit(orderedDawn, standingCtx, orderedDawnLogs);
+    check(
+      took(orderedDawnLogs, writtenPick.name) &&
+        !took(orderedDawnLogs, firstOffer.name) &&
+        orderedDawn.modifierFlags === writtenPick.modifiers &&
+        orderedDawn.boonChoices.length === 0 &&
+        orderedDawn.phase !== "dawn",
+      "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue",
+    );
+    const missedDawn = deal("dawn");
+    const missedFirst = missedDawn.boonChoices[0];
+    const offBoard = BOONS.find(
+      (b) => !missedDawn.boonChoices.some((o) => o.id === b.id),
+    );
+    if (!missedFirst || !offBoard)
+      throw new Error(
+        "The standing order checks need a catalogue boon that is not on the drawn board, or the fallback they measure cannot be told apart from a written choice.",
+      );
+    missedDawn.standingOrders = { ...quiet, boon: offBoard.id };
+    const missedDawnLogs: string[] = [];
+    autoCommit(missedDawn, standingCtx, missedDawnLogs);
+    check(
+      took(missedDawnLogs, missedFirst.name) &&
+        !took(missedDawnLogs, offBoard.name) &&
+        missedDawn.phase !== "dawn",
+      "a name the draft did not deal is passed over for the board's first offer, so a written order can never take a boon its captain was not shown",
+    );
+    const rollbackDawn = deal("dawn");
+    const rollbackPick = rollbackDawn.boonChoices[1];
+    const rollbackFirst = rollbackDawn.boonChoices[0];
+    if (!rollbackPick || !rollbackFirst)
+      throw new Error(
+        "The standing order checks need a draft holding more than one boon on it, or the rollback they measure cannot be told apart from the written choice.",
+      );
+    rollbackDawn.standingOrders = {
+      ...quiet,
+      boon: rollbackPick.id,
+      enabled: false,
+    };
+    const rollbackDawnLogs: string[] = [];
+    autoCommit(rollbackDawn, standingCtx, rollbackDawnLogs);
+    check(
+      took(rollbackDawnLogs, rollbackFirst.name) &&
+        !took(rollbackDawnLogs, rollbackPick.name),
+      "and with the switch off the same written boon is passed over too, which is the rollback the plan asks for",
+    );
+
+    // Market. The purse is deep enough that affordability is not what is
+    // being measured here; the price checks read the board they were dealt,
+    // so they hold wherever the lots happen to fall.
+    const boardTops = (state: GameState) => {
+      const tops = new Map<string, number>();
+      const floors = new Map<string, number>();
+      for (const card of state.resourceCards)
+        for (const r of card.resources) {
+          const price = r.price ?? 0;
+          tops.set(r.type, Math.max(tops.get(r.type) ?? price, price));
+          floors.set(r.type, Math.min(floors.get(r.type) ?? price, price));
+        }
+      return { tops, floors };
+    };
+    const listFrom = (
+      prices: Map<string, number>,
+      spare: number,
+    ): StandingOrders => ({
+      ...quiet,
+      buy: [...prices].map(([good, price]) => ({
+        good,
+        maxPrice: Math.max(0, price - spare),
+      })),
+    });
+
+    const whole = deepPurse(deal("market"));
+    const wholeLogs: string[] = [];
+    const wholeBoard = whole.resourceCards.map((card) => card.id);
+    whole.standingOrders = listFrom(boardTops(whole).tops, 0);
+    autoCommit(whole, standingCtx, wholeLogs);
+    check(
+      wholeBoard.length > 1 &&
+        sameIds(whole.purchasedCards, wholeBoard) &&
+        whole.money === 100000 - whole.totalCosts &&
+        took(wholeLogs, "Standing orders at the port board"),
+      `orders pricing every good at the top the board itself asks buy the whole board and pay for it out of the captain's purse (${wholeBoard.length} lots)`,
+    );
+    const choosy = deepPurse(deal("market"));
+    const choosyTops = boardTops(choosy).tops;
+    const underTops = choosy.resourceCards.filter((card) =>
+      card.resources.every(
+        (r) => (r.price ?? 0) < (choosyTops.get(r.type) ?? 0),
+      ),
+    );
+    choosy.standingOrders = listFrom(choosyTops, 1);
+    autoCommit(choosy, standingCtx, []);
+    check(
+      sameIds(
+        choosy.purchasedCards,
+        underTops.map((card) => card.id),
+      ),
+      `and a list priced a gold under those tops buys exactly the lots whose every unit is under them, leaving the rest of the board alone (${underTops.length} of ${choosy.resourceCards.length})`,
+    );
+    const nothingPriced = deepPurse(deal("market"));
+    const nothingPricedLogs: string[] = [];
+    nothingPriced.standingOrders = listFrom(boardTops(nothingPriced).floors, 1);
+    autoCommit(nothingPriced, standingCtx, nothingPricedLogs);
+    check(
+      nothingPriced.purchasedCards.length === 0 &&
+        nothingPriced.money === 100000 &&
+        !took(nothingPricedLogs, "Standing orders at the port board"),
+      "a list priced a gold under the cheapest lot the board offers buys nothing and says nothing, rather than reporting work it did not do",
+    );
+    const broke = deal("market");
+    broke.money = 0;
+    const brokeLogs: string[] = [];
+    broke.standingOrders = listFrom(boardTops(broke).tops, 0);
+    autoCommit(broke, standingCtx, brokeLogs);
+    check(
+      broke.purchasedCards.length === 0 &&
+        broke.money === 0 &&
+        !took(brokeLogs, "Standing orders at the port board"),
+      "and a purse that is empty buys nothing at all, because an order spends the same guard a hand does",
+    );
+    const reportedByHand = deepPurse(deal("market"));
+    const handCard = reportedByHand.resourceCards[0];
+    if (!handCard || reportedByHand.resourceCards.length < 2)
+      throw new Error(
+        "The standing order checks need a port board holding at least two lots, or the delta they measure cannot be told apart from the whole report.",
+      );
+    purchaseCard(reportedByHand, handCard.id, []);
+    const beforeOrders = tallyPurchasesByResource(reportedByHand);
+    reportedByHand.standingOrders = listFrom(boardTops(reportedByHand).tops, 0);
+    autoCommit(reportedByHand, standingCtx, []);
+    const orderDelta = reportedByHand._pendingPulseTally ?? {};
+    check(
+      Object.keys(orderDelta).length > 0 &&
+        sameTally(
+          sumTally(beforeOrders, orderDelta),
+          tallyPurchasesByResource(reportedByHand),
+        ),
+      "and the lots the orders bought after a captain's own round ride the pulse as a delta on that report, which together are the lots the harbor counts",
+    );
+
+    // Orders. The hold is what decides this seat. Two fixtures decide it
+    // without depending on how the board happened to fall: an empty hold
+    // covers no order at all, because every order on the board asks for at
+    // least one unit of something, and a hold loaded for the board's own
+    // first order covers that one by construction, since nothing precedes
+    // it on the board to spend the goods first.
+    const loadFor = (state: GameState) => {
+      const order = state.customerCards[0];
+      for (const good of goods) state.inventory[good] = 0;
+      if (!order)
+        throw new Error(
+          "The standing order checks need a trade board with at least one order on it.",
+        );
+      const hold: Record<string, number> = {};
+      for (const r of order.resources) {
+        const required = r.required ?? 0;
+        state.inventory[r.type] = (state.inventory[r.type] ?? 0) + required;
+        hold[r.type] = (hold[r.type] ?? 0) + required;
+      }
+      return { order, hold };
+    };
+    // The rule the panel promises a captain, written out here rather than
+    // read off the engine: walk the board in order, fill what the hold
+    // covers at that moment, and let every fill spend the goods it took.
+    // Holding the engine to this is what makes the check about the rule
+    // rather than about the engine agreeing with itself.
+    const greedyFills = (state: GameState, hold: Record<string, number>) => {
+      const filled: number[] = [];
+      for (const order of state.customerCards) {
+        const covered = order.resources.every(
+          (r) => (hold[r.type] ?? 0) >= (r.required ?? 0),
+        );
+        if (!covered) continue;
+        for (const r of order.resources) hold[r.type] -= r.required ?? 0;
+        filled.push(order.id);
+      }
+      return filled;
+    };
+    const bare = deal("orders");
+    for (const good of goods) bare.inventory[good] = 0;
+    const bareLogs: string[] = [];
+    bare.standingOrders = { ...quiet, fill: "all" };
+    autoCommit(bare, standingCtx, bareLogs);
+    check(
+      bare.customerCards.length > 0 &&
+        bare.completedOrders.length === 0 &&
+        bare.totalOrdersCompleted === 0 &&
+        !took(bareLogs, "Standing orders at the trade board"),
+      `an order to fill every order the hold can cover fills none of them from an empty hold, rather than buying goods to chase one (${bare.customerCards.length} on the board)`,
+    );
+    const filledHold = deal("orders");
+    const { order: firstOrder, hold: loadedHold } = loadFor(filledHold);
+    const filledHoldLogs: string[] = [];
+    filledHold.standingOrders = { ...quiet, fill: "all" };
+    autoCommit(filledHold, standingCtx, filledHoldLogs);
+    check(
+      sameIds(
+        filledHold.completedOrders,
+        greedyFills(filledHold, loadedHold),
+      ) &&
+        filledHold.completedOrders[0] === firstOrder.id &&
+        took(filledHoldLogs, "Standing orders at the trade board") &&
+        goods.every((good) => (filledHold.inventory[good] ?? 0) >= 0),
+      `a hold loaded for the first order on the board fills it, and then every later order it still covers, in board order and without overdrawing (${filledHold.completedOrders.length} of ${filledHold.customerCards.length} filled)`,
+    );
+    const skipping = deal("orders");
+    // The same loaded hold as the fixture above, so the order left
+    // standing below is the switch's doing and not an empty hold's.
+    loadFor(skipping);
+    const skippingLogs: string[] = [];
+    skipping.standingOrders = { ...quiet, fill: "none" };
+    autoCommit(skipping, standingCtx, skippingLogs);
+    check(
+      skipping.completedOrders.length === 0 &&
+        skipping.totalOrdersCompleted === 0 &&
+        !took(skippingLogs, "Standing orders at the trade board"),
+      `and the trade board's default is still to fill nothing, which is the seat [B2] shipped (the hold was loaded for it, and it is left standing)`,
+    );
+
+    // Dusk, the shipyard's one standing choice, and the seat whose guard is
+    // the engine's own: an order to upgrade that cannot be paid for does
+    // nothing and costs nothing.
+    const yard = deepPurse(deal("dusk"));
+    const yardLogs: string[] = [];
+    yard.standingOrders = { ...quiet, shipyard: "upgrade" };
+    autoCommit(yard, standingCtx, yardLogs);
+    check(
+      yard.shipLevel === 1 && took(yardLogs, "Standing orders at the shipyard"),
+      "an absent captain's Dusk buys the next hull the moment the yard opens, which is the one seat whose work is a purchase rather than a press",
+    );
+    const poor = deal("dusk");
+    poor.money = 0;
+    const poorLogs: string[] = [];
+    poor.standingOrders = { ...quiet, shipyard: "upgrade" };
+    autoCommit(poor, standingCtx, poorLogs);
+    check(
+      poor.shipLevel === 0 &&
+        took(poorLogs, "Gold to upgrade the ship") &&
+        !took(poorLogs, "Standing orders at the shipyard"),
+      "and a yard the purse cannot pay for is refused by the engine rather than by the order, so a written upgrade costs a captain nothing",
+    );
+    const topped = deepPurse(deal("dusk"));
+    topped.shipLevel = MAX_SHIP_LEVEL;
+    const toppedLogs: string[] = [];
+    topped.standingOrders = { ...quiet, shipyard: "upgrade" };
+    autoCommit(topped, standingCtx, toppedLogs);
+    check(
+      topped.shipLevel === MAX_SHIP_LEVEL &&
+        !took(toppedLogs, "Standing orders at the shipyard"),
+      `and a hull already at its own ceiling (level ${MAX_SHIP_LEVEL}) is left where it is, because that guard is the yard's and not the order's`,
+    );
+
+    // The seat itself, through the clock's own entry point, which is where
+    // the switch has to be read: with it off the whole seat is the seat
+    // [B2] shipped, and with it on the written work happens before the
+    // departure that would have happened anyway.
+    const absent = deepPurse(deal("market"));
+    autoCommit(absent, standingCtx, []);
+    check(
+      absent.purchasedCards.length === 0 &&
+        absent._pendingPulseTally === undefined &&
+        absent.phase !== "market",
+      "a captain who wrote nothing is played exactly as [B2] played them: no lot bought, no report added, and the seat left on the lap's own terms",
+    );
+    const played = deepPurse(deal("market"));
+    played.standingOrders = listFrom(boardTops(played).tops, 0);
+    autoCommit(played, standingCtx, []);
+    check(
+      played.purchasedCards.length > 0 &&
+        played._pendingPulseTally !== undefined &&
+        played.phase !== "market",
+      "and a captain who did write an order is played by it before the seat is left, which is the whole of what the clock does differently now",
+    );
+    const shutOff = deepPurse(deal("market"));
+    shutOff.standingOrders = {
+      ...listFrom(boardTops(shutOff).tops, 0),
+      enabled: false,
+    };
+    autoCommit(shutOff, standingCtx, []);
+    check(
+      shutOff.purchasedCards.length === 0 &&
+        shutOff._pendingPulseTally === undefined &&
+        shutOff.phase !== "market",
+      "while the same written set with the switch off buys nothing and reports nothing, and leaves the seat the way the seat is left anyway",
+    );
+
+    // Restart and the load heal, the two ways a record arrives at a voyage
+    // it was not written during.
+    const carried = createInitialGameState();
+    carried.standingOrders = { ...ordersWritten };
+    restartGame(carried, [], {});
+    check(
+      sameOrders(carried.standingOrders, ordersWritten),
+      "restarting the voyage keeps the set a captain wrote, because a host setting sail again is not the captain changing their mind",
+    );
+    const damaged = createInitialGameState();
+    damaged.standingOrders = "not a record" as unknown as StandingOrders;
+    restartGame(damaged, [], {});
+    check(
+      sameOrders(damaged.standingOrders, quiet),
+      "and a record the tree cannot read heals to the default rather than costing a captain their voyage",
+    );
+    const madeNow = createInitialGameState({ mode: "ocean_gambit" });
+    check(
+      sameOrders(
+        normalizeStandingOrders(madeNow.standingOrders),
+        madeNow.standingOrders,
+      ),
+      "which is what makes the heal a no op for a current save: a voyage this build creates holds a record the normalizer reads back unchanged",
+    );
+
+    // The copy rule, read off the files rather than off a claim about them.
+    check(
+      !carriesADash("src/lib/game/standing.ts") &&
+        !carriesADash("src/lib/game/engine/standing.ts") &&
+        !carriesADash(
+          "src/components/portmasters/game/StandingOrdersModal.tsx",
+        ) &&
+        !carriesADash("src/components/portmasters/game/GameControlPanel.tsx"),
+      "and none of the words a captain reads about standing orders, nor the comments that explain them, carries an en dash, an em dash or a doubled hyphen",
+    );
+
+    // =====================================================================
+    // [B4: the log surfaces]
+    //
+    // The plan asks for two logs at Dusk, one the whole room reads and one
+    // each captain holds, and what is held below is the contract between
+    // them rather than the screen they are drawn on: the room's log carries
+    // what the table already saw and never a hidden thing, and the private
+    // channel carries what one captain was told and reaches no other
+    // socket. That is the plan's own evaluation, a two client assertion
+    // that no private entry appears in the other captain's transcript, read
+    // here against the surface this slice adds.
+    //
+    // The vocabulary is checked first and without a server, so a failure
+    // further down is never read as a server that declined to write a line.
+    // =====================================================================
+    console.log("\nThe voyage log");
+
+    // Every kind, and the sentence a captain reads for it. The table is
+    // typed by the union, so a tenth kind is a compile error here as well
+    // as in the line writer, and the checks below walk the vocabulary
+    // rather than a list written out a second time.
+    const logFacts: Record<VoyageLogKind, VoyageLogFacts> = {
+      voyage_started: { kind: "voyage_started" },
+      leg_advanced: { kind: "leg_advanced", phase: "parley" },
+      offer_posted: {
+        kind: "offer_posted",
+        captain: "Smoke logger1",
+        offerItem: "Hemp",
+        offerAmount: 3,
+        requestItem: "Silk",
+        requestAmount: 2,
+      },
+      offer_filled: {
+        kind: "offer_filled",
+        captain: "Smoke logger1",
+        taker: "Smoke logger2",
+        offerItem: "Hemp",
+        offerAmount: 3,
+        requestItem: "Silk",
+        requestAmount: 2,
+      },
+      offer_expired: {
+        kind: "offer_expired",
+        captain: "Smoke logger1",
+        offerItem: "Hemp",
+        offerAmount: 3,
+      },
+      leg_timed_out: { kind: "leg_timed_out", phase: "market" },
+      audit_carried: { kind: "audit_carried", target: "Smoke logger2" },
+      maroon_carried: { kind: "maroon_carried", target: "Smoke logger2" },
+      captain_left: { kind: "captain_left", captain: "Smoke logger1" },
+    };
+    const logLines: Record<VoyageLogKind, string> = {
+      voyage_started: "The voyage leaves the dock.",
+      leg_advanced: "The harbor weighs anchor for the Parley.",
+      offer_posted: "Smoke logger1 posts 3 Hemp for 2 Silk.",
+      offer_filled:
+        "Smoke logger2 fills Smoke logger1's offer of 3 Hemp for 2 Silk.",
+      offer_expired: "Smoke logger1's offer of 3 Hemp lapses with the leg.",
+      leg_timed_out: "The tide runs out on the Market.",
+      audit_carried: "The harbor audits Smoke logger2.",
+      maroon_carried: "The harbor maroons Smoke logger2.",
+      captain_left: "Smoke logger1 leaves the harbor.",
+    };
+    for (const kind of VOYAGE_LOG_KINDS) {
+      check(
+        voyageLogLine(logFacts[kind]) === logLines[kind],
+        `the ${kind} line reads the way a captain reads it, and reads it the same way wherever the log is drawn`,
+      );
+    }
+    check(
+      new Set(VOYAGE_LOG_KINDS.map((kind) => logLines[kind])).size ===
+        VOYAGE_LOG_KINDS.length,
+      "and no two kinds share a sentence, so a line a captain reads names the thing that happened",
+    );
+    check(
+      LEG_PHASE_ORDER.every((phase) =>
+        voyageLogLine({ kind: "leg_advanced", phase }).includes(
+          phaseFace(phase).label,
+        ),
+      ),
+      "the anchor line names each phase off the phase's own face rather than off a second list of names kept in the log",
+    );
+
+    // The round belongs to the log's own stamp rather than to the caller,
+    // which is what lets a screen group a voyage by leg without working
+    // out which leg a line fell in.
+    const stamped = voyageLogEntry(3, logFacts.captain_left);
+    check(
+      stamped.round === 3 &&
+        stamped.kind === "captain_left" &&
+        stamped.text === logLines.captain_left,
+      "a line carries the leg it happened on, the kind of thing it was and the sentence, and nothing else",
+    );
+
+    // The cap, which both sides of the wire share. The oldest line is the
+    // one that goes: a bound on a live surface keeps the end a captain
+    // reads.
+    const logFlooded = Array.from({ length: VOYAGE_LOG_CAP + 10 }, (_, index) =>
+      voyageLogEntry(index, logFacts.voyage_started),
+    ).reduce<VoyageLogEntry[]>(
+      (kept, entry) => appendVoyageLog(kept, entry),
+      [],
+    );
+    check(
+      logFlooded.length === VOYAGE_LOG_CAP &&
+        logFlooded[0].round === 10 &&
+        logFlooded[logFlooded.length - 1].round === VOYAGE_LOG_CAP + 9,
+      `a voyage keeps the last ${VOYAGE_LOG_CAP} lines and drops the oldest, so a long voyage costs a surface a bounded amount`,
+    );
+
+    // The door every line off the wire comes through.
+    check(
+      normalizeVoyageLogEntry(stamped)?.kind === "captain_left" &&
+        normalizeVoyageLogEntry(stamped)?.round === 3,
+      "a line that is a line is read back as it was written, leg and all",
+    );
+    const notLines: unknown[] = [
+      null,
+      "The voyage leaves the dock.",
+      {},
+      { round: 1, kind: "captain_left" },
+      { round: 1, kind: "captain_left", text: "" },
+      { round: -1, kind: "captain_left", text: "Ari leaves the harbor." },
+      { round: 1, kind: "mutiny", text: "Ari leaves the harbor." },
+      { round: 1, kind: "captain_left", text: 7 },
+    ];
+    check(
+      notLines.every((value) => normalizeVoyageLogEntry(value) === null),
+      "and anything that is not a line is dropped rather than drawn, so a malformed frame cannot put a blank row in the middle of a voyage",
+    );
+    check(
+      normalizeVoyageLog([stamped, null, { round: 1 }, stamped]).length === 2 &&
+        normalizeVoyageLog("not a log").length === 0 &&
+        normalizeVoyageLog(
+          Array.from({ length: VOYAGE_LOG_CAP + 5 }, () => stamped),
+        ).length === VOYAGE_LOG_CAP,
+      "a whole log heals the same way and is capped the same way, and a log that is not a list is an empty log rather than a crash",
+    );
+
+    // Every kind has a writer. A vocabulary entry nothing produces is a
+    // line the suite would hold to its sentence while no captain could ever
+    // read it, and the scan is what makes adding a kind a two part change
+    // rather than a one part one.
+    const realtimeDir = join(
+      import.meta.dirname,
+      "..",
+      "src",
+      "server",
+      "realtime",
+    );
+    const realtimeSource = readdirSync(realtimeDir)
+      .filter((file) => file.endsWith(".ts"))
+      .map((file) => readFileSync(join(realtimeDir, file), "utf8"))
+      .join("\n");
+    check(
+      VOYAGE_LOG_KINDS.every((kind) =>
+        realtimeSource.includes(`kind: "${kind}"`),
+      ),
+      "every kind the log can hold has a writer in the realtime layer, so no line of its vocabulary is one no captain can read",
+    );
+
+    // The copy rule, read off the files rather than off a claim about them.
+    check(
+      !carriesADash("src/lib/game/voyage-log.ts") &&
+        !carriesADash("src/lib/use-voyage-log.ts") &&
+        !carriesADash("src/server/realtime/voyage-log.ts") &&
+        !carriesADash("src/components/portmasters/game/VoyageLogPanel.tsx"),
+      "and none of the words a captain reads in either log, nor the comments that explain them, carries an en dash, an em dash or a doubled hyphen",
+    );
+
+    // ---- The two logs, in a real harbor ----
+    // One Ocean Gambit harbor with two captains in it, because the pair
+    // under test needs the private channel to carry something: a card is
+    // dealt in this mode and nowhere else, and both captains hold one.
+    const logHost = await signUp("logger1");
+    const logMate = await signUp("logger2");
+    extraAccounts.push(logHost, logMate);
+    const logRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: logHost.cookie,
+        body: JSON.stringify({
+          name: `Smoke voyage log ${suffix}`,
+          isPublic: false,
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
+        }),
+      },
+    );
+    if (logRoom.status !== 200) {
+      throw new Error("No harbor to keep a voyage log in, stopping here.");
+    }
+    const logRoomId = logRoom.body.room.id;
+    const logMateJoined = await call<{ room: { id: string } }>(
+      "/api/rooms/join",
+      {
+        method: "POST",
+        cookie: logMate.cookie,
+        body: JSON.stringify({ code: logRoom.body.room.code }),
+      },
+    );
+    check(
+      logMateJoined.status === 200,
+      "two captains take a seat in a harbor that keeps a log",
+    );
+
+    type LogFrame = { event: string; text: string };
+    const logSeats: Array<{
+      captain: Captain;
+      socket: Socket;
+      frames: LogFrame[];
+    }> = [];
+    for (const captain of [logHost, logMate]) {
+      const socket = await openAuthedSocket(captain);
+      sockets.push(socket);
+      const frames: LogFrame[] = [];
+      socket.onAny((event: string, ...args: unknown[]) => {
+        frames.push({ event, text: JSON.stringify(args) });
+      });
+      const takenASeat = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === logRoomId,
+      );
+      socket.emit("room:join", { roomId: logRoomId });
+      const seat = await takenASeat;
+      check(seat !== null, `${captain.username} takes their seat`);
+      logSeats.push({ captain, socket, frames });
+    }
+    const logHostSeat = logSeats[0];
+    const logMateSeat = logSeats[1];
+
+    // The lines a socket was sent, read off the frames it kept. Only the
+    // room's log, since the private channel's frames are the other half of
+    // this pair and the point of the checks below is to keep the two apart.
+    const logEntriesOn = (frames: readonly LogFrame[]) =>
+      frames
+        .filter((frame) => frame.event === "voyage:log")
+        .map(
+          (frame) =>
+            (
+              JSON.parse(frame.text) as [
+                { roomId: string; entry: VoyageLogEntry },
+              ]
+            )[0]?.entry,
+        )
+        .filter((entry): entry is VoyageLogEntry => Boolean(entry));
+    const logTextOn = (frames: readonly LogFrame[]) =>
+      logEntriesOn(frames).map((entry) => entry.text);
+
+    const logCardFrames = logSeats.map((seat) =>
+      waitForEvent<WireDelivery>(
+        seat.socket,
+        "private:entry",
+        (payload) => payload?.roomId === logRoomId,
+      ),
+    );
+    logHostSeat.socket.emit("room:start", { roomId: logRoomId });
+    const logCards = await Promise.all(logCardFrames);
+    check(
+      logCards.every((card) => card?.entry?.kind === "card"),
+      "and the voyage sets sail, dealing each of them a card the other captain cannot read",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    check(
+      logTextOn(logHostSeat.frames).includes(logLines.voyage_started) &&
+        logTextOn(logMateSeat.frames).includes(logLines.voyage_started),
+      "the room's log opens with the voyage and reaches every socket in the harbor, not only the host's",
+    );
+    // The seat a voyage opens in is entered by the host's start rather than
+    // by a ready vote, and it is anchored all the same. A log whose first
+    // anchor line belonged to the second seat would read as a leg nobody
+    // played, and the opening seat of a Gambit voyage is not the pier: the
+    // phase the mode opens at is where the crew actually stands.
+    const logOpened = logEntriesOn(logHostSeat.frames);
+    const openingSeat = openingPhase("ocean_gambit");
+    check(
+      logOpened[0]?.kind === "voyage_started" &&
+        logOpened[0]?.round === 1 &&
+        logOpened[1]?.kind === "leg_advanced" &&
+        logOpened[1]?.round === 1 &&
+        logOpened[1]?.text ===
+          voyageLogLine({ kind: "leg_advanced", phase: openingSeat }),
+      "and the seat the voyage opens in is anchored like every other, so the log's spine has no gap where its first leg should be",
+    );
+
+    // A leg moves, and the log's own stamp moves with it. The status
+    // report is the real one a client sends, and it is what moves a room's
+    // checkpoint; the two reports below take the room from the leg it
+    // opened on to the Parley of the next one.
+    // The two anchor lines the reports below write. Named once each, and
+    // read again at the end of the section where the voyage is checked for
+    // order, so the section holds one copy of each sentence it expects.
+    const dawnAnchorLine = "The harbor weighs anchor for the Dawn.";
+    const parleyAnchorLine = "The harbor weighs anchor for the Parley.";
+    const anchored = waitForEvent<{ entry: VoyageLogEntry }>(
+      logMateSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.text.includes("Dawn"),
+    );
+    logHostSeat.socket.emit("game:status", {
+      roomId: logRoomId,
+      round: 2,
+      phase: "dawn",
+    });
+    const anchorFrame = await anchored;
+    check(
+      anchorFrame?.entry?.round === 2 &&
+        anchorFrame.entry.text === dawnAnchorLine,
+      "a leg that moves writes the anchor line for the seat being entered, stamped with the leg it is entering rather than the one it left",
+    );
+
+    const atParley = waitForEvent<{ entry: VoyageLogEntry }>(
+      logMateSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.text.includes("Parley"),
+    );
+    logHostSeat.socket.emit("game:status", {
+      roomId: logRoomId,
+      round: 2,
+      phase: "parley",
+    });
+    const parleyFrame = await atParley;
+    check(
+      parleyFrame?.entry?.round === 2 &&
+        parleyFrame.entry.text === parleyAnchorLine,
+      "and a phase that moves inside one leg keeps that leg's number, so a captain reading back sees the leg as one stretch rather than six",
+    );
+
+    // The offer board, which is the one surface whose whole life is worth
+    // a line: posted, filled, and lapsed.
+    const postedLine = waitForEvent<{ entry: VoyageLogEntry }>(
+      logMateSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "offer_posted",
+    );
+    logHostSeat.socket.emit("barter:post", {
+      roomId: logRoomId,
+      offerItem: "Hemp",
+      offerAmount: 3,
+      requestItem: "Silk",
+      requestAmount: 2,
+    });
+    const postedLog = await postedLine;
+    check(
+      postedLog?.entry?.text === "Smoke logger1 posts 3 Hemp for 2 Silk." &&
+        postedLog.entry.round === 2,
+      "an offer on the board writes the whole trade into the room's log, naming the captain who posted it",
+    );
+
+    // The settlement, taken by the second captain through the accept the
+    // client's own board sends. The board is live server state rather than
+    // a row, so the offer's id is read off the board itself: the host asks
+    // for its own state and reads the answer, which is the same copy the
+    // accepting client reads its id off. Asking rather than reading the
+    // frames the room was already sent, because the line above and the
+    // board update that follows it are two frames and the log's own is the
+    // first of them, so the board is not on the socket yet when the line
+    // arrives.
+    const logBoardAfterPost = waitForEvent<{
+      roomId: string;
+      offers?: WireOffer[];
+    }>(
+      logHostSeat.socket,
+      "barter:update",
+      (payload) => payload?.roomId === logRoomId,
+    );
+    logHostSeat.socket.emit("barter:state:request", { roomId: logRoomId });
+    const postedOffer = (await logBoardAfterPost)?.offers?.find(
+      (offer) => offer.fromUserId === logHost.id,
+    );
+    check(
+      postedOffer !== undefined,
+      "the offer is standing on the room's board, so the settlement below has something to settle",
+    );
+    const filledLine = waitForEvent<{ entry: VoyageLogEntry }>(
+      logHostSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "offer_filled",
+    );
+    logMateSeat.socket.emit("barter:accept", {
+      roomId: logRoomId,
+      offerId: postedOffer?.id,
+    });
+    const logFilled = await filledLine;
+    check(
+      logFilled?.entry?.text ===
+        "Smoke logger2 fills Smoke logger1's offer of 3 Hemp for 2 Silk.",
+      "and the captain who takes it writes the settlement into the log, naming both ends of the trade",
+    );
+
+    // The lapsed line, which is the board's other ending: an offer still
+    // standing when the room leaves the Parley goes back to its poster.
+    // The two lines this offer produces are named once each and read in
+    // both places they are needed: here, and in the readback at the end of
+    // the section, where the same voyage is checked for order.
+    const secondPostLine = "Smoke logger1 posts 1 Silk for 4 Hemp.";
+    const secondLapseLine =
+      "Smoke logger1's offer of 1 Silk lapses with the leg.";
+    const secondPosted = waitForEvent<{ entry: VoyageLogEntry }>(
+      logHostSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "offer_posted",
+    );
+    logHostSeat.socket.emit("barter:post", {
+      roomId: logRoomId,
+      offerItem: "Silk",
+      offerAmount: 1,
+      requestItem: "Hemp",
+      requestAmount: 4,
+    });
+    check(
+      (await secondPosted)?.entry?.text === secondPostLine,
+      "a second offer goes up while the room is still at the exchange",
+    );
+    const lapsedLine = waitForEvent<{ entry: VoyageLogEntry }>(
+      logHostSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "offer_expired",
+    );
+    logHostSeat.socket.emit("game:status", {
+      roomId: logRoomId,
+      round: 2,
+      phase: "resolve",
+    });
+    const lapsed = await lapsedLine;
+    check(
+      lapsed?.entry?.text === secondLapseLine,
+      "and leaving the phase an offer stands in writes the line that says it lapsed, one entry per offer rather than one for the sweep",
+    );
+
+    // The departure, through the pair of calls the Leave button makes: the
+    // seat is given up over REST and the socket follows it out.
+    const leftLine = waitForEvent<{ entry: VoyageLogEntry }>(
+      logHostSeat.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "captain_left",
+    );
+    const gaveUpSeat = await call<{ ok: boolean }>(
+      `/api/rooms/${logRoomId}/leave`,
+      { method: "POST", cookie: logMate.cookie },
+    );
+    check(gaveUpSeat.status === 200, "a captain can give up their seat");
+    logMateSeat.socket.emit("room:leave", { roomId: logRoomId });
+    const left = await leftLine;
+    const leavesTheHarbor = "Smoke logger2 leaves the harbor.";
+    check(
+      left?.entry?.text === leavesTheHarbor,
+      "a seat that leaves the voyage writes one line into the room's log, and the log's own guard is what keeps the reap from writing a second",
+    );
+    check(
+      logTextOn(logHostSeat.frames).filter((text) =>
+        text.includes("leaves the harbor"),
+      ).length === 1,
+      "and that line stands alone rather than beside a copy of itself",
+    );
+
+    // The history the Dusk screen asks for, answered to the socket that
+    // asked rather than to the room.
+    const history = waitForEvent<{
+      roomId: string;
+      round: number;
+      entries: VoyageLogEntry[];
+    }>(
+      logHostSeat.socket,
+      "voyage:log:history",
+      (payload) => payload?.roomId === logRoomId,
+    );
+    logHostSeat.socket.emit("voyage:log:request", { roomId: logRoomId });
+    const historyFrame = await history;
+    const readBack = historyFrame?.entries ?? [];
+    const textBack = readBack.map((entry) => entry.text);
+    // The voyage this section sailed, in the order it happened. Read as a
+    // run of positions rather than as a membership list, so the check says
+    // what its name says: a captain who asks for the log is handed the
+    // voyage, not a bag of lines. A line the clock added on its own (a
+    // phase that ran out while the room stood in it) is allowed to sit
+    // between two of these without failing the run, which is why the
+    // comparison is strictly increasing positions rather than equality
+    // with the whole list.
+    const orderedLines = [
+      logLines.voyage_started,
+      dawnAnchorLine,
+      parleyAnchorLine,
+      logLines.offer_posted,
+      logLines.offer_filled,
+      secondPostLine,
+      secondLapseLine,
+      leavesTheHarbor,
+    ];
+    const logOrder = orderedLines.map((line) => textBack.indexOf(line));
+    check(
+      historyFrame?.round === 2 &&
+        logOrder.every(
+          (at, index) => at >= 0 && (index === 0 || at > logOrder[index - 1]),
+        ),
+      "the log is handed back whole to the captain who asks for it, holding the voyage's own lines in the order they were written",
+    );
+    check(
+      readBack.length === logEntriesOn(logHostSeat.frames).length &&
+        readBack.every(
+          (entry, index) =>
+            entry.kind === logEntriesOn(logHostSeat.frames)[index]?.kind,
+        ),
+      "and it is the same log the room was reading as it happened, line for line, rather than a second copy assembled when it was asked for",
+    );
+    check(
+      readBack.every(
+        (entry) =>
+          typeof entry.round === "number" &&
+          typeof entry.kind === "string" &&
+          typeof entry.text === "string" &&
+          Object.keys(entry).length === 3,
+      ) && readBack.length > 0,
+      "and every line in it is a leg, a kind and a sentence, with no fourth field for anything hidden to travel in",
+    );
+
+    // The plan's own evaluation, read against this surface: the private
+    // channel's material reaches the captain it was dealt to and appears
+    // in no line the room can read.
+    const cardTexts = logSeats
+      .map((seat) => {
+        const cardFrame = seat.frames.find(
+          (frame) => frame.event === "private:entry",
+        );
+        if (!cardFrame) return null;
+        return (
+          JSON.parse(cardFrame.text) as [
+            { entry?: { role?: string; text?: string } },
+          ]
+        )[0]?.entry;
+      })
+      .filter((entry): entry is { role?: string; text?: string } =>
+        Boolean(entry?.text),
+      );
+    check(
+      cardTexts.length === 2,
+      "each captain holds a card of their own on the private channel, so the sweep below has something it could find",
+    );
+    check(
+      logSeats.every((seat) => {
+        const cardFrame = seat.frames.find(
+          (frame) => frame.event === "private:entry",
+        );
+        return cardFrame !== undefined && /"role"\s*:\s*"/.test(cardFrame.text);
+      }),
+      "and each of those cards is a frame carrying a role, which is a shape no log line may carry",
+    );
+    const publicLeaks = logSeats.flatMap((seat) =>
+      leakedHiddenFields(
+        seat.frames.filter((frame) => frame.event === "voyage:log"),
+      ).map((leak) => `${seat.captain.username} on ${leak}`),
+    );
+    check(
+      publicLeaks.length === 0,
+      "no line in the room's log carries a role, a flourish, an ally or an alignment word, on any socket in the harbor",
+    );
+    check(
+      logSeats.every((seat) =>
+        logTextOn(seat.frames).every((text) =>
+          cardTexts.every((card) => !text.includes(card.text ?? "")),
+        ),
+      ),
+      "and no private entry appears in the other captain's transcript, which is the plan's own evaluation for this slice",
+    );
+
+    // A restarted voyage is a new voyage, so the log goes with it and the
+    // room is told. The request afterwards is answered with nothing rather
+    // than with the voyage that just ended.
+    const restarted = waitForEvent<{ roomId: string }>(
+      logHostSeat.socket,
+      "room:restarted",
+      (payload) => payload?.roomId === logRoomId,
+    );
+    logHostSeat.socket.emit("room:restart", { roomId: logRoomId });
+    check(
+      (await restarted) !== null,
+      "the host can wipe the voyage and sail again",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    // A short wait rather than the usual one: nothing is expected here, so
+    // this check costs the suite the length of its own timeout.
+    const afterRestart = waitForEvent<{
+      roomId: string;
+      entries: VoyageLogEntry[];
+    }>(
+      logHostSeat.socket,
+      "voyage:log:history",
+      (payload) => payload?.roomId === logRoomId,
+      1200,
+    );
+    logHostSeat.socket.emit("voyage:log:request", { roomId: logRoomId });
+    check(
+      (await afterRestart) === null,
+      "and a restarted voyage has no log to hand back, because the log belonged to the voyage that was wiped",
+    );
 
     console.log("\nThe fleet commission");
     // Ocean Gambit's one public surface, and the contrast with the section
@@ -4554,8 +6890,8 @@ async function main(): Promise<void> {
     auditSockets[1].emit("game:status", {
       roomId: auditRoomId,
       round: AUDIT_FROM_ROUND,
-      phase: "barter",
-      phaseLabel: "Bartering",
+      phase: "parley",
+      phaseLabel: "Parley",
       gold: 120,
       reputation: 12,
       shipLevel: 0,
@@ -4571,7 +6907,7 @@ async function main(): Promise<void> {
     for (
       let waited = 0;
       (auditCheckpoint?.currentRound !== AUDIT_FROM_ROUND ||
-        auditCheckpoint?.currentPhase !== "barter") &&
+        auditCheckpoint?.currentPhase !== "parley") &&
       waited < 5000;
       waited += 250
     ) {
@@ -4580,7 +6916,7 @@ async function main(): Promise<void> {
     }
     check(
       auditCheckpoint?.currentRound === AUDIT_FROM_ROUND &&
-        auditCheckpoint?.currentPhase === "barter",
+        auditCheckpoint?.currentPhase === "parley",
       `the room's checkpoint is at leg ${AUDIT_FROM_ROUND}'s Parley, where the vote is called from`,
     );
     const auditVoyage = auditCheckpoint?.voyageEpoch ?? 0;
@@ -4786,14 +7122,14 @@ async function main(): Promise<void> {
       socket.emit("phase:ready", {
         roomId: auditRoomId,
         round: AUDIT_FROM_ROUND,
-        phase: "barter",
+        phase: "parley",
       });
     }
     const auditLeft = await Promise.all(auditAdvances);
     check(
       auditLeft.every(
         (frame) =>
-          frame?.round === AUDIT_FROM_ROUND && frame?.phase === "barter",
+          frame?.round === AUDIT_FROM_ROUND && frame?.phase === "parley",
       ),
       "the room leaves the Parley the audit spent, carrying the checkpoint it was leaving",
     );
@@ -4838,7 +7174,7 @@ async function main(): Promise<void> {
     for (
       let waited = 0;
       (auditReopened?.currentRound !== 1 ||
-        auditReopened?.currentPhase !== "0") &&
+        auditReopened?.currentPhase !== "harbor") &&
       waited < 5000;
       waited += 250
     ) {
@@ -4846,7 +7182,8 @@ async function main(): Promise<void> {
       auditReopened = await auditRoomRow();
     }
     check(
-      auditReopened?.currentRound === 1 && auditReopened?.currentPhase === "0",
+      auditReopened?.currentRound === 1 &&
+        auditReopened?.currentPhase === "harbor",
       "restarting the voyage reopens the harbor at its first checkpoint",
     );
     // The captain asking is one of the harbor's own, so the absence below
@@ -5283,9 +7620,13 @@ async function main(): Promise<void> {
         where: { id: maroonRoomId },
         select: { currentRound: true, currentPhase: true, voyageEpoch: true },
       });
+    // The phase is typed as the engine's own, so a checkpoint this suite
+    // walks the room onto is one of the values the room actually gates. It
+    // is still a string on the wire, which is what the two older names in
+    // the leg clock section below are about.
     const parkMaroonCheckpoint = async (
       round: number,
-      phase: string,
+      phase: Phase,
       phaseLabel: string,
     ) => {
       maroonSockets[1].emit("game:status", {
@@ -5312,10 +7653,10 @@ async function main(): Promise<void> {
       return row;
     };
 
-    const beforeTheRung = await parkMaroonCheckpoint(8, "barter", "Bartering");
+    const beforeTheRung = await parkMaroonCheckpoint(8, "parley", "Parley");
     check(
       beforeTheRung?.currentRound === 8 &&
-        beforeTheRung?.currentPhase === "barter",
+        beforeTheRung?.currentPhase === "parley",
       "and once it has sailed the room can be walked to the leg before the rung",
     );
     maroonSockets[1].emit("maroon:vote", {
@@ -5329,9 +7670,9 @@ async function main(): Promise<void> {
       "a nomination for a leg before the mode's rung is refused, so the vote belongs to the back half of a voyage",
     );
 
-    const atTheRung = await parkMaroonCheckpoint(9, "barter", "Bartering");
+    const atTheRung = await parkMaroonCheckpoint(9, "parley", "Parley");
     check(
-      atTheRung?.currentRound === 9 && atTheRung?.currentPhase === "barter",
+      atTheRung?.currentRound === 9 && atTheRung?.currentPhase === "parley",
       "the room's checkpoint is at leg nine's Parley, which is where the vote is called from",
     );
 
@@ -5342,8 +7683,8 @@ async function main(): Promise<void> {
     maroonSockets[5].emit("game:status", {
       roomId: maroonRoomId,
       round: 9,
-      phase: "barter",
-      phaseLabel: "Bartering",
+      phase: "parley",
+      phaseLabel: "Parley",
       gold: 0,
       reputation: 4,
       shipLevel: 0,
@@ -5538,7 +7879,7 @@ async function main(): Promise<void> {
     );
 
     // ---- The leg the hand lands on ----
-    const maroonReadyAll = (round: number, phase: string) => {
+    const maroonReadyAll = (round: number, phase: Phase) => {
       for (const socket of maroonSockets) {
         socket.emit("phase:ready", { roomId: maroonRoomId, round, phase });
       }
@@ -5552,18 +7893,14 @@ async function main(): Promise<void> {
         5000,
       );
 
-    const beforeTheMarket = await parkMaroonCheckpoint(
-      10,
-      "5",
-      "Drafting Boon",
-    );
+    const beforeTheMarket = await parkMaroonCheckpoint(10, "dawn", "Dawn");
     check(
       beforeTheMarket?.currentRound === 10 &&
-        beforeTheMarket?.currentPhase === "5",
+        beforeTheMarket?.currentPhase === "dawn",
       "the next checkpoint the room reaches is leg ten's boon draft, which is the step that opens its market",
     );
     const marketAdvance = nextMaroonAdvance(10);
-    maroonReadyAll(10, "5");
+    maroonReadyAll(10, "dawn");
     const atTheMarket = await marketAdvance;
     check(
       atTheMarket?.portShift?.port === secondCallPort &&
@@ -5594,9 +7931,9 @@ async function main(): Promise<void> {
       "and the hand itself is a Parley power: a captain away from the table cannot lean the market they are standing in front of",
     );
 
-    const afterTheMarket = await parkMaroonCheckpoint(11, "5", "Drafting Boon");
+    const afterTheMarket = await parkMaroonCheckpoint(11, "dawn", "Dawn");
     const clearAdvance = nextMaroonAdvance(11);
-    maroonReadyAll(11, "5");
+    maroonReadyAll(11, "dawn");
     const clearedMarket = await clearAdvance;
     check(
       afterTheMarket?.currentRound === 11 &&
@@ -5636,9 +7973,9 @@ async function main(): Promise<void> {
     // Once a leg rather than once a voyage: the power is the seat's, and the
     // seat sails on. The next Parley is the next leg, and a call made there
     // is a call the leg after it is priced against.
-    const nextParley = await parkMaroonCheckpoint(11, "barter", "Bartering");
+    const nextParley = await parkMaroonCheckpoint(11, "parley", "Parley");
     check(
-      nextParley?.currentRound === 11 && nextParley?.currentPhase === "barter",
+      nextParley?.currentRound === 11 && nextParley?.currentPhase === "parley",
       "and the voyage reaches the next leg's Parley, with the marooned captain still in it",
     );
     maroonSockets[4].emit("maroon:shift", {
@@ -5657,9 +7994,9 @@ async function main(): Promise<void> {
     // The one leg the console is hidden on. A call leans the market that
     // opens after the leg it was made in, so the closing leg of a voyage is
     // a call that would lean nothing.
-    const closingLeg = await parkMaroonCheckpoint(16, "barter", "Bartering");
+    const closingLeg = await parkMaroonCheckpoint(16, "parley", "Parley");
     check(
-      closingLeg?.currentRound === 16 && closingLeg?.currentPhase === "barter",
+      closingLeg?.currentRound === 16 && closingLeg?.currentPhase === "parley",
       "the voyage can be walked to its closing leg, the sixteenth of a Monsoon charter",
     );
     maroonSockets[4].emit("maroon:shift", {
@@ -5683,7 +8020,7 @@ async function main(): Promise<void> {
     for (
       let waited = 0;
       (maroonReopened?.currentRound !== 1 ||
-        maroonReopened?.currentPhase !== "0") &&
+        maroonReopened?.currentPhase !== "harbor") &&
       waited < 5000;
       waited += 250
     ) {
@@ -5692,7 +8029,7 @@ async function main(): Promise<void> {
     }
     check(
       maroonReopened?.currentRound === 1 &&
-        maroonReopened?.currentPhase === "0",
+        maroonReopened?.currentPhase === "harbor",
       "restarting the voyage reopens the harbor at its first checkpoint",
     );
     const maroonRejoin = await openAuthedSocket(gambitFifth);
@@ -6581,6 +8918,7 @@ async function main(): Promise<void> {
           userId: "captain-a",
           presentAtEnd: false,
           marooned: true,
+          muted: true,
           peerTradeProfit: 1234,
         },
       ],
@@ -6595,9 +8933,10 @@ async function main(): Promise<void> {
         telReadBack.endedAtLeg === 9 &&
         telReadBack.captains[0]?.presentAtEnd === false &&
         telReadBack.captains[0]?.marooned === true &&
+        telReadBack.captains[0]?.muted === true &&
         telReadBack.captains[0]?.peerTradeProfit === 1234 &&
         telReadBack.events.length === 1,
-      "and a record read back out of stored JSON keeps its header, its captains, the maroon and the peer ledger their lines carry, and its events",
+      "and a record read back out of stored JSON keeps its header, its captains, the maroon, the mute and the peer ledger their lines carry, and its events",
     );
     check(
       normalizeRecord(null) === null &&
@@ -6635,11 +8974,12 @@ async function main(): Promise<void> {
         readPeerTradeProfit([2200]) === 0,
       "the peer ledger is read out of a save the way the rule reads it, so one reading of a save cannot become two numbers",
     );
-    // The same two fields on their way back out of stored JSON, in the two
-    // shapes a reader can meet: a line an older build wrote, which carries
-    // neither, and a line whose values are not the shapes this build
-    // writes. Both read as the absence rather than as a hole, which is what
-    // lets a reader pass over a line without special casing it.
+    // The fields those two marks and the mute live on, on their way back
+    // out of stored JSON, in the two shapes a reader can meet: a line an
+    // older build wrote, which carries none of them, and a line whose
+    // values are not the shapes this build writes. Both read as the absence
+    // rather than as a hole, which is what lets a reader pass over a line
+    // without special casing it.
     const telOlderLines = normalizeRecord({
       voyageId: telVoyage,
       captains: [
@@ -6648,6 +8988,7 @@ async function main(): Promise<void> {
           userId: "captain-b",
           presentAtEnd: false,
           marooned: "yes",
+          muted: "yes",
           peerTradeProfit: Number.NaN,
         },
       ],
@@ -6656,10 +8997,12 @@ async function main(): Promise<void> {
       telOlderLines !== null &&
         telOlderLines.captains.length === 2 &&
         telOlderLines.captains[0]?.marooned === false &&
+        telOlderLines.captains[0]?.muted === false &&
         telOlderLines.captains[0]?.peerTradeProfit === 0 &&
         telOlderLines.captains[1]?.marooned === false &&
+        telOlderLines.captains[1]?.muted === false &&
         telOlderLines.captains[1]?.peerTradeProfit === 0,
-      "and a captain line written before the voyage recorded either reads as a captain the harbor did not put ashore and who took nothing in trade, rather than as a line a reader has to guard",
+      "and a captain line written before the voyage recorded any of them reads as a captain the harbor did not put ashore and did not silence, and who took nothing in trade, rather than as a line a reader has to guard",
     );
 
     // ---- The voyage that sails to its end ----
@@ -6752,7 +9095,7 @@ async function main(): Promise<void> {
       socket: Socket,
       roomId: string,
       round: number,
-      phase: string,
+      phase: Phase,
     ): Promise<void> => {
       socket.emit("game:status", {
         roomId,
@@ -6817,7 +9160,7 @@ async function main(): Promise<void> {
 
     // Leg one at the Parley, which is where a board opens and where both
     // votes below are called from.
-    await telStand(sailHome, sailRoomId, 1, "barter");
+    await telStand(sailHome, sailRoomId, 1, "parley");
 
     // ---- the market, all three of its lines ----
     // One offer taken, and one left standing to expire when the harbor
@@ -6910,10 +9253,12 @@ async function main(): Promise<void> {
     telLegReport(sailCast, 0, 1, 1, 1);
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    // The bartering phase ends and the standing offer goes back to its
-    // poster, which is the expired line.
-    await telStand(sailHome, sailRoomId, 1, "worker_mgmt");
-    await telStand(sailHome, sailRoomId, 2, "barter");
+    // The Parley ends and the standing offer goes back to its poster, which
+    // is the expired line. The checkpoint has to move forward off the table
+    // for that to happen, so this stands the room at the phase after it on
+    // this voyage's own lap, which is the one the room would open next.
+    await telStand(sailHome, sailRoomId, 1, "resolve");
+    await telStand(sailHome, sailRoomId, 2, "parley");
     // And a report filed one leg ahead of the harbor, which is the one leg
     // of slack the spine allows: a captain who has just finished counting a
     // leg is routinely ahead of a checkpoint that only moves when somebody
@@ -6926,7 +9271,7 @@ async function main(): Promise<void> {
     // Two of three carries both, and the record keeps the nominations and
     // the harbor's answer separately: the first is usage and the second is
     // the outcome.
-    await telStand(sailHome, sailRoomId, 5, "barter");
+    await telStand(sailHome, sailRoomId, 5, "parley");
     sailHome.emit("audit:vote", {
       roomId: sailRoomId,
       round: 5,
@@ -6939,7 +9284,7 @@ async function main(): Promise<void> {
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    await telStand(sailHome, sailRoomId, 9, "barter");
+    await telStand(sailHome, sailRoomId, 9, "parley");
     sailHome.emit("maroon:vote", {
       roomId: sailRoomId,
       round: 9,
@@ -7228,7 +9573,7 @@ async function main(): Promise<void> {
     // would read as a harbor where nobody ever abandons anything.
     const driftRoom = await telSail("abandoned", [telDrift]);
     const [driftSolo] = driftRoom.crewSockets;
-    await telStand(driftSolo, driftRoom.roomId, 2, "barter");
+    await telStand(driftSolo, driftRoom.roomId, 2, "parley");
     const driftLeft = await call<{ ok: boolean }>(
       `/api/rooms/${driftRoom.roomId}/leave`,
       { method: "POST", cookie: telDrift.cookie },
@@ -7291,7 +9636,7 @@ async function main(): Promise<void> {
     // belongs to it.
     const wipeRoom = await telSail("wiped", [telWipe]);
     const [wipeSolo] = wipeRoom.crewSockets;
-    await telStand(wipeSolo, wipeRoom.roomId, 2, "barter");
+    await telStand(wipeSolo, wipeRoom.roomId, 2, "parley");
     wipeSolo.emit("chat:room", {
       roomId: wipeRoom.roomId,
       content: "Wreck ahead.",
@@ -7387,10 +9732,10 @@ async function main(): Promise<void> {
       truncated: false,
       ...over,
     });
-    // One captain's line, with the two fields goal I2 added read as the
-    // ordinary case unless a fixture says otherwise: a captain who was
-    // still in the harbor when the voyage closed, who was not put ashore,
-    // and who took nothing in trade.
+    // One captain's line, with the fields the marks and the mute live on
+    // read as the ordinary case unless a fixture says otherwise: a captain
+    // who was still in the harbor when the voyage closed, who was not put
+    // ashore, who was not silenced, and who took nothing in trade.
     const dashLine = (
       userId: string,
       over: Partial<TelemetryRecord["captains"][number]> = {},
@@ -7398,6 +9743,7 @@ async function main(): Promise<void> {
       userId,
       presentAtEnd: true,
       marooned: false,
+      muted: false,
       peerTradeProfit: 0,
       ...over,
     });
@@ -8138,7 +10484,7 @@ async function main(): Promise<void> {
       10000,
     );
     for (let leg = 1; leg <= 12; leg++) {
-      await telStand(sizeRoom.crewSockets[0], sizeRoomId, leg, "barter");
+      await telStand(sizeRoom.crewSockets[0], sizeRoomId, leg, "parley");
     }
     for (const socket of sizeRoom.crewSockets) {
       socket.emit("game:status", {
@@ -8219,7 +10565,7 @@ async function main(): Promise<void> {
         // Only harbors this run created are deleted. A Quick Start can
         // legitimately seat the two test captains into a harbor that was
         // already open, and that harbor belongs to whoever opened it.
-        for (const id of [roomId, quickStartRoomId]) {
+        for (const id of [roomId, quickStartRoomId, ...lapRoomIds]) {
           if (id && !preExistingRoomIds.has(id)) {
             await db.room.deleteMany({ where: { id } });
           }
@@ -8228,23 +10574,23 @@ async function main(): Promise<void> {
           await db.session.deleteMany({ where: { userId: { in: ids } } });
           await db.user.deleteMany({ where: { id: { in: ids } } });
         }
-        // The telemetry rows are the one thing a deleted harbor does not
-        // take with it, and deliberately so: the model carries no foreign
-        // key, because a record has to outlive the room it describes. The
-        // two deletes above have just removed every harbor this run
-        // created, so the rows left pointing at a harbor that no longer
-        // exists are this run's, and the database is put back the way it
-        // was found.
+        // The telemetry rows and the report rows are the two things a
+        // deleted harbor does not take with it, and deliberately so: both
+        // models carry a bare roomId rather than a foreign key, because
+        // both have to outlive the room they describe. The two deletes
+        // above have just removed every harbor this run created, so the
+        // rows left pointing at a harbor that no longer exists are this
+        // run's, and the database is put back the way it was found.
         const roomsLeft = await db.room.findMany({ select: { id: true } });
-        await db.voyageTelemetry.deleteMany(
-          roomsLeft.length
-            ? {
-                where: {
-                  roomId: { notIn: roomsLeft.map((room) => room.id) },
-                },
-              }
-            : undefined,
-        );
+        const orphaned = roomsLeft.length
+          ? {
+              where: {
+                roomId: { notIn: roomsLeft.map((room) => room.id) },
+              },
+            }
+          : undefined;
+        await db.voyageTelemetry.deleteMany(orphaned);
+        await db.report.deleteMany(orphaned);
       } catch (err) {
         // Reported, never swallowed: an unnoticed leftover account is
         // exactly what this block exists to prevent.

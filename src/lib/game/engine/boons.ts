@@ -170,7 +170,7 @@ function equipModule(
 }
 
 export function startBoonDrafting(state: GameState, logs: string[]) {
-  state.phase = 5;
+  state.phase = "dawn";
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;
@@ -207,7 +207,8 @@ export function swapBoonChoices(state: GameState, logs: string[]) {
 // answer its caller needs: the boon draft is left by choosing a boon, so a
 // call that matched nothing must not be allowed to move the voyage on.
 //
-// It used to end by starting Phase 1 by name, which both pinned the draft to
+// It used to end by starting the market phase by name, which both pinned the
+// draft to
 // one voyage's leg and made the choice and the advance impossible to separate.
 // The advance belongs to lockInBoon in ./lifecycle now, which is the one place
 // allowed to name where a phase leads. The GameContext it used to take went
@@ -286,7 +287,7 @@ export function handleModuleSelect(
     // actually confirms a slot, so it leaves the pool untouched, backing
     // out via "Back to Draft" should still show every original choice.
     state._draftChoices = state._draftChoices!.filter((m) => m.id !== mod.id);
-    state.phase = 4;
+    state.phase = "dusk";
   } else {
     state._newModule = mod;
     state.phase = "module_swap";
@@ -310,13 +311,14 @@ export function finalizeModuleSwap(
     (m) => m.id !== mod.id,
   );
   state._newModule = undefined;
-  state.phase = 4;
+  state.phase = "dusk";
 }
 
 // The Shipyard's "Back" button, used to bail out of the module draft
 // (phase "module_draft") or the swap picker (phase "module_swap") without
-// committing to anything. Resets the captain to the Shipyard phase (4)
-// and clears the two transients the draft might have parked: the drafted
+// committing to anything. Resets the captain to the Shipyard phase, which the
+// leg calls Dusk, and clears the two transients the draft might have parked:
+// the drafted
 // pool itself (`_draftChoices`) and the half chosen swap target
 // (`_newModule`). Reopening the draft afterwards rolls a fresh pool, since
 // `startModuleDrafting` only skips the roll while `_draftChoices` is
@@ -329,7 +331,7 @@ export function finalizeModuleSwap(
 // free "peek at a different pool and keep the one I prefer" toggle, which
 // is exactly the free reroll exploit the swap cap exists to close.
 export function cancelModuleDraft(state: GameState) {
-  state.phase = 4;
+  state.phase = "dusk";
   state._draftChoices = undefined;
   state._newModule = undefined;
 }

@@ -6,7 +6,7 @@ import type { LoanRecord } from "@/types/realtime";
 
 // The wire shape for an outstanding loan lives in @/types/realtime as
 // LoanRecord. The hook keeps the original OutstandingLoan alias for
-// back compat with the Settlement phase component's imports.
+// back compat with the Settlement panel's imports.
 export type OutstandingLoan = LoanRecord;
 
 export type BackingResolved = {

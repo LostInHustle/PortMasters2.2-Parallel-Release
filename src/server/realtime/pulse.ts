@@ -10,7 +10,7 @@
 // Keyed by room, then by round, since a report can arrive for the round
 // that's just ending while a slower captain is still mid report for the
 // one before it. Reports for a round are only ever read once, the moment
-// the room advances into the next round's Phase 1 (see maybeAdvance in
+// the room advances into the next round's Market (see maybeAdvance in
 // checkpoint.ts), and are never written to the database: losing this on
 // a server restart just means one round rolls with a neutral market,
 // which is the same as round 1 every voyage already looks like.

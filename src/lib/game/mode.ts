@@ -11,8 +11,10 @@
 // how long, how wide the market, how likely a raid. Mode says which game
 // you are playing: which phases the room synchronizes on, in what order,
 // and what happens to a seat that fails. Classic is the voyage PortMasters
-// 2 has always run and its order is byte for byte what the shared
-// checkpoint module used to hold inline.
+// 2 has always run: the same ports, the same table, the same manifest, with
+// the goods sorted before the conversation. Both modes walk the same six
+// phases now (see ./phases.ts), and the order below is where the two of
+// them part company.
 // Adding a mode at all is what lets a second one exist beside it without
 // touching the first, which is the whole point of this file.
 //
@@ -22,6 +24,7 @@
 // =====================================================================
 
 import { difficultyConfig } from "./difficulty";
+import type { LegPhase, Phase } from "./types";
 
 export type GameMode = "classic" | "ocean_gambit";
 
@@ -34,18 +37,14 @@ export const DEFAULT_MODE: GameMode = "classic";
 // each and in the order the engine walks them, so a mode that moves a
 // phase and forgets its chart fails the suite rather than briefing its
 // crew wrongly.
+//
+// The leg's name, glyph and colour are not written here. They are the
+// phase's own face (see ./phases.ts), so the chart and the voyage rail
+// cannot call one phase two things, and a leg renamed once is renamed
+// everywhere. What is written here is what only this mode can say about
+// the leg: what happens in it, and what it decides for the legs after it.
 export interface RoundLeg {
-  phase: string;
-  // Display metadata, the same kind the mode record carries above it.
-  // The fill is written out rather than looked up from the phase, so the
-  // palette check, which reads this file like any other source file,
-  // sees the class it has to have a rule for. The artisan panel's tiles
-  // are the precedent: each wears the colour of the phase it names, so
-  // the chart reads as a map of the round rather than as seven unrelated
-  // swatches.
-  icon: string;
-  gradient: string;
-  label: string;
+  phase: LegPhase;
   // What happens at this leg, and what it decides for the legs after it.
   // Two lines rather than one because the second is the reason a mode
   // briefs in a chart at all: a leg a captain cannot read forward is a
@@ -90,14 +89,16 @@ interface ModeConfig {
   // order, which is what a hardcoded description does the moment a second
   // mode exists.
   //
-  // Neither shape is a fold over checkpointPhaseOrder, on purpose: the lap
-  // is eight checkpoints and a captain pays for a handful of legs, because
-  // the harbor is not a step anybody takes and because two checkpoints can
-  // read as one leg to the captain who pays for both. Deriving the shipped
-  // mode's line from the array would change it to say more than it means
-  // to. The chart is held to the lap from the other side instead: every
-  // leg names the checkpoint it is, and the suite proves the legs cover
-  // the mode's own phases once each, in the order the engine walks them.
+  // Neither shape is a fold over checkpointPhaseOrder, on purpose, and for
+  // two reasons. The lap opens at the pier, which is a lobby rather than a
+  // step anybody takes, so a fold would hand the captain a leg they never
+  // play. And the shipped mode's line speaks of four moves where the leg
+  // has six phases, because a captain reads a round as the handful of
+  // decisions they make rather than as the room's gates: the two are not
+  // the same list and were never meant to be. The chart is held to the lap
+  // from the other side instead: every leg names the phase it is, and the
+  // suite proves the legs cover the mode's own leg phases once each, in
+  // the order the engine walks them.
   //
   // How many legs there are is written inside the briefing and nowhere
   // beside it, which is a rule rather than a habit. The Welcome pill used
@@ -136,7 +137,18 @@ interface ModeConfig {
   // mode, so this is safe by construction, and checkpointRank takes the mode
   // as an argument rather than reading a global so that it stays true when a
   // future screen compares two voyages side by side.
-  checkpointPhaseOrder: readonly string[];
+  //
+  // [B1: the six phase leg, as data] Both laps are now the same six phases
+  // in the mode's own order, opening at the pier, and the difference between
+  // the two modes is exactly where Orders sits relative to Parley. That is
+  // the design's one structural claim about Classic and Gambit: the shipped
+  // mode sorts the goods before it sorts the conversation, and the
+  // experimental one closes the manifest before the table opens.
+  //
+  // The type is Phase rather than string, which is what makes a lap entry a
+  // phase the engine actually has: a mode that mistypes its order fails the
+  // build rather than leading its crew to a checkpoint no panel answers.
+  checkpointPhaseOrder: readonly Phase[];
 
   // Whether a seat that fails the voyage is finished with it.
   //
@@ -224,28 +236,40 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // must find the voyage they know. Null rather than a copy of the
     // tier's number, because a copy is the value that stops following.
     voyageLegs: null,
-    // A line, and byte for byte the one the Welcome screen printed before
-    // modes existed, and the reason it moved rather than being rewritten:
-    // the shipped mode briefs its crew in the words it always has. Which
-    // shape a mode briefs in is a property of the mode, not of the screen
-    // that renders it.
+    // A line, and the one the Welcome screen has always printed, and the
+    // reason it moved rather than being rewritten: the shipped mode briefs
+    // its crew in one sentence. Which shape a mode briefs in is a property
+    // of the mode, not of the screen that renders it.
+    //
+    // [B1: the six phase leg, as data] What the sentence says did have to
+    // change, because B1 retired the numerals it was built on: a captain on
+    // the rail now reads Dawn, Market, Parley, Orders, Resolve and Dusk, and
+    // a briefing that still counted to four would be briefing a second
+    // vocabulary. It walks this mode's own lap, in this mode's own order,
+    // and it is written out here rather than built from the faces because
+    // ./phases.ts reads ./types.ts, which reads this file back.
     briefing: {
       kind: "line",
-      text: "1️⃣ Buy at Ports (+ 🤝 Barter) → 2️⃣ Fill Trade Orders → 3️⃣ Pirates, Wages & Maintenance → 4️⃣ Upgrade Ship",
+      text: "🧭 Dawn: Draft a Boon → 📦 Market: Buy at Ports → 🤝 Parley: Barter → 📜 Orders: Fill Trade Orders → 💸 Resolve: Pirates, Wages & Maintenance → 🚢 Dusk: Upgrade Ship",
     },
-    // Unchanged from the single hardcoded order the shared checkpoint
-    // module carried before modes existed. Port market, then the cross
-    // captain trade board, then artisan assignment, then the trade
-    // manifest. Classic sorts the goods before it sorts the conversation.
+    // Port market, then the cross captain trade board, then the trade
+    // manifest. Classic sorts the goods before it sorts the conversation,
+    // and that order is the difference a Classic captain would notice if
+    // it moved: the manifest is filled after the table has been read.
+    //
+    // The artisan bench lives inside Market rather than beside it (see
+    // ../game/phases.ts), so the round from the harbour's side is six
+    // gates where it used to be eight. A Classic captain's own round is
+    // the one they know: buy, trade at the table, set the crew, fill the
+    // manifest.
     checkpointPhaseOrder: [
-      "0",
-      "5",
-      "1",
-      "barter",
-      "worker_mgmt",
-      "2",
-      "3",
-      "4",
+      "harbor",
+      "dawn",
+      "market",
+      "parley",
+      "orders",
+      "resolve",
+      "dusk",
     ],
   },
   ocean_gambit: {
@@ -295,84 +319,57 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // whose words differ. A captain who sails one mode and then the other
     // is handed the mode's difference and nothing else.
     //
-    // Two legs were written for the line and keep their words here. Barter
-    // is a leg of its own in this mode rather than a parenthetical on the
-    // market, so it takes a number like one and names the captains on the
-    // other side of the trade, because they are who the mode moved the leg
-    // to reach. The orders wear the verb the mode is built on rather than
-    // the one Classic uses (see the tagline above): the manifest is filled
-    // and closed before the room starts talking, so nothing in it can be
+    // Two rows read differently from Classic's line, and both are the
+    // mode's argument rather than decoration. The exchange is a leg of both
+    // modes since [B1], so its row names the captains on the other side of
+    // the trade, because they are who this mode moved the leg to reach. And
+    // the orders wear the verb the mode is built on rather than the one
+    // Classic uses (see the tagline above): the manifest is filled and
+    // closed before the room starts talking, so nothing in it can be
     // revised once it does.
     //
-    // The chart buys three things the line could not carry. The two legs
-    // the line folded away, the boon draft and the artisans, get a row of
-    // their own, and every leg gets the line the mode actually turns on:
-    // what it decides for the legs after it. That second line is why this
-    // mode briefs in a chart at all. An order is the mode's whole design,
-    // and a chart is the shape that shows an order as an order, where a
-    // sentence leaves a captain to reconstruct the shape from the words.
+    // The chart buys two things the line cannot carry. Every leg gets the
+    // line the mode actually turns on, what it decides for the legs after
+    // it, and the round closes with the run back to the top rather than
+    // stopping at the last leg. That second line is why this mode briefs in
+    // a chart at all. An order is the mode's whole design, and a chart is
+    // the shape that shows an order as an order, where a sentence leaves a
+    // captain to reconstruct the shape from the words.
     briefing: {
       kind: "flow",
       legs: [
         {
-          phase: "5",
-          icon: "🧭",
-          gradient: "pm-grad-boon",
-          label: "Draft a Boon",
+          phase: "dawn",
           body: "Three boons are dealt to you alone each round: cheaper buying, fuller workshops, a shelter from the tax, or a loan when the purse runs thin.",
           setsUp:
             "The one you take bends this round and no other, so read the rest of the round before you choose.",
         },
         {
-          phase: "1",
-          icon: "📦",
-          gradient: "pm-grad-purchase",
-          label: "Buy at Ports",
-          body: "Load the hold at the port market. Prices shift every round, and every captain is quoted their own.",
+          phase: "market",
+          body: "Load the hold at the port market and set each artisan a task. Prices shift every round, every captain is quoted their own, and wages fall due working or idle.",
           setsUp:
-            "The manifest is dealt the moment this leg closes and it asks for goods, not intentions: what you leave with is what you can commit.",
+            "What the artisans make lands at settlement, so their work answers the next manifest rather than the one you are about to fill.",
         },
         {
-          phase: "2",
-          icon: "📜",
-          gradient: "pm-grad-orders",
-          label: "Lock in Trade Orders",
+          phase: "orders",
           body: "The manifest deals and you commit: goods for Gold and Reputation, and nothing on the sheet can be revised once the fleet starts talking.",
           setsUp:
             "The fleet cannot see what you committed, which cuts both ways: your round stays hidden from them, and theirs from you.",
         },
         {
-          phase: "barter",
-          icon: "🤝",
-          gradient: "pm-grad-barter",
-          label: "Barter with the Fleet",
+          phase: "parley",
           body: "The Captain's Exchange opens. Post what you can spare and name your price, or take what another captain has already set on the table.",
           setsUp:
             "A majority of the fleet can open one captain's manifest from this table, and calling it spends the rest of the table's trading.",
         },
         {
-          phase: "worker_mgmt",
-          icon: "👥",
-          gradient: "pm-grad-workers",
-          label: "Put Artisans to Work",
-          body: "Hire artisans and set each one a task. Wages fall due every round, working or idle.",
-          setsUp:
-            "What they make lands at settlement, so their work answers the next manifest rather than the one you just filled.",
-        },
-        {
-          phase: "3",
-          icon: "🏴☠️",
-          gradient: "pm-grad-settlement",
-          label: "Pirates, Wages & Maintenance",
+          phase: "resolve",
           body: "Pirates roll for every coin aboard. An escort buys the safe passage for a cut of what you carry, so the fee is cheapest exactly when you have the least to protect.",
           setsUp:
             "Then the wages and the ship's maintenance come due, and what survives the bills is what you take to the yard.",
         },
         {
-          phase: "4",
-          icon: "🚢",
-          gradient: "pm-grad-shipyard",
-          label: "Upgrade Ship",
+          phase: "dusk",
           body: "Spend what survived: a level of hull carries another module slot and cuts the cost of every haul, and a drafted module is bolted on for good.",
           setsUp:
             "What you spend here is what the next round's port cannot be bought with.",
@@ -390,20 +387,19 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // classic order a market game rather than a table game. Every phase
     // below is visited exactly once per round, so the lap still closes.
     //
-    // The full six phase leg from the design proposal, Dawn, Market, Orders,
-    // Parley, Resolve, Dusk, needs three phases that do not exist yet:
-    // Dawn for the survival ticks, and Resolve and Dusk for settlement and
-    // the log readout. They arrive with the survival layer, and they land
-    // in this array when they do.
+    // [B1: the six phase leg, as data] This is the array the leg was
+    // reconciled into, and the mode's whole difference is now visible in it:
+    // orders before parley, where Classic reads parley before orders. The
+    // six names are the design's, and the artisan bench, which used to be a
+    // checkpoint of its own after the table, is the second half of Market.
     checkpointPhaseOrder: [
-      "0",
-      "5",
-      "1",
-      "2",
-      "barter",
-      "worker_mgmt",
-      "3",
-      "4",
+      "harbor",
+      "dawn",
+      "market",
+      "orders",
+      "parley",
+      "resolve",
+      "dusk",
     ],
   },
 };

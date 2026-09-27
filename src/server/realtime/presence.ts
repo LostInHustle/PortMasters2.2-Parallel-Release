@@ -32,6 +32,7 @@ import type { PublicUser, PrivateEntry } from "@/types/realtime";
 import type { SocketState } from "./types";
 import { forgetStatusIfLastSocket } from "./status";
 import { closeVoyageTelemetry, noteCaptainLeft } from "./telemetry";
+import { noteVoyageLogDeparture } from "./voyage-log";
 
 export const sockets = new Map<string, SocketState>();
 export const userSockets = new Map<string, Set<string>>();
@@ -265,6 +266,12 @@ export async function reapDeparture(
   // never started has nothing open to record against, which is what keeps
   // every ordinary lobby departure out of the records.
   noteCaptainLeft(roomId, userId);
+  // [B4: the log surfaces] The same departure into the room's log, after
+  // the same write and for the same reason: a leave that failed is not a
+  // leave. The name comes off the plan rather than a lookup, because the
+  // captain's own row may already be gone by the time this runs and the
+  // plan was built while the seat still existed.
+  noteVoyageLogDeparture(io, roomId, userId, displayName);
 
   if (result.roomDeleted) {
     // The room was deleted because this was its last member. Tear

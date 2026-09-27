@@ -44,6 +44,7 @@ import type { AuditReveal, AuditTally } from "@/types/realtime";
 import { activeRosterSet } from "./checkpoint";
 import { parseSave } from "./save";
 import { noteTelemetry } from "./telemetry";
+import { noteVoyageLog } from "./voyage-log";
 
 // One room's audit, for as long as the voyage lasts. Votes belong to a
 // leg and are replaced when the leg turns; the reveal belongs to the
@@ -214,5 +215,16 @@ export async function recordAuditVote(
   // usage is counted and the verdict is left to the one place that already
   // knew it.
   noteTelemetry(roomId, "audit_carried", { target: carried });
+  // [B4: the log surfaces] The room's line for the same carried vote, and
+  // it names the captain by display name rather than by id, which is the
+  // only place the two differ: a record is read by an operator who was not
+  // sitting at the table, and this is read by the captains who were. The
+  // name comes off the reveal below rather than from a second query, so
+  // the line and the frame that shows the table its answer cannot name two
+  // different captains.
+  noteVoyageLog(io, roomId, {
+    kind: "audit_carried",
+    target: reveal.target.name,
+  });
   io.to(`room:${roomId}`).emit("audit:reveal", reveal);
 }

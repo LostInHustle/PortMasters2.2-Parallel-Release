@@ -8,7 +8,7 @@ import { db, type PublicUser } from "./db";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
-export function hashPassword(password: string): string {
+function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(password, salt, 64).toString("hex");
   return `${salt}:${hash}`;
@@ -127,10 +127,12 @@ export async function getUserFromToken(token: string | undefined | null) {
 export const SESSION_COOKIE_NAME = "pm_session";
 export const sessionCookieMaxAge = SESSION_TTL_MS / 1000;
 
-// Avatar hue from a string (fallback when a user has none). Kept here next to
-// the session helpers so api-auth, the API routes, and the legacy layer all
-// import it from the same place instead of each carrying their own copy.
-export function hueFromString(s: string): number {
+// Avatar hue from a string, used once, when an account is created without
+// one. It is read here and nowhere else, because from that moment on the hue
+// travels with the account rather than being worked out again: every screen
+// that draws an avatar is handed the number, so there is no second caller to
+// share this with and no copy of the sum anywhere else in the tree.
+function hueFromString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
   return h;

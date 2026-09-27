@@ -17,6 +17,7 @@ import {
 import { DEFAULT_MODE, voyageRoundsFor, type GameMode } from "./mode";
 import type { PortShift } from "./maroon";
 import type { HouseId } from "./legacy";
+import { defaultStandingOrders, type StandingOrders } from "./standing";
 // The two runtime imports this module takes from the engine, and
 // deliberately narrow ones: ./engine/houses.ts imports nothing but types, so
 // the two cannot form a cycle. Both live at the one place a voyage is born,
@@ -24,15 +25,27 @@ import type { HouseId } from "./legacy";
 // empty perk set has a single definition rather than a copy per call site.
 import { applyHousePerkAtStart, noHousePerks } from "./engine/houses";
 
+// The six phases of a leg, and the states beside it.
+//
+// [B1: the six phase leg, as data] These were numbers for most of the
+// engine's life (`0` welcome, `1` purchase, `2` orders, `3` settlement,
+// `4` shipyard, `5` boon draft) with two string checkpoints bolted on
+// afterwards (`barter`, `worker_mgmt`), and the two modes put them in
+// different orders. The design asks for a six phase leg instead, so the
+// stations the numbers named became the phases they belong to, the two
+// bolted on checkpoints became work inside Parley and Market, and the
+// vocabulary is now words throughout: a phase is named for what it is.
+//
+// See ../game/phases.ts, which is where a phase's face lives and where a
+// value written by an older build is placed on load.
+export type LegPhase =
+  "dawn" | "market" | "orders" | "parley" | "resolve" | "dusk";
+
 export type Phase =
-  | 0 // welcome
-  | 1 // port purchase
-  | 2 // trade orders
-  | 3 // maintenance / settlement
-  | 4 // shipyard
-  | 5 // boon drafting
-  | "barter"
-  | "worker_mgmt"
+  | "harbor"
+  | LegPhase
+  // Personal sub states: a captain drafting or swapping a module is
+  // standing in Dusk, and the room is not waiting on them.
   | "module_draft"
   | "module_swap"
   | "bankruptcy"
@@ -68,7 +81,7 @@ export type OrderCard = {
   // undefined and is unaffected.
   isBrokerFavor?: boolean;
   // Set only on the Emperor's scheduled commission (see the mandate injection
-  // in startPhase2 and MANDATE_TEMPLATES in ./difficulty). Purely a marker for
+  // in startOrders and MANDATE_TEMPLATES in ./difficulty). Purely a marker for
   // the trade board's styling; the order settles like any other, except that it
   // carries isProductOrder: false so no VAT is charged on an imperial levy.
   isMandate?: boolean;
@@ -128,7 +141,7 @@ export type Worker = {
 //
 //   jadeFreeHireAvailable  hireWorker (waives the first wage, and clears the
 //                          waiver the moment it is spent)
-//   vermilionExtraCard     startPhase1 (one more cargo lot on the board)
+//   vermilionExtraCard     startMarket (one more cargo lot on the board)
 //   goldenWageDiscount     getHireCost (a fifth off every wage, which
 //                          reaches hiring, payroll and severance alike)
 //   goldenPirateBump       resolvePirateAttack (five percent more raids)
@@ -258,6 +271,15 @@ export type GameState = {
   // _pendingDebtSettlements/_draftChoices/_newModule already use for an
   // engine function that needs the React layer to act on its behalf.
   _pendingDocksClaim?: { total: number };
+  // [B3: standing orders] The same convention, for the other thing a
+  // market can produce without a hand on it. A market this captain's
+  // orders played buys lots after the round's own pulse report has already
+  // gone out, so the delta rides here and the phase sync hook relays it as
+  // a second report for the same round (see workStandingOrders in
+  // ./engine/standing and addPulseReport in src/server/realtime/pulse.ts,
+  // which accumulates rather than replaces). Empty is nothing to say, and
+  // the field is cleared by whoever relays it.
+  _pendingPulseTally?: Record<string, number>;
   gameOver: boolean;
   // [H7: Maroon and the Harbormaster] The two marks a failed voyage leaves
   // on a seat that is still sailing, and the reason they are flags on the
@@ -279,10 +301,10 @@ export type GameState = {
   phase2DemandTags: string[];
   revealedIntel: IntelItem[];
   // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
-  // round's Phase 1, keyed by resource name (Hemp, Silk, Tea), derived room
+  // round's Market, keyed by resource name (Hemp, Silk, Tea), derived room
   // wide from what the whole harbor bought last round (see
   // computeHarborPulse in src/lib/game/harborPulse.ts) and delivered on the same
-  // phase:advance broadcast that already carries every captain into Phase 1
+  // phase:advance broadcast that already carries every captain into Market
   // together. Read by genResourceCard in engine.ts as one more multiplier
   // alongside Boons and modules; never persisted beyond the round it was
   // delivered for, and empty on round 1 since there is no prior round to
@@ -304,10 +326,24 @@ export type GameState = {
   // is only the market's copy of it. Null on every voyage with no
   // Harbormaster, which is every Classic voyage and most Gambit ones.
   portShift: PortShift | null;
+  // [B3: standing orders] What this captain wants done at the seats they
+  // are not standing at, written once and read by the engine when the
+  // room's clock plays a seat out from under them. The vocabulary, the
+  // default and the normalizer live in ../game/standing, and the
+  // evaluation that reads it lives in ./engine/standing; this field is
+  // only the record.
+  //
+  // On the voyage rather than on the account, and therefore reset by
+  // everything that resets a voyage except one thing: restartGame carries
+  // it forward across a host's restart, because a captain configured it
+  // once and a restart is not the captain changing their mind. It is part
+  // of the save, so it rides the existing PUT /api/game/state with no new
+  // column, no new route and no new frame.
+  standingOrders: StandingOrders;
   // Price history: for each good, the average unit price paid across
-  // all purchases in each prior round. Used by the Purchase phase to
+  // all purchases in each prior round. Used by the Market station to
   // render a sparkline showing price trends. Seeded empty on a fresh
-  // voyage and appended once per round at the end of Phase 1.
+  // voyage and appended once per round at the end of Market.
   priceHistory: Record<string, number[]>;
   // [H2: the fleet commission] What this captain has handed to the
   // voyage's public objective so far, by good, cumulative for the voyage.
@@ -338,7 +374,7 @@ export type GameState = {
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
   // game:status handler in src/server/realtime/index.ts, which is where every
-  // captain's Reputation is already visible). Read by startPhase1 to add one
+  // captain's Reputation is already visible). Read by startMarket to add one
   // extra card to this captain's board from the next round onward; never
   // flips back, and never touches maxRounds, difficulty, or which tier's
   // content is visible, all of which stay the host's own choice.
@@ -367,7 +403,7 @@ export type GameState = {
   moduleSwapUsed: boolean;
   _newModule?: Module;
   // Reset every round in startBoonDrafting, same as boonSwapUsed/
-  // moduleSwapUsed above. Resolved once per round, in Phase 3, before the
+  // moduleSwapUsed above. Resolved once per round, in Resolve, before the
   // wages and maintenance settlement: either a 20% chance of losing every
   // Gold on hand, or a guaranteed safe escort for 10% of it.
   pirateAttackResolved: boolean;
@@ -587,7 +623,9 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     shipUpgradeCost: [15, 25, 40],
     shipUpgradePenalty: 0,
     maintenancePenalty: 0,
-    phase: 0,
+    // A voyage is born at the pier, before its first leg. See
+    // ../game/phases.ts for why the harbor is not one of the six.
+    phase: "harbor",
     resourceCards: [],
     customerCards: [],
     purchasedCards: [],
@@ -607,6 +645,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     revealedIntel: [],
     harborPulse: {},
     portShift: null,
+    standingOrders: defaultStandingOrders(),
     priceHistory: {},
     objectiveDelivered: {},
     objectiveTrace: [],
@@ -639,6 +678,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     // the new voyage (startModuleDrafting treats a non undefined
     // _draftChoices as "already rolled" and skips rolling a fresh pool).
     _pendingDocksClaim: undefined,
+    _pendingPulseTally: undefined,
     _draftChoices: undefined,
     _newModule: undefined,
     _pendingDebtSettlements: undefined,

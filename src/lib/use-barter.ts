@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { BarterOffer } from "@/types/realtime";
 
-// Forwarded so the Bartering phase component can import the wire shape
+// Forwarded so the Parley panel can import the wire shape
 // from the same place it imports the hook. The canonical home is
 // @/types/realtime so the realtime layer and the client hook share
 // one definition.
@@ -20,7 +20,7 @@ export type { BarterOffer };
  * or a sweep) is the caller's job via the engine functions in
  * src/lib/game/engine.ts.
  *
- * One hook, both surfaces. The Captain's Exchange in the Bartering phase
+ * One hook, both surfaces. The Captain's Exchange at the Parley
  * and the composer on a chat post into the same board through the same
  * call, and differ only in the `flexible` flag they carry: that flag is
  * what the server reads to decide whether the Renown gate and the

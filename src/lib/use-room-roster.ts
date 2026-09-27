@@ -6,6 +6,7 @@ import type {
   GameStatusUpdate,
   PublicUser,
   RoomMemberLive,
+  RoomMembersPayload,
 } from "@/types/realtime";
 
 type RoomStatusMap = Record<string, GameStatusUpdate>;
@@ -35,12 +36,11 @@ export function useRoomRoster(
   useEffect(() => {
     if (!socket) return;
 
-    const onMembers = (data: {
-      roomId: string;
-      members: RoomMemberLive[];
-      mutedUserIds?: string[];
-    }) => {
+    const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== roomId) return;
+      // The list is what this captain may see rather than what the room
+      // holds (see RoomMembersPayload), and the server is the only writer
+      // of it, so it is taken as handed rather than filtered here.
       setMutedUserIds(new Set(data.mutedUserIds ?? []));
       // Defensive dedupe by id. The server collapses a captain's many sockets
       // to one roster row, but a stale duplicate must never reach a render: it

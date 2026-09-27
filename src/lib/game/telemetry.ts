@@ -92,6 +92,19 @@ export interface TelemetryPayloads {
     ordersFilled: number;
     distinctGoods: number;
   };
+  // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
+  // the room was moved on without every captain having readied. The tally
+  // is the whole point of the event: ready is how many captains had said
+  // they were done when the clock fired, and required is the room the phase
+  // was actually waiting on. Read together they are the plan's tuning
+  // number, which is the share of legs that ran their full clock with
+  // nobody idle (ready 0 of required, meaning the crew was still working
+  // when time ran out, which is a phase that is too short) against the legs
+  // where the clock merely waited on a straggler (ready all but one or two).
+  // A leg nobody was sitting in at all writes nothing, because a room with
+  // no sockets is not moved by its clock; see the fire path in
+  // src/server/realtime/checkpoint.ts.
+  leg_timed_out: { leg: number; ready: number; required: number };
   // ---- market ----
   // The barter board's three outcomes. All three count the same side of an
   // offer, the units its poster put up, so the three add up: what was
@@ -118,6 +131,21 @@ export interface TelemetryPayloads {
   // the record closes with.
   maroon_asked: { leg: number; actor: string; target: string };
   maroon_carried: { leg: number; target: string };
+  // [J2: the mute and the report] The moderation surface, as usage. A
+  // mute is the host's act alone and so carries no carried line, unlike
+  // the audit and the maroon above: nothing in the harbor votes on it.
+  // Both halves of it are recorded, because the two are different facts
+  // about a voyage: a mute that stood to the end and a mute the host
+  // lifted after one leg read the same in the captain lines below, and
+  // the plan's question about a muted captain is only answerable if the
+  // record can tell them apart.
+  mute_set: { leg: number; actor: string; target: string };
+  mute_cleared: { leg: number; actor: string; target: string };
+  // A report, filed and on the record. The plan's console reads the rows
+  // themselves; this is the measurement, and it is here rather than left
+  // to the table because a record that says a voyage was played with a
+  // report in it has to be readable without the database that holds it.
+  report_filed: { leg: number; actor: string; target: string };
   // ---- business ----
   // A captain left a voyage that had started. The leg is the abandon
   // point the plan asks for, and it is recorded even when somebody else
@@ -134,6 +162,7 @@ export type TelemetryName = keyof TelemetryPayloads;
 export const TELEMETRY_FAMILY: Record<TelemetryName, TelemetryFamily> = {
   leg_advanced: "loop",
   leg_report: "loop",
+  leg_timed_out: "loop",
   offer_posted: "market",
   offer_filled: "market",
   offer_expired: "market",
@@ -142,6 +171,9 @@ export const TELEMETRY_FAMILY: Record<TelemetryName, TelemetryFamily> = {
   audit_carried: "social",
   maroon_asked: "social",
   maroon_carried: "social",
+  mute_set: "social",
+  mute_cleared: "social",
+  report_filed: "social",
   captain_left: "business",
 };
 
@@ -210,6 +242,17 @@ export interface TelemetryCaptain {
   // read for, which is the reading an unreadable save already gets, so the
   // field is never null and never guessed at.
   peerTradeProfit: number;
+  // [J2: the mute and the report] Whether the host muted this captain at
+  // any point in this voyage. A mark rather than a conclusion, and it is
+  // sticky on purpose: a captain who was muted and then forgiven reads
+  // true here and carries both halves of it in the events above, so a
+  // reader asking "was this captain still muted when the voyage ended"
+  // reads the last mute_set or mute_cleared for them rather than this
+  // field. The other way round would lose the mute entirely, and the
+  // plan's question about a muted captain is answered against the
+  // chronicle's own line for them, which is the join this field makes
+  // without needing one.
+  muted: boolean;
 }
 
 // The record one voyage leaves behind. The header is everything a reader
@@ -283,13 +326,15 @@ export function normalizeRecord(value: unknown): TelemetryRecord | null {
       .map((line) => ({
         userId: line.userId,
         presentAtEnd: line.presentAtEnd === true,
-        // A line written before goal I2 added these two reads as a captain
-        // the harbor did not put ashore and who took nothing in trade,
-        // which is the same absence an unreadable save gives. That is the
+        // A line written before these reads existed reads as a captain the
+        // harbor did not put ashore, was not silenced, and who took nothing
+        // in trade, which is the same absence an unreadable save gives.
+        // That is the
         // no backfill rule: an old record is read with defaults rather than
         // rewritten, and no record carries a null a reader would have to
         // special case.
         marooned: line.marooned === true,
+        muted: line.muted === true,
         peerTradeProfit: normalizeProfit(line.peerTradeProfit),
       })),
     events: events.filter(

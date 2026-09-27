@@ -123,7 +123,7 @@ export function Welcome({
   return (
     <div className="max-w-3xl mx-auto text-center py-4">
       <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1">
-        <span className="text-welcome">⚓ {APP_NAME} 🚢</span>
+        <span className="text-harbor">⚓ {APP_NAME} 🚢</span>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         {/* The voyage's own length, read from the state the captain is
@@ -141,7 +141,7 @@ export function Welcome({
               size="lg"
               className={cn(
                 "rounded-xl h-12 px-8 text-base",
-                canStart && "pm-grad-welcome",
+                canStart && "pm-grad-harbor",
               )}
               variant={canStart ? "default" : "secondary"}
               disabled={!canStart}
@@ -182,7 +182,7 @@ export function Welcome({
           tone="warn"
           title="⏱️ Production Delay"
           rows={[
-            "Assign task now → item arrives at Phase 3",
+            "Assign task now → item arrives at Resolve",
             "Workers don't produce instantly!",
           ]}
         />
@@ -191,7 +191,7 @@ export function Welcome({
           title="💸 Round End Costs"
           rows={[
             `🔧 ${cfg.maintenance} Gold ship maintenance per round`,
-            "👥 Wages settled at Phase 3, not on hire",
+            "👥 Wages settled at Resolve, not on hire",
           ]}
         />
         <InfoCard

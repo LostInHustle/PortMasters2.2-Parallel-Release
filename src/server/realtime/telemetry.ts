@@ -78,6 +78,14 @@ interface VoyageAccumulator {
   // the line the way the event rides the record, and the two are written
   // from the same call so neither can say something the other does not.
   marooned: Set<string>;
+  // [J2: the mute and the report] The captains the host has silenced at
+  // any point in this voyage, held as a mark for the same reason the
+  // maroon is: a voyage that ends by a wipe or by the harbor emptying has
+  // no conclusion to read a mute count from, and the plan's question
+  // about a muted captain is answered against the captains the record
+  // closes with. The set is never emptied by an unmute, because the mark
+  // means "was muted", and the two events beside it say when.
+  muted: Set<string>;
   events: TelemetryEvent[];
   truncated: boolean;
 }
@@ -150,6 +158,7 @@ export function openVoyageTelemetry(
     captains: new Set(roster),
     left: new Set(),
     marooned: new Set(),
+    muted: new Set(),
     events: [],
     truncated: false,
   });
@@ -344,6 +353,28 @@ export function noteCaptainMarooned(roomId: string, actor: string): void {
 }
 
 /**
+ * [J2: the mute and the report] The host silenced a captain.
+ *
+ * The same mark the maroon writes, written the same way and for the same
+ * reason: it is the server's own fact, it is written from the one place
+ * the mute is applied, and it goes onto the captain's own line rather than
+ * being joined out of the mute_set event at the reading end. Like the
+ * maroon it writes no event and so does not go through the event cap: a
+ * truncated record still says who was silenced, because the cap bounds how
+ * much happened rather than how the voyage stood when it ended.
+ *
+ * An unmute does not take the mark back. The mark reads "was muted", which
+ * is the thing a reader cannot recover from the record otherwise, and
+ * whether the mute stood to the end is read from the pair of events, the
+ * last of which decides it.
+ */
+export function noteCaptainMuted(roomId: string, actor: string): void {
+  const voyage = voyageTelemetry.get(roomId);
+  if (!voyage) return;
+  voyage.muted.add(actor);
+}
+
+/**
  * The voyage stopped. Writes the record and forgets the voyage.
  *
  * The list handed in is the whole truth about the end: the captains still
@@ -385,8 +416,15 @@ export async function closeVoyageTelemetry(
   }
   // A captain the harbor voted ashore is a captain this voyage saw, even
   // if they never filed a leg report, so the mark carries its own line
-  // rather than being dropped for want of one.
+  // rather than being dropped for want of one. The mute mark gets the same
+  // treatment for the same reason, and the reason is not hypothetical on
+  // this one: a captain who takes a seat mid voyage, is silenced, and
+  // gives the seat up again before reporting a leg is counted by nothing
+  // else, since noteCaptainLeft refuses a captain the voyage never counted.
   for (const userId of voyage.marooned) {
+    voyage.captains.add(userId);
+  }
+  for (const userId of voyage.muted) {
     voyage.captains.add(userId);
   }
   const captains: TelemetryCaptain[] = Array.from(
@@ -395,6 +433,7 @@ export async function closeVoyageTelemetry(
       userId,
       presentAtEnd: stillThere.has(userId),
       marooned: voyage.marooned.has(userId),
+      muted: voyage.muted.has(userId),
       peerTradeProfit: peerTradeProfits.get(userId) ?? 0,
     }),
   );

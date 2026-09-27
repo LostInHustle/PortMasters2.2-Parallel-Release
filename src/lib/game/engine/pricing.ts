@@ -249,7 +249,7 @@ const FOREIGN_QUARTER_GOODS = ["Spices", "Pearls"];
 const FOREIGN_QUARTER_PER_UNIT = 3;
 
 // What a market card actually costs, reported as a step by step breakdown
-// so the buying phase tooltip can show exactly where a price came from:
+// so the Market tooltip can show exactly where a price came from:
 // base cost, then whatever boon or module touched it. getCardFinalCost
 // below reads the final step, so this is the only price of a card there is
 // rather than a second opinion of one.
@@ -369,13 +369,12 @@ export function priceRatio(
 
 // A general "what does this typically cost" estimate for a raw material
 // or product, independent of any specific market card. Used for the
-// hover preview during the buying phase (Phase 1) so a captain can size
-// up the whole market, including goods that didn't happen to roll onto
-// one of this round's market cards. Ports nudge a raw
-// material's roll by
-// 1 Gold up or down depending on whether the port specializes in it
-// (see genResourceCard), which is why the range carries a margin note
-// instead of trying to fold that into the numbers themselves.
+// hover preview during Market so a captain can size up the whole market,
+// including goods that didn't happen to roll onto one of this round's
+// market cards. Ports nudge a raw material's roll by 1 Gold up or down
+// depending on whether the port specializes in it (see genResourceCard),
+// which is why the range carries a margin note instead of trying to fold
+// that into the numbers themselves.
 export function explainExpectedPrice(
   state: GameState,
   itemType: string,
@@ -439,9 +438,9 @@ export function explainExpectedPrice(
 // The canonical per worker, per round wage for a given type, given every
 // currently active modifier. There is no separate one time "hiring fee"
 // in this game (see hireWorker, which never touches state.money);
-// the number this returns is what Phase 3 actually charges for that
+// the number this returns is what Resolve actually charges for that
 // worker, so every place that shows or charges a wage, this function,
-// payWages, and the Pending Payroll preview in WorkerMgmt (GamePhasePanel.tsx),
+// payWages, and the Pending Payroll preview in phases/WorkerMgmt.tsx,
 // must all read from here rather than re deriving the formula themselves.
 // Root cause of the Master's Apprentice bug: payWages and that preview
 // used to hardcode WAGES[type] with only the Artisan's Workshop
@@ -456,13 +455,13 @@ export function getHireCost(state: GameState, type: string): number {
   // discounts the wage actually due rather than the list price, and read
   // here so hiring, payroll, severance and every interface preview quote
   // the same figure (see payWages, fireWorker, and the Pending Payroll
-  // preview in GamePhasePanel).
+  // preview in phases/WorkerMgmt.tsx).
   if (state.housePerks.goldenWageDiscount) wage = Math.floor(wage * 0.8);
   return wage;
 }
 
 // ========== Broker intel ==========
-// The Gold a captain pays for one Broker's rumor in Phase 1. Used to live
+// The Gold a captain pays for one Broker's rumor in Market. Used to live
 // directly on GameState as `intelCost`, set to 5 by createInitialGameState
 // and toggled to 2 by the Broker's Network module's equip/unequip hooks in
 // ./boons.ts. Derived here now instead, so the cost can never drift out of

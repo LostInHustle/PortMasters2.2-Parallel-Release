@@ -257,10 +257,12 @@ export function Th({
 
 /**
  * A labelled form row: the label, an optional hint on the far side of it,
- * and the control underneath. Shared by the two cards that take a captain
- * name and a password, so both ask for them the same way.
+ * and the control underneath. It backs the field below it rather than being
+ * spread across the tree, so the two cards that take a captain name and a
+ * password ask for them the same way without either of them reaching past
+ * the shaped field to the row it is built out of.
  */
-export function Field({
+function Field({
   label,
   hint,
   children,
