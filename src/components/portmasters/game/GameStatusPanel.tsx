@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  COLD_LEG_WARMTH,
   CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
@@ -10,7 +11,15 @@ import {
   SHIP_DISCOUNT_PER_LEVEL,
 } from "@/lib/game/constants";
 import { basePriceRange, getHireCost } from "@/lib/game/engine";
-import { onShortRations, survivalLayerOn } from "@/lib/game/larder";
+import { onShortRations } from "@/lib/game/larder";
+import { survivalLayerOn } from "@/lib/game/flags";
+import {
+  garmentsLayerOn,
+  legIsCold,
+  shortOfWarmth,
+  warmthScore,
+  warmthText,
+} from "@/lib/game/garments";
 import {
   computeVentureDeadlineBounds,
   ventureAlreadySpentReason,
@@ -85,6 +94,16 @@ export function GameStatusPanel({
   // whether the crew is short decides what colour the number wears.
   const larderOn = survivalLayerOn();
   const shortRations = larderOn && onShortRations(game);
+  // [C3: garments and the cold] The weather and the wardrobe, read once
+  // each for the chip below. The layer decides whether there is a chip at
+  // all, the tag decides whether this leg is one worth saying anything
+  // about, and the score is the same sum the settlement tick freezes
+  // against, so the warning printed here and the check that bites the crew
+  // cannot read differently.
+  const garmentsOn = garmentsLayerOn();
+  const coldLeg = garmentsOn && legIsCold(game);
+  const warmth = warmthScore(game);
+  const shortWarmth = shortOfWarmth(game);
 
   // Summed across the whole unlocked roster, not the three founding types.
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
@@ -206,6 +225,28 @@ export function GameStatusPanel({
             />
           )}
         </div>
+        {/* [C3: garments and the cold] The weather is readable from here in
+            every phase, which is the whole point of it: a captain decides
+            what to wear at the bench before the leg resolves, and the tag
+            is worth nothing if it only surfaces in the settlement that has
+            already happened. It is drawn on a cold leg alone, because a
+            mild one asks nothing of anybody, and it wears the meaning
+            colours rather than a hue of its own: the sea while the crew is
+            dressed for the weather, the alarm red the moment the clothes
+            on their backs are not enough. The Wardrobe panel on the bench
+            prints the same sum from the same function. */}
+        {coldLeg && (
+          <div
+            className={cn(
+              "mt-2 rounded-md py-1 text-center text-[10px]",
+              shortWarmth ? "bg-alarm/5 text-alarm" : "bg-sea/5 text-sea",
+            )}
+          >
+            {shortWarmth
+              ? `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, so the cold will take a hand.`
+              : `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, and the crew is dressed for it.`}
+          </div>
+        )}
         <VoyageTimeline
           currentRound={game.currentRound}
           maxRounds={game.maxRounds}

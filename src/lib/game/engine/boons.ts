@@ -27,6 +27,7 @@ import {
   type Boon,
   type Module,
 } from "../constants";
+import { settleHunger } from "../crew";
 import { feedCrew } from "../larder";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
@@ -180,7 +181,14 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   // what makes it once a leg by construction; the stamp the meal itself
   // keeps is what makes it once a leg anyway, since two of those paths can
   // meet on one client for one Dawn (see feedCrew in ../larder).
-  feedCrew(state, logs);
+  //
+  // [C2: crew loss by name] The price of hunger is paid at the same moment
+  // and off the same stamp: the meal answers whether this call was the
+  // leg's, and only then does the run of hungry legs advance. Settled
+  // beside the meal rather than inside it because the Larder counts the
+  // mouths and the roster is who they are, so the rule that takes a hand
+  // lives in ../crew and reads the Larder rather than the other way around.
+  if (feedCrew(state, logs)) settleHunger(state, logs);
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;

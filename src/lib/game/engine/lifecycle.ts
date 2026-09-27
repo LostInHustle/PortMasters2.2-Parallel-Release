@@ -23,6 +23,8 @@
 // =====================================================================
 import { APP_NAME, merchantRatingForScore } from "../constants";
 import { closesRound, lapSuccessor } from "../checkpoint";
+import { tickGarments } from "../garments";
+import { tickSpoilage } from "../foods";
 import { isLegPhase, normalizePhase, phaseFace } from "../phases";
 import { normalizeStandingOrders } from "../standing";
 import {
@@ -156,6 +158,22 @@ function startResolve(state: GameState, logs: string[]) {
 // Private for the same reason as completeOrders above: the settlement panel
 // reaches it through nextPhase now, so nothing outside this module names it.
 function finishSettlement(state: GameState, logs: string[]) {
+  // [C3: garments and the cold] The cold is settled with the books, which is
+  // where the plan puts it: decay and the check tick inside settlement, on
+  // the deterministic resolve step, and the module reads the round rather
+  // than a clock. It sits above the wage bill because it is a fact about the
+  // leg that just ended rather than a charge for it, so the wear and the
+  // frostbite are read before the numbers they are not part of.
+  tickGarments(state, logs);
+  // [C4: three foods, spoilage and the split hold] The pantry is settled
+  // beside the wardrobe and for the same reasons: the plan says spoilage
+  // and decay "both tick inside settlement, so both must be part of the
+  // deterministic resolve step and neither may read a clock", and the leg
+  // number is the only clock either of them has. It sits below the clothes
+  // rather than above them because the wear is about the leg that just
+  // ended and the rot is about what was carried through it, which is the
+  // same kind of fact a line later.
+  tickSpoilage(state, logs);
   logs.push("\n💰=== Paying Worker Wages ===");
   const wageResult = payWages(state, logs);
   if (wageResult === "bankruptcy") return failSeat(state, logs);

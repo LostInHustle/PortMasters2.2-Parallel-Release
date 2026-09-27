@@ -152,13 +152,13 @@ interface ModeConfig {
 
   // Whether a seat that fails the voyage is finished with it.
   //
-  // Classic is the voyage PortMasters 2 has always run, and in it a captain
-  // who cannot pay the harbor is done: the Bankruptcy screen is where their
-  // voyage ends and the standings are read without them. Ocean Gambit is
-  // built on the opposite pillar, that there are no dead seats, so a captain
-  // who runs out of Gold keeps their seat, their vote and their lap, and is
-  // marked bankrupt for the record and the verdict rather than removed from
-  // the table.
+  // Classic is the voyage PortMasters 2 Parallel Release has always run,
+  // and in it a captain who cannot pay the harbor is done: the Bankruptcy
+  // screen is where their voyage ends and the standings are read without
+  // them. Ocean Gambit is built on the opposite pillar, that there are no
+  // dead seats, so a captain who runs out of Gold keeps their seat, their
+  // vote and their lap, and is marked bankrupt for the record and the
+  // verdict rather than removed from the table.
   //
   // This lives on the mode rather than in the engine as a global because the
   // two are different games and the shipped one is entitled to the rules it

@@ -23,6 +23,8 @@ import {
   type WorkerTypeId,
 } from "../constants";
 import { onShortRations, shortRationsYield } from "../larder";
+import { newCrewIdentity } from "../crew";
+import { isFrostbitten } from "../garments";
 import type { GameState } from "../types";
 import { hasModule } from "./core";
 import { getHireCost } from "./pricing";
@@ -52,17 +54,28 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
   // map only ever held the same three labels WORKER_TYPES already carries.
   // `progress: 0` is also gone from the new worker, since Worker.progress
   // was always 0 and unused (see types.ts).
+  //
+  // [C2: crew loss by name] Who the new hand is, drawn here rather than
+  // inside their object literal, because the draw reads the roster and the
+  // voyage's losses. Read after every guard above, so a hire that bails
+  // out over an empty purse never spends a name, and the log line
+  // introduces the person rather than the trade: the bench's rows carry
+  // names now, and a captain meeting an artisan here and a row there
+  // should meet the same one.
+  const identity = newCrewIdentity(state);
   list.push({
     task: null,
     producedCount: 0,
     isSkilled: false,
+    name: identity.name,
+    seq: identity.seq,
     // Present only on the pledge hire, so a saved voyage carries the flag
     // on the one artisan it means rather than as an explicit false on every
     // worker. An absent flag and a false one read identically.
     freeFirstWage: pledged || undefined,
   });
   logs.push(
-    `${def?.icon ?? "🧑"} Hired a ${label}! Wage: ${wage} Gold / Round (paid at round end)`,
+    `${def?.icon ?? "🧑"} Hired ${identity.name} the ${label}! Wage: ${wage} Gold / Round (paid at round end)`,
   );
   if (pledged) {
     state.housePerks.jadeFreeHireAvailable = false;
@@ -94,7 +107,13 @@ export function fireWorker(
   }
   state.money -= wage;
   const worker = list.splice(idx, 1)[0];
-  logs.push(`💔 Dismissed a ${label}. Severance: ${wage} Gold`);
+  // [C2: crew loss by name] The line says who left. It used to say the
+  // trade alone ("Dismissed a Weaver"), which was all the roster ever
+  // carried; the bench's rows show a name now, and a dismissal that named
+  // only the craft would leave a captain matching people to the bill.
+  logs.push(
+    `💔 Dismissed ${worker.name} the ${label}. Severance: ${wage} Gold`,
+  );
   if (worker.task) logs.push(`  This worker was making: ${worker.task}`);
 }
 
@@ -107,7 +126,16 @@ export function assignTask(
   const list = state.workers[type as WorkerTypeId];
   if (!list) return;
   const recipe = RECIPES[task];
+  // [C3: garments and the cold] Whether any hand was passed over for the
+  // cold, kept so the refusal below can say what happened instead of
+  // reporting a full bench over hands that are standing idle because they
+  // froze.
+  let frozen = false;
   for (const worker of list) {
+    if (isFrostbitten(worker, state.currentRound)) {
+      frozen = true;
+      continue;
+    }
     if (worker.task === null) {
       let can = true;
       for (const [m, a] of Object.entries(recipe.materials))
@@ -140,7 +168,11 @@ export function assignTask(
       return;
     }
   }
-  logs.push("❌ All workers are already assigned tasks!");
+  logs.push(
+    frozen
+      ? "❌ The only free hands are out of action this leg with frostbite."
+      : "❌ All workers are already assigned tasks!",
+  );
 }
 
 export function processProduction(state: GameState, logs: string[]) {
@@ -168,6 +200,17 @@ export function processProduction(state: GameState, logs: string[]) {
     );
   for (const { list, name } of allLists) {
     for (const w of list) {
+      // [C3: garments and the cold] The bench will not hand work to a hand
+      // out of action, but a save is not the bench and can carry a task
+      // beside a frostbite mark. The rule is that a hand out of action does
+      // not work, so the task is left standing rather than dropped: its
+      // materials were spent when it was assigned, and it produces the leg
+      // after this one.
+      if (isFrostbitten(w, state.currentRound)) {
+        if (w.task)
+          logs.push(`🥶 ${w.name} is out of action and cannot work this leg.`);
+        continue;
+      }
       if (w.task) {
         let base = w.isSkilled ? 2 : 1;
         let amt = base + bonus;

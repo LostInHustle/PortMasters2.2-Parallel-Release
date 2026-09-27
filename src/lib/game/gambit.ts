@@ -40,7 +40,7 @@ export function normalizeRole(value: unknown): GambitRole {
   return value === "pirate" || value === "broker" ? value : "honest";
 }
 
-// The smallest table the mode deals a Variable into. A traitor needs a
+// The smallest table the mode deals a hidden card into. A traitor needs a
 // fleet to betray: at three captains the whole voyage is over before
 // deduction can start, and a captain holding a Pirate card at that size
 // is holding a card with nothing to do. Below this every captain draws
@@ -48,16 +48,24 @@ export function normalizeRole(value: unknown): GambitRole {
 const MIN_GAMBIT_TABLE = 4;
 
 // How many of a table are hiding something. The counts are the plan's:
-// four or five captains yields one Variable, six yields two, and a
+// four or five captains yield one hidden card, six yield two, and a
 // seven captain harbor is capped at two rather than dealt a third,
-// because the mode is written for six and a third Variable would make
+// because the mode is written for six and a third hidden card would make
 // the Honest majority the minority.
-export function variableCount(captains: number): number {
+//
+// [D1: the path configuration module] This count used to be called a
+// Variable, and the word is deliberately retired: it names a mode in the
+// design the plan was written from, and a word a captain can spend on the
+// thing somebody is hiding hands them a handle rather than a description.
+// The tell reads as the hidden card here and in the schema comment and in
+// the suite's labels, and no screen has ever printed it. See ./paths for
+// the sweep that retired the word and what else it reached.
+export function hiddenCardCount(captains: number): number {
   if (captains < MIN_GAMBIT_TABLE) return 0;
   return captains >= 6 ? 2 : 1;
 }
 
-// The pool the second Variable is drawn from at a six captain table. A
+// The pool the second hidden card is drawn from at a six captain table. A
 // Broker is never drawn beside another Broker, so this pool is only ever
 // asked once, and its two weights are the mix between the shapes a six
 // captain table can take.
@@ -75,7 +83,7 @@ const SECOND_SEAT: Array<[GambitRole, number]> = [
  *
  * The fleet never holds two Brokers, because a Broker wins alone and two
  * of them are two captains playing the same solitary game. At a table
- * large enough for two Variables the second seat is drawn between the two
+ * large enough for two hidden cards the second seat is drawn between the two
  * roles, so both Pirate and Broker tables are reachable; the mix between
  * them is a balance decision that belongs to the objective deck and the
  * role rewrite, and this is the line it will be changed on.
@@ -88,7 +96,7 @@ export function dealRoles(
   const order = [...captainIds].sort();
   // Fisher-Yates over the sorted roster, so the seat a card lands in
   // depends on the seed alone.
-  for (let i = order.length - 1; i > 0; i--) {
+  for (let i = order.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
   }
@@ -96,9 +104,9 @@ export function dealRoles(
   const roles: Record<string, GambitRole> = {};
   for (const id of order) roles[id] = "honest";
 
-  const count = variableCount(order.length);
+  const count = hiddenCardCount(order.length);
   for (let seat = 0; seat < count; seat++) {
-    // The first Variable is a Pirate, so a table large enough for two
+    // The first hidden card is a Pirate, so a table large enough for two
     // always has the sabotage half of the mode in it. The second may be
     // the Broker instead, and never another Broker.
     roles[order[seat]] = seat === 0 ? "pirate" : weightedPick(rng, SECOND_SEAT);
@@ -113,8 +121,8 @@ export function dealRoles(
  */
 export type GambitCard = {
   role: GambitRole;
-  // Which flourish, by id, an Honest captain was dealt. Null on a
-  // Variable card, because a Pirate and a Broker each win on a condition
+  // Which flourish, by id, an Honest captain was dealt. Null on a hidden
+  // card, because a Pirate and a Broker each win on a condition
   // of their own and neither is handed a second one.
   flourishId: string | null;
 };
@@ -160,7 +168,7 @@ export function dealCards(
  * the deal produced, with no column to fall out of step with it.
  *
  * A third Pirate is not a case this answers. The mode is authored for six
- * captains and deals at most two Variables, so a table that somehow held
+ * captains and deals at most two hidden cards, so a table that somehow held
  * three is told nothing rather than told something wrong.
  */
 export function allyFor(

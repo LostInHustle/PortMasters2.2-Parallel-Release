@@ -947,6 +947,17 @@ export function attachRealtime(httpServer: HttpServer): Server {
         typeof value === "number" && Number.isFinite(value)
           ? Math.max(0, Math.floor(value))
           : null;
+      // [C4] The hold's four figures are optional where the three above
+      // are required, and the difference is what a reader loses when one
+      // is missing: a report without its dealt count is a report that
+      // cannot answer the plan's expired orders, and a report without its
+      // pantry is a leg the survival layer was not playing. A value that
+      // is present but unreadable is dropped rather than refused, so a
+      // client cannot lose a whole leg over a field no rule reads.
+      const optional = (value: unknown): number | undefined =>
+        typeof value === "number" && Number.isFinite(value)
+          ? Math.max(0, Math.floor(value))
+          : undefined;
       const ordersDealt = check(payload?.ordersDealt);
       const ordersFilled = check(payload?.ordersFilled);
       const distinctGoods = check(payload?.distinctGoods);
@@ -961,6 +972,10 @@ export function attachRealtime(httpServer: HttpServer): Server {
         ordersDealt,
         ordersFilled,
         distinctGoods,
+        holdSlots: optional(payload?.holdSlots),
+        grainMeals: optional(payload?.grainMeals),
+        saltFishMeals: optional(payload?.saltFishMeals),
+        produceMeals: optional(payload?.produceMeals),
       });
     });
 

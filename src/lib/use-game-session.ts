@@ -34,6 +34,16 @@ import {
   normalizeLarderFedRound,
   onShortRations,
 } from "@/lib/game/larder";
+import {
+  larderMeals,
+  normalizeLarderLots,
+  normalizeLarderSpoilRound,
+} from "@/lib/game/foods";
+import { healCrewIdentity } from "@/lib/game/crew";
+import {
+  normalizeGarments,
+  normalizeGarmentsTickRound,
+} from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 
 // The most log lines a session keeps around at once (see the APPLY case
@@ -397,6 +407,45 @@ export function useGameSession(
           // than putting a captain on short rations for a leg nobody played.
           game.larder = normalizeLarder(game.larder);
           game.larderFedRound = normalizeLarderFedRound(game.larderFedRound);
+          // [C4: three foods, spoilage and the split hold] What the rations
+          // are, and the leg they last spoiled in. Aimed at the two shapes
+          // the reads above are: a voyage saved before the pantry existed
+          // lands on the one lot C1's plain number always was, a hold of
+          // grain, and a lot this tree cannot account for is dropped rather
+          // than eaten.
+          //
+          // The count is then set to what the account adds up to, and that
+          // direction is the whole of the invariant (see ./foods): the lots
+          // are the more specific fact, so a save whose number and account
+          // disagree is read as the account, and a save with no account at
+          // all is read as the number. Nothing here can invent food, which
+          // is what keeps a doctored file from feeding a crew for free.
+          game.larderLots = normalizeLarderLots(game.larderLots, game.larder);
+          game.larder = larderMeals(game);
+          game.larderSpoilRound = normalizeLarderSpoilRound(
+            game.larderSpoilRound,
+          );
+          // [C2: crew loss by name] The roster's faces, and the voyage's
+          // own tally of hungry legs and of the hands it has lost. Run
+          // here rather than inside normalizeWorkerRoster above, which
+          // gives the roster its shape a few lines earlier: a drawn name
+          // depends on the losses, the draw lives in the crew module, and
+          // the crew module reads the type module, so the type module
+          // could not do this for itself without a cycle. Every reader of
+          // a name sits after both calls.
+          healCrewIdentity(game);
+          // [C3: garments and the cold] The clothes a save was wearing, and
+          // the leg the settlement last read them in. Aimed at the same two
+          // shapes the heal above is: a voyage saved before the layer
+          // existed lands on an empty wardrobe, which is a crew with nothing
+          // on, and a garment a save cannot account for is dropped rather
+          // than worn. A damaged stamp lands on a leg no voyage has, so the
+          // first settlement after loading reads the wardrobe rather than
+          // treating the leg as one it already settled.
+          game.garments = normalizeGarments(game.garments);
+          game.garmentsTickRound = normalizeGarmentsTickRound(
+            game.garmentsTickRound,
+          );
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.

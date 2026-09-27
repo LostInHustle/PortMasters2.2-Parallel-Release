@@ -150,6 +150,17 @@ export type ObjectiveReport = {
  * else. `leg` is the client's own, because only the client knows which
  * leg it was playing; the server bounds it against the voyage before
  * recording anything.
+ *
+ * [C4: three foods, spoilage and the split hold] The four optional fields
+ * are the captain's own reading of the hold they closed the leg with: how
+ * many slots of the ship were carrying something, and how many meals of
+ * each food were aboard. They are optional on the wire rather than
+ * defaulted, because they mean something only under the switches that
+ * create them: the slots belong to the split hold, the meal counts to the
+ * survival layer, and a leg sailed without those carrying a zero would be
+ * a report of an empty ship rather than of an unmeasured one. The server
+ * keeps a field it can read, drops one it cannot, and bounds both (see
+ * the telemetry:leg handler).
  */
 export type LegReport = {
   roomId: string;
@@ -157,6 +168,10 @@ export type LegReport = {
   ordersDealt: number;
   ordersFilled: number;
   distinctGoods: number;
+  holdSlots?: number;
+  grainMeals?: number;
+  saltFishMeals?: number;
+  produceMeals?: number;
 };
 
 /**

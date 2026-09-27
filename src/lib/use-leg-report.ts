@@ -9,12 +9,25 @@
 // any of the three and must not try, so this hook reads them off the
 // voyage state and files them as a claim against the leg they belong to.
 //
-// What is deliberately not here is a hold utilization figure. The plan
-// asks for one, and this tree's hold has no size: an order board of three
-// is three of nothing, and a percentage invented for it would be a number
-// no rule moves. It waits for the split hold in C4, which is where a hold
-// gets a denominator. What ships instead is the variety the hold carried,
-// which is the number the dashboard's staple question actually reads.
+// What is deliberately absent from a base game report is a hold
+// utilization figure. The plan asks for one, and this tree's hold has no
+// size: an order board of three is three of nothing, and a percentage
+// invented for it would be a number no rule moves. It waited on the split
+// hold in C4, which landed the size, and the slots below are what it
+// reads now. The variety the hold carried stays, because it is the number
+// the dashboard's staple question actually reads.
+//
+// [C4: three foods, spoilage and the split hold] The last four figures
+// come off the same state and ride in the same report: the slots the ship
+// is carrying something in, and the meals of each food in the larder.
+// Each is sent only when the switch that gives it meaning is on, so a
+// voyage played without the split hold or without the survival layer
+// files a report with those fields absent rather than with zeroes, and a
+// reader counting food knows whether it is looking at a survival leg. The
+// slots figure is the ceiling of what is in use rather than a fraction,
+// which is the reading the provisions panel prints: a slot with anything
+// in it is a slot in use, and the record and the screen should not be two
+// roundings of one hold.
 //
 // The report is a claim and is treated as one. Nothing in the game reads
 // it, the server bounds its leg against the voyage before keeping it, and
@@ -33,6 +46,9 @@ import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import type { LegReport } from "@/types/realtime";
+import { mealsOf } from "@/lib/game/foods";
+import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
+import { survivalLayerOn } from "@/lib/game/flags";
 
 // The same cadence the captain's own status rides on (see
 // use-game-session.ts): enough to feel immediate, sparse enough that a
@@ -65,9 +81,21 @@ export function useLegReport(
   for (const count of Object.values(game.inventory)) {
     if (count > 0) distinctGoods++;
   }
+  // [C4] The hold and the pantry, read through the two switches rather
+  // than beside them: an undefined here is a field the record will not
+  // carry, which is the honest shape for a leg that was never playing the
+  // rule (see the LegReport type).
+  const holdSlots = holdCapacityOn()
+    ? Math.ceil(usedHoldSlots(game))
+    : undefined;
+  const grainMeals = survivalLayerOn() ? mealsOf(game, "Grain") : undefined;
+  const saltFishMeals = survivalLayerOn()
+    ? mealsOf(game, "Salt Fish")
+    : undefined;
+  const produceMeals = survivalLayerOn() ? mealsOf(game, "Produce") : undefined;
 
-  // The four figures are the dependency list, which is the point: the
-  // effect fires when a count moves, not when the captain clicks.
+  // The figures are the dependency list, which is the point: the effect
+  // fires when a count moves, not when the captain clicks.
   useEffect(() => {
     if (!socket || !roomId || leg < 1) return;
     const timer = setTimeout(() => {
@@ -77,9 +105,24 @@ export function useLegReport(
         ordersDealt,
         ordersFilled,
         distinctGoods,
+        holdSlots,
+        grainMeals,
+        saltFishMeals,
+        produceMeals,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [socket, roomId, leg, ordersDealt, ordersFilled, distinctGoods]);
+  }, [
+    socket,
+    roomId,
+    leg,
+    ordersDealt,
+    ordersFilled,
+    distinctGoods,
+    holdSlots,
+    grainMeals,
+    saltFishMeals,
+    produceMeals,
+  ]);
 }

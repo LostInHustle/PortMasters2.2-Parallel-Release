@@ -696,6 +696,250 @@ export const LARDER_MAX = 60;
 // lands instead).
 export const SHORT_RATIONS_YIELD = 0.5;
 
+// [C2: crew loss by name] The two things the loss rule needs, kept here
+// beside the provisions above for the reason every number in this file is
+// kept here: the run is a rule of the same family as the ration price, and
+// the pool is content the way WORKER_TYPES is, so a balance pass or a
+// content pass both find theirs where they already look.
+//
+// The run is the plan's own number, and it is written down rather than
+// inlined where it is read: "two consecutive legs on Short Rations costs a
+// crew member" is the rule, so a later tune that moved it to three should
+// cost one edit with the plan's own sentence as the note beside it.
+//
+// The pool is the crew's names, and the plan asks for names that read as
+// people rather than identifiers. It also says the pool is worth a content
+// pass of its own once the mechanic is proven, which is the shape this
+// list is written to: short enough for a log line, no repeats, and wide
+// enough that a voyage never reaches the end of it. Every name is a single
+// word so the sentences that carry one stay sentences.
+export const CREW_LOSS_AFTER_HUNGRY_LEGS = 2;
+export const CREW_NAMES: string[] = [
+  "Ada",
+  "Adil",
+  "Aiko",
+  "Amara",
+  "Anil",
+  "Anouk",
+  "Arjun",
+  "Asha",
+  "Bram",
+  "Cassia",
+  "Chen",
+  "Corin",
+  "Dara",
+  "Dev",
+  "Dilara",
+  "Emeka",
+  "Enzo",
+  "Farah",
+  "Fen",
+  "Gita",
+  "Hakon",
+  "Hana",
+  "Idris",
+  "Imani",
+  "Ines",
+  "Isolde",
+  "Jaya",
+  "Jonas",
+  "Kavi",
+  "Kiran",
+  "Lena",
+  "Lian",
+  "Mabel",
+  "Malik",
+  "Maren",
+  "Mateo",
+  "Mina",
+  "Nadia",
+  "Nia",
+  "Noor",
+  "Odile",
+  "Oren",
+  "Pia",
+  "Priya",
+  "Rafi",
+  "Rhea",
+  "Roshan",
+  "Runa",
+  "Sana",
+  "Selma",
+  "Shaan",
+  "Sora",
+  "Sunil",
+  "Tam",
+  "Tara",
+  "Teo",
+  "Thandi",
+  "Tomas",
+  "Uma",
+  "Vasco",
+  "Vera",
+  "Wren",
+  "Yara",
+  "Yusuf",
+  "Zaid",
+  "Zara",
+  "Zoya",
+];
+
+// [C3: garments and the cold] The wardrobe's numbers, kept here beside the
+// provisions above for the reason every other number in this file is kept
+// here: a balance pass edits them knowing they are prices rather than rules,
+// and the rules that read them live in ./garments.
+//
+// The plan names the ratings and the maxima itself, one, two and three for
+// hemp, cloth and fine silks with six, eight and ten, and this is where they
+// land. The three grades are the tree's own clothes rather than three new
+// goods: Linen Clothes is the hemp garment, Cotton Clothes the cloth one and
+// Brocade the fine silk. The Sachet is not here, and its absence is the one
+// judgement this table makes: a sachet is worn nowhere, and warmth rating on
+// a perfumed pouch would be a garment label on a thing nobody wears.
+//
+// The cold's numbers are the tune, since the plan names no weather. A cold
+// leg asks for two, which a fresh Cotton Clothes exactly meets and a fresh
+// Brocade has margin over, while a single fresh Linen Clothes does not; the
+// same two make a Cotton plus a Linen a pair that passes a second cold leg
+// on the fraction they keep. Three legs in ten are cold, so a twelve leg
+// voyage carries three or four of them. The scrap a worn out garment comes
+// to is the plan's own four Gold.
+export type GarmentSpec = { warmth: number; durability: number };
+export const GARMENTS: Record<string, GarmentSpec> = {
+  "Linen Clothes": { warmth: 1, durability: 6 },
+  "Cotton Clothes": { warmth: 2, durability: 8 },
+  Brocade: { warmth: 3, durability: 10 },
+};
+export const COLD_LEG_WARMTH = 2;
+export const COLD_LEG_CHANCE = 0.3;
+// The decay is one a leg, doubled on a cold leg. The plan's Implementation
+// section lists a third value for the frostbite leg and it is this second
+// one written twice, because a leg the check fails on is a cold leg: that is
+// where frostbite lands, so that is the number it wears. Two constants where
+// three would have had two the same, which is the shape a later reader can
+// check against the plan rather than have to redo.
+export const GARMENT_DECAY_PER_LEG = 1;
+export const GARMENT_DECAY_COLD_LEG = 2;
+
+// What a garment comes to when the sea has had all of it. The plan gives the
+// number and gives it a name, Rags, and this tree has nowhere to put Rags as
+// a good: no path in the engine sells a finished good outside an order or a
+// barter, so a hold item worth four Gold would be one nobody could ever turn
+// into Gold, and a warmth zero entry in the hold is cargo a captain carries
+// for nothing. The scrap is therefore credited at the moment the garment
+// wears out, which is the same four Gold arriving without the detour.
+export const RAG_SCRAP_VALUE = 4;
+
+// [C4: three foods, spoilage and the split hold] The pantry and the hold,
+// kept here beside the provisions above for the reason every other number
+// in this file is kept here: a balance pass edits them knowing they are
+// contents and capacities rather than rules, and the rules that read them
+// live in ./foods and ./hold.
+//
+// The plan names the whole tradeoff in one sentence: "Grain keeps
+// indefinitely but is least efficient per slot, salt fish keeps six legs,
+// produce spoils in two." So the axis it names is space against time, and
+// that is the axis these three rows carry, one number each way. Grain
+// feeds one mouth per slot and never turns; salt fish feeds two and keeps
+// six legs; produce feeds three and dies at the second Dusk.
+//
+// What the rows deliberately do not carry is a price. A meal costs the
+// same whichever food it comes out of (see RATION_PRICE), which is the
+// reading that keeps this feature's economy the one C1 already tuned: a
+// leg of provisions for the crew costs what it has always cost, and a
+// captain deciding between the three foods is deciding how long the food
+// has to last and how much of the hold it may take, never how much Gold
+// it takes. It is also what keeps the Preserve conversion from being a
+// mint: one slot of produce becomes one slot of salt fish, and the meal
+// it loses is the price of the fresh clock rather than a profit, since no
+// path in this tree sells food back to a port.
+//
+// Grain's row is the anchor the other two are read against. It is one
+// meal to a slot, which is what makes the Stores capacity below exactly
+// the Larder's old ceiling with the densities switched on, and it costs
+// RATION_PRICE, which is what makes a grain larder indistinguishable from
+// the plain number C1 shipped.
+//
+// The stores size is LARDER_MAX written in slots rather than meals. That
+// is the rollback's own arithmetic as the plan states it: reverting to a
+// single hold leaves the food's capacity the number it always was, sixty,
+// and the cargo's unbounded as it always was, because the hold this game
+// has always had caps the Larder and never the trade. What the split adds
+// is the other half of the plan's sentence, "so survival supplies can
+// never crowd out trading capacity": with one hold the two compete for
+// the same room, and with two they do not.
+export type FoodId = "Grain" | "Salt Fish" | "Produce";
+// The shape of one row of the catalogue, private to this module: every
+// reader asks a food for a number by name (see ./foods and ./hold) rather
+// than carrying the row around, so nothing outside this file has ever
+// needed to name the type its own table is made of.
+type FoodSpec = {
+  // How many meals one slot of the hold carries of this food. The whole
+  // of the space tradeoff: a slot of produce feeds three times the mouths
+  // a slot of grain does, for as long as it is food.
+  mealsPerSlot: number;
+  // How many legs it stays food for, counted from the leg it was bought
+  // or preserved in. Null keeps indefinitely, which is grain's row and
+  // the reason a captain buys grain at all.
+  keeps: number | null;
+  icon: string;
+};
+export const FOODS: Record<FoodId, FoodSpec> = {
+  Grain: { mealsPerSlot: 1, keeps: null, icon: "🌾" },
+  "Salt Fish": { mealsPerSlot: 2, keeps: 6, icon: "🐟" },
+  Produce: { mealsPerSlot: 3, keeps: 2, icon: "🥬" },
+};
+
+// The order the crew eats in, and the order the hold is read in wherever
+// the pantry is shown: whatever spoils soonest goes first, so a captain's
+// produce is eaten before their salt fish and their salt fish before the
+// grain that outlasts the voyage. Oldest first within a food, which is
+// the order the lots are kept in rather than a sort performed at dinner.
+export const FOODS_DRAW_ORDER: readonly FoodId[] = [
+  "Produce",
+  "Salt Fish",
+  "Grain",
+];
+
+// The two hold capacities. Cargo is the opening tune, set against what a
+// captain actually carries: a fresh hold starts with sixteen units of
+// hemp, silk and tea (see STARTING_STOCK), a market lot is two to five
+// units and an order asks for one to five, so thirty slots is a hold a
+// captain can fill, work out of and be turned away from on a fat leg,
+// which is the pressure the plan is asking for. Stores is the Larder's
+// old ceiling and is not a tune at all.
+export const CARGO_SLOTS = 30;
+export const STORES_SLOTS = LARDER_MAX;
+
+// The plan's clause for a hungry crew, and the one C1 left standing: "a
+// shortage costs cargo capacity down a quarter". The quarter comes off
+// the cargo and never off the stores, because the stores are the food and
+// a crew already short of it is not made shorter by a rule. See
+// cargoSlots in ./hold for where it lands.
+export const SHORT_RATIONS_CARGO = 0.75;
+
+// [D1: the path configuration module] The two path dials that are hold
+// arithmetic rather than prose, kept beside the hold's own numbers for the
+// reason the shortage's quarter is kept here: a size belongs with the
+// sizes. The Convoy's cannons are carried rather than stowed, so they cost
+// slots out of the cargo hold, which is the plan's own account of where
+// that path's structural poverty comes from; the Quartermaster's seat
+// carries "the largest hold" in the design, half again the base. Both are
+// read by ./paths and by nothing else, and both are meant to land at the
+// hold's one capacity read (see cargoCapacity in ./larder) rather than at a
+// counter, so a path's factor and the shortage's quarter are applied in one
+// place and in one order.
+export const CONVOY_CANNON_SLOTS = 6;
+export const QUARTERMASTER_HOLD_GAIN = 0.5;
+
+// Preserve, the plan's own ratio: "converts three produce into two salt
+// fish", at a port. Three meals of produce is one slot of the hold, and
+// two meals of salt fish is the same one slot, so the conversion is
+// space for nothing and a meal for a fresh clock, which is the whole of
+// what a captain pays for it.
+export const PRESERVE_MEALS_IN = 3;
+export const PRESERVE_MEALS_OUT = 2;
+
 export const MODULES: Module[] = [
   ...MODULES_TIER0,
   ...MODULES_TIER1,
@@ -904,7 +1148,7 @@ export function tutorialSteps(
       content: `<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the shipping fee. Your take is whatever is left after fees and tax.</p>
 <p>You can fill as many orders as your cargo allows while Orders is open.</p>
 <div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
-  📌 <strong>Finished goods</strong> (Fabric, Silk Garment, Sachet) pay two to three times more than raw materials. The catch is they need artisans, and artisans take a full voyage to deliver. That is covered next.
+  📌 <strong>Finished goods</strong> (Linen Clothes, Cotton Clothes, Brocade, Sachet) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.
 </div>
 ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions a <strong>mandate</strong>: one large order at a fixed reward, and the only order exempt from VAT. It often asks for more than a single hold carries, so plan to barter or borrow to fill it.</p>` : ""}`,
     },
@@ -912,7 +1156,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
       title: "⚠️ The artisan trap",
       content: `<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new players is this:</p>
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
-  Assign a task this voyage.<br>The goods are ready next voyage, not this one.
+  Assign a task this voyage.<br>Wages come due at Resolve either way.
 </div>
 <p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },

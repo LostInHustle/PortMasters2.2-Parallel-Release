@@ -506,14 +506,25 @@ function PeerEconomySummary({ game }: { game: GameState }) {
 
 /**
  * Crew Management Summary. Shows worker productivity stats at voyage
- * end: total workers hired, how many reached skilled status, total
- * items produced, and the wages paid.
+ * end: the crew still aboard, how many reached skilled status, total
+ * items produced, and the wages paid. [C2: crew loss by name] The first
+ * tile says "Crew Aboard" rather than "Workers Hired" because the two
+ * stopped being the same number the moment a hand could be lost or
+ * dismissed, and the line under the tiles is where the names of the lost
+ * are read back: the log said each one as it happened, and a summary that
+ * let a permanent loss go unmentioned would be the one screen pretending
+ * it had not.
  */
 function CrewSummary({ game }: { game: GameState }) {
   const allWorkers = flatWorkerRoster(game);
-  const totalHired = allWorkers.length;
+  // Read as the crew aboard rather than as the hands hired, which is the
+  // number the tile under it has always been showing: the two stopped
+  // agreeing the moment an artisan could leave the roster, and the name of
+  // this one is where that shows.
+  const crewAboard = allWorkers.length;
   const skilledCount = allWorkers.filter((w) => w.isSkilled).length;
   const totalWages = game.workerWages;
+  const lost = game.crewLost ?? [];
 
   // Estimate total items produced from worker producedCount
   const totalProduced = allWorkers.reduce(
@@ -521,7 +532,7 @@ function CrewSummary({ game }: { game: GameState }) {
     0,
   );
 
-  if (totalHired === 0) return null;
+  if (crewAboard === 0) return null;
 
   return (
     <div className="rounded-xl border border-due/20 bg-due/[0.03] px-4 py-3 my-3 text-left">
@@ -532,9 +543,9 @@ function CrewSummary({ game }: { game: GameState }) {
       <div className="grid grid-cols-3 gap-2">
         <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
           <div className="font-display text-lg font-bold text-due">
-            {totalHired}
+            {crewAboard}
           </div>
-          <div className="text-[9px] text-muted-foreground">Workers Hired</div>
+          <div className="text-[9px] text-muted-foreground">Crew Aboard</div>
         </div>
         <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
           <div className="font-display text-lg font-bold text-gain">
@@ -553,6 +564,16 @@ function CrewSummary({ game }: { game: GameState }) {
         <span className="text-muted-foreground">Total Wages Paid</span>
         <span className="font-bold text-due">{totalWages} Gold</span>
       </div>
+      {lost.length > 0 && (
+        <div className="mt-1.5 flex items-baseline justify-between gap-2 text-[11px]">
+          <span className="text-muted-foreground shrink-0">
+            ⚰️ Lost over the voyage
+          </span>
+          <span className="font-bold text-alarm text-right">
+            {lost.map((loss) => `${loss.name} (leg ${loss.round})`).join(", ")}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

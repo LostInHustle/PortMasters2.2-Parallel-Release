@@ -251,17 +251,38 @@ export function noteLegReport(
     ordersDealt: number;
     ordersFilled: number;
     distinctGoods: number;
+    holdSlots?: number;
+    grainMeals?: number;
+    saltFishMeals?: number;
+    produceMeals?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
   if (!Number.isInteger(leg) || leg < 1 || leg > voyage.leg + 1) return;
+  // [C4: three foods, spoilage and the split hold] The hold's four figures
+  // are carried only when the client sent them, which is only when the
+  // switch that gives them meaning was on (see LegReport). The record keeps
+  // the shape the wire had rather than filling the gaps, so a reader
+  // counting voyage food can tell a base game leg from a survival one, and
+  // a field that arrived unreadable stays absent instead of landing as a
+  // zero that would read as an empty hold.
+  const held = (value: number | undefined): number | undefined =>
+    value === undefined ? undefined : Math.max(0, Math.floor(value));
+  const holdSlots = held(figures.holdSlots);
+  const grainMeals = held(figures.grainMeals);
+  const saltFishMeals = held(figures.saltFishMeals);
+  const produceMeals = held(figures.produceMeals);
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
     ordersDealt: Math.max(0, Math.floor(figures.ordersDealt)),
     ordersFilled: Math.max(0, Math.floor(figures.ordersFilled)),
     distinctGoods: Math.max(0, Math.floor(figures.distinctGoods)),
+    ...(holdSlots === undefined ? {} : { holdSlots }),
+    ...(grainMeals === undefined ? {} : { grainMeals }),
+    ...(saltFishMeals === undefined ? {} : { saltFishMeals }),
+    ...(produceMeals === undefined ? {} : { produceMeals }),
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather

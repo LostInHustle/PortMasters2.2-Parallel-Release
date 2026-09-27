@@ -39,7 +39,8 @@ import {
   drawAudit,
   normalizeOrderFills,
 } from "@/lib/game/audit";
-import { normalizeLarder, survivalLayerOn } from "@/lib/game/larder";
+import { normalizeLarder } from "@/lib/game/larder";
+import { survivalLayerOn } from "@/lib/game/flags";
 import { normalizeMode } from "@/lib/game/mode";
 import type { AuditReveal, AuditTally } from "@/types/realtime";
 import { activeRosterSet } from "./checkpoint";

@@ -24,6 +24,10 @@ import {
   RESOURCE_WEIGHTS,
 } from "../constants";
 import { charterOpensOn, marketCountsFor } from "../difficulty";
+// The hold's room, read from ./larder rather than from ./hold because the
+// quarter a hungry crew takes off the cargo is a rule about hunger and
+// lives with the rest of that rule. See cargoRoom there.
+import { cargoRoom } from "../larder";
 import {
   unlockedPorts,
   unlockedProducts,
@@ -330,6 +334,22 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   if (state.money < cost) {
     logs.push(
       `❌ Insufficient funds! Need ${cost} Gold, Have ${state.money} Gold`,
+    );
+    return;
+  }
+  // [C4: three foods, spoilage and the split hold] The hold's size, the
+  // one place a purchase is turned away for space. A lot is all or
+  // nothing: the card's price is the lot's price, so selling half of one
+  // would be a different card and a different price rather than a
+  // courtesy. The room is read from ./larder, which is where the quarter
+  // a hungry crew takes off the cargo lives, and it is read after the
+  // purse rather than before it so a captain short of both hears the
+  // message they have always heard.
+  const units = card.resources.reduce((n, r) => n + (r.quantity ?? 0), 0);
+  const room = cargoRoom(state);
+  if (units > room) {
+    logs.push(
+      `❌ No room in the hold for that lot: it takes ${units} ${units === 1 ? "slot" : "slots"} and ${room} ${room === 1 ? "is" : "are"} free.`,
     );
     return;
   }

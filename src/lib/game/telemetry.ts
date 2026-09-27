@@ -79,36 +79,60 @@ export interface TelemetryPayloads {
   // and is kept as one: this is a measurement of what a captain played,
   // not a score, and nothing in the game reads it.
   //
-  // Two of the proposal's market numbers are deliberately not here. Median
-  // hold utilization needs a hold with a size, and this tree's hold is
-  // unbounded: a denominator invented for it would be a percentage of
-  // nothing. Chandler share and Bale usage are Epic G's, and they are
-  // absent for that reason rather than because nobody got to them.
+  // Two of the proposal's market numbers are deliberately not here.
+  // Chandler share and Bale usage are Epic G's, and they are absent for
+  // that reason rather than because nobody got to them. The third, median
+  // hold utilization, used to be absent beside them and is not any more:
+  // it needed a hold with a size and this tree's hold was unbounded, which
+  // is what C4's split hold answered. The four fields below are that
+  // answer and the pantry reading that came with it.
   //
   // This paragraph used to explain the hold's absence by pointing at the
   // audit's, which it described as refusing to print a Larder that C4 had
   // not built. Both halves of that were wrong and the correction is worth
   // the two lines: the Larder is C1's rather than C4's, and C1 has now
   // landed it, so the audit prints one and the analogy has nothing left to
-  // stand on. The hold's reason is the hold's own, as written above.
+  // stand on. The hold's reason was the hold's own, and the split hold has
+  // now landed the size that reason was waiting on.
   //
   // The survival family is undeclared above, and this is where that is
   // answered rather than left as a gap for a reader to guess at. Four
   // numbers belong to it: short rationed legs, crew losses, frostbite, and
-  // the Supply Barge's share of food spending. The first now has a source,
-  // because C1 landed and a shortage can really happen, so an event could
-  // be written for it. What has not landed is the reason to write one:
-  // nothing in this build reads the family, C1's own evaluation watches
-  // what the room says in the leg after a captain visibly goes hungry
-  // rather than a stored count of it, and a family declared ahead of the
-  // events that would fill it is a schema with no rows in it. It arrives
-  // with the epic that measures it.
+  // the Supply Barge's share of food spending. The first has a source,
+  // because C1 landed and a shortage can really happen, and the pantry
+  // below now reports what the shortage is a shortage of. What has still
+  // not landed is the reason to write an event for it: nothing in this
+  // build reads the family, C1's own evaluation watches what the room says
+  // in the leg after a captain visibly goes hungry rather than a stored
+  // count of it, and a family declared ahead of the events that would fill
+  // it is a schema with no rows in it. It arrives with the epic that
+  // measures it.
+  //
+  // [C4: three foods, spoilage and the split hold] The last four fields
+  // are one reading the plan asks for and three it does not, and the
+  // difference is which of them a dashboard divides by something. The
+  // slots are the numerator the utilization row reads, and they are absent
+  // on any leg whose voyage was not playing the split hold, because a
+  // hold with no size has no utilization to report and a zero there would
+  // read as an empty ship rather than as an unmeasured one. The three
+  // meal counts are the plan's own evaluation of this feature, "watch the
+  // mix of foods actually carried", and they are a record rather than a
+  // gate: no threshold in the plan puts one food's share inside a band, so
+  // a later reader compares the three against each other rather than
+  // against a line this reader would have had to invent. All four are
+  // absent together on a leg sailed with the survival layer off, for the
+  // reason every field of a switched off layer is absent: the record says
+  // what happened rather than what the build could have measured.
   leg_report: {
     leg: number;
     actor: string;
     ordersDealt: number;
     ordersFilled: number;
     distinctGoods: number;
+    holdSlots?: number;
+    grainMeals?: number;
+    saltFishMeals?: number;
+    produceMeals?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally

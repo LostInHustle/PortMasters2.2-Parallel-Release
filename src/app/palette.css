@@ -62,6 +62,7 @@
   --color-depth: var(--w-depth);
   --color-pulse: var(--w-pulse);
   --color-larder: var(--w-larder);
+  --color-wardrobe: var(--w-wardrobe);
   --color-planner: var(--w-planner);
   --color-dawn: var(--w-dawn);
   --color-modules: var(--w-modules);
@@ -292,6 +293,8 @@
   --w-pulse: oklch(0.53 0.13 90);
   /* The Larder: what the crew eats, and buying more of it. */
   --w-larder: oklch(0.53 0.13 270);
+  /* The Wardrobe: the clothes the crew wears against the cold. */
+  --w-wardrobe: oklch(0.53 0.13 219);
   /* Fulfillment Planner: which orders are worth filling. */
   --w-planner: oklch(0.53 0.13 132);
   /* Module list: what the ship already carries. */
@@ -351,9 +354,13 @@
   /*
      A House is named for its colour, so these three are named tokens
      like gold rather than widget hues, and they are exempt from the
-     distance rules that keep forty two widgets apart. Faction colour is
+     distance rules that keep the widget hues apart. A House colour is
      data: it says which House a captain sails for, and it is the same in
-     every panel that mentions one.
+     every panel that mentions one. The word for this used to be faction,
+     which [D1: the path configuration module] retired: a captain's
+     identity in this game is a path (see src/lib/game/paths.ts), and a
+     House is the account level colour a captain sails under rather than
+     an identity the table is built around.
   */
   --house-jade: oklch(0.53 0.12 160);
   --house-vermilion: oklch(0.53 0.17 28);
@@ -451,6 +458,7 @@
   --w-depth: oklch(0.76 0.12 347);
   --w-pulse: oklch(0.76 0.12 90);
   --w-larder: oklch(0.76 0.12 270);
+  --w-wardrobe: oklch(0.76 0.12 219);
   --w-planner: oklch(0.76 0.12 132);
   --w-modules: oklch(0.76 0.12 261);
   /* Every other widget is given a night value. Brand was the one that

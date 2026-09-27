@@ -60,6 +60,12 @@ import {
   type VoyageOutcome,
 } from "./balance";
 import { roleCard, type GambitRole } from "./gambit";
+// [C4: three foods, spoilage and the split hold] The utilization row's
+// denominator, read from the two capacities the split hold declares rather
+// than repeated as a number here: a hold whose size was retuned in
+// ./constants must move the percentage on this page without anybody
+// editing a dashboard.
+import { CARGO_SLOTS, STORES_SLOTS } from "./constants";
 // The table size bands, read from the deck's own table rather than
 // repeated here: the fill time below is read one band at a time, and a
 // band the draw knows and the dashboard does not would be a table size
@@ -498,10 +504,65 @@ function variancePanel(
   };
 }
 
+// The plan's utilization gate, which had no source until the hold had a
+// size to divide by and now reads the leg reports.
+//
+// The numerator is the captain's own count of the slots their ship was
+// carrying something in, filed as a claim like the rest of the leg report
+// and read here as one. Only a voyage playing the split hold files one:
+// a record written before this feature, or by a harbor with the split
+// switched off, carries no slots, and those legs are left out of the
+// sample rather than read as empty ships. That is the same line the whole
+// spine draws around a switched off layer, and it is what keeps this
+// reading from moving when a table rolls the switch back.
+//
+// The denominator is the ship's two capacities at their nominal size, and
+// deliberately not the quarter a hungry crew takes off the cargo: the
+// report does not carry the shortage, and a denominator that moved per
+// captain would make two captains' legs incomparable under a gate that is
+// a claim about the fleet. The cost of that is stated rather than hidden:
+// a captain on short rations reads against the hold they would have had,
+// which is the reading that says how full their ship is rather than how
+// much of it hunger took away.
+//
+// The median rather than the mean, for the reason the session length
+// gives: one captain who sailed with a hold almost empty is a tail rather
+// than a centre, and the gate is a claim about the ordinary ship.
+function holdUtilization(
+  records: readonly TelemetryRecord[],
+): DashboardReadingLine {
+  const fills: number[] = [];
+  for (const record of records) {
+    for (const event of record.events) {
+      if (event.name === "leg_report" && event.holdSlots !== undefined) {
+        fills.push(event.holdSlots / (CARGO_SLOTS + STORES_SLOTS));
+      }
+    }
+  }
+  const centre = median(fills);
+  if (centre === null) {
+    return {
+      label: "Median hold utilization",
+      value: "no leg report from a split hold",
+      target: "55 to 80%",
+      verdict: "unplayed",
+      gate: "hold_utilization",
+    };
+  }
+  const percent = Math.round(centre * 100);
+  return {
+    label: "Median hold utilization",
+    value: `${ratePercent(centre)}, median of ${fills.length}`,
+    target: "55 to 80%",
+    verdict: percent < 55 ? "under" : percent > 80 ? "over" : "in",
+    gate: "hold_utilization",
+  };
+}
+
 // The gates that are none of the three questions: the mode's worst
-// outcomes being rare and its people staying. Two of the four can be read
-// today and two cannot, and the panel keeps them together rather than
-// scattering them into questions they do not answer.
+// outcomes being rare and its people staying. Three of the four can be
+// read today and one cannot, and the panel keeps them together rather
+// than scattering them into questions they do not answer.
 function floorPanel(
   records: readonly TelemetryRecord[],
   outcomes: readonly DashboardOutcome[],
@@ -550,13 +611,7 @@ function floorPanel(
             : "in",
       gate: "bankruptcy",
     },
-    {
-      label: "Median hold utilization",
-      value: NO_SOURCE,
-      target: "55 to 80%",
-      verdict: "unmeasured",
-      gate: "hold_utilization",
-    },
+    holdUtilization(records),
     {
       label: "Parley participation",
       value: NO_SOURCE,
@@ -573,11 +628,11 @@ function floorPanel(
     state: stateOf(readings),
     answer: summarize(
       readings,
-      "Neither of the floor's readable gates has a voyage to read yet, and the other two have no source: utilization waits on C4 and participation on a talk line that names the phase.",
+      "No voyage in the window has a gate to read yet: utilization needs a leg report from a harbor playing the split hold, and participation needs a talk line that names the phase.",
     ),
     readings,
     gaps: [
-      "Hold utilization needs a hold with a size, and the split hold is C4's: the record counts the goods a captain dealt, filled and closed with, and none of those three numbers is a capacity to divide by.",
+      "Hold utilization is read off the leg reports, and only off those whose voyage was playing the split hold: a leg filed by a harbor with the split switched off carries no slots and is not in the sample. Its denominator is the ship's two capacities at their full size, because the quarter a hungry crew costs the cargo is not something the report carries, so a captain on short rations reads against the hold they would have had.",
       "Parley participation cannot be read off the record's talk line either, because that line carries the leg and not the phase, and talk is open through every phase of a leg: the record cannot separate Parley from the rest of the round.",
       "Retention is read over the voyages that closed with somebody standing, at the resolution the record has, which is presence at the close rather than the length of one connection.",
     ],

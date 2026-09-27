@@ -283,6 +283,22 @@ const WIDGETS: Widget[] = [
     screens: ["phase:market"],
     what: "The Larder, and the provisions it buys",
   },
+  /* [C3: garments and the cold] The Wardrobe is the fifth panel to open
+     inside the Market, and the Larder's note above leaves it one window:
+     217 to 220, between the Advisor at 197 and Chat at 240, which the
+     session rule checks against every phase. 219 takes it, 22 degrees from
+     the Advisor and 21 from Chat, where the floor is twenty. It is not
+     moved onto 218, which three widgets already wear, because what keeps
+     those apart is the screen string rather than the hue.
+     The cold chip in the status panel needs no rung at all: it wears the
+     sea when the crew is dressed for the weather and the alarm when it is
+     not, and those are meaning colours rather than widgets. */
+  {
+    name: "wardrobe",
+    hue: 219,
+    screens: ["phase:market"],
+    what: "The Wardrobe, and the clothes the crew wears",
+  },
   {
     name: "planner",
     hue: 132,
