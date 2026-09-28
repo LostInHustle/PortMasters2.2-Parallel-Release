@@ -46,14 +46,17 @@
 // hidden card, in the code, in the schema comment and in the suite's own
 // labels, and no screen has ever printed it.
 //
-// One collision is recorded here rather than silently resolved, because
-// resolving it is not this slice's to do: the word Convoy already names a
-// pooled contribution on the harbor's venture board (MANIFEST 04, see
-// ./convoy.ts), and the path below shares the word. They are different
-// things (a venture pools Gold against a target; the path sells protection
-// leg by leg), and D3 owns whether one of them moves or they live side by
-// side. The note is here so the next reader meets the question on purpose
-// rather than by surprise.
+// One collision was recorded here rather than silently resolved, because
+// resolving it was not D1's to do: the word Convoy already named a pooled
+// contribution on the harbor's venture board (MANIFEST 04, see ./convoy.ts),
+// and the path below shares the word. D3 resolved it, and resolved it this
+// way: the path keeps the name, because the plan's own content and the
+// draft that deals a path to every captain are written in it, and the
+// venture's player facing label moved instead, from Convoy Ventures to
+// Ventures, so the one word a captain meets on the boards names one thing
+// again. The venture's code keeps its historical identifiers, which is a
+// note ./convoy.ts carries rather than a second rename: the model is
+// persisted and a persisted name is a migration, not a copy change.
 // =====================================================================
 import {
   CARGO_SLOTS,
@@ -105,8 +108,18 @@ export interface PathConfig {
   // Three paths carry a pool and two do not, and the two are the paths
   // whose abilities are actions rather than errands: Convoy sells a
   // contract and Free Captain borrows another path's order, so neither
-  // brings the board an order of its own. That also makes the pools the
-  // plan's three locked slots are drawn from, one per pool.
+  // brings the board an order of its own. The pools are where D2's locked
+  // slots are drawn from, and the plan's phrase for that is one per pool,
+  // which is one per pool the manifest can trade rather than one per path:
+  // the Quartermaster's pool is C4's provisions, and provisions are pantry
+  // goods bought at RATION_PRICE a meal and never sold back to a port. An
+  // order for them would price like every other manifest order (five Gold
+  // an item and up against a ration that costs two) and would let a
+  // captain turn the till into a levy on their own larder, which is the
+  // one trade this tree has deliberately never had. So the seat brings the
+  // board no order, which is a reading of the plan rather than a gap in
+  // it, and it is why the board's three locked slots are drawn from two
+  // pools instead of three.
   orderPool: readonly string[];
 
   // A multiplier on the hold, and the one place a path's structural poverty
@@ -295,4 +308,40 @@ export function lockingPathFor(good: string): PathId | null {
     if (PATHS[id].orderPool.includes(good)) return id;
   }
   return null;
+}
+
+/**
+ * The hold's factor for a path, or the plain hold where there is no path.
+ *
+ * D3's reader, and the one that turns D1's recorded number into a rule: the
+ * Convoy's cannons are carried rather than stowed, so they cost slots, and
+ * the Quartermaster carries half again. It answers 1 rather than null for a
+ * pathless captain because the caller is arithmetic rather than a decision:
+ * a hold with no path is the base hold, and a multiplication is the shape
+ * every caller wants.
+ *
+ * Read only by cargoCapacity in ./larder, which is the hold's single
+ * capacity read, so a path factor and the shortage's quarter are applied in
+ * one place and in one order (see the constants' own note). A path added to
+ * the record tomorrow brings its factor here without a second edit.
+ */
+export function pathCargoModifier(value: PathId | null): number {
+  return value === null ? 1 : PATHS[value].cargoModifier;
+}
+
+/**
+ * The sentence a locked order card prints: what the card waits on, in plain
+ * language. Read from the record rather than written onto the card, which is
+ * the plan's own instruction for this feature ("The lock reason is computed
+ * from the path config rather than written into the card, so a retuned path
+ * cannot desynchronize from its own labels"): rename a path in this file and
+ * every card that waits on it says the new name the same afternoon.
+ *
+ * One string serves both places a captain meets the lock, the strip on the
+ * board and the ledger line a refused fill writes (see completeOrder in
+ * ./engine/orders), because two copies of it would be two chances for the
+ * card and the ledger to disagree about the same refusal.
+ */
+export function pathLockLine(id: PathId): string {
+  return `Only a captain who holds the ${PATHS[id].name} may fill this order.`;
 }

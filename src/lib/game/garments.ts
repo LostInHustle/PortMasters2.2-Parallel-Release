@@ -57,7 +57,7 @@ import {
 } from "./constants";
 import { newestAboard } from "./crew";
 import { crewSize } from "./larder";
-import { envFlagOn, survivalLayerOn } from "./flags";
+import { flagOn, survivalLayerOn } from "./flags";
 import { createRng } from "./rng";
 import {
   flatWorkerRoster,
@@ -78,18 +78,19 @@ const GARMENTS_WORN_MAX = 12;
  * Whether the garments layer is running.
  *
  * The plan's rollback for this feature is one flag, and this is it, read
- * through the same policy function the other two survival switches use (see
- * envFlagOn in ./larder, which carries the note about what the NEXT_PUBLIC_
- * prefix costs an operator). It is a rule of the survival family rather than
- * a layer of its own, so the layer governs it from above: a build with the
- * provisions off has no cold either, whatever this says.
+ * through the same policy function every other switch in the family uses
+ * (see flagOn in ./flags, which carries the note about how a read has to be
+ * written for a browser bundle to see it). It is a rule of the survival
+ * family rather than a layer of its own, so the layer governs it from
+ * above: a build with the provisions off has no cold either, whatever this
+ * says.
  *
  * With the switch off nothing is read of the wardrobe, nothing decays and
  * nobody freezes, and a save carrying one reads back as the same voyage with
  * its clothes still on it, unread rather than rewritten.
  */
 export function garmentsLayerOn(): boolean {
-  return envFlagOn("NEXT_PUBLIC_GARMENTS") && survivalLayerOn();
+  return flagOn(process.env.NEXT_PUBLIC_GARMENTS) && survivalLayerOn();
 }
 
 /**

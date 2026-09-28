@@ -102,10 +102,20 @@ export {
 } from "./engine/market";
 
 // ========== Orders: the trade manifest ==========
+// [D2: the nine slot order board] canFillOrder and its two path readers are
+// here rather than staying module private, because the board now has to ask
+// the same question the engine asks before it presses: which orders are
+// this captain's, and why one of them is not. The answers are computed in
+// ./engine/orders and nowhere else, so a card the board greys out is a card
+// the engine refuses, by construction rather than by agreement.
 export {
   callBrokersFavor,
+  canFillOrder,
   claimWordOnTheDocksReward,
   completeOrder,
+  lockedBehind,
+  openOrderCount,
+  pathOrderOf,
   purchaseIntel,
 } from "./engine/orders";
 
@@ -171,6 +181,51 @@ export {
   pirateChance,
   resolvePirateAttack,
 } from "./engine/pirates";
+
+// ========== The escort contract ==========
+// [D3: Convoy: the Escort Contract] The Convoy's market, split the way
+// ./engine/pirates.ts was split from its own panel: the rules are here and
+// the board that shows them is a component. Three callers read this block,
+// and each reads a different part of it. The client layer that owns a
+// captain's side of a contract reads applyEscortSide and coverFromBoard,
+// both of them from the room, which is where a relay becomes a state change.
+// The room's board module reads the three policy helpers, visibleContracts,
+// expireContracts and agreeContract, which are the rules about who sees what
+// and what an accept consumes; they live here rather than in the socket
+// closures for the reason ./convoy.ts gives about its own arithmetic, so a
+// rule can be tested without a live server. And the two screens that draw
+// the market read the questions a captain asks of it: canSellEscort,
+// escortFeeFor, escortCoverage and ESCORT_SELLER_PATH at the Parley table,
+// escortBuyerBusy to grey out a second cover, and escortCoverOf on the
+// Resolve screen, where it says whose guns are standing over the raid. That
+// last one is read here rather than testing the switch and the field on the
+// screen, so a build with the market off reads as uncovered wherever it is
+// asked.
+//
+// escortClaimFrom is deliberately absent. Its one caller is the raid roll
+// two blocks up, which is inside ./engine/ and reaches it directly.
+// escortSellerLabels was here and is not, which is worth the line: it
+// gathered the crest and the name a board draws, and the order board already
+// answers that question by calling pathConfig on the id it was handed (see
+// Orders.tsx). A second way to ask it would have been a second answer to
+// what a path looks like.
+export {
+  agreeContract,
+  applyEscortSide,
+  canSellEscort,
+  coverFromBoard,
+  escortBuyerBusy,
+  escortCoverage,
+  escortCoverOf,
+  escortFeeFor,
+  escortOfferStanding,
+  expireContracts,
+  normalizeEscortState,
+  resetEscortLeg,
+  visibleContracts,
+  ESCORT_SELLER_PATH,
+  type EscortContract,
+} from "./engine/contracts";
 
 // ========== Cross captain Gold: loans, backing, convoy ventures ==========
 export {

@@ -133,6 +133,26 @@ export interface TelemetryPayloads {
     grainMeals?: number;
     saltFishMeals?: number;
     produceMeals?: number;
+    // [D3: Convoy: the Escort Contract] The plan's own evaluation of this
+    // feature, "contracts sold per leg per Convoy captain and the ratio of
+    // fees collected to losses absorbed", read off the three figures that
+    // decide it: how many contracts this captain settled this leg, the fees
+    // they collected for them, and the Gold those contracts absorbed when a
+    // raid met their guns. The ratio is the quotient of the last two, worked
+    // out by whoever reads the record rather than stored here, for the same
+    // reason the expired order count is not stored: a number that is a
+    // division of two fields is one more thing that can disagree with them.
+    //
+    // The three ride together and are absent together on a leg sailed with
+    // the switch off, exactly as C4's four do, so a reader summing absorbed
+    // Gold across a voyage never has to guess whether a zero was a quiet leg
+    // or a build without the feature. The buyer's side is deliberately not
+    // recorded here: the plan asks what the market sold and what the market
+    // ate, and a captain who bought protection is on the other side of both
+    // numbers.
+    escortSold?: number;
+    escortFeesEarned?: number;
+    escortAbsorbed?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally

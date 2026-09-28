@@ -45,6 +45,7 @@ import {
   normalizeGarmentsTickRound,
 } from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
+import { normalizePath } from "@/lib/game/paths";
 
 // The most log lines a session keeps around at once (see the APPLY case
 // below, the only place this is enforced). Named rather than written out
@@ -446,6 +447,16 @@ export function useGameSession(
           game.garmentsTickRound = normalizeGarmentsTickRound(
             game.garmentsTickRound,
           );
+          // [D2: the nine slot order board] The path this captain sailed.
+          // Every save this build writes carries null here, because no rule
+          // in this tree deals a path until D7's draft lands, so the heal
+          // exists for the two shapes that can carry anything else: a save
+          // written by that draft's build and read back by this one, and a
+          // file written by hand. Both land on a captain who never drew,
+          // which is the ordinary table rather than a locked one, and the
+          // membership test behind this call is the one that keeps
+          // "constructor" from reading as a path.
+          game.path = normalizePath(game.path);
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.

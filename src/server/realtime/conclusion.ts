@@ -69,6 +69,7 @@ import {
 } from "./loans";
 import { resolveExpiredVentures } from "./ventures";
 import { clearBarter, clearFlexibleAccepted } from "./barter";
+import { clearContracts } from "./contracts";
 import { userSockets, roomMembers } from "./presence";
 import { recordRivalOutcomes, type RivalStanding } from "./rival";
 import { parseSave } from "./save";
@@ -225,6 +226,12 @@ export async function maybeConcludeVoyage(
   // save they end the voyage with. Each client returns its own escrow as
   // the board empties.
   clearBarter(io, roomId);
+  // [D3: Convoy: the Escort Contract] And the escort market's board, for
+  // the same reason and with the same shape: a voyage that has ended stops
+  // moving its checkpoint, so nothing else would ever sweep it, and a
+  // contract left standing would be a promise about a leg nobody is going
+  // to sail.
+  clearContracts(io, roomId);
   // The voyage is over, so the flexible allowance goes with it. Next
   // voyage opens on a full one, which is also the only moment a captain's
   // Renown can have moved, so the counter can never carry a stale level's

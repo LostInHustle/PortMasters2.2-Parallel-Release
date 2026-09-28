@@ -45,11 +45,14 @@ export type VoyageLogKind =
   | "leg_timed_out"
   | "audit_carried"
   | "maroon_carried"
-  | "captain_left";
+  | "captain_left"
+  | "contract_posted"
+  | "contract_agreed"
+  | "contract_claimed";
 
 // One fact, with the fields its sentence needs and no others. The union
 // is discriminated by `kind`, and voyageLogLine below names every arm, so
-// a tenth kind is a compile error there rather than a blank line on a
+// a new kind is a compile error there rather than a blank line on a
 // captain's screen.
 export type VoyageLogFacts =
   | { kind: "voyage_started" }
@@ -80,7 +83,30 @@ export type VoyageLogFacts =
   | { kind: "leg_timed_out"; phase: Phase }
   | { kind: "audit_carried"; target: string }
   | { kind: "maroon_carried"; target: string }
-  | { kind: "captain_left"; captain: string };
+  | { kind: "captain_left"; captain: string }
+  // [D3: Convoy: the Escort Contract] The market's three lines, which are
+  // the plan's own iteration item read as a surface: "a visible history of
+  // paid out claims". The three are what a table would repeat afterwards,
+  // in the order it would tell them: who was selling, who bought, and what
+  // the guns met.
+  //
+  // The posted line carries no buyer, deliberately. A direct offer is
+  // visible only to the two captains it names (see visibleContracts), and a
+  // line naming its target would hand the room the one fact the board is
+  // keeping back. It also carries no target for an open offer, where there
+  // is none to carry, so one sentence serves both and nothing in it says
+  // which of the two was posted.
+  //
+  // The claimed line carries no figure either, and the reason is that there
+  // is no figure the server could honestly write: what a raid took from the
+  // covered captain is the covered captain's report, and what the guns ate
+  // is worked out on the seller's own client against the seller's own purse
+  // (see applyEscortSide). A number on this line would be the server's
+  // second opinion of both. What it says instead is the fact the whole
+  // table can see for itself: the boarding party went to the guns.
+  | { kind: "contract_posted"; captain: string; fee: number }
+  | { kind: "contract_agreed"; captain: string; taker: string; fee: number }
+  | { kind: "contract_claimed"; captain: string; taker: string };
 
 // One line as it travels and as it is kept: the leg it happened on, what
 // kind of thing it was, and the sentence itself. The round is the room's
@@ -128,6 +154,12 @@ export function voyageLogLine(facts: VoyageLogFacts): string {
       return `The harbor maroons ${facts.target}.`;
     case "captain_left":
       return `${facts.captain} leaves the harbor.`;
+    case "contract_posted":
+      return `${facts.captain} offers one leg of protection for ${facts.fee} Gold.`;
+    case "contract_agreed":
+      return `${facts.taker} buys a leg of protection from ${facts.captain} for ${facts.fee} Gold.`;
+    case "contract_claimed":
+      return `Raiders bound for ${facts.taker} met ${facts.captain}'s guns.`;
   }
   // Named rather than defaulted, so a kind added to the union above stops
   // the build here instead of printing an empty line in the middle of a
@@ -176,6 +208,9 @@ export const VOYAGE_LOG_KINDS: readonly VoyageLogKind[] = [
   "audit_carried",
   "maroon_carried",
   "captain_left",
+  "contract_posted",
+  "contract_agreed",
+  "contract_claimed",
 ];
 
 // One door for a line arriving from outside this process: a frame off the

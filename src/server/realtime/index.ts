@@ -31,6 +31,8 @@ import {
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
   CONVOY_VENTURE_PAYOUT_MULTIPLIER,
+  ESCORT_CONTRACT_FEE_MAX,
+  ESCORT_CONTRACT_FEE_MIN,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_REWARD,
@@ -52,6 +54,20 @@ import {
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
+// [D3: Convoy: the Escort Contract] The market's policy, read from the
+// engine's public surface rather than from the module that declares it:
+// these four are the board's rules about who may post, who may take and
+// what a fee is, and they are the same four the client hook and the panel
+// read, which is what keeps a form and a socket from disagreeing about any
+// of them (see the block in @/lib/game/engine).
+import {
+  agreeContract,
+  escortBuyerBusy,
+  escortFeeFor,
+  escortOfferStanding,
+  type EscortContract,
+} from "@/lib/game/engine";
+import { escortContractsOn } from "@/lib/game/flags";
 import type {
   BarterOffer,
   LegReport,
@@ -112,6 +128,16 @@ import {
   recordFlexibleAccept,
   clearFlexibleAccepted,
 } from "./barter";
+import {
+  contractList,
+  contractPayloadFor,
+  setContracts,
+  broadcastContracts,
+  clearContracts,
+  removeUserContracts,
+  clearContractsSilent,
+  sweepContracts,
+} from "./contracts";
 import {
   aidList,
   clearAid,
@@ -357,6 +383,7 @@ function clearRoomAllMaps(roomId: string): void {
   disarmPhaseClock(roomId);
   clearRoomStatuses(roomId);
   clearBarterSilent(roomId);
+  clearContractsSilent(roomId);
   clearFlexibleAccepted(roomId);
   clearAidSilent(roomId);
   clearLoansSilent(roomId);
@@ -394,6 +421,7 @@ function clearRoomAllMaps(roomId: string): void {
 function buildDepartureCleanup(): DepartureCleanup {
   return {
     removeUserBarterOffers,
+    removeUserContracts,
     removeUserAidRequest,
     emitRoomMembers,
     maybeConcludeVoyage,
@@ -543,6 +571,15 @@ export function attachRealtime(httpServer: HttpServer): Server {
       io.to(socket.id).emit(
         "barter:update",
         barterPayloadFor(roomId, s.userId),
+      );
+      // [D3: Convoy: the Escort Contract] And the market's board, on the
+      // same reasoning as the barter one above: a reload mid leg has to get
+      // its own view of it back from here, and the view is this captain's
+      // rather than the room's because two captains can legitimately be
+      // owed two different boards.
+      io.to(socket.id).emit(
+        "contract:update",
+        contractPayloadFor(roomId, s.userId),
       );
       io.to(socket.id).emit("aid:update", {
         roomId,
@@ -844,6 +881,14 @@ export function attachRealtime(httpServer: HttpServer): Server {
             }
             clearBarter(io, roomId);
           }
+          // [D3: Convoy: the Escort Contract] The escort board's own sweep,
+          // which is narrower than the barter one above and deliberately
+          // not inside that branch: an offer dies when the Parley it was
+          // posted in closes, while a contract the two captains actually
+          // agreed survives into the leg it protects, which is the Resolve
+          // the raid is rolled in. What takes a contract off the board is
+          // the round, and that is the other half of the rule below.
+          sweepContracts(io, roomId, { phase: cp.phase, round: cp.round });
           if (cp.phase !== "resolve") clearAid(io, roomId);
         }
         // [B2: hard timers, the server as timekeeper] The seat a room is
@@ -976,6 +1021,13 @@ export function attachRealtime(httpServer: HttpServer): Server {
         grainMeals: optional(payload?.grainMeals),
         saltFishMeals: optional(payload?.saltFishMeals),
         produceMeals: optional(payload?.produceMeals),
+        // [D3: Convoy: the Escort Contract] The Convoy's own three, bounded
+        // by the same optional reader: present but unreadable is dropped
+        // rather than refused, so a market figure can never cost a captain
+        // the rest of their leg.
+        escortSold: optional(payload?.escortSold),
+        escortFeesEarned: optional(payload?.escortFeesEarned),
+        escortAbsorbed: optional(payload?.escortAbsorbed),
       });
     });
 
@@ -1178,7 +1230,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
           socket.emit("venture:error", {
             roomId,
             error:
-              "Too late in the voyage to post a new Convoy Venture. There's no round left that would leave time to spend the reward.",
+              "Too late in the voyage to post a new Venture. There's no round left that would leave time to spend the reward.",
           });
           return;
         }
@@ -1204,7 +1256,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
         await broadcastVentures(io, roomId);
         io.to(`room:${roomId}`).emit("room:system", {
           roomId,
-          content: `${s.user.displayName} posted a Convoy Venture: ${targetGold} Gold needed by Round ${deadlineRound}.`,
+          content: `${s.user.displayName} posted a Venture: ${targetGold} Gold needed by Round ${deadlineRound}.`,
         });
       },
     );
@@ -1646,6 +1698,282 @@ export function attachRealtime(httpServer: HttpServer): Server {
           requestAmount: offer.requestAmount,
         });
         broadcastBarter(io, roomId);
+      },
+    );
+
+    // ========== The escort contract ==========
+    //
+    // [D3: Convoy: the Escort Contract] The market a Convoy captain sells
+    // protection from during Parley. The board itself lives in ./contracts,
+    // and everything these handlers do is order it: refuse a post that
+    // duplicates one already standing, move one offer to agreed, and let
+    // the covered captain report the raid once.
+    //
+    // The money never passes through here. A fee moves on the two clients
+    // when the board says the two captains agreed, and the absorbed raid
+    // moves on the seller's client when the board says the raid arrived,
+    // which is the same division of labour the barter board runs on and the
+    // reason none of these handlers reads a purse. What the server is
+    // authoritative about is the ordering: one captain per cover, one claim
+    // per contract, and no agreement about a leg that has already gone.
+    socket.on("contract:state:request", (payload: { roomId?: string }) => {
+      const s = requireAuth(socket);
+      if (!s) return;
+      const roomId = payload?.roomId ?? s.roomId;
+      if (!roomId || roomId !== s.roomId) return;
+      socket.emit("contract:update", contractPayloadFor(roomId, s.userId));
+    });
+
+    socket.on(
+      "contract:post",
+      async (payload: {
+        roomId?: string;
+        fee?: number;
+        targetUserId?: string;
+      }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        if (!roomId || roomId !== s.roomId) return;
+        const fail = (error: string): void => {
+          socket.emit("contract:error", { roomId, error });
+        };
+        if (!escortContractsOn()) {
+          fail("The escort market is not running in this build.");
+          return;
+        }
+        // The fee is read through the same reader the panel reads it
+        // through, so a posting form and a posting socket cannot disagree
+        // about what a fee is (see escortFeeFor).
+        const fee = escortFeeFor(payload?.fee);
+        if (fee === null) {
+          fail(
+            `A fee is a whole number of Gold, at least ${ESCORT_CONTRACT_FEE_MIN} and at most ${ESCORT_CONTRACT_FEE_MAX}.`,
+          );
+          return;
+        }
+        // The one await in this handler, and every check is after it, so
+        // nothing between a check and the change it guards can yield.
+        const cp = await getCheckpoint(roomId);
+        if (cp.phase !== "parley") {
+          fail("One leg of protection is sold in the Parley phase.");
+          return;
+        }
+        let buyerUserId: string | null = null;
+        let buyerName: string | null = null;
+        if (payload?.targetUserId) {
+          if (payload.targetUserId === s.userId) {
+            fail("You can't sell protection to yourself.");
+            return;
+          }
+          const targetMember = await db.roomMember.findUnique({
+            where: {
+              userId_roomId: { userId: payload.targetUserId, roomId },
+            },
+            select: { user: { select: { displayName: true } } },
+          });
+          if (!targetMember) {
+            fail("That captain isn't in this harbor.");
+            return;
+          }
+          buyerUserId = payload.targetUserId;
+          buyerName = targetMember.user.displayName;
+        }
+        const list = contractList(roomId);
+        if (escortOfferStanding(list, s.userId, buyerUserId)) {
+          fail(
+            buyerUserId === null
+              ? "You already have an offer standing for anyone at this table."
+              : `You already have an offer standing for ${buyerName}.`,
+          );
+          return;
+        }
+        const contract: EscortContract = {
+          id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+          sellerUserId: s.userId,
+          sellerName: s.user.displayName,
+          buyerUserId,
+          buyerName,
+          fee,
+          round: cp.round,
+          status: "offered",
+        };
+        setContracts(roomId, [...list, contract]);
+        // [B4: the log surfaces] The room's line, which carries no buyer
+        // for the reason the kind's own note gives: a direct offer is one
+        // captain's business and the log is everyone's.
+        noteVoyageLog(io, roomId, {
+          kind: "contract_posted",
+          captain: contract.sellerName,
+          fee: contract.fee,
+        });
+        broadcastContracts(io, roomId);
+      },
+    );
+
+    socket.on(
+      "contract:accept",
+      async (payload: { roomId?: string; contractId?: string }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const contractId = payload?.contractId;
+        if (!roomId || roomId !== s.roomId || !contractId) return;
+        const fail = (error: string): void => {
+          socket.emit("contract:error", { roomId, error });
+        };
+        if (!escortContractsOn()) {
+          fail("The escort market is not running in this build.");
+          return;
+        }
+        const cp = await getCheckpoint(roomId);
+        // Synchronous from here down, so the offer cannot be taken by
+        // somebody else between the read and the write: JavaScript runs
+        // this block to the end before any other handler sees it.
+        const board = contractList(roomId);
+        const opening = board.find((c) => c.id === contractId);
+        if (!opening || opening.status !== "offered") {
+          fail("That offer has already gone.");
+          return;
+        }
+        if (opening.sellerUserId === s.userId) {
+          fail("You are the one selling that protection.");
+          return;
+        }
+        if (opening.buyerUserId !== null && opening.buyerUserId !== s.userId) {
+          fail("That offer was addressed to another captain.");
+          return;
+        }
+        if (opening.round !== cp.round) {
+          fail("That offer belongs to an earlier leg.");
+          return;
+        }
+        if (cp.phase !== "parley") {
+          fail("A contract is agreed in the Parley phase.");
+          return;
+        }
+        if (escortBuyerBusy(board, s.userId, cp.round)) {
+          fail("You are already covered for this leg.");
+          return;
+        }
+        setContracts(
+          roomId,
+          agreeContract(board, contractId, {
+            userId: s.userId,
+            name: s.user.displayName,
+          }),
+        );
+        noteVoyageLog(io, roomId, {
+          kind: "contract_agreed",
+          captain: opening.sellerName,
+          taker: s.user.displayName,
+          fee: opening.fee,
+        });
+        broadcastContracts(io, roomId);
+      },
+    );
+
+    socket.on(
+      "contract:cancel",
+      (payload: { roomId?: string; contractId?: string }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const contractId = payload?.contractId;
+        if (!roomId || roomId !== s.roomId || !contractId) return;
+        const fail = (error: string): void => {
+          socket.emit("contract:error", { roomId, error });
+        };
+        if (!escortContractsOn()) {
+          fail("The escort market is not running in this build.");
+          return;
+        }
+        const board = contractList(roomId);
+        const mine = board.find((c) => c.id === contractId);
+        if (!mine || mine.sellerUserId !== s.userId) return;
+        // Only an offer can be withdrawn. The plan's own sentence is that
+        // everything offered in Parley is binding once both parties accept,
+        // so an agreed contract is not the seller's to take back: what a
+        // seller who regrets the price has is the gap the voyage leaves
+        // them, and not a button.
+        if (mine.status !== "offered") {
+          fail("That contract has been agreed, so it can't be withdrawn.");
+          return;
+        }
+        setContracts(
+          roomId,
+          board.filter((c) => c.id !== contractId),
+        );
+        broadcastContracts(io, roomId);
+      },
+    );
+
+    socket.on(
+      "contract:claim",
+      async (payload: {
+        roomId?: string;
+        contractId?: string;
+        raidGold?: number;
+      }) => {
+        const s = requireAuth(socket);
+        if (!s) return;
+        const roomId = payload?.roomId ?? s.roomId;
+        const contractId = payload?.contractId;
+        if (!roomId || roomId !== s.roomId || !contractId) return;
+        const fail = (error: string): void => {
+          socket.emit("contract:error", { roomId, error });
+        };
+        if (!escortContractsOn()) return;
+        const raidGold = payload?.raidGold;
+        // A raid that would have taken nothing is not a claim: the covered
+        // captain keeps their empty hold and the seller owes nothing (see
+        // escortClaimFrom). Dropped silently rather than refused, because
+        // there is no captain doing anything wrong here.
+        if (
+          typeof raidGold !== "number" ||
+          !Number.isFinite(raidGold) ||
+          raidGold <= 0
+        ) {
+          return;
+        }
+        const cp = await getCheckpoint(roomId);
+        const board = contractList(roomId);
+        const contract = board.find((c) => c.id === contractId);
+        if (!contract || contract.status !== "agreed") {
+          fail("There is no agreed contract of yours to claim against.");
+          return;
+        }
+        if (contract.buyerUserId !== s.userId) {
+          fail("That contract covers another captain.");
+          return;
+        }
+        // The leg, not the phase. The raid is rolled in Resolve and the
+        // claim follows it by a frame, but a room whose clock has already
+        // carried it on is still the leg the contract was sold for, and a
+        // claim is a report about that leg rather than an action taken in
+        // one phase of it.
+        if (contract.round !== cp.round) {
+          fail("That contract was for an earlier leg.");
+          return;
+        }
+        setContracts(
+          roomId,
+          board.map((c) =>
+            c.id === contractId
+              ? {
+                  ...c,
+                  status: "claimed" as const,
+                  raidGold: Math.floor(raidGold),
+                }
+              : c,
+          ),
+        );
+        noteVoyageLog(io, roomId, {
+          kind: "contract_claimed",
+          captain: contract.sellerName,
+          taker: s.user.displayName,
+        });
+        broadcastContracts(io, roomId);
       },
     );
 
@@ -2464,6 +2792,11 @@ export function attachRealtime(httpServer: HttpServer): Server {
         disarmPhaseClock(roomId);
         clearRoomStatuses(roomId);
         clearBarter(io, roomId);
+        // [D3: Convoy: the Escort Contract] And the market's board, which
+        // belongs to the voyage that just ended rather than to the one
+        // about to start: a contract is a promise about a leg, and the new
+        // voyage's legs are not the old one's.
+        clearContracts(io, roomId);
         // A restarted voyage is a new voyage, so the flexible allowance
         // starts over with it.
         clearFlexibleAccepted(roomId);

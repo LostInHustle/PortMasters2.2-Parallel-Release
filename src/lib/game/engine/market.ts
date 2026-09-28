@@ -21,9 +21,11 @@ import {
   ICONS,
   PRODUCT_PRICES,
   RECIPES,
+  RESOURCES,
   RESOURCE_WEIGHTS,
 } from "../constants";
 import { charterOpensOn, marketCountsFor } from "../difficulty";
+import { lockingPathFor } from "../paths";
 // The hold's room, read from ./larder rather than from ./hold because the
 // quarter a hungry crew takes off the cargo is a rule about hunger and
 // lives with the rest of that rule. See cargoRoom there.
@@ -145,6 +147,41 @@ export function genMixedOrder(
   pools: MarketPools,
 ): Omit<OrderCard, "id"> {
   return rng() < 0.5 ? genRawOrder(rng, pools) : genProductOrder(rng, pools);
+}
+
+// [D2: the nine slot order board] The manifest's pathbound errand: one good,
+// named by the draw, priced by whichever generator the good's own kind uses,
+// so a pathbound card is a manifest order like any other and differs only in
+// that it waits on a path. The good is what decides which path that is (see
+// lockingPathFor), so nothing about the path is written here and nothing
+// about it needs to be: this function knows no crest and no name.
+//
+// Drawn from the pooled goods that some path's own order pool claims, which
+// is what keeps a locked card a card its path could really fill: the pool is
+// the table that path's trade lives in. Drawn from the round's unlocked
+// pools rather than from the pool lists themselves, so a pathbound card can
+// never demand a good the charter has not opened yet, and drawn with
+// replacement, the way the six ordinary orders are: a card is a draw and its
+// label is derived, so asking the draw for three different crests would make
+// the label an input to it rather than a reading of it.
+//
+// Null where the round has unlocked nothing any path claims, which no tier
+// reaches today (the founding trade alone is three commodities and three
+// garments) and which the caller reads as a slot left empty rather than as a
+// broken board.
+export function genPathOrder(
+  rng: Rng,
+  pools: MarketPools,
+): Omit<OrderCard, "id"> | null {
+  const candidates = [...pools.resources, ...pools.products].filter(
+    (good) => lockingPathFor(good) !== null,
+  );
+  if (candidates.length === 0) return null;
+  const good = pick(rng, candidates);
+  const order = (RESOURCES as readonly string[]).includes(good)
+    ? genRawOrder(rng, pools, good)
+    : genProductOrder(rng, pools, good);
+  return { ...order, isPathOrder: true };
 }
 
 function genProductPurchaseCard(

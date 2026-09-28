@@ -32,6 +32,7 @@ import { feedCrew } from "../larder";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
 import type { GameState } from "../types";
+import { resetEscortLeg } from "./contracts";
 
 function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -196,6 +197,12 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   state.pirateAttackResolved = false;
   state.escortHired = false;
   state.brokerTippedPirates = false;
+  // [D3: the escort contract] The leg's cover, the leg's pending claim and
+  // the leg's settlement ledger go with the rest of the round's facts. A
+  // contract covers one leg (see resetEscortLeg in ./contracts), and this is
+  // the one function every leg opens through, which is the same reason the
+  // meal above is taken here rather than at any of the three entries.
+  resetEscortLeg(state);
   logs.push("\n🧭=== The Navigator's Compass ===");
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }

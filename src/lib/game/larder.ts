@@ -68,6 +68,7 @@ import {
 } from "./hold";
 import { survivalLayerOn } from "./flags";
 import { addLot, drawMeals, foodRoomMeals, reconcileLarder } from "./foods";
+import { pathCargoModifier } from "./paths";
 import { flatWorkerRoster, type GameState } from "./types";
 
 /**
@@ -192,10 +193,20 @@ export function feedCrew(state: GameState, logs: string[]): boolean {
  * the split switched off the answer is unbounded, which is the hold this
  * game has always had: a hold with no size has no quarter to take off it,
  * and a rule that invented one would be a hold size by the back door.
+ *
+ * [D3] The path's factor lands here too, one line under the quarter, and
+ * the order of the two is the order D1's note described: the shortage
+ * takes its quarter off the hold a captain has, and the path then scales
+ * what that captain can carry of it. The Convoy's guns cost slots and the
+ * Quartermaster's seat carries half again, and both arrive as the single
+ * number ./paths reads off the record, so this stays the one place a
+ * capacity is decided and no counter grows a modifier of its own.
  */
 export function cargoCapacity(state: GameState): number {
   if (!holdCapacityOn()) return Number.POSITIVE_INFINITY;
-  return cargoSlots(onShortRations(state));
+  return Math.floor(
+    cargoSlots(onShortRations(state)) * pathCargoModifier(state.path),
+  );
 }
 
 /**

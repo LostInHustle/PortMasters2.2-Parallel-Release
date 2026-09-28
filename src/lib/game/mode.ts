@@ -11,10 +11,10 @@
 // how long, how wide the market, how likely a raid. Mode says which game
 // you are playing: which phases the room synchronizes on, in what order,
 // and what happens to a seat that fails. Classic is the voyage PortMasters
-// 2 has always run: the same ports, the same table, the same manifest, with
-// the goods sorted before the conversation. Both modes walk the same six
-// phases now (see ./phases.ts), and the order below is where the two of
-// them part company.
+// 2 Parallel Release has always run: the same ports, the same table, the
+// same manifest, with the goods sorted before the conversation. Both modes
+// walk the same six phases now (see ./phases.ts), and the order below is
+// where the two of them part company.
 // Adding a mode at all is what lets a second one exist beside it without
 // touching the first, which is the whole point of this file.
 //

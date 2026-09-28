@@ -932,6 +932,40 @@ export const SHORT_RATIONS_CARGO = 0.75;
 export const CONVOY_CANNON_SLOTS = 6;
 export const QUARTERMASTER_HOLD_GAIN = 0.5;
 
+// [D2: the nine slot order board] How many pathbound orders the manifest
+// posts beside the tier's own draw: three, which is the plan's number
+// ("Six basic orders open, three pathbound orders greyed out"). It is the
+// same number on every tier rather than a column in ./difficulty, because
+// the plan makes the board's size two things: the six are what a charter
+// schedules (orderCardsBase) and the three are what this feature adds, so
+// a tier added tomorrow inherits the nine without a column to fill in. See
+// startOrders in ./engine/orders for where the slots are filled, and
+// pathOrdersOn in ./flags for the switch that takes them off the board.
+export const PATH_ORDER_SLOTS = 3;
+
+// [D3: the escort contract] The ability's three numbers, kept together
+// because they are one feature's arithmetic and a reader who has one of
+// them is looking for the other two.
+//
+// CONVOY_RAID_COVERAGE is the "your cannons decide how much you actually
+// eat" clause read as a number: six gun ports beat off two fifths of a
+// boarding party, and the escort's hold eats the rest. It is stated here
+// rather than derived from CONVOY_CANNON_SLOTS above because the guns are
+// already spoken for: that number is the hold they cost, and a rule that
+// read it as a share of a raid would be one number answering two
+// questions. The two sit beside each other so a reader tuning the path's
+// poverty sees the price of its power.
+//
+// The fee bounds are the contract's own defence rather than a market
+// rule: a fee is a whole number of Gold, at least one (a free contract is
+// not a contract, and zero would let an offer sit on the board that
+// nobody can be held to) and at most a thousand, which is the number that
+// keeps a doctored client from posting a fee the room's arithmetic would
+// have to reason about. See escortFeeFor in ./engine/contracts.
+export const CONVOY_RAID_COVERAGE = 0.4;
+export const ESCORT_CONTRACT_FEE_MIN = 1;
+export const ESCORT_CONTRACT_FEE_MAX = 1000;
+
 // Preserve, the plan's own ratio: "converts three produce into two salt
 // fish", at a port. Three meals of produce is one slot of the hold, and
 // two meals of salt fish is the same one slot, so the conversion is
@@ -1264,7 +1298,7 @@ Finished Goods: Linen Clothes(30 to 42💰), Cotton Clothes(50 to 65💰), Broca
 • From the next Port Purchase onward, every captain's board gets one extra cargo lot, for the rest of the voyage
 • This never changes your voyage length or which tier's goods you see, only how busy the market gets
 
-⚓ Convoy Ventures:
+⚓ Ventures:
 • Found on the Dues tab of your captain's rail: any captain can post a venture, a Gold target and a deadline round
 • Anyone in the harbor, including the poster, can chip in Gold toward that target at any time before the deadline
 • Reach the target in time and it fills: every contributor is paid back ${Math.round((CONVOY_VENTURE_PAYOUT_MULTIPLIER - 1) * 100)}% more Gold than they put in, split in exact proportion to their share

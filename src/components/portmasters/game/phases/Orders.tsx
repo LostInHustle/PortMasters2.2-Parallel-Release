@@ -13,12 +13,16 @@ import {
   brokersFavorCommission,
   calcTransportCost,
   callBrokersFavor,
+  canFillOrder,
   completeOrder,
   explainTransportCost,
   explainVAT,
+  lockedBehind,
   nextPhase,
+  pathOrderOf,
   type PriceBreakdown,
 } from "@/lib/game/engine";
+import { pathConfig, pathLockLine } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
@@ -237,9 +241,17 @@ export function Orders({
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.customerCards.map((o) => {
-          const canComplete = o.resources.every(
-            (r) => (game.inventory[r.type] || 0) >= r.required!,
-          );
+          // [D2: the nine slot order board] The three pathbound cards. `path`
+          // is the path that posted this card, and it is null for an ordinary
+          // order; `locked` is the path this card waits on for this captain,
+          // and it is null wherever the card is theirs to fill, which is every
+          // ordinary card and every marked card whose path they hold. Both are
+          // the engine's own readings (pathOrderOf and lockedBehind), so a
+          // card greyed here is a card the engine refuses there: the board and
+          // the guard cannot come apart.
+          const path = pathConfig(pathOrderOf(o));
+          const locked = lockedBehind(game, o);
+          const canComplete = canFillOrder(game, o);
           const completed = game.completedOrders.includes(o.id);
           const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
           const transport = calcTransportCost(game, o.totalItems, hasSilk);
@@ -275,17 +287,27 @@ export function Orders({
               key={o.id}
               className={cn(
                 "rounded-xl border overflow-hidden flex flex-col",
-                // Harbour gold, filled rather than outlined. The intel
-                // "Guaranteed" highlight wears the same hue as a thin outline,
-                // so filled versus outlined keeps the two distinguishable
-                // without relying on hue alone.
-                o.isMandate
-                  ? "border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25"
-                  : o.isBrokerFavor
-                    ? "border-favor/45 bg-favor/[0.05]"
-                    : matchesIntel
-                      ? "border-intel/40 bg-intel/[0.04]"
-                      : "border-black/10 dark:border-white/10 bg-background/50",
+                // [D2] A locked card is asked first, because the lock is the
+                // strongest thing a card can say: a card nobody may fill is
+                // not a card to style as a prize. Dashed and muted is how this
+                // board renders a thing that is visible but not pressable (the
+                // same dress the Broker's Favor panel wears while it is shut),
+                // and the card keeps its goods and its reward readable, since
+                // the whole point of posting it is to show a captain what
+                // holding the path would open.
+                locked
+                  ? "border-dashed border-black/25 dark:border-white/25 bg-background/40 opacity-75"
+                  : // Harbour gold, filled rather than outlined. The intel
+                    // "Guaranteed" highlight wears the same hue as a thin outline,
+                    // so filled versus outlined keeps the two distinguishable
+                    // without relying on hue alone.
+                    o.isMandate
+                    ? "border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25"
+                    : o.isBrokerFavor
+                      ? "border-favor/45 bg-favor/[0.05]"
+                      : matchesIntel
+                        ? "border-intel/40 bg-intel/[0.04]"
+                        : "border-black/10 dark:border-white/10 bg-background/50",
               )}
             >
               <div className="px-3.5 py-2 text-xs font-semibold border-b border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] flex items-center justify-between gap-2">
@@ -299,7 +321,21 @@ export function Orders({
                         : "· Raw Material Demand"}
                   </span>
                 </span>
-                {o.isMandate ? (
+                {path ? (
+                  // [D2] The chip a pathbound card wears: the crest and the
+                  // name, both read off the path record rather than written
+                  // onto the card, so a path renamed in ./paths renames here.
+                  // Muted where the card is locked, which keeps the two ends
+                  // of the card saying the same thing.
+                  <span
+                    className={cn(
+                      "shrink-0",
+                      locked ? "text-muted-foreground" : "text-orders",
+                    )}
+                  >
+                    {path.crest} {path.name} order
+                  </span>
+                ) : o.isMandate ? (
                   <span className="text-orders shrink-0 font-bold">
                     📜 Imperial Mandate
                   </span>
@@ -393,19 +429,47 @@ export function Orders({
                     </Term>
                   </div>
                 )}
+                {path && (
+                  // What the path is, in the record's own words. Printed on
+                  // the cards that wait on a path so the board explains the
+                  // path rather than only naming it, and printed on the open
+                  // ones too, so a captain holding a path sees the same card
+                  // their tablemates see with the lock taken off.
+                  <div className="text-[11px] text-muted-foreground leading-snug mt-2 pt-1.5 border-t border-black/5 dark:border-white/10">
+                    {path.crest} {path.signature}
+                  </div>
+                )}
               </div>
               <div className="p-3 pt-0">
-                <Button
-                  className={cn(
-                    "w-full rounded-lg",
-                    canComplete && !completed ? "pm-grad-orders" : "",
-                  )}
-                  variant={canComplete && !completed ? "default" : "secondary"}
-                  disabled={!canComplete || completed}
-                  onClick={() => act((g, l) => completeOrder(g, o.id, l))}
-                >
-                  {completed ? "✅ Completed" : `🤝 Trade (Net ${netProfit}💰)`}
-                </Button>
+                {locked ? (
+                  // [D2] The lock line stands where the button stands, because
+                  // that is where a captain's eye already goes on every card
+                  // on this board. Deliberately not a disabled button: a
+                  // button that can never be pressed promises an action the
+                  // card does not have, and what a greyed card owes its
+                  // reader is a sentence about why rather than a grey shape.
+                  // The string is pathLockLine's, the same one the ledger
+                  // prints when a fill is refused.
+                  <div className="rounded-lg border border-dashed border-black/25 dark:border-white/25 px-3 py-2 text-[11px] text-muted-foreground leading-snug">
+                    🔒 {pathLockLine(locked)}
+                  </div>
+                ) : (
+                  <Button
+                    className={cn(
+                      "w-full rounded-lg",
+                      canComplete && !completed ? "pm-grad-orders" : "",
+                    )}
+                    variant={
+                      canComplete && !completed ? "default" : "secondary"
+                    }
+                    disabled={!canComplete || completed}
+                    onClick={() => act((g, l) => completeOrder(g, o.id, l))}
+                  >
+                    {completed
+                      ? "✅ Completed"
+                      : `🤝 Trade (Net ${netProfit}💰)`}
+                  </Button>
+                )}
               </div>
             </div>
           );
@@ -440,6 +504,12 @@ function OrderFulfillmentPlanner({ game }: { game: GameState }) {
 
   const plans: Plan[] = game.customerCards
     .filter((o) => !game.completedOrders.includes(o.id))
+    // [D2] Locked cards are left out of the plan, not listed as impossible
+    // ones: this panel answers what to sail for, and a card waiting on a path
+    // the captain does not hold is not a thing to sail for, whatever the hold
+    // is carrying. The board already prints those three cards in full, so
+    // nothing is being hidden here, only kept out of the arithmetic.
+    .filter((o) => lockedBehind(game, o) === null)
     .map((o) => {
       const missing: { item: string; have: number; need: number }[] = [];
       for (const r of o.resources) {

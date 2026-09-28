@@ -255,6 +255,9 @@ export function noteLegReport(
     grainMeals?: number;
     saltFishMeals?: number;
     produceMeals?: number;
+    escortSold?: number;
+    escortFeesEarned?: number;
+    escortAbsorbed?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -273,6 +276,15 @@ export function noteLegReport(
   const grainMeals = held(figures.grainMeals);
   const saltFishMeals = held(figures.saltFishMeals);
   const produceMeals = held(figures.produceMeals);
+  // [D3: Convoy: the Escort Contract] The market's three figures ride the
+  // same rule, and "held" is the right reader for all three: a fee is Gold
+  // and an absorbed raid is Gold, so neither can be negative, and a count of
+  // contracts is a count. The buyer's side is not here and is not merely
+  // unrecorded: nothing on the wire carries it, since the plan's evaluation
+  // is about what the seller's market did.
+  const escortSold = held(figures.escortSold);
+  const escortFeesEarned = held(figures.escortFeesEarned);
+  const escortAbsorbed = held(figures.escortAbsorbed);
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
@@ -283,6 +295,9 @@ export function noteLegReport(
     ...(grainMeals === undefined ? {} : { grainMeals }),
     ...(saltFishMeals === undefined ? {} : { saltFishMeals }),
     ...(produceMeals === undefined ? {} : { produceMeals }),
+    ...(escortSold === undefined ? {} : { escortSold }),
+    ...(escortFeesEarned === undefined ? {} : { escortFeesEarned }),
+    ...(escortAbsorbed === undefined ? {} : { escortAbsorbed }),
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather

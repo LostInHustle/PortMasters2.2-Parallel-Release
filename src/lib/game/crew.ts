@@ -62,7 +62,7 @@ import {
   type WorkerTypeId,
 } from "./constants";
 import { crewSize, onShortRations } from "./larder";
-import { envFlagOn } from "./flags";
+import { flagOn } from "./flags";
 import {
   flatWorkerRoster,
   type CrewLoss,
@@ -83,10 +83,10 @@ const CREW_LOST_MAX = 24;
  * Whether the loss rule is running.
  *
  * The plan's rollback for this feature is one flag, and this is it, read
- * through the same policy function the provisions layer's switch uses (see
- * envFlagOn in ./larder, which also carries the note about what the
- * NEXT_PUBLIC_ prefix costs an operator). With the switch off the roster
- * still exists and is still drawn, because the plan says the roster is the
+ * through the same policy function every other switch in the family uses
+ * (see flagOn in ./flags, which also carries the note about how a read has
+ * to be written for a browser bundle to see it). With the switch off the
+ * roster still exists and is still drawn, because the plan says the roster is the
  * durable part and the rule is what goes: a captain meets named artisans
  * and never loses one.
  *
@@ -95,7 +95,7 @@ const CREW_LOST_MAX = 24;
  * a build with the provisions off loses nobody whatever this says.
  */
 export function crewLossRuleOn(): boolean {
-  return envFlagOn("NEXT_PUBLIC_CREW_LOSS");
+  return flagOn(process.env.NEXT_PUBLIC_CREW_LOSS);
 }
 
 /**

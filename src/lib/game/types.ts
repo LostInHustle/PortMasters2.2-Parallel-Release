@@ -18,6 +18,7 @@ import {
 } from "./difficulty";
 import { DEFAULT_MODE, voyageRoundsFor, type GameMode } from "./mode";
 import type { PortShift } from "./maroon";
+import type { PathId } from "./paths";
 import type { HouseId } from "./legacy";
 import { defaultStandingOrders, type StandingOrders } from "./standing";
 // The two runtime imports this module takes from the engine, and
@@ -87,6 +88,13 @@ export type OrderCard = {
   // the trade board's styling; the order settles like any other, except that it
   // carries isProductOrder: false so no VAT is charged on an imperial levy.
   isMandate?: boolean;
+  // Set only on the orders the paths post to the manifest (see genPathOrder in
+  // ./engine/market and the slots startOrders fills). A marker and never a
+  // label: which path a marked card waits on is computed from the good it
+  // demands rather than written here (see pathOrderOf and lockedBehind in
+  // ./engine/orders), so a retuned pool cannot leave a card stamped for one
+  // path and locked to another.
+  isPathOrder?: boolean;
 };
 
 type IntelItem = { item: string; port: string };
@@ -264,6 +272,23 @@ export type OrderFill = {
   reward: number;
 };
 
+// [D3: the escort contract] The two small shapes the covered leg needs on
+// the state. A cover is a contract this captain bought, as their own engine
+// needs to read it at the raid roll: the contract's id, for the ledger that
+// keeps one movement from being applied twice, and the seller's name, for
+// the line the log prints and the panel shows. A claim is what
+// resolvePirateAttack leaves behind when a covered raid finds the hold: the
+// Gold the raid would have taken, carried to the seller through the room.
+export type EscortCover = {
+  contractId: string;
+  sellerName: string;
+};
+
+export type EscortClaim = {
+  contractId: string;
+  raidGold: number;
+};
+
 export type GameState = {
   inventory: Record<string, number>;
   money: number;
@@ -288,6 +313,20 @@ export type GameState = {
   // deterministic seed so a restart (which bumps the epoch) rerolls every
   // captain's market, orders, and Broker intel into a brand new voyage.
   voyageEpoch: number;
+  // The path this captain sails, or null for a captain who has not drawn one
+  // (see ./paths). Read by the manifest's lock rule, which is the first rule
+  // in this tree to ask who a captain is: a marked card is open to the captain
+  // holding its path and locked to everyone else (see lockedBehind in
+  // ./engine/orders), and every other card is open to all five paths alike.
+  //
+  // Null is the ordinary value rather than a broken one, because the slice
+  // that deals a path at all is D7's draft: until it lands no rule in this
+  // tree writes this field, so a table where every captain reads as pathless
+  // is exactly the table this build describes. It is healed on load through
+  // normalizePath (see use-game-session) rather than trusted, so a save
+  // written by hand, or by a build that spelled a path differently, reads as
+  // a captain who never drew rather than as one holding a path nobody knows.
+  path: PathId | null;
   totalRevenue: number;
   totalCosts: number;
   materialCosts: number;
@@ -528,6 +567,42 @@ export type GameState = {
   // the leak only raises this round's raid chance, once, and is announced in
   // the log rather than hidden. Reset every round in startBoonDrafting.
   brokerTippedPirates: boolean;
+  // [D3: the escort contract] The leg's cover as this captain's own engine
+  // reads it: set from the room's contract board when this captain is the
+  // buyer of an agreed contract for the round, cleared with the rest of the
+  // round's facts in startBoonDrafting. The board is the contract's home
+  // (room state, see src/server/realtime/contracts) and this is the mirror
+  // the raid roll consults, so the engine never reaches for the network and
+  // a captain whose seller left the room sails unprotected rather than
+  // protected by a contract nobody is on the other end of.
+  escortCover: EscortCover | null;
+  // The claim a covered raid raises, left on the state for the React layer
+  // to relay over contract:claim and then clear, the same shape the pulse
+  // tally relays over harbor:pulse:report (see _pendingPulseTally below).
+  // Set by resolvePirateAttack, flushed by use-escort-contracts.
+  pendingEscortClaim: EscortClaim | null;
+  // The contract money movements this captain has already applied, keyed
+  // "id:fee" or "id:claim". The ledger that makes a reload between a fee and
+  // its claim harmless: the side that already moved is never moved twice.
+  //
+  // Both of a contract's movements land in the leg the contract was agreed
+  // in, the fee when the two captains shook hands and the claim when the
+  // raid that leg went looking for the buyer, so the ledger never has to
+  // outlive a leg and the stamp below is what says which leg it belongs to.
+  // See resetEscortLeg in ./engine/contracts, which empties it at the Dawn
+  // it is stale for, and applyEscortSide, which reads the stamp before it
+  // reads the list.
+  escortSettled: string[];
+  escortSettledRound: number;
+  // The voyage's contract tally, seller side and buyer side. Read by the leg
+  // report (contracts sold, fees earned, gold absorbed) and by the two panels
+  // that quote a captain's own record back to them.
+  escortSold: number;
+  escortBought: number;
+  escortFeesEarned: number;
+  escortFeesPaid: number;
+  escortClaims: number;
+  escortAbsorbed: number;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
   // at the end of Round 8 (see settleOutstandingDebts in
@@ -770,6 +845,10 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     // A voyage is born at the pier, before its first leg. See
     // ../game/phases.ts for why the harbor is not one of the six.
     phase: "harbor",
+    // Every captain leaves the pier pathless, which is D7's draft to change
+    // and nobody else's: see the field's own note for why null is the
+    // ordinary value rather than a missing one.
+    path: null,
     resourceCards: [],
     customerCards: [],
     purchasedCards: [],
@@ -802,6 +881,16 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     pirateAttackResolved: false,
     escortHired: false,
     brokerTippedPirates: false,
+    escortCover: null,
+    pendingEscortClaim: null,
+    escortSettled: [],
+    escortSettledRound: 0,
+    escortSold: 0,
+    escortBought: 0,
+    escortFeesEarned: 0,
+    escortFeesPaid: 0,
+    escortClaims: 0,
+    escortAbsorbed: 0,
     debts: [],
     loansGiven: [],
     defaultedDebt: false,

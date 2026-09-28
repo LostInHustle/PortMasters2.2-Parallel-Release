@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
 import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter } from "@/lib/use-barter";
+import type { useEscortContracts } from "@/lib/use-escort-contracts";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
 import type { useAudit } from "@/lib/use-audit";
@@ -18,6 +19,11 @@ import { ReadyBar } from "../ReadyBar";
 
 type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
+// [D3: Convoy: the Escort Contract] The escort market's board, threaded the
+// same way the barter board is and for the same reason: the sockets live in
+// the room and no phase panel is handed one. Exported because the Parley
+// screen's market panel takes it as its own prop.
+export type Escort = ReturnType<typeof useEscortContracts>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
 type Audit = ReturnType<typeof useAudit>;
@@ -30,6 +36,14 @@ export type PhasePanelProps = {
   ctx: GameContext;
   phaseSync: PhaseSync;
   barter: Barter;
+  // [D3: Convoy: the Escort Contract] The market a Convoy captain sells
+  // protection from, opened at the Parley table beside the exchange. It is
+  // threaded like the board above and draws nothing at all in a build with
+  // the switch off, which is the only condition under which any phase pays
+  // it no attention: a captain who holds no path of their own still reads
+  // the market, because buying cover is what everyone else at the table is
+  // there for.
+  escort: Escort;
   aid: Aid;
   backing: Backing;
   // The Manifest Audit, threaded like the hooks above rather than called

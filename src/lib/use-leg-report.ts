@@ -48,7 +48,8 @@ import type { GameState } from "@/lib/game/types";
 import type { LegReport } from "@/types/realtime";
 import { mealsOf } from "@/lib/game/foods";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
-import { survivalLayerOn } from "@/lib/game/flags";
+import { escortContractsOn, survivalLayerOn } from "@/lib/game/flags";
+import { openOrderCount } from "@/lib/game/engine";
 
 // The same cadence the captain's own status rides on (see
 // use-game-session.ts): enough to feel immediate, sparse enough that a
@@ -72,7 +73,13 @@ export function useLegReport(
   // the engine resets at the top of every round and appends to on every
   // settlement. Dealt minus filled is the plan's expired count, worked
   // out by whoever reads the record rather than stored a second time.
-  const ordersDealt = game.customerCards.length;
+  //
+  // [D2] Dealt means the orders this captain could act on, so a card locked
+  // behind a path they do not hold is not one of them: the count comes from
+  // openOrderCount, where the lock rule lives, rather than from the length of
+  // the board, because a locked card is not an order anybody expired and
+  // counting it would read three of them against every captain's leg.
+  const ordersDealt = openOrderCount(game);
   const ordersFilled = game.completedOrders.length;
   // The goods the hold closes the leg carrying: a hold full of one thing
   // is the staple the plan's gate watches for, and no key of an empty
@@ -93,6 +100,16 @@ export function useLegReport(
     ? mealsOf(game, "Salt Fish")
     : undefined;
   const produceMeals = survivalLayerOn() ? mealsOf(game, "Produce") : undefined;
+  // [D3: Convoy: the Escort Contract] The market's three, read off the
+  // captain's own tally and sent only when the switch that gives them
+  // meaning is on. They are this captain's own record of what they sold,
+  // which is the seller's side the plan asks about: a buyer's leg carries no
+  // contract figures, because the market being measured is the seller's.
+  const escortSold = escortContractsOn() ? game.escortSold : undefined;
+  const escortFeesEarned = escortContractsOn()
+    ? game.escortFeesEarned
+    : undefined;
+  const escortAbsorbed = escortContractsOn() ? game.escortAbsorbed : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -109,6 +126,9 @@ export function useLegReport(
         grainMeals,
         saltFishMeals,
         produceMeals,
+        escortSold,
+        escortFeesEarned,
+        escortAbsorbed,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -124,5 +144,8 @@ export function useLegReport(
     grainMeals,
     saltFishMeals,
     produceMeals,
+    escortSold,
+    escortFeesEarned,
+    escortAbsorbed,
   ]);
 }

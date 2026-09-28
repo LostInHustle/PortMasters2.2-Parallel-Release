@@ -11,6 +11,7 @@ import { Term } from "../../Term";
 import { AuditVoteCard } from "../AuditPanel";
 import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
+import { EscortMarket } from "../EscortContracts";
 import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 // The Parley panel: the Captain's Exchange, and with it the two votes the
@@ -23,6 +24,7 @@ export function Parley({
   ctx,
   act,
   barter,
+  escort,
   audit,
   maroon,
   phaseSync,
@@ -36,6 +38,7 @@ export function Parley({
   | "ctx"
   | "act"
   | "barter"
+  | "escort"
   | "audit"
   | "maroon"
   | "phaseSync"
@@ -233,6 +236,12 @@ export function Parley({
           </div>
         )}
       </div>
+
+      {/* [D3: Convoy: the Escort Contract] The protection market, under the
+          exchange because it is the other thing sold at this table and it
+          sells on the same terms: a price agreed in the open, and one leg
+          of it. It draws nothing at all in a build with the switch off. */}
+      <EscortMarket game={game} escort={escort} me={me} members={members} />
 
       <ReadyFooter
         phaseSync={phaseSync}

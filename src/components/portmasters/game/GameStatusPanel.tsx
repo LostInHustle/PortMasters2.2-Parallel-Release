@@ -682,7 +682,7 @@ function ConvoyVenturesSection({
   return (
     <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
       <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
-        ━━ Convoy Ventures ━━
+        ━━ Ventures ━━
       </div>
 
       {convoy.error && (
@@ -697,8 +697,8 @@ function ConvoyVenturesSection({
         </p>
       ) : tooLateToPost ? (
         <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
-          Too late in this voyage to post a new Convoy Venture: there is no
-          round left that would leave time to spend the reward.
+          Too late in this voyage to post a new Venture: there is no round left
+          that would leave time to spend the reward.
         </p>
       ) : (
         <>

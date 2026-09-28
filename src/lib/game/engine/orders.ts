@@ -17,10 +17,17 @@
 //
 // The order generators come from ./market: Market and Orders draw from
 // the same seeded deck, so there is exactly one implementation of them.
+//
+// [D2: the nine slot order board] Three of the cards this module deals wait
+// on a path. Nothing about them lives on the card beyond one marker
+// (isPathOrder), because which path a card waits on is read from the good it
+// demands (see pathOrderOf below), the same way the board derives the crest
+// and the lock line it prints.
 // =====================================================================
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
   ICONS,
+  PATH_ORDER_SLOTS,
   PRODUCTS,
   RESOURCES,
   SILK_GOODS,
@@ -34,6 +41,8 @@ import {
   mandateIndexFor,
   marketCountsFor,
 } from "../difficulty";
+import { pathOrdersOn } from "../flags";
+import { lockingPathFor, pathLockLine, type PathId } from "../paths";
 import {
   isCharterGood,
   isTier1CharterProduct,
@@ -45,6 +54,7 @@ import type { GameContext, GameState, OrderCard } from "../types";
 import { hasModule } from "./core";
 import {
   genMixedOrder,
+  genPathOrder,
   genProductOrder,
   genRawOrder,
   poolsFor,
@@ -79,8 +89,70 @@ function orderShortfall(
   return null;
 }
 
+/**
+ * Which path posts an order, or null where none does. [D2: the nine slot
+ * order board]
+ *
+ * The answer is read from the good the order demands, never from the card,
+ * which is the plan's own instruction for this feature: a card's lock reason
+ * is computed from the path configuration rather than written onto the card,
+ * so retuning a pool moves the labels with it. It is also what keeps an
+ * ordinary order ordinary: a card the draw happened to deal against a pooled
+ * good carries no marker and is no path's locked order (see genMixedOrder in
+ * ./market, which writes no marker).
+ *
+ * The switch is read here as well as at the draw, and that is the rollback
+ * clause held at both ends: with path orders off, no card is a path's order,
+ * so a board dealt while the feature was on plays on as six ordinary orders
+ * rather than as a table where three cards stay grey forever.
+ */
+export function pathOrderOf(order: OrderCard): PathId | null {
+  if (!order.isPathOrder || !pathOrdersOn()) return null;
+  return lockingPathFor(order.resources[0]?.type ?? "");
+}
+
+/**
+ * The path a card waits on for this captain, or null where the card is
+ * theirs to fill. The board reads it to grey a card out and print the lock
+ * line; the two fill guards below read it to refuse one.
+ *
+ * A pathless captain is locked out of every pathbound card, and every
+ * captain is pathless until D7's draft deals one. The lock teaches by being
+ * true rather than by being staged, so it holds for a captain who has not
+ * drawn as firmly as for one who drew somebody else's path.
+ */
+export function lockedBehind(
+  state: GameState,
+  order: OrderCard,
+): PathId | null {
+  const path = pathOrderOf(order);
+  return path === null || path === state.path ? null : path;
+}
+
+// The board's guard, read as a yes or no: the hold covers the order and the
+// order is not locked behind a path. Both halves live in one function
+// because both callers (a captain's press and a standing order's) have to
+// ask the same question, and a caller that read only half of it is exactly
+// how a standing order would come to fill a card its own captain could not.
 export function canFillOrder(state: GameState, order: OrderCard): boolean {
-  return orderShortfall(state, order) === null;
+  return (
+    orderShortfall(state, order) === null && lockedBehind(state, order) === null
+  );
+}
+
+/**
+ * How many orders on this board are this captain's to fill: the board minus
+ * the cards locked behind a path they do not hold.
+ *
+ * [D2] One reader for the leg report's dealt count (see use-leg-report, and
+ * the expired orders reading built on it in docs/OCEAN_GAMBIT_AGILE_PLAN.md):
+ * a locked card is not an order this captain failed to fill, and counting it
+ * as one would charge every captain three expired orders a leg for a feature
+ * none of them can touch until the draft that deals a path lands.
+ */
+export function openOrderCount(state: GameState): number {
+  return state.customerCards.filter((o) => lockedBehind(state, o) === null)
+    .length;
 }
 
 export function completeOrder(
@@ -91,6 +163,17 @@ export function completeOrder(
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
   if (state.completedOrders.includes(order.id)) return;
+  // The lock is asked before the hold, and the order of the two matters: a
+  // locked card whose goods the captain happens to be carrying is still not
+  // theirs to fill, and telling them their inventory is short would be the
+  // wrong sentence about the right refusal. The line is pathLockLine's, the
+  // same string the board prints on the card, so the ledger and the board
+  // cannot come to describe one refusal two ways.
+  const locked = lockedBehind(state, order);
+  if (locked) {
+    logs.push(`❌ ${pathLockLine(locked)}`);
+    return;
+  }
   const short = orderShortfall(state, order);
   if (short) {
     logs.push(`❌ Inventory short! Need ${short.type}×${short.required}`);
@@ -456,5 +539,31 @@ export function startOrders(
     logs.push(
       `📜 Imperial Mandate at ${mandate.port}: ${need} for ${mandate.reward} Gold. The Emperor's commission is exempt from VAT.`,
     );
+  }
+  // [D2: the nine slot order board] The pathbound slots, filled last and
+  // drawn from a stream of their own (`:pathorders` rather than `:orders`),
+  // for the reason the intel guarantee above is applied after the seeded
+  // draw rather than inside it: the six the tier schedules have to stay the
+  // same six, seed for seed, so a table playing with the switch off is dealt
+  // exactly the board it was dealt before this feature existed. Appended
+  // rather than inserted, for the same reason and for one more: the mandate
+  // reads as the round's headline, and the tier's own orders keep the
+  // positions they have always held on the board.
+  //
+  // These cards are the board's invitation rather than its tax: each one
+  // names a good the path's trade lives in and pays what that trade pays, so
+  // a captain can see the whole of what holding the path would open without
+  // a panel explaining it.
+  if (pathOrdersOn()) {
+    const pathOrderRng = createRng(
+      `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:pathorders`,
+    );
+    for (let i = 0; i < PATH_ORDER_SLOTS; i++) {
+      const order = genPathOrder(pathOrderRng, orderPools);
+      if (!order) break;
+      const nextId =
+        state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+      state.customerCards.push({ id: nextId, ...order });
+    }
   }
 }

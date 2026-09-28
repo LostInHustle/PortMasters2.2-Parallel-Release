@@ -10,6 +10,7 @@
 // =====================================================================
 
 import type { Difficulty } from "@/lib/game/difficulty";
+import type { EscortContract } from "@/lib/game/engine";
 import type { GambitRole } from "@/lib/game/gambit";
 import type { HouseId } from "@/lib/game/legacy";
 import type { Objective } from "@/lib/game/objectives";
@@ -172,6 +173,13 @@ export type LegReport = {
   grainMeals?: number;
   saltFishMeals?: number;
   produceMeals?: number;
+  // [D3: Convoy: the Escort Contract] The Convoy's own figures for the leg,
+  // sent only when the switch that gives them meaning is on, for the reason
+  // the four above are: a leg sailed without the market reports no market
+  // rather than a market of zeroes.
+  escortSold?: number;
+  escortFeesEarned?: number;
+  escortAbsorbed?: number;
 };
 
 /**
@@ -495,6 +503,26 @@ export type AidRequest = {
   fromName: string;
   amount: number;
   round: number;
+};
+
+// [D3: Convoy: the Escort Contract] The escort market's board, as one
+// captain receives it.
+//
+// The row type is the game layer's (see EscortContract in
+// @/lib/game/engine/contracts) rather than a second copy declared here,
+// which is the rule this file keeps for everything the engine already
+// knows how to read: a contract that has been applied to a purse and a
+// contract that arrived over a socket have to be the same shape, and the
+// surest way for that to stay true is for them to be one type.
+//
+// The board is personalized by the server before it is ever sent, the way
+// the barter board is: a direct offer belongs to two captains and a claimed
+// contract's raid figure belongs to its seller, so two captains in one room
+// can legitimately receive two different boards and the filtering happens
+// where the rows are held rather than on the client that draws them.
+export type EscortBoard = {
+  roomId: string;
+  contracts: EscortContract[];
 };
 
 // An outstanding loan between two captains. The optional backer and

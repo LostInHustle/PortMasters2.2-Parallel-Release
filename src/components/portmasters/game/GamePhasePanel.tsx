@@ -120,6 +120,7 @@ function ActivePhase(props: Props) {
     phaseSync,
     barter,
     aid,
+    escort,
     backing,
     audit,
     maroon,
@@ -180,6 +181,7 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           barter={barter}
+          escort={escort}
           audit={audit}
           maroon={maroon}
           me={me}

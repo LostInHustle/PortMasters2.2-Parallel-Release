@@ -32,6 +32,16 @@ type VentureContributions = Record<string, VentureContribution>;
 // every contributor in full: a different venture in the same room's voyage
 // reached "filled" first and claimed the one shared chance before this one
 // got the chance to.
+//
+// [D3: Convoy: the Escort Contract] One naming note, and it is the only
+// thing this file's copy has in common with that feature. The label a
+// captain reads moved from Convoy Venture to Venture when the Convoy path
+// landed, because the two are different institutions wearing one word: the
+// path sells protection, and this is the harbor's pooled investment. The
+// plan's own section keeps the name it was written under, every identifier
+// here keeps it too (a persisted model's name is a migration rather than a
+// copy change), and what moved is the sentence a captain reads. See the
+// matching note in ./paths.ts.
 export type VentureOutcome = "filled" | "failed" | "destroyed";
 
 // One contributor's share of however a venture ended, as the settlement
@@ -155,15 +165,15 @@ export function computeVentureDeadlineBounds(
   return { minRound, maxRound };
 }
 
-// What a captain is told when the harbor's one Convoy Venture chance for
-// this voyage is already gone. The server says it to whoever posts anyway,
-// and the captain's own rail prints it as the reason there is no form to
-// fill in. One string for both, because the rail carried its own longer
-// version of the sentence: a refusal that reads differently from the notice
-// sitting above it is how a captain ends up reporting a button that was
-// never going to do anything.
+// What a captain is told when the harbor's one Venture chance for this
+// voyage is already gone. The server says it to whoever posts anyway, and
+// the captain's own rail prints it as the reason there is no form to fill
+// in. One string for both, because the rail carried its own longer version
+// of the sentence: a refusal that reads differently from the notice sitting
+// above it is how a captain ends up reporting a button that was never going
+// to do anything.
 export function ventureAlreadySpentReason(): string {
-  return "This harbor has already used its one Convoy Venture for this voyage. It opens again on a fresh voyage or a restart.";
+  return "This harbor has already used its one Venture for this voyage. It opens again on a fresh voyage or a restart.";
 }
 
 // The room wide chat announcement for each outcome, kept alongside the
@@ -172,10 +182,10 @@ export function ventureAlreadySpentReason(): string {
 // copy are both derived from one constant rather than two separate numbers.
 export function ventureAnnouncementFor(outcome: VentureOutcome): string {
   if (outcome === "filled") {
-    return `⚓ A Convoy Venture filled! Every contributor is paid their share, times ${CONVOY_VENTURE_PAYOUT_MULTIPLIER}x. This harbor's one Convoy Venture chance for this voyage has now been used.`;
+    return `⚓ A Venture filled! Every contributor is paid their share, times ${CONVOY_VENTURE_PAYOUT_MULTIPLIER}x. This harbor's one Venture chance for this voyage has now been used.`;
   }
   if (outcome === "failed") {
-    return `⚓ A Convoy Venture missed its deadline. Every contributor gets back a partial refund.`;
+    return `⚓ A Venture missed its deadline. Every contributor gets back a partial refund.`;
   }
-  return `⚓ A Convoy Venture was cancelled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
+  return `⚓ A Venture was cancelled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
 }

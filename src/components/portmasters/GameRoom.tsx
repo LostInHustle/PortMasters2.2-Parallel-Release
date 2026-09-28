@@ -36,6 +36,10 @@ import { useAudit } from "@/lib/use-audit";
 import { useMaroon } from "@/lib/use-maroon";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import {
+  useEscortContracts,
+  type EscortContract,
+} from "@/lib/use-escort-contracts";
+import {
   useAid,
   type GrantedLoan,
   type RepaidLoan,
@@ -103,10 +107,12 @@ import { useRoomRoster } from "@/lib/use-room-roster";
 import { renownProgress } from "@/lib/game/legacy";
 import {
   acceptBarterOffer,
+  applyEscortSide,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
   clearRedirectedLoan,
   contributeToVenture,
+  coverFromBoard,
   grantLoan,
   nextPhase,
   pledgeBacking,
@@ -371,17 +377,17 @@ export function GameRoom({
       if (!mine) return;
       act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
       if (outcome === "filled") {
-        toast.success("⚓ Convoy Venture filled!", {
+        toast.success("⚓ Venture filled!", {
           description: `Your share: +${mine.amount} Gold.`,
         });
         playSound("coin");
       } else if (outcome === "failed") {
-        toast("⚓ Convoy Venture missed its deadline", {
+        toast("⚓ Venture missed its deadline", {
           description: `Partial refund: +${mine.amount} Gold.`,
         });
         playSound("warn");
       } else {
-        toast("⚓ Convoy Venture cancelled", {
+        toast("⚓ Venture cancelled", {
           description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
         });
       }
@@ -394,6 +400,83 @@ export function GameRoom({
     onVentureContributed,
     onVentureSettled,
   );
+
+  // [D3: Convoy: the Escort Contract] The tenth relay, and the last of the
+  // ones that only ever touch this captain's own purse: a contract this
+  // captain is a side of has moved, and the engine works out what that
+  // means for them (see applyEscortSide). Both sides of a contract run this
+  // same callback against their own state, which is what keeps the fee and
+  // the absorbed raid on the two purses that agreed to them rather than on
+  // any other captain's.
+  //
+  // It is idempotent on the engine's side, so the board may report the same
+  // contract as often as it likes: the ledger is what decides whether the
+  // Gold has already moved.
+  const onEscortSettle = useCallback(
+    (contract: EscortContract) => {
+      act((g, l) => {
+        applyEscortSide(g, contract, me.id, l);
+      });
+    },
+    [act, me.id],
+  );
+  const escort = useEscortContracts(socket, room.id, me.id, onEscortSettle);
+
+  // The cover the raid roll consults, mirrored from the board this captain
+  // can see. The engine asks one field and never the network (see
+  // escortCoverOf), so the board has to be read into that field here, and
+  // here is the only place that turns a board into state.
+  //
+  // Gated on the load for the reason the pending refunds above are: a board
+  // that arrives before the save does would be written onto the placeholder
+  // and thrown away the moment the real voyage landed, and this effect runs
+  // again when the load finishes. The comparison before the dispatch is what
+  // keeps an ordinary board update, one that has nothing to do with this
+  // captain's cover, from cloning the whole voyage to write a value it
+  // already holds.
+  useEffect(() => {
+    if (!state.loaded) return;
+    const covered = coverFromBoard(
+      escort.contracts,
+      me.id,
+      state.game.currentRound,
+    );
+    if (
+      state.game.escortCover?.contractId === covered?.contractId &&
+      state.game.escortCover?.sellerName === covered?.sellerName
+    ) {
+      return;
+    }
+    act((g) => {
+      g.escortCover = covered;
+    });
+  }, [
+    escort.contracts,
+    state.loaded,
+    state.game.currentRound,
+    state.game.escortCover,
+    me.id,
+    act,
+  ]);
+
+  // The claim a covered raid leaves behind, relayed to the room and cleared.
+  // The raid itself stays a pure engine mutation (it sets the field rather
+  // than reaching for a socket it does not have), so this is the one place
+  // the covered captain's own report of what the pirates would have taken
+  // becomes a frame, which is also the one place it can be.
+  //
+  // Cleared before it is sent rather than after: a claim that the server
+  // refuses, because the leg moved on or the contract is already claimed,
+  // is still a raid that happened, and re-sending it every render would only
+  // be a way to keep asking.
+  useEffect(() => {
+    const pending = state.game.pendingEscortClaim;
+    if (!pending || !socket) return;
+    act((g) => {
+      g.pendingEscortClaim = null;
+    });
+    escort.claim(pending.contractId, pending.raidGold);
+  }, [state.game.pendingEscortClaim, socket, act, escort.claim]);
 
   // The six effects: join the room channel on every reconnect, watch for
   // voyage conclusion, relay the engine's pending debt settlements, relay
@@ -1190,6 +1273,7 @@ export function GameRoom({
               barter={barter}
               aid={aid}
               backing={backing}
+              escort={escort}
               audit={audit}
               maroon={maroon}
               voyageLog={voyageLog}
