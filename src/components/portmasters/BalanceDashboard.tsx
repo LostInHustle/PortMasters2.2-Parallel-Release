@@ -131,88 +131,101 @@ export function BalanceDashboard() {
 
   return (
     <div className="pm-canvas min-h-screen">
-      <header className="px-4 pb-2 pt-3 sm:px-6">
-        <div className="pm-glass pm-panel-bar mx-auto max-w-5xl">
-          <div className="flex items-center gap-3">
-            <div className="pm-seal pm-grad-admin">
-              <Gauge className="h-5 w-5 text-white" />
+      {/* The column, and the number every width decision below reads. The
+          cap and the padding live here rather than on the two children, so
+          the container measures the width the panels actually have.
+          Every breakpoint under it used to read the window instead, which
+          is how this page came to change shape at 1280 while the column it
+          draws in stayed at 1024: the four front page tiles jumped from two
+          across to four across without the room for them changing at all. */}
+      <div className="@container mx-auto max-w-5xl px-4 sm:px-6">
+        <header className="pb-2 pt-3">
+          <div className="pm-glass pm-panel-bar">
+            <div className="flex items-center gap-3">
+              <div className="pm-seal pm-grad-admin">
+                <Gauge className="h-5 w-5 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-display text-sm leading-tight font-bold tracking-tight">
+                  Balance Dashboard
+                </h1>
+                <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
+                  {subtitle}
+                </p>
+              </div>
+              <a
+                href="/admin"
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
+                title="The operator console"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Console</span>
+              </a>
+              <button
+                onClick={() => {
+                  setPending(true);
+                  setNonce((current) => current + 1);
+                }}
+                className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
+                title="Read the window again"
+                aria-label="Read the window again"
+              >
+                {pending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="font-display text-sm leading-tight font-bold tracking-tight">
-                Balance Dashboard
-              </h1>
-              <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
-                {subtitle}
-              </p>
+          </div>
+        </header>
+
+        <main className="space-y-3 pt-3 pb-10">
+          {error && <Notice message={error} onDismiss={() => setError(null)} />}
+
+          {reading === null && !error && (
+            <div className="pm-glass pm-tile flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Reading the window...
             </div>
-            <a
-              href="/admin"
-              className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
-              title="The operator console"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Console</span>
-            </a>
-            <button
-              onClick={() => {
-                setPending(true);
-                setNonce((current) => current + 1);
-              }}
-              className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
-              title="Read the window again"
-              aria-label="Read the window again"
-            >
-              {pending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-          </div>
-        </div>
-      </header>
+          )}
 
-      <main className="mx-auto max-w-5xl space-y-3 px-4 pt-3 pb-10 sm:px-6">
-        {error && <Notice message={error} onDismiss={() => setError(null)} />}
-
-        {reading === null && !error && (
-          <div className="pm-glass pm-tile flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Reading the window...
-          </div>
-        )}
-
-        {reading && (
-          <>
-            {/* The ship decision first, because it is the question the run
+          {reading && (
+            <>
+              {/* The ship decision first, because it is the question the run
                 is for, then the front page below it. */}
-            <LaunchStrip verdict={readLaunchVerdict(reading)} />
+              <LaunchStrip verdict={readLaunchVerdict(reading)} />
 
-            {/* The front page: the plan's number first, then the three
+              {/* The front page: the plan's number first, then the three
                 questions. A tile carries the state and the one sentence the
                 panel below can say today, so the strip alone is the minute
-                the evaluation asks for. */}
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <FrontNumber line={reading.frontPage} />
-              {reading.panels
-                .filter((panel) => panel.question !== null)
-                .map((panel) => (
-                  <FrontTile
-                    key={panel.id}
-                    title={panel.question ?? panel.title}
-                    state={STATE[panel.state]}
-                    answer={panel.answer}
-                  />
-                ))}
-            </div>
+                the evaluation asks for.
+                Four across where the column can carry four, two where it
+                can carry two, one on a phone. The two steps are read off
+                the column, so a tile keeps the width it was designed at
+                whatever window the column happens to be sitting in. */}
+              <div className="grid gap-3 @xl:grid-cols-2 @4xl:grid-cols-4">
+                <FrontNumber line={reading.frontPage} />
+                {reading.panels
+                  .filter((panel) => panel.question !== null)
+                  .map((panel) => (
+                    <FrontTile
+                      key={panel.id}
+                      title={panel.question ?? panel.title}
+                      state={STATE[panel.state]}
+                      answer={panel.answer}
+                    />
+                  ))}
+              </div>
 
-            {reading.panels.map((panel) => (
-              <Panel key={panel.id} panel={panel} />
-            ))}
-          </>
-        )}
-      </main>
+              {reading.panels.map((panel) => (
+                <Panel key={panel.id} panel={panel} />
+              ))}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -241,7 +254,7 @@ function LaunchStrip({ verdict }: { verdict: LaunchVerdict }) {
         </p>
       </div>
 
-      <div className="grid gap-x-6 gap-y-1 px-4 py-3 text-xs sm:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-1 px-4 py-3 text-xs @xl:grid-cols-2">
         <p className="text-muted-foreground">
           Run{" "}
           <span className="tabular-nums text-foreground">
@@ -353,14 +366,36 @@ function Panel({ panel }: { panel: DashboardPanel }) {
         </p>
       </div>
 
-      <div className="pm-scroll overflow-x-auto">
-        <table className="w-full min-w-[44rem] border-collapse text-sm">
+      {/* A reading is four facts: what was measured, what it read, the gate
+          it is judged against, and the verdict. A table carries all four in
+          a line where the column is wide enough, and a row per reading
+          carries the same four stacked where it is not. The stacked form is
+          not a smaller table: it keeps every fact, and it is the reason a
+          reader on a phone no longer has to drag the panel 308 pixels
+          sideways to find out whether a number passed. */}
+      <div className="hidden @3xl:block pm-scroll overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
           <thead>
+            {/* The four columns hold their proportions from panel to panel.
+                Left to itself a table sizes its columns from whatever it
+                happens to be carrying, and these four panels carry
+                different things: measured across the four, the Gate column
+                came out 291 pixels wide on one panel and 135 on the next,
+                so a gate wrapped on one table and sat on one line on the
+                table below it.
+                Each share is what its longest string needs on one line,
+                measured at the page's own cap of 974 pixels: Reading 321,
+                Gate 261, Verdict 105. Window would need 445 and cannot have
+                it, because all four together come to 1132 in a column of
+                974. Window is the one that gives: its values are lists of
+                readings by table size rather than numbers, so it is the
+                column that can take a second line and the only one that
+                does. The three that fit are the three a reader scans. */}
             <tr className="border-b border-black/[0.06] text-left dark:border-white/[0.08]">
-              <Th>Reading</Th>
-              <Th className="text-right">Window</Th>
-              <Th>Gate</Th>
-              <Th className="text-right">Verdict</Th>
+              <Th className="w-[35%]">Reading</Th>
+              <Th className="w-[27%] text-right">Window</Th>
+              <Th className="w-[27%]">Gate</Th>
+              <Th className="w-[11%] text-right">Verdict</Th>
             </tr>
           </thead>
           <tbody>
@@ -377,7 +412,16 @@ function Panel({ panel }: { panel: DashboardPanel }) {
                   {line.target}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <Pill tone={VERDICT[line.verdict].tone}>
+                  {/* Held on one line. A pill is a chip with a rounded
+                      background, and text that breaks inside one turns it
+                      into a two line lozenge that is taller than the row
+                      it stands in: "no source" was doing exactly that in
+                      this column, and the four rows carrying it came out
+                      eight pixels taller than the rows around them. */}
+                  <Pill
+                    tone={VERDICT[line.verdict].tone}
+                    className="whitespace-nowrap"
+                  >
                     {VERDICT[line.verdict].word}
                   </Pill>
                 </td>
@@ -386,6 +430,36 @@ function Panel({ panel }: { panel: DashboardPanel }) {
           </tbody>
         </table>
       </div>
+
+      {/* A reading as a row, in the shape every other row in this app
+          wears: what the row is about on the first line with its status at
+          the end of it, and the figures underneath.
+          The first line is the whole width of the card on purpose. An
+          earlier version laid the label out beside the value and the
+          verdict, and on a phone that left the longest label on the page
+          121 pixels to say "Distinct goods a hold closes a leg carrying,
+          median" in: three lines, and the one reading whose name most
+          needs reading was the one that was hardest to read. Given its own
+          line it says the same words in two. */}
+      <ul className="@3xl:hidden">
+        {panel.readings.map((line) => (
+          <li
+            key={line.label}
+            className="border-b border-black/[0.04] px-4 py-2.5 last:border-0 dark:border-white/[0.06]"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+              <p className="min-w-0 flex-1 text-xs">{line.label}</p>
+              <Pill tone={VERDICT[line.verdict].tone} className="shrink-0">
+                {VERDICT[line.verdict].word}
+              </Pill>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              <span className="tabular-nums text-foreground">{line.value}</span>{" "}
+              · {line.target}
+            </p>
+          </li>
+        ))}
+      </ul>
 
       <GapList gaps={panel.gaps} />
     </section>

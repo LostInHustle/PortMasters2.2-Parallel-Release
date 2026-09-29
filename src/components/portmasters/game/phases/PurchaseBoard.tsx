@@ -154,6 +154,17 @@ function PurchaseCard({
  * the grid the port merchant exchange reads them in. It owns no state and
  * asks the game nothing the cards do not answer for themselves, which is
  * why it is a map and a grid and very little else.
+ *
+ * The columns it deals are the stage's, not the window's. The board is
+ * drawn in the middle column of the room, so a breakpoint read off the
+ * window answers a question nobody asked: at a window wide enough for the
+ * old three across rule the stage is still a single column of the room, and
+ * three cards dealt into it wrapped every goods line and every chip they
+ * had. The stage is a container (see the room's own note), so this measures
+ * the room it is actually drawn in: one column while the stage cannot hold
+ * two cards, two while it can, and three once each card still has the width
+ * the goods rows want. The bottom margin is the panel rhythm the rest of
+ * this screen keeps, because each panel here carries its own.
  */
 export function PurchaseBoard({
   game,
@@ -163,7 +174,7 @@ export function PurchaseBoard({
   colorFor: (item: string) => string | undefined;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="mb-3.5 grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
       {game.resourceCards.map((c) => (
         <PurchaseCard
           key={c.id}

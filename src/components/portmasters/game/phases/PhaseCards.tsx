@@ -50,11 +50,17 @@ export function TradeCard({
  * The grid a draft deals its three choices into, with the stagger the two
  * draft screens have always used. The wrapper is the same on both, so it is
  * drawn once; each card inside it is a DraftCard.
+ *
+ * Three across as soon as the stage can hold three readable cards, and a
+ * single column before that, because a draft is a comparison and three
+ * choices cut down to a third of a narrow stage compare worse than three
+ * read one after another. The stage is the container this reads (see the
+ * room's own note), so the width it wants is the one it is drawn in.
  */
 export function DraftGrid({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+      className="grid grid-cols-1 @2xl:grid-cols-3 gap-4"
       initial="hidden"
       animate="visible"
       variants={{

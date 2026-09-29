@@ -48,9 +48,13 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colours, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
 
-Two habits worth keeping:
+Four habits worth keeping:
 
 **Give text room to be long.** A captain's display name, a room name and a chronicle line are all user supplied and can be any length. Wrap them in `pm-truncate` where the container is fixed, and give flex children `min-w-0` so they are allowed to shrink rather than pushing the layout wide.
+
+**Measure a screen against the column it stands in.** Every screen in the app draws inside a column that is narrower than the window, and it is narrower by a different amount on each screen: the game room's middle column, the operator console's register, the balance dashboard's panels. A breakpoint that reads the window is therefore reading a number the layout cannot see, and it fails both ways round. It fires early, where the column has not changed but the window has, so the same screen rearranges itself for no one; and it fires late, where the column is narrower than the window at every size, so the screen lays itself out for room it does not have. Put `@container` on the element that carries the cap and the padding, read `@` variants below it, and read the window only inside a modal, which is as wide as the window. `docs/SYSTEM_ANALYSIS.md` has the ladders and the measurements under "The Room's Width" and "The Operator Screens' Width".
+
+**Give a table's columns their proportions.** Left to itself a table sizes each column from whatever that table happens to be carrying, so two tables of the same four facts laid out one above the other come out with different columns and one of them breaks a line where the other does not. Measure the longest string in each column on one line, give the columns shares that clear the ones that have to, and name in a comment which column is the one that gives and why. `w-[35%]` on a `Th` is a hint with a floor under it: content that cannot break still sets the column's minimum.
 
 **Keep decoration below content.** A background texture is an absolutely positioned layer, so it needs the content beside it marked `relative` to stack above, and it needs `pointer-events-none` so it does not swallow clicks meant for the buttons underneath.
 

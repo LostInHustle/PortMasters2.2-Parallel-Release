@@ -25,7 +25,7 @@ import {
 } from "@/lib/game/convoy";
 import type { VentureSummary } from "@/types/realtime/ventures";
 
-export function ventureSummary(v: {
+function ventureSummary(v: {
   id: string;
   posterId: string;
   posterName: string;
@@ -59,7 +59,7 @@ export function ventureSummary(v: {
    there are two readers of it: the room at large when the board moves, and
    the single captain who asks for it on walking in. A second reader that
    rebuilt this payload would be a second answer to what is on the board. */
-export type VentureBoard = {
+type VentureBoard = {
   roomId: string;
   ventures: VentureSummary[];
   locked: boolean;

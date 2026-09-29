@@ -40,7 +40,7 @@ import type { FinishedCaptain, StandingRow, VoyageRun } from "./voyage";
 
 // What the harbor decided about one captain before anything else is read
 // about them.
-export type FinisherFacts = {
+type FinisherFacts = {
   // The ledger integrity pass wrote them off.
   forged: boolean;
   // The crown is theirs.
@@ -74,7 +74,7 @@ type LegacyFigures = LegacyCounters & {
 };
 
 // The two halves of one captain's finish, as the steps below hand it down.
-export type FinisherOutcome = FinisherFacts & LegacyCounters;
+type FinisherOutcome = FinisherFacts & LegacyCounters;
 
 // Everything the steps below read about the voyage rather than about the
 // captain: the room, the run it sailed, the harbor's saves, the crown and
@@ -89,7 +89,7 @@ export type FinisherContext = {
 
 // The rows one captain's finish produces, and the outcome the announcement
 // is read from.
-export type FinisherRows = {
+type FinisherRows = {
   outcome: FinisherOutcome;
   newMerits: string[];
   revealed: RevealedCaptain;
@@ -200,7 +200,7 @@ function readObjectiveTrace(raw: unknown): ObjectiveTraceEntry[] {
 }
 
 // One captain's whole finish, in the order it has always happened in.
-export async function concludeFinisher(
+async function concludeFinisher(
   f: FinishedCaptain,
   ctx: FinisherContext,
 ): Promise<FinisherRows> {
@@ -613,7 +613,7 @@ function rivalRow(f: FinishedCaptain, outcome: FinisherOutcome): RivalStanding {
 
 // What one voyage's finishes add up to: the rows the frames below are built
 // from, and the trace each honest captain contributed to the merge.
-export type FinisherTally = {
+type FinisherTally = {
   standings: StandingRow[];
   rivalStandings: RivalStanding[];
   revealed: RevealedCaptain[];

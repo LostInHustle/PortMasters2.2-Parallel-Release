@@ -316,6 +316,11 @@ function OrderCard({
  * The manifest itself: every order the harbour is posting this round, in
  * the grid the trade manifest reads them in. It owns no state; each card
  * answers the engine's own questions about itself.
+ *
+ * The columns are the stage's rather than the window's, for the reason the
+ * port board's are: a board drawn in the room's middle column that reads a
+ * window breakpoint deals for a width it does not have. See the note on
+ * PurchaseBoard, which deals the same ladder off the same container.
  */
 export function OrdersBoard({
   game,
@@ -325,7 +330,7 @@ export function OrdersBoard({
   colorFor: (item: string) => string | undefined;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
       {game.customerCards.map((o) => (
         <OrderCard
           key={o.id}

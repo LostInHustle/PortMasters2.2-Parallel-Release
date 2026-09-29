@@ -125,51 +125,63 @@ export function RosterRow({
             </Pill>
           )}
         </div>
-        <div className="text-[10px] text-muted-foreground truncate">
-          {status ? status.phaseLabel : "loading…"}
+        {/* What they are doing and what their books say, on the line under
+            the name rather than at the far end of it. The rail is a rail:
+            held to the width that leaves the board its own, one line for a
+            name, a crown, a "you" and two purses leaves the name about a
+            hundred pixels, which is where a captain's name stops being
+            read and starts being a first letter and an ellipsis. The two
+            purses sit with the phase label because they are the same kind
+            of fact: what this captain's voyage currently reads as. */}
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[10px] text-muted-foreground">
+            {status ? status.phaseLabel : "loading…"}
+          </span>
+          {!isBankrupt && (
+            <>
+              <Pill tone="gold" className="shrink-0 !px-2 !py-0">
+                <Coins className="h-2.5 w-2.5" /> {status ? status.gold : "…"}
+              </Pill>
+              <Pill tone="favor" className="shrink-0 !px-2 !py-0">
+                <Trophy className="h-2.5 w-2.5" />{" "}
+                {status ? status.reputation : "…"}
+              </Pill>
+            </>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        {isBankrupt ? (
+        {isBankrupt && (
           <Pill tone="alarm">
             <SkullIcon className="h-3 w-3" /> Bankrupt
           </Pill>
-        ) : (
-          <>
-            {/* A marooned captain still has real books, so the
-                gold and reputation pills stay; the badge says what
-                happened to the ship, not to the purse. */}
-            {isMarooned && (
-              <Pill tone="alarm">
-                <Anchor className="h-3 w-3" /> Ashore
-              </Pill>
-            )}
-            {/* [C1: the Larder and Short Rations] The plan asks for
-                the shortage to be visible to the fleet, not just to
-                the captain living it, and this is the board the
-                fleet reads. It wears the meaning red rather than
-                the Larder's own hue: the Larder's colour names the
-                panel on the Market screen, while a status is drawn
-                from the meaning half of the palette wherever it
-                appears (see Pill). Not folded into seatMarks, which
-                is about the two marks that write a seat off: a
-                hungry captain is neither of those, and a badge that
-                rode writtenOff would quietly take them out of the
-                running for a vote they are still entitled to. */}
-            {status?.shortRations && (
-              <span title="Going hungry: the crew is on short rations and working at a slower pace">
-                <Pill tone="alarm">
-                  <Utensils className="h-3 w-3" /> Short Rations
-                </Pill>
-              </span>
-            )}
-            <Pill tone="gold">
-              <Coins className="h-3 w-3" /> {status ? status.gold : "…"}
+        )}
+        {/* A marooned captain still has real books, so the gold and
+            reputation pills stay on their row; the badge says what
+            happened to the ship, not to the purse. */}
+        {isMarooned && (
+          <Pill tone="alarm">
+            <Anchor className="h-3 w-3" /> Ashore
+          </Pill>
+        )}
+        {/* [C1: the Larder and Short Rations] The plan asks for
+            the shortage to be visible to the fleet, not just to
+            the captain living it, and this is the board the
+            fleet reads. It wears the meaning red rather than
+            the Larder's own hue: the Larder's colour names the
+            panel on the Market screen, while a status is drawn
+            from the meaning half of the palette wherever it
+            appears (see Pill). Not folded into seatMarks, which
+            is about the two marks that write a seat off: a
+            hungry captain is neither of those, and a badge that
+            rode writtenOff would quietly take them out of the
+            running for a vote they are still entitled to. */}
+        {status?.shortRations && (
+          <span title="Going hungry: the crew is on short rations and working at a slower pace">
+            <Pill tone="alarm">
+              <Utensils className="h-3 w-3" /> Short Rations
             </Pill>
-            <Pill tone="favor">
-              <Trophy className="h-3 w-3" /> {status ? status.reputation : "…"}
-            </Pill>
-          </>
+          </span>
         )}
 
         {/* [MANIFEST: Partial Sight] Read only peek at a partner's

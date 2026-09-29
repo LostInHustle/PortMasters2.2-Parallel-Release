@@ -51,7 +51,7 @@ export type ReadyState = {
 // The hook's signature is otherwise exactly what it was: the same eight
 // values, the same defaults, and the same return shape. Only the shape of
 // the call changed.
-export type PhaseSyncOptions = {
+type PhaseSyncOptions = {
   roomId: string;
   socket: Socket | null;
   game: GameState;

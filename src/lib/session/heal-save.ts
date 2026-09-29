@@ -48,7 +48,7 @@ import { normalizePathSwitchLeg } from "@/lib/game/draft";
 
 // What the room and the account answered at the moment this save was
 // loaded, which is everything the heal cannot read out of the blob itself.
-export type LoadedSaveFacts = {
+type LoadedSaveFacts = {
   // The room's live answer and the hint the lobby carried in, which are
   // allowed to disagree: the response is the room answering a moment ago,
   // the hint is what the lobby said before the request.

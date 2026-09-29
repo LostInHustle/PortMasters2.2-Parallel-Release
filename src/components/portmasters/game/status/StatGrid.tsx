@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
  * running. The rail reads these every few seconds and they never scroll, so
  * they are drawn as one grid whose width follows whether that fourth cell
  * exists.
+ *
+ * The cells sit two to a row rather than four, because the rail is a rail:
+ * four across the width that leaves the stage the room it needs gives each
+ * cell about fifty pixels, and the longest label in the set ("Reputation")
+ * is wider than that on its own, so every cell would break its own word in
+ * half. Two rows of two cost the pinned block one row of height and read as
+ * a proper readout rather than as four abbreviations.
  */
 export function StatGrid({
   money,
@@ -33,9 +40,7 @@ export function StatGrid({
   shortRations: boolean;
 }) {
   return (
-    <div
-      className={cn("grid gap-1.5", larderOn ? "grid-cols-4" : "grid-cols-3")}
-    >
+    <div className="grid grid-cols-2 gap-1.5">
       <Stat label="Funds" value={`${money}`} className="text-gold-ink" />
       <Stat label="Reputation" value={`${score}`} className="text-favor" />
       {showObligations ? (

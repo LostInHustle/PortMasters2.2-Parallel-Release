@@ -39,7 +39,7 @@ import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
 import { PathDraft } from "./game/PathDraft";
-import { PathPanel } from "./game/PathPanel";
+import { PathChip } from "./game/status/PathChip";
 import { HarborTopBar } from "./game/HarborTopBar";
 import { ShortcutLegend } from "./game/ShortcutLegend";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
@@ -864,8 +864,13 @@ export function GameRoom({
 
       {/* Main layout. A column on a wide window, so the band below can be
           measured against the window rather than against its own content
-          and the columns under it can take whatever is left. */}
-      <main className="flex-1 min-h-0 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto flex flex-col gap-3">
+          and the columns under it can take whatever is left. Its own cap is
+          wider than the lobby's, because the lobby is a list of harbors and
+          this is a board: on a large monitor the three columns would
+          otherwise stop growing at the width a two column screen already
+          has, which is the one place a captain gets nothing for the extra
+          glass. */}
+      <main className="flex-1 min-h-0 px-3 sm:px-5 pb-4 max-w-[1760px] w-full mx-auto flex flex-col gap-3">
         {/* The table band: everything the whole harbor shares, above the
             three columns rather than inside one of them. It is capped at a
             share of the window on a wide screen and scrolls inside that cap.
@@ -936,21 +941,48 @@ export function GameRoom({
             />
           </div>
         </div>
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-rows-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
+        {/* The three columns, and the widths they are allowed. The two rails
+            are rails: they hold readings and channels rather than the board
+            itself, so they are held to a share of the window that leaves the
+            stage the rest of it. The clamps are narrower than the pair they
+            replaced by about a hundred and fifty pixels at a middling
+            window, which is the difference between a market card that fits
+            its own goods row and one that wraps every line. This clamp is a
+            share of the window, and it is the last width on this screen that
+            reads that way: what the boards inside the stage measure
+            themselves against is the stage (see the container on it below),
+            because a card is as wide as its column and not as wide as the
+            glass. */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-rows-1 lg:grid-cols-[clamp(216px,19vw,268px)_minmax(0,1fr)_clamp(228px,20vw,288px)] gap-3">
           {/* Left: the captain's own rail. It takes the height of the row
               and scrolls inside itself, the same shape ./game/GameStatusPanel
               is built for: the numbers a captain checks constantly stay in
-              one place while everything beside them moves. */}
+              one place while everything beside them moves.
+
+              What this captain sails as is the first line of it, above the
+              voyage header, because an identity is not a panel a captain
+              scrolls to: it dresses everything below it, and the stage it
+              used to sit in is the table's board rather than the captain's
+              own. The chip draws nothing at all in a harbor with the draft
+              switched off, so the rail still opens on the voyage header. */}
           <div className="order-2 lg:order-1 lg:min-h-0">
-            <div className="pm-glass h-full rounded-2xl p-3 lg:min-h-0">
-              <GameStatusPanel
+            <div className="pm-glass h-full rounded-2xl p-3 lg:min-h-0 flex flex-col gap-2.5">
+              <PathChip
                 game={state.game}
-                logs={state.logs}
-                onRepayLoan={handleRepayLoan}
-                convoy={convoy}
-                myUserId={me.id}
-                colorFor={colorFor}
+                error={draft.error}
+                onSwitch={draft.switchPath}
+                onDismissError={draft.clearError}
               />
+              <div className="flex-1 min-h-0">
+                <GameStatusPanel
+                  game={state.game}
+                  logs={state.logs}
+                  onRepayLoan={handleRepayLoan}
+                  convoy={convoy}
+                  myUserId={me.id}
+                  colorFor={colorFor}
+                />
+              </div>
             </div>
           </div>
 
@@ -963,7 +995,15 @@ export function GameRoom({
               The bar is the same component either way; only its place in
               the column changes. */}
           <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-3 lg:min-h-0">
-            <div className="shrink-0 lg:order-2">
+            {/* The bar and the key hints under it, in one block. The hints
+                belong to the controls the way a legend belongs to a map, so
+                they travel with the bar rather than with the board, and this
+                is also what keeps them legible: inside the stage's scroller
+                they were the one thing under a phase panel that fills the
+                stage, which put them exactly one row below the fold on every
+                screen whose board was short enough to fit. A hint nobody can
+                see is not a hint. */}
+            <div className="shrink-0 lg:order-2 space-y-2">
               <GameControlPanel
                 game={state.game}
                 saving={state.saving}
@@ -980,8 +1020,18 @@ export function GameRoom({
                 onStandingOrders={() => setStandingOpen(true)}
                 onCancelReady={phaseSync.cancelReady}
               />
+              <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
             </div>
-            <div className="space-y-3 lg:order-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
+            {/* The stage, and the one thing on this screen the boards
+                inside it are allowed to measure themselves against. It is a
+                container rather than a plain scroller because a phase board
+                laid out against the window is a board laid out for a width
+                it does not have: the market board used to read the window's
+                own breakpoint and deal three columns into a column half the
+                width of a phone's, so every card wrapped every line. The
+                boards ask this instead, and a board in a modal asks the
+                window, which is what a modal is as wide as. */}
+            <div className="@container space-y-3 lg:order-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
               <GamePhasePanel
                 game={state.game}
                 ctx={ctx}
@@ -1034,20 +1084,6 @@ export function GameRoom({
                   peerTradeProfit={state.game.peerTradeProfit}
                 />
               ))}
-              {/* [D7: the draft, and switching] What this captain sails as,
-                  beside the card they hold alone because the two are one
-                  fact seen at two moments: a hand the table is not shown
-                  while it is being read, and the path that hand leaves,
-                  which the fleet is told when the draft settles and told
-                  again on the one time a captain changes their papers. It
-                  draws nothing at all with the draft switched off. */}
-              <PathPanel
-                game={state.game}
-                error={draft.error}
-                onSwitch={draft.switchPath}
-                onDismissError={draft.clearError}
-              />
-              <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
             </div>
           </div>
 

@@ -169,7 +169,7 @@ export async function clearVoyageBoards(
 // The harbor's saves, read once, at the moment the voyage ends: the readers
 // of them each want a different thing out of the same rows, and reading
 // them once is what keeps those readers from describing different voyages.
-export type HarborSaves = {
+type HarborSaves = {
   // The blob each captain's save parsed into, or null for a row the read
   // could not parse.
   saves: Map<string, Record<string, unknown> | null>;

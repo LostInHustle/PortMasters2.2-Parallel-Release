@@ -17899,7 +17899,7 @@ async function main(): Promise<void> {
         !carriesADash("src/server/realtime/draft.ts") &&
         !carriesADash("src/lib/use-path-draft.ts") &&
         !carriesADash("src/components/portmasters/game/PathDraft.tsx") &&
-        !carriesADash("src/components/portmasters/game/PathPanel.tsx"),
+        !carriesADash("src/components/portmasters/game/status/PathChip.tsx"),
       "every file the draft's and the switch's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
     );
 

@@ -165,7 +165,14 @@ export function GameControlPanel({
       <div className="relative sm:hidden">
         <ActionSuggester game={game} />
       </div>
-      <div className="flex items-center gap-2">
+      {/* The four voyage buttons and the line about the save, in a group
+          that wraps like the bar it sits in. It used to be one line that
+          could not break, which was invisible on a desktop and a sideways
+          page on a phone: "Standing orders" alone is wider than a third of
+          a phone, and four of them plus their icons and gaps are wider than
+          the viewport itself, so the row pushed the whole page 35 pixels
+          wide and every screen in the harbor scrolled sideways with it. */}
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
