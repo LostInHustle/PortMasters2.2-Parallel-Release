@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { QuantityInput } from "@/components/ui/quantity-input";
+import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
-import {
-  ESCORT_CONTRACT_FEE_MAX,
-  ESCORT_CONTRACT_FEE_MIN,
-} from "@/lib/game/constants";
+import { CONSENT_FEE_MIN } from "@/lib/game/constants";
 import {
   ESCORT_SELLER_PATH,
   canSellEscort,
-  escortBuyerBusy,
+  consentPartyBusy,
   escortCoverage,
   type EscortContract,
 } from "@/lib/game/engine";
@@ -42,9 +39,10 @@ const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH)!;
  * second market the room could not see.
  *
  * The two rules the buttons carry are the server's, not this file's. A
- * captain is covered once a leg (escortBuyerBusy), and an offer belongs to
- * the leg it was posted in, so a board that lags a checkpoint shows the
- * refusal before a click instead of after one.
+ * captain is covered once a leg, which is the shared primitive's bound read
+ * on the buyer's side (see consentPartyBusy), and an offer belongs to the
+ * leg it was posted in, so a board that lags a checkpoint shows the refusal
+ * before a click instead of after one.
  */
 export function EscortMarket({
   game,
@@ -61,17 +59,20 @@ export function EscortMarket({
   // never depend on the build it is in. A panel that returned before its
   // own state would be a component whose hook order is conditional on a
   // constant, which is the shape the rules of hooks exist to forbid.
-  const [fee, setFee] = useState(ESCORT_CONTRACT_FEE_MIN);
+  const [fee, setFee] = useState(CONSENT_FEE_MIN);
   const [targetId, setTargetId] = useState("");
 
   if (!escortContractsOn()) return null;
 
   const canSell = canSellEscort(game);
-  const covered = escortBuyerBusy(escort.contracts, me.id, game.currentRound);
+  const covered = consentPartyBusy(
+    escort.contracts,
+    "buyer",
+    me.id,
+    game.currentRound,
+  );
   const others = members.filter((m) => m.id !== me.id);
   const beatenOff = `${Math.round(escortCoverage() * 100)}%`;
-  const selectClass =
-    "h-9 rounded-md border border-input bg-transparent px-2 text-sm";
 
   return (
     <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
@@ -91,44 +92,28 @@ export function EscortMarket({
           else, which is what makes this a market rather than a screen. */}
       {canSell && (
         <div className="rounded-lg border border-parley/15 bg-background/40 p-3 mb-3">
-          <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            <span className="text-muted-foreground">One leg of cover for</span>
-            <QuantityInput
-              value={fee}
-              onCommit={setFee}
-              min={ESCORT_CONTRACT_FEE_MIN}
-              max={ESCORT_CONTRACT_FEE_MAX}
-              aria-label="Fee in Gold"
-              className="w-20 h-9"
-            />
-            <span className="text-muted-foreground">Gold, offered to</span>
-            <select
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className={selectClass}
-              aria-label="Offer this contract to a specific captain"
-            >
-              <option value="">🌊 Anyone in the harbor</option>
-              {others.map((m) => (
-                <option key={m.id} value={m.id}>
-                  🔒 {m.displayName} only
-                </option>
-              ))}
-            </select>
-            <Button
-              className={cn("rounded-lg pm-grad-parley")}
-              onClick={() => escort.post(fee, targetId || undefined)}
-            >
-              {SELLER_PATH.crest} Offer Protection
-            </Button>
-          </div>
-          {targetId && (
-            <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-              Only {others.find((m) => m.id === targetId)?.displayName} will see
-              this offer, so nobody else can take it first. It still has to be
-              taken in this Parley.
-            </p>
-          )}
+          <PrivateOffer
+            lead={
+              <span className="text-muted-foreground">
+                One leg of cover for
+              </span>
+            }
+            fee={fee}
+            onFee={setFee}
+            targetId={targetId}
+            onTarget={setTargetId}
+            others={others}
+            audienceLabel="Offer this contract to a specific captain"
+            deadline="in this Parley."
+            action={
+              <Button
+                className={cn("rounded-lg pm-grad-parley")}
+                onClick={() => escort.post(fee, targetId || undefined)}
+              >
+                {SELLER_PATH.crest} Offer Protection
+              </Button>
+            }
+          />
           <p className="text-center text-[11px] text-muted-foreground mt-1.5">
             One open offer per captain you name, and an offer nobody takes
             before the Parley closes is gone.

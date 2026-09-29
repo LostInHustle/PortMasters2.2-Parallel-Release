@@ -28,8 +28,119 @@
 // poster and its one named target.
 // =====================================================================
 import type { Server } from "socket.io";
+import { db } from "@/lib/db";
+import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
 import type { BarterOffer } from "@/types/realtime";
-import { sockets } from "./presence";
+import { sockets, userSockets } from "./presence";
+
+// ========== Flexible bartering gate ==========
+// This gate stands in front of flexible bartering alone, the composer a
+// chat carries. The Captain's Exchange in the Parley phase reads
+// nothing here: it is open to every captain at every Renown level, and
+// every branch that would have consulted a level for it is gone.
+//
+// Renown rides the roster as a client reported, optional number, which is
+// fine for drawing a name and useless for deciding who may trade: a client
+// could simply report level 21. The account row is the only authoritative
+// source, so the gate reads that instead. Nothing is derived here, because
+// the voyage conclusion writes the level column beside the XP it came
+// from, so the two can never disagree about where the curve puts a
+// captain.
+//
+// Returns null rather than a fallback level when the read itself fails, so
+// a database hiccup is never mistaken for a captain who genuinely holds no
+// Renown. A gate that fails open under load is not a gate, and a gate that
+// tells somebody at level 20 that bartering "unlocks at level 10" sends
+// them looking for a problem that does not exist.
+export async function authoritativeRenownLevel(
+  userId: string,
+): Promise<number | null> {
+  try {
+    const row = await db.captainLegacy.findUnique({
+      where: { userId },
+      select: { renownLevel: true },
+    });
+    return row?.renownLevel ?? DEFAULT_LEGACY_SUMMARY.renownLevel;
+  } catch {
+    return null;
+  }
+}
+
+// Everything that can stop an offer being accepted, gathered in one place
+// so the accept handler can run the same checks on both sides of its
+// database reads and be certain the second pass saw the board the first
+// one did.
+export type OfferInspection =
+  { ok: true; offer: BarterOffer } | { ok: false; reason: string };
+
+export function inspectOfferForAccept(
+  roomId: string,
+  userId: string,
+  offerId: string,
+): OfferInspection {
+  const offer = barterList(roomId).find((o) => o.id === offerId);
+  if (!offer)
+    return { ok: false, reason: "That offer is no longer available." };
+  if (offer.fromUserId === userId)
+    return { ok: false, reason: "You can't accept your own offer." };
+  if (offer.targetUserId && offer.targetUserId !== userId)
+    return {
+      ok: false,
+      reason: "That offer is only open to a specific captain.",
+    };
+  // The poster has to be reachable, because a trade the poster is never
+  // told about cannot be settled honestly on their side. Their client
+  // holds the escrow and releases it when it sees the offer leave the
+  // board, so an offer that vanished into a completed trade they never
+  // heard about would hand the goods back to them as well as to whoever
+  // accepted it. Refusing leaves the offer standing for the next attempt,
+  // which costs a moment rather than a duplicate.
+  if (!userSockets.get(offer.fromUserId)?.size)
+    return {
+      ok: false,
+      reason:
+        "That captain is not here right now. Try again when they are back.",
+    };
+  return { ok: true, offer };
+}
+
+// What a captain below the unlock level is told when the gate, rather
+// than the offer, turned them away. It names the level to go and earn,
+// because a refusal that only says no leaves them nothing to act on.
+//
+// There is no counterpart for the Captain's Exchange, since nothing there
+// can refuse on these grounds any more.
+export function flexibleLockedReason(): string {
+  return `Flexible bartering unlocks at Renown Level ${FLEXIBLE_BARTER_UNLOCK_LEVEL}.`;
+}
+
+// What a captain is told when the account read behind the gate fails. It
+// is deliberately not a refusal: nothing was decided, so the copy says the
+// check did not run rather than pretending the captain failed it, and it
+// tells them the attempt costs nothing. Written out three times across the
+// two barter handlers before this existed, once per place a level is read.
+export function renownUnavailableReason(): string {
+  return "Could not check Renown just now. Try again in a moment.";
+}
+
+// What the poster is told when the captain they aimed a flexible offer at
+// is below the unlock level themselves. Both ends are held to the same bar
+// (see bothFlexibleBarterUnlocked), and this is the half of that answer
+// that names the other captain rather than the asker, so the refusal does
+// not send them looking at their own level.
+export function otherCaptainLockedReason(): string {
+  return "That captain has not unlocked flexible bartering yet.";
+}
+
+// What a captain is told once others have already taken every flexible
+// offer this voyage allows them. It names the two things that still work
+// so the refusal reads as an allowance running out rather than as a
+// lockout, which is exactly the confusion the two surfaces were split
+// apart to end.
+export function flexibleSpentReason(): string {
+  return "Every flexible trade this voyage allows you has already been taken. You can still use the Captain's Exchange and accept any offer.";
+}
 
 // The room's open offers. Module local on purpose: every reader and every
 // writer sits in this file, and there is one meaning for a room's board

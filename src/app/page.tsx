@@ -121,17 +121,21 @@ export default function Home() {
     }
   };
 
+  // The harbor screen, built once and returned from both places that draw
+  // it: the lobby proper, and the fall through below.
+  const harbor = (
+    <Lobby
+      me={user}
+      onEnterRoom={enterRoom}
+      onLogout={handleLogout}
+      onSessionLost={handleSessionLost}
+      notice={notice}
+      onDismissNotice={() => setNotice(null)}
+    />
+  );
+
   if (status === "lobby") {
-    return (
-      <Lobby
-        me={user}
-        onEnterRoom={enterRoom}
-        onLogout={handleLogout}
-        onSessionLost={handleSessionLost}
-        notice={notice}
-        onDismissNotice={() => setNotice(null)}
-      />
-    );
+    return harbor;
   }
 
   if (status === "game" && room) {
@@ -151,14 +155,7 @@ export default function Home() {
     );
   }
 
-  return (
-    <Lobby
-      me={user}
-      onEnterRoom={enterRoom}
-      onLogout={handleLogout}
-      onSessionLost={handleSessionLost}
-      notice={notice}
-      onDismissNotice={() => setNotice(null)}
-    />
-  );
+  // The fall through: a game screen with no room to draw, which is where a
+  // harbor that closed underneath this captain lands.
+  return harbor;
 }

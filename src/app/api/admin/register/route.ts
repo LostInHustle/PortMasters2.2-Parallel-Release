@@ -14,25 +14,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { publicUser } from "@/lib/db";
 import {
+  captainCredentials,
   createAccountAndSession,
-  sessionCookieMaxAge,
   USERNAME_TAKEN_ERROR,
   verifySetupCode,
 } from "@/lib/auth";
-import { sessionCookie } from "@/lib/api-auth";
+import { signedInResponse } from "@/lib/api-auth";
 import { readJson } from "@/lib/api-json";
 
-const Schema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(20)
-    .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "Username may only contain letters, numbers and underscores",
-    ),
-  password: z.string().min(6).max(72),
-  displayName: z.string().min(1).max(24).optional(),
+// The captain's rule with the operator door's own field added to it, so
+// an operator account is held to exactly the name and password a captain
+// account is (see captainCredentials in lib/auth.ts).
+const Schema = captainCredentials.extend({
   setupCode: z.string().min(1, "Enter the setup code").max(128),
 });
 
@@ -61,14 +54,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: USERNAME_TAKEN_ERROR }, { status: 409 });
   }
 
-  const res = NextResponse.json({
+  return signedInResponse({
     user: { ...publicUser(account.user), role: account.user.role },
-    expiresAt: account.expiresAt,
     token: account.token,
+    expiresAt: account.expiresAt,
   });
-  res.headers.set(
-    "Set-Cookie",
-    sessionCookie(account.token, sessionCookieMaxAge),
-  );
-  return res;
 }

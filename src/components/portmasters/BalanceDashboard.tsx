@@ -252,19 +252,35 @@ function LaunchStrip({ verdict }: { verdict: LaunchVerdict }) {
         <p className="text-muted-foreground">{verdict.tally}</p>
       </div>
 
-      {verdict.gaps.length > 0 && (
-        <ul className="space-y-1.5 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
-          {verdict.gaps.map((gap) => (
-            <li
-              key={gap}
-              className="text-[11px] leading-relaxed text-muted-foreground"
-            >
-              {gap}
-            </li>
-          ))}
-        </ul>
-      )}
+      <GapList gaps={verdict.gaps} />
     </section>
+  );
+}
+
+/**
+ * What a reading is waiting on, under the reading itself: the dashboard's
+ * own sentences, handed to it by the server that measured them. Drawn
+ * here rather than twice below, because the launch strip and every panel
+ * say the same thing in the same voice and a second copy would be a
+ * second voice the day one of them changed.
+ *
+ * Nothing to say and it draws nothing, which is the reading's own
+ * statement rather than this list's: a reading with no gaps is one that
+ * has everything it needs.
+ */
+function GapList({ gaps }: { gaps: string[] }) {
+  if (gaps.length === 0) return null;
+  return (
+    <ul className="space-y-1.5 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
+      {gaps.map((gap) => (
+        <li
+          key={gap}
+          className="text-[11px] leading-relaxed text-muted-foreground"
+        >
+          {gap}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -371,18 +387,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
         </table>
       </div>
 
-      {panel.gaps.length > 0 && (
-        <ul className="space-y-1.5 border-t border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
-          {panel.gaps.map((gap) => (
-            <li
-              key={gap}
-              className="text-[11px] leading-relaxed text-muted-foreground"
-            >
-              {gap}
-            </li>
-          ))}
-        </ul>
-      )}
+      <GapList gaps={panel.gaps} />
     </section>
   );
 }

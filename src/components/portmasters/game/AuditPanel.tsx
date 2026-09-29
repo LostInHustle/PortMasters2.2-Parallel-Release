@@ -26,6 +26,7 @@ import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
 import { tallyRows } from "@/lib/voteTally";
+import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import type { AuditReveal } from "@/types/realtime";
 import { Utensils } from "lucide-react";
 
@@ -103,19 +104,7 @@ export function AuditVoteCard({
               harbor.
             </p>
           )}
-          {rows.length > 0 && (
-            <div className="mt-3 space-y-0.5 text-center">
-              {rows.map((row) => (
-                <p key={row.targetId} className="text-[11px]">
-                  <span className="font-medium">{row.name}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    {row.voters.length}: {row.voters.join(", ")}
-                  </span>
-                </p>
-              ))}
-            </div>
-          )}
+          <VoteTallyRows rows={rows} />
           <p className="text-center text-[10px] text-muted-foreground/80 mt-2">
             A majority is more than half of the captains still in the voyage.
           </p>

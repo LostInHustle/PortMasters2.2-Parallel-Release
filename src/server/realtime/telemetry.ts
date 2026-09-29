@@ -258,6 +258,11 @@ export function noteLegReport(
     escortSold?: number;
     escortFeesEarned?: number;
     escortAbsorbed?: number;
+    refitsSold?: number;
+    refitFeesEarned?: number;
+    ragsRewoven?: number;
+    coldLeg?: boolean;
+    opportunistBorrows?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -285,6 +290,24 @@ export function noteLegReport(
   const escortSold = held(figures.escortSold);
   const escortFeesEarned = held(figures.escortFeesEarned);
   const escortAbsorbed = held(figures.escortAbsorbed);
+  // [D4: Loom: the Refit] The bench's three ride the same rule, and `held`
+  // reads all three for the reason it reads the escort's: a fee is Gold, a
+  // reweave is a count, and neither can be negative. The leg's weather is not
+  // a count and is deliberately not read through it. A cold leg is a truth
+  // rather than a tally, so false is a reading and not an absence, and
+  // flooring it would turn every fair leg in the record into a leg nobody
+  // measured: the reader below keeps the answer the client gave, either way,
+  // and drops only what arrived as something other than a boolean.
+  const refitsSold = held(figures.refitsSold);
+  const refitFeesEarned = held(figures.refitFeesEarned);
+  const ragsRewoven = held(figures.ragsRewoven);
+  const coldLeg =
+    typeof figures.coldLeg === "boolean" ? figures.coldLeg : undefined;
+  // [D6: Free Captain: Opportunist] One count, and `held` is the right
+  // reader for it for the reason it reads the escort's and the bench's: a
+  // borrow is a count and cannot be negative. The tally is the voyage's
+  // rather than the leg's, which the field's own note explains.
+  const opportunistBorrows = held(figures.opportunistBorrows);
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
@@ -298,6 +321,11 @@ export function noteLegReport(
     ...(escortSold === undefined ? {} : { escortSold }),
     ...(escortFeesEarned === undefined ? {} : { escortFeesEarned }),
     ...(escortAbsorbed === undefined ? {} : { escortAbsorbed }),
+    ...(refitsSold === undefined ? {} : { refitsSold }),
+    ...(refitFeesEarned === undefined ? {} : { refitFeesEarned }),
+    ...(ragsRewoven === undefined ? {} : { ragsRewoven }),
+    ...(coldLeg === undefined ? {} : { coldLeg }),
+    ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather

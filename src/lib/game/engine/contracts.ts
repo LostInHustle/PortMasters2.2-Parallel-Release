@@ -28,6 +28,13 @@
 // moment the contract leaves the board, so a seller who walked out takes
 // their guns with them rather than leaving a promise behind.
 //
+// Everything else an agreement is made of is not this module's any more.
+// What a fee may be, which rows a captain sees, when an offer expires, the
+// one offer per seller per buyer bound, the accept that sweeps the rest,
+// and the ledger that keeps a reload from moving the same Gold twice are
+// the consent primitive D4's refit shares (see ./consent), and the server
+// reads them from there rather than through a second name here.
+//
 // Two things are deliberately outside this module's reach and worth saying
 // here so the next reader does not go looking for them. The fee does not
 // reach peerTradeProfit in ./barter, because that ledger is the barter
@@ -38,14 +45,17 @@
 // of what already happened and the ledger of movements already applied,
 // both of which are records rather than agreements.
 // =====================================================================
-import {
-  CONVOY_RAID_COVERAGE,
-  ESCORT_CONTRACT_FEE_MAX,
-  ESCORT_CONTRACT_FEE_MIN,
-} from "../constants";
+import { CONVOY_RAID_COVERAGE } from "../constants";
 import { escortContractsOn } from "../flags";
 import type { PathId } from "../paths";
-import type { EscortClaim, EscortCover, GameState, Phase } from "../types";
+import type { EscortClaim, EscortCover, GameState } from "../types";
+import {
+  floorTallies,
+  markMovement,
+  movementApplied,
+  visibleConsent,
+  type ConsentTerms,
+} from "./consent";
 import { addOwnedAmount, getOwnedAmount } from "./core";
 
 /**
@@ -67,28 +77,6 @@ export const ESCORT_SELLER_PATH: PathId = "convoy";
  */
 export function canSellEscort(state: Pick<GameState, "path">): boolean {
   return escortContractsOn() && state.path === ESCORT_SELLER_PATH;
-}
-
-/**
- * A fee as the board will accept it, or null where the value cannot be one.
- *
- * One reader for the two places a fee arrives from outside this module, the
- * form a seller types into and the payload a socket delivers, so the board
- * and the server cannot disagree about what a fee is. A value that is not a
- * number at all, or that lands outside the bounds in ../constants, answers
- * null rather than being clamped: a fee somebody typed wrong is not the fee
- * they meant, and quietly charging a different one is the one behaviour a
- * market cannot have. A fraction is floored instead, because Gold is
- * counted in whole coins and a form that hands back a value a hair over the
- * number somebody typed is a form, not a cheat.
- */
-export function escortFeeFor(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  const fee = Math.floor(value);
-  if (fee < ESCORT_CONTRACT_FEE_MIN || fee > ESCORT_CONTRACT_FEE_MAX) {
-    return null;
-  }
-  return fee;
 }
 
 /**
@@ -170,153 +158,41 @@ export function coverFromBoard(
 }
 
 /**
- * Whether this captain is already the buyer of a contract for the round.
+ * The board as one captain should see it: which rows, and then what one of
+ * them says.
  *
- * One buyer's cover is one field, so a captain takes one escort a leg: the
- * server refuses a second accept on this reading, and the board hides the
- * accept on an offer when it is true. Nothing caps the selling side, which
- * is the plan's own shape ("contracts sold per leg per Convoy captain" is a
- * number it expects to move), and a seller who writes three contracts wears
- * three claims, which is the risk the path is priced on.
- */
-export function escortBuyerBusy(
-  contracts: EscortContract[],
-  userId: string,
-  round: number,
-): boolean {
-  return contracts.some(
-    (c) =>
-      c.status !== "offered" && c.buyerUserId === userId && c.round === round,
-  );
-}
-
-// =====================================================================
-// The board's own rules, kept pure and here rather than in the server
-// module, for the reason ./convoy.ts split the venture's arithmetic out of
-// the socket closures: a rule that only exists inside a live server cannot
-// be tested, and these three decide who sees what, what an expiry takes
-// away, and what an accept consumes.
-// =====================================================================
-
-/**
- * The board as one captain should see it, both which rows and what they say.
- *
- * An open offer is the market and everyone sees it. A direct offer is
- * addressed to one captain and is visible only to its two parties, the same
- * privacy the barter board gives a targeted offer. An agreed or claimed
- * contract is public: the price was agreed in the open and the claim is the
- * record the plan wants the table to be able to read, so both are shown to
- * everyone rather than to the pair alone.
- *
- * What is public about a claimed contract is that it was claimed, not what
- * it cost. `raidGold` is the covered captain's own report of what a raid
- * would have taken, and it is carried on the board for one reader: the
- * seller, who is the captain the number turns into a bill. Everyone else
- * reads the row without it, which is a filtering rule rather than a field
- * the wire leaves out, so a client that asked for the board directly reads
- * the same row the broadcast carried.
+ * The rows come from the shared primitive, which is where the privacy rule
+ * lives (see visibleConsent in ./consent). What this adds is the one field
+ * the escort carries that is not public: `raidGold` is the covered
+ * captain's own report of what a raid would have taken, and it is on the
+ * board for one reader, the seller, who is the captain the number turns
+ * into a bill. Everyone else, the buyer included, reads the row without it.
+ * That is a filtering rule rather than a field the wire leaves out, so a
+ * client that asked for the board directly reads the same row the broadcast
+ * carried.
  */
 export function visibleContracts(
   contracts: EscortContract[],
   userId: string,
 ): EscortContract[] {
-  return contracts
-    .filter(
-      (c) =>
-        c.status !== "offered" ||
-        c.buyerUserId === null ||
-        c.buyerUserId === userId ||
-        c.sellerUserId === userId,
-    )
-    .map((c) =>
-      c.raidGold === undefined || c.sellerUserId === userId
-        ? c
-        : { ...c, raidGold: undefined },
-    );
-}
-
-/**
- * The board after the voyage moves, which is what makes an offer an offer
- * rather than a standing promise.
- *
- * Two expiries and one rule each. An offer lives in the Parley it was
- * posted in, because the plan's own sentence is that everything offered in
- * Parley is binding once both parties accept, and an offer nobody accepted
- * before the phase closed is not binding on anyone. An agreed contract
- * lives exactly one leg, which is the round it was made in, so the round it
- * no longer matches is what takes it off the board. Read as a pure function
- * of the list and the checkpoint so the suite can hold both boundaries
- * without a server.
- */
-export function expireContracts(
-  contracts: EscortContract[],
-  standing: { phase: Phase; round: number },
-): EscortContract[] {
-  return contracts.filter(
-    (c) =>
-      c.round === standing.round &&
-      !(c.status === "offered" && standing.phase !== "parley"),
+  return visibleConsent(contracts, userId).map((c) =>
+    c.raidGold === undefined || c.sellerUserId === userId
+      ? c
+      : { ...c, raidGold: undefined },
   );
 }
 
-/**
- * Whether this seller already has an offer standing for this buyer.
- *
- * One open offer per seller per buyer, where an open offer counts as its
- * own buyer: a seller who is selling to anyone has already said that, and a
- * second identical row would only be a second way to take the same cover.
- * The rule is the board's bound as well as its tidiness. Nothing else caps
- * how many contracts a board can hold, and a post costs no escrow the way a
- * barter offer does, so without this a single client could paper the room.
- * With it, a seller's rows are bounded by the table: one open offer and one
- * named offer per other captain, which is the most a market of N captains
- * can mean anything by.
- */
-export function escortOfferStanding(
-  contracts: EscortContract[],
-  sellerUserId: string,
-  buyerUserId: string | null,
-): boolean {
-  return contracts.some(
-    (c) =>
-      c.status === "offered" &&
-      c.sellerUserId === sellerUserId &&
-      c.buyerUserId === buyerUserId,
-  );
-}
-
-/**
- * The board after a captain accepts an offer.
- *
- * Accepting writes the buyer onto the contract and moves it to agreed, and
- * takes every other open offer that named this captain as its buyer off the
- * board in the same pass. That sweep is the one buyer rule above seen from
- * the other side: a captain whose cover is one field cannot take two, and an
- * offer they can no longer take would otherwise sit on the board inviting a
- * second accept the server would have to refuse.
- */
-export function agreeContract(
-  contracts: EscortContract[],
-  contractId: string,
-  buyer: { userId: string; name: string },
-): EscortContract[] {
-  return contracts
-    .filter(
-      (c) =>
-        c.id === contractId ||
-        !(c.status === "offered" && c.buyerUserId === buyer.userId),
-    )
-    .map((c) =>
-      c.id === contractId
-        ? {
-            ...c,
-            status: "agreed" as const,
-            buyerUserId: buyer.userId,
-            buyerName: buyer.name,
-          }
-        : c,
-    );
-}
+/* The board's other three rules are the primitive's, and the escort no
+   longer names them: the expiry, the one offer per seller per buyer bound
+   and the accept that sweeps the rest are the same rules for both kinds, so
+   they are read from ./consent by the server and by the panels rather than
+   forwarded from here. What stays in this file is what only an escort can
+   answer: who may sell, what a contract does to a purse, which side of this
+   market is bounded to one agreement a leg (the buyer's, because one
+   captain's cover is one field), and which rows carry a number the rest of
+   the table must not read. A wrapper for each of the rest would be a second
+   name for one rule, which is the thing this tree deletes rather than
+   writes. */
 
 // =====================================================================
 // The settlement rule: what a contract does to a purse, applied by the
@@ -324,51 +200,21 @@ export function agreeContract(
 // =====================================================================
 
 /**
- * Whether this movement has already been applied, read through the leg
- * stamp.
- *
- * A ledger left over from an earlier leg answers for nothing: the keys are
- * contract ids, a leg's contracts are off the board by the next Dawn, and a
- * list that only ever grows is weight in every save the voyage writes. The
- * stamp is what lets the list be emptied at each roll without ever losing a
- * movement that has not settled yet, since both of a contract's movements
- * land in the leg it was agreed in.
- */
-function alreadySettled(state: GameState, key: string): boolean {
-  return (
-    state.escortSettledRound === state.currentRound &&
-    state.escortSettled.includes(key)
-  );
-}
-
-/** Records a movement as applied, on this leg's ledger. */
-function markSettled(state: GameState, key: string): void {
-  if (state.escortSettledRound !== state.currentRound) {
-    state.escortSettled = [];
-    state.escortSettledRound = state.currentRound;
-  }
-  state.escortSettled = [...state.escortSettled, key];
-}
-
-/**
  * The leg's contract facts, cleared where every other per leg fact is
  * cleared (startBoonDrafting, see the call there).
  *
- * Three things go, and each would be a lie if it stayed. The cover belongs
- * to one leg, so a captain carried into the next one still wearing it would
- * be protected by a contract that has expired. A pending claim is a raid
- * that already happened, so relaying it a leg late would ask a seller to
- * absorb a boarding party the board no longer remembers. And the ledger,
- * once the stamp says it is a leg old, is only weight. The stamp itself is
- * written rather than left alone, so the list is emptied here rather than at
- * the next settle, which is what keeps the saving small on a voyage where
- * nothing more is sold.
+ * Two things go, and each would be a lie if it stayed. The cover belongs to
+ * one leg, so a captain carried into the next one still wearing it would be
+ * protected by a contract that has expired. A pending claim is a raid that
+ * already happened, so relaying it a leg late would ask a seller to absorb a
+ * boarding party the board no longer remembers. The ledger this used to
+ * clear is not here any more, because it is not the escort's: it belongs to
+ * the consent primitive and is emptied beside this call (see
+ * resetConsentLedger in ./consent).
  */
 export function resetEscortLeg(state: GameState): void {
   state.escortCover = null;
   state.pendingEscortClaim = null;
-  state.escortSettled = [];
-  state.escortSettledRound = state.currentRound;
 }
 
 /**
@@ -401,7 +247,7 @@ export function applyEscortSide(
 
   if (contract.status === "agreed") {
     const key = `${contract.id}:fee`;
-    if (alreadySettled(state, key)) return false;
+    if (movementApplied(state, key)) return false;
     if (isBuyer) {
       // The hire that was agreed in the market, paid at once, and paid by a
       // purse that is allowed to be empty: the buyer's accept was guarded by
@@ -428,13 +274,13 @@ export function applyEscortSide(
         `🤝 Escort contract: ${contract.buyerName ?? "A captain"} paid ${contract.fee} Gold for one leg of protection.`,
       );
     }
-    markSettled(state, key);
+    markMovement(state, key);
     return true;
   }
 
   if (contract.status === "claimed" && isSeller) {
     const key = `${contract.id}:claim`;
-    if (alreadySettled(state, key)) return false;
+    if (movementApplied(state, key)) return false;
     const ate = Math.max(
       0,
       Math.min(
@@ -451,7 +297,7 @@ export function applyEscortSide(
         ? `🛡️ Raiders meant for ${who} met your guns: your hold lost ${ate} Gold.`
         : `🛡️ Raiders meant for ${who} met your guns and found your hold already bare.`,
     );
-    markSettled(state, key);
+    markMovement(state, key);
     return true;
   }
 
@@ -459,41 +305,31 @@ export function applyEscortSide(
 }
 
 /**
- * Heals the mirror and the ledger at the load site, the way every other
- * field this build added is healed: a save written before this feature, or
- * by a build that spelled one of these shapes differently, reads as a
+ * Heals the tally and the mirror at the load site, the way every other field
+ * this build added is healed: a save written before this feature reads as a
  * captain with nothing bought, nothing sold and nothing owed rather than as
  * one whose next raid roll throws.
  *
  * The tallies are floored and rounded because they are counts and sums of
- * Gold, and the ledger is filtered to strings because it is compared by
- * value: a number in that list would simply never match and would silently
- * re-apply a movement.
+ * Gold. What is healed beside them but not here is the ledger of movements
+ * already applied, which belongs to the consent primitive rather than to
+ * this kind and has its own reader (see normalizeConsentLedger in
+ * ./consent).
  */
 export function normalizeEscortState(state: GameState): void {
-  const counts = [
+  // Through the shared reader rather than a loop of its own, which is what
+  // the second copy of this arithmetic always costs: the first one floors a
+  // count and the second one forgets the finite check, and a NaN tally is
+  // added straight into a captain's score where the Ledger Integrity Pass
+  // reads it as forged (see floorTallies).
+  floorTallies(state, [
     "escortSold",
     "escortBought",
     "escortFeesEarned",
     "escortFeesPaid",
     "escortClaims",
     "escortAbsorbed",
-  ] as const;
-  for (const field of counts) {
-    const value = state[field];
-    state[field] =
-      typeof value === "number" && Number.isFinite(value)
-        ? Math.max(0, Math.floor(value))
-        : 0;
-  }
-  state.escortSettled = Array.isArray(state.escortSettled)
-    ? state.escortSettled.filter((key) => typeof key === "string")
-    : [];
-  state.escortSettledRound =
-    typeof state.escortSettledRound === "number" &&
-    Number.isFinite(state.escortSettledRound)
-      ? Math.max(0, Math.floor(state.escortSettledRound))
-      : 0;
+  ]);
   state.escortCover =
     state.escortCover &&
     typeof state.escortCover.contractId === "string" &&
@@ -513,18 +349,7 @@ export function normalizeEscortState(state: GameState): void {
 // layer is what both ends of the wire import from (see src/types/realtime,
 // which imports this shape rather than declaring a second one).
 // =====================================================================
-export type EscortContract = {
-  id: string;
-  sellerUserId: string;
-  sellerName: string;
-  // Null on an open offer, which any captain but the seller may take.
-  buyerUserId: string | null;
-  buyerName: string | null;
-  fee: number;
-  // The leg the contract was made for. An agreed contract protects the
-  // round it was agreed in and is off the board the moment the voyage
-  // stands in a later one.
-  round: number;
+export type EscortContract = ConsentTerms & {
   status: "offered" | "agreed" | "claimed";
   // The Gold a raid would have taken from the covered captain, carried on
   // the claim so the seller's client can price what it eats.

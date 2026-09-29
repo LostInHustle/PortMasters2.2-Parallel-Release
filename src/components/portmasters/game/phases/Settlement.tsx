@@ -49,7 +49,7 @@ function PirateAttack({
   const cover = escortCoverOf(game);
   return (
     <div className="max-w-xl mx-auto text-center py-4">
-      <div className="text-5xl mb-2">🏴☠️</div>
+      <div className="text-5xl mb-2">🏴‍☠️</div>
       <div className="text-2xl font-bold mb-1 font-display text-resolve pm-brush">
         Pirate Waters Ahead
       </div>

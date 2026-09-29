@@ -41,10 +41,13 @@ import {
 } from "@/lib/game/checkpoint";
 import { normalizePhase, phaseFace } from "@/lib/game/phases";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
+import { bazaarRumorsOn } from "@/lib/game/flags";
+import { rumorLean } from "@/lib/game/engine";
 import type { PortShift } from "@/lib/game/maroon";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Phase } from "@/lib/game/types";
 import type { Checkpoint } from "./types";
+import { bazaarList, broadcastBazaar } from "./bazaar";
 import { portShiftFor } from "./maroon";
 import { roomMembers } from "./presence";
 import { roomStatuses } from "./status";
@@ -193,6 +196,20 @@ async function announceAdvance(
   // only on the advance that opens a market.
   let harborPulse: Record<string, number> | undefined;
   let portShift: PortShift | null | undefined;
+  // [D5: Aroma: the Bazaar Rumor] The third hand, computed on the same
+  // turn and for the same reason: the bazaar's lean is a rule about the
+  // market about to be drawn, so it has to land before genResourceCard
+  // runs rather than as a round trip that could arrive after it. It is
+  // the only one of the three that is summed from room state rather than
+  // read off a record, so the rows are walked here rather than the answer
+  // being fetched.
+  //
+  // `undefined` and an empty object are two different answers on this
+  // frame and both are real: undefined is a build with the feature rolled
+  // back (or an advance into a seat that is not the market), and an empty
+  // object is a bazaar nobody spoke at, which has to reach the clients as
+  // a clear rather than as silence (see applyBazaarLean).
+  let bazaarLean: Record<string, number> | undefined;
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: { difficulty: true, mode: true },
@@ -203,6 +220,9 @@ async function announceAdvance(
       unlockedResources(room?.difficulty, from.round),
     );
     portShift = portShiftFor(roomId, from.round);
+    bazaarLean = bazaarRumorsOn()
+      ? rumorLean(bazaarList(roomId), from.round)
+      : undefined;
   }
   io.to(`room:${roomId}`).emit("phase:advance", {
     roomId,
@@ -210,7 +230,17 @@ async function announceAdvance(
     phase: from.phase,
     ...(harborPulse ? { harborPulse } : {}),
     ...(portShift !== undefined ? { portShift } : {}),
+    ...(bazaarLean !== undefined ? { bazaarLean } : {}),
   });
+  // [D5: Aroma: the Bazaar Rumor] And the reveal, at the one instant it
+  // is honest: the market that just opened on every client is the market
+  // the standing rumors moved, so this is the leg the directions become
+  // public (see publicRumors). Sending the board on a later turn would
+  // name a price move after the table had already had to guess at it,
+  // which is the opposite of what the plan asks this reveal to do.
+  if (bazaarLean !== undefined) {
+    broadcastBazaar(io, roomId, from.round);
+  }
 }
 
 // Once every active member has signaled ready for the checkpoint they're

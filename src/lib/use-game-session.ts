@@ -11,6 +11,11 @@ import {
 import { api } from "@/lib/api";
 import type { Socket } from "socket.io-client";
 import {
+  normalizeConsentLedger,
+  normalizeEscortState,
+  normalizeOpportunistBorrows,
+  normalizeRefitState,
+  normalizeRumorLean,
   noHousePerks,
   phaseLabel,
   showWelcome,
@@ -46,6 +51,7 @@ import {
 } from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 import { normalizePath } from "@/lib/game/paths";
+import { normalizePathSwitchLeg } from "@/lib/game/draft";
 
 // The most log lines a session keeps around at once (see the APPLY case
 // below, the only place this is enforced). Named rather than written out
@@ -391,6 +397,14 @@ export function useGameSession(
           // the pricing function a port that is not a port or a direction
           // that is not a direction.
           game.portShift = normalizePortShift(game.portShift);
+          // [D5: Aroma: the Bazaar Rumor] The lean the market reads, healed
+          // the way the shift above is and for the same reason: the bazaar's
+          // lean is a client's blob like everything else in a save, and it is
+          // read by a pricing function rather than by a screen, so a damaged
+          // one would not look wrong, it would price a market. A save written
+          // before this feature carries no field at all and heals to no lean,
+          // which is the market every voyage priced before the bazaar existed.
+          game.bazaarLean = normalizeRumorLean(game.bazaarLean);
           // [B3: standing orders] A voyage saved before the record existed
           // carries no set at all, and the engine reads it unconditionally
           // the moment the room's clock plays a seat, so an unhealed save
@@ -448,15 +462,55 @@ export function useGameSession(
             game.garmentsTickRound,
           );
           // [D2: the nine slot order board] The path this captain sailed.
-          // Every save this build writes carries null here, because no rule
-          // in this tree deals a path until D7's draft lands, so the heal
-          // exists for the two shapes that can carry anything else: a save
-          // written by that draft's build and read back by this one, and a
-          // file written by hand. Both land on a captain who never drew,
-          // which is the ordinary table rather than a locked one, and the
-          // membership test behind this call is the one that keeps
-          // "constructor" from reading as a path.
+          // Every save this build writes carries a path it was dealt by the
+          // draft or changed at a port (see D7 below), and every save from
+          // before the draft carries null, so the heal exists for the two
+          // shapes that can carry anything else: a file written by hand, and
+          // a save whose path names something this build retired. Both land
+          // on a captain who never drew, which is the ordinary table rather
+          // than a locked one, and the membership test behind this call is
+          // the one that keeps "constructor" from reading as a path.
           game.path = normalizePath(game.path);
+          // [D7: the draft, and switching] And the leg this captain last
+          // changed their papers on, read through the module's own reader
+          // for the reason every counter this build added is: it is a stamp
+          // rather than a boolean, and a save carrying nonsense where the
+          // stamp belongs has to read as a captain who has not switched
+          // rather than as one who has. The other direction would cost an
+          // innocent captain the one switch their voyage allows, and it is
+          // the same reading normalizeOpportunistBorrows takes below.
+          game.pathSwitchLeg = normalizePathSwitchLeg(game.pathSwitchLeg);
+          // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] The two
+          // markets' tallies and the ledger they both settle through.
+          //
+          // Three heals, and the third is the one that matters most. The
+          // counts are floored the way every other added tally is, so a save
+          // that predates a market reads as a captain who has never sold
+          // cover, absorbed a raid or put a garment right, rather than as
+          // one carrying an undefined that the first settlement would turn
+          // into NaN. A NaN in a score is not merely wrong: the Ledger
+          // Integrity Pass reads an impossible score as a forged one and
+          // would cost an innocent captain their Renown.
+          //
+          // The ledger is the guard on the other side of the same problem.
+          // It is what keeps a reload between an agreement and the Gold
+          // that follows it from moving that Gold twice, so a save carrying
+          // the name the previous build wrote has to have it read rather
+          // than dropped: losing it to a rename would be losing the
+          // protection, which is why the reader takes the old field (see
+          // normalizeConsentLedger). The two names are read off the save as
+          // it was written, which is what the cast is: everything above this
+          // line is this build's GameState and this is the one field whose
+          // old spelling still has to be understood.
+          normalizeConsentLedger(
+            game,
+            game as unknown as {
+              escortSettled?: unknown;
+              escortSettledRound?: unknown;
+            },
+          );
+          normalizeEscortState(game);
+          normalizeRefitState(game);
           // Refresh Renown from the freshly loaded legacy so a captain who
           // leveled up since this voyage was saved gets the current unlock
           // state; fall back to the saved value (then 1) if legacy is missing.
@@ -464,6 +518,16 @@ export function useGameSession(
             ? renownLevel
             : (game.renownLevel ?? 1);
           game.brokersFavorUsed = game.brokersFavorUsed ?? false;
+          // [D6: Free Captain: Opportunist] A save written before the borrow
+          // existed carries no counter at all, and an undefined counter is
+          // NaN the first time one is spent, which would then ride the
+          // voyage's figures into the record. The healing is the module's own
+          // reader, so a save carrying a fraction or a negative is read here
+          // the way the board and the engine read it rather than trusted
+          // because it came off a disk.
+          game.opportunistBorrows = normalizeOpportunistBorrows(
+            game.opportunistBorrows,
+          );
           // A save written before helping other captains had a per voyage
           // ceiling has no tally at all, and the ceiling is arithmetic:
           // cap minus undefined is NaN, which would then be added straight

@@ -19,7 +19,14 @@ import {
   explainVAT,
   lockedBehind,
   nextPhase,
+  opportunistBorrowsLeft,
+  opportunistLine,
+  opportunistMayBorrow,
+  opportunistPayout,
+  opportunistUsesLine,
   pathOrderOf,
+  OPPORTUNIST_PATH,
+  OPPORTUNIST_SPENT_LINE,
   type PriceBreakdown,
 } from "@/lib/game/engine";
 import { pathConfig, pathLockLine } from "@/lib/game/paths";
@@ -253,6 +260,23 @@ export function Orders({
           const locked = lockedBehind(game, o);
           const canComplete = canFillOrder(game, o);
           const completed = game.completedOrders.includes(o.id);
+          // [D6: Free Captain: Opportunist] The one card on this board whose
+          // price this captain can move. `mayBorrow` is the ability question,
+          // asked of the engine rather than answered here (the path holds it
+          // and a borrow is left), and everything the card quotes is priced
+          // off the payout the borrow would actually pay. completeOrder runs
+          // the same arithmetic on the same reduced number, so the net figure
+          // on the card and the Gold that lands in the purse are one number;
+          // a card that showed the face value would be advertising a sum the
+          // engine never hands over. A captain with nothing to spend reads
+          // the card exactly as everyone else at the table does.
+          const mayBorrow =
+            locked !== null && opportunistMayBorrow(game, locked);
+          const borrowPayout = opportunistPayout(o.reward);
+          const rewardBasis = mayBorrow ? borrowPayout : o.reward;
+          const canBorrow = canFillOrder(game, o, true);
+          const borrowSpent =
+            game.path === OPPORTUNIST_PATH && opportunistBorrowsLeft(game) < 1;
           const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
           const transport = calcTransportCost(game, o.totalItems, hasSilk);
           const transportBreakdown = explainTransportCost(
@@ -260,7 +284,7 @@ export function Orders({
             o.totalItems,
             hasSilk,
           );
-          let netProfit = o.reward - transport;
+          let netProfit = rewardBasis - transport;
           let totalVat = 0;
           let vatBreakdown: PriceBreakdown | null = null;
           if (o.isProductOrder) {
@@ -268,7 +292,7 @@ export function Orders({
             vatBreakdown = explainVAT(
               game,
               product,
-              o.reward / o.resources[0].required!,
+              rewardBasis / o.resources[0].required!,
             );
             totalVat = vatBreakdown.final * o.resources[0].required!;
             netProfit -= totalVat;
@@ -389,11 +413,11 @@ export function Orders({
                     netProfit >= 0 ? "text-gain" : "text-alarm",
                   )}
                 >
-                  💰 Reward: {o.reward} Gold 📊 Net: {netProfit} Gold
+                  💰 Reward: {rewardBasis} Gold 📊 Net: {netProfit} Gold
                   {(() => {
                     const margin =
-                      o.reward > 0
-                        ? Math.round((netProfit / o.reward) * 100)
+                      rewardBasis > 0
+                        ? Math.round((netProfit / rewardBasis) * 100)
                         : 0;
                     return (
                       <span
@@ -450,8 +474,51 @@ export function Orders({
                   // reader is a sentence about why rather than a grey shape.
                   // The string is pathLockLine's, the same one the ledger
                   // prints when a fill is refused.
-                  <div className="rounded-lg border border-dashed border-black/25 dark:border-white/25 px-3 py-2 text-[11px] text-muted-foreground leading-snug">
-                    🔒 {pathLockLine(locked)}
+                  <div className="space-y-1.5">
+                    <div className="rounded-lg border border-dashed border-black/25 dark:border-white/25 px-3 py-2 text-[11px] text-muted-foreground leading-snug">
+                      🔒 {pathLockLine(locked)}
+                    </div>
+                    {completed || mayBorrow ? (
+                      // [D6] The Free Captain's reach, drawn under the lock it
+                      // reaches through. The lock line stays above it because
+                      // the lock is still the truth about every other captain;
+                      // what this captain gets is a price, and the price is
+                      // stated twice on the card, once in the sentence and
+                      // once in the card's own arithmetic above, which is
+                      // already reading the reduced payout. The sentences
+                      // themselves are the module's, so the board and the
+                      // ledger describe one transaction in one voice, and the
+                      // count of what is left is printed before the press
+                      // rather than after it: a one shot ability a captain
+                      // discovers they had used is a rule taught by surprise.
+                      <>
+                        <div className="text-[11px] text-orders leading-snug">
+                          {opportunistLine(o.reward, borrowPayout)}
+                        </div>
+                        <Button
+                          className={cn(
+                            "w-full rounded-lg",
+                            canBorrow && !completed ? "pm-grad-orders" : "",
+                          )}
+                          variant={
+                            canBorrow && !completed ? "default" : "secondary"
+                          }
+                          disabled={!canBorrow || completed}
+                          onClick={() =>
+                            act((g, l) => completeOrder(g, o.id, l, true))
+                          }
+                        >
+                          {completed ? "✅ Completed" : "🎭 Borrow this order"}
+                        </Button>
+                        <div className="text-[10px] text-muted-foreground">
+                          {opportunistUsesLine(game)}
+                        </div>
+                      </>
+                    ) : borrowSpent ? (
+                      <div className="text-[11px] text-muted-foreground leading-snug">
+                        {OPPORTUNIST_SPENT_LINE}
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <Button

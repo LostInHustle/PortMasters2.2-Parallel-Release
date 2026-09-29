@@ -343,9 +343,6 @@
   .pm-grad-parley {
     --pm-fill: var(--w-parley-fill);
   }
-  .pm-grad-market {
-    --pm-fill: var(--w-market-fill);
-  }
   .pm-grad-dusk {
     --pm-fill: var(--w-dusk-fill);
   }

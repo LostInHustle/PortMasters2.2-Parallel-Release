@@ -23,9 +23,15 @@ now, with what closed them written where they were raised.
 Three surfaces, taken from the plan:
 
 1. **Every site that builds a broadcast payload.** Anything a whole harbor
-   receives. There are 50 `io.to(...)` and `io.emit(...)` statements across
-   16 files under `src/server/realtime`, and the question asked of each is
-   whether anything private can be inside the payload it sends.
+   receives. There are 59 `io.to(...)` and `io.emit(...)` statements across
+   28 files under `src/server/realtime`, and the question asked of each is
+   whether anything private can be inside the payload it sends. The two
+   passes read the 50 statements across the 16 files that existed when they
+   ran; four files joined the surface after them, and the extraction that
+   moved the connection handlers one to a file moved statements between
+   files without adding one, so the count above is the surface as it stands
+   rather than the pages that were turned. The last section records what the
+   repeat rule makes of both.
 2. **Every site that writes to the log array.** The session conversation,
    which lives in process memory for the length of a room's life and is
    deliberately never written to the database.
@@ -49,7 +55,7 @@ path and the report row line by line.
 
 Then the reading was turned into a gate, because a review that ends in a
 document is a review that is true exactly once. `scripts/private-scan.ts`,
-run as `npm run check:private`, holds six rules:
+run as `npm run check:private`, holds seven rules:
 
 1. One delivery path for a private entry. The event is handled in the
    emitter, the wire type, the client's one hook, and the suite that sweeps
@@ -65,6 +71,10 @@ run as `npm run check:private`, holds six rules:
    mute list, goes out one captain at a time. A mute is the host's judgement
    of one captain, so a roster frame sent to a room is that judgement told to
    the room.
+7. The draft frame, which carries a captain's hand, goes out one captain at
+   a time for the sixth rule's reason. A hand dealt to a seat is that seat's
+   information, and a draft view sent to a room channel lays every seat's
+   cards in front of the table.
 
 Its first run produced 25 findings, nearly all of them its own noise, and the
 calibration is recorded in its header: `scripts/smoke.ts` was allowed as a
@@ -85,16 +95,42 @@ allow list of per-recipient emitters, rather than on the mute field riding
 beside it, because the defect it guards is not a payload that mentions the
 list: it is the frame losing the captain it was addressed to.
 
+The third pass added the seventh rule when the draft landed, and proved it
+the same way: a probe file that delivered a draft frame to a room was
+written, the scan named the file and the line at the emit statement, reported
+1 finding, exited 1, and the probe was deleted in the same command, after
+which the scan read the tree clean again. The rule is deliberately the sixth
+rule's shape, because the thing being sent is the same kind of thing: a
+frame whose audience is its privacy. It keys on the emit statement rather
+than on the event name alone so that the four allowed delivery sites (the two
+named per-recipient emitters, a reply on the asking socket, and a
+`to(socket.id)` send, which is the same single recipient spelled the long
+way) pass on their spelling rather than on their intent.
+
+The suite's own reading of the same boundary was proved the same way, on a
+copy of the tree rather than on the tree: with the draft's view changed to
+a room broadcast for one run, the sweep reported the two seats it caught
+and the run exited 1, and the copy was restored from the tree and read
+clean again. The sweep keeps every frame both sockets at a draft table
+receive, on every event rather than on the events the feature names, and
+reads each hand it finds against the beat that hand belongs to, so a hand
+that changes inside a single beat is a card that reached the wrong socket.
+
 ## The inventories
 
 ### 1. Broadcast payloads
 
-50 statements, 16 files. Every one was read for what it carries. The
-findings that matter are in the next section; what the inventory establishes
-is the shape of the surface: the broadcasts carry room rosters, chat lines, a
-voyage checkpoint, objective totals, barter and aid offers, telemetry
-statuses, the audit reveal, and the end of voyage reveal. The two that carry
-a secret are deliberate, and are listed under boundaries below.
+59 statements, 28 files. The two passes read the 50 statements across the 16
+files that existed when they ran, and every one of those was read for what it
+carries; the four files added since are named in the last section, and the
+extraction that moved the connection handlers one to a file took 29
+statements out of the composition root and into nine leaves, which is one
+file off the surface and nine on with the total unchanged, so the count here
+is the surface as it stands rather than the pages that were turned. The findings that matter are in the next section; what the inventory
+establishes is the shape of the surface: the broadcasts carry room rosters,
+chat lines, a voyage checkpoint, objective totals, barter and aid offers,
+telemetry statuses, the audit reveal, and the end of voyage reveal. The two
+that carry a secret are deliberate, and are listed under boundaries below.
 
 The roster frame is the one entry the second pass changed, and it changed by
 losing a recipient rather than a field: the count above is the count after
@@ -114,7 +150,7 @@ The four clauses below were applied to it, and the one of them it touches is
 the broadcast payload clause, which it satisfies by adding fields to a
 statement already in this inventory rather than a statement of its own. The
 single new broadcast statement is the harbor's own line explaining a move the
-room did not vote for (`src/server/realtime/checkpoint.ts:281`), which
+room did not vote for (`src/server/realtime/checkpoint.ts:319`), which
 carries a sentence and a room id and nothing about any captain. No new path
 trusts a client either: the departure a captain who had not acted takes is
 computed by the same client authoritative engine the boundaries below
@@ -122,17 +158,19 @@ already accept.
 
 ### 2. The session log array
 
-`src/server/realtime/chat.ts` holds two arrays: `roomChatLog` (line 57) and
-`roomDirectLog` (line 61). Both are written through one function,
-`appendBounded` (line 92), reached by `recordHarborMessage` (line 107) and
-`recordDirectMessage` (line 114), and both are bounded at 200 lines
-(`SESSION_LOG_LIMIT`, line 53). Reads are asymmetric on purpose: `harborLog`
-(line 121) hands back the room's own conversation, while `directLogFor`
-(line 129) filters on read to the lines the reader sent or received. The
+`src/server/realtime/chat.ts` holds two arrays: `roomChatLog` (line 77) and
+`roomDirectLog` (line 81). Both are written through one function,
+`appendBounded` (line 112), reached by `recordHarborMessage` (line 127) and
+`recordDirectMessage` (line 134), and both are bounded at 200 lines
+(`SESSION_LOG_LIMIT`, line 73). Reads are asymmetric on purpose: `harborLog`
+(line 141) hands back the room's own conversation, while `directLogFor`
+(line 149) filters on read to the lines the reader sent or received. The
 filter is the design rather than the storage, which is what keeps one
 captain's private thread from reaching another when a room is hydrated after
 a reload. Both arrays are dropped when the room is restarted or torn down
-(`clearSessionChat`, line 138).
+(`clearSessionChat`, line 158). The lines here moved down by twenty when the
+mute book's own unique violation reader joined this module; the readers and
+the arrays are the same ones the pass read.
 
 Nothing here needed a fix. It is recorded because it is the one place in the
 product where private conversation is stored at all, and the next slice that
@@ -188,10 +226,10 @@ defect that makes the popup worse than not existing.
 
 Fixed by holding the question. `player:detail:request` now verifies that the
 target is a member of the asker's own room before forwarding, and writes the
-pair down (`rememberDetailRequest`, `src/server/realtime/presence.ts:92`).
+pair down (`rememberDetailRequest`, `src/server/realtime/presence.ts:93`).
 The response is relayed only if a question is waiting for that exact pair,
 and only if the asker is still standing in the room the question was about
-(`src/server/realtime/index.ts:1787`). The room and the requester on the
+(`src/server/realtime/wiring/player-detail.ts:85`). The room and the requester on the
 relayed frame are the ones the server wrote down, never the ones the
 answering client sent. Holds expire after 30 seconds and are dropped with the
 room on a restart or a teardown. Three branches of it are now exercised by
@@ -241,7 +279,7 @@ has that reading, so it is fixed here.
 
 As fixed, `src/server/realtime/inbound-limit.ts` puts every incoming frame on
 a token bucket per socket, installed in front of every handler
-(`src/server/realtime/index.ts:440`): thirty frames in hand
+(`src/server/realtime/index.ts:264`): thirty frames in hand
 (`inbound-limit.ts:53`) and ten a second earned back, both read off the client
 this tree ships rather than picked. An idle captain in a voyage sends two
 heartbeats per eight seconds, a captain trading sends two to nine frames a
@@ -279,7 +317,7 @@ rather than as a leak, since nothing secret was revealed about anyone, and J2
 is the slice that shaped the mute.
 
 As fixed, the frame is delivered one captain at a time through `emitToUser`
-(`src/server/realtime/chat.ts:200`), and the field means what that recipient
+(`src/server/realtime/chat.ts:220`), and the field means what that recipient
 may see rather than what the harbor decided: the host is handed the list they
 set, a silenced captain is handed their own row of it, and a captain who is
 neither is handed nothing. No client shape changed, because both existing
@@ -323,7 +361,8 @@ administrator, and the check is server side (`src/server/realtime/admin.ts:111`)
 **Identity is bound on the socket, never read from a payload.** `auth`
 resolves the account through `getUserFromToken` (`src/server/realtime/auth.ts:75`)
 and writes the id onto the socket state (line 102). `room:join` verifies a
-membership row before the seat is claimed (line 427). No handler in the
+membership row before the seat is claimed
+(`src/server/realtime/wiring/room-join.ts:67`). No handler in the
 realtime layer reads a captain's identity out of the frame it was sent,
 which is what makes "the sender is who they say they are" true by
 construction rather than by review.
@@ -336,7 +375,7 @@ none did before the fixes either: the alignment table has three production
 readers, all inside `src/server/realtime/gambit.ts` (lines 154, 213, 270),
 and the only wire field that can carry an alignment is `role`, inside a
 `PrivateEntry` that `emitPrivate` addresses to one captain's own sockets
-(`src/server/realtime/presence.ts:62`).
+(`src/server/realtime/presence.ts:63`).
 
 That verdict is now mechanical rather than remembered. Two sweeps in the
 smoke suite read every frame every socket receives at two Gambit tables,
@@ -422,3 +461,35 @@ it triggered on two of the four clauses at once. The second pass is recorded
 on this page rather than in a document of its own, because a second reading of
 the same surfaces is a second pass over the same page: the scope, the
 inventories, the findings and the limits above now carry both.
+
+**The surface has grown since the second pass, and the trigger is met again.**
+The passes read 50 broadcast statements across 16 files. There are now 59
+across 20: the four files added since are `bazaar.ts`, `consent.ts`,
+`draft.ts` and `voyage-log.ts`, and the files that were already there carry
+five more statements between them than they did. That is the fourth clause
+read as a count, so this is written down as an owed repeat rather than
+settled here, and it is left visible on purpose: the numbers in the scope and
+the inventory above are the surface as it stands, and the reading behind them
+is the one the second pass took.
+
+**The surface then moved without growing.** The extraction that split the
+connection handlers one to a file changed where the statements live and
+nothing else about them: the composition root held 29 of the 59 and now holds
+none, those 29 sit one to a file across nine leaves under
+`src/server/realtime/wiring`, and the total is 59 before and after. No frame
+was added, no recipient changed, no payload gained a field, and no path that
+trusts a client appeared, so the private channel clause and the persisted
+secret clause are untouched and the broadcast payload clause is untouched in
+substance: a statement does not become a new payload by moving to another
+file. What it does change is the count that clause is read against, and that
+count is already recorded above as an owed repeat. The repeat stays owed, it
+is now owed over 28 files rather than 20, and no reading has been taken over
+the newer ones, which is stated here rather than implied by the numbers.
+
+What holds the newer paths in the meantime is `npm run check:private`, whose
+fourth rule reads the text of every broadcast payload statement for a secret
+written into it, which is the part of this reading a command can keep. What
+that rule cannot do is the part this review exists for: it reads the words of
+an emit rather than its meaning, so it catches a payload that says role or
+flourish or ally or alignment and passes one that smuggles the same value
+under a name nobody taught it.

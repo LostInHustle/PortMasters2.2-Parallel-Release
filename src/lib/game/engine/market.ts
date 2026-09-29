@@ -25,6 +25,7 @@ import {
   RESOURCE_WEIGHTS,
 } from "../constants";
 import { charterOpensOn, marketCountsFor } from "../difficulty";
+import { bazaarRumorsOn } from "../flags";
 import { lockingPathFor } from "../paths";
 // The hold's room, read from ./larder rather than from ./hold because the
 // quarter a hungry crew takes off the cargo is a rule about hunger and
@@ -235,11 +236,20 @@ function genProductPurchaseCard(
 // reason: a port lean is a hand on that port's market for goods it
 // trades, and a finished product's card is priced from its recipe rather
 // than from the port it is standing in.
+//
+// [D5: Aroma: the Bazaar Rumor] rumor is the third hand, keyed by good
+// rather than by port, and it is the one of the three that arrives
+// already summed: the bazaar's lean is one number per good, worked out
+// from the room's rows by rumorLean in ./bazaar and shipped to every
+// client on the advance. It is a parameter here for the reason the other
+// two are, and it is defaulted for the reason they are: a caller that
+// knows nothing about rumors prices the market it has always priced.
 function genResourceCard(
   rng: Rng,
   pools: MarketPools,
   pulse: Record<string, number> = {},
   shift: PortShift | null = null,
+  rumor: Record<string, number> = {},
 ): Omit<ResourceCard, "id"> {
   if (rng() < 0.3) return genProductPurchaseCard(rng, pools);
   const num = randInt(rng, 1, 3);
@@ -267,14 +277,26 @@ function genResourceCard(
     const [min, max] = COMMODITIES[chosen].basePrice;
     const base = randInt(rng, min, max);
     let price = COMMODITIES[chosen].ports.includes(port) ? base - 1 : base + 1;
-    // One rounding for both hands rather than one each, so a port the
-    // harbor leaned into and the Harbormaster leaned against is priced
-    // the way the net of the two says and not the way either alone
-    // rounds. `?? 0` because an absent key is not a nudge of zero until
-    // this line makes it one.
-    const nudge = pulse[chosen];
+    // One rounding for all three hands rather than one each, so a port
+    // the harbor leaned into and the Harbormaster leaned against is
+    // priced the way the net of the two says and not the way either
+    // alone rounds. `?? 0` because an absent key is not a nudge of zero
+    // until this line makes it one.
+    //
+    // [D5: Aroma: the Bazaar Rumor] The bazaar's third hand is summed
+    // here rather than applied as a second pass, which is the whole of
+    // what keeps this one rounding: a rumor folded in after the
+    // rounding would be a second rounding, and two markets that
+    // differed only in which of the two hands was applied first would
+    // price the same card two ways. It is a fraction where the pulse is
+    // a percentage and the shift is a multiplier, and the three are one
+    // expression because they are one price: the harbor's appetite,
+    // the Harbormaster's call and the bazaar's rumor are three
+    // accounts of what this good is worth at this port this leg, and a
+    // captain is shown the price all three of them make.
+    const nudge = (pulse[chosen] ?? 0) + (rumor[chosen] ?? 0);
     if (nudge || lean !== 1) {
-      price = Math.max(1, Math.round(price * (1 + (nudge ?? 0)) * lean));
+      price = Math.max(1, Math.round(price * (1 + nudge) * lean));
     }
     resources.push({ type: chosen, quantity: qty, price });
   }
@@ -346,6 +368,68 @@ export function applyHarborPulse(
 // src/server/realtime/checkpoint.ts), which is what makes that possible.
 export function applyPortShift(state: GameState, shift: PortShift | null) {
   state.portShift = shift;
+}
+
+// [D5: Aroma: the Bazaar Rumor] Stamps the bazaar's lean onto local
+// state, on the same advance the two hands above ride, so the market about
+// to be drawn is already leaned when genResourceCard runs. It is a third
+// setter rather than a widening of one of the other two because the three
+// are three different facts: the pulse is the room's own buying, the shift
+// is one captain's call at one port, and the lean is one good moved by
+// whoever spoke at the bazaar.
+//
+// An empty object is a real value here and not an omission, the same
+// reading applyPortShift takes of null: the bazaar is silent on most legs,
+// so the leg nothing was published has to clear whatever was published
+// last leg rather than leave it leaning. The server sends the answer for
+// every market it opens, which is what makes that possible.
+export function applyBazaarLean(
+  state: GameState,
+  lean: Record<string, number>,
+) {
+  state.bazaarLean = lean;
+}
+
+// [D5: Aroma: the Bazaar Rumor] The three hands the advance carries, read
+// as one payload rather than as three guesses at the frame's shape.
+//
+// The client used to reach into the frame itself, twice, for the pulse
+// alone (`if (data.harborPulse) act(...)` written at each of the two sites
+// an advance can arrive at), and the port shift was never read at either
+// of them: the Harbormaster's call was announced to the table and never
+// priced, because a field nothing reads is a field nothing notices going
+// missing. This shape is what makes the difference visible. Every hand the
+// frame can carry is named here, the one function below is the only reader
+// of any of them, and a hand added to the frame without a line here is a
+// hand the engine never applies, which the suite can now hold.
+//
+// Every field is optional and each is read for presence rather than for
+// truth, because the three clear themselves differently: the pulse and the
+// lean clear with an empty object, and the shift clears with null, which is
+// a value rather than an absence (see applyPortShift).
+export type MarketLeans = {
+  harborPulse?: Record<string, number>;
+  portShift?: PortShift | null;
+  bazaarLean?: Record<string, number>;
+};
+
+/**
+ * Applies whichever of the market's three hands this frame carried, and
+ * nothing for the ones it did not.
+ *
+ * The absent case is the backward compatible one and it is deliberate: a
+ * frame from a server that predates a hand leaves that hand's state alone
+ * rather than clearing it, which is the reading every other field on this
+ * wire takes. A frame that carries the field is the server telling this
+ * client what the market it is about to draw is leaned by, and an empty
+ * object in that position is the server saying nothing is.
+ */
+export function applyMarketLeans(state: GameState, leans: MarketLeans): void {
+  if (leans.harborPulse) applyHarborPulse(state, leans.harborPulse);
+  if (leans.portShift !== undefined) {
+    applyPortShift(state, leans.portShift ?? null);
+  }
+  if (leans.bazaarLean) applyBazaarLean(state, leans.bazaarLean);
 }
 
 // [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
@@ -500,6 +584,16 @@ export function startMarket(
   const houseLot = state.housePerks.vermilionExtraCard ? 1 : 0;
   const purchaseCount =
     tierPurchaseCount + (state.tidewatchSurge ? 1 : 0) + houseLot;
+  // [D5: Aroma: the Bazaar Rumor] The bazaar's lean is read here, once,
+  // and gated by the switch at the point it is applied. With the feature
+  // rolled back the field on state is ignored rather than trusted, so a
+  // captain who had a rumor standing when the switch went off prices the
+  // market they have always priced: the server stops sending a lean on
+  // the same turn (see announceAdvance in
+  // src/server/realtime/checkpoint.ts), and this is the other end of that
+  // pair. A save loaded with a lean in it does not price one either, for
+  // the same reason.
+  const rumorLean = bazaarRumorsOn() ? state.bazaarLean : {};
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,
@@ -508,6 +602,7 @@ export function startMarket(
         marketPools,
         state.harborPulse,
         state.portShift,
+        rumorLean,
       ),
     });
   }

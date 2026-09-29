@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import {
   FOODS,
   FOODS_DRAW_ORDER,
-  ITEMS,
   LARDER_MAX,
+  MARKET_GOODS,
   PRESERVE_MEALS_IN,
   PRESERVE_MEALS_OUT,
   RATION_PRICE,
@@ -46,6 +46,7 @@ import {
   Utensils,
 } from "lucide-react";
 import { Term } from "../../Term";
+import { RefitBench } from "../RefitBench";
 import { ItemIcon } from "../../shared";
 import { Sparkline } from "../../Sparkline";
 import {
@@ -72,7 +73,7 @@ function MarketPriceReference({
         ━━ MARKET PRICE REFERENCE (hover for details) ━━
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {ITEMS.map((item) => {
+        {MARKET_GOODS.map((item) => {
           const history = game.priceHistory?.[item] ?? [];
           const hasHistory = history.length > 0;
           return (
@@ -109,7 +110,7 @@ function MarketPriceReference({
       </div>
       {/* Price history heatmap */}
       {(() => {
-        const goodsWithHistory = ITEMS.filter(
+        const goodsWithHistory = MARKET_GOODS.filter(
           (item) => (game.priceHistory?.[item]?.length ?? 0) > 0,
         );
         if (goodsWithHistory.length === 0) return null;
@@ -657,16 +658,23 @@ export function Purchase({
   game,
   act,
   colorFor,
+  refit,
+  me,
+  members,
   onRumorBoardOpen,
   onContinue,
-}: Pick<PhasePanelProps, "game" | "act" | "colorFor" | "onRumorBoardOpen"> & {
+}: Pick<
+  PhasePanelProps,
+  "game" | "act" | "colorFor" | "refit" | "me" | "members" | "onRumorBoardOpen"
+> & {
   /**
    * Walks to the artisan bench, the second station of this phase. Handed in
    * by the Market container rather than named here: which station follows
    * this board is the phase's business, and this board has no ready vote of
    * its own to spend on it. A captain is not done with Market when they are
-   * done with the board. It also means the harbor is not waited on from
-   * here, which is why this panel no longer takes the room's member list.
+   * done with the board. It also means the harbor is never waited on from
+   * here. The member list is the bench's, which names the captains a
+   * private offer may be made to, and not a ready vote's.
    */
   onContinue: () => void;
 }) {
@@ -712,6 +720,18 @@ export function Purchase({
       <MarketPulse game={game} />
       <MarketDepth game={game} colorFor={resolveColor} />
       <Provisions game={game} act={act} />
+      {/* [D4: Loom: the Refit] The bench stands on the port board at the foot
+          of the merchant's own panels, because a captain reads what the
+          harbor is selling before they read what a neighbour is. It draws
+          itself out of the tree wherever the refit switch is off, so this
+          line costs a build without the bench nothing. */}
+      <RefitBench
+        game={game}
+        act={act}
+        refit={refit}
+        me={me}
+        members={members}
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {game.resourceCards.map((c) => {
           const finalCost = getCardFinalCost(game, c);

@@ -319,14 +319,30 @@ export type GameState = {
   // holding its path and locked to everyone else (see lockedBehind in
   // ./engine/orders), and every other card is open to all five paths alike.
   //
-  // Null is the ordinary value rather than a broken one, because the slice
-  // that deals a path at all is D7's draft: until it lands no rule in this
-  // tree writes this field, so a table where every captain reads as pathless
-  // is exactly the table this build describes. It is healed on load through
-  // normalizePath (see use-game-session) rather than trusted, so a save
-  // written by hand, or by a build that spelled a path differently, reads as
-  // a captain who never drew rather than as one holding a path nobody knows.
+  // Null is the ordinary value rather than a broken one: every voyage
+  // leaves the dock pathless and D7's draft is what deals this field its
+  // value, so the captains who read null are the ones who arrived after the
+  // deal rather than ones the tree failed to fill. It is healed on load
+  // through normalizePath (see use-game-session) rather than trusted, so a
+  // save written by hand, or by a build that spelled a path differently,
+  // reads as a captain who never drew rather than as one holding a path
+  // nobody knows.
   path: PathId | null;
+  // [D7: the draft, and switching] The leg this captain changed their papers
+  // on, or 0 for a captain who has not changed them (see ./draft and
+  // ./engine/draft). Written by applyPathSwitch and read by
+  // pathSwitchBlocked, which is the guard and the record in one field: a
+  // switch cannot be recorded without being spent, and the plan's "once per
+  // voyage" is what the pair of them means.
+  //
+  // It is a stamp rather than a boolean because the leg is the fact and
+  // "spent" is one reading of it: the guard above asks whether there is a
+  // leg at all, while the leg itself is the when, which a save carried
+  // through a voyage is the right place to keep and a flag would throw
+  // away. Zero is the absence of a switch rather than a leg, the same
+  // reading every counter in this build takes, and it is healed through
+  // normalizePathSwitchLeg on load for the same reason path above is.
+  pathSwitchLeg: number;
   totalRevenue: number;
   totalCosts: number;
   materialCosts: number;
@@ -403,7 +419,8 @@ export type GameState = {
   purchaseCount: number;
   orderCount: number;
   // Reputation already earned this voyage from lending and backing, kept
-  // so both can share one ceiling (see HELPER_REPUTATION_VOYAGE_CAP).
+  // so both can share one ceiling (see helperReputationCapFor in
+  // ./constants, read through ./engine/aid).
   helperReputationEarned: number;
   // [H4: the Broker] Coin this captain has taken from other captains in
   // trade, net of coin paid to them, across the whole voyage. The one
@@ -480,6 +497,22 @@ export type GameState = {
   // is only the market's copy of it. Null on every voyage with no
   // Harbormaster, which is every Classic voyage and most Gambit ones.
   portShift: PortShift | null;
+  // [D5: Aroma: the Bazaar Rumor] The third hand on a price, and the one
+  // that is a good rather than a port or a room. A rumor published at the
+  // Parley of one leg leans one commodity's band in the market of the
+  // next, keyed by good and signed in the direction the publisher named
+  // (see rumorLean in src/lib/game/engine/bazaar.ts, which sums the
+  // room's rows per good and clamps them to one tenth before multiplying).
+  // Read by genResourceCard in engine/market.ts alongside the pulse and
+  // the shift, and summed with the pulse before the one rounding.
+  //
+  // What travels here is the aggregate and not the rows: the direction a
+  // named captain leaned is theirs until the market they moved has been
+  // drawn, and this field is the number every client has to agree on to
+  // draw the same prices rather than a record of who said what. An empty
+  // object is the bazaar being silent, which is most legs, and it arrives
+  // on the same advance broadcast the pulse above does.
+  bazaarLean: Record<string, number>;
   // [B3: standing orders] What this captain wants done at the seats they
   // are not standing at, written once and read by the engine when the
   // room's clock plays a seat out from under them. The vocabulary, the
@@ -545,6 +578,16 @@ export type GameState = {
   // never in endRound, which is what keeps it to one use per game rather than
   // one per round.
   brokersFavorUsed: boolean;
+  // [D6: Free Captain: Opportunist] How many borrows this voyage has spent,
+  // counted rather than flagged so the plan's iteration note is a constant
+  // away ("The Factor charter in F6 turns this into three uses at a sixty
+  // percent penalty, so the counter should be a configurable number from
+  // the start"). Like Broker's Favor above it is a once a voyage
+  // allowance: reset only by starting a fresh voyage (createInitialGameState
+  // / restartGame), never in endRound, and it lives beside the skill's own
+  // flag rather than in the round's bookkeeping so a reader looking for the
+  // voyage's one shot limits finds them together.
+  opportunistBorrows: number;
   equippedModules: Module[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
@@ -581,19 +624,26 @@ export type GameState = {
   // tally relays over harbor:pulse:report (see _pendingPulseTally below).
   // Set by resolvePirateAttack, flushed by use-escort-contracts.
   pendingEscortClaim: EscortClaim | null;
-  // The contract money movements this captain has already applied, keyed
-  // "id:fee" or "id:claim". The ledger that makes a reload between a fee and
-  // its claim harmless: the side that already moved is never moved twice.
+  // The money movements this captain has already applied, keyed "id:fee" or
+  // "id:claim". The ledger that makes a reload between a fee and its claim
+  // harmless: the side that already moved is never moved twice.
   //
-  // Both of a contract's movements land in the leg the contract was agreed
-  // in, the fee when the two captains shook hands and the claim when the
-  // raid that leg went looking for the buyer, so the ledger never has to
-  // outlive a leg and the stamp below is what says which leg it belongs to.
-  // See resetEscortLeg in ./engine/contracts, which empties it at the Dawn
-  // it is stale for, and applyEscortSide, which reads the stamp before it
-  // reads the list.
-  escortSettled: string[];
-  escortSettledRound: number;
+  // [D4: Loom: the Refit] One ledger for every agreement, not one for each
+  // kind. The keys are agreement ids, so the two kinds cannot collide, and
+  // the question a ledger answers is the same question for both: has this
+  // movement already been applied to my purse. It was named for the escort
+  // when the escort was the only agreement there was, which is the name a
+  // save written by that build still carries (see normalizeConsentLedger in
+  // ./engine/consent, which reads it).
+  //
+  // Both movements of an agreement land in the leg it was agreed in, the
+  // fee when the two captains shook hands and the claim when the raid that
+  // leg went looking for the buyer, so the ledger never has to outlive a leg
+  // and the stamp below is what says which leg it belongs to. See
+  // resetConsentLedger, which empties it at the Dawn it is stale for, and
+  // movementApplied, which reads the stamp before it reads the list.
+  settledMovements: string[];
+  settledRound: number;
   // The voyage's contract tally, seller side and buyer side. Read by the leg
   // report (contracts sold, fees earned, gold absorbed) and by the two panels
   // that quote a captain's own record back to them.
@@ -603,6 +653,30 @@ export type GameState = {
   escortFeesPaid: number;
   escortClaims: number;
   escortAbsorbed: number;
+  // [D4: Loom: the Refit] The voyage's refit and scrap tally, seller side
+  // and buyer side, plus the two halves of the bench. Read by the leg report
+  // (refits sold, fees earned, rags rewoven) and by the bench panel, which
+  // quotes a captain's own record of the trade back to them.
+  //
+  // The mend stamp is a round rather than a boolean, and it is compared
+  // rather than cleared, the same shape garmentsTickRound and frostbittenRound
+  // take: a stamp whose leg has passed is inert rather than wrong, so a
+  // voyage saved mid leg needs no heal to be read correctly at the next Dawn.
+  //
+  // The pile's stamp and count are the same idea with a number attached,
+  // because how much scrap came ashore is a quantity rather than a yes: the
+  // harbor lets one Loom captain take so many rags a leg, and what bounds
+  // that is this pair, read against the pile the leg drew.
+  refitsSold: number;
+  refitsBought: number;
+  refitFeesEarned: number;
+  refitFeesPaid: number;
+  mendsMade: number;
+  mendRound: number;
+  ragsBought: number;
+  ragsRewoven: number;
+  ragsTaken: number;
+  ragsRound: number;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
   // at the end of Round 8 (see settleOutstandingDebts in
@@ -796,6 +870,9 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     mode,
     renownLevel,
     brokersFavorUsed: false,
+    // [D6: Free Captain: Opportunist] No borrow has been spent, and the
+    // plan's allowance is what this voyage has to spend.
+    opportunistBorrows: 0,
     voyageEpoch,
     score: 0,
     currentRound: 1,
@@ -847,8 +924,11 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     phase: "harbor",
     // Every captain leaves the pier pathless, which is D7's draft to change
     // and nobody else's: see the field's own note for why null is the
-    // ordinary value rather than a missing one.
+    // ordinary value rather than a missing one. The stamp beside it is the
+    // same reading: a voyage that has not been sailed has had no papers
+    // changed in it.
     path: null,
+    pathSwitchLeg: 0,
     resourceCards: [],
     customerCards: [],
     purchasedCards: [],
@@ -868,6 +948,9 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     revealedIntel: [],
     harborPulse: {},
     portShift: null,
+    // [D5: Aroma: the Bazaar Rumor] Nothing has been said at the bazaar
+    // yet, so nothing leans.
+    bazaarLean: {},
     standingOrders: defaultStandingOrders(),
     priceHistory: {},
     objectiveDelivered: {},
@@ -883,14 +966,24 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     brokerTippedPirates: false,
     escortCover: null,
     pendingEscortClaim: null,
-    escortSettled: [],
-    escortSettledRound: 0,
+    settledMovements: [],
+    settledRound: 0,
     escortSold: 0,
     escortBought: 0,
     escortFeesEarned: 0,
     escortFeesPaid: 0,
     escortClaims: 0,
     escortAbsorbed: 0,
+    refitsSold: 0,
+    refitsBought: 0,
+    refitFeesEarned: 0,
+    refitFeesPaid: 0,
+    mendsMade: 0,
+    mendRound: 0,
+    ragsBought: 0,
+    ragsRewoven: 0,
+    ragsTaken: 0,
+    ragsRound: 0,
     debts: [],
     loansGiven: [],
     defaultedDebt: false,

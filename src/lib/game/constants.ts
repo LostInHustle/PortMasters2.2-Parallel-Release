@@ -19,7 +19,22 @@ import {
 // not sailing. Read through the one selector, which returns the tier's own
 // ladder for the founding mode and so leaves its copy byte for byte what it
 // was.
-import { voyageRoundsFor, type GameMode } from "./mode";
+//
+// Everything else these three surfaces say about a mode comes out of the
+// record itself: its badge, its tagline, its round, the rule for a failed
+// seat and the list of what it changes. The tutorial used to draw the
+// founding mode's four phases by hand over a count read from the mode, and
+// to state the founding mode's bankruptcy rule to every crew, which meant a
+// Gambit captain was taught Classic's lap and told that bankruptcy ends a
+// voyage in a mode built on the opposite pillar. Copy about a mode is only
+// safe beside the mode, so the copy moved to ./mode and these surfaces
+// render it.
+import { modeConfig, MODES, voyageRoundsFor, type GameMode } from "./mode";
+// The phase faces are what a round is called and drawn with, and they are
+// read here rather than typed: the record names a leg by its phase, and the
+// name a captain reads is the face's rather than the mode's. One import and
+// nothing back, since ./phases reads nothing but the phase types.
+import { phaseFace } from "./phases";
 
 // Single source of truth for the project's display name. Every screen,
 // log line, and metadata tag that shows the game's name should pull from
@@ -44,6 +59,7 @@ export const ICONS: Record<string, string> = {
   Pearls: "🦪",
   "Foreign Balm": "🧴",
   "Pearl String": "📿",
+  Rags: "🪡",
 };
 
 export const COLORS: Record<string, string> = {
@@ -63,6 +79,7 @@ export const COLORS: Record<string, string> = {
   Pearls: "#9AA7B1",
   "Foreign Balm": "#C99B6E",
   "Pearl String": "#B9A0E0",
+  Rags: "#A89A8C",
 };
 
 // [MANIFEST 16: Colorblind Safe Palette] The set above puts Silk (a
@@ -98,6 +115,7 @@ export const COLORS_COLORBLIND_SAFE: Record<string, string> = {
   Pearls: "#A8B4BD",
   "Foreign Balm": "#C99B6E",
   "Pearl String": "#7B6FA6",
+  Rags: "#C3B7A4",
 };
 
 // =====================================================================
@@ -133,10 +151,29 @@ export const PRODUCTS = [
   ...PRODUCTS_TIER1,
   ...PRODUCTS_TIER2,
 ] as const;
+// [D4: Loom: the Refit] The worn out end of a garment, and the one good in
+// this catalogue the market board never trades. It is named here with the
+// other goods rather than down beside the rest of the Loom's arithmetic,
+// because the hold, the icons and the colours are all built from the names
+// in this block and the name has to exist before the catalogue below reads
+// it. What it is worth, and what it turns back into, live with the numbers
+// that do that arithmetic (see the D4 block further down).
+export const RAGS = "Rags";
+
 // Every tradable good across every tier, unlocked or not. This is the
 // catalogue the cargo hold is built from, so a key exists for each good from
 // the moment a voyage starts and no write can ever land on an absent key.
-export const ITEMS = [...RESOURCES, ...PRODUCTS] as const;
+//
+// The market's own goods are named one line up from the hold's, because the
+// two stopped being the same list the day Rags arrived. Rags is cargo: it
+// takes a slot, it is priced, and it is bought and sold in this file. What
+// it is not is a market good, since the plan gives one path the exclusive
+// right to buy it, so its only seller is the harbor's own pile and its only
+// shelf is the Loom's bench. A panel that lists what the market trades reads
+// MARKET_GOODS, and a panel that counts what a hold can carry reads ITEMS,
+// which is the difference between the price reference and the Ledger.
+export const MARKET_GOODS = [...RESOURCES, ...PRODUCTS] as const;
+export const ITEMS = [...MARKET_GOODS, RAGS] as const;
 
 // The stock a captain begins a voyage with. Anything not named here starts at
 // zero; the hold is filled in from ITEMS rather than listed by hand, so a good
@@ -822,13 +859,86 @@ export const GARMENT_DECAY_PER_LEG = 1;
 export const GARMENT_DECAY_COLD_LEG = 2;
 
 // What a garment comes to when the sea has had all of it. The plan gives the
-// number and gives it a name, Rags, and this tree has nowhere to put Rags as
-// a good: no path in the engine sells a finished good outside an order or a
-// barter, so a hold item worth four Gold would be one nobody could ever turn
-// into Gold, and a warmth zero entry in the hold is cargo a captain carries
-// for nothing. The scrap is therefore credited at the moment the garment
-// wears out, which is the same four Gold arriving without the detour.
+// number and gives it a name, Rags, and this is the four Gold a captain is
+// paid for one at the moment it wears through (see tickGarments in
+// ./garments). It reads the same at both ends of the scrap trade, which is
+// stated once here rather than given a second name further down: the harbor
+// buys a worn out garment for it and sells the pile on for it, so the number
+// a captain is credited and the number the Loom pays are the same number,
+// and a balance pass that moves the scrap moves both ends together.
 export const RAG_SCRAP_VALUE = 4;
+
+// [D4: Loom: the Refit] The Loom's numbers, kept beside C3's wardrobe for
+// the reason every other number in this file is kept where it is: the rules
+// that read them live in ./garments and ./engine/refits, and a balance pass
+// edits these knowing they are prices rather than rules.
+//
+// A mend is the plan's "than they could manage alone" written as a number:
+// one point of durability for five Gold, once a leg, at the port. Whole
+// Linen Clothes is six points and thirty Gold over six legs at that rate,
+// which is the rate a refit is priced against rather than a rule it obeys.
+//
+// A refit puts back three points, up to whatever the garment's own maximum
+// leaves room for, so the work one Loom captain does in a single leg would
+// cost a customer fifteen Gold and three legs without them. That is the
+// whole of "faster and cheaper", and both halves are numbers: one leg rather
+// than three, and whatever the two captains agree rather than fifteen.
+//
+// The reweave is the weaver's own recipe read from the other end. Linen
+// Clothes takes two of its material and this takes two rags, so the chain
+// the Loom holds is the one RECIPES already describes, minus the worker and
+// the hemp. The count is stated rather than summed off the recipe at load,
+// because a recipe edited to take three materials should be a check that
+// fails rather than a reweave whose price quietly moved with it (see the
+// smoke check that holds the two together).
+//
+// RAGS_AT_PORT_COLD is the harbor's pile after a cold leg, drawn from the
+// voyage's own numbers the way the weather itself is, and there is no pile
+// after a warm one. That is the plan's tension as a number rather than as a
+// sentence: on a warm leg the Loom has neither a customer nor a pile to
+// work, and on a cold leg both arrive at once.
+//
+// The pile is what one Loom captain may take from the quay in a leg rather
+// than a shelf that empties, because the draw happens on each captain's own
+// machine and there is no server frame that could make one captain's
+// spending visible to another's. So the ceiling on the reweave is the
+// reweave's own bound as well: three rags is one coat and a spare, which is
+// the wage a path should earn from a leg rather than an industry.
+export const MEND_GOLD_PER_POINT = 5;
+export const MEND_POINTS = 1;
+export const REFIT_POINTS = 3;
+export const REWEAVE_GOOD = "Linen Clothes";
+export const REWEAVE_RAGS = 2;
+export const RAGS_AT_PORT_COLD = 3;
+
+// [D5: Aroma: the Bazaar Rumor] The rumor's two numbers, kept beside the
+// Loom's for the reason that block gives, and they are one shape each.
+//
+// The cooldown is the plan's "once every three legs" written as the number
+// of legs between two publications rather than as a count of them, so a
+// captain may speak in the first leg of a voyage and again in the fourth,
+// the seventh and the tenth. Three is also what makes the last word of a
+// twelve leg voyage land before the voyage ends, which the plan's Rollback
+// asks for without naming: "the band shift itself is a settlement step, so
+// make sure it is skipped cleanly rather than left half applied", and a
+// publication from the closing leg would be a settlement that never comes.
+//
+// The shift is the same tenth the Harbormaster's hand is (see
+// PORT_SHIFT_FRACTION in ./maroon), and that agreement is the point rather
+// than a coincidence: the plan's Iteration note for this slice reads
+// "adjusted against the Launched guard on how swingy prices may become",
+// so the largest honest lean in this game is one tenth, and a rumor that
+// moved a band further than the mode's own declared hand would be the
+// balance change the guard is there to catch. Both are multipliers on the
+// same rolled price, which is why they add before the one rounding rather
+// than compounding after it (see genResourceCard in ./engine/market).
+//
+// Where the two hands differ is coverage and secrecy: a port lean is one
+// port and is called in front of the table, and a rumor is one good, is
+// published in front of the table, and carries its direction to the
+// server alone until the market it moves has been drawn.
+export const RUMOR_COOLDOWN_ROUNDS = 3;
+export const RUMOR_SHIFT_FRACTION = 0.1;
 
 // [C4: three foods, spoilage and the split hold] The pantry and the hold,
 // kept here beside the provisions above for the reason every other number
@@ -943,6 +1053,26 @@ export const QUARTERMASTER_HOLD_GAIN = 0.5;
 // pathOrdersOn in ./flags for the switch that takes them off the board.
 export const PATH_ORDER_SLOTS = 3;
 
+// [D6: Free Captain: Opportunist] The ability's two numbers, kept together
+// for the reason the escort's three are: a reader who has one of them is
+// looking for the other. The plan's own text sets both, and its iteration
+// note is why neither is written into the rule as a literal: "The Factor
+// charter in F6 turns this into three uses at a sixty percent penalty, so
+// the counter should be a configurable number from the start."
+//
+// OPPORTUNIST_USES is "once per voyage" as a count. The counter it bounds
+// resets with the voyage and never with the round, so it lives beside
+// brokersFavorUsed and the D3/D4 tallies rather than in the round's own
+// bookkeeping (see the field's note in ./types).
+//
+// OPPORTUNIST_PENALTY is the forty percent the payout is cut by, stated as
+// the share the house keeps rather than the share the captain keeps,
+// because it is read as a deduction: the payout function subtracts it from
+// the face value and rounds the subtraction, the reading the charter
+// bonuses take for the same floating point reason (see completeOrder).
+export const OPPORTUNIST_USES = 1;
+export const OPPORTUNIST_PENALTY = 0.4;
+
 // [D3: the escort contract] The ability's three numbers, kept together
 // because they are one feature's arithmetic and a reader who has one of
 // them is looking for the other two.
@@ -956,15 +1086,80 @@ export const PATH_ORDER_SLOTS = 3;
 // questions. The two sit beside each other so a reader tuning the path's
 // poverty sees the price of its power.
 //
-// The fee bounds are the contract's own defence rather than a market
-// rule: a fee is a whole number of Gold, at least one (a free contract is
-// not a contract, and zero would let an offer sit on the board that
+// The fee bounds are the agreement's own defence rather than a market
+// rule: a fee is a whole number of Gold, at least one (a free agreement is
+// not an agreement, and zero would let an offer sit on the board that
 // nobody can be held to) and at most a thousand, which is the number that
 // keeps a doctored client from posting a fee the room's arithmetic would
-// have to reason about. See escortFeeFor in ./engine/contracts.
+// have to reason about. See consentFeeFor in ./engine/consent.
+//
+// They are named for the consent primitive rather than for the contract
+// that needed them first, because D4's refit is the second thing sold on
+// the same terms and the bound belongs to the shape rather than to either
+// kind: a refit fee outside a contract's bounds would be one market with
+// two rules about what a price is, which is the one thing a market cannot
+// have.
 export const CONVOY_RAID_COVERAGE = 0.4;
-export const ESCORT_CONTRACT_FEE_MIN = 1;
-export const ESCORT_CONTRACT_FEE_MAX = 1000;
+export const CONSENT_FEE_MIN = 1;
+export const CONSENT_FEE_MAX = 1000;
+
+// [D7: the draft, and switching] The draft's two numbers and its clock, kept
+// together because they are one feature's arithmetic and a reader who has
+// one of them is looking for the others. The plan's own text sets the first
+// two: "Deal each captain three path cards face down from a deck seeded so
+// at least two Quartermaster cards are in circulation", and the third is the
+// plan's target for the whole draft read as a clock.
+//
+// DRAFT_DEAL is the hand every captain is dealt, and it is also the size of
+// the deck: three cards a captain, dealt out entirely, so the deal and the
+// deck size are one number rather than two that have to agree. See
+// draftDeck in ./draft for where the deck is built to it.
+//
+// DRAFT_QUARTERMASTER_MIN is the plan's floor, and it is a floor rather than
+// a weight: the plan asks for the seat to be "always physically present", so
+// the deck carries at least this many Quartermaster cards whatever the
+// table's size. The weights below decide how the rest of the deck leans,
+// which is the knob the plan's iteration note gives its own sentence: "Tune
+// the deck composition separately from the pass rules, because those are two
+// different knobs and the proposal's balance targets will move the first one
+// repeatedly." The floor is deliberately not one of those weights, because a
+// knob that can be tuned to zero is not a guarantee.
+//
+// DRAFT_STEP_SECONDS is the clock on one keep, and three of them are the
+// plan's forty five seconds: "Forty five seconds with a good interface is
+// the target". The server holds the clock and picks for a captain who has
+// not, because a table where one seat walks away is a table that never
+// sails, and the pick it makes is the first card in that captain's hand
+// rather than a card of the server's choosing (see DRAFT_AUTO_PICK in
+// ./draft).
+export const DRAFT_DEAL = 3;
+export const DRAFT_QUARTERMASTER_MIN = 2;
+export const DRAFT_STEP_SECONDS = 15;
+
+// [D7: the draft, and switching] The switch's window, its fee and its
+// ceiling, and the plan's own clause for all three: "once per voyage, at a
+// port, legs three through nine, forfeiting unfulfilled pathbound orders and
+// paying a Refit fee scaled to Renown".
+//
+// The window is two numbers rather than a range written into a comparison,
+// so the panel that offers the switch and the handler that accepts it read
+// the same pair, which is the shape every window in this tree takes (see
+// AUDIT_FROM_ROUND in ./audit and maroonFrom in ./mode).
+//
+// The fee is linear in Renown with a ceiling, the shape
+// renownStartingGoldBonus takes for the same reason: a captain who has
+// sailed further pays more for the same favour, and the ceiling is what
+// keeps the price of an identity a number a mid voyage purse can still
+// answer. The base is read at the first rung, so the ladder's own floor
+// pays it and nobody pays less, and the ceiling is reached at the
+// sixteenth rung, which is where the price stops rising rather than a
+// number above the ladder nothing ever meets (see the check in the
+// suite that walks the ladder and finds it).
+export const PATH_SWITCH_FROM_ROUND = 3;
+export const PATH_SWITCH_TO_ROUND = 9;
+export const PATH_SWITCH_FEE_BASE = 30;
+export const PATH_SWITCH_FEE_PER_LEVEL = 8;
+export const PATH_SWITCH_FEE_MAX = 150;
 
 // Preserve, the plan's own ratio: "converts three produce into two salt
 // fish", at a port. Three meals of produce is one slot of the hold, and
@@ -1121,45 +1316,128 @@ function escortPct(cfg: DifficultyConfig): string {
   return `${Math.round(cfg.escortCostRate * 100)}%`;
 }
 
+// One page of the tutorial, named so the step a mode adds can be built
+// beside the list rather than inside it. A mode with nothing to add
+// spreads an empty array, which is what leaves the founding voyage's page
+// count exactly what it has always been.
+type TutorialStep = { title: string; content: string };
+
+/**
+ * One round, as the tutorial renders it: the mode's own briefing, in the
+ * shape the mode chose to brief in.
+ *
+ * The step this feeds used to draw the founding mode's phases as cards,
+ * by hand, above a count read from the mode. On a Gambit voyage that
+ * taught Classic's lap, left one of the six phases out of the grid
+ * entirely, and put the manifest after the table on a mode whose whole
+ * argument is that it runs before it. Which shape a mode briefs in is the
+ * record's own decision (see ModeBriefing), so this renders the record
+ * rather than keeping a second copy of the lap for every mode that might
+ * move it.
+ *
+ * The accent is the phase's own CSS variable, named after the phase, which
+ * is the pairing the palette already holds for all six of them, so a leg
+ * added to a chart is drawn in its own colour without a table of them
+ * living here. Classic's line keeps the accent its cards wore.
+ */
+function roundStepHtml(mode: GameMode): string {
+  const { briefing } = modeConfig(mode);
+  if (briefing.kind === "line") {
+    return `<div style="background:color-mix(in oklch, var(--gain) 12%, transparent);border-radius:6px;padding:12px;border-left:3px solid var(--gain);color:var(--foreground);line-height:1.9">${briefing.text}</div>`;
+  }
+  const legs = briefing.legs
+    .map((leg) => {
+      const face = phaseFace(leg.phase);
+      return `  <div style="background:color-mix(in oklch, var(--w-${leg.phase}) 12%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-${leg.phase});color:var(--foreground)">
+    <strong>${face.icon} ${face.label}</strong><br>
+    <span style="font-size:13px">${leg.body}</span><br>
+    <span style="font-size:12px;color:var(--muted-foreground)">${leg.setsUp}</span>
+  </div>`;
+    })
+    .join("\n");
+  return `<div style="display:grid;gap:8px;margin:12px 0">
+${legs}
+</div>
+<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0">${briefing.closes}</p>`;
+}
+
+/**
+ * The same round the tutorial charts, as the guide prints it.
+ *
+ * The guide is the long surface and the tutorial is the short one, and
+ * both say the same thing about the round because both read it from the
+ * record: a mode that moves a phase moves both, and neither can be left
+ * describing the lap of the other mode. The chart keeps its two lines per
+ * leg here, where there is room for them, and a mode that briefs in one
+ * sentence prints the sentence, which is the shape that mode chose.
+ */
+function roundLines(mode: GameMode): string {
+  const { briefing } = modeConfig(mode);
+  if (briefing.kind === "line") return briefing.text;
+  const legs = briefing.legs.map((leg) => {
+    const face = phaseFace(leg.phase);
+    return `• ${face.icon} ${face.label}: ${leg.body}\n  ${leg.setsUp}`;
+  });
+  return [...legs, briefing.closes].join("\n");
+}
+
+/**
+ * What this mode changes, as a page of the tutorial, or no page at all for
+ * the founding voyage.
+ *
+ * The list is the record's own, so this page cannot say something the mode
+ * does not do, and the sentence above it says the thing the list cannot:
+ * that the rest of the voyage is the one a Classic captain already knows.
+ * That sentence is the point of the page. A new captain opening a mode
+ * they have never sailed has two questions, what changed and whether they
+ * still know how to play, and the answer to the second one is yes.
+ */
+function differenceSteps(mode: GameMode): TutorialStep[] {
+  const play = modeConfig(mode);
+  if (play.differences.length === 0) return [];
+  const items = play.differences.map((line) => `  <li>${line}</li>`).join("\n");
+  return [
+    {
+      title: `🧭 ${play.badge}: what is different`,
+      content: `<p>This voyage does not play like the founding one. Here is what <strong>${play.badge}</strong> changes about it, all of it:</p>
+<ul style="padding-left:18px;line-height:1.9;font-size:14px">
+${items}
+</ul>
+<p style="font-size:12px;color:var(--muted-foreground);margin:8px 0 0">Everything else is the voyage you would sail in Classic, so everything you learn there carries over. You can read the same list any time with F1.</p>`,
+    },
+  ];
+}
+
 export function tutorialSteps(
   mode: GameMode,
   difficulty: Difficulty,
-): { title: string; content: string }[] {
+): TutorialStep[] {
   const cfg = difficultyConfig(difficulty);
   const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
+  const play = modeConfig(mode);
   return [
     {
       title: "⚓ Welcome aboard",
-      content: `<p>${APP_NAME} puts you on the ancient Silk Road. ${rounds} voyages, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
+      content: `<p>${APP_NAME} puts you on the ancient Silk Road: one voyage of ${rounds} rounds, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
+<p>You are sailing <strong>${play.badge}</strong>: ${play.tagline}</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
-<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the four things that catch new players out most.</p>
+<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the things that catch new players out most.</p>
 <p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
     },
     {
       title: "🏆 What you're playing for",
-      content: `<p>After ${rounds} voyages, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
-<p>One rule overrides everything else: <strong>do not go bankrupt</strong>. Hit zero gold and the game ends immediately. There is no coming back from it.</p>
+      content: `<p>After ${rounds} rounds, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
+<p>${play.failureRule}</p>
 <p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
     {
-      title: "🔄 How a voyage works",
-      // The count is the voyage's, read from the mode, while the cards
-      // below are still the founding mode's four phases drawn by hand.
-      // Making the cards follow the mode as well means rendering the
-      // briefing record here rather than keeping a second copy of the lap,
-      // which is a change this feature does not own: the count is the
-      // number this feature moved, so the count is what moves here.
-      content: `<p>Each of the ${rounds} voyages runs through four core phases in order, with a quick bartering window right after buying:</p>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0">
-  <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--gain);color:var(--foreground)"><strong>📦 Market</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Stock up at port markets</span></div>
-  <div style="background:color-mix(in oklch, var(--w-parley) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-parley);color:var(--foreground)"><strong>🤝 Parley</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Swap goods with other captains</span></div>
-  <div style="background:color-mix(in oklch, var(--w-orders) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-orders);color:var(--foreground)"><strong>📜 Orders</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Sell to waiting buyers</span></div>
-  <div style="background:color-mix(in oklch, var(--w-resolve) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-resolve);color:var(--foreground)"><strong>💸 Resolve</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Production lands, bills come due</span></div>
-  <div style="background:color-mix(in oklch, var(--w-dusk) 14%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-dusk);color:var(--foreground)"><strong>🚢 Dusk</strong><br><span style="font-size:12px;color:var(--muted-foreground)">Improve your ship</span></div>
-</div>
-<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0">A round opens at Dawn, with the Boon you draft for it, and the five phases above follow in the order your voyage runs them. <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking.</p>`,
+      title: "🔄 How a round runs",
+      content: `<p>A round is one lap of the voyage, and this voyage runs ${rounds} of them. Each round walks the phases below in the order your voyage puts them:</p>
+${roundStepHtml(mode)}
+<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking, and a voyage is one whole run of these rounds rather than a round of its own.</p>`,
     },
+    ...differenceSteps(mode),
     {
       title: "🏪 Market: Buying",
       content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every voyage. Buy now, then barter at Parley and sell at Orders. That is the core loop.</p>
@@ -1244,13 +1522,27 @@ export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
   const rounds = voyageRoundsFor(mode, difficulty);
   const mandates = mandateRounds(cfg);
+  const play = modeConfig(mode);
+  // The mode's own list, printed only by a mode that has one, which is
+  // what its empty array says: the founding voyage differs from itself
+  // nowhere, so a heading over an empty list would be the only trace of
+  // the two modes ever having been one screen. See ModeConfig.differences.
+  const changes = play.differences.length
+    ? `\n🎲 How ${play.badge} Differs From ${MODES.classic.badge}:\n${play.differences.map((line) => `• ${line}`).join("\n")}\n`
+    : "";
   return `⚓ ${APP_NAME}: Rules
 
 🌊 These Waters: ${cfg.icon} ${cfg.name}
 ${cfg.summary}
 
+🧭 This Voyage: ${play.badge}
+${play.tagline}
+${changes}
 🚢 Objective:
-Travel ${rounds} voyages, accumulate wealth and reputation!
+Sail one voyage of ${rounds} rounds, and finish it with the most wealth and reputation in the harbor.
+
+⚖️ If Your Books Fail:
+${play.failureRule}
 
 📦 Goods System:
 Raw Materials: Hemp(3 to 6💰), Silk(6 to 10💰), Tea(10 to 14💰)
@@ -1329,13 +1621,8 @@ Captain's Legacy:
 • Whoever ends a voyage with the highest Reputation among everyone who reached the endgame screen is crowned Sea Master
 • Check your current Renown level, title, and Sea Master crowns any time from the Lobby
 
-🌊 Voyage Phases:
-• Dawn: draft a Boon for the coming round
-• Market: buy resources at ports (plus Broker rumors), and set your artisans to work
-• Orders: complete trade orders
-• Parley: barter with the other captains, which your voyage runs right after Market or right after Orders
-• Resolve: pirates may strike first, then wages and maintenance come due (ask for a loan if you're short)
-• Dusk: improve ships and install modules
+🌊 The Round:
+${roundLines(mode)}
 
 ⌨️ Shortcuts:
 • Ctrl+S: Save Game
@@ -1353,11 +1640,28 @@ Captain's Legacy:
 // length rather than the tier's on a mode that pins one.
 export function tipsText(mode: GameMode, difficulty: Difficulty): string {
   const rounds = voyageRoundsFor(mode, difficulty);
-  return `⚓ Avoiding Bankruptcy Strategies:
-
+  const play = modeConfig(mode);
+  // The heading and the note above the advice, both written for the mode
+  // the captain is actually sailing: every strategy below is written for a
+  // captain whose books can end the voyage, and on a mode that keeps a
+  // failed seat sailing the first thing to say is so. The note is the
+  // record's own sentence rather than a second one written here, so the
+  // tutorial, the guide and this page cannot tell a captain three
+  // different things about the same rule.
+  const heading = play.bankruptcyIsFinal
+    ? "⚓ Avoiding Bankruptcy Strategies:"
+    : `⚓ Staying Afloat in ${play.badge}:`;
+  // A block of its own between the heading and the advice, with a blank
+  // line on either side of it. The founding mode prints nothing where it
+  // would be, which is what leaves its page byte for byte what it was.
+  const keptSeat = play.bankruptcyIsFinal
+    ? ""
+    : `\n🛟 If the Bills Beat You:\n${play.failureRule}\n`;
+  return `${heading}
+${keptSeat}
 💰 Financial Management:
 1. Always maintain reserve funds for expenses
-2. Maintenance + Wages are fixed rounds costs
+2. Maintenance + Wages are fixed round costs
 3. Calculate total expenditure before buying
 
 👥 Worker Management:
@@ -1378,7 +1682,7 @@ export function tipsText(mode: GameMode, difficulty: Difficulty): string {
 
 🔄 Bartering Strategy:
 1. Trade away surplus raw materials for the one you're actually short on
-2. A modest Gold offer can secure a needed item faster than waiting on next voyage's market
+2. A modest Gold offer can secure a needed item faster than waiting on the next round's market
 3. Cancel an offer that's sitting unclaimed if you'd rather keep the material yourself
 
 🤝 Trading Strategy:

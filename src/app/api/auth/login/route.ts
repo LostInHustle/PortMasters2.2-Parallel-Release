@@ -8,10 +8,9 @@ import { db, publicUser } from "@/lib/db";
 import {
   BANNED_ACCOUNT_ERROR,
   createSession,
-  sessionCookieMaxAge,
   verifyPassword,
 } from "@/lib/auth";
-import { sessionCookie } from "@/lib/api-auth";
+import { signedInResponse } from "@/lib/api-auth";
 import { readJson } from "@/lib/api-json";
 
 const Schema = z.object({
@@ -55,11 +54,5 @@ export async function POST(req: NextRequest) {
     .catch(() => {});
 
   const { token, expiresAt } = await createSession(user.id);
-  const res = NextResponse.json({
-    user: publicUser(user),
-    expiresAt,
-    token,
-  });
-  res.headers.set("Set-Cookie", sessionCookie(token, sessionCookieMaxAge));
-  return res;
+  return signedInResponse({ user: publicUser(user), token, expiresAt });
 }

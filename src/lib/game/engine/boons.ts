@@ -33,6 +33,7 @@ import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
+import { resetConsentLedger } from "./consent";
 
 function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -202,7 +203,17 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   // contract covers one leg (see resetEscortLeg in ./contracts), and this is
   // the one function every leg opens through, which is the same reason the
   // meal above is taken here rather than at any of the three entries.
+  //
+  // [D4: Loom: the Refit] The ledger is the consent primitive's rather than
+  // the escort's, so it is emptied by its own function and not inside the
+  // call above, and the two stand together here because this is the one place
+  // a leg opens. Emptying it is not load bearing for correctness, since the
+  // stamp it carries makes a stale list answer for nothing either way (see
+  // movementApplied in ./consent), and that is exactly why it has to be
+  // written down: what the call buys is that a voyage where nothing more is
+  // agreed stops carrying the last leg's keys in every save it writes.
   resetEscortLeg(state);
+  resetConsentLedger(state);
   logs.push("\n🧭=== The Navigator's Compass ===");
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }

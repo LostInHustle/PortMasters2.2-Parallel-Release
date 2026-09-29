@@ -29,7 +29,7 @@
 // iteration a later slice would do; this one is the set that plays one
 // voyage.
 // =====================================================================
-import { BOONS, ITEMS, type Boon } from "./constants";
+import { BOONS, MARKET_GOODS, type Boon } from "./constants";
 
 /**
  * One line of a captain's shopping list: a good, and the dearest they will
@@ -82,11 +82,18 @@ export type StandingOrders = {
 
 /**
  * The longest a shopping list can be and still say anything: one line for
- * every good the tree can price. Derived rather than chosen, the same way
+ * every good the port board trades. Derived rather than chosen, the same way
  * ./integrity.ts derives its ceilings, so a charter that adds a good
  * widens this with it instead of quietly leaving lines off the end.
+ *
+ * The board's list rather than the hold's, which is the one thing D4 changed
+ * here. An instruction buys a card, and the merchant's cards are dealt from
+ * the goods the merchant trades (see MARKET_GOODS in ./constants): the moment
+ * Rags became cargo without becoming a market good, a line for Rags turned
+ * into a line that could never fire, and a cap counted over it would be the
+ * length of a list a line longer than anything the board can answer.
  */
-export const MAX_STANDING_BUYS = ITEMS.length;
+export const MAX_STANDING_BUYS = MARKET_GOODS.length;
 
 /**
  * A captain who has written nothing: the switch on, every seat at its
@@ -148,7 +155,7 @@ export function normalizeStandingOrders(raw: unknown): StandingOrders {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const e = entry as Record<string, unknown>;
     const good = typeof e.good === "string" ? e.good : "";
-    if (!(ITEMS as readonly string[]).includes(good)) continue;
+    if (!(MARKET_GOODS as readonly string[]).includes(good)) continue;
     if (seen.has(good)) continue;
     const price =
       typeof e.maxPrice === "number" && Number.isFinite(e.maxPrice)

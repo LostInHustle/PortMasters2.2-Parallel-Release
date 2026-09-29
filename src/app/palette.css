@@ -63,6 +63,7 @@
   --color-pulse: var(--w-pulse);
   --color-larder: var(--w-larder);
   --color-wardrobe: var(--w-wardrobe);
+  --color-refit: var(--w-refit);
   --color-planner: var(--w-planner);
   --color-dawn: var(--w-dawn);
   --color-modules: var(--w-modules);
@@ -295,6 +296,8 @@
   --w-larder: oklch(0.53 0.13 270);
   /* The Wardrobe: the clothes the crew wears against the cold. */
   --w-wardrobe: oklch(0.53 0.13 219);
+  /* The Loom's bench: the work a Loom captain sells, and the rags it buys. */
+  --w-refit: oklch(0.53 0.13 133);
   /* Fulfillment Planner: which orders are worth filling. */
   --w-planner: oklch(0.53 0.13 132);
   /* Module list: what the ship already carries. */
@@ -459,6 +462,7 @@
   --w-pulse: oklch(0.76 0.12 90);
   --w-larder: oklch(0.76 0.12 270);
   --w-wardrobe: oklch(0.76 0.12 219);
+  --w-refit: oklch(0.76 0.12 133);
   --w-planner: oklch(0.76 0.12 132);
   --w-modules: oklch(0.76 0.12 261);
   /* Every other widget is given a night value. Brand was the one that

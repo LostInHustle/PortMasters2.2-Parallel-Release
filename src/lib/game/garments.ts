@@ -28,10 +28,14 @@
 // and the number the panel prints. Nothing anywhere draws a durability
 // meter, because the plan's sentence is that a multiplier is a decision.
 //
-// Rags are a state rather than a good. A garment at zero leaves the wardrobe
-// and pays the plan's four Gold as scrap, which is the one way this tree can
-// give a finished good a cash value outside an order or a barter (see
-// RAG_SCRAP_VALUE in ./constants).
+// A garment at zero leaves the wardrobe and pays the plan's four Gold as
+// scrap, which is the one way this tree can give a finished good a cash value
+// outside an order or a barter (see RAG_SCRAP_VALUE in ./constants). The
+// scrap itself used to be a bare number on the state and is now a good like
+// any other, named in the catalogue the day the Loom's bench arrived to buy
+// it off the quay and reweave it (see RAGS there), which is the one thing on
+// this page D4 changed. What a rag is worth and what it turns back into are
+// not read here: they belong to the bench's own arithmetic.
 //
 // The weather is drawn rather than stored. Every input the tag needs is
 // already room wide on the state, so one function answers for the whole
@@ -272,6 +276,88 @@ export function wearGarment(
     `🧥 The crew puts on the ${good}. Warmth ${spec.warmth} while it lasts.`,
   );
   return true;
+}
+
+/**
+ * Which of the crew's garments of this good a repair would work on, and how
+ * much of it is missing.
+ *
+ * The most worn one, because that is the one a captain means: a crew with
+ * two of the same garment wants the thin one put right, and answering with
+ * anything else would spend a mend on the wrong coat. The answer is zero
+ * for a good the crew is not wearing at all and for one already at its own
+ * maximum, which is the same reading the two callers need: the bench greys
+ * a button out on it, and the repair below does nothing on it.
+ *
+ * Exported because the panels that offer a repair quote it as well as
+ * compare it, and a panel that worked the shortfall out again would be a
+ * second opinion about the number the button turns on.
+ */
+export function garmentRoom(
+  state: Pick<GameState, "garments">,
+  good: unknown,
+): number {
+  const spec = garmentSpec(good);
+  if (!spec || typeof good !== "string") return 0;
+  let most = 0;
+  for (const garment of state.garments ?? []) {
+    if (garment?.good !== good) continue;
+    const missing = spec.durability - durabilityOf(garment.durability, spec);
+    if (missing > most) most = missing;
+  }
+  return most;
+}
+
+/**
+ * Putting points back into a garment the crew is wearing, and the one writer
+ * of a durability that goes up.
+ *
+ * [D4: Loom: the Refit] The port mend and the Loom's refit are the same
+ * arithmetic at two prices, so they are one function: both name a good,
+ * both hand it a number of points, and both are refused in the same place.
+ * It returns how much of the garment actually came back rather than a
+ * boolean, because both callers charge for the work and neither may charge
+ * for work it did not do: a mend on a garment already whole is not a mend,
+ * and a fee is not owed for one.
+ *
+ * It reads the same healing every other reader here reads (durabilityOf)
+ * rather than trusting the field, and it writes a new row rather than
+ * mutating one, which is the shape the settlement tick already uses for the
+ * garments it keeps.
+ */
+export function restoreGarment(
+  state: GameState,
+  good: unknown,
+  points: number,
+  logs: string[],
+): number {
+  if (!garmentsLayerOn()) return 0;
+  const spec = garmentSpec(good);
+  if (!spec || typeof good !== "string") return 0;
+  const worn = state.garments ?? [];
+  let target = -1;
+  for (let i = 0; i < worn.length; i++) {
+    if (worn[i]?.good !== good) continue;
+    if (
+      target === -1 ||
+      durabilityOf(worn[i].durability, spec) <
+        durabilityOf(worn[target].durability, spec)
+    ) {
+      target = i;
+    }
+  }
+  if (target === -1) return 0;
+  const before = durabilityOf(worn[target].durability, spec);
+  const wanted = Math.max(0, Math.floor(points));
+  const after = Math.min(spec.durability, before + wanted);
+  if (after <= before) return 0;
+  state.garments = worn.map((garment, i) =>
+    i === target ? { ...garment, durability: after } : garment,
+  );
+  logs.push(
+    `🧵 The ${good} comes back to ${after} of ${spec.durability}, worth ${warmthText(garmentWarmth({ good, durability: after }))} of warmth.`,
+  );
+  return after - before;
 }
 
 /**

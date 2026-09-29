@@ -39,12 +39,15 @@ import {
   COLD_LEG_CHANCE,
   COLD_LEG_WARMTH,
   COMMODITIES,
+  CONSENT_FEE_MAX,
+  CONSENT_FEE_MIN,
   CONVOY_CANNON_SLOTS,
   CONVOY_RAID_COVERAGE,
   CREW_LOSS_AFTER_HUNGRY_LEGS,
   CREW_NAMES,
-  ESCORT_CONTRACT_FEE_MAX,
-  ESCORT_CONTRACT_FEE_MIN,
+  DRAFT_DEAL,
+  DRAFT_QUARTERMASTER_MIN,
+  DRAFT_STEP_SECONDS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
   FOODS,
   FOODS_DRAW_ORDER,
@@ -54,21 +57,40 @@ import {
   ITEMS,
   LARDER_MAX,
   LARDER_START,
+  MARKET_GOODS,
   MAX_SHIP_LEVEL,
+  MEND_GOLD_PER_POINT,
   MODULES,
+  OPPORTUNIST_PENALTY,
+  OPPORTUNIST_USES,
   PATH_ORDER_SLOTS,
+  PATH_SWITCH_FEE_BASE,
+  PATH_SWITCH_FEE_MAX,
+  PATH_SWITCH_FEE_PER_LEVEL,
+  PATH_SWITCH_FROM_ROUND,
+  PATH_SWITCH_TO_ROUND,
   PORTS_TIER2,
   PRESERVE_MEALS_IN,
   PRESERVE_MEALS_OUT,
   PRODUCT_PRICES,
   PRODUCTS_TIER0,
   QUARTERMASTER_HOLD_GAIN,
+  RAGS,
+  RAGS_AT_PORT_COLD,
   RAG_SCRAP_VALUE,
   RATION_PRICE,
+  RECIPES,
+  REFIT_POINTS,
   RESOURCES,
   RESOURCES_TIER0,
+  RESOURCES_TIER1,
+  REWEAVE_GOOD,
+  REWEAVE_RAGS,
+  RUMOR_COOLDOWN_ROUNDS,
+  RUMOR_SHIFT_FRACTION,
   SHORT_RATIONS_CARGO,
   SHORT_RATIONS_YIELD,
+  SILK_GOODS,
   STARTING_STOCK,
   STORES_SLOTS,
   guideText,
@@ -260,45 +282,59 @@ import {
   usedHoldSlots,
   usedStoreSlots,
 } from "@/lib/game/hold";
-import { escortContractsOn, pathOrdersOn, splitHoldOn } from "@/lib/game/flags";
+import {
+  bazaarRumorsOn,
+  escortContractsOn,
+  pathDraftOn,
+  pathOrdersOn,
+  splitHoldOn,
+} from "@/lib/game/flags";
 import { cargoCapacity, cargoRoom, provisionFood } from "@/lib/game/larder";
 import type {
   AuditReveal,
+  BazaarBoard,
+  DraftView,
   EscortBoard,
   MaroonResult,
+  PathSwitched,
   PlayerReportAck,
   PortShiftNotice,
+  RefitBoard,
   RoomMembersPayload,
 } from "@/types/realtime";
 import {
   acceptBarterOffer,
-  agreeContract,
+  agreeConsent,
   applyEscortSide,
+  applyMarketLeans,
   applyPortShift,
   assignTask,
   autoCommit,
+  calcTransportCost,
   canFillOrder,
   canSellEscort,
   completeOrder,
+  consentFeeFor,
+  consentOfferStanding,
+  consentPartyBusy,
   coverFromBoard,
-  escortBuyerBusy,
   escortCoverage,
   escortCoverOf,
-  escortFeeFor,
-  escortOfferStanding,
-  expireContracts,
+  expireConsent,
   failSeat,
   handleModuleSelect,
   hireWorker,
   lockedBehind,
   maroonSeat,
   nextPhase,
+  normalizeConsentLedger,
   normalizeEscortState,
   openOrderCount,
   pathOrderOf,
   postBarterOffer,
   purchaseCard,
   refundBarterOffer,
+  resetConsentLedger,
   resetEscortLeg,
   resolvePirateAttack,
   restartGame,
@@ -309,6 +345,95 @@ import {
   visibleContracts,
   ESCORT_SELLER_PATH,
   type EscortContract,
+  type MarketLeans,
+} from "@/lib/game/engine";
+// [D6: Free Captain: Opportunist] The borrow's own block, imported beside
+// the bazaar's for the reason that one is imported at all: what the
+// allowance is and what the order board does with it are one subject, and
+// the checks below are about the second. canFillOrder and completeOrder
+// are already imported above, because they are the manifest's own guards
+// rather than this feature's, and the two functions here are the ability
+// the guards ask about.
+import {
+  normalizeOpportunistBorrows,
+  opportunistBorrowsLeft,
+  opportunistBorrowsTaken,
+  opportunistLine,
+  opportunistMayBorrow,
+  opportunistPayout,
+  OPPORTUNIST_PATH,
+} from "@/lib/game/engine";
+// [D7: the draft, and switching] The deal's own arithmetic and the two
+// writes a path leaves in a save, imported beside the borrow's for the
+// reason every feature's block is imported here: what the rule means and
+// what the engine does with it are one subject, and the checks below are
+// about both. The rule module is pure, so the deck, the pass, the window
+// and the fee are readable here without a server; the two apply functions
+// and the guard the panel and the room share come from the engine, which is
+// where they live.
+import {
+  applyDraftPath,
+  applyPathSwitch,
+  pathSwitchBlocked,
+  pathSwitchOpenLine,
+} from "@/lib/game/engine";
+import {
+  DRAFT_AUTO_PICK,
+  draftComposition,
+  draftDeck,
+  draftHands,
+  keepFrom,
+  normalizePathSwitchLeg,
+  passLeft,
+  pathSwitchFee,
+  pathSwitchPhase,
+  pathSwitchWindow,
+} from "@/lib/game/draft";
+import { createRng } from "@/lib/game/rng";
+// [D5: Aroma: the Bazaar Rumor] The bazaar's own block, imported beside the
+// bench's for the reason that one is imported here at all: the record the
+// table hears and what the market does with it are one subject, and the
+// checks below are about the second. The one promise this file makes about
+// the wire is the row shape, and the type below is the shape a client is
+// handed rather than the one the room holds, which is the feature's secret
+// written as a type.
+import {
+  canPublishRumor,
+  bazaarGoods,
+  normalizeBazaarRumor,
+  normalizeRumorLean,
+  publicRumors,
+  rumorCooldownLeft,
+  rumorCooldownLine,
+  rumorDirectionLine,
+  rumorGoodAllowed,
+  rumorId,
+  rumorLean,
+  rumorStanding,
+  BAZAAR_SELLER_PATH,
+  type BazaarRumor,
+  type PublicRumor,
+  type RumorDirection,
+} from "@/lib/game/engine";
+// [D4: Loom: the Refit] The bench's own block, imported beside the escort's
+// for the reason that block is imported here at all: what the record means
+// and what the engine does with it are one subject, and the checks below are
+// about the second. The consent primitive's rules are above, because the two
+// markets are made of them.
+import {
+  applyRefitSide,
+  buyRag,
+  canSellRefit,
+  mendGarment,
+  normalizeRefitState,
+  ragsAtPort,
+  ragsLeftAtPort,
+  refitRoomFor,
+  refitSellerBusy,
+  refitsOn,
+  reweaveRags,
+  REFIT_SELLER_PATH,
+  type RefitContract,
 } from "@/lib/game/engine";
 // The record a captain writes and the few readings of it the panel and the
 // engine share. Imported beside the engine for the same reason the checks
@@ -495,6 +620,44 @@ const CARRIES_A_DASH = new RegExp(
 );
 
 /**
+ * The stricter house rule for the words a mode hands a captain: no hyphen
+ * of any kind, single or doubled, beside the two dash characters the rest
+ * of the tree is held to.
+ *
+ * A second expression rather than a widening of the first, because the two
+ * rules answer different questions. The tree wide rule is about typography
+ * (a doubled hyphen standing in for an em dash), and it cannot be widened:
+ * `--` is how a CSS custom property is read, so every `var(--w-dawn)` in
+ * the tree would fail it. This one is about a mode's prose, where a hyphen
+ * has no work to do.
+ */
+const CARRIES_A_HYPHEN = new RegExp(
+  `[-${String.fromCharCode(0x2013, 0x2014)}]|-{2}`,
+);
+
+/**
+ * Every source file under a directory, for a check whose claim is about
+ * the tree rather than about a file.
+ *
+ * Here rather than inside the check that first needed it, because a second
+ * feature needed one too and a second copy of a directory walk is how two
+ * scans of the same tree end up reading different files. Read only, and
+ * only .ts and .tsx: the claim every caller makes is about source.
+ */
+function walkSrc(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...walkSrc(full));
+      continue;
+    }
+    if (/\.tsx?$/.test(entry)) out.push(full);
+  }
+  return out;
+}
+
+/**
  * The same rule, read off a file rather than off a claim about it. Whole
  * files rather than the strings a captain reads, because the directive
  * asks the comments to hold it too, and every file named here is read by
@@ -507,6 +670,26 @@ function carriesADash(relative: string): boolean {
   return CARRIES_A_DASH.test(
     readFileSync(join(import.meta.dirname, "..", relative), "utf8"),
   );
+}
+
+/**
+ * A component's source with its comments taken out, for a check about what
+ * a screen prints rather than about what its file says.
+ *
+ * The two are different on purpose in this tree: a comment here quotes the
+ * sentence it replaced, because that is what makes a repair readable a year
+ * later, so a check that read the raw file would fail on the note that
+ * explains the fix. Only the shapes this tree actually writes are stripped,
+ * which makes this the codebase's own convention rather than a parser: a
+ * JSX comment, a block comment, and a line whose first characters are two
+ * slashes. A URL inside a string survives all three, since none of them
+ * matches a line that begins with anything else.
+ */
+function withoutComments(source: string): string {
+  return source
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
 }
 
 /**
@@ -864,21 +1047,36 @@ function accountIn(
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
 
-  let host: Captain | null = null;
-  let guest: Captain | null = null;
-  let third: Captain | null = null;
-  // Accounts this run creates that belong to no harbor, so there is
-  // nothing to tear down for them but the accounts themselves. The
-  // messages they send each other cascade away with them.
-  const extraAccounts: Captain[] = [];
-  let roomId: string | null = null;
-  let quickStartRoomId: string | null = null;
-  // Harbors opened for the one walk that sails a voyage rather than
-  // probing a route. They are this run's, so cleanup deletes them, and
-  // they are listed here rather than reused from the slots above because
-  // that walk needs a room whose whole voyage it drives itself.
-  const lapRoomIds: string[] = [];
-  const sockets: Socket[] = [];
+  // Everything one smoke run accumulates, in one object. The sections of
+  // the run are functions rather than one sixteen thousand line body, and
+  // this is what they share: the captains this run signs up, the harbor it
+  // opens, the sockets it holds open, and the flag that arms cleanup.
+  //
+  // It is one object rather than eleven closed over variables because a
+  // section that reaches back into its caller's scope cannot be read on
+  // its own, and reading a section on its own is the whole reason to split
+  // a file this size. A field here is a fact about the run; a local inside
+  // a section is that section's business.
+  const run = {
+    host: null as Captain | null,
+    guest: null as Captain | null,
+    third: null as Captain | null,
+    // Accounts this run creates that belong to no harbor, so there is
+    // nothing to tear down for them but the accounts themselves. The
+    // messages they send each other cascade away with them.
+    extraAccounts: [] as Captain[],
+    roomId: null as string | null,
+    quickStartRoomId: null as string | null,
+    // Harbors opened for the one walk that sails a voyage rather than
+    // probing a route. They are this run's, so cleanup deletes them, and
+    // they are listed here rather than reused from the fields above
+    // because that walk needs a room whose whole voyage it drives itself.
+    lapRoomIds: [] as string[],
+    sockets: [] as Socket[],
+    // Only armed once the first account has been proven visible to this
+    // process's database connection. Until then, nothing is deleted.
+    cleanupIsSafe: false,
+  };
 
   // Every harbor that already exists before this run starts. Cleanup only
   // ever deletes a room this run created, so a Quick Start that seats the
@@ -887,42 +1085,39 @@ async function main(): Promise<void> {
   const preExistingRoomIds = new Set(
     (await db.room.findMany({ select: { id: true } })).map((r) => r.id),
   );
-  // Only armed once the first account has been proven visible to this
-  // process's database connection. Until then, nothing is deleted.
-  let cleanupIsSafe = false;
 
   try {
     console.log("Accounts");
-    host = await signUp("host");
+    run.host = await signUp("host");
 
     // Safety interlock. The account was just written through the API; if
     // this connection cannot see it, the server and this script are on
     // different databases and the cleanup below would silently do
     // nothing. Stop now, before a second account and a room exist.
     const visible = await db.user.findUnique({
-      where: { username: host.username },
+      where: { username: run.host.username },
       select: { id: true },
     });
-    if (!visible || visible.id !== host.id) {
+    if (!visible || visible.id !== run.host.id) {
       throw new Error(
         `The server at ${BASE} is writing to a different database than this script reads.\n` +
           `This script resolves DATABASE_URL from this project's .env, so start the server the same way,\n` +
           `or export DATABASE_URL first. Nothing has been deleted.`,
       );
     }
-    cleanupIsSafe = true;
+    run.cleanupIsSafe = true;
 
-    guest = await signUp("guest");
-    check(Boolean(host.token), "the host receives a session token");
-    check(Boolean(guest.token), "the guest receives a session token");
+    run.guest = await signUp("guest");
+    check(Boolean(run.host.token), "the host receives a session token");
+    check(Boolean(run.guest.token), "the guest receives a session token");
 
     console.log("\nThe signed in captain");
     const me = await call<{ user: { id: string } | null }>("/api/auth/me", {
-      cookie: host.cookie,
+      cookie: run.host.cookie,
     });
     check(me.status === 200, "GET /api/auth/me answers");
     check(
-      me.body?.user?.id === host.id,
+      me.body?.user?.id === run.host.id,
       "the session cookie identifies the host",
     );
 
@@ -941,10 +1136,10 @@ async function main(): Promise<void> {
     // anywhere, which is the branch that reaches it.
     const ashore = await signUp("ashore");
     const quay = await signUp("quay");
-    extraAccounts.push(ashore, quay);
+    run.extraAccounts.push(ashore, quay);
     const ashoreSocket = await openAuthedSocket(ashore);
     const quaySocket = await openAuthedSocket(quay);
-    sockets.push(ashoreSocket, quaySocket);
+    run.sockets.push(ashoreSocket, quaySocket);
 
     const quayLine = "meet me at the quay before the tide turns";
     const heardAtQuay = waitForEvent<WireMessage>(
@@ -1056,7 +1251,7 @@ async function main(): Promise<void> {
       "/api/rooms",
       {
         method: "POST",
-        cookie: host.cookie,
+        cookie: run.host.cookie,
         body: JSON.stringify({
           name: `Smoke harbor ${suffix}`,
           isPublic: false,
@@ -1065,12 +1260,12 @@ async function main(): Promise<void> {
     );
     check(created.status === 200, "the host can create a room");
     if (created.status !== 200) throw new Error("No room, stopping here.");
-    roomId = created.body.room.id;
+    run.roomId = created.body.room.id;
     const code = created.body.room.code;
 
     const joined = await call<{ room: { id: string } }>("/api/rooms/join", {
       method: "POST",
-      cookie: guest.cookie,
+      cookie: run.guest.cookie,
       body: JSON.stringify({ code }),
     });
     check(joined.status === 200, "the guest can join with the room code");
@@ -1081,23 +1276,23 @@ async function main(): Promise<void> {
         members: Array<{ username: string }>;
         host: { id: string };
       };
-    }>(`/api/rooms/${roomId}`, { cookie: host.cookie });
+    }>(`/api/rooms/${run.roomId}`, { cookie: run.host.cookie });
     check(
       detail.body?.room?.memberCount === 2,
       "the harbor reads back two members",
     );
     check(
-      detail.body?.room?.host?.id === host.id,
+      detail.body?.room?.host?.id === run.host.id,
       "the host is recorded as the host",
     );
 
     console.log("\nThe realtime channel");
-    const hostSocket = await openAuthedSocket(host);
-    sockets.push(hostSocket);
+    const hostSocket = await openAuthedSocket(run.host);
+    run.sockets.push(hostSocket);
     check(hostSocket.connected, "the host socket is connected on the app port");
 
-    const guestSocket = await openAuthedSocket(guest);
-    sockets.push(guestSocket);
+    const guestSocket = await openAuthedSocket(run.guest);
+    run.sockets.push(guestSocket);
     check(
       guestSocket.connected,
       "the guest socket is connected on the app port",
@@ -1117,19 +1312,25 @@ async function main(): Promise<void> {
       },
     );
     const online = presence.map((u) => u.username);
-    check(online.includes(host.username), "presence reports the host online");
-    check(online.includes(guest.username), "presence reports the guest online");
+    check(
+      online.includes(run.host.username),
+      "presence reports the host online",
+    );
+    check(
+      online.includes(run.guest.username),
+      "presence reports the guest online",
+    );
 
     console.log("\nSeeing each other's live data");
-    const hostId = host.id;
-    const guestToken = guest.token;
+    const hostId = run.host.id;
+    const guestToken = run.guest.token;
 
     // Both captains take a seat in the harbor's socket channel. The
     // server only relays room traffic to sockets that have joined one.
     const joinedHost = waitForEvent(hostSocket, "room:members");
     const joinedGuest = waitForEvent(guestSocket, "room:members");
-    hostSocket.emit("room:join", { roomId });
-    guestSocket.emit("room:join", { roomId });
+    hostSocket.emit("room:join", { roomId: run.roomId });
+    guestSocket.emit("room:join", { roomId: run.roomId });
     const [hostRoster, guestRoster] = await Promise.all([
       joinedHost,
       joinedGuest,
@@ -1196,7 +1397,7 @@ async function main(): Promise<void> {
     // room as the market; passed through, it would be a roster disagreeing
     // with the voyage for every captain looking at it.
     hostSocket.emit("game:status", {
-      roomId,
+      roomId: run.roomId,
       round: 3,
       phase: 1,
       phaseLabel: "Purchase",
@@ -1242,7 +1443,7 @@ async function main(): Promise<void> {
     // Read out here rather than inside the callbacks below, where the
     // captain the suite is holding could have been signed out from under
     // them as far as the compiler is concerned.
-    const askerId = guest.id;
+    const askerId = run.guest.id;
     const detailQuestions: { requesterId?: string }[] = [];
     hostSocket.on(
       "player:detail:request",
@@ -1260,14 +1461,17 @@ async function main(): Promise<void> {
 
     // One. The question reaches the captain it is about, and their answer
     // reaches the captain who asked, carrying the snapshot they sent.
-    guestSocket.emit("player:detail:request", { roomId, targetUserId: hostId });
+    guestSocket.emit("player:detail:request", {
+      roomId: run.roomId,
+      targetUserId: hostId,
+    });
     await new Promise((resolve) => setTimeout(resolve, 400));
     check(
       detailQuestions.some((question) => question.requesterId === askerId),
       "a captain asking for another captain's detail is relayed to that captain, labelled with the asker",
     );
     hostSocket.emit("player:detail:response", {
-      roomId,
+      roomId: run.roomId,
       targetUserId: hostId,
       requesterId: askerId,
       data: { gold: 1234 },
@@ -1284,7 +1488,7 @@ async function main(): Promise<void> {
     // The hold is consumed by the first one, so this names a question
     // nobody is waiting on and is dropped rather than relayed.
     hostSocket.emit("player:detail:response", {
-      roomId,
+      roomId: run.roomId,
       targetUserId: hostId,
       requesterId: askerId,
       data: { gold: 9999 },
@@ -1298,12 +1502,15 @@ async function main(): Promise<void> {
     // Three. A question the asker walks away from. The answer arrives
     // after they have left the harbor, so there is nobody the frame is
     // about any more and it is dropped rather than delivered.
-    guestSocket.emit("player:detail:request", { roomId, targetUserId: hostId });
+    guestSocket.emit("player:detail:request", {
+      roomId: run.roomId,
+      targetUserId: hostId,
+    });
     await new Promise((resolve) => setTimeout(resolve, 400));
-    guestSocket.emit("room:leave", { roomId });
+    guestSocket.emit("room:leave", { roomId: run.roomId });
     await new Promise((resolve) => setTimeout(resolve, 400));
     hostSocket.emit("player:detail:response", {
-      roomId,
+      roomId: run.roomId,
       targetUserId: hostId,
       requesterId: askerId,
       data: { gold: 5555 },
@@ -1325,10 +1532,10 @@ async function main(): Promise<void> {
       guestSocket,
       "room:members",
       (payload) =>
-        payload?.roomId === roomId &&
+        payload?.roomId === run.roomId &&
         payload.members.some((member) => member.id === askerId),
     );
-    guestSocket.emit("room:join", { roomId });
+    guestSocket.emit("room:join", { roomId: run.roomId });
     check(
       (await retaken) !== null,
       "and the guest takes their seat back, so the harbor is as it was",
@@ -1340,10 +1547,10 @@ async function main(): Promise<void> {
     const guestReloadSocket = connect(BASE, {
       path: SOCKET_PATH,
       transports: ["websocket"],
-      extraHeaders: { Cookie: guest.cookie },
+      extraHeaders: { Cookie: run.guest.cookie },
       reconnection: false,
     });
-    sockets.push(guestReloadSocket);
+    run.sockets.push(guestReloadSocket);
     await new Promise<void>((resolve) => {
       guestReloadSocket.on("connect", () => {
         guestReloadSocket.emit("auth", { token: guestToken });
@@ -1356,7 +1563,7 @@ async function main(): Promise<void> {
       "game:status",
       (payload) => payload?.user?.id === hostId,
     );
-    guestReloadSocket.emit("room:join", { roomId });
+    guestReloadSocket.emit("room:join", { roomId: run.roomId });
     const hydratedStatus = await hydrated;
     check(
       hydratedStatus?.gold === 777,
@@ -1367,11 +1574,11 @@ async function main(): Promise<void> {
     const active = await call<{ room: { id: string } | null }>(
       "/api/rooms/active",
       {
-        cookie: guest.cookie,
+        cookie: run.guest.cookie,
       },
     );
     check(
-      active.body?.room?.id === roomId,
+      active.body?.room?.id === run.roomId,
       "a reloaded captain lands back in the harbor",
     );
 
@@ -1400,11 +1607,11 @@ async function main(): Promise<void> {
         hostMatch.roomId === guestMatch.roomId,
       "both captains are paired into the same harbor",
     );
-    quickStartRoomId = hostMatch?.roomId ?? guestMatch?.roomId ?? null;
+    run.quickStartRoomId = hostMatch?.roomId ?? guestMatch?.roomId ?? null;
 
-    const quickRoom = quickStartRoomId
+    const quickRoom = run.quickStartRoomId
       ? await db.room.findUnique({
-          where: { id: quickStartRoomId },
+          where: { id: run.quickStartRoomId },
           select: { difficulty: true },
         })
       : null;
@@ -1416,12 +1623,12 @@ async function main(): Promise<void> {
     console.log("\nA conversation the voyage keeps to itself");
     // The third captain exists for one reason: a private thread is only
     // private if a captain who is not in it cannot be handed it.
-    third = await signUp("third");
+    run.third = await signUp("third");
     const thirdJoined = await call<{ room: { id: string } }>(
       "/api/rooms/join",
       {
         method: "POST",
-        cookie: third.cookie,
+        cookie: run.third.cookie,
         body: JSON.stringify({ code }),
       },
     );
@@ -1434,7 +1641,7 @@ async function main(): Promise<void> {
       "chat:room",
       (payload) => payload?.message?.content === harborLine,
     );
-    hostSocket.emit("chat:room", { roomId, content: harborLine });
+    hostSocket.emit("chat:room", { roomId: run.roomId, content: harborLine });
     const heard = await heardHarbor;
     check(heard !== null, "a line in the harbor chat reaches the room");
     check(
@@ -1452,7 +1659,7 @@ async function main(): Promise<void> {
       "chat:dm",
       (payload) => payload?.sender?.id === hostId,
     );
-    hostSocket.emit("chat:dm", { recipientId: guest.id, content: dmLine });
+    hostSocket.emit("chat:dm", { recipientId: run.guest.id, content: dmLine });
     const dmAtGuest = await heardDm;
     const dmAtHost = await heardOwnDm;
     check(
@@ -1469,7 +1676,9 @@ async function main(): Promise<void> {
     // The claim under test: a session conversation is held in the server's
     // memory and nowhere else. Anything written down for this room, or
     // between these two captains, would be a trace of the voyage.
-    const storedForRoom = await db.message.count({ where: { roomId } });
+    const storedForRoom = await db.message.count({
+      where: { roomId: run.roomId },
+    });
     check(
       storedForRoom === 0,
       "nothing said in the session was written against the room",
@@ -1477,8 +1686,8 @@ async function main(): Promise<void> {
     const storedBetween = await db.message.count({
       where: {
         OR: [
-          { senderId: host.id, recipientId: guest.id },
-          { senderId: guest.id, recipientId: host.id },
+          { senderId: run.host.id, recipientId: run.guest.id },
+          { senderId: run.guest.id, recipientId: run.host.id },
         ],
       },
     });
@@ -1487,14 +1696,14 @@ async function main(): Promise<void> {
       "and the private thread between the two was not written either",
     );
 
-    const reloaded = await openAuthedSocket(guest);
-    sockets.push(reloaded);
+    const reloaded = await openAuthedSocket(run.guest);
+    run.sockets.push(reloaded);
     const reloadedHistory = waitForEvent<WireHistory>(
       reloaded,
       "chat:history",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
-    reloaded.emit("room:join", { roomId });
+    reloaded.emit("room:join", { roomId: run.roomId });
     const seeded = await reloadedHistory;
     check(seeded !== null, "a captain who reloads is handed the conversation");
     check(
@@ -1508,14 +1717,14 @@ async function main(): Promise<void> {
       "so does the private thread, keeping whose message it was",
     );
 
-    const thirdSocket = await openAuthedSocket(third);
-    sockets.push(thirdSocket);
+    const thirdSocket = await openAuthedSocket(run.third);
+    run.sockets.push(thirdSocket);
     const thirdHistory = waitForEvent<WireHistory>(
       thirdSocket,
       "chat:history",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
-    thirdSocket.emit("room:join", { roomId });
+    thirdSocket.emit("room:join", { roomId: run.roomId });
     const thirdSeen = await thirdHistory;
     check(thirdSeen !== null, "the third captain joined the harbor channel");
     check(
@@ -1539,8 +1748,8 @@ async function main(): Promise<void> {
     // them below is inside a callback the waiters own, and a captain read
     // out of the enclosing scope is a captain TypeScript cannot narrow.
     // The host's id is already a string in this scope.
-    const guestCaptainId = guest.id;
-    const thirdCaptainId = third.id;
+    const guestCaptainId = run.guest.id;
+    const thirdCaptainId = run.third.id;
     const frameLog: Record<string, Array<{ event: string; text: string }>> = {
       host: [],
       guest: [],
@@ -1571,7 +1780,10 @@ async function main(): Promise<void> {
       "room:members",
       () => true,
     );
-    hostSocket.emit("chat:mute", { roomId, targetUserId: thirdCaptainId });
+    hostSocket.emit("chat:mute", {
+      roomId: run.roomId,
+      targetUserId: thirdCaptainId,
+    });
     check((await hostMuted) !== null, "the host is handed the list they set");
     const thirdHears = await thirdMuted;
     check(
@@ -1588,10 +1800,10 @@ async function main(): Promise<void> {
     const heardMuted = waitForEvent<{ roomId: string }>(
       thirdSocket,
       "chat:muted",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
     const mutedLine = "the harbor should not hear this line";
-    thirdSocket.emit("chat:room", { roomId, content: mutedLine });
+    thirdSocket.emit("chat:room", { roomId: run.roomId, content: mutedLine });
     check(
       (await heardMuted) !== null,
       "a silenced captain is told their line did not land",
@@ -1615,12 +1827,15 @@ async function main(): Promise<void> {
       "room:members",
       (payload) => (payload?.mutedUserIds ?? []).length === 0,
     );
-    hostSocket.emit("chat:unmute", { roomId, targetUserId: thirdCaptainId });
+    hostSocket.emit("chat:unmute", {
+      roomId: run.roomId,
+      targetUserId: thirdCaptainId,
+    });
     check(
       (await thirdLifted) !== null,
       "unmuting is handed back to the captain it concerned",
     );
-    thirdSocket.emit("chat:room", { roomId, content: liftedLine });
+    thirdSocket.emit("chat:room", { roomId: run.roomId, content: liftedLine });
     check(
       (await hostHearsAgain) !== null,
       "and their next line reaches the room",
@@ -1629,10 +1844,10 @@ async function main(): Promise<void> {
     const strangerMute = waitForEvent<{ roomId: string; error: string }>(
       hostSocket,
       "room:error",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
     hostSocket.emit("chat:mute", {
-      roomId,
+      roomId: run.roomId,
       targetUserId: "an-account-that-is-not-in-this-harbor",
     });
     check(
@@ -1649,14 +1864,21 @@ async function main(): Promise<void> {
       "player:report:filed",
       (payload) => payload?.targetUserId === hostId,
     );
-    guestSocket.emit("player:report", { roomId, targetUserId: hostId });
+    guestSocket.emit("player:report", {
+      roomId: run.roomId,
+      targetUserId: hostId,
+    });
     const filed = await filedAck;
     check(
       filed?.alreadyFiled === false,
       "a report is filed and answered to the captain who filed it",
     );
     const filedRows = await db.report.count({
-      where: { roomId, reporterId: guestCaptainId, targetUserId: hostId },
+      where: {
+        roomId: run.roomId,
+        reporterId: guestCaptainId,
+        targetUserId: hostId,
+      },
     });
     check(
       filedRows === 1,
@@ -1668,14 +1890,21 @@ async function main(): Promise<void> {
       "player:report:filed",
       (payload) => payload?.targetUserId === hostId,
     );
-    guestSocket.emit("player:report", { roomId, targetUserId: hostId });
+    guestSocket.emit("player:report", {
+      roomId: run.roomId,
+      targetUserId: hostId,
+    });
     check(
       (await repeatedAck)?.alreadyFiled === true,
       "a second report of the same captain in the same voyage is answered as already on the record",
     );
     check(
       (await db.report.count({
-        where: { roomId, reporterId: guestCaptainId, targetUserId: hostId },
+        where: {
+          roomId: run.roomId,
+          reporterId: guestCaptainId,
+          targetUserId: hostId,
+        },
       })) === 1,
       "and the row is not written twice",
     );
@@ -1683,9 +1912,12 @@ async function main(): Promise<void> {
     const selfReport = waitForEvent<{ roomId: string; error: string }>(
       guestSocket,
       "room:error",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
-    guestSocket.emit("player:report", { roomId, targetUserId: guestCaptainId });
+    guestSocket.emit("player:report", {
+      roomId: run.roomId,
+      targetUserId: guestCaptainId,
+    });
     check(
       (await selfReport)?.error === "You can't report yourself.",
       "a captain cannot report themselves",
@@ -1693,10 +1925,10 @@ async function main(): Promise<void> {
     const strangerReport = waitForEvent<{ roomId: string; error: string }>(
       guestSocket,
       "room:error",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
     guestSocket.emit("player:report", {
-      roomId,
+      roomId: run.roomId,
       targetUserId: "an-account-that-is-not-in-this-harbor",
     });
     check(
@@ -1738,8 +1970,8 @@ async function main(): Promise<void> {
     // the bystanding captain is counted as a difference across their own
     // frames rather than as a total, after a quiet moment that lets the
     // connect this probe caused finish reaching them.
-    const floodSocket = await openAuthedSocket(third);
-    sockets.push(floodSocket);
+    const floodSocket = await openAuthedSocket(run.third);
+    run.sockets.push(floodSocket);
     let floodAnswered = 0;
     let floodNotices = 0;
     let politeAnswered = 0;
@@ -1820,7 +2052,7 @@ async function main(): Promise<void> {
       (payload) => Boolean(payload?.error),
     );
     hostSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Hemp",
       offerAmount: 1,
       requestItem: "Gold",
@@ -1854,7 +2086,7 @@ async function main(): Promise<void> {
       (payload) => Boolean(payload?.error),
     );
     hostSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Hemp",
       offerAmount: 1,
       requestItem: "Gold",
@@ -1897,13 +2129,13 @@ async function main(): Promise<void> {
       });
     };
     await seedRenown(hostId);
-    await seedRenown(guest.id);
-    await seedRenown(third!.id);
+    await seedRenown(run.guest.id);
+    await seedRenown(run.third!.id);
     // Both of the other two are read by name inside the event callbacks
     // below, and a callback can run at any point after the captain it
     // names was assigned, so neither is narrowed by the time one does.
-    const guestId = guest.id;
-    const thirdId = third!.id;
+    const guestId = run.guest.id;
+    const thirdId = run.third!.id;
 
     // The chat composer's board, which is the flexible one: no phase has
     // been started, and the offer still posts, shows and closes exactly
@@ -1914,7 +2146,7 @@ async function main(): Promise<void> {
       (payload) => (payload?.offers ?? []).some((o) => o.fromUserId === hostId),
     );
     hostSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Hemp",
       offerAmount: 3,
       requestItem: "Gold",
@@ -1945,7 +2177,7 @@ async function main(): Promise<void> {
           .length === 2,
     );
     hostSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Silk",
       offerAmount: 1,
       requestItem: "Gold",
@@ -1970,7 +2202,7 @@ async function main(): Promise<void> {
         (payload?.offers ?? []).some((o) => o.fromUserId === guestId),
     );
     guestSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Tea",
       offerAmount: 2,
       requestItem: "Silk",
@@ -1989,7 +2221,7 @@ async function main(): Promise<void> {
         (payload?.offers ?? []).some((o) => o.fromUserId === thirdId),
     );
     thirdSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Spice",
       offerAmount: 1,
       requestItem: "Hemp",
@@ -2006,7 +2238,7 @@ async function main(): Promise<void> {
       "barter:update",
       (payload) => (payload?.offers ?? []).some((o) => o.id === posted?.id),
     );
-    guestSocket.emit("barter:state:request", { roomId });
+    guestSocket.emit("barter:state:request", { roomId: run.roomId });
     check((await seenBoard) !== null, "the rest of the harbor sees it");
 
     const fulfilledToTaker = waitForEvent<{ offer: WireOffer }>(
@@ -2029,7 +2261,10 @@ async function main(): Promise<void> {
       "barter:update",
       (payload) => !(payload?.offers ?? []).some((o) => o.id === posted?.id),
     );
-    guestSocket.emit("barter:accept", { roomId, offerId: posted?.id });
+    guestSocket.emit("barter:accept", {
+      roomId: run.roomId,
+      offerId: posted?.id,
+    });
     check(
       (await fulfilledToTaker) !== null,
       "the captain who takes it is told the trade completed",
@@ -2071,7 +2306,10 @@ async function main(): Promise<void> {
       "barter:fulfilled",
       (payload) => payload?.offer?.id === guestPosted?.id,
     );
-    hostSocket.emit("barter:accept", { roomId, offerId: guestPosted?.id });
+    hostSocket.emit("barter:accept", {
+      roomId: run.roomId,
+      offerId: guestPosted?.id,
+    });
     check(
       (await takenByHost) !== null,
       "a captain whose own offer was just taken can still take another",
@@ -2085,7 +2323,7 @@ async function main(): Promise<void> {
       (payload) => Boolean(payload?.error),
     );
     hostSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Hemp",
       offerAmount: 1,
       requestItem: "Gold",
@@ -2112,7 +2350,10 @@ async function main(): Promise<void> {
       "barter:accept:fail",
       (payload) => payload?.offerId === thirdPosted?.id,
     );
-    guestSocket.emit("barter:accept", { roomId, offerId: thirdPosted?.id });
+    guestSocket.emit("barter:accept", {
+      roomId: run.roomId,
+      offerId: thirdPosted?.id,
+    });
     const refusal = await refused;
     check(
       refusal !== null,
@@ -2123,8 +2364,8 @@ async function main(): Promise<void> {
       "and the refusal says so rather than failing silently",
     );
     const thirdLeft = await call<{ ok: boolean }>(
-      `/api/rooms/${roomId}/leave`,
-      { method: "POST", cookie: third.cookie },
+      `/api/rooms/${run.roomId}/leave`,
+      { method: "POST", cookie: run.third.cookie },
     );
     check(thirdLeft.status === 200, "the third captain can leave the harbor");
 
@@ -2134,7 +2375,7 @@ async function main(): Promise<void> {
     // Renown doing the work: the same account is refused the flexible
     // offer below at exactly the level the exchange is served at.
     await db.captainLegacy.update({
-      where: { userId: guest.id },
+      where: { userId: run.guest.id },
       data: { renownLevel: 1, renownXP: 0 },
     });
     // [J2: the mute and the report] A mute belongs to the table it was set
@@ -2148,7 +2389,10 @@ async function main(): Promise<void> {
       "room:members",
       (payload) => (payload?.mutedUserIds ?? []).includes(guestId),
     );
-    hostSocket.emit("chat:mute", { roomId, targetUserId: guest.id });
+    hostSocket.emit("chat:mute", {
+      roomId: run.roomId,
+      targetUserId: run.guest.id,
+    });
     check(
       (await mutedInLobby) !== null,
       "the host can silence a captain in the lobby",
@@ -2161,14 +2405,14 @@ async function main(): Promise<void> {
     // The exchange only opens while the room is actually in the Parley,
     // and the checkpoint only follows a report from a voyage that has set
     // sail, so both of those have to happen before the board will take one.
-    hostSocket.emit("room:start", { roomId });
+    hostSocket.emit("room:start", { roomId: run.roomId });
     check(
       (await liftedAtDeparture) !== null,
       "and the voyage lifts it, because a mute is a judgement about a table rather than about a captain",
     );
     await new Promise((resolve) => setTimeout(resolve, 500));
     hostSocket.emit("game:status", {
-      roomId,
+      roomId: run.roomId,
       round: 1,
       phase: "parley",
       phaseLabel: "Parley",
@@ -2186,7 +2430,7 @@ async function main(): Promise<void> {
         (payload?.offers ?? []).some((o) => o.fromUserId === guestId),
     );
     guestSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Porcelain",
       offerAmount: 2,
       requestItem: "Tea",
@@ -2215,7 +2459,7 @@ async function main(): Promise<void> {
       (payload) => Boolean(payload?.error),
     );
     guestSocket.emit("barter:post", {
-      roomId,
+      roomId: run.roomId,
       offerItem: "Porcelain",
       offerAmount: 1,
       requestItem: "Tea",
@@ -2239,7 +2483,7 @@ async function main(): Promise<void> {
       (payload) => payload?.offer?.id === exchangePosted?.id,
     );
     hostSocket.emit("barter:accept", {
-      roomId,
+      roomId: run.roomId,
       offerId: exchangePosted?.id,
     });
     check(
@@ -2251,14 +2495,14 @@ async function main(): Promise<void> {
     const clearedAtHost = waitForEvent<{ roomId: string }>(
       hostSocket,
       "chat:cleared",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
     const clearedAtGuest = waitForEvent<{ roomId: string }>(
       guestSocket,
       "chat:cleared",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
-    hostSocket.emit("room:restart", { roomId });
+    hostSocket.emit("room:restart", { roomId: run.roomId });
     check(
       (await clearedAtHost) !== null,
       "restarting the voyage tells the room its conversation is gone",
@@ -2268,14 +2512,14 @@ async function main(): Promise<void> {
       "and tells every captain in it the same",
     );
 
-    const afterTheWipe = await openAuthedSocket(guest);
-    sockets.push(afterTheWipe);
+    const afterTheWipe = await openAuthedSocket(run.guest);
+    run.sockets.push(afterTheWipe);
     const wipedHistory = waitForEvent<WireHistory>(
       afterTheWipe,
       "chat:history",
-      (payload) => payload?.roomId === roomId,
+      (payload) => payload?.roomId === run.roomId,
     );
-    afterTheWipe.emit("room:join", { roomId });
+    afterTheWipe.emit("room:join", { roomId: run.roomId });
     const wiped = await wipedHistory;
     check(wiped !== null, "a captain who reloads still gets an answer");
     check(
@@ -2303,7 +2547,7 @@ async function main(): Promise<void> {
     );
     // Belt and braces: if that refusal were ever wrong, the account it
     // made has to be cleaned up like any other this run created.
-    if (wrongCode.captain) extraAccounts.push(wrongCode.captain);
+    if (wrongCode.captain) run.extraAccounts.push(wrongCode.captain);
 
     const made = await registerOperator("keeper", setupCode);
     check(made.status === 200, "the setup code admits an operator account");
@@ -2313,9 +2557,9 @@ async function main(): Promise<void> {
     );
     if (!made.captain) throw new Error("No operator account, stopping here.");
     const operator = made.captain;
-    extraAccounts.push(operator);
+    run.extraAccounts.push(operator);
     const operatorSocket = await openAuthedSocket(operator);
-    sockets.push(operatorSocket);
+    run.sockets.push(operatorSocket);
 
     // A captain who is not an operator asks for the roster. The console
     // only ever hides itself; the server is what has to refuse.
@@ -2341,7 +2585,7 @@ async function main(): Promise<void> {
     const roster = await asked;
     check(roster !== null, "the operator is handed the roster");
     check(
-      accountIn(roster, host.id)?.username === host.username,
+      accountIn(roster, run.host.id)?.username === run.host.username,
       "and it lists the captains it is there to manage",
     );
 
@@ -2358,18 +2602,18 @@ async function main(): Promise<void> {
       3000,
     );
     const afterBan = waitForEvent<WireRoster>(operatorSocket, "admin:accounts");
-    operatorSocket.emit("admin:ban", { userId: guest.id });
+    operatorSocket.emit("admin:ban", { userId: run.guest.id });
     check(
       (await toldTheBanned) !== null,
       "a banned captain's socket is told why it is being closed",
     );
     check((await bannedSocketClosed) !== null, "and is closed");
     check(
-      accountIn(await afterBan, guest.id)?.bannedAt != null,
+      accountIn(await afterBan, run.guest.id)?.bannedAt != null,
       "the roster shows the account banned",
     );
     const noLongerSignedIn = await call<{ user: unknown }>("/api/auth/me", {
-      cookie: guest.cookie,
+      cookie: run.guest.cookie,
     });
     check(
       noLongerSignedIn.body?.user === null,
@@ -2377,7 +2621,7 @@ async function main(): Promise<void> {
     );
     const bannedLogin = await call<{ error: string }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username: guest.username, password }),
+      body: JSON.stringify({ username: run.guest.username, password }),
     });
     check(bannedLogin.status === 403, "a banned captain cannot sign back in");
     check(
@@ -2389,27 +2633,27 @@ async function main(): Promise<void> {
       operatorSocket,
       "admin:accounts",
     );
-    operatorSocket.emit("admin:unban", { userId: guest.id });
+    operatorSocket.emit("admin:unban", { userId: run.guest.id });
     check(
-      accountIn(await afterUnban, guest.id)?.bannedAt === null,
+      accountIn(await afterUnban, run.guest.id)?.bannedAt === null,
       "unbanning clears the ban",
     );
     // The signed in session has to come back too, and the smoke run needs
     // one for the sign out check at the end, so the fresh session is kept.
-    const signedBackIn = await signInAgain(guest.username);
+    const signedBackIn = await signInAgain(run.guest.username);
     check(signedBackIn !== null, "and the captain can sign in again");
     if (signedBackIn) {
-      guest.cookie = signedBackIn.cookie;
-      guest.token = signedBackIn.token;
+      run.guest.cookie = signedBackIn.cookie;
+      run.guest.token = signedBackIn.token;
     }
 
     const afterGrant = waitForEvent<WireRoster>(
       operatorSocket,
       "admin:accounts",
     );
-    operatorSocket.emit("admin:grant", { userId: host.id });
+    operatorSocket.emit("admin:grant", { userId: run.host.id });
     check(
-      accountIn(await afterGrant, host.id)?.role === "admin",
+      accountIn(await afterGrant, run.host.id)?.role === "admin",
       "an operator can hand the role to another captain",
     );
     // The role is read from the account row on every event, so the socket
@@ -2434,9 +2678,9 @@ async function main(): Promise<void> {
       operatorSocket,
       "admin:accounts",
     );
-    operatorSocket.emit("admin:revoke", { userId: host.id });
+    operatorSocket.emit("admin:revoke", { userId: run.host.id });
     check(
-      accountIn(await afterRevoke, host.id)?.role === "captain",
+      accountIn(await afterRevoke, run.host.id)?.role === "captain",
       "and take the role away again",
     );
     const demotion = await toldTheDemoted;
@@ -2478,10 +2722,10 @@ async function main(): Promise<void> {
     // is about to be deleted.
     const doomed = await signUp("doomed");
     const crew = await signUp("crew");
-    extraAccounts.push(doomed, crew);
+    run.extraAccounts.push(doomed, crew);
     const doomedSocket = await openAuthedSocket(doomed);
     const crewSocket = await openAuthedSocket(crew);
-    sockets.push(doomedSocket, crewSocket);
+    run.sockets.push(doomedSocket, crewSocket);
 
     const doomedRoom = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
@@ -2608,7 +2852,7 @@ async function main(): Promise<void> {
     const crowdA = await signUp("crowd_a");
     const crowdB = await signUp("crowd_b");
     const outcast = await signUp("outcast");
-    extraAccounts.push(crowdA, crowdB, outcast);
+    run.extraAccounts.push(crowdA, crowdB, outcast);
 
     // One account is put out of standing on its own first, so that the
     // selection below has a refusal to report and not only successes.
@@ -2702,7 +2946,10 @@ async function main(): Promise<void> {
       undefined,
       1200,
     );
-    operatorSocket.emit("admin:bulk", { action: "unban", userIds: [host.id] });
+    operatorSocket.emit("admin:bulk", {
+      action: "unban",
+      userIds: [run.host.id],
+    });
     const noChange = await refusedNothing;
     check(
       noChange !== null,
@@ -3000,7 +3247,7 @@ async function main(): Promise<void> {
     const gambitSecond = await signUp("gamb_b");
     const gambitThird = await signUp("gamb_c");
     const gambitFourth = await signUp("gamb_d");
-    extraAccounts.push(gambitHost, gambitSecond, gambitThird, gambitFourth);
+    run.extraAccounts.push(gambitHost, gambitSecond, gambitThird, gambitFourth);
     const gambitCrew = [gambitHost, gambitSecond, gambitThird, gambitFourth];
 
     const gambitRoom = await call<{
@@ -3053,7 +3300,7 @@ async function main(): Promise<void> {
     }> = [];
     for (const captain of gambitCrew) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const frames: Frame[] = [];
       socket.onAny((event: string, ...args: unknown[]) => {
         frames.push({ event, text: JSON.stringify(args) });
@@ -3196,7 +3443,7 @@ async function main(): Promise<void> {
     // row is read back rather than drawn again, which is what keeps a
     // refresh from moving every card at the table.
     const rejoining = await openAuthedSocket(gambitSecond);
-    sockets.push(rejoining);
+    run.sockets.push(rejoining);
     const replayed = waitForEvent<WireDelivery>(
       rejoining,
       "private:entry",
@@ -3237,7 +3484,7 @@ async function main(): Promise<void> {
     // under the same assertions as the draw.
     const gambitFifth = await signUp("gamb_e");
     const gambitSixth = await signUp("gamb_f");
-    extraAccounts.push(gambitFifth, gambitSixth);
+    run.extraAccounts.push(gambitFifth, gambitSixth);
     const pairedCrew = [...gambitCrew, gambitFifth, gambitSixth];
 
     const pairedRoom = await call<{
@@ -3281,7 +3528,7 @@ async function main(): Promise<void> {
     }> = [];
     for (const captain of pairedCrew) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const frames: Frame[] = [];
       socket.onAny((event: string, ...args: unknown[]) => {
         frames.push({ event, text: JSON.stringify(args) });
@@ -3422,7 +3669,7 @@ async function main(): Promise<void> {
     // A reload of a Pirate, which is the one path that has to work the
     // pairing out again rather than read it off the row it is sending.
     const pairedReload = await openAuthedSocket(gambitSecond);
-    sockets.push(pairedReload);
+    run.sockets.push(pairedReload);
     const pairedReplayed = waitForEvent<WireDelivery>(
       pairedReload,
       "private:entry",
@@ -3785,11 +4032,14 @@ async function main(): Promise<void> {
     // The house rule for every string a mode hands a captain, read with the
     // one rule a regex can hold this file to.
     const modeCopy = MODE_ORDER.flatMap((mode) => {
-      const { badge, tagline, summary, briefing } = MODES[mode];
+      const { badge, tagline, summary, failureRule, differences, briefing } =
+        MODES[mode];
       return [
         badge,
         tagline,
         summary,
+        failureRule,
+        ...differences,
         ...(briefing.kind === "line"
           ? [briefing.text]
           : [
@@ -3821,6 +4071,214 @@ async function main(): Promise<void> {
     check(
       modeCopy.every((line) => line.trim().length > 0),
       "and every string a mode hands a captain says something rather than opening empty",
+    );
+
+    // The same copy under the stricter rule, which is the one the mode's own
+    // prose is held to: no hyphen at all. Built from the prose rather than
+    // from the array above, and the difference is the point. What is left
+    // out is the badge, the phase faces and the gradient classes, which are
+    // identifiers rather than sentences, and the phase labels, which are
+    // shared with the rail rather than written by the mode. What is in it is
+    // every sentence a mode writes about itself: what it is, what it costs
+    // to fail, what it changes, and what each leg of its round decides.
+    const modeProse = MODE_ORDER.flatMap((mode) => {
+      const { tagline, summary, failureRule, differences, briefing } =
+        MODES[mode];
+      return [
+        tagline,
+        summary,
+        failureRule,
+        ...differences,
+        ...(briefing.kind === "line"
+          ? [briefing.text]
+          : [
+              ...briefing.legs.flatMap((leg) => [leg.body, leg.setsUp]),
+              briefing.closes,
+            ]),
+      ];
+    });
+    check(
+      modeProse.every((line) => !CARRIES_A_HYPHEN.test(line)),
+      "and every sentence a mode writes about itself is free of hyphens as well as dashes, which is the rule for the documentation a captain reads",
+    );
+    // The founding voyage is what the others differ from, so its list is
+    // empty rather than absent, and a mode that claims to change nothing is
+    // a mode someone forgot to write. The two claims are one check because
+    // either one alone passes on a broken record: an empty list on both
+    // modes passes the first, and a non empty list on Classic passes the
+    // second.
+    check(
+      MODES.classic.differences.length === 0 &&
+        MODES.ocean_gambit.differences.length > 0,
+      "the founding voyage lists no differences from itself while the experimental one lists the ways it plays differently, which is the array every surface that explains a mode reads",
+    );
+
+    // What the three surfaces that teach the rules do with that array. Each
+    // one is read for both modes and for every tier, and each one has to do
+    // two things: print the record's own words rather than a version of
+    // them written where they are shown, and say something different about
+    // Gambit than it says about Classic. The defect this section was
+    // written for was both at once: the tutorial taught Classic's lap and
+    // promised that bankruptcy ends the voyage, on a mode built on the
+    // opposite pillar, and nothing in this file could see it.
+    for (const mode of MODE_ORDER) {
+      const play = MODES[mode];
+      const steps = tutorialSteps(mode, "fair_winds");
+      const guide = guideText(mode, "fair_winds");
+      const tips = tipsText(mode, "fair_winds");
+      check(
+        steps.some((step) => step.content.includes(play.failureRule)) &&
+          guide.includes(play.failureRule) &&
+          // The advice prints it where the rule is not the end of a voyage,
+          // because every line under it is written for a captain whose
+          // books can sink them, and that is what the note is for.
+          (play.bankruptcyIsFinal || tips.includes(play.failureRule)) &&
+          guide.includes(play.tagline) &&
+          play.differences.every(
+            (line) =>
+              steps.some((step) => step.content.includes(line)) &&
+              guide.includes(line),
+          ),
+        `every surface that teaches the ${play.badge} voyage prints the words the record states, so the tutorial, the guide and the advice cannot teach three versions of one rule`,
+      );
+    }
+    for (const tier of ["fair_winds", "open_waters", "monsoon"] as const) {
+      check(
+        guideText("classic", tier) !== guideText("ocean_gambit", tier) &&
+          tipsText("classic", tier) !== tipsText("ocean_gambit", tier) &&
+          JSON.stringify(tutorialSteps("classic", tier)) !==
+            JSON.stringify(tutorialSteps("ocean_gambit", tier)),
+        `${MODES.ocean_gambit.badge} is documented on its own terms at ${tier}: the guide, the advice and the tutorial each word the experimental voyage differently from the founding one rather than sharing a page`,
+      );
+    }
+    // The page count, which is the other half of the same claim: a mode with
+    // nothing to say about itself adds no page, and a mode that changes
+    // rules adds exactly one, so a new captain's manual is as long as the
+    // mode they picked has something to teach them.
+    check(
+      tutorialSteps("ocean_gambit", "fair_winds").length ===
+        tutorialSteps("classic", "fair_winds").length + 1 &&
+        MODES.classic.differences.length === 0,
+      "the experimental voyage adds one page to the tutorial, the list of what it changes, where the founding voyage's manual is the length it has always been",
+    );
+    // Every word those surfaces print, with the markup stripped: the
+    // directive's rule applied to the documentation a captain reads. The
+    // tags are stripped rather than the check narrowed, because a style
+    // attribute carries hyphens of its own (font-size, color-mix) and they
+    // are not words: what a captain reads is the text between the tags.
+    const taughtProse = MODE_ORDER.flatMap((mode) =>
+      (["fair_winds", "open_waters", "monsoon"] as const).flatMap((tier) => [
+        ...tutorialSteps(mode, tier).flatMap((step) => [
+          step.title,
+          step.content.replace(/<[^>]*>/g, " "),
+        ]),
+        guideText(mode, tier),
+        tipsText(mode, tier),
+      ]),
+    );
+    check(
+      taughtProse.every((line) => !CARRIES_A_HYPHEN.test(line)),
+      "every word the tutorial, the guide and the advice print for either mode at any tier is free of dashes and hyphens, read with the markup stripped",
+    );
+
+    // The two surfaces a captain meets before the first round, which are
+    // components rather than functions and so are read as source rather
+    // than rendered: the lobby's manual and the room's Welcome screen. Each
+    // one takes the mode and prints the record's own fields, and neither
+    // states a mode's rules in words of its own. The sentence named in the
+    // second check is the one the manual used to carry: it told every crew,
+    // in the founding mode's voice, that failing the bills ends the voyage,
+    // and no crew sailing the experimental mode had been told the truth.
+    const manualSource = readFileSync(
+      join(
+        import.meta.dirname,
+        "..",
+        "src/components/portmasters/HowToPlayModal.tsx",
+      ),
+      "utf8",
+    );
+    const welcomeSource = readFileSync(
+      join(
+        import.meta.dirname,
+        "..",
+        "src/components/portmasters/game/phases/Welcome.tsx",
+      ),
+      "utf8",
+    );
+    // Read with the comments taken out, because these two checks are about
+    // what a screen prints rather than about what its file says, and the
+    // difference is real here: this tree's comments quote the sentence they
+    // replaced, which is what makes a repair readable a year later, and the
+    // first run of this check failed on the note that explains the fix
+    // rather than on the defect. Stripping is the narrowest way to say
+    // "the code": a comment that names play.failureRule no longer counts as
+    // printing it either, so the check gets stronger as well as truer.
+    const manualCode = withoutComments(manualSource);
+    const welcomeCode = withoutComments(welcomeSource);
+    check(
+      manualCode.includes("modeConfig(mode)") &&
+        manualCode.includes("play.failureRule") &&
+        manualCode.includes("play.differences") &&
+        !manualCode.includes("you go bankrupt"),
+      "the lobby's manual takes the mode it is opened for and prints the record's own rule for a failed seat, rather than the sentence that told every crew the founding voyage's answer",
+    );
+    check(
+      welcomeCode.includes("play.failureRule") &&
+        !welcomeCode.includes("Voyages await"),
+      "and the Welcome screen states the mode's own stake before the first Dawn, and counts rounds rather than calling each round a voyage",
+    );
+    // The last of the copy this defect reached, and the only line of it that
+    // was wrong before the experimental mode existed: the lobby's Legacy
+    // card named Fair Winds' eight rounds above the very screen a captain
+    // chooses a voyage on, which is wrong for two of the three charters and
+    // for every Gambit table as well, and it ended on the founding mode's
+    // ending. The rule needs neither a number nor an ending.
+    const lobbyCode = withoutComments(
+      readFileSync(
+        join(import.meta.dirname, "..", "src/components/portmasters/Lobby.tsx"),
+        "utf8",
+      ),
+    );
+    check(
+      !lobbyCode.includes("on the way to Round 8") &&
+        !lobbyCode.includes("ends in bankruptcy"),
+      "and the lobby's Legacy card states the Renown rule without naming a voyage's length or a mode's ending, so the card a captain reads before choosing a charter is true of the charter they choose",
+    );
+    check(
+      !carriesADash("src/lib/game/mode.ts") &&
+        !carriesADash("src/components/portmasters/HowToPlayModal.tsx") &&
+        !carriesADash("src/components/portmasters/game/phases/Welcome.tsx") &&
+        !carriesADash("src/components/portmasters/Lobby.tsx"),
+      "and the four files this copy lands in carry no dash of any kind, comments included",
+    );
+
+    // The glyphs a captain reads, held by the same rule the words are: the
+    // sequences that draw them are built from code points rather than
+    // spelled, because a check that carries the sequence it verifies cannot
+    // see the sequence change. What this guards is a real regression rather
+    // than an imagined one. The pirate flag is a flag joined to a skull by a
+    // zero width joiner, which is invisible in the source and to the
+    // compiler, and a documentation pass over the settlement panel dropped
+    // it: the flag rendered as a bare black flag with a skull beside it for
+    // a release, and only a player could see it.
+    const PIRATE_FLAG = String.fromCodePoint(0x1f3f4, 0x200d, 0x2620, 0xfe0f);
+    const UNJOINED_FLAG_FORMS = [
+      String.fromCodePoint(0x1f3f4, 0x2620, 0xfe0f),
+      String.fromCodePoint(0x1f3f4, 0x2620),
+    ];
+    const pirateSites = walkSrc(join(import.meta.dirname, "..", "src"));
+    const settlementSource = pirateSites.find((file) =>
+      file.endsWith(join("phases", "Settlement.tsx")),
+    );
+    check(
+      settlementSource !== undefined &&
+        readFileSync(settlementSource, "utf8").includes(PIRATE_FLAG) &&
+        pirateSites.every((file) =>
+          UNJOINED_FLAG_FORMS.every(
+            (form) => !readFileSync(file, "utf8").includes(form),
+          ),
+        ),
+      "the pirate flag is drawn with the zero width joiner that makes it one glyph, in the panel that shows it and in every other source file, so the icon cannot quietly lose it again",
     );
 
     // Where a mode's briefing puts a thing, as the words it prints for its
@@ -4074,7 +4532,7 @@ async function main(): Promise<void> {
     ) => {
       const opening = await signUp(`${tag}a`);
       const crewmate = await signUp(`${tag}b`);
-      extraAccounts.push(opening, crewmate);
+      run.extraAccounts.push(opening, crewmate);
       const opened = await call<{ room: { id: string; code: string } }>(
         "/api/rooms",
         {
@@ -4092,7 +4550,7 @@ async function main(): Promise<void> {
         throw new Error(`No ${label} harbor to sail a lap in, stopping here.`);
       }
       const room = opened.body.room.id;
-      lapRoomIds.push(room);
+      run.lapRoomIds.push(room);
       const joined = await call<{ room: { id: string } }>("/api/rooms/join", {
         method: "POST",
         cookie: crewmate.cookie,
@@ -4110,7 +4568,7 @@ async function main(): Promise<void> {
       }> = [];
       for (const captain of [opening, crewmate]) {
         const socket = await openAuthedSocket(captain);
-        sockets.push(socket);
+        run.sockets.push(socket);
         const frames: LapFrame[] = [];
         const record =
           (event: LapFrame["event"]) =>
@@ -4429,7 +4887,7 @@ async function main(): Promise<void> {
       for (let seat = 0; seat < seats; seat++) {
         captains.push(await signUp(`${tag}${seat}`));
       }
-      extraAccounts.push(...captains);
+      run.extraAccounts.push(...captains);
       const opened = await call<{ room: { id: string; code: string } }>(
         "/api/rooms",
         {
@@ -4446,7 +4904,7 @@ async function main(): Promise<void> {
         throw new Error(`No ${label} harbor to run a clock in, stopping here.`);
       }
       const roomId = opened.body.room.id;
-      lapRoomIds.push(roomId);
+      run.lapRoomIds.push(roomId);
       for (const captain of captains.slice(1)) {
         const seated = await call("/api/rooms/join", {
           method: "POST",
@@ -4464,7 +4922,7 @@ async function main(): Promise<void> {
       }> = [];
       for (const captain of captains) {
         const socket = await openAuthedSocket(captain);
-        sockets.push(socket);
+        run.sockets.push(socket);
         const frames: ClockFrame[] = [];
         socket.on(
           "phase:advance",
@@ -4549,7 +5007,7 @@ async function main(): Promise<void> {
     const clockRecord = async (roomId: string) => {
       for (let waited = 0; waited < 25000; waited += 250) {
         const row = await db.voyageTelemetry.findFirst({
-          where: { roomId },
+          where: { roomId: roomId },
           select: { outcome: true, record: true },
         });
         if (row) {
@@ -4840,7 +5298,7 @@ async function main(): Promise<void> {
       garbage.every((raw) => sameOrders(normalizeStandingOrders(raw), quiet)),
       "and anything the vocabulary does not name is read back as that same record rather than trusted",
     );
-    const goods = ITEMS;
+    const goods = MARKET_GOODS;
     const littered = normalizeStandingOrders({
       enabled: true,
       buy: [
@@ -4870,6 +5328,25 @@ async function main(): Promise<void> {
         everyGood.buy.length === MAX_STANDING_BUYS &&
         everyGood.buy.every((line) => line.maxPrice === 1),
       `and one line per good is the whole of what a list can say, however long the list it was read from was (${goods.length} goods)`,
+    );
+    // [D4: Loom: the Refit] The line the board can never answer. Rags is
+    // cargo the Loom's bench buys off the quay rather than a good the port
+    // merchant trades, so an instruction naming one would be a line the
+    // merchant could never fill, and the reader drops it the same way it
+    // drops a name no catalogue carries. This is the reason the cap above is
+    // the board's list rather than the hold's: the two stopped being the
+    // same list the day Rags arrived.
+    const ragsLine = normalizeStandingOrders({
+      enabled: true,
+      buy: [{ good: RAGS, maxPrice: 999 }],
+    });
+    check(
+      !(MARKET_GOODS as readonly string[]).includes(RAGS) &&
+        (ITEMS as readonly string[]).includes(RAGS) &&
+        ragsLine.buy.length === 0 &&
+        MAX_STANDING_BUYS === MARKET_GOODS.length &&
+        MAX_STANDING_BUYS < ITEMS.length,
+      "a shopping list cannot name a rag, because a standing order buys a card and the merchant's cards are dealt from the goods the merchant trades, so the hold's catalogue and the board's are two lists rather than one",
     );
     // A set the captain wrote and then switched off is the rollback the
     // plan asks for, and it is measured against this one record below.
@@ -5371,6 +5848,42 @@ async function main(): Promise<void> {
         captain: "Smoke logger1",
         taker: "Smoke logger2",
       },
+      refit_posted: {
+        kind: "refit_posted",
+        captain: "Smoke logger1",
+        good: "Linen Clothes",
+        fee: 12,
+      },
+      refit_agreed: {
+        kind: "refit_agreed",
+        captain: "Smoke logger1",
+        taker: "Smoke logger2",
+        good: "Linen Clothes",
+        fee: 12,
+      },
+      // [D5: Aroma: the Bazaar Rumor] The one fact this table carries that
+      // is deliberately incomplete, and the line below says the same: the
+      // captain and the good, with no direction, because the log is public
+      // the moment it is written and the direction is not public yet.
+      rumor_published: {
+        kind: "rumor_published",
+        captain: "Smoke logger1",
+        good: "Silk",
+      },
+      // [D7: the draft, and switching] The identity pair, and the switch is
+      // the line the plan asks for by name: "the switch is published to the
+      // fleet log where everyone sees it." Both carry the path taken up and
+      // never the path left, for the reason the writer's own note gives.
+      path_taken: {
+        kind: "path_taken",
+        captain: "Smoke logger1",
+        path: "loom",
+      },
+      path_switched: {
+        kind: "path_switched",
+        captain: "Smoke logger1",
+        path: "quartermaster",
+      },
     };
     const logLines: Record<VoyageLogKind, string> = {
       voyage_started: "The voyage leaves the dock.",
@@ -5389,6 +5902,15 @@ async function main(): Promise<void> {
         "Smoke logger2 buys a leg of protection from Smoke logger1 for 12 Gold.",
       contract_claimed:
         "Raiders bound for Smoke logger2 met Smoke logger1's guns.",
+      refit_posted:
+        "Smoke logger1 offers to put a Linen Clothes right for 12 Gold.",
+      refit_agreed:
+        "Smoke logger2 pays Smoke logger1 12 Gold to put the Linen Clothes right.",
+      rumor_published:
+        "Smoke logger1 publishes a rumor about Silk at the bazaar.",
+      path_taken: "Smoke logger1 takes up the Loom path.",
+      path_switched:
+        "Smoke logger1 sets aside their old papers and takes up the Quartermaster path.",
     };
     for (const kind of VOYAGE_LOG_KINDS) {
       check(
@@ -5470,6 +5992,12 @@ async function main(): Promise<void> {
     // line the suite would hold to its sentence while no captain could ever
     // read it, and the scan is what makes adding a kind a two part change
     // rather than a one part one.
+    //
+    // Walked rather than listed, and by the same walker every other scan of
+    // this tree uses: the layer keeps its frames in the modules under
+    // ./wiring now, and a flat listing here would read the composition root
+    // alone and report a vocabulary entry as unwritten that three leaves
+    // write between them.
     const realtimeDir = join(
       import.meta.dirname,
       "..",
@@ -5477,9 +6005,8 @@ async function main(): Promise<void> {
       "server",
       "realtime",
     );
-    const realtimeSource = readdirSync(realtimeDir)
-      .filter((file) => file.endsWith(".ts"))
-      .map((file) => readFileSync(join(realtimeDir, file), "utf8"))
+    const realtimeSource = walkSrc(realtimeDir)
+      .map((file) => readFileSync(file, "utf8"))
       .join("\n");
     check(
       VOYAGE_LOG_KINDS.every((kind) =>
@@ -5503,7 +6030,7 @@ async function main(): Promise<void> {
     // dealt in this mode and nowhere else, and both captains hold one.
     const logHost = await signUp("logger1");
     const logMate = await signUp("logger2");
-    extraAccounts.push(logHost, logMate);
+    run.extraAccounts.push(logHost, logMate);
     const logRoom = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
       {
@@ -5542,7 +6069,7 @@ async function main(): Promise<void> {
     }> = [];
     for (const captain of [logHost, logMate]) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const frames: LogFrame[] = [];
       socket.onAny((event: string, ...args: unknown[]) => {
         frames.push({ event, text: JSON.stringify(args) });
@@ -6086,7 +6613,7 @@ async function main(): Promise<void> {
     );
 
     const lateArrival = await openAuthedSocket(gambitThird);
-    sockets.push(lateArrival);
+    run.sockets.push(lateArrival);
     const greeted = boardOn(lateArrival);
     lateArrival.emit("room:join", { roomId: gambitRoomId });
     check(
@@ -6261,7 +6788,7 @@ async function main(): Promise<void> {
       gambitFourth,
     ]) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const seatedHere = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -6736,7 +7263,7 @@ async function main(): Promise<void> {
     const rungSockets: Socket[] = [];
     for (const captain of [gambitHost, ...rungCrew]) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const takenASeat = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -7089,7 +7616,7 @@ async function main(): Promise<void> {
     const auditSockets: Socket[] = [];
     for (const captain of [gambitHost, ...auditCrew]) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const takenASeat = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -7446,7 +7973,7 @@ async function main(): Promise<void> {
     // (see roomLockedFor): the same captain, a fresh socket, which is
     // what a client that comes back mid voyage opens.
     const auditReloadSocket = await openAuthedSocket(gambitFifth);
-    sockets.push(auditReloadSocket);
+    run.sockets.push(auditReloadSocket);
     const handedReveal = waitForEvent<AuditReveal>(
       auditReloadSocket,
       "audit:reveal",
@@ -7493,7 +8020,7 @@ async function main(): Promise<void> {
     // the door: a captain who is not a member is turned away before any of
     // this and would prove nothing about the reveal.
     const auditRejoin = await openAuthedSocket(gambitFifth);
-    sockets.push(auditRejoin);
+    run.sockets.push(auditRejoin);
     const staleReveal = waitForEvent<AuditReveal>(
       auditRejoin,
       "audit:reveal",
@@ -7833,7 +8360,7 @@ async function main(): Promise<void> {
     const maroonSockets: Socket[] = [];
     for (const captain of [gambitHost, ...maroonCrew]) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const takenASeat = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -7999,7 +8526,7 @@ async function main(): Promise<void> {
     maroonSockets[1].emit("maroon:vote", {
       roomId: maroonRoomId,
       round: 9,
-      targetUserId: guest.id,
+      targetUserId: run.guest.id,
     });
     await maroonSettle();
     check(
@@ -8250,7 +8777,7 @@ async function main(): Promise<void> {
     // voyage in flight is closed to new seats, so it is the same captain on
     // a fresh socket, which is what a client that comes back opens.
     const maroonReload = await openAuthedSocket(gambitFifth);
-    sockets.push(maroonReload);
+    run.sockets.push(maroonReload);
     const handedResult = waitForEvent<MaroonResult>(
       maroonReload,
       "maroon:result",
@@ -8335,7 +8862,7 @@ async function main(): Promise<void> {
       "restarting the voyage reopens the harbor at its first checkpoint",
     );
     const maroonRejoin = await openAuthedSocket(gambitFifth);
-    sockets.push(maroonRejoin);
+    run.sockets.push(maroonRejoin);
     const staleResult = waitForEvent<MaroonResult>(
       maroonRejoin,
       "maroon:result",
@@ -8378,7 +8905,7 @@ async function main(): Promise<void> {
     const revNew = await signUp("revnew");
     const revForged = await signUp("revfake");
     const revCrew = [revHonest, revPirate, revBroker, revNew, revForged];
-    extraAccounts.push(...revCrew);
+    run.extraAccounts.push(...revCrew);
 
     const revRoom = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
@@ -8419,7 +8946,7 @@ async function main(): Promise<void> {
     const revSeen = new Map<string, WireReveal[]>();
     for (const captain of revCrew) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       revSeen.set(captain.id, []);
       socket.on("voyage:reveal", (payload: WireReveal) => {
         revSeen.get(captain.id)?.push(payload);
@@ -8807,7 +9334,7 @@ async function main(): Promise<void> {
     // what the table saw, and the hand out is the same door the audit's
     // reveal and the commission's board come through.
     const revRejoin = await openAuthedSocket(revBroker);
-    sockets.push(revRejoin);
+    run.sockets.push(revRejoin);
     const revHanded = waitForEvent<WireReveal>(
       revRejoin,
       "voyage:reveal",
@@ -8829,7 +9356,7 @@ async function main(): Promise<void> {
     const revStale = await (async () => {
       await new Promise((resolve) => setTimeout(resolve, 1200));
       const socket = await openAuthedSocket(revNew);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const frame = waitForEvent<WireReveal>(
         socket,
         "voyage:reveal",
@@ -8913,7 +9440,7 @@ async function main(): Promise<void> {
     const unlHome = await signUp("unlhome");
     const unlNew = await signUp("unlnew");
     const unlFake = await signUp("unlfake");
-    extraAccounts.push(unlHome, unlNew, unlFake);
+    run.extraAccounts.push(unlHome, unlNew, unlFake);
     await db.captainLegacy.create({
       data: { userId: unlHome.id, voyagesCompleted: UNLOCK_EARNED_AT - 1 },
     });
@@ -8954,7 +9481,7 @@ async function main(): Promise<void> {
     const unlSockets: Socket[] = [];
     for (const captain of unlCrew) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const seatedHere = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -9125,7 +9652,7 @@ async function main(): Promise<void> {
     // harbor that reopens is still the harbor it was opened as, which is
     // what the lobby card a captain reads it off promises either way.
     const unlGateSocket = await openAuthedSocket(unlNew);
-    sockets.push(unlGateSocket);
+    run.sockets.push(unlGateSocket);
     const unlGateSeated = waitForEvent<WireHistory>(
       unlGateSocket,
       "chat:history",
@@ -9324,7 +9851,7 @@ async function main(): Promise<void> {
     const telCast = await signUp("tel_c");
     const telDrift = await signUp("tel_d");
     const telWipe = await signUp("tel_e");
-    extraAccounts.push(telHome, telMate, telCast, telDrift, telWipe);
+    run.extraAccounts.push(telHome, telMate, telCast, telDrift, telWipe);
 
     // One harbor, chartered, seated and started. The three fixtures differ
     // in what they then do to it rather than in how it comes into being,
@@ -9367,7 +9894,7 @@ async function main(): Promise<void> {
       const crewSockets: Socket[] = [];
       for (const captain of crew) {
         const socket = await openAuthedSocket(captain);
-        sockets.push(socket);
+        run.sockets.push(socket);
         const aboard = waitForEvent<WireHistory>(
           socket,
           "chat:history",
@@ -9400,7 +9927,7 @@ async function main(): Promise<void> {
       phase: Phase,
     ): Promise<void> => {
       socket.emit("game:status", {
-        roomId,
+        roomId: roomId,
         round,
         phase,
         phaseLabel: phase,
@@ -9428,7 +9955,7 @@ async function main(): Promise<void> {
     // suite that stopped early.
     const telStored = async (roomId: string) => {
       const rows = await db.voyageTelemetry.findMany({
-        where: { roomId },
+        where: { roomId: roomId },
         select: {
           outcome: true,
           leg: true,
@@ -9539,6 +10066,10 @@ async function main(): Promise<void> {
         saltFishMeals?: unknown;
         produceMeals?: unknown;
       },
+      // [D6: Free Captain: Opportunist] The borrow counter rides here for
+      // the reason the hold figures do: a report is a claim, and what the
+      // checks below are about is what the spine does with one.
+      ability?: { opportunistBorrows?: unknown },
     ) =>
       socket.emit("telemetry:leg", {
         roomId: sailRoomId,
@@ -9547,13 +10078,20 @@ async function main(): Promise<void> {
         ordersFilled,
         distinctGoods,
         ...(hold ?? {}),
+        ...(ability ?? {}),
       });
     telLegReport(sailHome, 1, 3, 1, 2);
     // The same captain, the same leg, reporting again after filling another
     // order: the last report for a leg is the one kept, so this is the pair
-    // of figures the record has to close with.
-    telLegReport(sailHome, 1, 4, 2, 3);
-    telLegReport(sailMate, 1, 2, 2, 1);
+    // of figures the record has to close with. The borrow counter rides the
+    // second of the two, so a reader can tell that the replacement kept the
+    // whole report rather than the three figures it was filed for.
+    telLegReport(sailHome, 1, 4, 2, 3, undefined, {
+      opportunistBorrows: 3.7,
+    });
+    telLegReport(sailMate, 1, 2, 2, 1, undefined, {
+      opportunistBorrows: "three",
+    });
     // Two claims outside the voyage's reach, which the spine refuses rather
     // than keeping: a leg it never got to, and a leg that does not exist at
     // all. Both are filed about a captain who never filed a report of their
@@ -9581,12 +10119,26 @@ async function main(): Promise<void> {
     // than assumed: a claim is floored and kept, a negative is clamped to
     // the empty hold it is, and a value that is not a number is dropped
     // rather than defaulted to a zero a reader would take for a real one.
-    telLegReport(sailMate, 3, 5, 0, 4, {
-      holdSlots: 27.9,
-      grainMeals: 12,
-      saltFishMeals: -4,
-      produceMeals: "six",
-    });
+    telLegReport(
+      sailMate,
+      3,
+      5,
+      0,
+      4,
+      {
+        holdSlots: 27.9,
+        grainMeals: 12,
+        saltFishMeals: -4,
+        produceMeals: "six",
+      },
+      // [D6: Free Captain: Opportunist] The borrow counter rides the same
+      // report and the same spine reader as the four figures above, filed
+      // as a negative here so the clamp is exercised rather than assumed.
+      // It is deliberately not a report of its own: a second report for one
+      // captain and one leg replaces the first, which would take the hold
+      // figures off the record rather than add a figure to it.
+      { opportunistBorrows: -2 },
+    );
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // ---- the two votes, at their own rungs ----
@@ -9823,6 +10375,22 @@ async function main(): Promise<void> {
         homeLegOne?.produceMeals === undefined,
       "and a hold reading on a report is a claim the spine floors, clamps or drops rather than a figure it trusts, while a leg that measured no hold carries none of the four",
     );
+    // [D6: Free Captain: Opportunist] The borrow counter is read by that
+    // same rule, and the three readings are the whole of it: a fraction
+    // floors to the whole borrows it can stand for, a negative clamps to
+    // the voyage that spent none, and a claim that is not a number at all
+    // is dropped. The last is the one that matters most on this field,
+    // because a zero here is a real reading rather than an empty one: it
+    // says the allowance is unspent.
+    const mateLegOne = sailReports.find(
+      (event) => event.actor === telMate.id && event.leg === 1,
+    );
+    check(
+      homeLegOne?.opportunistBorrows === 3 &&
+        mateLegThree?.opportunistBorrows === 0 &&
+        mateLegOne?.opportunistBorrows === undefined,
+      "and the borrow counter rides the same reader, so a fraction floors to the whole borrows it stands for, a negative clamps to the voyage that spent none, and a value that is not a number is dropped rather than landing as a zero a reader could take for an unspent allowance",
+    );
     check(
       !sailReportLines.some(
         (line) => line.endsWith(":99") || line.endsWith(":0"),
@@ -10058,7 +10626,7 @@ async function main(): Promise<void> {
     ): TelemetryRecord => ({
       version: TELEMETRY_VERSION,
       voyageId: voyageIdFor(roomId, 1),
-      roomId,
+      roomId: roomId,
       voyageEpoch: 1,
       mode: "ocean_gambit",
       difficulty: "fair_winds",
@@ -10495,7 +11063,7 @@ async function main(): Promise<void> {
     const captainBalance = await call<{ error?: string }>(
       "/api/admin/balance",
       {
-        cookie: host.cookie,
+        cookie: run.host.cookie,
       },
     );
     check(
@@ -10791,15 +11359,21 @@ async function main(): Promise<void> {
     // The copy a captain reads. All three of these quoted the tier before
     // this feature, which was the same number as the voyage until a mode
     // could pin one, and the loan line's round is the voyage's last leg.
+    // The wording is the record's, and it counts rounds: a voyage is the
+    // whole run, so the guide's objective line is what states its length.
     check(
-      guideText("ocean_gambit", "fair_winds").includes("Travel 12 voyages") &&
+      guideText("ocean_gambit", "fair_winds").includes(
+        "Sail one voyage of 12 rounds",
+      ) &&
         tipsText("ocean_gambit", "fair_winds").includes("Round 12") &&
         tutorialSteps("ocean_gambit", "fair_winds")[0]?.content.includes(
-          "12 voyages, limited gold",
+          "one voyage of 12 rounds",
         ) &&
-        guideText("classic", "fair_winds").includes("Travel 8 voyages") &&
+        guideText("classic", "fair_winds").includes(
+          "Sail one voyage of 8 rounds",
+        ) &&
         tipsText("classic", "fair_winds").includes("Round 8"),
-      "the guide, the advice and the tutorial quote the voyage's own length, so a twelve leg table is never briefed on the eight leg voyage its tier would have run",
+      "the guide, the advice and the tutorial quote the voyage's own length, so a twelve round table is never briefed on the eight round voyage its tier would have run",
     );
 
     // A four captain harbor, sailed to its end. The crew walks the legs the
@@ -10812,7 +11386,7 @@ async function main(): Promise<void> {
     const sizeMate = await signUp("size_b");
     const sizeThird = await signUp("size_c");
     const sizeFourth = await signUp("size_d");
-    extraAccounts.push(sizeHome, sizeMate, sizeThird, sizeFourth);
+    run.extraAccounts.push(sizeHome, sizeMate, sizeThird, sizeFourth);
     const sizeRoom = await telSail("four seat", [
       sizeHome,
       sizeMate,
@@ -11389,7 +11963,7 @@ async function main(): Promise<void> {
     // explicit true is a hungry crew, so a client that never had a larder
     // reads as fed rather than as unknown.
     const larderHome = await signUp("lard_h");
-    extraAccounts.push(larderHome);
+    run.extraAccounts.push(larderHome);
     const larderRoom = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
       {
@@ -11406,7 +11980,7 @@ async function main(): Promise<void> {
     }
     const larderRoomId = larderRoom.body.room.id;
     const larderSocket = await openAuthedSocket(larderHome);
-    sockets.push(larderSocket);
+    run.sockets.push(larderSocket);
     const larderSeated = waitForEvent<WireHistory>(
       larderSocket,
       "chat:history",
@@ -12933,18 +13507,6 @@ async function main(): Promise<void> {
     // name), and it is swept for across every source file, so finding it in
     // one file is finding the sentence in one file however a second copy of
     // it might be spelled.
-    const walkSrc = (dir: string): string[] => {
-      const out: string[] = [];
-      for (const entry of readdirSync(dir)) {
-        const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
-          out.push(...walkSrc(full));
-          continue;
-        }
-        if (/\.tsx?$/.test(entry)) out.push(full);
-      }
-      return out;
-    };
     const lockStem = pathLockLine(PATH_IDS[0]).split(
       PATHS[PATH_IDS[0]].name,
     )[0];
@@ -12979,20 +13541,19 @@ async function main(): Promise<void> {
     // A fee, as the one reader both the form and the socket go through
     // reads it.
     check(
-      escortFeeFor(ESCORT_CONTRACT_FEE_MIN) === ESCORT_CONTRACT_FEE_MIN &&
-        escortFeeFor(ESCORT_CONTRACT_FEE_MAX) === ESCORT_CONTRACT_FEE_MAX &&
-        escortFeeFor(50) === 50 &&
-        escortFeeFor(ESCORT_CONTRACT_FEE_MAX + 0.6) ===
-          ESCORT_CONTRACT_FEE_MAX &&
-        escortFeeFor(1.9) === 1,
+      consentFeeFor(CONSENT_FEE_MIN) === CONSENT_FEE_MIN &&
+        consentFeeFor(CONSENT_FEE_MAX) === CONSENT_FEE_MAX &&
+        consentFeeFor(50) === 50 &&
+        consentFeeFor(CONSENT_FEE_MAX + 0.6) === CONSENT_FEE_MAX &&
+        consentFeeFor(1.9) === 1,
       "a fee inside the contract's own bounds is accepted, and a fraction of a Gold coin is floored rather than refused, because a form that hands back a value a hair over what was typed is a form and not a cheat",
     );
     check(
       [
         0,
         -1,
-        ESCORT_CONTRACT_FEE_MIN - 1,
-        ESCORT_CONTRACT_FEE_MAX + 1,
+        CONSENT_FEE_MIN - 1,
+        CONSENT_FEE_MAX + 1,
         Number.NaN,
         Number.POSITIVE_INFINITY,
         Number.NEGATIVE_INFINITY,
@@ -13001,7 +13562,7 @@ async function main(): Promise<void> {
         undefined,
         {},
         true,
-      ].every((value) => escortFeeFor(value) === null),
+      ].every((value) => consentFeeFor(value) === null),
       "and a fee outside them, or one that is not a number at all, is refused outright rather than clamped, because a fee somebody typed wrong is not the fee they meant",
     );
 
@@ -13052,7 +13613,15 @@ async function main(): Promise<void> {
     );
 
     // One contract, in whatever shape a check below needs it.
-    const contractOn = (over: Partial<EscortContract>): EscortContract => ({
+    //
+    // The phase is the one field no check here varies, so it is the one field
+    // the fixture refuses to take an override for: every row on this market
+    // was made at the Parley, which is where the board is drawn, and a helper
+    // that could place a contract in another phase would let a check describe
+    // a board the market cannot produce.
+    const contractOn = (
+      over: Partial<Omit<EscortContract, "phase">>,
+    ): EscortContract => ({
       id: "c1",
       sellerUserId: "seller",
       sellerName: "Smoke Seller",
@@ -13060,6 +13629,7 @@ async function main(): Promise<void> {
       buyerName: "Smoke Buyer",
       fee: 40,
       round: 3,
+      phase: "parley",
       status: "agreed",
       ...over,
     });
@@ -13080,11 +13650,17 @@ async function main(): Promise<void> {
       "and a board that carries no contract covers nobody, which is the whole of what a seller's departure takes from the buyer they were covering",
     );
     check(
-      escortBuyerBusy([contractOn({})], "buyer", 3) &&
-        !escortBuyerBusy([contractOn({})], "buyer", 4) &&
-        !escortBuyerBusy([contractOn({ status: "offered" })], "buyer", 3) &&
-        !escortBuyerBusy([contractOn({})], "seller", 3),
-      "one cover per captain per leg: a contract somebody actually holds is what makes a buyer busy, an offer they have not taken is not, and a seller is not occupied by the contracts they wrote",
+      consentPartyBusy([contractOn({})], "buyer", "buyer", 3) &&
+        !consentPartyBusy([contractOn({})], "buyer", "buyer", 4) &&
+        !consentPartyBusy(
+          [contractOn({ status: "offered" })],
+          "buyer",
+          "buyer",
+          3,
+        ) &&
+        !consentPartyBusy([contractOn({})], "buyer", "seller", 3) &&
+        consentPartyBusy([contractOn({})], "seller", "seller", 3),
+      "one agreement per captain per leg, asked on the side the market bounds: an agreement somebody actually holds makes that party busy, an offer they have not taken is not, a captain on the other side of the table is not, and the side is the whole of what the two markets differ on, so the escort asks about its buyer while the Loom's bench asks about its seller",
     );
 
     // The board's own three policies: who sees a row, what an expiry takes
@@ -13115,24 +13691,22 @@ async function main(): Promise<void> {
       "and a claimed contract is public while the figure it carries is not: the seller reads what the raid would have taken, and everyone else reads that it was claimed",
     );
     check(
-      expireContracts([openOffer], { phase: "orders", round: 3 }).length ===
-        0 &&
-        expireContracts([directOffer], { phase: "orders", round: 3 }).length ===
+      expireConsent([openOffer], { phase: "orders", round: 3 }).length === 0 &&
+        expireConsent([directOffer], { phase: "orders", round: 3 }).length ===
           0 &&
-        expireContracts([claimedRow], { phase: "orders", round: 3 }).length ===
+        expireConsent([claimedRow], { phase: "orders", round: 3 }).length ===
           1 &&
-        expireContracts([claimedRow], { phase: "parley", round: 4 }).length ===
-          0,
+        expireConsent([claimedRow], { phase: "parley", round: 4 }).length === 0,
       "an offer nobody took dies with the Parley it was posted in, because an offer nobody accepted is not binding on anyone, while a contract the two captains did agree survives the phase it was made in and lives exactly the leg it protects",
     );
     check(
-      escortOfferStanding([openOffer], "seller", null) &&
-        !escortOfferStanding([openOffer], "seller", "buyer") &&
-        !escortOfferStanding([openOffer], "buyer", null) &&
-        !escortOfferStanding([claimedRow], "seller", "buyer"),
+      consentOfferStanding([openOffer], "seller", null) &&
+        !consentOfferStanding([openOffer], "seller", "buyer") &&
+        !consentOfferStanding([openOffer], "buyer", null) &&
+        !consentOfferStanding([claimedRow], "seller", "buyer"),
       "a seller's rows are bounded by the table they are selling at: an offer for anyone is not a second offer to a named captain, another captain's row is not this seller's standing offer, and a contract already agreed is not an offer",
     );
-    const sweptBoard = agreeContract(
+    const sweptBoard = agreeConsent(
       [
         openOffer,
         directOffer,
@@ -13257,27 +13831,32 @@ async function main(): Promise<void> {
     // The ledger, which is the idempotence and the leg stamp both.
     const ledgerLeftOver = purseOf(500);
     ledgerLeftOver.currentRound = 5;
-    ledgerLeftOver.escortSettled = ["c1:fee"];
-    ledgerLeftOver.escortSettledRound = 4;
+    ledgerLeftOver.settledMovements = ["c1:fee"];
+    ledgerLeftOver.settledRound = 4;
     applyEscortSide(ledgerLeftOver, contractOn({}), "buyer", []);
     check(
       ledgerLeftOver.money === 460 &&
-        ledgerLeftOver.escortSettled.length === 1 &&
-        ledgerLeftOver.escortSettled[0] === "c1:fee",
+        ledgerLeftOver.settledMovements.length === 1 &&
+        ledgerLeftOver.settledMovements[0] === "c1:fee",
       "a ledger left over from an earlier leg answers for nothing: the movement applies and the list is replaced rather than grown, so an id that comes round again on a new leg still settles",
     );
     const leaving = purseOf(500);
     leaving.currentRound = 4;
     leaving.escortCover = aCover;
     leaving.pendingEscortClaim = { contractId: "c1", raidGold: 100 };
-    leaving.escortSettled = ["c1:fee", "c1:claim"];
-    leaving.escortSettledRound = 4;
+    leaving.settledMovements = ["c1:fee", "c1:claim"];
+    leaving.settledRound = 4;
+    // The two calls the Dawn makes, in the order it makes them, because the
+    // ledger stopped being the escort's when the primitive arrived (see
+    // startBoonDrafting): one takes the leg's cover and its waiting claim,
+    // and the other empties the leg's settlement ledger and stamps it.
     resetEscortLeg(leaving);
+    resetConsentLedger(leaving);
     check(
       leaving.escortCover === null &&
         leaving.pendingEscortClaim === null &&
-        leaving.escortSettled.length === 0 &&
-        leaving.escortSettledRound === 4,
+        leaving.settledMovements.length === 0 &&
+        leaving.settledRound === 4,
       "the Dawn that opens a leg takes the cover, the claim waiting to be relayed and the ledger with it, and stamps the new leg so the list is emptied there rather than at the next settlement",
     );
 
@@ -13338,8 +13917,8 @@ async function main(): Promise<void> {
     for (const field of [
       "escortCover",
       "pendingEscortClaim",
-      "escortSettled",
-      "escortSettledRound",
+      "settledMovements",
+      "settledRound",
       "escortSold",
       "escortBought",
       "escortFeesEarned",
@@ -13352,30 +13931,32 @@ async function main(): Promise<void> {
     const wounded = createInitialGameState();
     wounded.escortSold = -3;
     wounded.escortAbsorbed = Number.NaN;
-    wounded.escortSettled = ["c1:fee", 7] as unknown as string[];
-    wounded.escortSettledRound = 2.7;
+    wounded.settledMovements = ["c1:fee", 7] as unknown as string[];
+    wounded.settledRound = 2.7;
     wounded.escortCover = { contractId: 5 } as unknown as EscortCover;
     wounded.pendingEscortClaim = {
       contractId: "c1",
       raidGold: "100",
     } as unknown as EscortClaim;
     normalizeEscortState(ancient);
+    normalizeConsentLedger(ancient);
     normalizeEscortState(wounded);
+    normalizeConsentLedger(wounded);
     check(
       ancient.escortSold === 0 &&
         ancient.escortAbsorbed === 0 &&
         ancient.escortCover === null &&
         ancient.pendingEscortClaim === null &&
-        ancient.escortSettled.length === 0 &&
-        ancient.escortSettledRound === 0,
+        ancient.settledMovements.length === 0 &&
+        ancient.settledRound === 0,
       "a save written before this feature reads as a captain who has bought nothing, sold nothing and owes nobody, rather than as one whose next raid roll throws",
     );
     check(
       wounded.escortSold === 0 &&
         wounded.escortAbsorbed === 0 &&
-        wounded.escortSettled.length === 1 &&
-        wounded.escortSettled[0] === "c1:fee" &&
-        wounded.escortSettledRound === 2 &&
+        wounded.settledMovements.length === 1 &&
+        wounded.settledMovements[0] === "c1:fee" &&
+        wounded.settledRound === 2 &&
         wounded.escortCover === null &&
         wounded.pendingEscortClaim === null,
       "and a save carrying the fields in shapes the engine would not survive is healed to the same reading: counts floored, the ledger filtered to strings rather than left holding a key that would never match, and a cover or a claim missing its own fields dropped outright",
@@ -13411,7 +13992,7 @@ async function main(): Promise<void> {
     const escortSeller = await signUp("esc_s");
     const escortBuyer = await signUp("esc_b");
     const escortForeigner = await signUp("esc_f");
-    extraAccounts.push(escortSeller, escortBuyer, escortForeigner);
+    run.extraAccounts.push(escortSeller, escortBuyer, escortForeigner);
 
     const escortRoom = await call<{ room: { id: string; code: string } }>(
       "/api/rooms",
@@ -13451,7 +14032,7 @@ async function main(): Promise<void> {
     const escortSockets = new Map<string, Socket>();
     for (const captain of escortCrew) {
       const socket = await openAuthedSocket(captain);
-      sockets.push(socket);
+      run.sockets.push(socket);
       const seatedHere = waitForEvent<WireHistory>(
         socket,
         "chat:history",
@@ -13538,8 +14119,8 @@ async function main(): Promise<void> {
     const badFee = await refusedFrom(escortSeller, "contract:post", { fee: 0 });
     check(
       badFee !== null &&
-        badFee.includes(String(ESCORT_CONTRACT_FEE_MIN)) &&
-        badFee.includes(String(ESCORT_CONTRACT_FEE_MAX)),
+        badFee.includes(String(CONSENT_FEE_MIN)) &&
+        badFee.includes(String(CONSENT_FEE_MAX)),
       "a fee outside the contract's bounds is refused by the server rather than clamped, and the refusal states both ends of the range it will take",
     );
 
@@ -13587,12 +14168,12 @@ async function main(): Promise<void> {
     // A real account standing somewhere else. The membership check is per
     // harbor, which is the only thing that makes aiming an offer at a
     // captain a check at all.
-    if (!host) {
+    if (!run.host) {
       throw new Error("No captain in another harbor to aim an offer at.");
     }
     const strangerTarget = await refusedFrom(escortSeller, "contract:post", {
       fee: 50,
-      targetUserId: host.id,
+      targetUserId: run.host.id,
     });
     check(
       strangerTarget !== null,
@@ -13823,39 +14404,3253 @@ async function main(): Promise<void> {
       "every file the escort contract's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
     );
 
+    console.log("\nLoom: the refit");
+
+    // ---- The bench, on a captain's own machine ----
+    //
+    // The wardrobe is switched on for the whole block, because the bench
+    // stands on it (see refitsOn), and the bench's own switch is switched on
+    // for everything but the checks that are about that switch. A run that
+    // left either one at whatever the environment happened to say would make
+    // the checks below pass for the wrong reason.
+    withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
+      check(
+        [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+          withEnv("NEXT_PUBLIC_REFITS", value, refitsOn),
+        ) &&
+          ["off", "0", "OFF", " off ", "Off"].every(
+            (value) => !withEnv("NEXT_PUBLIC_REFITS", value, refitsOn),
+          ),
+        "the Loom's bench is on for every value of its own switch except the word off and the digit zero, which is the policy every switch in this tree is read through",
+      );
+      check(
+        !withEnv("NEXT_PUBLIC_GARMENTS", "off", () =>
+          withEnv("NEXT_PUBLIC_REFITS", "1", refitsOn),
+        ),
+        "and it stands on the wardrobe rather than beside it: a table with no clothes layer has nothing to put right, so the bench's own switch cannot open it alone",
+      );
+
+      // One voyage, in whatever shape a check below needs it, and one helper
+      // that keeps the lines a refusal writes. Every function on this bench
+      // answers yes or no and says why, so the checks below hold the sentence
+      // as well as the answer: a captain who presses a button is owed one.
+      const benchState = (over: Partial<GameState> = {}): GameState => ({
+        ...createInitialGameState({ voyageEpoch: 7 }),
+        path: REFIT_SELLER_PATH,
+        money: 500,
+        ...over,
+      });
+      const attempt = (
+        trade: (logs: string[]) => boolean,
+      ): { ok: boolean; said: string } => {
+        const logs: string[] = [];
+        const ok = trade(logs);
+        return { ok, said: logs[logs.length - 1] ?? "" };
+      };
+
+      withEnv("NEXT_PUBLIC_REFITS", "1", () => {
+        check(
+          PATH_IDS.every(
+            (id) => canSellRefit({ path: id }) === (id === REFIT_SELLER_PATH),
+          ) && !canSellRefit({ path: null }),
+          "one path works the bench and no other does, so the question a captain asks before offering is answered by the path record rather than by a name written into a screen",
+        );
+
+        // The two legs this block needs, found by asking the sea rather than
+        // by naming rounds that happen to be cold. The weather is drawn from
+        // the voyage's own numbers (see legIsCold), so a block that listed its
+        // legs would be holding its own copy of the draw and would go on
+        // passing after the draw moved.
+        const legAt = (round: number): GameState =>
+          benchState({ currentRound: round });
+        const rounds = Array.from({ length: 60 }, (_, index) => index + 1);
+        const coldRound = rounds.find((round) => legIsCold(legAt(round)));
+        const warmRound = rounds.find((round) => !legIsCold(legAt(round)));
+        if (coldRound === undefined || warmRound === undefined) {
+          // A precondition rather than a claim: a sixty leg window of one
+          // fixed draw that came back all one kind would make every check
+          // below a statement about a weather system this voyage does not
+          // have, and the checks are about the pile rather than the sea.
+          throw new Error("This voyage's weather carried no leg of one kind.");
+        }
+        const coldLeg = legAt(coldRound);
+        const warmLeg = legAt(warmRound);
+        const pile = ragsAtPort(coldLeg);
+        check(
+          pile >= 1 &&
+            pile <= RAGS_AT_PORT_COLD &&
+            ragsLeftAtPort(coldLeg) === pile &&
+            ragsAtPort(warmLeg) === 0 &&
+            ragsLeftAtPort(warmLeg) === 0,
+          "the harbor's pile fills on a cold leg, inside the bound the constants carry, and there is no pile at all after a fair one, which is the plan's tension written as a number: a Loom is poor in fair weather and busy in cold",
+        );
+        check(
+          ragsAtPort(legAt(coldRound)) === pile &&
+            ragsAtPort(benchState({ currentRound: coldRound, path: null })) ===
+              pile,
+          "and the pile is drawn from the voyage's own numbers rather than from the captain reading it, so two Loom captains at one table each take their own share of the same pile, and a reload answers the way it answered before",
+        );
+        check(
+          ragsLeftAtPort({
+            ...coldLeg,
+            ragsRound: coldRound,
+            ragsTaken: pile,
+          }) === 0 &&
+            ragsLeftAtPort({
+              ...coldLeg,
+              ragsRound: coldRound - 1,
+              ragsTaken: pile + 4,
+            }) === pile &&
+            ragsLeftAtPort({
+              ...coldLeg,
+              ragsRound: coldRound,
+              ragsTaken: pile + 4,
+            }) === 0,
+          "the share counts down as it is taken and floors at nothing, and a count stamped with an earlier leg is not subtracted from this one's, which is what lets a save written mid leg be read at the next Dawn without a heal",
+        );
+
+        const noPath = attempt((logs) =>
+          buyRag(benchState({ currentRound: coldRound, path: null }), logs),
+        );
+        check(
+          noPath.ok === false && noPath.said.includes("Only a Loom captain"),
+          "only a Loom captain buys rags off the harbor pile, and the refusal is a sentence rather than a silent false, because the exclusivity the plan asks for is this line rather than a greyed out button",
+        );
+        const spent = benchState({
+          currentRound: coldRound,
+          ragsRound: coldRound,
+          ragsTaken: pile,
+        });
+        const spentTry = attempt((logs) => buyRag(spent, logs));
+        check(
+          spentTry.ok === false &&
+            spentTry.said.includes("no rags left") &&
+            spent.money === 500 &&
+            (spent.inventory[RAGS] ?? 0) === 0,
+          "and a captain whose share of the pile is spent is refused with the Gold still in the purse and the rag still on the quay",
+        );
+        const shortPurse = benchState({
+          currentRound: coldRound,
+          money: RAG_SCRAP_VALUE - 1,
+        });
+        const shortTry = attempt((logs) => buyRag(shortPurse, logs));
+        check(
+          shortTry.ok === false &&
+            shortTry.said.includes(String(RAG_SCRAP_VALUE)) &&
+            shortPurse.money === RAG_SCRAP_VALUE - 1,
+          "and a purse that cannot cover the scrap is refused with the price named in the sentence, rather than being drained into a negative hold",
+        );
+        // The hold's own room, which is two switches of its own rather than
+        // this bench's (see holdCapacityOn). Named here so the check cannot
+        // pass on a build whose hold is unbounded.
+        withEnv("NEXT_PUBLIC_SURVIVAL", "1", () =>
+          withEnv("NEXT_PUBLIC_SPLIT_HOLD", "1", () => {
+            const fullHold = benchState({ currentRound: coldRound });
+            fullHold.inventory = { Hemp: cargoCapacity(fullHold) };
+            const fullTry = attempt((logs) => buyRag(fullHold, logs));
+            check(
+              cargoRoom(fullHold) === 0 &&
+                fullTry.ok === false &&
+                fullTry.said.includes("no room") &&
+                (fullHold.inventory[RAGS] ?? 0) === 0,
+              "and a hold with no room left is refused in words, because a rag takes a slot in exactly the way a bolt of silk does: the bench reads the one capacity reader rather than working the room out for itself",
+            );
+          }),
+        );
+        const loom = benchState({ currentRound: coldRound });
+        const bought = attempt((logs) => buyRag(loom, logs));
+        check(
+          bought.ok &&
+            loom.money === 500 - RAG_SCRAP_VALUE &&
+            loom.inventory[RAGS] === 1 &&
+            loom.ragsBought === 1 &&
+            loom.ragsTaken === 1 &&
+            loom.ragsRound === coldRound &&
+            bought.said.includes(`${pile - 1} left`),
+          "the purchase takes the scrap out of the purse, puts one rag in the hold and stamps the leg it was taken in, and the line it writes is the count the captain has left rather than the count the harbor started with",
+        );
+        const drained = benchState({ currentRound: coldRound });
+        drained.inventory = {};
+        let taken = 0;
+        while (buyRag(drained, [])) taken += 1;
+        check(
+          taken === pile &&
+            ragsLeftAtPort(drained) === 0 &&
+            (drained.inventory[RAGS] ?? 0) === pile &&
+            drained.money === 500 - pile * RAG_SCRAP_VALUE,
+          "and one captain can take the whole share and not a rag more, one at a time, which is the count the plan bounds the reweave with: three rags at the quay is one coat and a spare rather than an industry",
+        );
+
+        const tooFew = benchState({
+          currentRound: coldRound,
+          inventory: { [RAGS]: REWEAVE_RAGS - 1 },
+        });
+        const fewTry = attempt((logs) => reweaveRags(tooFew, logs));
+        check(
+          fewTry.ok === false &&
+            fewTry.said.includes(String(REWEAVE_RAGS)) &&
+            (tooFew.inventory[REWEAVE_GOOD] ?? 0) === 0,
+          "a reweave takes the two rags the constants name and is refused when the hold has fewer, with the count in the sentence rather than the hold quietly losing what it had",
+        );
+        const strangerWeave = benchState({
+          path: null,
+          inventory: { [RAGS]: REWEAVE_RAGS },
+        });
+        const strangerWove = attempt((logs) =>
+          reweaveRags(strangerWeave, logs),
+        );
+        check(
+          strangerWove.ok === false &&
+            strangerWove.said.includes("Only a Loom captain") &&
+            (strangerWeave.inventory[RAGS] ?? 0) === REWEAVE_RAGS,
+          "and nobody but the path that holds the chain works rags back into cloth, which is what makes the pile worth buying in the first place",
+        );
+        const weaver = benchState({
+          currentRound: coldRound,
+          inventory: { [RAGS]: REWEAVE_RAGS },
+        });
+        const wove = attempt((logs) => reweaveRags(weaver, logs));
+        check(
+          wove.ok &&
+            (weaver.inventory[RAGS] ?? 0) === 0 &&
+            (weaver.inventory[REWEAVE_GOOD] ?? 0) === 1 &&
+            weaver.ragsRewoven === 1 &&
+            wove.said.includes(REWEAVE_GOOD),
+          "a reweave spends the rags and returns one coat, which is the weaver's recipe read from the other end: what the path is paid for is the shortcut rather than a cheaper garment",
+        );
+        // The tie the constants state and this check holds: the chain the
+        // Loom holds is the recipe's own, minus the worker and the hemp, so a
+        // recipe retuned to three materials fails here rather than quietly
+        // moving the price of the chain with it.
+        const recipeMaterials = Object.values(
+          RECIPES[REWEAVE_GOOD].materials,
+        ).reduce((total, count) => total + count, 0);
+        check(
+          REWEAVE_RAGS === recipeMaterials,
+          "and the rags it takes are the materials the recipe it replaces takes, which is the one place the two numbers are held together",
+        );
+
+        // The port mend: what every captain can do alone, and the price a
+        // refit is measured against.
+        const worn = garmentSpec(REWEAVE_GOOD);
+        if (!worn) {
+          throw new Error("The catalogue carries no garment to mend.");
+        }
+        const wearing = (durability: number, money = 500): GameState =>
+          benchState({
+            currentRound: coldRound,
+            money,
+            garments: [{ good: REWEAVE_GOOD, durability }],
+          });
+        const notAGood = attempt((logs) =>
+          mendGarment(benchState({ currentRound: coldRound }), "Sails", logs),
+        );
+        check(
+          notAGood.ok === false &&
+            notAGood.said.includes("not something the harbor can put right"),
+          "the harbor tailors refuse a good that is not a garment before they read anything else, because what they are asked to put right comes from the wardrobe table rather than from the request",
+        );
+        const nothingWorn = attempt((logs) =>
+          mendGarment(
+            benchState({ currentRound: coldRound }),
+            REWEAVE_GOOD,
+            logs,
+          ),
+        );
+        check(
+          nothingWorn.ok === false && nothingWorn.said.includes("no worn"),
+          "and a crew wearing none of that good has nothing for the tailors to work on, so the button is refused where it is charged rather than only where it is drawn",
+        );
+        const mender = wearing(worn.durability - 2, MEND_GOLD_PER_POINT);
+        const mended = attempt((logs) =>
+          mendGarment(mender, REWEAVE_GOOD, logs),
+        );
+        check(
+          mended.ok &&
+            mender.garments[0]?.durability === worn.durability - 1 &&
+            mender.money === 0 &&
+            mender.mendsMade === 1 &&
+            mender.mendRound === coldRound &&
+            mended.said.includes(String(MEND_GOLD_PER_POINT)),
+          "the harbor tailors put one point back for the five Gold the constants carry and stamp the leg they worked in rather than clearing a flag, which is what lets a save written mid leg be read at the next Dawn without a heal",
+        );
+        const twice = attempt((logs) =>
+          mendGarment(mender, REWEAVE_GOOD, logs),
+        );
+        check(
+          twice.ok === false && twice.said.includes("already worked"),
+          "and a second mend in the same leg is refused rather than sold, so the once a leg rule belongs to the engine and not to the panel that draws the button",
+        );
+        const whole = wearing(worn.durability);
+        const wholeTry = attempt((logs) =>
+          mendGarment(whole, REWEAVE_GOOD, logs),
+        );
+        check(
+          wholeTry.ok === false &&
+            wholeTry.said.includes("no worn") &&
+            whole.money === 500 &&
+            whole.garments[0]?.durability === worn.durability,
+          "and a mend on a garment already whole is refused rather than sold, because the tailors are paid for the work that happened and there was none to do",
+        );
+        const thinPurse = wearing(worn.durability - 2, MEND_GOLD_PER_POINT - 1);
+        const thinTry = attempt((logs) =>
+          mendGarment(thinPurse, REWEAVE_GOOD, logs),
+        );
+        check(
+          thinTry.ok === false &&
+            thinTry.said.includes("purse is short") &&
+            thinPurse.garments[0]?.durability === worn.durability - 2,
+          "and a purse that cannot cover the mend is refused with the garment left exactly as it was, so nothing is ever half paid for",
+        );
+
+        check(
+          refitRoomFor(wearing(worn.durability - 1), REWEAVE_GOOD) === 1 &&
+            refitRoomFor(wearing(1), REWEAVE_GOOD) === REFIT_POINTS &&
+            refitRoomFor(
+              wearing(worn.durability - (REFIT_POINTS + 1)),
+              REWEAVE_GOOD,
+            ) === REFIT_POINTS &&
+            refitRoomFor(wearing(worn.durability), REWEAVE_GOOD) === 0 &&
+            refitRoomFor(benchState(), REWEAVE_GOOD) === 0 &&
+            refitRoomFor(benchState(), "Sails") === 0,
+          "a refit is worth the three points the constants carry, cut down to whatever the garment's own maximum leaves room for: a coat that has lost one point is a one point refit, and a coat already whole is not a refit at all",
+        );
+
+        // One refit, in whatever shape a check below needs it. The phase is
+        // the one field no check here varies: every row on this bench was
+        // posted at the Market, which is where the board is drawn.
+        const refitOn = (
+          over: Partial<Omit<RefitContract, "phase">>,
+        ): RefitContract => ({
+          id: "r1",
+          sellerUserId: "loom",
+          sellerName: "Smoke Loom",
+          buyerUserId: "customer",
+          buyerName: "Smoke Customer",
+          fee: 30,
+          round: 3,
+          phase: "market",
+          status: "offered",
+          good: REWEAVE_GOOD,
+          ...over,
+        });
+        check(
+          refitSellerBusy([refitOn({ status: "agreed" })], "loom", 3) &&
+            !refitSellerBusy([refitOn({})], "loom", 3) &&
+            !refitSellerBusy([refitOn({ status: "agreed" })], "loom", 4) &&
+            !refitSellerBusy([refitOn({ status: "agreed" })], "customer", 3),
+          "the bench bounds the seller rather than the customer: a refit that was actually taken makes the Loom busy for that leg, an offer nobody took does not, the next leg frees the hands again, and the customer who bought the work is not the party this market runs out of hands",
+        );
+        check(
+          expireConsent([refitOn({})], { phase: "orders", round: 3 }).length ===
+            0 &&
+            expireConsent([refitOn({})], { phase: "market", round: 3 })
+              .length === 1 &&
+            expireConsent([refitOn({ status: "agreed" })], {
+              phase: "orders",
+              round: 3,
+            }).length === 1 &&
+            expireConsent([refitOn({ status: "agreed" })], {
+              phase: "market",
+              round: 4,
+            }).length === 0,
+          "an offer nobody took dies with the Market it was posted in, while a refit the two captains agreed survives the rest of the leg and dies with it, which is the same expiry the escort contract lives under because it is the same primitive",
+        );
+
+        // What a refit does to two purses, which is the whole of the trade.
+        const agreedRefit = refitOn({ id: "r2", status: "agreed" });
+        const seller = benchState({ currentRound: 3 });
+        const customer = benchState({
+          currentRound: 3,
+          garments: [{ good: REWEAVE_GOOD, durability: 2 }],
+        });
+        const sellerLogs: string[] = [];
+        const customerLogs: string[] = [];
+        check(
+          applyRefitSide(seller, agreedRefit, "loom", sellerLogs) &&
+            applyRefitSide(customer, agreedRefit, "customer", customerLogs) &&
+            seller.money === 530 &&
+            customer.money === 470 &&
+            customer.garments[0]?.durability === 2 + REFIT_POINTS &&
+            seller.refitsSold === 1 &&
+            seller.refitFeesEarned === 30 &&
+            customer.refitsBought === 1 &&
+            customer.refitFeesPaid === 30,
+          "one function settles both sides of a refit: the customer pays the fee the two of them agreed and their own garment takes the points back on their own machine, the seller is paid it, and neither captain's state is ever written by the other's machine",
+        );
+        check(
+          !applyRefitSide(customer, agreedRefit, "customer", []) &&
+            !applyRefitSide(seller, agreedRefit, "loom", []) &&
+            customer.money === 470 &&
+            seller.money === 530,
+          "and applying the same side twice moves nothing the second time, because the ledger is what keeps a reload between the agreement and the broadcast that carries it from charging the same fee twice",
+        );
+        const bystander = benchState({ currentRound: 3 });
+        check(
+          !applyRefitSide(bystander, agreedRefit, "other", []) &&
+            bystander.money === 500 &&
+            bystander.refitsSold === 0,
+          "and a captain who is neither side of the agreement is not moved by it, which is the whole of what the two names on the row are for",
+        );
+        const broke = benchState({
+          currentRound: 3,
+          money: 5,
+          garments: [{ good: REWEAVE_GOOD, durability: 2 }],
+        });
+        const brokeLogs: string[] = [];
+        check(
+          applyRefitSide(broke, agreedRefit, "customer", brokeLogs) &&
+            broke.money === 0 &&
+            broke.refitFeesPaid === 5 &&
+            broke.garments[0]?.durability === 2 + REFIT_POINTS &&
+            brokeLogs.some((line) => line.includes("paid 5 Gold")),
+          "a purse that moved between the accept and the settlement pays what it has rather than a negative hold, and the work still happens, because the price was agreed in the open and the purse is the customer's own business",
+        );
+        const bare = benchState({ currentRound: 3 });
+        const bareLogs: string[] = [];
+        check(
+          applyRefitSide(bare, agreedRefit, "customer", bareLogs) &&
+            bareLogs.some((line) => line.includes("no worn")),
+          "and a customer whose wardrobe lost the garment between the accept and the settlement reads a sentence saying so, which is the line for a state that moved underneath an agreement rather than for an ordinary leg",
+        );
+        const dark = benchState({ currentRound: 3 });
+        check(
+          !withEnv("NEXT_PUBLIC_REFITS", "off", () =>
+            applyRefitSide(dark, agreedRefit, "customer", []),
+          ) && dark.money === 500,
+          "and an agreement settled with the bench switched off moves nobody, which is the plan's rollback read at the one place a refit would have changed a state",
+        );
+
+        // The load site, where every field this build added is healed.
+        const ancient = createInitialGameState();
+        const stripped = ancient as unknown as Record<string, unknown>;
+        for (const field of [
+          "refitsSold",
+          "refitsBought",
+          "refitFeesEarned",
+          "refitFeesPaid",
+          "mendsMade",
+          "mendRound",
+          "ragsBought",
+          "ragsRewoven",
+          "ragsTaken",
+          "ragsRound",
+        ]) {
+          stripped[field] = undefined;
+        }
+        normalizeRefitState(ancient);
+        check(
+          ancient.refitsSold === 0 &&
+            ancient.refitFeesPaid === 0 &&
+            ancient.mendsMade === 0 &&
+            ancient.ragsRewoven === 0 &&
+            ancient.mendRound === 0 &&
+            ancient.ragsRound === 0,
+          "a save written before this feature reads as a captain who has never mended anything, bought a rag or sold a refit, and both stamps heal to a leg no voyage has rather than to one that reads as already spent",
+        );
+        const wounded = createInitialGameState();
+        wounded.refitsSold = -3;
+        wounded.refitFeesEarned = Number.NaN;
+        wounded.mendsMade = 2.7;
+        wounded.ragsBought = Number.POSITIVE_INFINITY;
+        wounded.ragsTaken = -1;
+        wounded.mendRound = 2.7;
+        wounded.ragsRound = -4;
+        normalizeRefitState(wounded);
+        const carried = JSON.parse(JSON.stringify(wounded)) as GameState;
+        check(
+          wounded.refitsSold === 0 &&
+            wounded.refitFeesEarned === 0 &&
+            wounded.mendsMade === 2 &&
+            wounded.ragsBought === 0 &&
+            wounded.ragsTaken === 0 &&
+            wounded.mendRound === 2 &&
+            wounded.ragsRound === 0 &&
+            carried.mendsMade === 2 &&
+            carried.mendRound === 2,
+          "and a save carrying the fields in shapes the engine would not survive is healed to the same reading, floored to whole counts with anything that is not a number read as none, and it round trips through a save with the same meaning on the far side",
+        );
+      });
+
+      // The bench from the other side of its own switch. The plan's rollback
+      // is to remove the Refit action and leave the consent primitive in
+      // place for later use, so every reader this feature added answers
+      // nothing at all rather than half of it answering. Which leg this state
+      // stands in does not matter: the pile is not drawn at all with the
+      // bench switched off.
+      const offLeg = benchState();
+      check(
+        !withEnv("NEXT_PUBLIC_REFITS", "off", () =>
+          canSellRefit({ path: REFIT_SELLER_PATH }),
+        ) &&
+          withEnv("NEXT_PUBLIC_REFITS", "off", () =>
+            refitRoomFor(offLeg, REWEAVE_GOOD),
+          ) === 0 &&
+          withEnv("NEXT_PUBLIC_REFITS", "off", () => ragsAtPort(offLeg)) ===
+            0 &&
+          withEnv("NEXT_PUBLIC_REFITS", "off", () => ragsLeftAtPort(offLeg)) ===
+            0 &&
+          !withEnv("NEXT_PUBLIC_REFITS", "off", () => buyRag(offLeg, [])) &&
+          !withEnv("NEXT_PUBLIC_REFITS", "off", () =>
+            reweaveRags(offLeg, []),
+          ) &&
+          !withEnv("NEXT_PUBLIC_REFITS", "off", () =>
+            mendGarment(offLeg, REWEAVE_GOOD, []),
+          ) &&
+          offLeg.money === 500 &&
+          (offLeg.inventory[RAGS] ?? 0) === 0,
+        "with the bench switched off every reader this feature added answers nothing at all, which is what makes the rollback a bench that is gone rather than one that is half running",
+      );
+    });
+
+    // ---- The bench, in a real harbor ----
+    //
+    // Three captains at a table of their own, for the reason the market above
+    // gave: the harbor this run shares is still standing at the end of this
+    // section, and the checks after it read that one.
+    const loomSeller = await signUp("loom_s");
+    const loomBuyer = await signUp("loom_b");
+    const loomForeigner = await signUp("loom_f");
+    run.extraAccounts.push(loomSeller, loomBuyer, loomForeigner);
+
+    const loomRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: loomSeller.cookie,
+        body: JSON.stringify({
+          name: `Smoke loom ${suffix}`,
+          isPublic: false,
+        }),
+      },
+    );
+    if (loomRoom.status !== 200) {
+      throw new Error("No harbor to put a garment right in.");
+    }
+    const loomRoomId = loomRoom.body.room.id;
+    const loomCrew = [loomSeller, loomBuyer, loomForeigner];
+    const loomJoins = await Promise.all(
+      loomCrew.slice(1).map((captain) =>
+        call<{ room: { id: string } }>("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: loomRoom.body.room.code }),
+        }),
+      ),
+    );
+    check(
+      loomJoins.every((join) => join.status === 200),
+      "three captains can sit at a table where garments are put right",
+    );
+
+    // Each socket's newest bench, and every row that bench has ever carried.
+    // The second is what makes the privacy check below a claim about what a
+    // captain was told rather than about what they happened to read last.
+    const loomBoards = new Map<string, RefitContract[]>();
+    const loomSeen = new Map<string, Set<string>>();
+    const loomSockets = new Map<string, Socket>();
+    for (const captain of loomCrew) {
+      const socket = await openAuthedSocket(captain);
+      run.sockets.push(socket);
+      const seatedHere = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === loomRoomId,
+      );
+      socket.emit("room:join", { roomId: loomRoomId });
+      await seatedHere;
+      socket.on("refit:update", (payload: RefitBoard) => {
+        if (payload?.roomId !== loomRoomId) return;
+        loomBoards.set(captain.id, payload.refits);
+        const seen = loomSeen.get(captain.id) ?? new Set<string>();
+        for (const refit of payload.refits) seen.add(refit.id);
+        loomSeen.set(captain.id, seen);
+      });
+      loomSockets.set(captain.id, socket);
+    }
+    const loomSocketOf = (captain: Captain): Socket => {
+      const found = loomSockets.get(captain.id);
+      if (!found) throw new Error(`No socket for ${captain.username}.`);
+      return found;
+    };
+    const loomBoardOf = (captain: Captain): RefitContract[] =>
+      loomBoards.get(captain.id) ?? [];
+    const loomSettle = () => new Promise((resolve) => setTimeout(resolve, 500));
+    // The emit and the wait are one call, for the reason the market above
+    // gives: a refusal waited for after the fact is a refusal this run might
+    // already have missed.
+    const loomRefused = async (
+      captain: Captain,
+      event: string,
+      frame: Record<string, unknown>,
+    ): Promise<string | null> => {
+      const refused = waitForEvent<{ roomId: string; error: string }>(
+        loomSocketOf(captain),
+        "refit:error",
+        (payload) => payload?.roomId === loomRoomId && Boolean(payload.error),
+      );
+      loomSocketOf(captain).emit(event, { roomId: loomRoomId, ...frame });
+      return (await refused)?.error ?? null;
+    };
+    const loomSettles = (
+      captain: Captain,
+      match: (board: RefitContract[]) => boolean,
+    ) =>
+      waitForEvent<RefitBoard>(
+        loomSocketOf(captain),
+        "refit:update",
+        (payload) =>
+          payload?.roomId === loomRoomId && match(payload?.refits ?? []),
+      );
+
+    loomSocketOf(loomSeller).emit("room:start", { roomId: loomRoomId });
+    await loomSettle();
+
+    // The bench belongs to the Market, and the departure puts the room at its
+    // opening seat rather than at one, so this is posted out of season by
+    // construction rather than by a clock the run has to wait on.
+    const loomOffSeason = await loomRefused(loomSeller, "refit:post", {
+      fee: 20,
+      good: REWEAVE_GOOD,
+    });
+    check(
+      loomOffSeason !== null &&
+        loomOffSeason.includes(phaseFace("market").label),
+      "a refit cannot be offered outside the Market, and the refusal names the phase that opens the bench, because a refit is offered at a port rather than at sea",
+    );
+
+    // The room's seat, moved the way this suite moves any room's seat.
+    const loomSeat = (captain: Captain, round: number, phase: Phase) =>
+      loomSocketOf(captain).emit("game:status", {
+        roomId: loomRoomId,
+        round,
+        phase,
+        phaseLabel: phaseFace(phase).label,
+        gold: 0,
+        reputation: 0,
+        shipLevel: 0,
+        gameOver: false,
+      });
+    loomSeat(loomSeller, 1, "market");
+    await loomSettle();
+
+    const loomBadFee = await loomRefused(loomSeller, "refit:post", {
+      fee: CONSENT_FEE_MAX + 1,
+      good: REWEAVE_GOOD,
+    });
+    check(
+      loomBadFee !== null &&
+        loomBadFee.includes(String(CONSENT_FEE_MIN)) &&
+        loomBadFee.includes(String(CONSENT_FEE_MAX)),
+      "a fee outside the bounds is refused by the server rather than clamped, and the refusal states both ends of the range it will take, because the form and the socket go through one reader",
+    );
+
+    const notAGarment = await loomRefused(loomSeller, "refit:post", {
+      fee: 20,
+      good: "Sails",
+    });
+    check(
+      notAGarment !== null && notAGarment.includes("garment the crew can wear"),
+      "and a refit naming a good nobody can wear is refused at the door, because a row no customer could take would sit on the bench for a whole leg",
+    );
+
+    const loomSelfSell = await loomRefused(loomSeller, "refit:post", {
+      fee: 20,
+      good: REWEAVE_GOOD,
+      targetUserId: loomSeller.id,
+    });
+    check(
+      loomSelfSell !== null,
+      "and a captain cannot sell a refit to themselves",
+    );
+
+    // A real account standing somewhere else. The membership check is per
+    // harbor, which is the only thing that makes aiming an offer at a captain
+    // a check at all.
+    if (!run.host) {
+      throw new Error("No captain in another harbor to aim an offer at.");
+    }
+    const loomStrangerTarget = await loomRefused(loomSeller, "refit:post", {
+      fee: 20,
+      good: REWEAVE_GOOD,
+      targetUserId: run.host.id,
+    });
+    check(
+      loomStrangerTarget !== null,
+      "and an offer cannot be addressed at a captain who is not in this harbor, whoever they are in another one",
+    );
+
+    const loomOpenPosted = loomSettles(loomForeigner, (board) =>
+      board.some(
+        (row) => row.sellerUserId === loomSeller.id && row.status === "offered",
+      ),
+    );
+    loomSocketOf(loomSeller).emit("refit:post", {
+      roomId: loomRoomId,
+      fee: 21.7,
+      good: REWEAVE_GOOD,
+    });
+    const loomOpenRow = ((await loomOpenPosted)?.refits ?? []).find(
+      (row) => row.sellerUserId === loomSeller.id && row.status === "offered",
+    );
+    check(
+      loomOpenRow !== undefined &&
+        loomOpenRow.fee === 21 &&
+        loomOpenRow.good === REWEAVE_GOOD &&
+        loomOpenRow.buyerUserId === null &&
+        loomOpenRow.phase === "market" &&
+        loomOpenRow.round === 1,
+      "an open offer lands on the whole table's bench at the fee the form meant, floored to whole Gold, naming the garment, addressed to nobody and stamped with the leg and the phase it was posted in",
+    );
+    check(
+      loomOpenRow !== undefined && loomBoardOf(loomForeigner).length === 1,
+      "and it is the only row the third captain is handed, because an offer to the room is the one every captain may take",
+    );
+
+    const loomDoubled = await loomRefused(loomSeller, "refit:post", {
+      fee: 21,
+      good: REWEAVE_GOOD,
+    });
+    check(
+      loomDoubled !== null,
+      "a second offer of the same shape from the same seller is refused, so one client cannot paper the bench",
+    );
+
+    const loomDirectPosted = loomSettles(loomBuyer, (board) =>
+      board.some(
+        (row) => row.buyerUserId === loomBuyer.id && row.status === "offered",
+      ),
+    );
+    loomSocketOf(loomSeller).emit("refit:post", {
+      roomId: loomRoomId,
+      fee: 30,
+      good: REWEAVE_GOOD,
+      targetUserId: loomBuyer.id,
+    });
+    const loomDirectRow = ((await loomDirectPosted)?.refits ?? []).find(
+      (row) => row.buyerUserId === loomBuyer.id && row.status === "offered",
+    );
+    check(
+      loomDirectRow !== undefined && loomDirectRow.fee === 30,
+      "a direct offer lands for the captain it names, at the price that was asked",
+    );
+    await loomSettle();
+    check(
+      loomDirectRow !== undefined &&
+        loomSeen.get(loomBuyer.id)?.has(loomDirectRow.id) === true &&
+        loomSeen.get(loomForeigner.id)?.has(loomDirectRow.id) === false,
+      "and no bench the third captain was ever handed carried it, which is the privacy a targeted trade is worth",
+    );
+
+    // Asked at a quiet moment, so the next bench this captain is handed is
+    // the answer to the question rather than a broadcast that overtook it.
+    const askedForBench = waitForEvent<RefitBoard>(
+      loomSocketOf(loomForeigner),
+      "refit:update",
+      (payload) => payload?.roomId === loomRoomId,
+    );
+    loomSocketOf(loomForeigner).emit("refit:state:request", {
+      roomId: loomRoomId,
+    });
+    const answeredBench = (await askedForBench)?.refits ?? [];
+    check(
+      loomOpenRow !== undefined &&
+        answeredBench.length === 1 &&
+        answeredBench[0]?.id === loomOpenRow.id,
+      "a captain who asks for the bench is handed the same bench the room broadcast, personalised by the same rules, so the row addressed to somebody else is absent from the answer as well",
+    );
+
+    const loomTakenByThird = await loomRefused(loomForeigner, "refit:accept", {
+      contractId: loomDirectRow?.id ?? "",
+    });
+    check(
+      loomTakenByThird !== null &&
+        loomTakenByThird.includes("addressed to another"),
+      "an offer addressed to one captain cannot be taken by another, even though the bench never showed it to them",
+    );
+    const loomSoldBySeller = await loomRefused(loomSeller, "refit:accept", {
+      contractId: loomOpenRow?.id ?? "",
+    });
+    check(
+      loomSoldBySeller !== null,
+      "and the captain selling the work is not the captain who takes it",
+    );
+
+    const loomAgreedBoard = loomSettles(loomSeller, (board) =>
+      board.some(
+        (row) => row.id === loomDirectRow?.id && row.status === "agreed",
+      ),
+    );
+    loomSocketOf(loomBuyer).emit("refit:accept", {
+      roomId: loomRoomId,
+      contractId: loomDirectRow?.id ?? "",
+    });
+    const loomAgreedRow = ((await loomAgreedBoard)?.refits ?? []).find(
+      (row) => row.id === loomDirectRow?.id,
+    );
+    // The name the row wears is the one the account is registered under, read
+    // from the row the server itself read it from rather than typed here, so
+    // the check cannot pass on a name this file made up.
+    const loomAccount = await db.user.findUnique({
+      where: { id: loomBuyer.id },
+      select: { displayName: true },
+    });
+    check(
+      loomAgreedRow?.status === "agreed" &&
+        loomAgreedRow.buyerUserId === loomBuyer.id &&
+        loomAgreedRow.buyerName === loomAccount?.displayName,
+      "a captain takes the work by taking the offer, and the row that was an ask is now an agreement with their own name written on it",
+    );
+
+    const handsFull = await loomRefused(loomBuyer, "refit:accept", {
+      contractId: loomOpenRow?.id ?? "",
+    });
+    check(
+      handsFull !== null && handsFull.includes("already taken on a refit"),
+      "and a Loom captain whose hands are full is refused a second customer, because one pair of hands works one garment and a leg is how long they have",
+    );
+
+    const loomWithdrawRefused = await loomRefused(loomSeller, "refit:cancel", {
+      contractId: loomDirectRow?.id ?? "",
+    });
+    check(
+      loomWithdrawRefused !== null,
+      "an agreement the two captains made cannot be withdrawn by the seller, so the one captain who regrets a price is left with the gap rather than with a button",
+    );
+
+    const loomCancelledBoard = loomSettles(loomForeigner, (board) =>
+      board.every((row) => row.id !== loomOpenRow?.id),
+    );
+    loomSocketOf(loomSeller).emit("refit:cancel", {
+      roomId: loomRoomId,
+      contractId: loomOpenRow?.id ?? "",
+    });
+    check(
+      (await loomCancelledBoard) !== null,
+      "while an offer nobody has taken is the seller's own to take back",
+    );
+
+    // A captain who is not the seller of a row has no button for it, and the
+    // silence is the answer rather than an error: reading a row that is
+    // somebody else's is not a mistake anybody has made.
+    const silentForeign = waitForEvent<{ roomId: string; error: string }>(
+      loomSocketOf(loomForeigner),
+      "refit:error",
+      (payload) => Boolean(payload?.error),
+      900,
+    );
+    loomSocketOf(loomForeigner).emit("refit:cancel", {
+      roomId: loomRoomId,
+      contractId: loomDirectRow?.id ?? "",
+    });
+    check(
+      (await silentForeign) === null,
+      "and a captain who is not the seller of a row cannot take it back, which the server answers with silence rather than with an error",
+    );
+
+    // The room's log, which is the other place the trade is written down.
+    const loomLog = waitForEvent<{
+      roomId: string;
+      entries: VoyageLogEntry[];
+    }>(
+      loomSocketOf(loomForeigner),
+      "voyage:log:history",
+      (payload) => payload?.roomId === loomRoomId,
+    );
+    loomSocketOf(loomForeigner).emit("voyage:log:request", {
+      roomId: loomRoomId,
+    });
+    const loomLines = ((await loomLog)?.entries ?? []).map(
+      (entry) => entry.text,
+    );
+    // The two lines are built from the rows the server itself broadcast, so
+    // the check is a claim about the bench and the log agreeing rather than
+    // about this file's copy of a sentence.
+    const loomPostedLine = voyageLogLine({
+      kind: "refit_posted",
+      captain: loomOpenRow?.sellerName ?? "",
+      good: loomOpenRow?.good ?? "",
+      fee: loomOpenRow?.fee ?? 0,
+    });
+    const loomAgreedLine = voyageLogLine({
+      kind: "refit_agreed",
+      captain: loomAgreedRow?.sellerName ?? "",
+      taker: loomAgreedRow?.buyerName ?? "",
+      good: loomAgreedRow?.good ?? "",
+      fee: loomAgreedRow?.fee ?? 0,
+    });
+    check(
+      loomOpenRow !== undefined &&
+        loomAgreedRow !== undefined &&
+        loomLines.includes(loomPostedLine) &&
+        loomLines.includes(loomAgreedLine),
+      "the room's log carries the trade as the bench wrote it, the offer and the agreement, with the price and the garment on both lines and the taker named on the second",
+    );
+
+    // The leg moves on. Everything on the bench was sold for the leg that
+    // just ended, so the sweep is what takes the whole of it away.
+    loomSeat(loomSeller, 2, "market");
+    await loomSettle();
+    check(
+      loomBoardOf(loomSeller).length === 0 &&
+        loomBoardOf(loomBuyer).length === 0 &&
+        loomBoardOf(loomForeigner).length === 0,
+      "the leg a refit was sold for is the leg it lives, and the move to the next one takes the whole bench off every captain's screen",
+    );
+
+    const loomReopenedBench = loomSettles(loomForeigner, (board) =>
+      board.some(
+        (row) => row.sellerUserId === loomSeller.id && row.status === "offered",
+      ),
+    );
+    loomSocketOf(loomSeller).emit("refit:post", {
+      roomId: loomRoomId,
+      fee: 12,
+      good: REWEAVE_GOOD,
+    });
+    const loomReopenedRow = ((await loomReopenedBench)?.refits ?? []).find(
+      (row) => row.sellerUserId === loomSeller.id,
+    );
+    check(
+      loomReopenedRow?.round === 2 && loomReopenedRow?.fee === 12,
+      "and the bench opens again on the new leg, which is what makes the one refit a leg a bound the voyage reads a leg at a time rather than a ceiling on the trade",
+    );
+
+    // The house rule, over the copy this feature added: the sentences a
+    // captain reads at the bench are the bench's own, and the files that
+    // carry them are held whole, comments included.
+    check(
+      !carriesADash("src/lib/game/engine/refits.ts") &&
+        !carriesADash("src/lib/game/engine/consent.ts") &&
+        !carriesADash("src/lib/use-refit-contracts.ts") &&
+        !carriesADash("src/lib/use-consent-board.ts") &&
+        !carriesADash("src/components/portmasters/game/RefitBench.tsx") &&
+        !carriesADash("src/server/realtime/refits.ts") &&
+        !carriesADash("src/server/realtime/consent.ts"),
+      "every file the refit's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+    );
+
+    // =====================================================================
+    console.log("\nAroma: the bazaar rumor");
+
+    // ---- The board, on a captain's own machine ----
+    //
+    // The switch is switched on for the whole block, the same way the
+    // bench's is, so every check below that is not about the switch is
+    // about the rule rather than about whatever the environment happened
+    // to say. Nothing in this feature moves Gold or goods, so unlike the
+    // two consent markets above there is no settlement to check and no
+    // ledger to heal: what a rumor does to a voyage is lean a price, and
+    // the market at the end of this half is where that is measured.
+    withEnv("NEXT_PUBLIC_BAZAAR", "1", () => {
+      check(
+        [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+          withEnv("NEXT_PUBLIC_BAZAAR", value, bazaarRumorsOn),
+        ) &&
+          ["off", "0", "OFF", " off ", "Off"].every(
+            (value) => !withEnv("NEXT_PUBLIC_BAZAAR", value, bazaarRumorsOn),
+          ),
+        "the bazaar is on for every value of its own switch except the word off and the digit zero, which is the policy every switch in this tree is read through",
+      );
+      check(
+        PATH_IDS.every(
+          (id) => canPublishRumor({ path: id }) === (id === BAZAAR_SELLER_PATH),
+        ) && !canPublishRumor({ path: null }),
+        "one path works the bazaar and no other does, so the question a captain asks before speaking is answered by the path record rather than by a name written into a screen",
+      );
+      check(
+        !withEnv("NEXT_PUBLIC_BAZAAR", "off", () =>
+          canPublishRumor({ path: BAZAAR_SELLER_PATH }),
+        ),
+        "and the switch is read before the path rather than beside it: a build with the bazaar rolled back refuses an Aroma captain as flatly as it refuses everyone else",
+      );
+
+      // The goods a rumor may name, read the way the desk and the server
+      // read them: one leg ahead, against the room's own charter. Fair
+      // Winds never opens a tier and Open Waters opens one at leg four,
+      // which is what gives the checks below a real commodity the coming
+      // market does not trade and a real commodity that unlocks on the
+      // very leg a rumor would move.
+      const tierOne = RESOURCES_TIER1[0] ?? "";
+      const goodsAt = (difficulty: string, round: number) =>
+        bazaarGoods(difficulty, round);
+      check(
+        goodsAt("fair_winds", 3).length > 0 &&
+          goodsAt("fair_winds", 3).every((good) => good in COMMODITIES) &&
+          RESOURCES_TIER0.every((good) =>
+            goodsAt("fair_winds", 3).includes(good),
+          ) &&
+          !goodsAt("fair_winds", 9).includes(tierOne),
+        "the bazaar's goods are the goods the port trades, read off the one list the market draws from and narrowed to the goods the pricing table carries, so a rumor always lands on a price rather than on nothing",
+      );
+      check(
+        !goodsAt("open_waters", 3).includes(tierOne) &&
+          goodsAt("open_waters", 4).includes(tierOne),
+        "and a tier is nameable one leg before the port stocks it, because a rumor is a claim about the market the room has not reached yet: a captain can speak about a cargo before the harbor has the goods, which is the fiction the plan asks for",
+      );
+      check(
+        rumorGoodAllowed("Hemp", "fair_winds", 3) &&
+          !rumorGoodAllowed(tierOne, "fair_winds", 3) &&
+          !rumorGoodAllowed(
+            Object.keys(PRODUCT_PRICES)[0] ?? "",
+            "fair_winds",
+            3,
+          ) &&
+          !rumorGoodAllowed("", "fair_winds", 3) &&
+          !rumorGoodAllowed(null, "fair_winds", 3) &&
+          !rumorGoodAllowed(7, "fair_winds", 3),
+        "and the server's check is a membership test on that same list rather than a second set of conditions, so a good the desk offers and a good the server refuses cannot come apart: a finished good is refused with the raws, because the market a rumor prices draws raw goods",
+      );
+
+      // The wait, which is the one rule in this feature a client cannot
+      // carry: it is measured off the room's own rows.
+      const speaker = "captain-a";
+      const spoke = (rounds: number[], who = speaker) =>
+        rounds.map((round) => ({ publisherUserId: who, round }));
+      check(
+        rumorCooldownLeft([], speaker, 5) === 0 &&
+          rumorCooldownLeft(spoke([4], "captain-b"), speaker, 5) === 0,
+        "a captain who has never spoken waits for nothing, and neither does a captain whose table has been busy, because the wait is measured off a captain's own rows rather than off the board",
+      );
+      check(
+        [3, 4, 5, 6, 9]
+          .map((round) => rumorCooldownLeft(spoke([3]), speaker, round))
+          .join(",") === `${RUMOR_COOLDOWN_ROUNDS},2,1,0,0`,
+        "the wait counts down from the leg the captain spoke in and reaches nothing on the third leg after it, where it stays rather than going negative, which is the once every three legs the plan asks for",
+      );
+      check(
+        rumorCooldownLeft(spoke([1, 5]), speaker, 6) === 2 &&
+          rumorCooldownLeft(spoke([5, 1]), speaker, 6) === 2,
+        "and it is measured from the newest row rather than the oldest, in whichever order the board happens to hold them, because a captain who has spoken twice is waiting on the second time",
+      );
+      check(
+        rumorCooldownLine(0) === "The bazaar will hear you again." &&
+          rumorCooldownLine(1).includes("one more leg") &&
+          rumorCooldownLine(2).includes("2 more legs") &&
+          !rumorCooldownLine(1).includes("2"),
+        "the wait is said in legs and in a sentence rather than as a bare number: a captain with one leg to wait is told so in words, and a captain whose wait is over is told that rather than told nothing",
+      );
+
+      // One row, as the room holds it and as three readers may see it.
+      const rumorRow: BazaarRumor = {
+        id: rumorId(speaker, 5),
+        publisherUserId: speaker,
+        publisherName: "Smoke aroma",
+        good: "Silk",
+        direction: 1,
+        round: 5,
+      };
+      const rowBy = (over: Partial<BazaarRumor>): BazaarRumor => ({
+        ...rumorRow,
+        ...over,
+      });
+      const asPublisher = publicRumors([rumorRow], speaker, 5)[0];
+      const asOther = publicRumors([rumorRow], "captain-b", 5)[0];
+      const asLater = publicRumors([rumorRow], "captain-b", 6)[0];
+      check(
+        rumorStanding(rumorRow, 5) &&
+          !rumorStanding(rumorRow, 6) &&
+          !rumorStanding(rumorRow, 7),
+        "a rumor stands in the leg it was spoken in and in no leg after it, which is the one question the whole visibility rule turns on",
+      );
+      check(
+        asPublisher?.direction === 1 &&
+          asOther?.direction === null &&
+          asLater?.direction === 1 &&
+          rumorRow.direction === 1,
+        "the direction is stripped for every reader but its publisher while the rumor stands, and it is public the moment the market it moved is drawn, while the row the room holds keeps it either way: the fleet is handed the captain, the good and the leg rather than the lean, and the row itself is never rewritten",
+      );
+      check(
+        asOther?.publisherName === "Smoke aroma" &&
+          asOther?.good === "Silk" &&
+          asOther?.round === 5 &&
+          asOther?.id === rumorRow.id,
+        "and the name, the good and the leg travel to everyone, because a rumor the harbor cannot attribute is not the mechanic: the fleet is meant to know who spoke and to have to guess at why",
+      );
+      check(
+        rumorId(speaker, 5) !== rumorId(speaker, 6) &&
+          rumorId(speaker, 5) !== rumorId("captain-b", 5) &&
+          rumorId(speaker, 5).includes(speaker) &&
+          rumorId(speaker, 5).includes("5"),
+        "one captain speaks once a leg, so a row's id is its publisher and its leg together: two rows can never be handed one id, which is what the board's one writer relies on rather than checking",
+      );
+
+      // What the lean does, which is the other half of the visibility
+      // rule: the row is public but the direction is what prices a market,
+      // and it prices exactly one market.
+      const teaRow = rowBy({
+        id: rumorId("captain-b", 5),
+        publisherUserId: "captain-b",
+        good: "Tea",
+        direction: -1,
+      });
+      const atSix = rumorLean([rumorRow, teaRow], 6);
+      check(
+        atSix.Silk === RUMOR_SHIFT_FRACTION &&
+          atSix.Tea === -RUMOR_SHIFT_FRACTION &&
+          Object.keys(rumorLean([rumorRow, teaRow], 5)).length === 0 &&
+          Object.keys(rumorLean([rumorRow, teaRow], 7)).length === 0,
+        "a rumor is priced by the very next market and by no other: the leg it was spoken in has already been drawn and the leg after next has moved on, so one row leans one price once",
+      );
+      check(
+        rumorLean([rumorRow, rowBy({ publisherUserId: "captain-b" })], 6)
+          .Silk === RUMOR_SHIFT_FRACTION &&
+          Object.keys(
+            rumorLean(
+              [
+                rumorRow,
+                rowBy({ publisherUserId: "captain-b", direction: -1 }),
+              ],
+              6,
+            ),
+          ).length === 0,
+        "and two captains naming one good are summed and then held to the band the Harbormaster's own hand is capped at, so the loudest the bazaar can get is the loudest one call can get, while two rumors pulling against each other cancel rather than averaging into a move nobody called",
+      );
+      check(
+        Object.keys(
+          normalizeRumorLean(
+            rumorLean([rumorRow, rowBy({ publisherUserId: "captain-b" })], 6),
+          ),
+        ).length === 1 &&
+          normalizeRumorLean(rumorLean([rumorRow, teaRow], 6)).Silk ===
+            RUMOR_SHIFT_FRACTION,
+        "and a lean that has been through a save is the lean that went into it, because a good the rumors left alone has one representation rather than two",
+      );
+
+      // The two shapes a row and a lean arrive in, off a wire and off a
+      // save. Both are read by something that would not look wrong if they
+      // were read as they came: a screen would draw a row, and the market
+      // would price a card.
+      const soundRow = {
+        id: "captain-a:5",
+        publisherUserId: "captain-a",
+        publisherName: "Smoke aroma",
+        good: "Silk",
+        direction: 1,
+        round: 5,
+      };
+      check(
+        normalizeBazaarRumor({ ...soundRow, direction: null })?.direction ===
+          null &&
+          normalizeBazaarRumor({ ...soundRow, round: 5.7 })?.round === 5 &&
+          normalizeBazaarRumor(null) === null &&
+          normalizeBazaarRumor([]) === null &&
+          normalizeBazaarRumor("Silk") === null &&
+          normalizeBazaarRumor({ ...soundRow, publisherUserId: "" }) === null &&
+          normalizeBazaarRumor({ ...soundRow, good: "" }) === null &&
+          normalizeBazaarRumor({ ...soundRow, round: 0 }) === null &&
+          normalizeBazaarRumor({ ...soundRow, round: Number.NaN }) === null &&
+          normalizeBazaarRumor({ ...soundRow, direction: 0 }) === null &&
+          normalizeBazaarRumor({ ...soundRow, direction: 2 }) === null &&
+          normalizeBazaarRumor({ ...soundRow, direction: "higher" }) === null,
+        "a row off the wire is kept only when it names a publisher, a good and a leg and its direction is a real lean or the null a standing row carries, because a row that failed to parse is not an empty row and a row the screen draws is a row the fleet believes",
+      );
+      const leaned = normalizeRumorLean({
+        Silk: RUMOR_SHIFT_FRACTION,
+        Tea: -RUMOR_SHIFT_FRACTION,
+        Hemp: 0.9,
+        Spices: -5,
+        Pearls: 0,
+        "Porcelain Clay": Number.NaN,
+        Sails: "0.1",
+      });
+      check(
+        leaned.Silk === RUMOR_SHIFT_FRACTION &&
+          leaned.Tea === -RUMOR_SHIFT_FRACTION &&
+          leaned.Hemp === RUMOR_SHIFT_FRACTION &&
+          leaned.Spices === -RUMOR_SHIFT_FRACTION &&
+          !("Pearls" in leaned) &&
+          !("Porcelain Clay" in leaned) &&
+          !("Sails" in leaned) &&
+          Object.keys(normalizeRumorLean(null)).length === 0 &&
+          Object.keys(normalizeRumorLean([RUMOR_SHIFT_FRACTION])).length === 0,
+        "and a lean off a save is held to the band the constant declares with everything that is not a finite number dropped, so a save edited to lean a good by half is read as a rumor's worth and no more, which is the defensive half of the plan's own guard on how swingy a price may become",
+      );
+
+      // The two sentences, which are the ones a captain reads and the room
+      // keeps.
+      check(
+        rumorDirectionLine({ good: "Silk", direction: 1 }).includes("Silk") &&
+          rumorDirectionLine({ good: "Silk", direction: 1 }).includes(
+            String(Math.round(RUMOR_SHIFT_FRACTION * 100)),
+          ) &&
+          rumorDirectionLine({ good: "Silk", direction: 1 }).includes(
+            "higher",
+          ) &&
+          rumorDirectionLine({ good: "Silk", direction: -1 }).includes(
+            "lower",
+          ) &&
+          !rumorDirectionLine({ good: "Silk", direction: -1 }).includes(
+            "higher",
+          ),
+        "the clause a row is drawn with reads its percent off the constant the market prices with and names the way in words, so the number a captain reads and the number the market applied are one number",
+      );
+      const rumorLine = voyageLogLine({
+        kind: "rumor_published",
+        captain: "Smoke aroma",
+        good: "Silk",
+      });
+      check(
+        rumorLine.includes("Smoke aroma") &&
+          rumorLine.includes("Silk") &&
+          !rumorLine.includes("higher") &&
+          !rumorLine.includes("lower") &&
+          !rumorLine.includes("%"),
+        "the room's log carries the captain and the good and never the direction, because the log is public the instant it is written and the direction is not public until the market answers the row",
+      );
+
+      // ---- The market the lean lands on ----
+      //
+      // One leg drawn twice from one seed for two captains who differ in
+      // one thing only: what the bazaar told them. The cards have to come
+      // out identical and only the named good's price may move, which is
+      // also what proves a rumor is a price rather than a second market
+      // nobody else can see.
+      const marketCtx = {
+        seedBase: "harbor-b:captain-b",
+        harborId: "harbor-b",
+      };
+      const marketUnder = (leans: MarketLeans) => {
+        const state = createInitialGameState({ difficulty: "fair_winds" });
+        applyMarketLeans(state, leans);
+        snapToCheckpoint(state, marketCtx, 6, "market", []);
+        return state;
+      };
+      const plainMarket = marketUnder({});
+      const priced = (price: number, lean: number) =>
+        Math.max(1, Math.round(price * (1 + lean)));
+      // The good the rumor names is read off the drawn board rather than
+      // named here, for the reason the Harbormaster's own block gives: a
+      // tenth of a price that is already high is a price that moves, and a
+      // tenth of three Gold rounds away and would leave the comparison
+      // below asserting nothing.
+      const drawnRaw = plainMarket.resourceCards
+        .filter((card) => !card.isProductCard)
+        .flatMap((card) => card.resources)
+        .map((resource) => ({
+          good: resource.type,
+          price: resource.price ?? 0,
+        }));
+      const rumored = [...new Set(drawnRaw.map((raw) => raw.good))].find(
+        (good) =>
+          drawnRaw
+            .filter((raw) => raw.good === good)
+            .every(
+              (raw) =>
+                priced(raw.price, RUMOR_SHIFT_FRACTION) > raw.price &&
+                priced(raw.price, -RUMOR_SHIFT_FRACTION) < raw.price,
+            ),
+      );
+      if (rumored === undefined) {
+        throw new Error("This leg's board carried no good a tenth moves.");
+      }
+      const leanedUp = marketUnder({
+        bazaarLean: { [rumored]: RUMOR_SHIFT_FRACTION },
+      });
+      const leanedDown = marketUnder({
+        bazaarLean: { [rumored]: -RUMOR_SHIFT_FRACTION },
+      });
+      const sameDraw = plainMarket.resourceCards.every((card, i) => {
+        const other = leanedUp.resourceCards[i];
+        return (
+          other !== undefined &&
+          other.port === card.port &&
+          other.isProductCard === card.isProductCard &&
+          other.resources.length === card.resources.length &&
+          card.resources.every(
+            (resource, j) =>
+              other.resources[j].type === resource.type &&
+              other.resources[j].quantity === resource.quantity,
+          )
+        );
+      });
+      check(
+        plainMarket.resourceCards.length > 1 && sameDraw,
+        "the same ports, the same goods and the same counts, so a rumor moves a price and never the market: the lean is the third hand on one price rather than a board of its own",
+      );
+      const pricedByTheRumor = (market: GameState, direction: 1 | -1) =>
+        plainMarket.resourceCards.every((card, i) => {
+          const under = market.resourceCards[i];
+          return card.resources.every(
+            (resource, j) =>
+              under.resources[j].price ===
+              (resource.type === rumored
+                ? priced(resource.price ?? 0, direction * RUMOR_SHIFT_FRACTION)
+                : resource.price),
+          );
+        });
+      check(
+        pricedByTheRumor(leanedUp, 1) && pricedByTheRumor(leanedDown, -1),
+        "and every price of the good the rumor names is a tenth up or a tenth down at every port, floored at one Gold, while every other good on every card is untouched",
+      );
+
+      // The three hands at once, which is what the single rounding in the
+      // pricing rewrite is for: the harbor's appetite, the Harbormaster's
+      // call and the bazaar's rumor are three accounts of one price, so
+      // they are one rounding rather than three. The card this is measured
+      // on is found rather than named, and it is a card where rounding the
+      // hands one at a time would land somewhere else, so the check is a
+      // measurement rather than a coincidence.
+      const hands = { pulse: PORT_SHIFT_FRACTION, rumor: RUMOR_SHIFT_FRACTION };
+      const together = (price: number, nudge: number, lean: number) =>
+        Math.max(1, Math.round(price * (1 + nudge) * lean));
+      const apart = (price: number, nudge: number, lean: number) =>
+        Math.max(
+          1,
+          Math.round(Math.max(1, Math.round(price * (1 + nudge))) * lean),
+        );
+      const leaningCard = plainMarket.resourceCards
+        .filter((card) => !card.isProductCard)
+        .find((card) =>
+          card.resources.some(
+            (resource) =>
+              resource.type === rumored &&
+              together(
+                resource.price ?? 0,
+                hands.pulse + hands.rumor,
+                1 + PORT_SHIFT_FRACTION,
+              ) !==
+                apart(
+                  resource.price ?? 0,
+                  hands.pulse + hands.rumor,
+                  1 + PORT_SHIFT_FRACTION,
+                ),
+          ),
+        );
+      if (leaningCard === undefined) {
+        throw new Error(
+          "This leg's board carried no card where the three hands disagree about rounding.",
+        );
+      }
+      const allThree = marketUnder({
+        harborPulse: { [rumored]: hands.pulse },
+        portShift: { port: leaningCard.port, direction: 1 },
+        bazaarLean: { [rumored]: hands.rumor },
+      });
+      const pricedByAllThree = plainMarket.resourceCards.every((card, i) => {
+        const under = allThree.resourceCards[i];
+        const atThePort = !card.isProductCard && card.port === leaningCard.port;
+        return card.resources.every((resource, j) => {
+          const nudge =
+            resource.type === rumored ? hands.pulse + hands.rumor : 0;
+          const lean = atThePort ? 1 + PORT_SHIFT_FRACTION : 1;
+          return (
+            under.resources[j].price ===
+            together(resource.price ?? 0, nudge, lean)
+          );
+        });
+      });
+      check(
+        pricedByAllThree,
+        "and the three hands are one price rather than three: a card carrying the rumored good at the port under the Harbormaster's call is priced by the rounding of the whole product, and this leg's board carries a card where rounding the hands one at a time would land elsewhere, so that is the claim and not a coincidence",
+      );
+    });
+
+    // ---- The bazaar, in a real harbor ----
+    //
+    // Three captains at a table of their own, for the reason the two blocks
+    // above give: the harbor this run shares is still standing at the end
+    // of this section, and the checks after it read that one.
+    //
+    // Fair Winds on purpose: it never opens a tier, so a real commodity the
+    // coming market does not trade is nameable on this table and the
+    // refusal for it is about the route rather than about a good invented
+    // for the check.
+    // Short labels, because a username is capped and the suffix is six
+    // characters of it.
+    const bazaarSeller = await signUp("baz_s");
+    const bazaarReader = await signUp("baz_r");
+    const bazaarThird = await signUp("baz_t");
+    run.extraAccounts.push(bazaarSeller, bazaarReader, bazaarThird);
+
+    const bazaarRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: bazaarSeller.cookie,
+        body: JSON.stringify({
+          name: `Smoke bazaar ${suffix}`,
+          isPublic: false,
+          difficulty: "fair_winds",
+        }),
+      },
+    );
+    if (bazaarRoom.status !== 200) {
+      throw new Error("No harbor to spread a rumor in.");
+    }
+    const bazaarRoomId = bazaarRoom.body.room.id;
+    const bazaarCrew = [bazaarSeller, bazaarReader, bazaarThird];
+    const bazaarJoins = await Promise.all(
+      bazaarCrew.slice(1).map((captain) =>
+        call<{ room: { id: string } }>("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: bazaarRoom.body.room.code }),
+        }),
+      ),
+    );
+    check(
+      bazaarJoins.every((join) => join.status === 200),
+      "three captains can sit at a table where rumors are spread",
+    );
+
+    // Each socket's newest board, and every row that board has ever
+    // carried, the second being what makes the checks below claims about
+    // what a captain was told rather than about what they happened to read
+    // last.
+    const bazaarBoards = new Map<string, PublicRumor[]>();
+    const bazaarSeen = new Map<string, Set<string>>();
+    const bazaarSockets = new Map<string, Socket>();
+    for (const captain of bazaarCrew) {
+      const socket = await openAuthedSocket(captain);
+      run.sockets.push(socket);
+      const seatedHere = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === bazaarRoomId,
+      );
+      socket.emit("room:join", { roomId: bazaarRoomId });
+      await seatedHere;
+      socket.on("bazaar:update", (payload: BazaarBoard) => {
+        if (payload?.roomId !== bazaarRoomId) return;
+        bazaarBoards.set(captain.id, payload.rumors);
+        const seen = bazaarSeen.get(captain.id) ?? new Set<string>();
+        for (const row of payload.rumors) seen.add(row.id);
+        bazaarSeen.set(captain.id, seen);
+      });
+      bazaarSockets.set(captain.id, socket);
+    }
+    const bazaarSocketOf = (captain: Captain): Socket => {
+      const found = bazaarSockets.get(captain.id);
+      if (!found) throw new Error(`No socket for ${captain.username}.`);
+      return found;
+    };
+    const bazaarBoardOf = (captain: Captain): PublicRumor[] =>
+      bazaarBoards.get(captain.id) ?? [];
+    const bazaarDirectionOf = (
+      captain: Captain,
+      rowId: string,
+    ): RumorDirection | null | undefined =>
+      bazaarBoardOf(captain).find((row) => row.id === rowId)?.direction;
+    const bazaarSettle = () =>
+      new Promise((resolve) => setTimeout(resolve, 500));
+    // The emit and the wait are one call, for the reason the market above
+    // gives: a refusal waited for after the fact is a refusal this run might
+    // already have missed.
+    const bazaarRefused = async (
+      captain: Captain,
+      event: string,
+      frame: Record<string, unknown>,
+    ): Promise<string | null> => {
+      const refused = waitForEvent<{ roomId: string; error: string }>(
+        bazaarSocketOf(captain),
+        "bazaar:error",
+        (payload) => payload?.roomId === bazaarRoomId && Boolean(payload.error),
+      );
+      bazaarSocketOf(captain).emit(event, { roomId: bazaarRoomId, ...frame });
+      return (await refused)?.error ?? null;
+    };
+    const bazaarSpeaks = (
+      captain: Captain,
+      match: (board: PublicRumor[]) => boolean,
+    ) =>
+      waitForEvent<BazaarBoard>(
+        bazaarSocketOf(captain),
+        "bazaar:update",
+        (payload) =>
+          payload?.roomId === bazaarRoomId && match(payload?.rumors ?? []),
+      );
+    // The boards a claim reads beyond the one it watched a frame on.
+    //
+    // A board is delivered per socket rather than per room: the one pass
+    // that writes a frame writes it on each captain's own connection, and
+    // the order two of them land in is not the order the server wrote them.
+    // So a claim that read a board which had not taken the frame in yet
+    // would be testing the scheduler rather than the rule, and every board a
+    // claim reads is waited for here, armed before the publish rather than
+    // checked after it. A board already holding what the claim wants is not
+    // waited on, which is what keeps a wait from outliving the frame it was
+    // armed for and hanging a run that had nothing left to hear.
+    const bazaarBoardsReach = (
+      captains: Captain[],
+      match: (board: PublicRumor[]) => boolean,
+    ): Promise<unknown> =>
+      Promise.all(
+        captains
+          .filter((captain) => !match(bazaarBoardOf(captain)))
+          .map((captain) =>
+            waitForEvent<BazaarBoard>(
+              bazaarSocketOf(captain),
+              "bazaar:update",
+              (payload) =>
+                payload?.roomId === bazaarRoomId &&
+                match(payload?.rumors ?? []),
+            ),
+          ),
+      );
+
+    // The room's own seat, moved the way this suite moves any room's seat.
+    // A checkpoint only ever moves forward, so the legs below are walked in
+    // order rather than named at random.
+    const bazaarRoomRow = async () =>
+      db.room.findUnique({
+        where: { id: bazaarRoomId },
+        select: { currentRound: true, currentPhase: true },
+      });
+    const parkBazaar = async (round: number, phase: Phase) => {
+      bazaarSocketOf(bazaarReader).emit("game:status", {
+        roomId: bazaarRoomId,
+        round,
+        phase,
+        phaseLabel: phaseFace(phase).label,
+        gold: 0,
+        reputation: 0,
+        shipLevel: 0,
+        gameOver: false,
+      });
+      let row = await bazaarRoomRow();
+      for (
+        let waited = 0;
+        (row?.currentRound !== round || row?.currentPhase !== phase) &&
+        waited < 5000;
+        waited += 250
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        row = await bazaarRoomRow();
+      }
+      return row;
+    };
+    const bazaarReadyAll = (round: number, phase: Phase) => {
+      for (const captain of bazaarCrew) {
+        bazaarSocketOf(captain).emit("phase:ready", {
+          roomId: bazaarRoomId,
+          round,
+          phase,
+        });
+      }
+    };
+    const bazaarAdvanceTo = (from: number) =>
+      waitForEvent<{
+        roomId: string;
+        round: number;
+        phase: string;
+        bazaarLean?: Record<string, number>;
+      }>(
+        bazaarSocketOf(bazaarThird),
+        "phase:advance",
+        (payload) =>
+          payload?.roomId === bazaarRoomId && payload?.round === from,
+        5000,
+      );
+
+    bazaarSocketOf(bazaarSeller).emit("room:start", { roomId: bazaarRoomId });
+    await bazaarSettle();
+
+    // The bazaar belongs to the Parley, and the departure puts the room at
+    // its opening seat rather than at one, so this is refused out of season
+    // by construction rather than by a clock the run has to wait on.
+    const bazaarAtPort = await parkBazaar(2, "market");
+    const bazaarOutOfSeason = await bazaarRefused(
+      bazaarSeller,
+      "bazaar:publish",
+      { good: "Silk", direction: 1 },
+    );
+    check(
+      bazaarAtPort?.currentPhase === "market" &&
+        bazaarOutOfSeason !== null &&
+        bazaarOutOfSeason.includes(phaseFace("parley").label),
+      "a rumor cannot be spread outside the Parley, and the refusal names the phase that opens the bazaar, because a rumor is spoken where the whole table hears it and the market it moves is the one after it",
+    );
+
+    await parkBazaar(3, "parley");
+    const bazaarNoLean = await bazaarRefused(bazaarSeller, "bazaar:publish", {
+      good: "Silk",
+      direction: 0,
+    });
+    const bazaarSilent = await bazaarRefused(bazaarSeller, "bazaar:publish", {
+      good: "Silk",
+    });
+    check(
+      bazaarNoLean !== null &&
+        bazaarNoLean === bazaarSilent &&
+        bazaarNoLean.includes("one way or the other"),
+      "a rumor leaning neither way is refused before anything else is read, and a frame carrying no direction at all is refused in the same sentence, because a row the market would ignore is a lie about a lie",
+    );
+
+    const bazaarLockedGood = Object.keys(COMMODITIES).find(
+      (good) => !bazaarGoods("fair_winds", 4).includes(good),
+    );
+    if (!bazaarLockedGood) {
+      throw new Error(
+        "This route traded every commodity, so nothing is out of season at this port.",
+      );
+    }
+    const bazaarNotTraded = await bazaarRefused(
+      bazaarSeller,
+      "bazaar:publish",
+      {
+        good: bazaarLockedGood,
+        direction: 1,
+      },
+    );
+    check(
+      bazaarNotTraded !== null && bazaarNotTraded.includes("does not trade"),
+      "and a real commodity the coming market does not stock is refused rather than leaned onto nothing, because the list the server checks is the list that market draws from rather than the catalogue the game owns",
+    );
+
+    // The two rows this leg will price the next market with.
+    const bazaarSilk = bazaarSpeaks(bazaarThird, (board) => board.length === 1);
+    // The claim below reads the speaker's own board beside the frame it
+    // watched, so that board is waited for too rather than read hopeful.
+    const bazaarSilkEverywhere = bazaarBoardsReach(
+      [bazaarSeller],
+      (board) => board.length === 1,
+    );
+    bazaarSocketOf(bazaarSeller).emit("bazaar:publish", {
+      roomId: bazaarRoomId,
+      good: "Silk",
+      direction: 1,
+    });
+    const bazaarAfterSilk = await bazaarSilk;
+    await bazaarSilkEverywhere;
+    check(
+      bazaarAfterSilk?.rumors.length === 1 &&
+        bazaarAfterSilk.rumors[0].round === 3 &&
+        bazaarAfterSilk.rumors[0].publisherUserId === bazaarSeller.id &&
+        bazaarAfterSilk.rumors[0].good === "Silk",
+      "a captain who speaks puts a row on the board the whole harbor reads, and the row carries the leg it was spoken in and the name of the captain who spoke it",
+    );
+    check(
+      bazaarAfterSilk?.rumors[0].direction === null &&
+        bazaarDirectionOf(bazaarSeller, rumorId(bazaarSeller.id, 3)) === 1,
+      "and the one fact the row is carrying is handed to its publisher alone: the captain who spoke reads their own lean back while the captain beside them reads the same row with the direction taken off",
+    );
+
+    const bazaarTea = bazaarSpeaks(bazaarThird, (board) => board.length === 2);
+    // This claim reads three boards, and the frame it watched is only one of
+    // them: the speaker's and the listener's are waited for beside it, or the
+    // two lean readings it makes could be made against a board a moment
+    // behind the frame that carried them.
+    const bazaarTeaEverywhere = bazaarBoardsReach(
+      [bazaarSeller, bazaarReader],
+      (board) => board.length === 2,
+    );
+    bazaarSocketOf(bazaarReader).emit("bazaar:publish", {
+      roomId: bazaarRoomId,
+      good: "Tea",
+      direction: -1,
+    });
+    const bazaarAfterTea = await bazaarTea;
+    await bazaarTeaEverywhere;
+    check(
+      bazaarAfterTea?.rumors.length === 2 &&
+        bazaarDirectionOf(bazaarThird, rumorId(bazaarSeller.id, 3)) === null &&
+        bazaarDirectionOf(bazaarThird, rumorId(bazaarReader.id, 3)) === null &&
+        bazaarDirectionOf(bazaarSeller, rumorId(bazaarSeller.id, 3)) === 1 &&
+        bazaarDirectionOf(bazaarSeller, rumorId(bazaarReader.id, 3)) === null &&
+        bazaarDirectionOf(bazaarReader, rumorId(bazaarSeller.id, 3)) === null &&
+        bazaarDirectionOf(bazaarReader, rumorId(bazaarReader.id, 3)) === -1,
+      "two captains can speak in one leg about two goods, and each of them reads their own row with its direction and the other captain's without: the third captain at the table, who holds no path at all, reads both rows and neither lean, which is what makes this a market rather than a private channel",
+    );
+
+    // A rumor is not a promise, so a captain who leaves the harbor does not
+    // take their row with them. The two consent boards drop a departed
+    // captain's rows; this one deliberately does not, because a row the
+    // harbor heard is priced by the market it names whether or not the
+    // captain who said it is still ashore.
+    bazaarSocketOf(bazaarSeller).close();
+    await bazaarSettle();
+    check(
+      bazaarBoardOf(bazaarThird).length === 2 &&
+        bazaarSeen.get(bazaarThird.id)?.size === 2,
+      "and a captain who leaves the table does not take their rumor with them, because a rumor is not a promise: dropping the row would reprice the good for everyone still sailing, which is a settlement applied halfway rather than a cleanup",
+    );
+
+    // A captain who comes back is handed the room's board, and the row they
+    // own comes back to them with the lean still on it: the personalization
+    // is a property of the payload rather than of the broadcast that
+    // happened to be in flight when they left.
+    const bazaarReload = await openAuthedSocket(bazaarSeller);
+    run.sockets.push(bazaarReload);
+    bazaarSockets.set(bazaarSeller.id, bazaarReload);
+    const bazaarSnapshot = waitForEvent<BazaarBoard>(
+      bazaarReload,
+      "bazaar:update",
+      (payload) => payload?.roomId === bazaarRoomId,
+    );
+    const bazaarSeatedAgain = waitForEvent<WireHistory>(
+      bazaarReload,
+      "chat:history",
+      (payload) => payload?.roomId === bazaarRoomId,
+    );
+    bazaarReload.emit("room:join", { roomId: bazaarRoomId });
+    const [bazaarOnJoin] = await Promise.all([
+      bazaarSnapshot,
+      bazaarSeatedAgain,
+    ]);
+    // A second wait is attached after the first board has landed, so the two
+    // reads below are two frames rather than one frame seen twice.
+    const bazaarAskedFor = waitForEvent<BazaarBoard>(
+      bazaarReload,
+      "bazaar:update",
+      (payload) => payload?.roomId === bazaarRoomId,
+    );
+    bazaarReload.emit("bazaar:state:request", { roomId: bazaarRoomId });
+    const bazaarOnAsk = await bazaarAskedFor;
+    const readFrom = (board: BazaarBoard | null, rowId: string) =>
+      (board?.rumors ?? []).find((row) => row.id === rowId)?.direction;
+    check(
+      readFrom(bazaarOnJoin, rumorId(bazaarSeller.id, 3)) === 1 &&
+        readFrom(bazaarOnJoin, rumorId(bazaarReader.id, 3)) === null &&
+        readFrom(bazaarOnAsk, rumorId(bazaarSeller.id, 3)) === 1 &&
+        readFrom(bazaarOnAsk, rumorId(bazaarReader.id, 3)) === null,
+      "a captain who comes back is handed the board twice, once as they take their seat and once when they ask for it, and both reads say the same thing: their own row comes back with the lean still on it and the row their tablemate spoke under comes back as nothing, because the personalization belongs to the payload rather than to the broadcast that happened to be in flight when they left",
+    );
+
+    const bazaarTooSoon = await bazaarRefused(bazaarSeller, "bazaar:publish", {
+      good: "Hemp",
+      direction: 1,
+    });
+    check(
+      bazaarTooSoon !== null &&
+        bazaarTooSoon === rumorCooldownLine(RUMOR_COOLDOWN_ROUNDS),
+      "and a captain who has already spoken this leg is refused in the sentence the desk prints, counted off the rows the room already holds rather than off a counter a doctored client could simply not obey",
+    );
+
+    // The room's log, which is the other place the trade is written down.
+    const bazaarLog = waitForEvent<{
+      roomId: string;
+      entries: VoyageLogEntry[];
+    }>(
+      bazaarSocketOf(bazaarThird),
+      "voyage:log:history",
+      (payload) => payload?.roomId === bazaarRoomId,
+    );
+    bazaarSocketOf(bazaarThird).emit("voyage:log:request", {
+      roomId: bazaarRoomId,
+    });
+    const bazaarLines = ((await bazaarLog)?.entries ?? []).map(
+      (entry) => entry.text,
+    );
+    // The line is built from the row the server itself broadcast, so the
+    // check is a claim about the bazaar and the log agreeing rather than
+    // about this file's copy of a sentence.
+    const bazaarSilkRow = bazaarBoardOf(bazaarThird).find(
+      (row) => row.id === rumorId(bazaarSeller.id, 3),
+    );
+    check(
+      bazaarSilkRow !== undefined &&
+        bazaarLines.includes(
+          voyageLogLine({
+            kind: "rumor_published",
+            captain: bazaarSilkRow.publisherName,
+            good: bazaarSilkRow.good,
+          }),
+        ),
+      "the room's log carries the rumor as the bazaar wrote it, with the captain and the good and never the direction, because the log is public the instant it is written and the direction is not public until the market answers the row",
+    );
+
+    // ---- The leg the rumors land on ----
+    //
+    // The market of leg four is the one both rows were aimed at, and it is
+    // opened by the advance out of Dawn, which is the step the server hangs
+    // the lean on.
+    await parkBazaar(4, "dawn");
+    const bazaarReveal = bazaarAdvanceTo(4);
+    // The reveal rides the same advance, so this is waited for as its own
+    // frame rather than read after the fact: what the check below is about
+    // is what the third captain was told, not what a board happened to hold
+    // a moment later.
+    const bazaarRevealed = waitForEvent<BazaarBoard>(
+      bazaarSocketOf(bazaarThird),
+      "bazaar:update",
+      (payload) =>
+        payload?.roomId === bazaarRoomId &&
+        payload.rumors.some(
+          (row) =>
+            row.id === rumorId(bazaarReader.id, 3) && row.direction === -1,
+        ),
+    );
+    bazaarReadyAll(4, "dawn");
+    const bazaarAtTheMarket = await bazaarReveal;
+    await bazaarRevealed;
+    check(
+      bazaarAtTheMarket?.bazaarLean?.Silk === RUMOR_SHIFT_FRACTION &&
+        bazaarAtTheMarket?.bazaarLean?.Tea === -RUMOR_SHIFT_FRACTION &&
+        Object.keys(bazaarAtTheMarket?.bazaarLean ?? {}).length === 2,
+      "the leg four market is priced against both rumors, each good leaned by exactly the band the constant declares, and the frame carrying the lean carries no name with it: every captain draws the same market from that frame and none of them is told which captain leaned which way",
+    );
+    check(
+      bazaarDirectionOf(bazaarThird, rumorId(bazaarSeller.id, 3)) === 1 &&
+        bazaarDirectionOf(bazaarThird, rumorId(bazaarReader.id, 3)) === -1,
+      "and the reveal lands with the market rather than after it: the third captain, who read two rows with no direction a moment ago, now reads both, which is the plan's false positive generator and the reason a direction is held back for exactly one leg",
+    );
+
+    await parkBazaar(4, "parley");
+    const bazaarStillQuiet = await bazaarRefused(
+      bazaarSeller,
+      "bazaar:publish",
+      {
+        good: "Hemp",
+        direction: 1,
+      },
+    );
+    check(
+      bazaarStillQuiet !== null && bazaarStillQuiet === rumorCooldownLine(2),
+      "a captain who spoke in one leg is refused through the two legs after it and told how many are left, which is the wait the desk draws before the click rather than a refusal discovered after it",
+    );
+
+    const bazaarThirdSpeaks = bazaarSpeaks(bazaarThird, (board) =>
+      board.some((row) => row.publisherUserId === bazaarThird.id),
+    );
+    bazaarSocketOf(bazaarThird).emit("bazaar:publish", {
+      roomId: bazaarRoomId,
+      good: "Hemp",
+      direction: -1,
+    });
+    check(
+      (await bazaarThirdSpeaks) !== null,
+      "and the wait is a hush on one captain rather than over the table: a captain who has not spoken this voyage may speak while the captain beside them is still quiet",
+    );
+
+    // The window the whole feature is built on: the market after next is
+    // priced by the rumor spoken in leg four and by neither of the two from
+    // leg three, and the market after that is told that nobody spoke at all.
+    await parkBazaar(5, "dawn");
+    const bazaarLegFive = bazaarAdvanceTo(5);
+    bazaarReadyAll(5, "dawn");
+    const bazaarAtFive = await bazaarLegFive;
+    check(
+      bazaarAtFive?.bazaarLean?.Hemp === -RUMOR_SHIFT_FRACTION &&
+        Object.keys(bazaarAtFive?.bazaarLean ?? {}).length === 1,
+      "and the next market is priced by the rumor spoken in leg four alone: the two rows from leg three are not carried forward, which is the one leg window the feature is built on",
+    );
+
+    await parkBazaar(6, "dawn");
+    const bazaarLegSix = bazaarAdvanceTo(6);
+    bazaarReadyAll(6, "dawn");
+    const bazaarAtSix = await bazaarLegSix;
+    check(
+      bazaarAtSix !== null &&
+        "bazaarLean" in bazaarAtSix &&
+        Object.keys(bazaarAtSix.bazaarLean ?? {}).length === 0,
+      "and a market nobody spoke about is sent an empty lean rather than no lean at all, because a market that is never told last leg's rumor is over would price the same good twice",
+    );
+
+    // The house rule, over the copy this feature added: the sentences a
+    // captain reads at the bazaar are the bazaar's own, and the files that
+    // carry them are held whole, comments included.
+    check(
+      !carriesADash("src/lib/game/engine/bazaar.ts") &&
+        !carriesADash("src/lib/use-bazaar-rumors.ts") &&
+        !carriesADash("src/components/portmasters/game/BazaarRumors.tsx") &&
+        !carriesADash("src/server/realtime/bazaar.ts"),
+      "every file the bazaar's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+    );
+
+    // =====================================================================
+    // [D6: Free Captain: Opportunist] The plan's clause for this feature,
+    // and the whole of it: "Once per voyage, fulfill any one pathbound
+    // order without joining that path, at a forty percent payout penalty."
+    //
+    // The checks are split the way the feature is. The allowance is
+    // arithmetic and is read here without a server, because nothing in this
+    // feature travels: the borrow is a permission the captain's own client
+    // holds, the fill is the fill the manifest already ran, and the one
+    // wire fact it adds is the counter the leg report files, which is read
+    // where every leg report is read (see the telemetry spine above). The
+    // board a captain meets is dealt through the engine's own lifecycle
+    // rather than assembled by hand, the same way the pathbound board above
+    // is dealt, so what is read here is the board a Free Captain really
+    // meets in the Orders phase.
+    // =====================================================================
+    console.log("\nFree Captain: the borrow");
+
+    // ---- the allowance ----
+    // The two numbers the plan sets, and the payout they make. The penalty
+    // is read off the constant rather than typed here, so F6's retune moves
+    // this check with it.
+    check(
+      OPPORTUNIST_USES === 1 &&
+        OPPORTUNIST_PENALTY === 0.4 &&
+        opportunistPayout(100) === 60 &&
+        opportunistPayout(100) === 100 - Math.round(100 * OPPORTUNIST_PENALTY),
+      "a hundred Gold order pays sixty on the borrow, which is the plan's forty percent penalty read off the constant rather than typed into the rule",
+    );
+    // The property, over every face value a card can carry rather than over
+    // one example: the payout never exceeds the face value, never goes
+    // below zero, and never falls as the order grows. The first of those is
+    // the one the smallest orders decide, because a deduction that floored
+    // instead of rounding would leave a two Gold order paying two and the
+    // penalty would stop being real exactly where the plan says the reach
+    // has to cost something.
+    check(
+      Array.from({ length: 200 }, (_, i) => i + 1).every(
+        (face, i, all) =>
+          opportunistPayout(face) <= face &&
+          opportunistPayout(face) >= 0 &&
+          (i === 0 || opportunistPayout(face) >= opportunistPayout(all[i - 1])),
+      ) &&
+        opportunistPayout(2) === 1 &&
+        opportunistPayout(1) === 1 &&
+        opportunistPayout(0) === 0 &&
+        opportunistPayout(-5) === 0,
+      "and the payout is bounded by the face value at every size, so the penalty is charged on a one Gold errand as surely as on a hundred: the deduction is the number rounded and the smallest orders still pay it",
+    );
+    // One path works the borrow and no other does, and the switch is read
+    // before the path rather than beside it: the reading every ability
+    // reader in this tree takes, and the reason a rolled back build refuses
+    // a Free Captain as flatly as it refuses everyone else.
+    check(
+      PATH_IDS.every(
+        (id) =>
+          opportunistMayBorrow(
+            { path: id, opportunistBorrows: 0 },
+            "convoy",
+          ) ===
+          (id === OPPORTUNIST_PATH),
+      ) &&
+        !opportunistMayBorrow(
+          { path: null, opportunistBorrows: 0 },
+          "convoy",
+        ) &&
+        !withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
+          opportunistMayBorrow(
+            { path: OPPORTUNIST_PATH, opportunistBorrows: 0 },
+            "convoy",
+          ),
+        ) &&
+        !opportunistMayBorrow(
+          { path: OPPORTUNIST_PATH, opportunistBorrows: 0 },
+          null,
+        ),
+      "one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
+    );
+    // The counter itself: a bound read off the constant, a spent allowance
+    // that reads as none left, and a save carrying more spent than this
+    // build allows reading as none left rather than as a debt.
+    check(
+      opportunistBorrowsLeft({ opportunistBorrows: 0 }) === OPPORTUNIST_USES &&
+        opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES }) ===
+          0 &&
+        opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES + 5 }) ===
+          0 &&
+        opportunistBorrowsTaken({ opportunistBorrows: 2.7 }) === 2 &&
+        opportunistBorrowsTaken({ opportunistBorrows: -4 }) === 0,
+      "the allowance is a count rather than a flag, bounded by the constant F6 retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
+    );
+    // The heal, and the old save it exists for: a voyage written before
+    // this feature carries no counter at all, and the load site reads it
+    // with the module's own reader, so the reading here is the reading the
+    // board gets.
+    check(
+      normalizeOpportunistBorrows(undefined) === 0 &&
+        normalizeOpportunistBorrows(Number.NaN) === 0 &&
+        normalizeOpportunistBorrows("two") === 0 &&
+        normalizeOpportunistBorrows(2.7) === 2 &&
+        normalizeOpportunistBorrows(-1) === 0,
+      "and a save written before the borrow existed reads as a captain who never borrowed anything, rather than as a counter that would turn the first spend into a NaN the record would carry",
+    );
+    // ---- where the counter lives ----
+    // The plan's own clause: "The counter resets with the voyage, not with
+    // the round, and it lives in the same place as the other once per
+    // voyage limits." Both halves are observed rather than asserted: the
+    // rest of the round is walked through the engine's own lap until the
+    // books roll over, and the counter is still spent afterwards; then the
+    // voyage is restarted and it is not.
+    const borrowCarried = createInitialGameState();
+    borrowCarried.money = 400;
+    borrowCarried.opportunistBorrows = 1;
+    borrowCarried.phase = "resolve";
+    borrowCarried.pirateAttackResolved = true;
+    const borrowCtx = {
+      seedBase: `smoke:borrow:${suffix}`,
+      harborId: `smoke-borrow-${suffix}`,
+    };
+    // Bounded rather than a fixed count of presses: the phases a mode runs
+    // between the settlement and the next round are the mode's own, so the
+    // check walks whatever this build's lap is rather than a list of phase
+    // names written here.
+    for (let step = 0; step < 6 && borrowCarried.currentRound === 1; step++) {
+      nextPhase(borrowCarried, borrowCtx, []);
+    }
+    check(
+      borrowCarried.currentRound === 2 &&
+        borrowCarried.opportunistBorrows === 1,
+      "a round walked through the engine's own lap leaves the borrow spent, which is what makes it a voyage's allowance rather than a leg's",
+    );
+    restartGame(borrowCarried, [], {});
+    check(
+      borrowCarried.currentRound === 1 &&
+        borrowCarried.opportunistBorrows === 0,
+      "and setting sail again hands the allowance back with everything else the voyage holds, because the counter is part of the voyage's own state rather than of the account behind it",
+    );
+
+    // ---- the board, and the fill ----
+    // The board a Free Captain meets, dealt through the engine's own
+    // lifecycle: the tier's draw plus the paths' three, and every one of
+    // the three is locked to a captain who holds none of those paths.
+    const borrowBoard = (label: string): GameState => {
+      const state = createInitialGameState();
+      snapToCheckpoint(
+        state,
+        { seedBase: `smoke:borrow-board:${label}`, harborId: "harbor-a" },
+        1,
+        "orders",
+        [],
+      );
+      state.path = OPPORTUNIST_PATH;
+      return state;
+    };
+    // The card's goods put in the hold, so the only thing standing between
+    // the captain and the order is the lock.
+    const stockFor = (
+      state: GameState,
+      card: GameState["customerCards"][number],
+    ) => {
+      for (const r of card.resources) state.inventory[r.type] = r.required ?? 0;
+    };
+    const lockedCardsOf = (state: GameState) =>
+      state.customerCards.filter((card) => lockedBehind(state, card) !== null);
+
+    withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+      const board = borrowBoard("a");
+      const lockedCards = lockedCardsOf(board);
+      const openCards = board.customerCards.filter(
+        (card) => lockedBehind(board, card) === null,
+      );
+      check(
+        lockedCards.length === PATH_ORDER_SLOTS && openCards.length > 0,
+        `a Free Captain's board carries the paths' three locked cards like everyone else's (${lockedCards.length} locked, ${openCards.length} open)`,
+      );
+      const lockedCard = lockedCards[0]!;
+      check(
+        !canFillOrder(board, lockedCard) &&
+          canFillOrder(board, lockedCard, true) &&
+          board.completedOrders.length === 0,
+        "and the manifest refuses the locked card through its ordinary guard while the same card with the borrow asked for is the captain's to fill",
+      );
+      check(
+        !canFillOrder({ ...board, inventory: {} }, lockedCard, true),
+        "and the borrow is not a way around the hold: a captain carrying none of the goods is refused with the ability asked for as flatly as without it, because the order still has to be filled rather than unlocked",
+      );
+
+      // The fill itself, through the engine's own settlement, with the
+      // freight read the way the settlement reads it so the check is about
+      // the payout rather than about a freight figure typed here.
+      const filled = borrowBoard("b");
+      filled.money = 500;
+      const card = lockedCardsOf(filled)[0]!;
+      stockFor(filled, card);
+      const freight = calcTransportCost(
+        filled,
+        card.totalItems,
+        card.resources.some((r) => SILK_GOODS.includes(r.type)),
+      );
+      const paid = opportunistPayout(card.reward);
+      const lines: string[] = [];
+      completeOrder(filled, card.id, lines, true);
+      check(
+        filled.money === 500 + paid - freight &&
+          filled.completedOrders.includes(card.id) &&
+          filled.opportunistBorrows === 1 &&
+          filled.path === OPPORTUNIST_PATH,
+        "a borrowed order fills through the same settlement as any other, pays the reduced reward down to the coin, spends the allowance, and leaves the captain holding the path they already held: the order is filled without joining its own",
+      );
+      check(
+        lines.includes(opportunistLine(card.reward, paid)) &&
+          paid < card.reward,
+        "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the plan says has to cost something real",
+      );
+
+      // The second locked card, with the allowance spent: refused through
+      // the same reader, and refused with the sentence every other captain
+      // is refused with rather than with one written for this path.
+      const spare = lockedCardsOf(filled).find((o) => o.id !== card.id)!;
+      const spareLock = lockedBehind(filled, spare)!;
+      stockFor(filled, spare);
+      const moneyBefore = filled.money;
+      const refused: string[] = [];
+      completeOrder(filled, spare.id, refused, true);
+      check(
+        filled.money === moneyBefore &&
+          !filled.completedOrders.includes(spare.id) &&
+          filled.opportunistBorrows === 1 &&
+          refused.includes(`❌ ${pathLockLine(spareLock)}`),
+        "a second borrow in the same voyage is refused and the order stays standing, with the lock line every other captain reads rather than a sentence written for this path: one action with one counter, which is the plan's own rollback shape",
+      );
+
+      // The flag on a card that was never locked: asked for, and read as
+      // nothing at all. This is the shape the board's borrow button uses
+      // (it asks with the flag on every board it draws), and it is what
+      // keeps an over eager caller from taxing a captain wrongly.
+      const ordinary = borrowBoard("c");
+      ordinary.money = 500;
+      // A raw good order rather than a finished product, because a product
+      // order pays VAT on top of its reward and this check is about the
+      // face value coming through whole.
+      const openCard = ordinary.customerCards.find(
+        (card) => lockedBehind(ordinary, card) === null && !card.isProductOrder,
+      );
+      if (!openCard) {
+        throw new Error(
+          "No open raw order on the board to read the unbought case off.",
+        );
+      }
+      stockFor(ordinary, openCard);
+      const ordinaryFreight = calcTransportCost(
+        ordinary,
+        openCard.totalItems,
+        openCard.resources.some((r) => SILK_GOODS.includes(r.type)),
+      );
+      const ordinaryLines: string[] = [];
+      completeOrder(ordinary, openCard.id, ordinaryLines, true);
+      check(
+        ordinary.money === 500 + openCard.reward - ordinaryFreight &&
+          ordinary.opportunistBorrows === 0 &&
+          !ordinaryLines.some((line) => line.includes("Free Captain")),
+        "while the same flag asked for on an order nobody locked is read as nothing at all: the card pays its full reward, the allowance is untouched and no borrow line is written, so an over eager caller cannot tax a captain for an ability their order never needed",
+      );
+    });
+
+    // ---- the switch, off ----
+    // The rollback the plan asks for, and it is the one switch D2 already
+    // ships: with the locks off the board holds no pathbound card at all,
+    // so there is nothing for the borrow to reach through and the ability
+    // is refused with the cards that carry it.
+    withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () => {
+      const dark = borrowBoard("d");
+      const darkCards = dark.customerCards.filter((card) => card.isPathOrder);
+      const darkLocked = lockedCardsOf(dark);
+      check(
+        darkCards.length === 0 &&
+          darkLocked.length === 0 &&
+          !opportunistMayBorrow(dark, "convoy"),
+        "with the path orders rolled back the board holds none of the paths' three even though the draw wrote them, and the borrow is refused with them: the plan's rollback is one switch, and this one is already the locks'",
+      );
+    });
+
+    // The house rule, over the copy this feature added: every sentence a
+    // captain reads on a borrowed card is written in the module beside the
+    // arithmetic it describes, board and ledger together, so the two files
+    // swept here are where the whole of it lives. The board component is
+    // deliberately not swept whole, and the reason is the tree's own: it
+    // reads its colors through CSS custom properties, and a doubled hyphen
+    // is how that syntax is spelled (see the note on CARRIES_A_DASH above),
+    // so the file cannot be held to a rule about dashes. Every borrow
+    // string it draws is one of the module's own, which is what the check
+    // below is standing on, and the rendered board is read in a browser
+    // where the sentences land rather than here.
+    check(
+      !carriesADash("src/lib/game/engine/opportunist.ts") &&
+        !carriesADash("src/lib/game/engine/orders.ts"),
+      "every file the borrow's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+    );
+
+    // =====================================================================
+    // [D7: the draft, and switching] The plan's clause for this feature, and
+    // the whole of it: "Deal each captain three path cards face down from a
+    // deck seeded so at least two Quartermaster cards are in circulation.
+    // Keep one, pass two to the left, keep one of the two received, pass
+    // one, discard the last. Then switching: once per voyage, at a port,
+    // legs three through nine, forfeiting unfulfilled pathbound orders and
+    // paying a Refit fee scaled to Renown, and the switch is published to
+    // the fleet log where everyone sees it."
+    //
+    // The checks are split the way the feature is. The deal's arithmetic is
+    // read here without a server, because the rule module holds no state and
+    // nothing about a deck needs a room. The deal itself is then played on a
+    // real harbor, because the privacy of a hand is the wire half of this
+    // feature and no reading of a rule module can observe it: two captains
+    // sit down, the voyage sets sail, and every frame both sockets receive
+    // is kept. The switch is read in both halves, the engine's own guard
+    // over a save and the room's publication over the wire, because the
+    // plan's "everyone knows" is a claim about the fleet rather than about
+    // the captain who changed their papers.
+    // =====================================================================
+    console.log("\nThe path draft");
+
+    // ---- the deal's arithmetic ----
+    check(
+      DRAFT_DEAL === 3 &&
+        DRAFT_STEP_SECONDS * DRAFT_DEAL === 45 &&
+        DRAFT_QUARTERMASTER_MIN >= 2,
+      "the deal is three cards a captain over three steps of fifteen seconds, which is the plan's forty five second interface read off the constants rather than typed into a rule, with the Quartermaster floor at the two the plan asks to be in circulation",
+    );
+
+    // The composition, over every table this lap can seat. Two properties
+    // are read at every size: the deck is exactly three cards a captain, so
+    // it is dealt out entirely, and the Quartermaster floor holds, which is
+    // the plan's "always physically present" read as a guarantee rather than
+    // a lean. The smallest table is the one that decides the second: a solo
+    // captain's deck is three cards and two of them are the floor.
+    check(
+      Array.from({ length: 12 }, (_, i) => i + 1).every((captains) => {
+        const counts = draftComposition(captains);
+        const total = PATH_IDS.reduce((sum, id) => sum + counts[id], 0);
+        return (
+          total === captains * DRAFT_DEAL &&
+          counts.quartermaster >= DRAFT_QUARTERMASTER_MIN &&
+          PATH_IDS.every((id) => counts[id] >= 0)
+        );
+      }),
+      "every table from one captain to twelve is dealt a deck of exactly three cards a captain with the Quartermaster floor held, so the deck is dealt out to the last card and the card the plan wants in circulation is in circulation at every size",
+    );
+
+    // The deck itself: the composition, shuffled. The shuffle is what hides
+    // the order and the composition is what decides the counts, so what is
+    // read here is that the two are one deck still: the same cards, in a
+    // different order than they were built in.
+    const composedDeck = PATH_IDS.flatMap((id) =>
+      Array.from({ length: draftComposition(6)[id] }, () => id),
+    );
+    const dealtDeck = draftDeck(6, createRng("smoke:draft:deck"));
+    check(
+      dealtDeck.length === composedDeck.length &&
+        [...dealtDeck].sort().join() === [...composedDeck].sort().join() &&
+        dealtDeck.some((card, index) => card !== composedDeck[index]),
+      "the shuffled deck is the composition to the last card and in a different order than it was built in, so the floor survives the shuffle and the deal begins from a deck nobody can read",
+    );
+
+    // The hands: the deck dealt out three at a time, in seating order.
+    const composedHands = draftHands(dealtDeck, 6);
+    check(
+      composedHands.length === 6 &&
+        composedHands.every((hand) => hand.length === DRAFT_DEAL) &&
+        composedHands.flat().join() === dealtDeck.join(),
+      "the deck is dealt out to the table three cards at a time in the order the seats were opened in, so what a captain holds is a slice of one deck rather than a draw of its own",
+    );
+    check(
+      draftHands(dealtDeck, 7).flat().length === dealtDeck.length &&
+        draftHands(dealtDeck, 7)[6]?.length === 0,
+      "and a table with one seat too many is handed a short hand rather than a card somebody else is already holding",
+    );
+
+    // The keep and the pass. A pick names a place in a hand rather than a
+    // path, because a deck with a floor can hand one captain two cards of
+    // the same path and "keep the Quartermaster" would not name a card.
+    const spreadHand: PathId[] = ["quartermaster", "convoy", "quartermaster"];
+    const keptOne = keepFrom(spreadHand, 1);
+    check(
+      keptOne?.kept === "convoy" &&
+        keptOne.rest.length === 2 &&
+        keptOne.rest.filter((card) => card === "quartermaster").length === 2 &&
+        keepFrom(spreadHand, DRAFT_DEAL) === null &&
+        keepFrom(spreadHand, -1) === null &&
+        keepFrom(spreadHand, 1.5) === null &&
+        keepFrom(spreadHand, "1") === null,
+      "a card is kept by the place it holds in a hand, so a captain dealt two Quartermasters keeps one of them and leaves the other in play, and a pick that names nothing in the hand is refused rather than rounded to somewhere",
+    );
+    const fourHands: PathId[][] = [
+      ["convoy", "convoy", "loom"],
+      ["aroma", "aroma", "quartermaster"],
+      ["free_captain", "free_captain", "loom"],
+      ["quartermaster", "aroma", "convoy"],
+    ];
+    const passedHands = passLeft(fourHands);
+    check(
+      passedHands.every(
+        (hand, seat) =>
+          hand === fourHands[(seat - 1 + fourHands.length) % fourHands.length],
+      ) &&
+        passedHands[0]?.join() === fourHands[fourHands.length - 1]?.join() &&
+        passedHands.length === fourHands.length,
+      "the two cards a captain did not keep travel to the seat on their left, which is the next seat in the order the draft was opened with and wraps at the table's end",
+    );
+    check(
+      DRAFT_AUTO_PICK === 0 &&
+        keepFrom(spreadHand, DRAFT_AUTO_PICK)?.kept === "quartermaster",
+      "and the card the room lays for a captain who let the clock run out is the first card of their own hand, which is a card they were dealt rather than one the server liked",
+    );
+
+    // ---- the window, the seat and the price ----
+    check(
+      pathSwitchWindow(PATH_SWITCH_FROM_ROUND) &&
+        pathSwitchWindow(PATH_SWITCH_TO_ROUND) &&
+        pathSwitchWindow(PATH_SWITCH_FROM_ROUND + 0.9) &&
+        !pathSwitchWindow(PATH_SWITCH_FROM_ROUND - 1) &&
+        !pathSwitchWindow(PATH_SWITCH_TO_ROUND + 1) &&
+        !pathSwitchWindow(Number.NaN) &&
+        ["market", "orders", "parley"].every((seat) => pathSwitchPhase(seat)) &&
+        ["harbor", "dawn", "resolve", "dusk"].every(
+          (seat) => !pathSwitchPhase(seat),
+        ) &&
+        !pathSwitchPhase(null) &&
+        !pathSwitchPhase(4),
+      "new papers are read in legs three through nine and in the three seats the port is: a captain buys, commits and talks at Market, Orders and Parley, and sails, raids and settles accounts in the others",
+    );
+    const feeLadder = Array.from({ length: RENOWN_MAX_LEVEL }, (_, rung) =>
+      pathSwitchFee(rung + 1),
+    );
+    const firstCapped = feeLadder.findIndex(
+      (fee) => fee === PATH_SWITCH_FEE_MAX,
+    );
+    check(
+      feeLadder[0] === PATH_SWITCH_FEE_BASE &&
+        pathSwitchFee(RENOWN_MAX_LEVEL) === PATH_SWITCH_FEE_MAX &&
+        firstCapped > 0 &&
+        firstCapped < RENOWN_MAX_LEVEL &&
+        feeLadder.every(
+          (fee, rung) =>
+            fee <= PATH_SWITCH_FEE_MAX &&
+            (rung === 0 || fee >= feeLadder[rung - 1]),
+        ),
+      `the price of new papers is the plan's Refit fee scaled to Renown: the base at the first rung, ${PATH_SWITCH_FEE_PER_LEVEL} Gold more for each rung above it, and a ceiling that binds before the ladder's top rung rather than above it, so a captain really meets the bound`,
+    );
+    check(
+      pathSwitchFee(0) === PATH_SWITCH_FEE_BASE &&
+        pathSwitchFee(-3) === PATH_SWITCH_FEE_BASE &&
+        pathSwitchFee(Number.NaN) === PATH_SWITCH_FEE_BASE &&
+        pathSwitchFee(3.9) === pathSwitchFee(3),
+      "and a save carrying a rung nobody sails on pays the base rather than less than it, because the ladder's floor is where every captain starts",
+    );
+    check(
+      normalizePathSwitchLeg(4.7) === 4 &&
+        normalizePathSwitchLeg(9) === 9 &&
+        normalizePathSwitchLeg(0) === 0 &&
+        normalizePathSwitchLeg(-2) === 0 &&
+        normalizePathSwitchLeg(Number.NaN) === 0 &&
+        normalizePathSwitchLeg("four") === 0,
+      "the leg a switch is stamped with reads as the voyage's own counter, and nonsense in that field reads as a captain who has not changed their papers: the direction that keeps a corrupt save from spending the one switch a voyage allows",
+    );
+    check(
+      pathSwitchOpenLine(PATH_SWITCH_FROM_ROUND - 1, "market") ===
+        `The harbor reads new papers from round ${PATH_SWITCH_FROM_ROUND}.` &&
+        pathSwitchOpenLine(PATH_SWITCH_TO_ROUND + 1, "market") ===
+          `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.` &&
+        pathSwitchOpenLine(4, "dawn") ===
+          "Papers are changed at the port, in Market, Orders or Parley." &&
+        pathSwitchOpenLine(4, "market") === null &&
+        pathSwitchOpenLine(2, "dawn") ===
+          `The harbor reads new papers from round ${PATH_SWITCH_FROM_ROUND}.`,
+      "the harbor's answer about when it reads new papers is one sentence per fact and the season is asked before the seat, so a switch attempted in the wrong part of a voyage is told about the voyage rather than about the phase it happened to be attempted in",
+    );
+
+    // ---- what a kept card writes into a save ----
+    const kept = createInitialGameState();
+    const keptLines: string[] = [];
+    check(
+      kept.path === null &&
+        kept.pathSwitchLeg === 0 &&
+        applyDraftPath(kept, "quartermaster", keptLines) === true &&
+        kept.path === "quartermaster" &&
+        keptLines.length === 1 &&
+        keptLines[0]!.includes(pathConfig("quartermaster")!.name) &&
+        applyDraftPath(kept, "loom", keptLines) === false &&
+        kept.path === "quartermaster" &&
+        keptLines.length === 1,
+      "the card the draft leaves a captain holding is written once and only once: a second card arriving, which a reload or a second deal would send, is a frame to drop rather than an identity to overwrite behind the fleet's back",
+    );
+
+    // ---- the switch, over a save ----
+    // A board dealt through the engine's own lifecycle in a seat inside the
+    // window, so the forfeiture below walks the manifest a captain really
+    // meets rather than cards assembled by hand. It is read under the path
+    // order switch the way every board this suite deals one is, because a
+    // locked card only exists while that switch is on and a fixture that
+    // forgot it would be reading a manifest with nothing in it to forfeit.
+    const switched = withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+      const state = createInitialGameState({ mode: "ocean_gambit" });
+      snapToCheckpoint(
+        state,
+        { seedBase: `smoke:d7:switch:${suffix}`, harborId: "harbor-a" },
+        4,
+        "orders",
+        [],
+      );
+      state.money = 500;
+      state.renownLevel = 4;
+      const locked = state.customerCards
+        .map((card) => ({ card, lock: pathOrderOf(card) }))
+        .filter(
+          (row): row is { card: OrderCard; lock: PathId } => row.lock !== null,
+        );
+      const from = locked[0]?.lock ?? "convoy";
+      const to = PATH_IDS.find((id) => id !== from)!;
+      const mine = locked
+        .filter((row) => row.lock === from)
+        .map((row) => row.card);
+      // One of the old papers' cards already filled, on the boards that
+      // carry two of them: the manifest is also the leg's history, so a
+      // filled order is not something a switch can take away. A board that
+      // carries only one of them leaves it open instead, and the forfeiture
+      // below reads its count off the ledger rather than off a card.
+      const filled = mine.length > 1 ? mine.slice(0, 1) : [];
+      const open = mine.filter((card) => !filled.includes(card));
+      const loose = state.customerCards.filter(
+        (card) => pathOrderOf(card) === null,
+      );
+      state.path = from;
+      state.pathSwitchLeg = 0;
+      state.completedOrders = [
+        ...state.completedOrders,
+        ...filled.map((card) => card.id),
+      ];
+      const fee = pathSwitchFee(state.renownLevel);
+      const purse = state.money;
+      const lines: string[] = [];
+      const applied = applyPathSwitch(state, to, lines);
+      const held = (card: OrderCard) =>
+        state.customerCards.some((kept) => kept.id === card.id);
+      return {
+        state,
+        locked,
+        from,
+        to,
+        filled,
+        open,
+        loose,
+        fee,
+        purse,
+        lines,
+        applied,
+        held,
+      };
+    });
+    check(
+      switched.locked.length > 0,
+      `a leg four board carries the paths' cards like any other (${switched.locked.length} locked), which is what the forfeiture below has to have to walk`,
+    );
+    check(
+      switched.applied &&
+        switched.state.path === switched.to &&
+        switched.state.pathSwitchLeg === 4 &&
+        switched.state.money === switched.purse - switched.fee &&
+        switched.open.length > 0 &&
+        switched.open.every((card) => !switched.held(card)) &&
+        switched.filled.every((card) => switched.held(card)) &&
+        switched.loose.every((card) => switched.held(card)),
+      "the one switch a voyage allows charges the fee, stamps the leg it happened on and takes the unfulfilled pathbound orders of the path being set aside with it, while the orders already filled and the cards nobody locked stay on the manifest",
+    );
+    check(
+      switched.lines.some(
+        (line) =>
+          line.includes(pathConfig(switched.from)!.name) &&
+          line.includes(pathConfig(switched.to)!.name) &&
+          line.includes(String(switched.fee)),
+      ) &&
+        switched.lines.filter((line) => line.startsWith("📜 Forfeited"))
+          .length === 1 &&
+        switched.lines.includes(
+          `📜 Forfeited ${switched.open.length} unfulfilled pathbound order${switched.open.length === 1 ? "" : "s"}.`,
+        ),
+      "and the ledger says the whole of the price: the path set aside, the path taken up, the Gold it cost, and the orders it took with it counted once and counted right",
+    );
+    // The other side of the same guard, on a board whose locked cards are
+    // all filled: the forfeiture a switch costs is the work a captain did
+    // not do, so a manifest with none of it left has nothing to lose and
+    // says so by leaving the sentence off rather than by printing a zero.
+    withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+      const carried = createInitialGameState({ mode: "ocean_gambit" });
+      snapToCheckpoint(
+        carried,
+        { seedBase: `smoke:d7:carried:${suffix}`, harborId: "harbor-a" },
+        4,
+        "orders",
+        [],
+      );
+      const anyLocked = carried.customerCards.find(
+        (card) => pathOrderOf(card) !== null,
+      );
+      const abandoned =
+        anyLocked === undefined ? null : (pathOrderOf(anyLocked) ?? null);
+      carried.path = abandoned ?? PATH_IDS[0];
+      carried.money = 500;
+      const marked = carried.customerCards.filter(
+        (card) => pathOrderOf(card) === abandoned,
+      );
+      carried.completedOrders = [
+        ...carried.completedOrders,
+        ...marked.map((card) => card.id),
+      ];
+      const before = carried.customerCards.length;
+      const lines: string[] = [];
+      const switchedHere = applyPathSwitch(
+        carried,
+        PATH_IDS.find((id) => id !== carried.path)!,
+        lines,
+      );
+      check(
+        abandoned !== null &&
+          switchedHere &&
+          carried.customerCards.length === before &&
+          marked.length > 0 &&
+          marked.every((card) =>
+            carried.customerCards.some((kept) => kept.id === card.id),
+          ) &&
+          lines.every((line) => !line.startsWith("📜 Forfeited")),
+        "and a manifest whose pathbound cards are all filled loses nothing to a switch and says so by leaving the forfeiture line off entirely, so the line a captain reads is the count of what they gave up rather than a sentence the ledger prints every time",
+      );
+    });
+
+    // The refusals, one per fact, and each of them is the sentence the panel
+    // greys a button out with and the switch itself obeys, because they are
+    // one function rather than two that could drift.
+    const atSea = (
+      round: number,
+      phase: Phase,
+      path: PathId,
+      money: number,
+    ) => {
+      const state = createInitialGameState();
+      state.currentRound = round;
+      state.phase = phase;
+      state.path = path;
+      state.money = money;
+      return state;
+    };
+    // Two paths, and they are read off the record rather than off the board
+    // above: none of these sentences depends on what a manifest was dealt.
+    const heldPath = PATH_IDS[0];
+    const wantedPath = PATH_IDS[1];
+    const atPort = atSea(4, "orders", heldPath, 500);
+    check(
+      pathSwitchBlocked(createInitialGameState(), wantedPath) ===
+        "You hold no path to set aside." &&
+        pathSwitchBlocked(atPort, heldPath) === "You already hold that path." &&
+        pathSwitchBlocked({ ...atPort, pathSwitchLeg: 3 }, wantedPath) ===
+          "A captain changes their papers once a voyage, and yours are already changed." &&
+        pathSwitchBlocked(
+          atSea(PATH_SWITCH_FROM_ROUND - 1, "orders", heldPath, 500),
+          wantedPath,
+        ) ===
+          `The harbor reads new papers from round ${PATH_SWITCH_FROM_ROUND}.` &&
+        pathSwitchBlocked(
+          atSea(PATH_SWITCH_TO_ROUND + 1, "orders", heldPath, 500),
+          wantedPath,
+        ) ===
+          `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.` &&
+        pathSwitchBlocked(atSea(4, "dawn", heldPath, 500), wantedPath) ===
+          "Papers are changed at the port, in Market, Orders or Parley." &&
+        pathSwitchBlocked(atPort, wantedPath) === null,
+      "a captain with no path to set aside, one who has already changed their papers this voyage, one outside the legs the window spans, one in a seat that is not the port, one naming the path they already hold and one at the port in season: each is refused or allowed in the words the panel prints, and only the last of them can switch",
+    );
+    check(
+      pathSwitchBlocked(atPort, wantedPath) === null &&
+        pathSwitchBlocked(
+          { ...atPort, money: pathSwitchFee(atPort.renownLevel) - 1 },
+          wantedPath,
+        ) ===
+          `❌ Need ${pathSwitchFee(atPort.renownLevel)} Gold to change your papers.`,
+      "and a purse that cannot answer the price is refused last, after everything about where and when, so a captain is never told what a switch costs instead of why they cannot make one",
+    );
+    const refusedBoard = atSea(4, "dawn", heldPath, 500);
+    const refusedLines: string[] = [];
+    check(
+      applyPathSwitch(refusedBoard, wantedPath, refusedLines) === false &&
+        refusedBoard.path === heldPath &&
+        refusedBoard.pathSwitchLeg === 0 &&
+        refusedBoard.money === 500 &&
+        refusedLines[0] ===
+          "Papers are changed at the port, in Market, Orders or Parley.",
+      "a switch attempted in a seat the port does not keep is refused with the reason written into the captain's own ledger and nothing charged: a refusal costs a captain nothing but the sentence",
+    );
+    check(
+      pathSwitchOpenLine(4, "orders") === null &&
+        pathSwitchOpenLine(4, "dawn") ===
+          pathSwitchBlocked(atSea(4, "dawn", heldPath, 500), wantedPath) &&
+        pathSwitchOpenLine(2, "dawn") ===
+          pathSwitchBlocked(atSea(2, "dawn", heldPath, 500), wantedPath),
+      "and the room asks the same function the engine does, so a switch the fleet is shown is a switch the captain's own books would accept: the season and the seat are one sentence told twice",
+    );
+
+    // The plan's rollback, and it is one switch: with the draft off nothing
+    // deals a path, so the change of papers has no precondition to meet and
+    // says so in its first sentence rather than in a rule written for the
+    // rolled back build.
+    check(
+      withEnv("NEXT_PUBLIC_PATH_DRAFT", "off", () => !pathDraftOn()) &&
+        withEnv("NEXT_PUBLIC_PATH_DRAFT", "on", () => pathDraftOn()) &&
+        pathSwitchBlocked(createInitialGameState(), "loom") ===
+          "You hold no path to set aside.",
+      "the draft's own switch reads off the environment and defaults to on, and the pathless captain it leaves behind is refused by the same first sentence a captain who never drew one meets, so the rolled back build needs no second rule",
+    );
+
+    // ---- the deal, played on a real harbor ----
+    // Two captains, because a pass needs a seat to pass to and a hand's
+    // privacy is only observable with a second set of frames to compare
+    // against. Every frame both sockets receive is kept, and the deal is
+    // read back against the rule module's own composition: what the room
+    // deals is what this tree says a table of two is owed, to the last card.
+    const draftHost = await signUp("draft_a");
+    const draftMate = await signUp("draft_b");
+    run.extraAccounts.push(draftHost, draftMate);
+    const draftRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: draftHost.cookie,
+        body: JSON.stringify({
+          name: `Smoke draft harbor ${suffix}`,
+          isPublic: false,
+        }),
+      },
+    );
+    if (draftRoom.status !== 200) {
+      throw new Error("No draft harbor to deal into, stopping here.");
+    }
+    const draftRoomId = draftRoom.body.room.id;
+    run.lapRoomIds.push(draftRoomId);
+    await call("/api/rooms/join", {
+      method: "POST",
+      cookie: draftMate.cookie,
+      body: JSON.stringify({ code: draftRoom.body.room.code }),
+    });
+
+    const draftSeats: Array<{
+      captain: Captain;
+      socket: Socket;
+      views: DraftView[];
+      frames: Array<{ event: string; text: string }>;
+      closed: number;
+      switched: PathSwitched[];
+      errors: string[];
+    }> = [];
+    for (const captain of [draftHost, draftMate]) {
+      const socket = await openAuthedSocket(captain);
+      run.sockets.push(socket);
+      const seat = {
+        captain,
+        socket,
+        views: [] as DraftView[],
+        frames: [] as Array<{ event: string; text: string }>,
+        closed: 0,
+        switched: [] as PathSwitched[],
+        errors: [] as string[],
+      };
+      // Every frame this socket receives, on any event rather than on the
+      // three the draft is known to use, so the privacy check at the end of
+      // the deal reads the wire rather than the events the feature happens
+      // to name today: a hand that left under a second event name is
+      // exactly what a listener per event cannot see.
+      socket.onAny((event: string, ...args: unknown[]) => {
+        seat.frames.push({ event, text: JSON.stringify(args) });
+      });
+      socket.on("draft:update", (payload: DraftView | null) => {
+        if (payload === null) seat.closed += 1;
+        else if (payload?.roomId === draftRoomId) seat.views.push(payload);
+      });
+      socket.on("path:switched", (payload: PathSwitched) => {
+        if (payload?.roomId === draftRoomId) seat.switched.push(payload);
+      });
+      socket.on(
+        "path:error",
+        (payload: { roomId?: string; error?: string }) => {
+          if (
+            payload?.roomId === draftRoomId &&
+            typeof payload.error === "string"
+          ) {
+            seat.errors.push(payload.error);
+          }
+        },
+      );
+      const seated = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === draftRoomId,
+      );
+      socket.emit("room:join", { roomId: draftRoomId });
+      await seated;
+      draftSeats.push(seat);
+    }
+    // The two lines the settle writes, collected off the host's own socket
+    // rather than waited for one at a time: a draft's log lines are one
+    // fact per seat and arrive together, so a reader that waited for the
+    // first and then the second would be waiting on the same frame twice.
+    const takenLines: VoyageLogEntry[] = [];
+    draftSeats[0]!.socket.on(
+      "voyage:log",
+      (payload: { entry?: VoyageLogEntry }) => {
+        if (payload?.entry?.kind === "path_taken")
+          takenLines.push(payload.entry);
+      },
+    );
+
+    const firstBeats = draftSeats.map((seat) =>
+      waitForEvent<DraftView>(
+        seat.socket,
+        "draft:update",
+        (payload) =>
+          payload?.roomId === draftRoomId && payload?.step === "first",
+        15000,
+      ),
+    );
+    draftSeats[0]!.socket.emit("room:start", { roomId: draftRoomId });
+    const openingViews = await Promise.all(firstBeats);
+    check(
+      openingViews.every(
+        (view) =>
+          view !== null &&
+          view.hand.length === DRAFT_DEAL &&
+          view.open === 2 &&
+          view.path === null &&
+          view.deadline > Date.now(),
+      ),
+      "every captain at the table is dealt their own three cards face down, told the whole table is still to choose and given the server's clock, and nobody holds a path until the last step closes",
+    );
+    const openingHands = openingViews.map((view) => view!.hand);
+    const openingCounts = PATH_IDS.reduce(
+      (tally, id) => {
+        tally[id] = openingHands.flat().filter((card) => card === id).length;
+        return tally;
+      },
+      {} as Record<PathId, number>,
+    );
+    const deckOwed = draftComposition(2);
+    check(
+      PATH_IDS.every((id) => openingCounts[id] === deckOwed[id]) &&
+        deckOwed.quartermaster >= DRAFT_QUARTERMASTER_MIN,
+      `the two hands on the table are the deck this tree says a table of two is owed, to the last card (${PATH_IDS.map((id) => `${id} ${openingCounts[id]}`).join(", ")})`,
+    );
+
+    // The host keeps the card the plan's evaluation watches for and the mate
+    // keeps nothing at all: their step is left to run out, which is the one
+    // path through this feature that only a clock can prove.
+    const pickOf = (hand: readonly PathId[]): number => {
+      const quartermaster = hand.indexOf("quartermaster");
+      return quartermaster >= 0 ? quartermaster : DRAFT_AUTO_PICK;
+    };
+    const hostFirstPick = pickOf(openingHands[0]!);
+    const countDropping = waitForEvent<DraftView>(
+      draftSeats[0]!.socket,
+      "draft:update",
+      (payload) =>
+        payload?.roomId === draftRoomId &&
+        payload?.step === "first" &&
+        payload?.open === 1,
+    );
+    const hostSecond = waitForEvent<DraftView>(
+      draftSeats[0]!.socket,
+      "draft:update",
+      (payload) =>
+        payload?.roomId === draftRoomId && payload?.step === "second",
+      DRAFT_STEP_SECONDS * 1000 + 10000,
+    );
+    const mateSecond = waitForEvent<DraftView>(
+      draftSeats[1]!.socket,
+      "draft:update",
+      (payload) =>
+        payload?.roomId === draftRoomId && payload?.step === "second",
+      DRAFT_STEP_SECONDS * 1000 + 10000,
+    );
+    draftSeats[0]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: hostFirstPick,
+    });
+    check(
+      (await countDropping)?.open === 1,
+      "a card laid down is counted for the whole table rather than held by the server, so the captains still reading know whether they are waiting on four people or on one",
+    );
+    const secondCard = waitForEvent<{ roomId?: string; error?: string }>(
+      draftSeats[0]!.socket,
+      "draft:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    draftSeats[0]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: hostFirstPick,
+    });
+    check(
+      (await secondCard)?.error === "Your card is already laid down.",
+      "and a captain who lays a second card down in the same step is told what happened rather than ignored, because the first answer is the one the table has been shown",
+    );
+    const atSecond = (await hostSecond)!;
+    const mateAtSecond = (await mateSecond)!;
+    check(
+      atSecond !== null &&
+        mateAtSecond !== null &&
+        atSecond.hand.length === 2 &&
+        mateAtSecond.hand.length === 2,
+      "the step the mate never answered closes on the room's own clock and the two cards they were passed arrive without them having chosen anything",
+    );
+    // The pass, read off both frames: each captain holds the two cards the
+    // other did not keep, in the order they were dealt and not kept in. The
+    // order is part of the promise, because a pick is an index into this
+    // array: a frame whose cards are in another order would have the client
+    // choosing by one numbering and the room counting by another.
+    const mateRests = openingHands[1]!.filter(
+      (_, index) => index !== DRAFT_AUTO_PICK,
+    );
+    const hostRests = openingHands[0]!.filter(
+      (_, index) => index !== hostFirstPick,
+    );
+    check(
+      atSecond.hand.join() === mateRests.join() &&
+        mateAtSecond.hand.join() === hostRests.join(),
+      "and each of them holds the two cards the other captain did not keep, in the order the other was holding them: the pass travels to the left, and the cards arrive as a hand a captain can still pick out of",
+    );
+    check(
+      draftSeats[1]!.errors.length === 0,
+      "the captain who said nothing is never told they did anything wrong, and the card the room laid for them was one of their own",
+    );
+
+    // The second keep, answered by both this time, and then the last step:
+    // the two cards a captain holds at the end are their own two keeps, and
+    // the voyage is sailed on whichever of them they hold on to.
+    const hostLast = waitForEvent<DraftView>(
+      draftSeats[0]!.socket,
+      "draft:update",
+      (payload) => payload?.roomId === draftRoomId && payload?.step === "last",
+    );
+    const mateLast = waitForEvent<DraftView>(
+      draftSeats[1]!.socket,
+      "draft:update",
+      (payload) => payload?.roomId === draftRoomId && payload?.step === "last",
+    );
+    const hostSettled = waitForEvent<DraftView>(
+      draftSeats[0]!.socket,
+      "draft:update",
+      (payload) => payload?.roomId === draftRoomId && payload?.step === "done",
+    );
+    const mateSettled = waitForEvent<DraftView>(
+      draftSeats[1]!.socket,
+      "draft:update",
+      (payload) => payload?.roomId === draftRoomId && payload?.step === "done",
+    );
+    const hostSecondPick = pickOf(atSecond.hand);
+    const mateSecondPick = pickOf(mateAtSecond.hand);
+    draftSeats[0]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: hostSecondPick,
+    });
+    draftSeats[1]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: mateSecondPick,
+    });
+    const hostAtLast = (await hostLast)!;
+    const mateAtLast = (await mateLast)!;
+    const hostPapers = [
+      openingHands[0]![hostFirstPick]!,
+      atSecond.hand[hostSecondPick]!,
+    ];
+    const matePapers = [
+      openingHands[1]![DRAFT_AUTO_PICK]!,
+      mateAtSecond.hand[mateSecondPick]!,
+    ];
+    check(
+      hostAtLast !== null &&
+        mateAtLast !== null &&
+        hostAtLast.hand.join() === hostPapers.join() &&
+        mateAtLast.hand.join() === matePapers.join(),
+      "the last step is the two papers that captain kept, in the order they kept them, so the choice is between a card out of their own deal and a card they kept off the pass rather than between two cards somebody else chose",
+    );
+    // The host keeps the card on offer and the mate the other of their two,
+    // which is the plan's own evaluation read as a fixture: taking the card
+    // in the deck the plan watches for is a choice somebody makes rather
+    // than a duty somebody gets assigned, so the two captains at this table
+    // end on different papers for different reasons.
+    const hostLastPick = pickOf(hostAtLast.hand);
+    const mateLastPick = mateAtLast.hand.length - 1 - pickOf(mateAtLast.hand);
+    draftSeats[0]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: hostLastPick,
+    });
+    draftSeats[1]!.socket.emit("draft:keep", {
+      roomId: draftRoomId,
+      pick: mateLastPick,
+    });
+    const settledViews = [await hostSettled, await mateSettled];
+    const hostPath = hostAtLast.hand[hostLastPick]!;
+    const matePath = mateAtLast.hand[mateLastPick]!;
+    check(
+      settledViews[0]?.path === hostPath &&
+        settledViews[1]?.path === matePath &&
+        settledViews[0]?.open === 0 &&
+        settledViews.every((view) => view?.step === "done"),
+      "when the last card is laid the draft settles and every seat is told the path it sails on, which is the card that captain held on to: the whole of the result rides the settled view rather than a frame of its own",
+    );
+    for (
+      let waited = 0;
+      takenLines.length < 2 && waited < 8000;
+      waited += 100
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    check(
+      takenLines.length === 2 &&
+        takenLines.every(
+          (entry) =>
+            entry.round === 1 &&
+            [hostPath, matePath].some((path) =>
+              entry.text.includes(pathConfig(path)!.name),
+            ),
+        ) &&
+        takenLines.some(
+          (entry) =>
+            entry.text ===
+            `Smoke draft_a takes up the ${pathConfig(hostPath)!.name} path.`,
+        ) &&
+        takenLines.some(
+          (entry) =>
+            entry.text ===
+            `Smoke draft_b takes up the ${pathConfig(matePath)!.name} path.`,
+        ),
+      "and the fleet is told what each captain took in the voyage log, once a seat, at the leg the draft was dealt in and named by the captain rather than by the card",
+    );
+
+    // ---- the hand, read back off the wire ----
+    // What the checks above cannot show, because every one of them reads a
+    // frame that named the draft rather than what the two sockets were
+    // actually sent. `hand` is a field of one wire type and one only (see
+    // DraftView), so a frame that names one is either a seat's own draft
+    // frame or a hand that travelled somewhere it was not addressed, and
+    // the second reading is the one that matters: a hand that changes
+    // inside a single beat is a card that belongs to somebody else, since a
+    // beat is dealt to one seat once and no pick moves the cards until the
+    // step closes. The reading is taken here, after the settle and after
+    // both log lines have landed, because that is the moment the wire is
+    // provably quiet: the settle sends each seat its view before it writes
+    // the line for that seat, so a socket that has heard its line has heard
+    // its view, and a sweep taken any earlier could miss a frame still in
+    // flight and call the wire clean by arriving first.
+    const strayHands = draftSeats.flatMap((seat) => {
+      const beats = new Map<string, string>();
+      return seat.frames.flatMap((frame) => {
+        if (!frame.text.includes('"hand":')) return [];
+        const [payload] = JSON.parse(frame.text) as [DraftView | null];
+        if (frame.event !== "draft:update" || !payload) {
+          return [`a hand rode ${frame.event} to ${seat.captain.username}`];
+        }
+        const key = `${payload.step}@${payload.deadline}`;
+        const hand = payload.hand.join(".");
+        const seen = beats.get(key);
+        if (seen === undefined) {
+          beats.set(key, hand);
+          return [];
+        }
+        return seen === hand
+          ? []
+          : [`${seat.captain.username} was sent two hands for ${key}`];
+      });
+    });
+    check(
+      strayHands.length === 0,
+      `the only frames either socket received that name a hand are the draft's own, one hand a captain a beat (${draftSeats.reduce((count, seat) => count + seat.frames.length, 0)} frames read on every event across the two sockets), so a hand is private in its whole shape: the frame goes to the captain it was dealt to and to no one else`,
+    );
+
+    // ---- the switch, published to the fleet ----
+    // The captain who drew the older papers is the one who changes them, and
+    // the frame that comes back is the room's answer rather than their own
+    // press: the fee, the forfeiture and the stamp are theirs to apply, and
+    // nothing here charges anybody.
+    const switcher = draftSeats[0]!;
+    const other = draftSeats[1]!;
+    const otherPath = PATH_IDS.find((id) => id !== hostPath)!;
+    const tooEarly = waitForEvent<{ roomId?: string; error?: string }>(
+      switcher.socket,
+      "path:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    switcher.socket.emit("path:switch", {
+      roomId: draftRoomId,
+      path: otherPath,
+    });
+    check(
+      (await tooEarly)?.error ===
+        `The harbor reads new papers from round ${PATH_SWITCH_FROM_ROUND}.`,
+      "a switch pressed in the leg the voyage opens on is refused by the room with the season it is waiting for, and nothing is published",
+    );
+    check(
+      switcher.switched.length === 0 && other.switched.length === 0,
+      "so the fleet has heard nothing, which is what makes the publication the price of the change rather than a line about it",
+    );
+
+    // The room's seat, moved the way this suite moves any room's seat, to a
+    // leg and a seat the port keeps.
+    const draftRoomRow = async () =>
+      db.room.findUnique({
+        where: { id: draftRoomId },
+        select: { currentRound: true, currentPhase: true },
+      });
+    const parkDraftRoom = async (round: number, phase: Phase) => {
+      switcher.socket.emit("game:status", {
+        roomId: draftRoomId,
+        round,
+        phase,
+        phaseLabel: phaseFace(phase).label,
+        gold: 500,
+        reputation: 12,
+        shipLevel: 0,
+        gameOver: false,
+        renownLevel: 4,
+      });
+      let row = await draftRoomRow();
+      for (
+        let waited = 0;
+        (row?.currentRound !== round || row?.currentPhase !== phase) &&
+        waited < 5000;
+        waited += 250
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        row = await draftRoomRow();
+      }
+      return row;
+    };
+    // The first leg the window opens on, named once so that the reading of
+    // the published frame below is of this same leg rather than of a number
+    // written out twice.
+    const switchLegRound = PATH_SWITCH_FROM_ROUND + 1;
+    const atThePort = await parkDraftRoom(switchLegRound, "orders");
+    check(
+      atThePort?.currentRound === switchLegRound &&
+        atThePort?.currentPhase === "orders",
+      "and the room can be walked to a leg and a seat where the port reads new papers",
+    );
+    const nonsense = waitForEvent<{ roomId?: string; error?: string }>(
+      switcher.socket,
+      "path:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    switcher.socket.emit("path:switch", {
+      roomId: draftRoomId,
+      path: "galleon",
+    });
+    check(
+      (await nonsense)?.error === "No such path.",
+      "a switch naming a path this build does not have is refused at the room rather than published to it, since the fleet log is a record rather than a place to try things out",
+    );
+    const published = waitForEvent<PathSwitched>(
+      other.socket,
+      "path:switched",
+      (payload) =>
+        payload?.roomId === draftRoomId && payload?.userId === draftHost.id,
+    );
+    const logged = waitForEvent<{ entry: VoyageLogEntry }>(
+      other.socket,
+      "voyage:log",
+      (payload) => payload?.entry?.kind === "path_switched",
+    );
+    switcher.socket.emit("path:switch", {
+      roomId: draftRoomId,
+      path: otherPath,
+    });
+    const publishedFrame = await published;
+    check(
+      publishedFrame?.path === otherPath &&
+        publishedFrame.name === "Smoke draft_a" &&
+        switcher.switched.length === 1,
+      "a switch in season is published to the whole room, the captain who made it included, and it carries the path taken up and not the one set aside, because the server has never read a save to know what that was",
+    );
+    check(
+      (await logged)?.entry?.text ===
+        `Smoke draft_a sets aside their old papers and takes up the ${pathConfig(otherPath)!.name} path.`,
+      "and the fleet log keeps the line, which is the record the table reads back rather than the frame it watched",
+    );
+    const again = waitForEvent<{ roomId?: string; error?: string }>(
+      switcher.socket,
+      "path:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    switcher.socket.emit("path:switch", {
+      roomId: draftRoomId,
+      path: matePath,
+    });
+    check(
+      (await again)?.error ===
+        "A captain changes their papers once a voyage, and yours are already changed." &&
+        switcher.switched.length === 1,
+      "and a second change in the same voyage is refused by the room's own book, which is the half of the once a voyage rule a server can keep",
+    );
+    const offSeat = await parkDraftRoom(5, "dawn");
+    const notAtPort = waitForEvent<{ roomId?: string; error?: string }>(
+      other.socket,
+      "path:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    other.socket.emit("path:switch", { roomId: draftRoomId, path: "convoy" });
+    const notAtPortFrame = await notAtPort;
+    check(
+      offSeat?.currentPhase === "dawn" &&
+        notAtPortFrame?.error ===
+          "Papers are changed at the port, in Market, Orders or Parley." &&
+        // The mate's own socket is carrying the host's switch, which the
+        // room published to the whole fleet, so what is read here is that
+        // no frame names the mate rather than that the socket is empty.
+        other.switched.every((frame) => frame.userId === draftHost.id),
+      "while a captain in a seat that is not the port is refused in the engine's own words, so the room and the books tell a captain the same thing",
+    );
+    const late = await parkDraftRoom(PATH_SWITCH_TO_ROUND + 1, "orders");
+    const closed = waitForEvent<{ roomId?: string; error?: string }>(
+      other.socket,
+      "path:error",
+      (payload) => payload?.roomId === draftRoomId,
+    );
+    other.socket.emit("path:switch", { roomId: draftRoomId, path: "convoy" });
+    check(
+      late?.currentRound === PATH_SWITCH_TO_ROUND + 1 &&
+        (await closed)?.error ===
+          `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.`,
+      "and past the last leg of the window the room closes it with the leg it closes after, which is the same sentence the panel would have greyed the button out with",
+    );
+
+    // ---- the wipe that takes a draft with it ----
+    // The plan's own rollback note is "draft state is transient per voyage,
+    // so nothing durable is at risk", and this is that sentence read as a
+    // frame: a harbor wiped while its captains are still reading their cards
+    // tells them there is no draft rather than leaving three cards in front
+    // of a table that has already set sail again.
+    const solo = await signUp("draft_s");
+    run.extraAccounts.push(solo);
+    const soloRoom = await call<{ room: { id: string } }>("/api/rooms", {
+      method: "POST",
+      cookie: solo.cookie,
+      body: JSON.stringify({
+        name: `Smoke draft wipe harbor ${suffix}`,
+        isPublic: false,
+      }),
+    });
+    if (soloRoom.status !== 200) {
+      throw new Error("No draft harbor to wipe, stopping here.");
+    }
+    const soloRoomId = soloRoom.body.room.id;
+    run.lapRoomIds.push(soloRoomId);
+    const soloSocket = await openAuthedSocket(solo);
+    run.sockets.push(soloSocket);
+    let soloClosed = 0;
+    soloSocket.on("draft:update", (payload: DraftView | null) => {
+      if (payload === null) soloClosed += 1;
+    });
+    const soloSeated = waitForEvent<WireHistory>(
+      soloSocket,
+      "chat:history",
+      (payload) => payload?.roomId === soloRoomId,
+    );
+    soloSocket.emit("room:join", { roomId: soloRoomId });
+    await soloSeated;
+    const soloDeal = waitForEvent<DraftView>(
+      soloSocket,
+      "draft:update",
+      (payload) => payload?.roomId === soloRoomId && payload?.step === "first",
+    );
+    soloSocket.emit("room:start", { roomId: soloRoomId });
+    const soloCards = await soloDeal;
+    // What this seat has heard before the wipe, which is one null: a harbor
+    // that has not dealt a card tells the captain who walks into it that
+    // there is no draft, and that is the frame the client draws nothing for.
+    // It is counted here rather than assumed so that the wipe below is read
+    // as a frame of its own rather than as "some null or other".
+    const closedAtJoin = soloClosed;
+    const soloWiped = waitForEvent<{ roomId: string }>(
+      soloSocket,
+      "room:restarted",
+      (payload) => payload?.roomId === soloRoomId,
+    );
+    soloSocket.emit("room:restart", { roomId: soloRoomId });
+    check(
+      soloCards?.hand.length === DRAFT_DEAL && soloCards.open === 1,
+      "a captain sailing alone is dealt a hand like any other, and the whole table is still to choose",
+    );
+    const soloWipedFrame = await soloWiped;
+    check(
+      soloWipedFrame !== null && closedAtJoin === 1 && soloClosed === 2,
+      "and a harbor wiped while that draft is being read tells the seat holding the cards, once, that there is no draft, which is the frame the client puts the table away on: the only other time that seat heard it was walking in before the voyage had dealt anything",
+    );
+
+    // ---- the record the draft leaves behind ----
+    // The telemetry spine's two D7 numbers, read off the row the draft
+    // room's own wipe writes rather than off the frames above: the path each
+    // captain took up and the seconds that captain's interface took. A
+    // record is written when a voyage closes, so the room is wiped here,
+    // and that is a reading of its own: the wipe must not be able to drop
+    // what the draft measured before it.
+    const draftWiped = waitForEvent<{ roomId?: string }>(
+      draftSeats[0]!.socket,
+      "room:restarted",
+      (payload) => payload?.roomId === draftRoomId,
+      8000,
+    );
+    draftSeats[0]!.socket.emit("room:restart", { roomId: draftRoomId });
+    check(
+      (await draftWiped) !== null,
+      "the draft's own harbor is wiped once its work is done",
+    );
+    const draftRecord = (await telWaitForOne(draftRoomId))?.record ?? null;
+    const draftTaken = (draftRecord?.events ?? []).filter(
+      (event) => event.name === "path_taken",
+    );
+    const draftSwitched = (draftRecord?.events ?? []).filter(
+      (event) => event.name === "path_switched",
+    );
+    const takenBy = (actor: string) =>
+      draftTaken.find((event) => event.actor === actor)?.path ?? null;
+    check(
+      draftRecord !== null &&
+        draftRecord.outcome === "restarted" &&
+        draftTaken.length === 2 &&
+        draftTaken.every(
+          (event) =>
+            event.seconds >= 0 &&
+            [hostPath, matePath].some((path) => path === event.path) &&
+            [draftHost.id, draftMate.id].some((id) => id === event.actor),
+        ) &&
+        takenBy(draftHost.id) === hostPath &&
+        takenBy(draftMate.id) === matePath,
+      "the draft is measured per captain per seat: the path each of them took up, filed against the captain who kept it and not against their neighbor, and the seconds that captain's own interface took, which is the number the plan's target of forty five is read against",
+    );
+    check(
+      draftSwitched.length === 1 &&
+        draftSwitched[0]?.actor === draftHost.id &&
+        draftSwitched[0]?.path === otherPath &&
+        draftSwitched[0]?.leg === switchLegRound &&
+        // The voyage went on to the leg the room was parked on last, so the
+        // leg above is the leg the papers were changed on rather than the
+        // leg the record happens to have ended on.
+        draftRecord?.endedAtLeg === PATH_SWITCH_TO_ROUND + 1,
+      "and the one change of papers a voyage allowed is filed beside it with the leg it happened on, so a reader can tell a table that switched from one that never did",
+    );
+
+    // The house rule, over the copy this feature added. Every sentence a
+    // captain reads in this feature is written in one of these files: the
+    // rule module carries the ledger's own lines, the engine carries the
+    // refusals the panel prints, the room module carries the sentences a
+    // refused request is answered with, the hook carries none and the two
+    // components carry the faces of the beats. The two components are swept
+    // whole, unlike the borrow's board, because they read no colour through
+    // a CSS custom property: their classes are Tailwind's and carry no
+    // doubled hyphen.
+    check(
+      !carriesADash("src/lib/game/draft.ts") &&
+        !carriesADash("src/lib/game/engine/draft.ts") &&
+        !carriesADash("src/server/realtime/draft.ts") &&
+        !carriesADash("src/lib/use-path-draft.ts") &&
+        !carriesADash("src/components/portmasters/game/PathDraft.tsx") &&
+        !carriesADash("src/components/portmasters/game/PathPanel.tsx"),
+      "every file the draft's and the switch's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+    );
+
     console.log("\nSigning out");
     const out = await call<{ ok: boolean }>("/api/auth/logout", {
       method: "POST",
-      cookie: guest.cookie,
+      cookie: run.guest.cookie,
     });
     check(out.status === 200, "sign out succeeds");
     const afterOut = await call<{ user: unknown }>("/api/auth/me", {
-      cookie: guest.cookie,
+      cookie: run.guest.cookie,
     });
     check(
       afterOut.body?.user === null,
       "the session is gone after signing out",
     );
   } finally {
-    for (const socket of sockets) {
+    for (const socket of run.sockets) {
       socket.removeAllListeners();
       socket.close();
     }
 
     const ids = [
-      host?.id,
-      guest?.id,
-      third?.id,
-      ...extraAccounts.map((c) => c.id),
+      run.host?.id,
+      run.guest?.id,
+      run.third?.id,
+      ...run.extraAccounts.map((c) => c.id),
     ].filter((id): id is string => Boolean(id));
     const usernames = [
-      host?.username,
-      guest?.username,
-      third?.username,
-      ...extraAccounts.map((c) => c.username),
+      run.host?.username,
+      run.guest?.username,
+      run.third?.username,
+      ...run.extraAccounts.map((c) => c.username),
     ].filter((name): name is string => Boolean(name));
 
-    if (cleanupIsSafe) {
+    if (run.cleanupIsSafe) {
       try {
         // Order matters: the harbors go first so their memberships are
         // gone before the accounts those memberships point at.
@@ -13863,7 +17658,11 @@ async function main(): Promise<void> {
         // Only harbors this run created are deleted. A Quick Start can
         // legitimately seat the two test captains into a harbor that was
         // already open, and that harbor belongs to whoever opened it.
-        for (const id of [roomId, quickStartRoomId, ...lapRoomIds]) {
+        for (const id of [
+          run.roomId,
+          run.quickStartRoomId,
+          ...run.lapRoomIds,
+        ]) {
           if (id && !preExistingRoomIds.has(id)) {
             await db.room.deleteMany({ where: { id } });
           }

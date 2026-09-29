@@ -2,7 +2,7 @@
 // Returns the room plus the last 100 public room chat messages. DMs are
 // scoped to recipientId not null and never appear here.
 import { NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
+import { db, ROOM_WITH_MEMBERS, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { serializeRoom } from "@/lib/rooms";
 
@@ -18,16 +18,9 @@ export async function GET(
   const room = await db.room.findUnique({
     where: { id },
     include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
+      // The harbor a captain is looking at: the same roster and host every
+      // other read of a room asks for, with the room's own chat beside it.
+      ...ROOM_WITH_MEMBERS,
       messages: {
         where: { recipientId: null },
         orderBy: { createdAt: "asc" },

@@ -20,10 +20,25 @@
 //
 // Nothing here reads a clock, a database, or a socket. It is a data record
 // plus a defensive normalize, so both the interface and the realtime layer
-// can import it without either one owning it.
+// can import it without either one owning it. The two modules it now reads
+// numbers from are pure in the same way: ./audit owns the rung its vote
+// opens at, and ./maroon owns the width of the Harbormaster's hand.
+//
+// A mode carries its captain's words beside its rules, and both came back
+// to this record for the same reason. The briefing on the Welcome screen,
+// the rule for a failed seat, and the list of ways the mode plays
+// differently from the founding voyage all sit here, and every surface
+// that teaches a mode (the lobby's manual, the in room tutorial and the
+// guide) reads them out of here rather than wording its own. That is what
+// keeps three teachers from teaching three modes, which is not a
+// hypothetical: the tutorial spent a release telling a Gambit captain that
+// bankruptcy ends the voyage, because its copy of the rule was written
+// out by hand while this record said the opposite.
 // =====================================================================
 
 import { difficultyConfig } from "./difficulty";
+import { AUDIT_FROM_ROUND, AUDIT_REVEAL_COUNT, AUDIT_WINDOW } from "./audit";
+import { PORT_SHIFT_FRACTION } from "./maroon";
 import type { LegPhase, Phase } from "./types";
 
 export type GameMode = "classic" | "ocean_gambit";
@@ -108,6 +123,30 @@ interface ModeConfig {
   // screen. A count that has to be kept in step with a list is a second
   // copy of that list, and the copy nobody rewrites is the one that rots.
   briefing: ModeBriefing;
+
+  // What a failed seat costs, in the words a captain reads, printed by
+  // every surface that says what a voyage is played for: the tutorial's
+  // second page, the guide's rules, and the lobby's manual.
+  //
+  // It sits on the record for the reason the briefing does, and this one
+  // has a body: the tutorial told a Gambit captain "do not go bankrupt,
+  // there is no coming back from it" while bankruptcyIsFinal below said
+  // false, so the page a new captain learns the rules from contradicted
+  // the mode they had chosen. A sentence about a mode's rules is a second
+  // copy of those rules, and the copy nobody rechecks is the one that
+  // rots. Read against bankruptcyIsFinal and maroonFrom, which are the
+  // rule this sentence describes.
+  failureRule: string;
+
+  // The ways this mode plays differently from the founding voyage, in the
+  // captain's words, and empty for the founding voyage itself.
+  //
+  // Empty rather than absent for Classic, and empty is the honest answer:
+  // Classic is what the others differ from, so its list of differences
+  // from itself is not a list. Every surface that explains a mode reads
+  // this one array, which is what makes a second mode a matter of writing
+  // it here rather than of finding every screen that described the first.
+  differences: readonly string[];
 
   // Flags a mode that is still being built. The interface says so plainly
   // wherever a captain could choose it, because a player who walks into an
@@ -213,6 +252,18 @@ interface ModeConfig {
   voyageLegs: number | null;
 }
 
+// Gambit's own two rungs, named once each.
+//
+// Both are read twice inside the mode below: as the field that decides the
+// rule, and inside the sentence that tells a captain about it. A number
+// written out in two places is a number that drifts apart from itself,
+// which is the same reason voyageRoundsFor exists rather than a tier read
+// at one call site and a mode read at the next. The rungs themselves are
+// explained where the rules that use them live, and these two names carry
+// no rule of their own.
+const GAMBIT_LEGS = 12;
+const GAMBIT_MAROON_FROM = 9;
+
 export const MODES: Record<GameMode, ModeConfig> = {
   classic: {
     badge: "Classic",
@@ -252,6 +303,14 @@ export const MODES: Record<GameMode, ModeConfig> = {
       kind: "line",
       text: "🧭 Dawn: Draft a Boon → 📦 Market: Buy at Ports → 🤝 Parley: Barter → 📜 Orders: Fill Trade Orders → 💸 Resolve: Pirates, Wages & Maintenance → 🚢 Dusk: Upgrade Ship",
     },
+    // The founding voyage's rule for a failed seat, which is the one it has
+    // always run and the one its captains expect to find here: the
+    // bankruptcy screen is where that captain's voyage ends.
+    failureRule:
+      "Fall short on the bills and the voyage is over for that captain: the bankruptcy screen is the last of it, and the standings are read without them.",
+    // Empty, because this is the voyage the others differ from. See the
+    // field's own comment.
+    differences: [],
     // Port market, then the cross captain trade board, then the trade
     // manifest. Classic sorts the goods before it sorts the conversation,
     // and that order is the difference a Classic captain would notice if
@@ -305,13 +364,13 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // the rung is never reached, which is deliberate rather than an
     // oversight, since a maroon needs remaining legs to mean anything.
     bankruptcyIsFinal: false,
-    maroonFrom: 9,
+    maroonFrom: GAMBIT_MAROON_FROM,
     // [I5: session length, and table size] Twelve legs, on every tier. The
     // number the mode is tuned to, and the reason the rung above sits at
     // nine: the mode wants a voyage long enough that the harbor has
     // something to read before it acts, and eight leaves the rung
     // unreachable while sixteen holds the tension past its welcome.
-    voyageLegs: 12,
+    voyageLegs: GAMBIT_LEGS,
     // The round as a chart, which is the shape this mode's argument asks
     // for. It is read on the same screen and at the same moment in the
     // voyage as Classic's line, so the legs both modes run are worded the
@@ -378,6 +437,28 @@ export const MODES: Record<GameMode, ModeConfig> = {
       closes:
         "The round closes at the yard and opens again at the ports, with whatever this one left in the hold.",
     },
+    // The mode's own words for the rules above, and the length it pins.
+    // They are read on three surfaces and written on one, which is the
+    // whole reason the fields above exist: a captain who opens the lobby's
+    // manual, the in room tutorial and the guide is reading the same
+    // sentences in all three, and a rule that moves moves them together.
+    //
+    // Every sentence here is written for a captain rather than for the
+    // engine, so a round is a round here and not a leg. The engine's own
+    // word for one lap of the voyage is a leg (see GameState.maxRounds,
+    // the leg reports in ./telemetry, and the rail), and the two words
+    // name one thing: a voyage is the whole run, and it is measured in
+    // rounds. The tutorial used to call each lap a voyage, which is what
+    // left a captain who read the guide and then looked at the rail
+    // believing they were on the eighth of eight voyages.
+    failureRule:
+      "No captain leaves the table here. Fall short on the bills and the harbor marks it against you for the rest of the voyage, and you sail on with your card, your vote and your say at the table.",
+    differences: [
+      "The manifest closes before the table opens: Orders runs ahead of Parley, so you commit to your sheet first and nothing on it can be revised once the fleet starts talking.",
+      `Every voyage here runs ${GAMBIT_LEGS} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.`,
+      `From round ${AUDIT_FROM_ROUND}, a simple majority of the fleet can open one captain's manifest at a Parley. The room is shown ${AUDIT_REVEAL_COUNT} of that captain's last ${AUDIT_WINDOW} fills, and calling the vote spends the rest of that Parley's trading.`,
+      `From round ${GAMBIT_MAROON_FROM}, two thirds of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${Math.round(PORT_SHIFT_FRACTION * 100)} percent either way.`,
+    ],
     // The one structural change this mode makes on day one, and it is the
     // center of the whole design argument: the trade manifest moves ahead of
     // the cross captain trade board. Ordering and committing happen

@@ -53,6 +53,11 @@ import { createRng, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard } from "../types";
 import { hasModule } from "./core";
 import {
+  opportunistLine,
+  opportunistMayBorrow,
+  opportunistPayout,
+} from "./opportunist";
+import {
   genMixedOrder,
   genPathOrder,
   genProductOrder,
@@ -134,10 +139,24 @@ export function lockedBehind(
 // because both callers (a captain's press and a standing order's) have to
 // ask the same question, and a caller that read only half of it is exactly
 // how a standing order would come to fill a card its own captain could not.
-export function canFillOrder(state: GameState, order: OrderCard): boolean {
-  return (
-    orderShortfall(state, order) === null && lockedBehind(state, order) === null
-  );
+//
+// [D6: Free Captain: Opportunist] The borrow is a third half, and it is the
+// one that is asked rather than assumed: `borrow` names whether the caller
+// is spending the Free Captain's once a voyage ability on this card, and it
+// defaults to false so every existing caller (a standing order, the
+// suggester, a plain press) keeps its reading and no policy surface can
+// spend an ability its captain did not choose. The ability itself is asked
+// in ./opportunist, which is where the allowance lives; this function only
+// says what the board is allowed to offer.
+export function canFillOrder(
+  state: GameState,
+  order: OrderCard,
+  borrow = false,
+): boolean {
+  if (orderShortfall(state, order) !== null) return false;
+  const locked = lockedBehind(state, order);
+  if (locked === null) return true;
+  return borrow && opportunistMayBorrow(state, locked);
 }
 
 /**
@@ -159,6 +178,7 @@ export function completeOrder(
   state: GameState,
   orderId: number,
   logs: string[],
+  borrow = false,
 ) {
   const order = state.customerCards.find((o) => o.id === orderId);
   if (!order) return;
@@ -169,8 +189,14 @@ export function completeOrder(
   // wrong sentence about the right refusal. The line is pathLockLine's, the
   // same string the board prints on the card, so the ledger and the board
   // cannot come to describe one refusal two ways.
+  //
+  // [D6: Free Captain: Opportunist] A locked card is fillable by exactly one
+  // caller: a Free Captain who passed `borrow` and still has the allowance
+  // (see canFillOrder, which is what the board offers this through, and
+  // ./opportunist, which owns the allowance). The parameter defaults to
+  // false, so a refusal that arrives from anywhere else is the flat one.
   const locked = lockedBehind(state, order);
-  if (locked) {
+  if (locked && !(borrow && opportunistMayBorrow(state, locked))) {
     logs.push(`❌ ${pathLockLine(locked)}`);
     return;
   }
@@ -187,6 +213,24 @@ export function completeOrder(
   let transport = calcTransportCost(state, order.totalItems, hasSilk);
   for (const r of order.resources) state.inventory[r.type] -= r.required!;
   let reward = order.reward;
+  // [D6: Free Captain: Opportunist] The borrow's penalty lands here, on the
+  // face value and before anything else touches the number, so every step
+  // below (product VAT, the charter percentages, the Silk Monopoly) scales
+  // the reduced payout rather than the card's advertised one. That is the
+  // order the plan's own price implies: a captain who borrowed the order is
+  // paid the borrowed order's reward, and a percentage bonus read off the
+  // unreduced face value would quietly refund part of the penalty.
+  //
+  // The spend sits at the same line as the payout, which is safe because
+  // every guard above has already passed and nothing below can refuse: an
+  // order that reaches this point is filled. A reload between the press and
+  // the broadcast is covered by the completedOrders guard at the top, so the
+  // allowance cannot be spent twice for one fill.
+  if (locked) {
+    state.opportunistBorrows += 1;
+    reward = opportunistPayout(order.reward);
+    logs.push(opportunistLine(order.reward, reward));
+  }
   let totalVat = 0;
   if (order.isProductOrder) {
     const product = order.resources[0].type;

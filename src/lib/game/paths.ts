@@ -29,9 +29,10 @@
 // Nothing here reads a clock, a database or a socket, and there is no
 // environment value behind it: a path is content, so retuning one is an
 // edit to this record rather than a deploy. The slice that lets a captain
-// hold one at all is D7's draft, so until it lands every captain reads as
-// pathless (see pathConfig), which is the honest state of a table where
-// nobody has drawn yet.
+// hold one at all is D7's draft, which deals every seat a hand as the
+// voyage leaves the dock, so the pathless captain this record keeps
+// describing is the one who arrived after the deal rather than the one who
+// has not chosen yet (see pathConfig).
 //
 // The naming change is the other half of D1 and it has two halves of its
 // own. The plan's instruction is that faction becomes path everywhere: this
@@ -193,11 +194,11 @@ export const PATHS = {
   // faster than they could manage alone, on top of the crafting chain the
   // path holds. Its goods are the garments themselves, which are the goods
   // a refit acts on and the goods a garment order demands, so the two lists
-  // are one list and are read from one table. What the plan adds on top
-  // (the exclusive right to buy Rags at scrap and reweave them) is not a
-  // good this tree has yet: ./garments.ts says plainly that Rags are a
-  // state rather than a good, so that half waits for D4 to bring the good
-  // into the catalogue rather than being invented here.
+  // are one list and are read from one table. The crafting chain is not
+  // named with them, which is the record doing its job rather than an
+  // omission: Rags is cargo the bench buys off the quay rather than a good
+  // the port board trades (see RAGS in ./constants), so no order of this
+  // captain's ever demands one and nothing here would read a rag.
   loom: {
     name: "Loom",
     crest: "🧵",
@@ -264,10 +265,10 @@ export const PATH_IDS = Object.keys(PATHS) as PathId[];
  * Whatever a save, a row or a request says about a path, read back as one
  * of the paths this build has, or null.
  *
- * Null is the absence of a path rather than a failure, and it is the answer
- * for every captain today: the draft that deals one is D7's, so a table
- * where nobody holds a path is the ordinary table rather than a broken one,
- * and a save written before paths existed is a captain who never drew. The
+ * Null is the absence of a path rather than a failure: D7's draft deals one
+ * to every seat at the dock, so the captains who read null here are the
+ * ones who arrived after the deal, and a save written before paths existed
+ * is a captain who never drew. The
  * house shape for an unknown value (normalizeMode, normalizeDifficulty,
  * normalizeRole) falls back to a default; this one deliberately does not,
  * because the fallback would be an identity nobody chose and the draft's

@@ -47,9 +47,18 @@ import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import type { LegReport } from "@/types/realtime";
 import { mealsOf } from "@/lib/game/foods";
+import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
-import { escortContractsOn, survivalLayerOn } from "@/lib/game/flags";
-import { openOrderCount } from "@/lib/game/engine";
+import {
+  escortContractsOn,
+  pathOrdersOn,
+  survivalLayerOn,
+} from "@/lib/game/flags";
+import {
+  openOrderCount,
+  opportunistBorrowsTaken,
+  refitsOn,
+} from "@/lib/game/engine";
 
 // The same cadence the captain's own status rides on (see
 // use-game-session.ts): enough to feel immediate, sparse enough that a
@@ -110,6 +119,34 @@ export function useLegReport(
     ? game.escortFeesEarned
     : undefined;
   const escortAbsorbed = escortContractsOn() ? game.escortAbsorbed : undefined;
+  // [D4: Loom: the Refit] The bench's three, read off the same tally the
+  // panel prints and sent only when the switch that gives them meaning is
+  // on. The seller's side, for the escort's reason: the plan asks what the
+  // market sold, and the customer is on the other side of that number.
+  //
+  // The weather is the odd one out and is deliberately not read through the
+  // bench's switch. A Loom is poor in fair weather and busy in cold, which is
+  // a claim about a run of legs rather than about one of them, so a reader
+  // needs the weather of every leg the voyage sailed including the ones the
+  // bench sat out. It is read through the wardrobe layer instead, which is
+  // where that rule lives (see legIsCold), so a build with no coats reports
+  // no weather rather than reporting every leg fair.
+  const refitsSold = refitsOn() ? game.refitsSold : undefined;
+  const refitFeesEarned = refitsOn() ? game.refitFeesEarned : undefined;
+  const ragsRewoven = refitsOn() ? game.ragsRewoven : undefined;
+  const coldLeg = garmentsLayerOn() ? legIsCold(game) : undefined;
+  // [D6: Free Captain: Opportunist] The borrow counter, the last of the
+  // ability figures and the only one that counts the voyage rather than the
+  // leg: the plan's evaluation is a usage rate, which is a share of voyages,
+  // so what a reader wants is how many borrows the allowance has spent.
+  // It rides the path orders switch, which is the ability's own rollback
+  // rather than a switch of its own: with no locked card on the board there
+  // is nothing to borrow, so a build without locks reports nothing rather
+  // than a zero it could never have moved. A voyage that never borrowed
+  // reports its zero, because zero is a reading of the allowance.
+  const opportunistBorrows = pathOrdersOn()
+    ? opportunistBorrowsTaken(game)
+    : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -129,6 +166,11 @@ export function useLegReport(
         escortSold,
         escortFeesEarned,
         escortAbsorbed,
+        refitsSold,
+        refitFeesEarned,
+        ragsRewoven,
+        coldLeg,
+        opportunistBorrows,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -147,5 +189,10 @@ export function useLegReport(
     escortSold,
     escortFeesEarned,
     escortAbsorbed,
+    refitsSold,
+    refitFeesEarned,
+    ragsRewoven,
+    coldLeg,
+    opportunistBorrows,
   ]);
 }

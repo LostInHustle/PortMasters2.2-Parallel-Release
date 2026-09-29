@@ -56,6 +56,31 @@ import {
 import type { NotificationItem } from "@/lib/use-notifications";
 
 /**
+ * The close row every reading dialog ends on. It was written out at four
+ * sites, three of them the identical three lines and one carrying a label
+ * and a margin, so the four are one component with the two differences as
+ * props. Nothing about the row is a decision: a secondary button that
+ * closes the dialog it sits in, right aligned.
+ */
+function CloseFooter({
+  onClose,
+  label = "Close",
+  className,
+}: {
+  onClose: () => void;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex justify-end", className)}>
+      <Button variant="secondary" onClick={onClose}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+/**
  * The long form reading dialogs: the Navigation Guide and the Trade
  * Strategy Advice. Both are a heading with a badge beside it and a
  * scrollable wall of preformatted text, and they were written out twice
@@ -98,27 +123,34 @@ function TextModal({
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed bg-muted/40 rounded-lg p-3.5 max-h-[60vh] overflow-y-auto pm-scroll">
           {body}
         </pre>
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
+        <CloseFooter onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
 }
+
+/**
+ * The three dialogs a voyage opens from its own controls that print a
+ * reading: the Navigation Guide, the Trade Strategy Advice and the
+ * walkthrough. All three take the same four props, and the shape was
+ * written out three times. It is named once here because the three read
+ * the same two facts (see the note above the mode import), so a fourth
+ * written later is held to the same pair rather than to its own idea of
+ * them.
+ */
+type VoyageReadingProps = {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  mode: GameMode;
+  difficulty: Difficulty;
+};
 
 export function GuideModal({
   open,
   onOpenChange,
   mode,
   difficulty,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  mode: GameMode;
-  difficulty: Difficulty;
-}) {
+}: VoyageReadingProps) {
   return (
     <TextModal
       open={open}
@@ -140,12 +172,7 @@ export function TipsModal({
   onOpenChange,
   mode,
   difficulty,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  mode: GameMode;
-  difficulty: Difficulty;
-}) {
+}: VoyageReadingProps) {
   return (
     <TextModal
       open={open}
@@ -232,11 +259,7 @@ export function NotificationHistoryModal({
             </div>
           )}
         </ScrollArea>
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
+        <CloseFooter onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
@@ -295,11 +318,11 @@ export function RumorBoardModal({
             </div>
           )}
         </div>
-        <div className="flex justify-end mt-2">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close Board
-          </Button>
-        </div>
+        <CloseFooter
+          onClose={() => onOpenChange(false)}
+          label="Close Board"
+          className="mt-2"
+        />
       </DialogContent>
     </Dialog>
   );
@@ -367,12 +390,7 @@ export function TutorialModal({
   onOpenChange,
   mode,
   difficulty,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  mode: GameMode;
-  difficulty: Difficulty;
-}) {
+}: VoyageReadingProps) {
   const [step, setStep] = useState(0);
   const steps = useMemo(
     () => tutorialSteps(mode, difficulty),
@@ -480,6 +498,40 @@ function ProfileStatTile({
         {icon} {value}
       </div>
       <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+/**
+ * One line of a captain's cargo: the good's icon, its name in the good's
+ * own colour, and the count the popup was told. It was written out twice
+ * in the profile below, once under Raw Materials and once under Finished
+ * Goods, differing only in which unlock list was walked, which is the whole
+ * reason it is one component: the two lists are the same kind of thing and
+ * their rows should not be two chances to drift.
+ *
+ * The colour is resolved by the caller rather than looked up here, because
+ * the resolver comes from the viewer's own colour preference and belongs to
+ * the screen rather than to a row of it. It is allowed to be absent, which
+ * is the resolver's own answer for a good it has no colour for: the name
+ * then draws in the panel's text colour, which is what it drew before.
+ */
+function CargoRow({
+  item,
+  count,
+  color,
+}: {
+  item: string;
+  count: number;
+  color: string | undefined;
+}) {
+  return (
+    <div className="flex items-center text-[12px] py-0.5">
+      <ItemIcon item={item} className="mr-1.5 h-3.5 w-3.5" />
+      <span className="flex-1" style={{ color }}>
+        {item}
+      </span>
+      <b style={{ color }}>{count}</b>
     </div>
   );
 }
@@ -652,21 +704,12 @@ export function PlayerDetailModal({
                         Raw Materials
                       </div>
                       {unlockedResources(difficulty, detail.round).map((r) => (
-                        <div
+                        <CargoRow
                           key={r}
-                          className="flex items-center text-[12px] py-0.5"
-                        >
-                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span
-                            className="flex-1"
-                            style={{ color: resolveColor(r) }}
-                          >
-                            {r}
-                          </span>
-                          <b style={{ color: resolveColor(r) }}>
-                            {detail.inventory[r] || 0}
-                          </b>
-                        </div>
+                          item={r}
+                          count={detail.inventory[r] || 0}
+                          color={resolveColor(r)}
+                        />
                       ))}
                     </div>
                     <div>
@@ -674,21 +717,12 @@ export function PlayerDetailModal({
                         Finished Goods
                       </div>
                       {unlockedProducts(difficulty, detail.round).map((r) => (
-                        <div
+                        <CargoRow
                           key={r}
-                          className="flex items-center text-[12px] py-0.5"
-                        >
-                          <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
-                          <span
-                            className="flex-1"
-                            style={{ color: resolveColor(r) }}
-                          >
-                            {r}
-                          </span>
-                          <b style={{ color: resolveColor(r) }}>
-                            {detail.inventory[r] || 0}
-                          </b>
-                        </div>
+                          item={r}
+                          count={detail.inventory[r] || 0}
+                          color={resolveColor(r)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -776,11 +810,7 @@ export function PlayerDetailModal({
           </div>
         )}
 
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
+        <CloseFooter onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

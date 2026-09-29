@@ -5,6 +5,8 @@ import type { PublicUser } from "@/lib/api";
 import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter } from "@/lib/use-barter";
 import type { useEscortContracts } from "@/lib/use-escort-contracts";
+import type { useRefitContracts } from "@/lib/use-refit-contracts";
+import type { useBazaarRumors } from "@/lib/use-bazaar-rumors";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
 import type { useAudit } from "@/lib/use-audit";
@@ -24,6 +26,17 @@ export type Barter = ReturnType<typeof useBarter>;
 // the room and no phase panel is handed one. Exported because the Parley
 // screen's market panel takes it as its own prop.
 export type Escort = ReturnType<typeof useEscortContracts>;
+// [D4: Loom: the Refit] The bench's board, threaded the same way and for the
+// same reason. Exported because the port screen's bench panel takes it as
+// its own prop, which is the one difference between the two markets at this
+// layer: the escort's market is a whole phase screen's, and this one is a
+// station of the Market.
+export type Refit = ReturnType<typeof useRefitContracts>;
+// [D5: Aroma: the Bazaar Rumor] The bazaar's board, threaded the same way
+// and for the same reason. Exported because the Parley screen's desk panel
+// takes it as its own prop, which is where this one sits: the market the
+// plan puts at the table, beside the exchange and the protection market.
+export type Bazaar = ReturnType<typeof useBazaarRumors>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
 type Audit = ReturnType<typeof useAudit>;
@@ -44,6 +57,20 @@ export type PhasePanelProps = {
   // the market, because buying cover is what everyone else at the table is
   // there for.
   escort: Escort;
+  // [D4: Loom: the Refit] The bench a Loom captain sells repair work from,
+  // opened at the port station of the Market phase. Threaded like the
+  // market above and drawn in exactly the same circumstances: a captain who
+  // holds no path of their own still reads it, because buying a refit is
+  // what the bench is for, and a build with the switch off draws nothing at
+  // all of it.
+  refit: Refit;
+  // [D5: Aroma: the Bazaar Rumor] The desk an Aroma captain speaks from at
+  // the Parley table, and the board the whole fleet reads there. Threaded
+  // like the two markets above and drawn in the same circumstances: a
+  // captain who holds no path of their own still reads the board, because
+  // knowing who spoke is the half of this feature that makes a price move
+  // attributable, and a build with the switch off draws none of it.
+  bazaar: Bazaar;
   aid: Aid;
   backing: Backing;
   // The Manifest Audit, threaded like the hooks above rather than called

@@ -46,6 +46,7 @@
 //   pricing         core
 //   market          core, pricing
 //   orders          core, pricing, market
+//   draft           orders (the two writes read the manifest's locks)
 //   workers         core, pricing
 //   barter          core
 //   pirates         core
@@ -94,12 +95,47 @@ export {
 
 // ========== Market: the port board ==========
 export {
+  applyBazaarLean,
   applyHarborPulse,
+  applyMarketLeans,
   applyPortShift,
   applyTidewatchSurge,
   purchaseCard,
   tallyPurchasesByResource,
+  type MarketLeans,
 } from "./engine/market";
+
+// ========== The bazaar: the rumor ==========
+// [D5: Aroma: the Bazaar Rumor] The whole of the rule, and the split is
+// the one the other path modules take: what a rumor is (the cooldown, the
+// visibility rule, the lean and the healing) is here, and the room's board
+// is beside the socket that speaks on it (see
+// src/server/realtime/bazaar.ts). The server reads rumorCooldownLeft,
+// rumorGoodAllowed, rumorId, rumorLean and publicRumors off this barrel
+// and every one of them takes its rows and its leg as arguments, so the
+// suite holds the rule without opening a server.
+//
+// canPublishRumor is the desk's, and it is the Aroma path's own reader
+// rather than a second copy of the flag: it asks the switch and the path
+// together, the same pair canSellRefit asks.
+export {
+  bazaarGoods,
+  canPublishRumor,
+  normalizeBazaarRumor,
+  normalizeRumorLean,
+  publicRumors,
+  rumorCooldownLeft,
+  rumorCooldownLine,
+  rumorDirectionLine,
+  rumorGoodAllowed,
+  rumorId,
+  rumorLean,
+  rumorStanding,
+  BAZAAR_SELLER_PATH,
+  type BazaarRumor,
+  type PublicRumor,
+  type RumorDirection,
+} from "./engine/bazaar";
 
 // ========== Orders: the trade manifest ==========
 // [D2: the nine slot order board] canFillOrder and its two path readers are
@@ -118,6 +154,64 @@ export {
   pathOrderOf,
   purchaseIntel,
 } from "./engine/orders";
+
+// ========== The Free Captain's borrow ==========
+// [D6: Free Captain: Opportunist] The allowance, the payout and the
+// sentences the borrow is described with. Exported for the reason the
+// other ability readers are: four layers read this rule and none of them
+// owns it. The board asks what it may offer (opportunistMayBorrow) and
+// what the offer pays (opportunistPayout, opportunistBorrowsLeft), the
+// card and the ledger print the same sentence (opportunistLine) and the
+// card alone prints what is left of the allowance (opportunistUsesLine,
+// OPPORTUNIST_SPENT_LINE), the leg report files what a voyage spent
+// (opportunistBorrowsTaken) and the save's heal reads
+// normalizeOpportunistBorrows. completeOrder is the only caller that
+// spends one, and it reads the same readers the board does, so what the
+// button promises and what the engine pays cannot come apart.
+export {
+  normalizeOpportunistBorrows,
+  opportunistBorrowsLeft,
+  opportunistBorrowsTaken,
+  opportunistLine,
+  opportunistMayBorrow,
+  opportunistPayout,
+  opportunistUsesLine,
+  OPPORTUNIST_PATH,
+  OPPORTUNIST_SPENT_LINE,
+} from "./engine/opportunist";
+
+// ========== The draft, and switching ==========
+// [D7: the draft, and switching] The two writes a path leaves in a
+// captain's save, and the one refusal that guards the second. The rule
+// they read (the deck, the pass, the window and the fee) lives outside
+// the engine, in ./draft, for the reason ./contracts and ./bazaar state
+// about their own arithmetic: it holds no state, so the suite can hold it
+// without a server, and only the two apply functions here touch a save.
+//
+// pathSwitchBlocked is exported because two callers ask it the same
+// question and they have to agree: the panel that offers the switch, and
+// the frame handler that applies it when the room publishes one, so a
+// switch that arrives twice is a no-op rather than a second fee.
+// pathSwitchOpenLine is the "when" half of that same guard, exported on
+// its own because the third caller is across the wire: the room refuses a
+// switch outside the window before it publishes one (see the path:switch
+// handler), and it has to refuse it in the same words the engine would.
+// pathSwitchSpentLine is the other half of that one sentence's trip, the
+// once a voyage refusal, and it is out here for the same reason: the room
+// reads a book of its own to answer whether the allowance was spent, and
+// the answer it gives a captain has to be the engine's own words.
+// forfeitPathOrders and the three ledger lines are deliberately absent:
+// each is written for one caller and read nowhere else, and the two
+// callers are the writes above, applyDraftPath for the line it takes and
+// applyPathSwitch for the other two, so a reader out here would be a
+// second surface printing a save's own log.
+export {
+  applyDraftPath,
+  applyPathSwitch,
+  pathSwitchBlocked,
+  pathSwitchOpenLine,
+  pathSwitchSpentLine,
+} from "./engine/draft";
 
 // ========== The fleet commission ==========
 // The Ocean Gambit objective. Lives out here rather than in the Orders
@@ -182,6 +276,37 @@ export {
   resolvePirateAttack,
 } from "./engine/pirates";
 
+// ========== The consent primitive ==========
+// [D4: Loom: the Refit] The agreement shape two kinds of trade are made of,
+// exported here because three callers read it and none of them is the kind
+// that happens to share it. The room's two board modules read the policy
+// helpers, visibleConsent, expireConsent, consentOfferStanding, agreeConsent
+// and consentPartyBusy, which are the rules about what a price is, who sees
+// a row, when an offer expires and what an accept consumes; they live in the
+// game layer rather than in the socket closures for the reason ./convoy.ts
+// gives about its own arithmetic, so a rule can be tested without a live
+// server. The client layer reads consentFeeFor for the form a seller types
+// into, and floorTallies, movementApplied and normalizeConsentLedger at the
+// load site, where a save is healed.
+//
+// The type is the other half of the export and the more important one: both
+// ends of the wire import ConsentTerms from here rather than each declaring
+// a shape the other has to be kept in step with.
+export {
+  agreeConsent,
+  consentFeeFor,
+  consentOfferStanding,
+  consentPartyBusy,
+  expireConsent,
+  floorTallies,
+  markMovement,
+  movementApplied,
+  normalizeConsentLedger,
+  resetConsentLedger,
+  visibleConsent,
+  type ConsentTerms,
+} from "./engine/consent";
+
 // ========== The escort contract ==========
 // [D3: Convoy: the Escort Contract] The Convoy's market, split the way
 // ./engine/pirates.ts was split from its own panel: the rules are here and
@@ -189,18 +314,23 @@ export {
 // and each reads a different part of it. The client layer that owns a
 // captain's side of a contract reads applyEscortSide and coverFromBoard,
 // both of them from the room, which is where a relay becomes a state change.
-// The room's board module reads the three policy helpers, visibleContracts,
-// expireContracts and agreeContract, which are the rules about who sees what
-// and what an accept consumes; they live here rather than in the socket
-// closures for the reason ./convoy.ts gives about its own arithmetic, so a
-// rule can be tested without a live server. And the two screens that draw
-// the market read the questions a captain asks of it: canSellEscort,
-// escortFeeFor, escortCoverage and ESCORT_SELLER_PATH at the Parley table,
-// escortBuyerBusy to grey out a second cover, and escortCoverOf on the
-// Resolve screen, where it says whose guns are standing over the raid. That
-// last one is read here rather than testing the switch and the field on the
-// screen, so a build with the market off reads as uncovered wherever it is
-// asked.
+// The two screens that draw the market read the questions a captain asks of
+// it: canSellEscort, escortCoverage and ESCORT_SELLER_PATH at the Parley
+// table, and escortCoverOf on the Resolve screen, where it says whose guns
+// are standing over the raid. That last one is read here rather than
+// testing the switch and the field on the screen, so a build with the
+// market off reads as uncovered wherever it is asked. visibleContracts is
+// the board one captain sees, which is the shared privacy filter plus the
+// one field only this kind carries.
+//
+// The board's other rules are not here because they are not this kind's:
+// what a fee is, which rows are visible, when an offer expires, the accept
+// that sweeps the rest and the ledger of applied movements are the consent
+// primitive above, and a wrapper for each would be a second name for one
+// rule. That includes the bound on a second cover, which the panel reads as
+// consentPartyBusy(rows, "buyer", ...) with the side named where it is
+// asked, since the side is the whole of what the two markets differ on
+// there.
 //
 // escortClaimFrom is deliberately absent. Its one caller is the raid roll
 // two blocks up, which is inside ./engine/ and reaches it directly.
@@ -210,22 +340,50 @@ export {
 // Orders.tsx). A second way to ask it would have been a second answer to
 // what a path looks like.
 export {
-  agreeContract,
   applyEscortSide,
   canSellEscort,
   coverFromBoard,
-  escortBuyerBusy,
   escortCoverage,
   escortCoverOf,
-  escortFeeFor,
-  escortOfferStanding,
-  expireContracts,
   normalizeEscortState,
   resetEscortLeg,
   visibleContracts,
   ESCORT_SELLER_PATH,
   type EscortContract,
 } from "./engine/contracts";
+
+// ========== The Loom's bench ==========
+// [D4: Loom: the Refit] The three things the plan hands this path, in the
+// order a captain meets them at the port. buyRag and reweaveRags are the
+// crafting chain and the exclusive right to the harbor's pile; mendGarment
+// and ragsAtPort are what a captain can do alone, which is the baseline the
+// refit is priced against; refitSellerBusy, refitRoomFor and canSellRefit
+// are the questions a Loom captain asks before offering; and applyRefitSide
+// is the client layer's, where a relay becomes the one state change in this
+// engine that a second captain asked for. The point a refit puts back is
+// read through refitRoomFor rather than worked out on a screen, so the
+// number an offer quotes and the number the warmth moves by are one number.
+//
+// refitsOn is exported with them rather than from ./flags, for the reason
+// its own comment gives: it stands on the wardrobe, and ./garments already
+// reads ./flags. normalizeRefitState is the load site's, healing the tally
+// this build added, and ragsLeftAtPort is the bench panel's, which prints
+// what is left of the pile rather than the pile.
+export {
+  applyRefitSide,
+  buyRag,
+  canSellRefit,
+  mendGarment,
+  normalizeRefitState,
+  ragsAtPort,
+  ragsLeftAtPort,
+  refitRoomFor,
+  refitsOn,
+  refitSellerBusy,
+  reweaveRags,
+  REFIT_SELLER_PATH,
+  type RefitContract,
+} from "./engine/refits";
 
 // ========== Cross captain Gold: loans, backing, convoy ventures ==========
 export {

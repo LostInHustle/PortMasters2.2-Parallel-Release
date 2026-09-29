@@ -34,6 +34,26 @@ import { db } from "@/lib/db";
 import type { PublicUser, RoomMembersPayload } from "@/types/realtime";
 import { emitToUser, roomMembers } from "./presence";
 
+// [J2: the mute and the report] Whether a write failed because the row it
+// tried to write was already there.
+//
+// Read off the error's own code rather than through the class Prisma
+// throws, and that is a deliberate shape rather than laziness: the client
+// is imported in exactly one place in this tree (the singleton in
+// src/lib/db.ts), and every module above it works through the handle
+// rather than through the library's types. Reaching past that for one
+// error class would put a second dependency on the generated client into
+// the composition root. What the code means is stable and documented
+// (P2002 is a unique constraint violation), and a value that is not it is
+// treated as the failure it is.
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 const roomMutedUsers = new Map<string, Set<string>>();
 
 // One line of session conversation, in the same shape the chat:room and

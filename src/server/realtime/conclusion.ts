@@ -69,7 +69,11 @@ import {
 } from "./loans";
 import { resolveExpiredVentures } from "./ventures";
 import { clearBarter, clearFlexibleAccepted } from "./barter";
-import { clearContracts } from "./contracts";
+import { escortContracts } from "./contracts";
+import { refitContracts } from "./refits";
+import { clearBazaar } from "./bazaar";
+import { clearPathVoyage } from "./draft";
+import { getCheckpoint } from "./checkpoint";
 import { userSockets, roomMembers } from "./presence";
 import { recordRivalOutcomes, type RivalStanding } from "./rival";
 import { parseSave } from "./save";
@@ -226,12 +230,33 @@ export async function maybeConcludeVoyage(
   // save they end the voyage with. Each client returns its own escrow as
   // the board empties.
   clearBarter(io, roomId);
-  // [D3: Convoy: the Escort Contract] And the escort market's board, for
-  // the same reason and with the same shape: a voyage that has ended stops
-  // moving its checkpoint, so nothing else would ever sweep it, and a
-  // contract left standing would be a promise about a leg nobody is going
-  // to sail.
-  clearContracts(io, roomId);
+  // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] And the two
+  // consent boards, for the same reason and with the same shape: a voyage
+  // that has ended stops moving its checkpoint, so nothing else would ever
+  // sweep them, and a promise left standing on either would be one about a
+  // leg nobody is going to sail.
+  escortContracts.clear(io, roomId);
+  refitContracts.clear(io, roomId);
+  // [D5: Aroma: the Bazaar Rumor] And the bazaar's rows, for the third time
+  // and the same reason. They carry no escrow and no promise, so nothing is
+  // left hanging by them, but a row is about a voyage's leg and the voyage
+  // it is about has ended: the next one starts with a bazaar nobody has
+  // spoken at, which is also what every captain's cooldown is measured
+  // from. The leg is read here rather than carried on the call, because
+  // every send from this board is personalized by the room's leg and a
+  // cleared board is still a send. This is a map lookup: the checkpoint
+  // this voyage has been holding all along is still in hand.
+  clearBazaar(io, roomId, (await getCheckpoint(roomId)).round);
+  // [D7: the draft, and switching] And the path draft's two maps, for the
+  // fourth time and the same reason. A draft that outlived the voyage would
+  // be a hand of cards dealt to a table that has finished sailing, and it
+  // would be the one thing left in this process that could still write a
+  // path into a captain's save after the chronicle was drawn. The book of
+  // switches goes with it: the voyage it counted is over, and the next one
+  // hands every captain their one switch back. There is nothing to publish
+  // here beyond the null views the clear sends, and no line for the log,
+  // which has just been written up.
+  clearPathVoyage(io, roomId);
   // The voyage is over, so the flexible allowance goes with it. Next
   // voyage opens on a full one, which is also the only moment a captain's
   // Renown can have moved, so the counter can never carry a stale level's

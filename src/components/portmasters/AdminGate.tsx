@@ -13,20 +13,72 @@
 // screen exists so that somebody who is not an operator is told so
 // plainly rather than being shown a console whose every button refuses
 // them.
+//
+// The form itself is CredentialCard's, shared with the captain's door.
+// What is this screen's own is the setup code (a field the harbor never
+// asks for), the role check behind the sign in tab, and the console's
+// colors.
 // =====================================================================
 
-import { useState } from "react";
-import { motion } from "framer-motion";
 import { api, type PublicUser } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CredentialField, Notice } from "@/components/portmasters/shared";
-import { Loader2, ShieldCheck, KeyRound } from "lucide-react";
+import { ShieldCheck, KeyRound } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants";
+import { DISPLAY_NAME_MAX } from "@/lib/credentials";
+import {
+  CHOSEN_NAME,
+  CHOSEN_PASSWORD,
+  CredentialCard,
+  SIGN_IN_FIELDS,
+  type CredentialFieldSpec,
+} from "@/components/portmasters/CredentialCard";
 
 // The same sentence the server refuses a non operator with, so the two
 // cannot describe the same refusal differently.
 const NOT_AN_OPERATOR = "This account is not an administrator.";
+
+// The register tab: the setup code the server was configured with, then
+// the captain's own two fields with the roster's display name between
+// them. The code comes first because it is the one field this door has
+// that the harbor's does not, and a form that opened on the field both
+// doors share would be a form that looks like the other one.
+const REGISTER_FIELDS: CredentialFieldSpec[] = [
+  {
+    key: "setupCode",
+    label: "Setup Code",
+    hint: "from the server configuration",
+    type: "password",
+    placeholder: "setup code",
+    autoFocus: true,
+    autoComplete: "off",
+  },
+  CHOSEN_NAME,
+  {
+    key: "displayName",
+    label: "Display Name",
+    hint: "shown in the roster",
+    placeholder: "for example, Harbor Master",
+    maxLength: DISPLAY_NAME_MAX,
+    optional: true,
+  },
+  CHOSEN_PASSWORD,
+];
+
+/** The console's own crest, above the form. */
+function ConsoleHeader() {
+  return (
+    <div className="mb-7 flex flex-col items-center text-center">
+      <div className="pm-grad-admin relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
+        <ShieldCheck className="h-8 w-8 text-white" strokeWidth={2.2} />
+      </div>
+      <h1 className="font-display text-xl font-bold tracking-tight">
+        Operator Console
+      </h1>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Account tools for {APP_NAME}
+      </p>
+    </div>
+  );
+}
 
 export function AdminGate({
   onAuthed,
@@ -40,24 +92,25 @@ export function AdminGate({
   notice?: string | null;
   onDismissNotice?: () => void;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [setupCode, setSetupCode] = useState("");
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      if (mode === "login") {
+  return (
+    <CredentialCard
+      fields={{ login: SIGN_IN_FIELDS, register: REGISTER_FIELDS }}
+      header={<ConsoleHeader />}
+      notice={notice}
+      onDismissNotice={onDismissNotice}
+      onAuthed={onAuthed}
+      submit={async (mode, values) => {
+        if (mode === "register") {
+          return api.adminRegister({
+            username: values.username.trim(),
+            password: values.password,
+            displayName: values.displayName.trim() || undefined,
+            setupCode: values.setupCode,
+          });
+        }
         const { token } = await api.login({
-          username: username.trim(),
-          password,
+          username: values.username.trim(),
+          password: values.password,
         });
         // The sign in answer carries the public captain only, so the role
         // is read separately. This is the authoritative read: /api/auth/me
@@ -65,157 +118,20 @@ export function AdminGate({
         // banned from another console cannot get back in through here.
         const { user } = await api.me();
         if (!user || user.role !== "admin") throw new Error(NOT_AN_OPERATOR);
-        onAuthed(user, token);
-      } else {
-        const { user, token } = await api.adminRegister({
-          username: username.trim(),
-          password,
-          displayName: displayName.trim() || undefined,
-          setupCode,
-        });
-        onAuthed(user, token);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="pm-canvas flex min-h-screen w-full items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="pm-glass-strong pm-crackle w-full max-w-md rounded-3xl p-7 sm:p-9"
-      >
-        <div className="mb-7 flex flex-col items-center text-center">
-          <div className="pm-grad-admin relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
-            <ShieldCheck className="h-8 w-8 text-white" strokeWidth={2.2} />
-          </div>
-          <h1 className="font-display text-xl font-bold tracking-tight">
-            Operator Console
-          </h1>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Account tools for {APP_NAME}
-          </p>
-        </div>
-
-        {notice && (
-          <Notice
-            message={notice}
-            onDismiss={onDismissNotice}
-            className="mb-5"
-          />
-        )}
-
-        <Tabs
-          value={mode}
-          onValueChange={(v) => {
-            setMode(v as "login" | "register");
-            setError(null);
-          }}
-        >
-          <TabsList className="mb-5 grid w-full grid-cols-2">
-            <TabsTrigger value="login">Sign In</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
-
-          <form onSubmit={submit} className="space-y-4">
-            <TabsContent value="login" className="mt-0 space-y-4">
-              <CredentialField
-                label="Captain Name"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="your captain name"
-                autoFocus
-                autoComplete="username"
-              />
-              <CredentialField
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="password"
-                autoComplete="current-password"
-              />
-            </TabsContent>
-
-            <TabsContent value="register" className="mt-0 space-y-4">
-              <CredentialField
-                label="Setup Code"
-                hint="from the server configuration"
-                type="password"
-                value={setupCode}
-                onChange={(e) => setSetupCode(e.target.value)}
-                placeholder="setup code"
-                autoFocus
-                autoComplete="off"
-              />
-              <CredentialField
-                label="Captain Name"
-                hint="3 to 20 chars, letters, numbers, underscore"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="choose a captain name"
-                autoComplete="username"
-              />
-              <CredentialField
-                label="Display Name"
-                hint="shown in the roster"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="for example, Harbor Master"
-                maxLength={24}
-              />
-              <CredentialField
-                label="Password"
-                hint="at least 6 characters"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="password"
-                autoComplete="new-password"
-              />
-            </TabsContent>
-
-            {error && (
-              <div className="rounded-xl border border-alarm/20 bg-alarm/5 px-3.5 py-2.5 text-sm text-alarm">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={
-                loading ||
-                !username ||
-                !password ||
-                (mode === "register" && !setupCode)
-              }
-              className="pm-grad-admin h-11 w-full rounded-xl font-semibold shadow-lg"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mode === "login" ? (
-                <>
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Open the Console
-                </>
-              ) : (
-                <>
-                  <KeyRound className="mr-2 h-4 w-4" /> Create Operator
-                </>
-              )}
-            </Button>
-          </form>
-        </Tabs>
-
+        return { user, token };
+      }}
+      labels={{ login: "Open the Console", register: "Create Operator" }}
+      icons={{
+        login: <ShieldCheck className="mr-2 h-4 w-4" />,
+        register: <KeyRound className="mr-2 h-4 w-4" />,
+      }}
+      accent="pm-grad-admin"
+      footer={
         <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
           Registration needs the setup code the server was configured with.
           Accounts created here are administrators.
         </p>
-      </motion.div>
-    </div>
+      }
+    />
   );
 }

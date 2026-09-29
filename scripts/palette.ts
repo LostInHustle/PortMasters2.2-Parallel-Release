@@ -299,6 +299,27 @@ const WIDGETS: Widget[] = [
     screens: ["phase:market"],
     what: "The Wardrobe, and the clothes the crew wears",
   },
+  /* [D4: Loom: the Refit] The bench is the sixth panel to open inside the
+     Market, and by the time it arrived the screen's rungs were nearly all
+     spoken for: the phase tag at 154, the Advisor at 197, the Depth at 347,
+     the Pulse at 90, the Larder at 270, the Wardrobe at 219, and the five
+     session surfaces every phase is checked against. What is left on a
+     screen that dense is three windows, 67 to 70, 131 to 134 and 324 to 327,
+     which are the gaps between Voyage and Pulse, Ship and the phase tag, and
+     Ledger and Depth. 133 takes the middle one: 22 degrees from Ship and 21
+     from the Market tag, where the floor is twenty, and it is not moved to
+     either end of its window because the window is only four wide.
+     The bench wears no fill. The Larder and the Wardrobe took no fill either
+     and their reason is the same: a fill is a widget claiming a rung, this
+     panel already has one of its own, and painting its buttons in the
+     market's green would say the bench is part of the board it opens beside
+     rather than a panel on it. */
+  {
+    name: "refit",
+    hue: 133,
+    screens: ["phase:market"],
+    what: "The Loom's bench, and the work it sells",
+  },
   {
     name: "planner",
     hue: 132,

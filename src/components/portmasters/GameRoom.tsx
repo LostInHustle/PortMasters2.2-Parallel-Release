@@ -40,6 +40,12 @@ import {
   type EscortContract,
 } from "@/lib/use-escort-contracts";
 import {
+  useRefitContracts,
+  type RefitContract,
+} from "@/lib/use-refit-contracts";
+import { useBazaarRumors } from "@/lib/use-bazaar-rumors";
+import { usePathDraft } from "@/lib/use-path-draft";
+import {
   useAid,
   type GrantedLoan,
   type RepaidLoan,
@@ -62,6 +68,8 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
+import { PathDraft } from "./game/PathDraft";
+import { PathPanel } from "./game/PathPanel";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
 import { ObjectivePanel } from "./game/ObjectivePanel";
 import { AuditRevealStrip } from "./game/AuditPanel";
@@ -108,6 +116,7 @@ import { renownProgress } from "@/lib/game/legacy";
 import {
   acceptBarterOffer,
   applyEscortSide,
+  applyRefitSide,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
   clearRedirectedLoan,
@@ -421,6 +430,51 @@ export function GameRoom({
     [act, me.id],
   );
   const escort = useEscortContracts(socket, room.id, me.id, onEscortSettle);
+
+  // [D4: Loom: the Refit] The bench's relay, which is the escort's shape
+  // with one fewer number in it: a refit this captain is a side of has been
+  // agreed, and the engine works out what that means for them (see
+  // applyRefitSide). The customer pays and their own garment gets the points
+  // back, both on their own machine, and the seller is paid the price the
+  // two of them named. No third captain is touched.
+  //
+  // There is nothing to mirror into GameState afterwards, which is the
+  // difference between this market and the escort's. A contract has to be
+  // read back into escortCover because the raid roll consults a field; a
+  // refit's whole result is the fee and the garment, and the garment is
+  // already this captain's own state.
+  const onRefitSettle = useCallback(
+    (refit: RefitContract) => {
+      act((g, l) => {
+        applyRefitSide(g, refit, me.id, l);
+      });
+    },
+    [act, me.id],
+  );
+  const refit = useRefitContracts(socket, room.id, me.id, onRefitSettle);
+
+  // [D5: Aroma: the Bazaar Rumor] The bazaar's relay, and it is the
+  // shortest of the three because nothing about a rumor moves anything
+  // between captains. There is no settle report to give and no field on
+  // GameState to mirror into, which is the difference between this board
+  // and the other two: a contract's cover has to be read back into a field
+  // because the raid roll consults one, and a refit's whole result lands on
+  // the customer's own garment. What a rumor does to a price never touches
+  // this hook at all: the lean arrives on the advance frame and is applied
+  // to the market by the engine (see applyMarketLeans in
+  // @/lib/game/engine/market), so all this holds is what the harbor has
+  // been told, for the desk and the board to draw.
+  const bazaar = useBazaarRumors(socket, room.id);
+
+  // [D7: the draft, and switching] The path draft's relay, which is the one
+  // in this room that carries a card addressed to a single captain: the
+  // draft deals every seat its own hand and this hook holds the one it was
+  // dealt (see ./use-path-draft). It takes `act` where the three markets
+  // above take nothing, because the two frames it listens for are writes to
+  // this captain's own save: the settled view is the path they sail on, and
+  // the room's published switch is applied to their own purse and manifest,
+  // which is the same shape useMaroon's result hand-out takes.
+  const draft = usePathDraft(socket, room.id, me.id, act);
 
   // The cover the raid roll consults, mirrored from the board this captain
   // can see. The engine asks one field and never the network (see
@@ -1218,6 +1272,22 @@ export function GameRoom({
 
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
+        {/* [D7: the draft, and switching] The deal, at the very top of the
+            voyage's own column because of when it happens rather than what
+            it is: it is dealt as the voyage leaves the dock, over the
+            opening leg, so a captain who is reading this panel is also
+            reading their first market behind it. Renders nothing at all
+            outside a live draft (see PathDraft), and the hook holding the
+            hand is fed by the server rather than by anything on this
+            screen. */}
+        {draft.view && (
+          <PathDraft
+            view={draft.view}
+            error={draft.error}
+            onKeep={draft.keep}
+            onDismissError={draft.clearError}
+          />
+        )}
         <FleetTicker
           socket={socket}
           roomId={room.id}
@@ -1274,6 +1344,8 @@ export function GameRoom({
               aid={aid}
               backing={backing}
               escort={escort}
+              refit={refit}
+              bazaar={bazaar}
               audit={audit}
               maroon={maroon}
               voyageLog={voyageLog}
@@ -1328,6 +1400,19 @@ export function GameRoom({
                 peerTradeProfit={state.game.peerTradeProfit}
               />
             ))}
+            {/* [D7: the draft, and switching] What this captain sails as,
+                beside the card they hold alone because the two are one
+                fact seen at two moments: a hand the table is not shown
+                while it is being read, and the path that hand leaves,
+                which the fleet is told when the draft settles and told
+                again on the one time a captain changes their papers. It
+                draws nothing at all with the draft switched off. */}
+            <PathPanel
+              game={state.game}
+              error={draft.error}
+              onSwitch={draft.switchPath}
+              onDismissError={draft.clearError}
+            />
             {/* Wraps rather than overflowing. These five hint chips and
                 their labels are wider than a phone, and a centred row
                 with no wrap spills off both edges at once, which both

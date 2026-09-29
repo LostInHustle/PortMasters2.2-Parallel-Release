@@ -214,12 +214,13 @@ export function cancelDeparture(roomId: string, userId: string): boolean {
 // or the cross module room teardown, which would create a cycle.
 export type DepartureCleanup = {
   removeUserBarterOffers: (io: Server, roomId: string, userId: string) => void;
-  // [D3: Convoy: the Escort Contract] The market's own, for the reason the
-  // barter board has one: the room must not be left holding an offer from,
-  // or a promise by, a captain who is no longer in it. The contract board's
-  // rule is the wider of the two and is stated where it is applied (see
-  // removeUserContracts in ./contracts).
-  removeUserContracts: (io: Server, roomId: string, userId: string) => void;
+  // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] The two consent
+  // boards' own, for the reason the barter board has one: the room must not
+  // be left holding an offer from, or a promise by, a captain who is no
+  // longer in it. Both markets are swept by one callback because a
+  // departure is one event, and the two conditions a departure applies to a
+  // row are stated where they are applied (see removeUser in ./consent).
+  removeUserConsentBoards: (io: Server, roomId: string, userId: string) => void;
   removeUserAidRequest: (io: Server, roomId: string, userId: string) => void;
   emitRoomMembers: (io: Server, roomId: string) => Promise<void>;
   maybeConcludeVoyage: (io: Server, roomId: string) => Promise<void>;
@@ -258,7 +259,7 @@ export async function reapDeparture(
   const { roomId, userId, displayName, cleanup, keepEmptyRoom } = plan;
 
   cleanup.removeUserBarterOffers(io, roomId, userId);
-  cleanup.removeUserContracts(io, roomId, userId);
+  cleanup.removeUserConsentBoards(io, roomId, userId);
   cleanup.removeUserAidRequest(io, roomId, userId);
 
   const result = await leaveRoomForUser(userId, roomId, {
