@@ -146,7 +146,7 @@ export function MaroonResultStrip({ result }: { result: MaroonResult | null }) {
   if (dismissed === key) return null;
 
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-alarm/40 bg-alarm/[0.06] ring-1 ring-alarm/20">
+    <div className="rounded-2xl px-3 py-2 border border-alarm/40 bg-alarm/[0.06] ring-1 ring-alarm/20">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🏝️
@@ -194,7 +194,7 @@ export function PortShiftStrip({
   if (!shift) return null;
   const landed = shift.round < round;
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-alarm/30 bg-alarm/[0.05]">
+    <div className="rounded-2xl px-3 py-2 border border-alarm/30 bg-alarm/[0.05]">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🧭

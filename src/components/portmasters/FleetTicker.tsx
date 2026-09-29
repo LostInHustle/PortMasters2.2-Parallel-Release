@@ -44,7 +44,7 @@ export function FleetTicker({
   if (sorted.length <= 1) return null;
 
   return (
-    <div className="pm-glass rounded-2xl px-3 py-2 mb-3 overflow-x-auto pm-scroll">
+    <div className="pm-glass rounded-2xl px-3 py-2 overflow-x-auto pm-scroll">
       <div className="flex items-center gap-2 w-max min-w-full">
         {sorted.map((m) => {
           const st = statuses[m.id];

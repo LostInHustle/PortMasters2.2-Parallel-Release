@@ -833,8 +833,14 @@ export function GameRoom({
       ? { ...chatTrade, defaultTarget: dmTarget }
       : undefined;
 
+  // On a wide window the room is an app shell: it takes the window's own
+  // height and never grows past it, so the three columns below can each
+  // scroll inside themselves and the rails stay where the captain left
+  // them. Below the lg breakpoint it is an ordinary document again, with
+  // the page doing the scrolling, because a narrow window has no room for
+  // fixed rails and needs the whole thing to move as one.
   return (
-    <div className="pm-canvas min-h-screen w-full flex flex-col">
+    <div className="pm-canvas min-h-screen w-full flex flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       <HarborTopBar
         room={room}
         memberCount={members.length}
@@ -856,57 +862,87 @@ export function GameRoom({
         onLeave={handleLeave}
       />
 
-      {/* Main layout */}
-      <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
-        {/* [D7: the draft, and switching] The deal, at the very top of the
-            voyage's own column because of when it happens rather than what
-            it is: it is dealt as the voyage leaves the dock, over the
-            opening leg, so a captain who is reading this panel is also
-            reading their first market behind it. Renders nothing at all
-            outside a live draft (see PathDraft), and the hook holding the
-            hand is fed by the server rather than by anything on this
-            screen. */}
-        {draft.view && (
-          <PathDraft
-            view={draft.view}
-            error={draft.error}
-            onKeep={draft.keep}
-            onDismissError={draft.clearError}
+      {/* Main layout. A column on a wide window, so the band below can be
+          measured against the window rather than against its own content
+          and the columns under it can take whatever is left. */}
+      <main className="flex-1 min-h-0 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto flex flex-col gap-3">
+        {/* The table band: everything the whole harbor shares, above the
+            three columns rather than inside one of them. It is capped at a
+            share of the window on a wide screen and scrolls inside that cap.
+            Uncapped it is what pushed the columns off the fold, because a
+            voyage carrying a draft and three notices stacks half a window of
+            strips before the first column starts. The draft leads the band
+            rather than following the ticker: it is the one entry here with a
+            deadline on it, and reading it should never mean scrolling for
+            it. */}
+        <div className="shrink-0 space-y-3 lg:max-h-[45vh] lg:overflow-y-auto pm-scroll lg:pr-1">
+          {/* [D7: the draft, and switching] The deal, at the very top of the
+              voyage's own column because of when it happens rather than what
+              it is: it is dealt as the voyage leaves the dock, over the
+              opening leg, so a captain who is reading this panel is also
+              reading their first market behind it. Renders nothing at all
+              outside a live draft (see PathDraft), and the hook holding the
+              hand is fed by the server rather than by anything on this
+              screen. */}
+          {draft.view && (
+            <PathDraft
+              view={draft.view}
+              error={draft.error}
+              onKeep={draft.keep}
+              onDismissError={draft.clearError}
+            />
+          )}
+          <FleetTicker
+            socket={socket}
+            roomId={room.id}
+            me={me}
+            initialMembers={members}
           />
-        )}
-        <FleetTicker
-          socket={socket}
-          roomId={room.id}
-          me={me}
-          initialMembers={members}
-        />
-        {/* The voyage's public objective, full width because it is owed by
-            the whole harbor rather than by the captain whose column it
-            would otherwise sit in. Renders nothing at all in Classic. */}
-        <ObjectivePanel
-          game={state.game}
-          objective={objective.objective}
-          progress={objective.progress}
-          deliverable={objective.deliverable}
-          onDeliver={objective.deliver}
-        />
-        {/* Whatever the harbor voted to open, and nothing at all in a
-            voyage that has not audited anyone. It sits under the
-            commission because it is the other thing the whole table
-            shares, and it stays for the rest of the voyage: the argument
-            about what it means is the feature. */}
-        <AuditRevealStrip reveal={audit.reveal} />
-        {/* The harbor's heavier vote, and the market condition it leaves
-            behind. Both sit in the same place for the same reason: they
-            belong to the table rather than to a column, and the market
-            strip has to be readable while a captain is pricing a card.
-            Each renders nothing at all in a voyage neither has touched. */}
-        <MaroonResultStrip result={maroon.result} />
-        <PortShiftStrip shift={maroon.shift} round={state.game.currentRound} />
-        <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
-          {/* Left: the captain's own rail */}
-          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
-            <div className="pm-glass h-full rounded-2xl p-3">
+          {/* The table's notices. They sit in a wrapping row rather than in a
+              stack, so two of them cost one row instead of two, and they wrap
+              rather than sharing a fixed grid so a single live notice keeps
+              the full width the strips were drawn for. The row styles its own
+              children rather than wrapping each one: a wrapper would still be
+              in the layout on a voyage with nothing to say, and the gap
+              between two empty wrappers is a band of nothing above the
+              columns. The four are the row's own children, so each one that
+              draws nothing simply is not there. */}
+          <div className="flex flex-wrap items-start gap-3 [&>*]:grow [&>*]:basis-[420px] [&>*]:min-w-[280px]">
+            {/* The voyage's public objective, owed by the whole harbor
+                rather than by the captain whose column it would otherwise
+                sit in. Renders nothing at all in Classic. */}
+            <ObjectivePanel
+              game={state.game}
+              objective={objective.objective}
+              progress={objective.progress}
+              deliverable={objective.deliverable}
+              onDeliver={objective.deliver}
+            />
+            {/* Whatever the harbor voted to open, and nothing at all in a
+                voyage that has not audited anyone. It sits under the
+                commission because it is the other thing the whole table
+                shares, and it stays for the rest of the voyage: the argument
+                about what it means is the feature. */}
+            <AuditRevealStrip reveal={audit.reveal} />
+            {/* The harbor's heavier vote, and the market condition it leaves
+                behind. Both sit in the same place for the same reason: they
+                belong to the table rather than to a column, and the market
+                strip has to be readable while a captain is pricing a card.
+                Each renders nothing at all in a voyage neither has touched. */}
+            <MaroonResultStrip result={maroon.result} />
+            <PortShiftStrip
+              shift={maroon.shift}
+              round={state.game.currentRound}
+            />
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-rows-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
+          {/* Left: the captain's own rail. It takes the height of the row
+              and scrolls inside itself, the same shape ./game/GameStatusPanel
+              is built for: the numbers a captain checks constantly stay in
+              one place while everything beside them moves. */}
+          <div className="order-2 lg:order-1 lg:min-h-0">
+            <div className="pm-glass h-full rounded-2xl p-3 lg:min-h-0">
               <GameStatusPanel
                 game={state.game}
                 logs={state.logs}
@@ -918,99 +954,120 @@ export function GameRoom({
             </div>
           </div>
 
-          {/* Center: phase + controls */}
-          <div className="space-y-3 order-1 lg:order-2 min-w-0">
-            <GamePhasePanel
-              game={state.game}
-              ctx={ctx}
-              act={act}
-              members={members}
-              phaseSync={phaseSync}
-              barter={barter}
-              aid={aid}
-              backing={backing}
-              escort={escort}
-              refit={refit}
-              bazaar={bazaar}
-              audit={audit}
-              maroon={maroon}
-              voyageLog={voyageLog}
-              privateLog={privateLog}
-              me={me}
-              room={{
-                id: room.id,
-                code: room.code,
-                name: room.name,
-                hostId,
-              }}
-              voyageResult={voyageResult}
-              reveal={reveal}
-              myLegacy={myLegacy}
-              onRestart={handleRestart}
-              onRumorBoardOpen={() => setRumorOpen(true)}
-              onTutorialOpen={() => setTutOpen(true)}
-              colorFor={colorFor}
-              roster={roster}
-            />
-            <GameControlPanel
-              game={state.game}
-              saving={state.saving}
-              isHost={isHost}
-              onSetSail={phaseSync.startGame}
-              onNextPhase={handleNext}
-              onGuide={() => setGuideOpen(true)}
-              onSave={handleSave}
-              onRestart={handleRestart}
-              waiting={phaseSync.waiting}
-              readyCount={phaseSync.readyCount}
-              requiredCount={phaseSync.requiredCount}
-              clock={phaseSync.phaseClock}
-              onStandingOrders={() => setStandingOpen(true)}
-              onCancelReady={phaseSync.cancelReady}
-            />
-            {/* The captain's own card, below the controls, where it
-                stands under the buttons rather than between them and the
-                phase they act on. It draws nothing at all in a harbor
-                that has not dealt one.
-
-                The peer ledger is the one thing a card shows that the
-                server did not send: it is read from the captain's own
-                voyage, on the captain's own screen, and no drawer holds
-                it, which is why the card asks for it rather than it
-                travelling on the private entry. Only a Broker's card
-                prints it. */}
-            {privateLog.map((entry, index) => (
-              <PrivateCard
-                key={`${entry.kind}:${index}`}
-                entry={entry}
-                peerTradeProfit={state.game.peerTradeProfit}
+          {/* Center: the stage, and the row of controls that acts on it.
+              On a wide window the stage scrolls inside its own column and
+              the controls stay under it, so pressing the next phase never
+              means scrolling to find the button first. Below the
+              breakpoint the bar leads the column, because a narrow window
+              has one scroll and the bar is the thing a thumb reaches for.
+              The bar is the same component either way; only its place in
+              the column changes. */}
+          <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-3 lg:min-h-0">
+            <div className="shrink-0 lg:order-2">
+              <GameControlPanel
+                game={state.game}
+                saving={state.saving}
+                isHost={isHost}
+                onSetSail={phaseSync.startGame}
+                onNextPhase={handleNext}
+                onGuide={() => setGuideOpen(true)}
+                onSave={handleSave}
+                onRestart={handleRestart}
+                waiting={phaseSync.waiting}
+                readyCount={phaseSync.readyCount}
+                requiredCount={phaseSync.requiredCount}
+                clock={phaseSync.phaseClock}
+                onStandingOrders={() => setStandingOpen(true)}
+                onCancelReady={phaseSync.cancelReady}
               />
-            ))}
-            {/* [D7: the draft, and switching] What this captain sails as,
-                beside the card they hold alone because the two are one
-                fact seen at two moments: a hand the table is not shown
-                while it is being read, and the path that hand leaves,
-                which the fleet is told when the draft settles and told
-                again on the one time a captain changes their papers. It
-                draws nothing at all with the draft switched off. */}
-            <PathPanel
-              game={state.game}
-              error={draft.error}
-              onSwitch={draft.switchPath}
-              onDismissError={draft.clearError}
-            />
-            <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
+            </div>
+            <div className="space-y-3 lg:order-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
+              <GamePhasePanel
+                game={state.game}
+                ctx={ctx}
+                act={act}
+                members={members}
+                phaseSync={phaseSync}
+                barter={barter}
+                aid={aid}
+                backing={backing}
+                escort={escort}
+                refit={refit}
+                bazaar={bazaar}
+                audit={audit}
+                maroon={maroon}
+                voyageLog={voyageLog}
+                privateLog={privateLog}
+                me={me}
+                room={{
+                  id: room.id,
+                  code: room.code,
+                  name: room.name,
+                  hostId,
+                }}
+                voyageResult={voyageResult}
+                reveal={reveal}
+                myLegacy={myLegacy}
+                onRestart={handleRestart}
+                onRumorBoardOpen={() => setRumorOpen(true)}
+                onTutorialOpen={() => setTutOpen(true)}
+                colorFor={colorFor}
+                roster={roster}
+              />
+              {/* The captain's own card. It sits at the foot of the stage
+                  rather than up among the controls, because it is
+                  something a captain reads about their own voyage and not
+                  something they press: the bar under the stage holds the
+                  buttons, and the reading is what scrolls. It draws
+                  nothing at all in a harbor that has not dealt one.
+
+                  The peer ledger is the one thing a card shows that the
+                  server did not send: it is read from the captain's own
+                  voyage, on the captain's own screen, and no drawer holds
+                  it, which is why the card asks for it rather than it
+                  travelling on the private entry. Only a Broker's card
+                  prints it. */}
+              {privateLog.map((entry, index) => (
+                <PrivateCard
+                  key={`${entry.kind}:${index}`}
+                  entry={entry}
+                  peerTradeProfit={state.game.peerTradeProfit}
+                />
+              ))}
+              {/* [D7: the draft, and switching] What this captain sails as,
+                  beside the card they hold alone because the two are one
+                  fact seen at two moments: a hand the table is not shown
+                  while it is being read, and the path that hand leaves,
+                  which the fleet is told when the draft settles and told
+                  again on the one time a captain changes their papers. It
+                  draws nothing at all with the draft switched off. */}
+              <PathPanel
+                game={state.game}
+                error={draft.error}
+                onSwitch={draft.switchPath}
+                onDismissError={draft.clearError}
+              />
+              <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
+            </div>
           </div>
 
-          {/* Right: roster + chat. Under the lg breakpoint this column leads
-              the stack and the chat leads inside it. The chat used to come
-              last of everything, below the phase panel and the roster, which
-              put it three screens down on a narrow window and left captains
-              reading it as missing. The FleetTicker above already carries the
-              roster at these widths, so nothing is lost by following with it
-              rather than opening with it. */}
-          <div className="order-3 space-y-3 min-w-0">
-            <div className="h-[320px]">
+          {/* Right: roster + chat, last of the three columns at every width.
+              The chat used to sit at the very bottom of the page, under the
+              phase panel and the roster, which put it three screens down on
+              a narrow window and left captains reading it as missing. The
+              FleetTicker above already carries the roster at these widths,
+              so the pair can follow the stage rather than opening with it.
+
+              On a wide window this is the column a captain scrolls least and
+              reads most, so it holds still: the roster keeps a share of the
+              column and the chat takes the rest, and if the two together need
+              more room than the column has, the column scrolls rather than
+              either panel being cut off at the knee. Each panel still scrolls
+              inside itself, which is the behaviour the two of them were
+              always meant to have and the reason seeing them travel with the
+              page read as wrong. */}
+          <div className="order-3 min-w-0 flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
+            <div className="h-[320px] shrink-0 lg:h-[26vh] lg:min-h-[150px] lg:max-h-[320px]">
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1021,10 +1078,7 @@ export function GameRoom({
                 myRenownLevel={myRenownLevel}
               />
             </div>
-            <div
-              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
-              style={{ height: 380 }}
-            >
+            <div className="pm-glass rounded-2xl overflow-hidden flex flex-col h-[380px] lg:h-auto lg:flex-1 lg:min-h-[260px]">
               <Tabs
                 value={chatTab}
                 onValueChange={(v) => setChatTab(v as "room" | "dm")}

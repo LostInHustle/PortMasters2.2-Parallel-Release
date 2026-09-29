@@ -129,7 +129,7 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
   if (dismissed === key) return null;
 
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-intel/40 bg-intel/[0.06] ring-1 ring-intel/20">
+    <div className="rounded-2xl px-3 py-2 border border-intel/40 bg-intel/[0.06] ring-1 ring-intel/20">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🔎

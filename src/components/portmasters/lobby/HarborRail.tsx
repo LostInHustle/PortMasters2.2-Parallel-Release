@@ -63,8 +63,21 @@ export function HarborRail({
   lobbyHistory: ChatMessage[];
   dmHistory: ChatMessage[];
 }) {
+  // On a wide window the rail holds still while the harbor board beside it
+  // scrolls, the same shape the game room's rail has: who is about and the
+  // conversation with them are things a captain glances at rather than
+  // reads top to bottom, and having them travel up the screen every time
+  // the board moved made glancing back at them a scroll of its own.
+  // self-start is what lets the rail stick at all, because a grid item
+  // stretched to the height of its row has nothing to stick within. On a
+  // window too short for both panels it scrolls inside its own cap rather
+  // than pushing the board off the screen.
+  //
+  // The offset is the lobby's masthead rather than the game room's topbar:
+  // this screen keeps its header stuck to the top of a page that scrolls,
+  // so the rail has to start below it or it parks underneath the tabs.
   return (
-    <aside className="-order-1 space-y-3 lg:order-2">
+    <aside className="-order-1 space-y-3 lg:order-2 lg:sticky lg:top-40 lg:max-h-[calc(100dvh-11rem)] lg:self-start lg:overflow-y-auto pm-scroll lg:pr-1">
       <div className="pm-glass pm-panel">
         <CardHead icon={Users} tone="text-captains" title="Captains Online">
           <Pill tone="gain">

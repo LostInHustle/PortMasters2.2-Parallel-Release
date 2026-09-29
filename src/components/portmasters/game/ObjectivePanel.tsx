@@ -52,7 +52,7 @@ export function ObjectivePanel({
   const open = game.phase === OBJECTIVE_DELIVERY_PHASE;
 
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25">
+    <div className="rounded-2xl px-3 py-2 border border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           {mode.icon}
