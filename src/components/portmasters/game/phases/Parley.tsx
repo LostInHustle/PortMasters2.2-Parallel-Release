@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { ICONS } from "@/lib/game/constants";
+import { ICONS } from "@/lib/game/constants/brand";
 import { nextPhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { Handshake } from "lucide-react";
@@ -14,7 +14,14 @@ import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
 import { BazaarRumors } from "../BazaarRumors";
-import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
+import {
+  HuePanel,
+  PanelHeading,
+  PanelTitle,
+  PhaseError,
+  ReadyFooter,
+  type PhasePanelProps,
+} from "./PhaseShared";
 
 // The Parley panel: the Captain's Exchange, and with it the two votes the
 // table carries. Named for the phase it is (see @/lib/game/phases), the
@@ -89,10 +96,10 @@ export function Parley({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+      <PanelTitle className="mb-1">
         <Handshake className="h-5 w-5 text-parley" />
         <Term term="Barter">Captain's Exchange</Term>
-      </h2>
+      </PanelTitle>
       <p className="text-sm text-muted-foreground mb-4">
         Short on one good and sitting on too much of another? Post a swap for
         the rest of the harbor to see, or take someone else's. The board stays
@@ -100,10 +107,8 @@ export function Parley({
         as well as from here.
       </p>
 
-      <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
-        <h3 className="text-center font-semibold mb-3 text-sm">
-          📤 Post an Offer
-        </h3>
+      <HuePanel tone="parley" className="p-4 mb-4">
+        <PanelHeading className="mb-3 text-sm">📤 Post an Offer</PanelHeading>
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
           <span className="text-muted-foreground">I'll give</span>
           <QuantityInput
@@ -184,7 +189,7 @@ export function Parley({
             You only have {draft.owned} {draft.offerItem}.
           </p>
         )}
-      </div>
+      </HuePanel>
 
       {/* [H7: Maroon and the Harbormaster] The console sits above the two
           votes because it belongs to one captain and it is the reason this
@@ -211,10 +216,8 @@ export function Parley({
         />
       )}
 
-      <div className="rounded-xl border border-ship/15 bg-ship/[0.03] p-4 mb-4">
-        <h3 className="text-center font-semibold mb-3 text-sm">
-          📋 Open Offers
-        </h3>
+      <HuePanel tone="ship" className="p-4 mb-4">
+        <PanelHeading className="mb-3 text-sm">📋 Open Offers</PanelHeading>
         {barter.offers.length === 0 ? (
           <p className="text-center text-xs text-muted-foreground py-4">
             No offers on the board yet. Be the first.
@@ -233,7 +236,7 @@ export function Parley({
             ))}
           </div>
         )}
-      </div>
+      </HuePanel>
 
       {/* [D3: Convoy: the Escort Contract] The protection market, under the
           exchange because it is the other thing sold at this table and it

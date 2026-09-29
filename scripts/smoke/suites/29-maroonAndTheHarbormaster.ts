@@ -1,0 +1,935 @@
+// PortMasters 2.2 Parallel Release, smoke run: Maroon, and the Harbormaster's hand.
+
+import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
+import { db } from "@/lib/db";
+import { MODULES } from "@/lib/game/constants/drafts";
+import { PORTS_TIER2 } from "@/lib/game/constants/world";
+import {
+  applyPortShift,
+  failSeat,
+  handleModuleSelect,
+  maroonSeat,
+  snapToCheckpoint,
+} from "@/lib/game/engine";
+import type { PortShift } from "@/lib/game/maroon";
+import {
+  MAROON_SHARE,
+  PORT_SHIFT_FRACTION,
+  maroonCarried,
+  maroonKeptGold,
+  normalizePortShift,
+  portShiftLine,
+  portShiftMultiplier,
+} from "@/lib/game/maroon";
+import { modeConfig } from "@/lib/game/mode";
+import { unlockedPorts } from "@/lib/game/pools";
+import type { GameState, Phase } from "@/lib/game/types";
+import { createInitialGameState } from "@/lib/game/types";
+import {
+  CARRIES_A_DASH,
+  LEDGER_PHRASE,
+  call,
+  check,
+  openAuthedSocket,
+  suffix,
+  waitForEvent,
+} from "../harness";
+import type { WireHistory } from "../wire";
+import type { Socket } from "socket.io-client";
+import type { SmokeRun } from "../run";
+
+export async function maroonAndTheHarbormasterSuite(
+  run: SmokeRun,
+  inputs: {
+    gambitFifth: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+    gambitFourth: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+    gambitHost: { id: string; token: string; cookie: string; username: string };
+    gambitSecond: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+    gambitSixth: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+    gambitThird: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+    guest: {
+      id: string;
+      token: string;
+      cookie: string;
+      username: string;
+    };
+  },
+): Promise<{ maroonRoomId: string; maroonTargetId: string }> {
+  const {
+    gambitFifth,
+    gambitFourth,
+    gambitHost,
+    gambitSecond,
+    gambitSixth,
+    gambitThird,
+    guest,
+  } = inputs;
+  // [H7] The harbor's second vote, and the only thing in this game a
+  // majority can take off one captain. From the mode's rung, once a
+  // voyage, two thirds of the captains the room is still counting may put
+  // one of them ashore: the ship and its hold go to the harbor, half the
+  // Gold stays aboard, the seat stays at the table, and the captain is
+  // handed the one power in the mode that is not about their own books.
+  //
+  // The checks come in the two halves the feature lives in, the way the
+  // audit's do. What the vote takes, what it keeps, the market the hand
+  // leans and the mark a failed settlement leaves are all pure, so they
+  // are checked directly and to the Gold. The vote itself, and the leg
+  // the power lands on, are checked over the wire against a real harbor,
+  // because a majority that is not wired to the checkpoint it is called
+  // from is a majority that never fires.
+
+  // ---- What the harbor takes, and what it leaves ----
+  check(
+    modeConfig("ocean_gambit").maroonFrom === 9 &&
+      modeConfig("classic").maroonFrom === null &&
+      modeConfig("ocean_gambit").bankruptcyIsFinal === false &&
+      modeConfig("classic").bankruptcyIsFinal === true,
+    "the rung and the bankruptcy both belong to the mode: leg nine and a seat that keeps sailing in Ocean Gambit, and neither of them in Classic",
+  );
+  check(
+    MAROON_SHARE === 0.5 && PORT_SHIFT_FRACTION === 0.1,
+    "the harbor leaves half the purse aboard and leans a port by a tenth, which are the two numbers the plan names",
+  );
+  check(
+    maroonKeptGold(100) === 50 &&
+      maroonKeptGold(101) === 50 &&
+      maroonKeptGold(3) === 1 &&
+      maroonKeptGold(1) === 0,
+    "a marooned captain keeps half their Gold, floored, so half of one coin is no coins at all",
+  );
+  check(
+    maroonKeptGold(0) === 0 &&
+      maroonKeptGold(-40) === 0 &&
+      maroonKeptGold(Number.NaN) === 0,
+    "and a captain with an empty purse, or with a figure that is not a number, keeps nothing rather than a negative",
+  );
+
+  // Two thirds, counted from the roster rather than from the votes. At six
+  // the fraction lands on a whole seat and every reading of it agrees; at
+  // three, strictly more than two thirds is unanimity, and unanimity is
+  // not a vote.
+  const nominations = (targets: string[]) =>
+    new Map(targets.map((target, i) => [`voter-${i}`, target]));
+  check(
+    maroonCarried(nominations(["a", "a"]), 3) === "a" &&
+      maroonCarried(nominations(["a"]), 3) === null,
+    "two thirds of a table of three is two captains, so two carry the vote and one does not",
+  );
+  check(
+    maroonCarried(nominations(["a", "a", "a"]), 6) === null &&
+      maroonCarried(nominations(["a", "a", "a", "a"]), 6) === "a",
+    "and three of six is not two thirds of six while four is, which is the pair the audit's simple majority never draws",
+  );
+  check(
+    maroonCarried(nominations(["a", "a", "a", "b", "b", "b"]), 6) === null &&
+      maroonCarried(new Map(), 6) === null &&
+      maroonCarried(nominations(["a"]), 0) === null,
+    "a room split down the middle puts nobody ashore, and neither does a room with no votes in it or no seats at all",
+  );
+
+  // ---- The port the hand leans ----
+  check(
+    portShiftMultiplier(
+      { port: "Quanzhou Port", direction: 1 },
+      "Quanzhou Port",
+    ) ===
+      1 + PORT_SHIFT_FRACTION &&
+      portShiftMultiplier(
+        { port: "Quanzhou Port", direction: -1 },
+        "Quanzhou Port",
+      ) ===
+        1 - PORT_SHIFT_FRACTION,
+    "a port the Harbormaster leaned is priced a tenth up or a tenth down",
+  );
+  check(
+    portShiftMultiplier(
+      { port: "Ningbo Port", direction: 1 },
+      "Quanzhou Port",
+    ) === 1 && portShiftMultiplier(null, "Quanzhou Port") === 1,
+    "and every other port on the same card, and every port on a leg nobody called, is priced exactly as it always was",
+  );
+  check(
+    normalizePortShift({ port: "Quanzhou Port", direction: -1 })?.direction ===
+      -1 &&
+      normalizePortShift({ port: "Quanzhou Port", direction: 1 })?.port ===
+        "Quanzhou Port",
+    "a call a client saved is read back as a port and a direction",
+  );
+  check(
+    [
+      null,
+      "Quanzhou Port",
+      [],
+      {},
+      { port: "", direction: 1 },
+      { port: "Quanzhou Port", direction: 0 },
+      { port: "Quanzhou Port", direction: 2 },
+      { port: "Quanzhou Port", direction: "1" },
+    ].every((saved) => normalizePortShift(saved) === null),
+    "and a save that is not a call, or names no port, or leans by something that is not a tenth one way or the other, reads as a voyage where nothing was ever called",
+  );
+
+  const leanLine = portShiftLine({ port: "Quanzhou Port", direction: 1 });
+  check(
+    leanLine === "Quanzhou Port: every price 10 percent higher" &&
+      portShiftLine({ port: "Ningbo Port", direction: -1 }) ===
+        "Ningbo Port: every price 10 percent lower",
+    "a call reads as one clause naming the port, the tenth and the way it moves, with no arithmetic left in the words",
+  );
+  check(
+    !CARRIES_A_DASH.test(leanLine),
+    "and carries no dash of any kind, which is the house rule for every string a captain reads",
+  );
+
+  // ---- The two ways a seat fails ----
+  // Run against a real state rather than described, because the whole of
+  // the mode's fourth pillar is the difference between these two lines.
+  const classicFailure = createInitialGameState({ mode: "classic" });
+  failSeat(classicFailure, []);
+  check(
+    classicFailure.bankrupt &&
+      classicFailure.gameOver &&
+      classicFailure.phase === "bankruptcy",
+    "in Classic a captain who cannot pay is bankrupt, out of the voyage and standing on the bankruptcy screen",
+  );
+  const gambitFailure = createInitialGameState({ mode: "ocean_gambit" });
+  const gambitFailureLogs: string[] = [];
+  failSeat(gambitFailure, gambitFailureLogs);
+  check(
+    gambitFailure.bankrupt &&
+      !gambitFailure.gameOver &&
+      gambitFailure.phase !== "bankruptcy",
+    "in Ocean Gambit the same failure marks the name and leaves the captain at the table with the voyage running",
+  );
+  failSeat(gambitFailure, gambitFailureLogs);
+  check(
+    gambitFailureLogs.filter((line) => line.includes("Bankrupt")).length === 1,
+    "and the mark is written and said once, however many settlements the captain goes on to fail",
+  );
+
+  // The vote, applied to a real seat. Everything on the ship goes with
+  // it, and the two modules below are the ones that carry a lasting
+  // surcharge, installed through the draft the way a captain installs
+  // them, so that the check after the vote is that the harbor taking the
+  // hull takes their cost off the books with it.
+  const maroonedSeat = createInitialGameState({
+    mode: "ocean_gambit",
+    difficulty: "monsoon",
+  });
+  maroonedSeat.money = 101;
+  maroonedSeat.shipLevel = 2;
+  maroonedSeat.inventory.Tea = 6;
+  maroonedSeat.inventory.Brocade = 2;
+  const heldModules = MODULES.filter((mod) =>
+    ["bulk_hauler", "overdrive_engine"].includes(mod.id),
+  );
+  maroonedSeat._draftChoices = heldModules;
+  const seatLogs: string[] = [];
+  // Every pick is taken at the head of the batch rather than by counting
+  // through it, because a direct install drops its own pick from the
+  // pool: the second module a captain takes from a fresh draft of two is
+  // the first one left in it.
+  heldModules.forEach(() => handleModuleSelect(maroonedSeat, 0, seatLogs));
+  check(
+    maroonedSeat.equippedModules.length === 2 &&
+      maroonedSeat.shipUpgradePenalty === 15 &&
+      maroonedSeat.maintenancePenalty === 10,
+    "a captain with a hold and a hull of two modules installed starts with the surcharges those two modules carry",
+  );
+  maroonSeat(maroonedSeat, seatLogs);
+  check(
+    maroonedSeat.money === 50 &&
+      maroonedSeat.marooned &&
+      maroonedSeat.shipLevel === 0 &&
+      maroonedSeat.equippedModules.length === 0 &&
+      Object.values(maroonedSeat.inventory).every((count) => count === 0),
+    "the harbor taking the ship takes the slots, the hold and half the Gold, and leaves the captain the rest of the purse and their seat",
+  );
+  check(
+    maroonedSeat.shipUpgradePenalty === 0 &&
+      maroonedSeat.maintenancePenalty === 0,
+    "and the surcharges those modules charged for as long as they were bolted on come off with them",
+  );
+  const keptAfterTheVote = maroonedSeat.money;
+  maroonSeat(maroonedSeat, seatLogs);
+  check(
+    maroonedSeat.money === keptAfterTheVote,
+    "and applying the vote twice takes nothing the second time, which is what a replayed broadcast needs it to do",
+  );
+
+  // ---- The market the hand lands on ----
+  // The same leg drawn twice from one seed, for two captains who differ in
+  // one thing only: one of them is standing under a call. The cards have
+  // to come out identical and only the leaned port's prices may move,
+  // which is also what proves the power is a price rather than a second
+  // market nobody else can see.
+  const marketCtx = { seedBase: "harbor-a:captain-a", harborId: "harbor-a" };
+  const marketUnder = (shift: PortShift | null) => {
+    const state = createInitialGameState({
+      mode: "ocean_gambit",
+      difficulty: "monsoon",
+    });
+    applyPortShift(state, shift);
+    snapToCheckpoint(state, marketCtx, 10, "1", []);
+    return state;
+  };
+  const plainMarket = marketUnder(null);
+  // The leaning port is read off a drawn market rather than named, so the
+  // check below is against a card that is really there. It is the port of
+  // the dearest raw good on the board, because a tenth of a price that is
+  // already high is a price that moves: a tenth of four Gold rounds away
+  // and would leave the comparison asserting nothing.
+  const dearestRaw = plainMarket.resourceCards
+    .filter((card) => !card.isProductCard)
+    .map((card) => ({
+      port: card.port,
+      top: Math.max(...card.resources.map((r) => r.price ?? 0)),
+    }))
+    .sort((a, b) => b.top - a.top)[0];
+  const leaningPort = dearestRaw?.port ?? "";
+  const leanedUpMarket = marketUnder({ port: leaningPort, direction: 1 });
+  const leanedDownMarket = marketUnder({ port: leaningPort, direction: -1 });
+
+  check(
+    plainMarket.resourceCards.length > 1 &&
+      dearestRaw !== undefined &&
+      dearestRaw.top > 4,
+    "a leg's board is dealt the same cards whoever is looking at it, and the port these checks lean is one with a real price at it",
+  );
+  const sameDraw = plainMarket.resourceCards.every((card, i) => {
+    const other = leanedUpMarket.resourceCards[i];
+    return (
+      other.port === card.port &&
+      other.isProductCard === card.isProductCard &&
+      other.resources.length === card.resources.length &&
+      card.resources.every(
+        (r, j) =>
+          other.resources[j].type === r.type &&
+          other.resources[j].quantity === r.quantity,
+      )
+    );
+  });
+  check(
+    sameDraw,
+    "the same ports, the same goods and the same counts, so the hand moves a price and never the market",
+  );
+  const pricedByTheLean = (market: GameState, direction: 1 | -1) =>
+    plainMarket.resourceCards.every((card, i) => {
+      const priced = market.resourceCards[i];
+      const leans = !card.isProductCard && card.port === leaningPort;
+      return card.resources.every((r, j) => {
+        const drawn = r.price ?? 0;
+        const underTheLean = Math.max(
+          1,
+          Math.round(drawn * (1 + direction * PORT_SHIFT_FRACTION)),
+        );
+        return priced.resources[j].price === (leans ? underTheLean : drawn);
+      });
+    });
+  check(
+    pricedByTheLean(leanedUpMarket, 1) && pricedByTheLean(leanedDownMarket, -1),
+    "and every price at the port under the call is a tenth up or a tenth down, floored at one Gold, while every card at every other port is untouched",
+  );
+
+  // ---- The vote, in a real harbor ----
+  // Six captains, and a Monsoon charter, for two reasons that are both
+  // about the numbers rather than about the voyage. Six is the smallest
+  // table where two thirds is its own number rather than a rephrasing of
+  // unanimity, and it is the table the plan's own arithmetic is drawn at.
+  // Monsoon because its charter opens late enough that leg ten still has
+  // ports the room cannot see, which is what lets a call be refused for
+  // naming one.
+  type AdvanceFrame = {
+    roomId: string;
+    round: number;
+    phase: string;
+    portShift?: PortShift | null;
+  };
+  const maroonRoom = await call<{ room: { id: string; code: string } }>(
+    "/api/rooms",
+    {
+      method: "POST",
+      cookie: gambitHost.cookie,
+      body: JSON.stringify({
+        name: `Smoke maroon ${suffix}`,
+        isPublic: false,
+        mode: "ocean_gambit",
+        unlock: LEDGER_PHRASE,
+        difficulty: "monsoon",
+      }),
+    },
+  );
+  if (maroonRoom.status !== 200) {
+    throw new Error("No six captain harbor to put a captain ashore in.");
+  }
+  const maroonRoomId = maroonRoom.body.room.id;
+  const maroonCrew = [
+    gambitSecond,
+    gambitThird,
+    gambitFourth,
+    gambitFifth,
+    gambitSixth,
+  ];
+  const maroonSeats = await Promise.all(
+    maroonCrew.map((captain) =>
+      call<{ room: { id: string } }>("/api/rooms/join", {
+        method: "POST",
+        cookie: captain.cookie,
+        body: JSON.stringify({ code: maroonRoom.body.room.code }),
+      }),
+    ),
+  );
+  check(
+    maroonSeats.every((join) => join.status === 200),
+    "six captains can sit at the table a maroon is called from",
+  );
+
+  const maroonSockets: Socket[] = [];
+  for (const captain of [gambitHost, ...maroonCrew]) {
+    const socket = await openAuthedSocket(captain);
+    run.sockets.push(socket);
+    const takenASeat = waitForEvent<WireHistory>(
+      socket,
+      "chat:history",
+      (payload) => payload?.roomId === maroonRoomId,
+    );
+    socket.emit("room:join", { roomId: maroonRoomId });
+    await takenASeat;
+    maroonSockets.push(socket);
+  }
+
+  // The captain the harbor puts ashore and the captain it has already
+  // written off are two different seats on purpose. The second is the one
+  // a nomination has to be dropped for, and the first is the one the room
+  // has to go on counting, since a marooned seat sails on with everyone
+  // else.
+  const maroonTargetId = gambitFifth.id;
+  const maroonMarkedId = gambitSixth.id;
+
+  const maroonTallies: Array<{
+    round: number;
+    votes: Record<string, string>;
+  }> = [];
+  const maroonResults: MaroonResult[] = [];
+  const maroonCalls: PortShiftNotice[] = [];
+  const maroonReadyStates: Array<{
+    round: number;
+    phase: string;
+    requiredUserIds: string[];
+  }> = [];
+  maroonSockets.forEach((socket) => {
+    socket.on(
+      "maroon:tally",
+      (payload: { round?: number; votes?: Record<string, string> }) => {
+        maroonTallies.push({
+          round: payload?.round ?? 0,
+          votes: payload?.votes ?? {},
+        });
+      },
+    );
+    socket.on("maroon:result", (payload: MaroonResult) =>
+      maroonResults.push(payload),
+    );
+    socket.on("maroon:shift", (payload: PortShiftNotice) =>
+      maroonCalls.push(payload),
+    );
+    socket.on(
+      "phase:ready_update",
+      (payload: { round: number; phase: string; requiredUserIds: string[] }) =>
+        maroonReadyStates.push(payload),
+    );
+  });
+  const maroonSettle = () => new Promise((resolve) => setTimeout(resolve, 400));
+
+  // The first way a nomination is dropped is the oldest one: there is no
+  // voyage yet, so there is no checkpoint to call a vote from.
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === 0,
+    "a nomination in a harbor that has not set sail is refused",
+  );
+
+  const maroonDeparture = maroonSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === maroonRoomId,
+    ),
+  );
+  maroonSockets[0].emit("room:start", { roomId: maroonRoomId });
+  await Promise.all(maroonDeparture);
+
+  // Nothing here is special to the maroon: a harbor reaches a leg the way
+  // it reaches every leg, by one captain reporting where they stand and
+  // the room's checkpoint following the furthest report.
+  const maroonRoomRow = () =>
+    db.room.findUnique({
+      where: { id: maroonRoomId },
+      select: { currentRound: true, currentPhase: true, voyageEpoch: true },
+    });
+  // The phase is typed as the engine's own, so a checkpoint this suite
+  // walks the room onto is one of the values the room actually gates. It
+  // is still a string on the wire, which is what the two older names in
+  // the leg clock section below are about.
+  const parkMaroonCheckpoint = async (
+    round: number,
+    phase: Phase,
+    phaseLabel: string,
+  ) => {
+    maroonSockets[1].emit("game:status", {
+      roomId: maroonRoomId,
+      round,
+      phase,
+      phaseLabel,
+      gold: 120,
+      reputation: 12,
+      shipLevel: 0,
+      gameOver: false,
+      renownLevel: 3,
+    });
+    let row = await maroonRoomRow();
+    for (
+      let waited = 0;
+      (row?.currentRound !== round || row?.currentPhase !== phase) &&
+      waited < 5000;
+      waited += 250
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      row = await maroonRoomRow();
+    }
+    return row;
+  };
+
+  const beforeTheRung = await parkMaroonCheckpoint(8, "parley", "Parley");
+  check(
+    beforeTheRung?.currentRound === 8 &&
+      beforeTheRung?.currentPhase === "parley",
+    "and once it has sailed the room can be walked to the leg before the rung",
+  );
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 8,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === 0,
+    "a nomination for a leg before the mode's rung is refused, so the vote belongs to the back half of a voyage",
+  );
+
+  const atTheRung = await parkMaroonCheckpoint(9, "parley", "Parley");
+  check(
+    atTheRung?.currentRound === 9 && atTheRung?.currentPhase === "parley",
+    "the room's checkpoint is at leg nine's Parley, which is where the vote is called from",
+  );
+
+  // The captain the harbor has already written off. The mark travels the
+  // way every other fact about a seat travels, on a status, and it stays
+  // in the roster: a bankrupt captain still holds a card, which is what
+  // makes the arithmetic below a count of six.
+  maroonSockets[5].emit("game:status", {
+    roomId: maroonRoomId,
+    round: 9,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 0,
+    reputation: 4,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+    bankrupt: true,
+  });
+  await maroonSettle();
+
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: guest.id,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === 0,
+    "a captain who is not in this harbor cannot be nominated into one",
+  );
+
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonMarkedId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === 0,
+    "and a captain the harbor has already written off cannot be put ashore, since the vote would be arming a captain whose race is already run",
+  );
+
+  // The count, at the table. Four of six is what carries it, and the
+  // three votes before that are the plan's own arithmetic rather than a
+  // build up to the interesting one.
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === maroonSockets.length &&
+      maroonTallies.every(
+        (tally) => tally.votes[gambitSecond.id] === maroonTargetId,
+      ) &&
+      maroonResults.length === 0,
+    "a nomination reaches every captain in the harbor, and one of six opens nothing",
+  );
+
+  maroonSockets[2].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === maroonSockets.length * 2 &&
+      maroonResults.length === 0,
+    "two of six is a third of the table and still nothing",
+  );
+
+  maroonSockets[3].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === maroonSockets.length * 3 &&
+      maroonResults.length === 0,
+    "and three of six is half of it, which the plan's arithmetic says is not two thirds",
+  );
+
+  maroonSockets[4].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonResults.length === maroonSockets.length &&
+      maroonResults.every(
+        (result) =>
+          result.roomId === maroonRoomId &&
+          result.round === 9 &&
+          result.target.userId === maroonTargetId &&
+          // The harness's own display name, which is the half of the
+          // frame the room reads: who was put ashore, and nothing about
+          // what it cost them.
+          result.target.name === "Smoke gamb_e",
+      ),
+    "four of six carries it, and the harbor hears who was put ashore and nothing at all about their books",
+  );
+
+  maroonSockets[0].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: gambitSecond.id,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === maroonSockets.length * 4 &&
+      maroonResults.length === maroonSockets.length,
+    "and the vote is spent: a harbor cannot put a second captain ashore in one voyage",
+  );
+
+  // ---- The call, and the ports it may name ----
+  // The charter's edge is derived rather than typed out, so the refusal
+  // below is of a port this room really cannot see on the leg the market
+  // lands on.
+  const maroonPorts = unlockedPorts("monsoon", 10);
+  const firstCallPort = maroonPorts[0];
+  const secondCallPort = maroonPorts[maroonPorts.length - 1];
+  const lockedCallPort =
+    PORTS_TIER2.find((port) => !maroonPorts.includes(port)) ?? "";
+  check(
+    maroonPorts.length >= 2 && Boolean(lockedCallPort),
+    "leg ten of a Monsoon charter has ports the room can see and ports it cannot, which is what the refusals below are read against",
+  );
+
+  maroonSockets[0].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: firstCallPort,
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === 0,
+    "a captain the harbor did not maroon has no hand on the market, whatever they send",
+  );
+
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: firstCallPort,
+    direction: 0,
+  });
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: lockedCallPort,
+    direction: 1,
+  });
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: "Nowhere Port",
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === 0,
+    "and the captain who was marooned may lean a port by a tenth up or down and nothing else: not zero, not a port the charter has not opened, and not a port that does not exist",
+  );
+
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: firstCallPort,
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === maroonSockets.length &&
+      maroonCalls.every(
+        (call) =>
+          call.round === 9 &&
+          call.port === firstCallPort &&
+          call.direction === 1 &&
+          call.by.userId === maroonTargetId &&
+          call.by.name === "Smoke gamb_e",
+      ),
+    "a call by a marooned captain is public: the room hears the port, the direction and the hand that named them",
+  );
+
+  // A Harbormaster who changes their mind in front of the table has done
+  // what the mode asked, and the last word before the market opens is the
+  // one that lands.
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: secondCallPort,
+    direction: -1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === maroonSockets.length * 2 &&
+      maroonCalls[maroonSockets.length].port === secondCallPort &&
+      maroonCalls[maroonSockets.length].direction === -1,
+    "a second call in the same leg replaces the first rather than being refused, and both are read by the room",
+  );
+
+  // ---- The leg the hand lands on ----
+  const maroonReadyAll = (round: number, phase: Phase) => {
+    for (const socket of maroonSockets) {
+      socket.emit("phase:ready", { roomId: maroonRoomId, round, phase });
+    }
+  };
+  const nextMaroonAdvance = (from: number) =>
+    waitForEvent<AdvanceFrame>(
+      maroonSockets[0],
+      "phase:advance",
+      (payload) => payload?.roomId === maroonRoomId && payload?.round === from,
+      5000,
+    );
+
+  const beforeTheMarket = await parkMaroonCheckpoint(10, "dawn", "Dawn");
+  check(
+    beforeTheMarket?.currentRound === 10 &&
+      beforeTheMarket?.currentPhase === "dawn",
+    "the next checkpoint the room reaches is leg ten's boon draft, which is the step that opens its market",
+  );
+  const marketAdvance = nextMaroonAdvance(10);
+  maroonReadyAll(10, "dawn");
+  const atTheMarket = await marketAdvance;
+  check(
+    atTheMarket?.portShift?.port === secondCallPort &&
+      atTheMarket?.portShift?.direction === -1,
+    "and the market that opens there is priced against the call the Harbormaster made in the leg before it, which is the last one of the two",
+  );
+
+  // The seat survived the vote, which is the pillar the mode is built on
+  // rather than a mercy: the leg the room left after the maroon still
+  // waited for the captain it had put ashore.
+  check(
+    maroonReadyStates.some(
+      (state) =>
+        state.round === 10 && state.requiredUserIds.includes(maroonTargetId),
+    ),
+    "the room counted the marooned seat the whole way: the leg ten advance waited on the captain it had just put ashore",
+  );
+
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 10,
+    port: firstCallPort,
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === maroonSockets.length * 2,
+    "and the hand itself is a Parley power: a captain away from the table cannot lean the market they are standing in front of",
+  );
+
+  const afterTheMarket = await parkMaroonCheckpoint(11, "dawn", "Dawn");
+  const clearAdvance = nextMaroonAdvance(11);
+  maroonReadyAll(11, "dawn");
+  const clearedMarket = await clearAdvance;
+  check(
+    afterTheMarket?.currentRound === 11 &&
+      clearedMarket !== null &&
+      "portShift" in clearedMarket &&
+      clearedMarket.portShift === null,
+    "the market after that one is priced as though nobody had ever called, because a hand that is not sent again is a hand that has to be taken off",
+  );
+
+  // A captain who comes back into a harbor that has already voted sees
+  // what the room saw. The reload is the path this hand out serves, and a
+  // voyage in flight is closed to new seats, so it is the same captain on
+  // a fresh socket, which is what a client that comes back opens.
+  const maroonReload = await openAuthedSocket(gambitFifth);
+  run.sockets.push(maroonReload);
+  const handedResult = waitForEvent<MaroonResult>(
+    maroonReload,
+    "maroon:result",
+    (payload) => payload?.roomId === maroonRoomId,
+  );
+  const handedCall = waitForEvent<PortShiftNotice>(
+    maroonReload,
+    "maroon:shift",
+    (payload) => payload?.roomId === maroonRoomId,
+  );
+  maroonReload.emit("room:join", { roomId: maroonRoomId });
+  const [reloadedResult, reloadedCall] = await Promise.all([
+    handedResult,
+    handedCall,
+  ]);
+  check(
+    reloadedResult?.target.userId === maroonTargetId &&
+      reloadedCall?.port === secondCallPort,
+    "a captain who reloads after the vote is handed the vote the harbor made and the call it produced",
+  );
+
+  // Once a leg rather than once a voyage: the power is the seat's, and the
+  // seat sails on. The next Parley is the next leg, and a call made there
+  // is a call the leg after it is priced against.
+  const nextParley = await parkMaroonCheckpoint(11, "parley", "Parley");
+  check(
+    nextParley?.currentRound === 11 && nextParley?.currentPhase === "parley",
+    "and the voyage reaches the next leg's Parley, with the marooned captain still in it",
+  );
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 11,
+    port: firstCallPort,
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === maroonSockets.length * 3 &&
+      maroonCalls[maroonSockets.length * 2].round === 11,
+    "and every leg after the vote, the Harbormaster may lean one port once more",
+  );
+
+  // The one leg the console is hidden on. A call leans the market that
+  // opens after the leg it was made in, so the closing leg of a voyage is
+  // a call that would lean nothing.
+  const closingLeg = await parkMaroonCheckpoint(16, "parley", "Parley");
+  check(
+    closingLeg?.currentRound === 16 && closingLeg?.currentPhase === "parley",
+    "the voyage can be walked to its closing leg, the sixteenth of a Monsoon charter",
+  );
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 16,
+    port: firstCallPort,
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonCalls.length === maroonSockets.length * 3,
+    "where the hand is refused as well, since a market that never opens is not a market to lean",
+  );
+
+  // A restarted voyage has marooned nobody, which is the load bearing half
+  // of the once per voyage rule: the result is what spends the vote, so a
+  // voyage that inherited one would find its own spent before it began,
+  // and its first vote would vanish with no frame to explain why.
+  maroonSockets[0].emit("room:restart", { roomId: maroonRoomId });
+  let maroonReopened = await maroonRoomRow();
+  for (
+    let waited = 0;
+    (maroonReopened?.currentRound !== 1 ||
+      maroonReopened?.currentPhase !== "harbor") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    maroonReopened = await maroonRoomRow();
+  }
+  check(
+    maroonReopened?.currentRound === 1 &&
+      maroonReopened?.currentPhase === "harbor",
+    "restarting the voyage reopens the harbor at its first checkpoint",
+  );
+  const maroonRejoin = await openAuthedSocket(gambitFifth);
+  run.sockets.push(maroonRejoin);
+  const staleResult = waitForEvent<MaroonResult>(
+    maroonRejoin,
+    "maroon:result",
+    (payload) => payload?.roomId === maroonRoomId,
+    1200,
+  );
+  const staleCall = waitForEvent<PortShiftNotice>(
+    maroonRejoin,
+    "maroon:shift",
+    (payload) => payload?.roomId === maroonRoomId,
+    1200,
+  );
+  maroonRejoin.emit("room:join", { roomId: maroonRoomId });
+  check(
+    (await Promise.all([staleResult, staleCall])).every(
+      (frame) => frame === null,
+    ),
+    "and a harbor that has just reopened hands nobody the last voyage's maroon, so its own vote is still there to call",
+  );
+
+  return { maroonRoomId, maroonTargetId };
+}

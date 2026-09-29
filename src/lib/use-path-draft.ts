@@ -27,12 +27,16 @@
 // path in this build goes through.
 // =====================================================================
 
+import {
+  DRAFT_STEPS,
+  type DraftStep,
+  type DraftView,
+} from "@/types/realtime/draft";
 import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { applyDraftPath, applyPathSwitch } from "@/lib/game/engine";
 import { normalizePath, type PathId } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { DRAFT_STEPS, type DraftStep, type DraftView } from "@/types/realtime";
 
 // The events this feature speaks on, named in one place for the reason the
 // bazaar's and the two consent boards' own channels are.

@@ -12,7 +12,7 @@ import {
   renownTitleForLevel,
   type CaptainLegacySummary,
 } from "@/lib/game/legacy";
-import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { DIFFICULTIES, DIFFICULTY_ORDER } from "@/lib/game/difficulty";
 import { MERITS } from "@/lib/game/merits";
 import { MeritIcon } from "./shared";

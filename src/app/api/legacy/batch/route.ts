@@ -5,7 +5,7 @@
 // Lobby's "Captains Online" list, doesn't need one request per captain.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { legacySummariesFor } from "@/lib/captain-legacy";
 import { readJson } from "@/lib/api-json";
 
@@ -13,8 +13,7 @@ const BatchSchema = z.object({ userIds: z.array(z.string()).max(200) });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const body = await readJson(req, BatchSchema);
   if (!body.ok) return body.response;

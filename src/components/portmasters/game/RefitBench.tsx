@@ -6,15 +6,15 @@ import { Button } from "@/components/ui/button";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import {
-  CONSENT_FEE_MIN,
   MEND_GOLD_PER_POINT,
   MEND_POINTS,
-  RAGS,
   RAG_SCRAP_VALUE,
   REFIT_POINTS,
   REWEAVE_GOOD,
   REWEAVE_RAGS,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/garments";
+import { RAGS } from "@/lib/game/constants/goods";
+import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
   buyRag,
@@ -95,7 +95,7 @@ export function RefitBench({
   const [good, setGood] = useState<string>(SELLER_PATH.goods[0] ?? "");
   const [targetId, setTargetId] = useState("");
 
-  if (!refitsOn()) return null;
+  if (!refitsOn(game.mode)) return null;
 
   const canSell = canSellRefit(game);
   const others = members.filter((m) => m.id !== me.id);

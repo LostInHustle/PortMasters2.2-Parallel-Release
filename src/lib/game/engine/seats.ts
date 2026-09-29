@@ -29,7 +29,7 @@
 // decides how much Gold survives is not here, it is in ../maroon.
 // =====================================================================
 
-import { ITEMS } from "../constants";
+import { ITEMS } from "../constants/goods";
 import { modeConfig } from "../mode";
 import { maroonKeptGold } from "../maroon";
 import type { GameState } from "../types";

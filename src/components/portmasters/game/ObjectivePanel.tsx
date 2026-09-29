@@ -20,7 +20,7 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ICONS } from "@/lib/game/constants";
+import { ICONS } from "@/lib/game/constants/brand";
 import { modeConfig } from "@/lib/game/mode";
 import type { Objective, ObjectiveProgress } from "@/lib/game/objectives";
 import { OBJECTIVE_DELIVERY_PHASE } from "@/lib/game/engine";

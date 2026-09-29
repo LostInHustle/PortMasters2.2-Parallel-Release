@@ -77,7 +77,7 @@ run as `npm run check:private`, holds seven rules:
    cards in front of the table.
 
 Its first run produced 25 findings, nearly all of them its own noise, and the
-calibration is recorded in its header: `scripts/smoke.ts` was allowed as a
+calibration is recorded in its header: `scripts/smoke/` was allowed as a
 reader because a suite reading rows back is a test of the module rather than
 a second production reader, the rules were narrowed to `src/` where they are
 about what the product ships, and word matching was replaced with shape

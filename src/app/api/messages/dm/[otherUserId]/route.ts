@@ -5,15 +5,15 @@
 // a `mine` flag the renderer uses to right align the bubbles.
 import { NextRequest, NextResponse } from "next/server";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
+import { MESSAGE_PAGE, messageRows } from "@/lib/messages";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ otherUserId: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const { otherUserId } = await params;
 
   if (otherUserId === user.id) {
@@ -34,23 +34,11 @@ export async function GET(
         { senderId: otherUserId, recipientId: user.id },
       ],
     },
-    orderBy: { createdAt: "asc" },
-    take: 200,
-    include: {
-      sender: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    ...MESSAGE_PAGE,
   });
 
   return NextResponse.json({
     other,
-    messages: msgs.map((m) => ({
-      id: m.id,
-      content: m.content,
-      createdAt: m.createdAt.toISOString(),
-      sender: m.sender,
-      mine: m.senderId === user.id,
-    })),
+    messages: messageRows(msgs, user.id),
   });
 }

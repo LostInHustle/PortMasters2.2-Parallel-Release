@@ -21,7 +21,7 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 2. **Write the rules as pure functions** in `src/lib/game` or `src/lib/game/engine`. Take plain data in, return plain data out. No clock reads, no randomness except through the seeded generator.
 3. **Add the table** to `prisma/schema.prisma` if you needed one, then run `npm run db:push`.
 4. **Expose it.** A REST route under `src/app/api` for anything a page loads or saves. A socket event in `src/server/realtime` for anything that must reach the other captains immediately.
-5. **Share the wire shape.** Put it in `src/types/realtime.ts` so the client and the server are described by one definition rather than two that drift.
+5. **Share the wire shape.** Put it in `src/types/realtime/` so the client and the server are described by one definition rather than two that drift.
 6. **Write the hook** in `src/lib` and then the interface on top of it.
 
 ## Rules that must not be broken

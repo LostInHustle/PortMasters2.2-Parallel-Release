@@ -30,10 +30,10 @@
 // waiting to be told, which is the one way to leave a room stuck forever.
 // =====================================================================
 
+import { AuditReveal, AuditTally } from "@/types/realtime/audit";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import {
-  AUDIT_FROM_ROUND,
   auditCarried,
   auditSeed,
   drawAudit,
@@ -41,8 +41,7 @@ import {
 } from "@/lib/game/audit";
 import { normalizeLarder } from "@/lib/game/larder";
 import { survivalLayerOn } from "@/lib/game/flags";
-import { normalizeMode } from "@/lib/game/mode";
-import type { AuditReveal, AuditTally } from "@/types/realtime";
+import { auditOpensAt } from "@/lib/game/mode";
 import { activeRosterSet } from "./checkpoint";
 import { parseSave } from "./save";
 import { noteTelemetry } from "./telemetry";
@@ -103,17 +102,26 @@ export function clearAudits(roomId: string): void {
 }
 
 // The room's facts as the audit needs them: which voyage this is, for the
-// seed, and whether an audit is owed here at all. Read from the room and
-// never from the payload, for the reason the commission reads its own:
-// a client cannot audit in a harbor that is playing Classic, or against
-// a voyage it is not in.
-async function auditRoomEpoch(roomId: string): Promise<number | null> {
+// seed, and the leg its manifest may first be opened on. Read from the room
+// and never from the payload, for the reason the commission reads its own:
+// a client cannot audit in a harbor whose mode opens no manifest, or
+// against a voyage it is not in.
+//
+// The rung comes off the mode record rather than off a constant, and that
+// makes the two facts one read and one question: a mode with no rung never
+// opens a manifest, so a null here is both "not this harbor" and "not ever",
+// and the caller has one thing to check rather than a mode and a number that
+// could disagree. It is the same shape auditOpensAt gives the panels.
+async function auditRoomGate(
+  roomId: string,
+): Promise<{ voyageEpoch: number; opensAt: number } | null> {
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: { mode: true, voyageEpoch: true },
   });
-  if (!room || normalizeMode(room.mode) !== "ocean_gambit") return null;
-  return room.voyageEpoch;
+  const opensAt = auditOpensAt(room?.mode);
+  if (!room || opensAt === null) return null;
+  return { voyageEpoch: room.voyageEpoch, opensAt };
 }
 
 // The reveal itself: who, and the sample out of their manifest.
@@ -146,9 +154,16 @@ async function revealFor(
   round: number,
   targetUserId: string,
 ): Promise<AuditReveal | null> {
+  // The room's mode rides along on the membership read rather than being
+  // asked for separately, the same way room:join takes it: this function
+  // already reads the row, and the provisions field below is the one part
+  // of the reveal the mode decides.
   const member = await db.roomMember.findUnique({
     where: { userId_roomId: { userId: targetUserId, roomId } },
-    select: { user: { select: { displayName: true } } },
+    select: {
+      user: { select: { displayName: true } },
+      room: { select: { mode: true } },
+    },
   });
   if (!member) return null;
   const row = await db.gameState.findUnique({
@@ -164,7 +179,9 @@ async function revealFor(
       auditSeed(roomId, voyageEpoch, round, targetUserId),
       normalizeOrderFills(save?.orderFills),
     ),
-    larder: survivalLayerOn() ? normalizeLarder(save?.larder) : undefined,
+    larder: survivalLayerOn(member.room.mode)
+      ? normalizeLarder(save?.larder, member.room.mode)
+      : undefined,
   };
 }
 
@@ -191,9 +208,10 @@ export async function recordAuditVote(
   round: number,
   targetUserId: string,
 ): Promise<void> {
-  const voyageEpoch = await auditRoomEpoch(roomId);
-  if (voyageEpoch === null) return;
-  if (round < AUDIT_FROM_ROUND) return;
+  const gate = await auditRoomGate(roomId);
+  if (!gate) return;
+  if (round < gate.opensAt) return;
+  const voyageEpoch = gate.voyageEpoch;
   const state = auditStateFor(roomId, round);
   if (state.reveal) return;
   const roster = await activeRosterSet(roomId);

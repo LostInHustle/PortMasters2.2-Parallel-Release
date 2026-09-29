@@ -1,6 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 /**
@@ -43,5 +44,35 @@ export function ModalOverlay({
       {children}
     </div>,
     document.body,
+  );
+}
+
+/**
+ * The panel a dialog's content sits on: the card that rises and settles as
+ * the dialog opens, wearing the game's glass treatment with the seigaiha
+ * wash behind whatever is inside it.
+ *
+ * It lives beside the overlay because the two are one idea in two pieces,
+ * and it lives here rather than in either of the dialogs that use it (the
+ * age's detail and the shortcut list) because those two are the same panel
+ * with different content inside. A look two screens share is a look that
+ * drifts the first time one of them is retouched, so the classes below are
+ * written once: change them here and both dialogs move together.
+ *
+ * The heading and the close button are the caller's, because those are the
+ * two things the callers do not agree about.
+ */
+export function ModalCard({ children }: { children: ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="pm-glass-strong pm-crackle relative z-10 w-full max-w-md overflow-hidden rounded-3xl p-6"
+    >
+      <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
+      <div className="relative">{children}</div>
+    </motion.div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { COLORS, COLORS_COLORBLIND_SAFE } from "@/lib/game/constants";
+import { COLORS, COLORS_COLORBLIND_SAFE } from "@/lib/game/constants/brand";
 
 // Colorblind safe palette: purely a client side rendering choice, the same
 // reasoning the tutorial seen flag in GameRoom.tsx already follows: read

@@ -1,8 +1,8 @@
 "use client";
 
+import { LoanRecord } from "@/types/realtime/loans";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { LoanRecord } from "@/types/realtime";
 
 // The wire shape for an outstanding loan lives in @/types/realtime as
 // LoanRecord. The hook keeps the original OutstandingLoan alias for

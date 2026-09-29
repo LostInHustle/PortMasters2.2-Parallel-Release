@@ -23,7 +23,7 @@ import {
 import {
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/world";
 import { cn } from "@/lib/utils";
 
 /**

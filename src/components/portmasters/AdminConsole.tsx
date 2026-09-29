@@ -30,14 +30,14 @@
 // which account was left and why.
 // =====================================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import type { PublicUser } from "@/lib/api";
-import type {
+import {
   AdminAccount,
   AdminBulkAction,
   AdminBulkReport,
-} from "@/types/realtime";
+} from "@/types/realtime/admin";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import type { PublicUser } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
 import { useAdmin } from "@/lib/use-admin";
 import { Avatar, Notice, OnlineDot, Th } from "@/components/portmasters/shared";
@@ -63,7 +63,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { APP_NAME } from "@/lib/game/constants";
+import { APP_NAME } from "@/lib/game/constants/brand";
 
 // The tick box, native rather than rebuilt, tinted with the same token the
 // administrator pill beside it wears. There is no Checkbox component in

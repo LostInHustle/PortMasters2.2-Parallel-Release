@@ -15,7 +15,7 @@
 // Triangular growth: level 2 needs 100 XP, level 3 needs 300, level 4
 // needs 600, level 5 needs 1000, and so on, each level asking for one
 // more 100 XP "step" than the last. One strong voyage (Successful
-// Merchant territory and up, see the rank thresholds in constants.ts) is
+// Merchant territory and up, see the rank thresholds in constants/reputation.ts) is
 // enough for an early level; the higher tiers take a long string of
 // voyages on purpose, since this is meant to reward captains who keep
 // coming back over weeks of play, not one lucky run.

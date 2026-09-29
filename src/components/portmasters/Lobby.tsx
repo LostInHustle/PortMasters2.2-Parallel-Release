@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { VoyageChronicle } from "@/types/realtime/voyage";
+import { HouseStanding } from "@/types/realtime/standings";
+import { APP_NAME } from "@/lib/game/constants/brand";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   api,
@@ -31,8 +27,7 @@ import {
   voyageRoundsFor,
   type GameMode,
 } from "@/lib/game/mode";
-import { Avatar, OnlineDot, Pill } from "./shared";
-import { ChatPanel } from "./ChatPanel";
+import { Avatar, OnlineDot } from "./shared";
 import { CaptainProfileModal } from "./CaptainProfileModal";
 import { AgeBanner } from "./AgeBanner";
 import { HowToPlayModal } from "./HowToPlayModal";
@@ -47,6 +42,10 @@ import {
   ChronicleDialog,
   HousesDialog,
 } from "./lobby/LobbyDialogs";
+import { Gauge, GaugeRule } from "./lobby/HarborGauge";
+import { HarborRail } from "./lobby/HarborRail";
+import { VoyageCards } from "./lobby/VoyageCards";
+import { WatersScale } from "./lobby/WatersScale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,7 +60,6 @@ import {
   Users,
   KeyRound,
   Loader2,
-  MessageCircle,
   RefreshCw,
   Gift,
   Zap,
@@ -71,12 +69,9 @@ import {
   Trophy,
   Info,
   X,
-  AlertTriangle,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { APP_NAME } from "@/lib/game/constants";
 import { HOUSES } from "@/lib/game/engine";
 import {
   DEFAULT_LEGACY_SUMMARY,
@@ -85,303 +80,6 @@ import {
   type HouseId,
 } from "@/lib/game/legacy";
 import { checkInStatus, type CheckInStatus } from "@/lib/game/checkin";
-import type { HouseStanding, VoyageChronicle } from "@/types/realtime";
-
-// =====================================================================
-// The shapes the Lobby's headings and figures are built from.
-//
-// They exist because each heading and each figure here used to be grown by
-// hand, and no two of them agreed. One card led with its icon at five and
-// the next at four, one figure was bold and its neighbour was not, and a
-// heading nudged to fit its own card drifted out of line the moment the
-// text beside it changed length. A heading written once cannot drift away
-// from itself.
-// =====================================================================
-
-// A card's head: one icon, one title, and whatever controls belong to that
-// card on the right. The icon takes its colour from the call site, because
-// colour is how a card says which part of the harbor it is.
-//
-// It had a second line of explanation under the title for as long as two
-// cards wanted one. Both of those cards are gone, so the prop went with
-// them rather than sit here unread.
-function CardHead({
-  icon: Icon,
-  tone,
-  title,
-  children,
-}: {
-  icon: LucideIcon;
-  tone: string;
-  title: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <Icon className={cn("h-4 w-4 shrink-0", tone)} />
-        <h2 className="pm-truncate font-display text-sm font-semibold leading-tight">
-          {title}
-        </h2>
-      </div>
-      {children && (
-        <div className="flex shrink-0 items-center gap-1.5">{children}</div>
-      )}
-    </div>
-  );
-}
-
-// One cell of the masthead's gauge row. Three of these sit side by side under
-// a hairline, so the shape lives here rather than three times over in the
-// markup: one icon at one size, one quiet label, one tabular figure. A call
-// site picks the icon and its colour and nothing else.
-function Gauge({
-  icon: Icon,
-  tone,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  tone: string;
-  label: string;
-  value: ReactNode;
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <Icon className={cn("h-3.5 w-3.5", tone)} />
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <b className="text-[11px] tabular-nums">{value}</b>
-    </span>
-  );
-}
-
-// The hairline the gauge row divides itself with.
-function GaugeRule() {
-  return <span className="h-4 w-px shrink-0 bg-black/10 dark:bg-white/15" />;
-}
-
-// Voyage and Waters are different kinds of question, so they are drawn as two
-// different instruments rather than as one dial used twice.
-//
-// Mode is a choice between two whole voyages that differ in what the phases
-// are and what order they run in, so it is drawn as a pair of cards a captain
-// reads one at a time. Difficulty is a position on a ladder, because the tiers
-// genuinely escalate: more rounds, a wider market, a likelier raid. Drawn as
-// one dial each, both became rows of identical pills, which made the larger
-// choice look the same size as the smaller one and left two of those rows
-// stacked on the form.
-//
-// Neither control takes pm-pressable. Its hover lift scales a control by 1.04,
-// which suits a 2rem tool in the masthead and not a card half a panel wide,
-// where the growth would reach past its own gap and onto its neighbour. They
-// take the focus ring the Button primitive uses instead.
-type VoyageOption<T extends string> = {
-  key: T;
-  icon: string;
-  badge: string;
-  tagline: string;
-  summary: string;
-  experimental: boolean;
-  // [H9: the unlock code] Whether this voyage has to be opened with a
-  // phrase. Read from the mode record rather than from the unlock table,
-  // because the question the card answers is about the voyage it is
-  // offering and the table only says which doorway that is.
-  sealed: boolean;
-};
-
-function VoyageCards<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly VoyageOption<T>[];
-  value: T;
-  onChange: (next: T) => void;
-}) {
-  return (
-    <>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {/* items-start, because a card should be the size of what it says. The
-          grid stretches its cells to the tallest row by default, and the
-          experimental card always runs longer than the shipped one, so the
-          shipped card was being handed a block of empty space under its own
-          text every time. */}
-      <div className="mt-1.5 grid gap-2 sm:grid-cols-2 sm:items-start">
-        {options.map((option) => {
-          const active = value === option.key;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => onChange(option.key)}
-              aria-pressed={active}
-              className={cn(
-                "flex items-start gap-3 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                active
-                  ? "border-charter/50 bg-charter/[0.07]"
-                  : "border-black/10 bg-background/40 hover:bg-black/[0.03] dark:border-white/10 dark:hover:bg-white/[0.04]",
-              )}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg",
-                  active ? "pm-grad-charter" : "bg-black/5 dark:bg-white/10",
-                )}
-              >
-                {option.icon}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "font-display text-sm font-semibold",
-                      active && "text-charter",
-                    )}
-                  >
-                    {option.badge}
-                  </span>
-                  {option.experimental && (
-                    <Pill tone="none" className="bg-warn/5 text-warn">
-                      Experimental
-                    </Pill>
-                  )}
-                  {/* [H9: the unlock code] The seal, beside the state above
-                      rather than in it. A card can wear both, and they say
-                      different things: one is how finished the voyage is
-                      and one is how a host gets into it. The key is the
-                      same glyph the room card uses for the table it opened,
-                      so the pair reads as one idea in two places. */}
-                  {option.sealed && <Pill tone="default">🔒 Sealed</Pill>}
-                </span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                  {option.tagline}
-                </span>
-                {/* The summary shows on both cards, not only on the one that
-                    carries a warning: it is what the voyage asks of a captain,
-                    so it belongs to the choice rather than to the caution. */}
-                <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/70">
-                  {option.summary}
-                </span>
-                {/* A captain who walks into an unfinished mode without being
-                    told has been misled rather than tested, so the warning
-                    belongs to the card that offers it rather than to a
-                    paragraph under the control that moves when the choice
-                    changes. The pill beside the badge names the state; this
-                    line is the caution, so it does not name it twice. */}
-                {option.experimental && (
-                  <span className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-warn">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                    <span>Still being built.</span>
-                  </span>
-                )}
-                {/* Not a caution, so not the caution's colour: a sealed
-                    voyage is finished, and what it asks for is a phrase
-                    rather than patience. The line names the ask and the
-                    field under the cards is where it is answered. */}
-                {option.sealed && (
-                  <span className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
-                    <KeyRound className="mt-0.5 h-3 w-3 shrink-0" />
-                    <span>Opens with a phrase.</span>
-                  </span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-// Difficulty is a position rather than a choice between two things, and the
-// tiers say so themselves: they run 8, 12 and 16 rounds, and the raid chance
-// climbs with them. So Waters is one continuous rail whose fill deepens toward
-// the storm end, with a stop per tier.
-//
-// Every stop carries its own round count. The dial only ever showed that
-// number for the tier already selected, which hid the plainest evidence that
-// the three are a ladder rather than three unrelated settings.
-type WatersStop<T extends string> = {
-  key: T;
-  icon: string;
-  badge: string;
-  rounds: number;
-};
-
-// Rising fill, one step per tier. Built from bg-sea at stepped opacity rather
-// than from a from-sea gradient, because opacity on the sea token is what the
-// rest of the tree already leans on and a gradient on it is unproven here. The
-// classes stay literal, the same way the old dial kept grid-cols-2 and
-// grid-cols-3 literal, so the stylesheet can still see them.
-const WATERS_FILL = ["bg-sea/20", "bg-sea/45", "bg-sea/70"] as const;
-
-function WatersScale<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly WatersStop<T>[];
-  value: T;
-  onChange: (next: T) => void;
-}) {
-  return (
-    <>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {/* No gap between the cells, so the three rail segments meet and read as
-          one band. Each cell keeps its own hit area and its own pressed state,
-          which is what the three buttons the dial had also carried. */}
-      <div className="mt-1.5 grid grid-cols-3">
-        {options.map((option, index) => {
-          const active = value === option.key;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => onChange(option.key)}
-              aria-pressed={active}
-              className="flex flex-col items-center rounded-xl pb-1 pt-2 outline-none transition-colors hover:bg-sea/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <span aria-hidden className="text-lg leading-none">
-                {option.icon}
-              </span>
-              <span className="relative mt-2 flex h-4 w-full items-center justify-center">
-                <span
-                  aria-hidden
-                  className={cn("h-1 w-full", WATERS_FILL[index])}
-                />
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute h-3 w-3 rounded-full border-2 transition-colors",
-                    active
-                      ? "border-sea bg-sea ring-2 ring-sea/25"
-                      : "border-sea/40 bg-background",
-                  )}
-                />
-              </span>
-              <span
-                className={cn(
-                  "mt-1.5 font-display text-xs font-semibold",
-                  active ? "text-sea" : "text-muted-foreground",
-                )}
-              >
-                {option.badge}
-              </span>
-              <span className="text-[10px] tabular-nums text-muted-foreground">
-                {option.rounds} rounds
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
 
 export function Lobby({
   me,
@@ -1445,175 +1143,23 @@ export function Lobby({
         </section>
 
         {/* The rail: who is about, and the conversation with whoever the
-            captain picked from that list.
-
-            Two panels, not one that swaps between them. Merging the pair
-            gave the conversation the whole rail, which took the roster away
-            whenever a thread was open, and it left a captain arriving at the
-            lobby looking at a list of names with nothing under it and no way
-            to tell a chat was there at all. The chat keeps a panel of its
-            own, where it can be read before anyone has been picked. */}
-        {/* Below the lg breakpoint this rail leads and the harbor board
-            follows it, the way the game room's chat column leads. Stacked
-            last, the conversation sat under the whole board, and its depth
-            grew with every harbor the fleet had open, so it read as absent
-            rather than as simply further down. The board is one short scroll
-            away instead, and a captain scrolling a room list is reading
-            anyway. Above the breakpoint nothing moves. */}
-        <aside className="-order-1 space-y-3 lg:order-2">
-          <div className="pm-glass pm-panel">
-            <CardHead icon={Users} tone="text-captains" title="Captains Online">
-              <Pill tone="gain">
-                <OnlineDot online size={8} /> {totalOnline}
-              </Pill>
-            </CardHead>
-            {/* The plain scroller rather than ScrollArea, capped rather than
-                stretched. A viewport sized in percentages inside a flex
-                parent resolves back to auto and stops scrolling, so a list
-                that has to fill its parent uses this div, the same one the
-                captain profile and the crew ledger use. */}
-            <div className="pm-scroll max-h-56 overflow-y-auto pr-2">
-              {onlineUsers.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  {connected
-                    ? "No other captains online yet."
-                    : "Connecting to the harbor…"}
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {onlineUsers.map((u) => {
-                    const isMe = u.id === me.id;
-                    const otherLegacy = otherLegacies[u.id];
-                    return (
-                      <button
-                        key={u.id}
-                        onClick={() => !isMe && openDm(u)}
-                        disabled={isMe}
-                        className={cn(
-                          "pm-row w-full text-left",
-                          isMe ? "cursor-default opacity-60" : "cursor-pointer",
-                        )}
-                      >
-                        <div className="relative">
-                          <Avatar
-                            hue={u.avatarHue}
-                            name={u.displayName}
-                            size={30}
-                          />
-                          <OnlineDot
-                            online
-                            size={8}
-                            className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">
-                            {u.displayName}{" "}
-                            {isMe && (
-                              <span className="text-[10px] text-muted-foreground">
-                                (you)
-                              </span>
-                            )}
-                          </div>
-                          <div className="truncate text-[10px] text-muted-foreground">
-                            {u.roomId ? "In a harbor" : "In the lobby"}
-                          </div>
-                        </div>
-                        {otherLegacy && (
-                          <Pill tone="gold" className="shrink-0">
-                            <Star className="h-3 w-3" />{" "}
-                            {renownProgress(otherLegacy.renownXP).level}
-                          </Pill>
-                        )}
-                        {!isMe && (
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* The chat draws its own header and its own scroller, so it takes
-              the panel's corners without its padding. Two parts, the same
-              two the voyage's chat carries: the harbor square, which is
-              where a captain speaks to everybody standing in the lobby,
-              and the private threads, which is where picking a name above
-              lands. */}
-          <div className="pm-glass pm-panel-flush flex h-[22.5rem] flex-col">
-            <Tabs
-              value={chatTab}
-              onValueChange={(v) => setChatTab(v as "lobby" | "dm")}
-              className="flex h-full flex-col"
-            >
-              <div className="flex items-center gap-2 px-4 pt-3">
-                <MessageCircle className="h-4 w-4 shrink-0 text-messages" />
-                <span className="pm-truncate min-w-0 flex-1 text-sm font-medium">
-                  {chatTab === "lobby"
-                    ? "Harbor chat"
-                    : dmTarget
-                      ? `Direct · ${dmTarget.displayName}`
-                      : "Direct messages"}
-                </span>
-              </div>
-              <TabsList className="mx-4 mt-2 grid grid-cols-2">
-                <TabsTrigger value="lobby">
-                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Harbor
-                </TabsTrigger>
-                <TabsTrigger value="dm">
-                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Direct
-                </TabsTrigger>
-              </TabsList>
-              {/* Both channels stay mounted, so the square keeps filling in
-                  while the captain is reading a private thread and is still
-                  there on the way back. Unmounted, it would reseed from the
-                  backlog this screen loaded once, which is a fetch old by
-                  then and knows nothing of what arrived live. */}
-              <TabsContent
-                value="lobby"
-                forceMount
-                className="mt-0 flex-1 min-h-0 data-[state=inactive]:hidden"
-              >
-                <ChatPanel
-                  socket={socket}
-                  me={me}
-                  mode="lobby"
-                  initialMessages={lobbyHistory}
-                />
-              </TabsContent>
-              <TabsContent
-                value="dm"
-                forceMount
-                className="mt-0 flex-1 min-h-0 data-[state=inactive]:hidden"
-              >
-                {dmTarget ? (
-                  dmLoading ? (
-                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-                    </div>
-                  ) : (
-                    <ChatPanel
-                      socket={socket}
-                      me={me}
-                      mode="dm"
-                      other={dmTarget}
-                      initialMessages={dmHistory}
-                    />
-                  )
-                ) : (
-                  <div className="flex h-full items-center justify-center px-6 text-center">
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      Pick a captain from the list above to start a private
-                      conversation.
-                    </p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
-        </aside>
+            captain picked from that list. See ./lobby/HarborRail for the
+            two panels and for why they do not merge. */}
+        <HarborRail
+          totalOnline={totalOnline}
+          connected={connected}
+          onlineUsers={onlineUsers}
+          me={me}
+          otherLegacies={otherLegacies}
+          openDm={openDm}
+          chatTab={chatTab}
+          onChatTabChange={setChatTab}
+          dmTarget={dmTarget}
+          dmLoading={dmLoading}
+          socket={socket}
+          lobbyHistory={lobbyHistory}
+          dmHistory={dmHistory}
+        />
       </main>
 
       <LegacyDialog

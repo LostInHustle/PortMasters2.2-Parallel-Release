@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { z } from "zod";
 
-export type JsonBody<T> =
+type JsonBody<T> =
   { ok: true; data: T } | { ok: false; response: NextResponse };
 
 /**

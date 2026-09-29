@@ -13,7 +13,10 @@
 // ceiling: two separate ceilings would just move the exploit from
 // whichever is capped to whichever is not. ./backingState imports it.
 // =====================================================================
-import { AID_REPUTATION_PER_GOLD, helperReputationCapFor } from "../constants";
+import {
+  AID_REPUTATION_PER_GOLD,
+  helperReputationCapFor,
+} from "../constants/reputation";
 import type { GameState } from "../types";
 
 // The borrower's side: the Gold arrives and the debt goes on their ledger.

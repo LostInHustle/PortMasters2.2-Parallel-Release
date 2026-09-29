@@ -5,14 +5,12 @@
 // authentication but is not room scoped.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { normalizeHouseId } from "@/lib/game/legacy";
 
 export async function GET() {
   const me = await getCurrentUser();
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!me) return unauthorizedResponse();
 
   const rows = await db.captainLegacy.findMany({
     include: {

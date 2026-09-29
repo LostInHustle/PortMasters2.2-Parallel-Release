@@ -32,13 +32,20 @@ const DEFAULT_TELEMETRY_SAMPLE_RATE = 1;
 // [B2: hard timers, the server as timekeeper] The multiplier on every
 // phase's authored budget, as a positive fraction of one. 1 runs the
 // budgets the phases are written with (see PHASE_FACES in
-// src/lib/game/phases.ts), which is the default because a table of
-// captains is the thing the clock is for; a smaller number shortens every
-// phase, which is what a practice table, a demo and a test run want; 0
-// switches the clock off entirely and leaves the room on manual advance,
-// which is the rollback the slice's plan asks for. Nothing about the clock
-// is written down, so the switch costs no migration in either direction.
-const DEFAULT_PHASE_CLOCK_SCALE = 1;
+// src/lib/game/phases.ts) and a smaller number shortens every phase, which
+// is what a practice table, a demo and a test run want.
+//
+// The default is 0, the clock switched off, and that is a decision rather
+// than a leftover: a seat that ends because a timer says so is a pressure
+// rather than a convenience, and a mode is the only thing that can say it
+// wants one (see phaseClock on the mode record, which is read first and is
+// the whole reason a mode that keeps no clock keeps none). An operator
+// default of on would start the clock on every voyage of every mode that
+// has one, at tables that never asked for it, so the operator's half of the
+// decision defaults to off and PHASE_CLOCK is how a table asks. Nothing
+// about the clock is written down, so the switch costs no migration in
+// either direction.
+const DEFAULT_PHASE_CLOCK_SCALE = 0;
 
 const ServerConfigSchema = z.object({
   nodeEnv: z.enum(["development", "production", "test"]),

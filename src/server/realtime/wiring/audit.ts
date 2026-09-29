@@ -6,7 +6,7 @@ import type { Server, Socket } from "socket.io";
 
 import { recordAuditVote } from "../audit";
 import { seated } from "../auth";
-import { getCheckpoint } from "../checkpoint";
+import { parleyCheckpoint } from "../checkpoint";
 
 export function wireAudit(io: Server, socket: Socket): void {
   // The room's one majority vote (see ./audit). The guards here are the
@@ -25,8 +25,8 @@ export function wireAudit(io: Server, socket: Socket): void {
       const targetUserId = payload?.targetUserId;
       if (!targetUserId) return;
       void (async () => {
-        const cp = await getCheckpoint(roomId);
-        if (cp.phase !== "parley" || cp.round !== payload?.round) return;
+        const cp = await parleyCheckpoint(roomId, payload?.round);
+        if (!cp) return;
         await recordAuditVote(io, roomId, s.userId, cp.round, targetUserId);
       })();
     },

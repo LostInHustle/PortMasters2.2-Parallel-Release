@@ -25,7 +25,7 @@ export type SeatStatus = {
   marooned?: boolean;
 };
 
-export type SeatMarks = {
+type SeatMarks = {
   // Out of the voyage for good, whichever way this mode writes it off.
   bankrupt: boolean;
   // Put ashore by a vote of the harbor, and still sailing.

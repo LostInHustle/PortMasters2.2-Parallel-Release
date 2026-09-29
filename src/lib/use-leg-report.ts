@@ -42,10 +42,10 @@
 // record.
 // =====================================================================
 
+import { LegReport } from "@/types/realtime/objectives";
 import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
-import type { LegReport } from "@/types/realtime";
 import { mealsOf } from "@/lib/game/foods";
 import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
@@ -101,24 +101,30 @@ export function useLegReport(
   // than beside them: an undefined here is a field the record will not
   // carry, which is the honest shape for a leg that was never playing the
   // rule (see the LegReport type).
-  const holdSlots = holdCapacityOn()
+  const holdSlots = holdCapacityOn(game.mode)
     ? Math.ceil(usedHoldSlots(game))
     : undefined;
-  const grainMeals = survivalLayerOn() ? mealsOf(game, "Grain") : undefined;
-  const saltFishMeals = survivalLayerOn()
+  const grainMeals = survivalLayerOn(game.mode)
+    ? mealsOf(game, "Grain")
+    : undefined;
+  const saltFishMeals = survivalLayerOn(game.mode)
     ? mealsOf(game, "Salt Fish")
     : undefined;
-  const produceMeals = survivalLayerOn() ? mealsOf(game, "Produce") : undefined;
+  const produceMeals = survivalLayerOn(game.mode)
+    ? mealsOf(game, "Produce")
+    : undefined;
   // [D3: Convoy: the Escort Contract] The market's three, read off the
   // captain's own tally and sent only when the switch that gives them
   // meaning is on. They are this captain's own record of what they sold,
   // which is the seller's side the plan asks about: a buyer's leg carries no
   // contract figures, because the market being measured is the seller's.
-  const escortSold = escortContractsOn() ? game.escortSold : undefined;
-  const escortFeesEarned = escortContractsOn()
+  const escortSold = escortContractsOn(game.mode) ? game.escortSold : undefined;
+  const escortFeesEarned = escortContractsOn(game.mode)
     ? game.escortFeesEarned
     : undefined;
-  const escortAbsorbed = escortContractsOn() ? game.escortAbsorbed : undefined;
+  const escortAbsorbed = escortContractsOn(game.mode)
+    ? game.escortAbsorbed
+    : undefined;
   // [D4: Loom: the Refit] The bench's three, read off the same tally the
   // panel prints and sent only when the switch that gives them meaning is
   // on. The seller's side, for the escort's reason: the plan asks what the
@@ -131,10 +137,12 @@ export function useLegReport(
   // bench sat out. It is read through the wardrobe layer instead, which is
   // where that rule lives (see legIsCold), so a build with no coats reports
   // no weather rather than reporting every leg fair.
-  const refitsSold = refitsOn() ? game.refitsSold : undefined;
-  const refitFeesEarned = refitsOn() ? game.refitFeesEarned : undefined;
-  const ragsRewoven = refitsOn() ? game.ragsRewoven : undefined;
-  const coldLeg = garmentsLayerOn() ? legIsCold(game) : undefined;
+  const refitsSold = refitsOn(game.mode) ? game.refitsSold : undefined;
+  const refitFeesEarned = refitsOn(game.mode)
+    ? game.refitFeesEarned
+    : undefined;
+  const ragsRewoven = refitsOn(game.mode) ? game.ragsRewoven : undefined;
+  const coldLeg = garmentsLayerOn(game.mode) ? legIsCold(game) : undefined;
   // [D6: Free Captain: Opportunist] The borrow counter, the last of the
   // ability figures and the only one that counts the voyage rather than the
   // leg: the plan's evaluation is a usage rate, which is a share of voyages,
@@ -144,7 +152,7 @@ export function useLegReport(
   // is nothing to borrow, so a build without locks reports nothing rather
   // than a zero it could never have moved. A voyage that never borrowed
   // reports its zero, because zero is a reading of the allowance.
-  const opportunistBorrows = pathOrdersOn()
+  const opportunistBorrows = pathOrdersOn(game.mode)
     ? opportunistBorrowsTaken(game)
     : undefined;
 

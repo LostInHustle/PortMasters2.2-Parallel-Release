@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   PATH_SWITCH_FROM_ROUND,
   PATH_SWITCH_TO_ROUND,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/paths";
 import { pathSwitchFee } from "@/lib/game/draft";
 import { pathSwitchBlocked } from "@/lib/game/engine";
 import { pathDraftOn } from "@/lib/game/flags";
@@ -60,7 +60,7 @@ export function PathPanel({
   // reading "no path" on every screen in every harbor. It draws nothing at
   // all instead, which is the voyage this tree sailed before the draft
   // existed.
-  if (!pathDraftOn()) return null;
+  if (!pathDraftOn(game.mode)) return null;
 
   if (game.path === null) {
     return (

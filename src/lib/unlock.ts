@@ -26,7 +26,7 @@ import type { GameMode } from "./game/mode";
 
 export type UnlockId = "second_ledger";
 
-export interface UnlockConfig {
+interface UnlockConfig {
   // What the interface calls a harbor that was opened with this phrase.
   // Read on the room card, so a captain joining one can see that the
   // table they are walking into was opened rather than found.

@@ -3,9 +3,9 @@
 // claim about a screen the server never sees.
 // =====================================================================
 
+import { type LegReport } from "@/types/realtime/objectives";
 import type { Socket } from "socket.io";
 
-import { type LegReport } from "@/types/realtime";
 import { seated } from "../auth";
 import { noteLegReport } from "../telemetry";
 

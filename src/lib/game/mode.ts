@@ -219,6 +219,69 @@ interface ModeConfig {
   // record, so neither of them can move it.
   maroonFrom: number | null;
 
+  // The first leg the harbor may open a captain's manifest, or null where
+  // it never may.
+  //
+  // [H6: the manifest audit] The rung the audit opens on, held here for the
+  // reason the maroon's rung is held here and not in ./engine/audit: it is
+  // one of this mode's own rules, and the panel that offers the vote and
+  // the tally that counts it read this one record, so neither can move it
+  // without the other. Null on the shipped mode, which is the whole of the
+  // gate: a Classic voyage is not a voyage where a captain's sheet is ever
+  // opened to the room, and a rung of null says so in the same breath as
+  // the field that would carry it.
+  //
+  // The plan's rollback note for this slice is "so the mode should go off
+  // with it", which is why this is a rung rather than a switch: the audit
+  // and the mode are one decision, and a second lever that could disagree
+  // with the first is a lever nobody would remember to pull.
+  auditFrom: number | null;
+
+  // Whether this mode carries the systems this release added.
+  //
+  // The one boundary every system built after the frozen release stands
+  // behind. Classic is PortMasters 2 Parallel Release as it shipped, kept
+  // exactly as it was, and the proof of that is a rule rather than a
+  // promise: a captain who sails Classic tomorrow is sailing the release
+  // they know, so nothing this branch added may reach them. Every switch in
+  // ./flags reads this field before it reads its own environment value, and
+  // the systems that have no switch read it directly.
+  //
+  // Deliberately a second field rather than experimental above, and the two
+  // are not the same question. That one is a label on the lobby card, and
+  // it would be answered differently the day this mode stops being
+  // described as experimental; this one is the boundary itself, and it does
+  // not move when the label does. A mode promoted out of experimental
+  // status that quietly deleted its own systems would be the exact drift
+  // this record exists to prevent.
+  //
+  // It reads as one flag over nine systems rather than nine gates over
+  // nine, and that is the shape the requirement asked for: the systems are
+  // one decision about where the branch's work lives, so they share one
+  // answer, and the operator's per system environment switches sit inside
+  // this gate rather than beside it.
+  gambitSystems: boolean;
+
+  // Whether this mode's seats run on a clock.
+  //
+  // [B2: the leg clock] The countdown that closes a seat when the table
+  // stops answering. Classic is off, and stays off whatever the process
+  // environment says: the shipped mode has never hurried a captain, and a
+  // stale PHASE_CLOCK in a deployment's environment is not a reason to
+  // start. That is also why this is a field rather than a reading of the
+  // scale: the scale says how fast the clock runs, this says whether the
+  // mode has one, and the second question is not the operator's to answer
+  // for the shipped mode.
+  phaseClock: boolean;
+
+  // Whether this mode's captains keep a standing order for a seat.
+  //
+  // [B3: the standing order] A captain writes down what they want done at
+  // the next leg and reads it back once the seat opens. Off on Classic:
+  // the shipped voyage decides each seat when the seat arrives, and there
+  // has never been a page in it that answers a seat in advance.
+  standingOrders: boolean;
+
   // How many legs a voyage of this mode runs, or null where the tier's own
   // ladder decides the length.
   //
@@ -281,6 +344,16 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // has, and the harbor has never voted anyone ashore.
     bankruptcyIsFinal: true,
     maroonFrom: null,
+    // The shipped mode opens no manifest and keeps no standing order and
+    // runs on no clock. Three nulls and one false, and each of them is the
+    // rule rather than a value waiting to be filled in: this is the voyage
+    // as it shipped, and the systems that are not in it are not in it.
+    auditFrom: null,
+    // Every system this release added is Gambit's, and this is the field
+    // that says so. Read ./flags for what stands behind it.
+    gambitSystems: false,
+    phaseClock: false,
+    standingOrders: false,
     // The founding voyage keeps the tier's ladder, because the ladder is
     // what it has always run on: Fair Winds is eight rounds, Open Waters
     // twelve, Monsoon sixteen, and a captain who sails Classic tomorrow
@@ -365,6 +438,22 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // oversight, since a maroon needs remaining legs to mean anything.
     bankruptcyIsFinal: false,
     maroonFrom: GAMBIT_MAROON_FROM,
+    // [H6] The audit opens at the same leg on every tier, and the rung is
+    // the constant the mode's own sentence above reads, so the card that
+    // tells a captain when their sheet can be opened and the rule that
+    // opens it are one number.
+    auditFrom: AUDIT_FROM_ROUND,
+    // The systems of this release live here. Read ./flags for the nine
+    // switches that sit inside this gate.
+    gambitSystems: true,
+    // [B2] The clock the mode is built around, and the one the shipped
+    // default leaves off (see DEFAULT_PHASE_CLOCK_SCALE in ../config): a
+    // Gambit table that wants the pressure turns it on, and a Classic
+    // table that somehow had it turned on still does not get one.
+    phaseClock: true,
+    // [B3] One standing order per captain, read back at the seat they
+    // wrote it for.
+    standingOrders: true,
     // [I5: session length, and table size] Twelve legs, on every tier. The
     // number the mode is tuned to, and the reason the rung above sits at
     // nine: the mode wants a voyage long enough that the harbor has
@@ -498,6 +587,33 @@ export function normalizeMode(value: unknown): GameMode {
 
 export function modeConfig(value: unknown): ModeConfig {
   return MODES[normalizeMode(value)];
+}
+
+/**
+ * Whether a mode carries the systems this release added.
+ *
+ * The one predicate the boundaries outside ./flags read. The nine operator
+ * switches ask this question through ./flags, which folds it into each
+ * switch so a caller asks one thing rather than two; the systems that have
+ * no switch of their own (the audit's rung, the standing order, the leg
+ * clock and the fleet's log) ask it here, and they ask it rather than
+ * testing the field so that the question has one spelling.
+ *
+ * Takes an unknown for the reason normalizeMode does: a stale save, a room
+ * row written before the field existed and a malformed request all land on
+ * the founding mode, which is the mode that carries none of it.
+ */
+export function gambitSystemsOn(value: unknown): boolean {
+  return modeConfig(value).gambitSystems;
+}
+
+/**
+ * The first leg a mode's harbor may open a manifest, or null where it never
+ * may. Same shape as maroonFrom and read the same way by the panels that
+ * offer the vote.
+ */
+export function auditOpensAt(value: unknown): number | null {
+  return modeConfig(value).auditFrom;
 }
 
 /**

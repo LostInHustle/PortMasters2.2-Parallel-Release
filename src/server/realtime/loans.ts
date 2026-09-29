@@ -17,10 +17,10 @@
 // leaves their purse the moment it is accepted. Losing a mute costs
 // nothing. Losing a loan destroys Gold a captain actually paid.
 // =====================================================================
+import { LoanRecord } from "@/types/realtime/loans";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { computeBackingResolution } from "@/lib/game/backing";
-import type { LoanRecord } from "@/types/realtime";
 import { emitToUser } from "./presence";
 
 const roomOutstandingLoans = new Map<string, LoanRecord[]>();

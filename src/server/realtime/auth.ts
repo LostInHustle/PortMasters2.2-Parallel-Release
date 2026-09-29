@@ -8,13 +8,13 @@
 // deletes expired sessions on sight, and on success stamps the
 // socket's state with the user and triggers a presence broadcast.
 // =====================================================================
+import { PublicUser } from "@/types/realtime/presence";
 import type { Server, Socket } from "socket.io";
 import {
   BANNED_ACCOUNT_ERROR,
   getUserFromToken,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import type { PublicUser } from "@/types/realtime";
 import type { SocketState } from "./types";
 import {
   sockets,

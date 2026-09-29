@@ -21,10 +21,12 @@
 // the handoff at the bottom of nextPhase is the only thing that decides
 // where a phase leads, and it asks the lap.
 // =====================================================================
-import { APP_NAME, merchantRatingForScore } from "../constants";
+import { APP_NAME } from "../constants/brand";
+import { merchantRatingForScore } from "../constants/reputation";
 import { closesRound, lapSuccessor } from "../checkpoint";
 import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
+import { modeConfig } from "../mode";
 import { isLegPhase, normalizePhase, phaseFace } from "../phases";
 import { normalizeStandingOrders } from "../standing";
 import {
@@ -45,7 +47,7 @@ import { failSeat } from "./seats";
 import { standingBoonId, workStandingOrders } from "./standing";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
-// merchantRatingForScore used to live here. It moved to ../constants.ts so
+// merchantRatingForScore used to live here. It moved to ../constants/reputation.ts so
 // the MERCHANT_RATINGS table and the lookup that scans it sit beside each
 // other and so the merit in ../merits.ts can read both from the same module
 // without dragging in the engine's lifecycle. The barrel (../engine.ts)
@@ -402,7 +404,17 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
   // the rollback the plan asks for is one decision in one place: with the
   // switch off, every branch here behaves exactly as [B2] shipped and the
   // written set is left on the record untouched.
-  const orders = state.standingOrders.enabled ? state.standingOrders : null;
+  //
+  // The mode is asked in front of the captain's own switch rather than
+  // beside it, and the two are different questions: the switch is the
+  // captain saying they do not want their seat played for them, and the
+  // mode is whether this voyage has such a page at all. The shipped voyage
+  // does not, so a set left on a Classic save is unread rather than
+  // rewritten, which is the same way the rolled back switch reads it.
+  const orders =
+    modeConfig(state.mode).standingOrders && state.standingOrders.enabled
+      ? state.standingOrders
+      : null;
   // Dawn is left by choosing, so its fallback is the board's first offer. The
   // list is dealt deterministically by draftBoons, so the boon a captain who
   // is not there takes is the same boon everyone watching their seat sees

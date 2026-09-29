@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
-import { BOON_SWAP_COST } from "@/lib/game/constants";
+import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
 import { cn } from "@/lib/utils";

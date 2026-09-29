@@ -4,32 +4,18 @@
 // with neither a room nor a recipient, so the channel is the shape of the
 // query rather than a flag somewhere that could disagree with it.
 import { NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
+import { MESSAGE_PAGE, messageRows } from "@/lib/messages";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const msgs = await db.message.findMany({
     where: { roomId: null, recipientId: null },
-    orderBy: { createdAt: "asc" },
-    take: 200,
-    include: {
-      sender: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    ...MESSAGE_PAGE,
   });
 
-  return NextResponse.json({
-    messages: msgs.map((m) => ({
-      id: m.id,
-      content: m.content,
-      createdAt: m.createdAt.toISOString(),
-      sender: m.sender,
-      mine: m.senderId === user.id,
-    })),
-  });
+  return NextResponse.json({ messages: messageRows(msgs, user.id) });
 }

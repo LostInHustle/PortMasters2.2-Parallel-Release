@@ -1,10 +1,10 @@
 "use client";
 
+import { LeaderboardEntry } from "@/types/realtime/standings";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Crown, Star, Ship, Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
-import type { LeaderboardEntry } from "@/types/realtime";
 import { Avatar, Pill, RANK_MEDALS } from "./shared";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";

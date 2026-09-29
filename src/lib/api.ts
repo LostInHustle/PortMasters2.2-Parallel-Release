@@ -5,6 +5,13 @@
 // served the page. The API routes, the page and the realtime socket all
 // live on that one origin, so nothing here needs a host or a port.
 // =====================================================================
+import { VoyageChronicle } from "@/types/realtime/voyage";
+import { PublicUser } from "@/types/realtime/presence";
+import {
+  HouseStanding,
+  LeaderboardEntry,
+  RivalEntry,
+} from "@/types/realtime/standings";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import type { DashboardReading } from "@/lib/game/dashboard";
@@ -12,13 +19,6 @@ import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameMode } from "@/lib/game/mode";
 import type { HouseId } from "@/lib/game/legacy";
 import type { UnlockId } from "@/lib/unlock";
-import type {
-  HouseStanding,
-  LeaderboardEntry,
-  PublicUser,
-  RivalEntry,
-  VoyageChronicle,
-} from "@/types/realtime";
 
 // Forwarded so existing call sites that imported PublicUser from
 // "@/lib/api" keep compiling. The canonical home is @/types/realtime.

@@ -87,8 +87,8 @@ export function wirePathDraft(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("path:error", { roomId, error });
       };
-      if (!pathDraftOn()) {
-        fail("The path draft is not running in this build.");
+      if (!pathDraftOn(s.mode)) {
+        fail("The path draft is not running in this harbor.");
         return;
       }
       // The destination is read off the wire and answered as a path this

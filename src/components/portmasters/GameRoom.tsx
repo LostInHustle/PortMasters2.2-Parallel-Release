@@ -1,5 +1,12 @@
 "use client";
 
+import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
+import { RoomMembersPayload } from "@/types/realtime/moderation";
+import {
+  BROKERS_FAVOR_UNLOCK_LEVEL,
+  TIDEWATCH_SURGE_THRESHOLD,
+  WORD_ON_THE_DOCKS_THRESHOLD,
+} from "@/lib/game/constants/world";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -8,17 +15,7 @@ import {
   type PublicUser,
   type RoomDetail,
 } from "@/lib/api";
-import type {
-  RoomMembersPayload,
-  VoyageResult,
-  VoyageReveal,
-} from "@/types/realtime";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import {
-  BROKERS_FAVOR_UNLOCK_LEVEL,
-  TIDEWATCH_SURGE_THRESHOLD,
-  WORD_ON_THE_DOCKS_THRESHOLD,
-} from "@/lib/game/constants";
 import { meritById } from "@/lib/game/merits";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 import { useRealtime } from "@/lib/use-realtime";
@@ -34,35 +31,8 @@ import { useObjective } from "@/lib/use-objective";
 import { useLegReport } from "@/lib/use-leg-report";
 import { useAudit } from "@/lib/use-audit";
 import { useMaroon } from "@/lib/use-maroon";
-import { useBarter, type BarterOffer } from "@/lib/use-barter";
-import {
-  useEscortContracts,
-  type EscortContract,
-} from "@/lib/use-escort-contracts";
-import {
-  useRefitContracts,
-  type RefitContract,
-} from "@/lib/use-refit-contracts";
-import { useBazaarRumors } from "@/lib/use-bazaar-rumors";
-import { usePathDraft } from "@/lib/use-path-draft";
-import {
-  useAid,
-  type GrantedLoan,
-  type RepaidLoan,
-  type RedirectedLoanClosed,
-} from "@/lib/use-aid";
-import {
-  useBacking,
-  type BackingCovered,
-  type BackingResolved,
-  type OutstandingLoan,
-} from "@/lib/use-backing";
-import {
-  useConvoy,
-  type VentureOutcome,
-  type VentureSettlement,
-} from "@/lib/use-convoy";
 import { useNotificationCenter } from "@/lib/use-notifications";
+import { useHarborBoards } from "@/lib/use-harbor-boards";
 import { PlayerDetailModal } from "./game/GameModals";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
@@ -70,6 +40,8 @@ import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
 import { PathDraft } from "./game/PathDraft";
 import { PathPanel } from "./game/PathPanel";
+import { HarborTopBar } from "./game/HarborTopBar";
+import { ShortcutLegend } from "./game/ShortcutLegend";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
 import { ObjectivePanel } from "./game/ObjectivePanel";
 import { AuditRevealStrip } from "./game/AuditPanel";
@@ -84,56 +56,26 @@ import {
 } from "./game/GameModals";
 import { MembersPanel } from "./MembersPanel";
 import { FleetTicker } from "./FleetTicker";
-import { AgeBanner } from "./AgeBanner";
-import { ActionSuggester } from "./ActionSuggester";
 import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 import { SettingsModal } from "./SettingsModal";
 import { ChatPanel, type ChatTrade } from "./ChatPanel";
-import { Avatar, MeritIcon, OnlineDot, Pill } from "./shared";
+import { DmTab } from "./chat/DmTab";
+import { MeritIcon } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import {
-  Anchor,
-  DoorOpen,
-  Copy,
-  Users,
-  MessageCircle,
-  Ship,
-  LifeBuoy,
-  Bell,
-  Palette,
-  Volume2,
-  VolumeX,
-  Settings,
-} from "lucide-react";
-import { cn, normalizeRoomName } from "@/lib/utils";
+import { MessageCircle, Ship, LifeBuoy } from "lucide-react";
 import { useColorPreference } from "@/lib/use-color-preference";
 import { useSound } from "@/lib/use-sound";
 import { useRoomRoster } from "@/lib/use-room-roster";
 import { renownProgress } from "@/lib/game/legacy";
 import {
-  acceptBarterOffer,
-  applyEscortSide,
-  applyRefitSide,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
-  clearRedirectedLoan,
-  contributeToVenture,
   coverFromBoard,
-  grantLoan,
   nextPhase,
-  pledgeBacking,
   purchaseIntel,
-  receiveBackedCoverage,
-  receiveBackingOutcome,
-  receiveLoan,
-  receiveRepayment,
-  receiveVentureSettlement,
-  refundBarterOffer,
   repayLoan,
-  settleBarterTrade,
 } from "@/lib/game/engine";
 
 // Browser scoped: the onboarding guide is a "you have played this before"
@@ -182,312 +124,49 @@ export function GameRoom({
     // still starts their voyage on the lap the rest of the harbor is keeping.
     room.mode,
   );
-  const phaseSync = usePhaseSync(
-    room.id,
+  const phaseSync = usePhaseSync({
+    roomId: room.id,
     socket,
-    state.game,
+    game: state.game,
     act,
     // The voyage's own seed identity, which the engine's autoCommit needs to
     // leave a seat on the clock's behalf (see [B2] in @/lib/use-phase-sync).
     ctx,
     authed,
-    me.id,
+    myUserId: me.id,
     startingGoldBonus,
-  );
-  // Notification center needs to be initialized before the relay
-  // callbacks and effects that call notifications.push, otherwise the
-  // lint rule flags it as accessed before declaration.
+  });
+  // Notification center needs to be initialized before the effects that
+  // call notifications.push, otherwise the lint rule flags it as accessed
+  // before declaration.
   const notifications = useNotificationCenter();
 
-  // The nine relay callbacks. Each translates a realtime event into a local
-  // engine mutation: a barter trade closes, a loan lands, a backer covers a
-  // shortfall, a convoy venture settles. Every callback is the same shape:
-  // figure out which side of the event this captain is on, then run the
-  // matching engine function inside `act`.
-  const onBarterFulfilled = useCallback(
-    (offer: BarterOffer, accepterId: string) => {
-      if (accepterId === me.id) {
-        act((g, l) =>
-          acceptBarterOffer(
-            g,
-            offer.requestItem,
-            offer.requestAmount,
-            offer.offerItem,
-            offer.offerAmount,
-            l,
-          ),
-        );
-      } else if (offer.fromUserId === me.id) {
-        act((g, l) =>
-          settleBarterTrade(
-            g,
-            offer.requestItem,
-            offer.requestAmount,
-            offer.offerItem,
-            offer.offerAmount,
-            l,
-          ),
-        );
-      }
-    },
-    [act, me.id],
-  );
-  // Refunds that arrived before this captain's voyage was loaded. The board
-  // hydrates over the socket, which can be quicker than the save arriving
-  // over REST, and anything applied while state.game is still the placeholder
-  // is thrown away the moment the real save lands. They wait here instead and
-  // are applied together once it has. The trade this makes is deliberate:
-  // holding them costs a gift of goods in the one case where the room is
-  // restarted inside that same moment, while dropping them loses a captain's
-  // escrow silently, which is the worse of the two.
-  const pendingRefunds = useRef<BarterOffer[]>([]);
-  const onBarterRefund = useCallback(
-    (offer: BarterOffer) => {
-      if (!state.loaded) {
-        pendingRefunds.current.push(offer);
-        return;
-      }
-      act((g, l) =>
-        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l),
-      );
-    },
-    [act, state.loaded],
-  );
-  const barter = useBarter(
-    socket,
-    room.id,
-    me.id,
-    onBarterFulfilled,
-    onBarterRefund,
-  );
-  useEffect(() => {
-    if (!state.loaded || pendingRefunds.current.length === 0) return;
-    const held = pendingRefunds.current;
-    pendingRefunds.current = [];
-    act((g, l) => {
-      for (const offer of held)
-        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l);
+  // The eight boards this room runs outside a save file, and the nine
+  // relays that close them into this captain's own voyage. They live in
+  // one hook because they are one kind of thing: see ./use-harbor-boards
+  // for the boards themselves and for what each relay is watching for.
+  const { barter, aid, backing, convoy, escort, refit, bazaar, draft } =
+    useHarborBoards({
+      socket,
+      roomId: room.id,
+      meId: me.id,
+      act,
+      loaded: state.loaded,
+      playSound,
     });
-  }, [state.loaded, act]);
-
-  const onAidGranted = useCallback(
-    (loan: GrantedLoan, role: "borrower" | "helper") => {
-      if (role === "borrower") {
-        act((g, l) =>
-          receiveLoan(
-            g,
-            {
-              id: loan.requestId,
-              fromUserId: loan.helperId,
-              fromName: loan.helperName,
-              amount: loan.amount,
-            },
-            l,
-          ),
-        );
-      } else {
-        act((g, l) =>
-          grantLoan(
-            g,
-            {
-              id: loan.requestId,
-              borrowerId: loan.borrowerId,
-              borrowerName: loan.borrowerName,
-              amount: loan.amount,
-            },
-            l,
-          ),
-        );
-      }
-    },
-    [act],
-  );
-  const onAidRepaid = useCallback(
-    (loan: RepaidLoan) => {
-      act((g, l) =>
-        receiveRepayment(g, loan.debtId, loan.amount, loan.fromName, l),
-      );
-    },
-    [act],
-  );
-  const onAidRedirectedClosed = useCallback(
-    (closed: RedirectedLoanClosed) => {
-      act((g, l) =>
-        clearRedirectedLoan(g, closed.debtId, closed.redirectedToName, l),
-      );
-    },
-    [act],
-  );
-  const aid = useAid(
-    socket,
-    room.id,
-    me.id,
-    onAidGranted,
-    onAidRepaid,
-    onAidRedirectedClosed,
-  );
-
-  const onBackingAccepted = useCallback(
-    (loan: OutstandingLoan) => {
-      if (loan.backedAmount)
-        act((g, l) => pledgeBacking(g, loan.backedAmount!, l));
-    },
-    [act],
-  );
-  const onBackingResolved = useCallback(
-    (resolved: BackingResolved) => {
-      act((g, l) =>
-        receiveBackingOutcome(
-          g,
-          resolved.refundAmount,
-          resolved.calledAmount,
-          l,
-        ),
-      );
-    },
-    [act],
-  );
-  const onBackingCovered = useCallback(
-    (covered: BackingCovered) => {
-      act((g, l) =>
-        receiveBackedCoverage(
-          g,
-          covered.amount,
-          covered.backerName,
-          covered.borrowerName,
-          l,
-        ),
-      );
-    },
-    [act],
-  );
-  const backing = useBacking(
-    socket,
-    room.id,
-    me.id,
-    onBackingAccepted,
-    onBackingResolved,
-    onBackingCovered,
-  );
-
-  const onVentureContributed = useCallback(
-    (_ventureId: string, accepted: number) => {
-      act((g, l) => contributeToVenture(g, accepted, l));
-    },
-    [act],
-  );
-  const onVentureSettled = useCallback(
-    (
-      _ventureId: string,
-      outcome: VentureOutcome,
-      settlements: VentureSettlement[],
-    ) => {
-      const mine = settlements.find((s) => s.userId === me.id);
-      if (!mine) return;
-      act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
-      if (outcome === "filled") {
-        toast.success("⚓ Venture filled!", {
-          description: `Your share: +${mine.amount} Gold.`,
-        });
-        playSound("coin");
-      } else if (outcome === "failed") {
-        toast("⚓ Venture missed its deadline", {
-          description: `Partial refund: +${mine.amount} Gold.`,
-        });
-        playSound("warn");
-      } else {
-        toast("⚓ Venture cancelled", {
-          description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
-        });
-      }
-    },
-    [act, me.id, playSound],
-  );
-  const convoy = useConvoy(
-    socket,
-    room.id,
-    onVentureContributed,
-    onVentureSettled,
-  );
-
-  // [D3: Convoy: the Escort Contract] The tenth relay, and the last of the
-  // ones that only ever touch this captain's own purse: a contract this
-  // captain is a side of has moved, and the engine works out what that
-  // means for them (see applyEscortSide). Both sides of a contract run this
-  // same callback against their own state, which is what keeps the fee and
-  // the absorbed raid on the two purses that agreed to them rather than on
-  // any other captain's.
-  //
-  // It is idempotent on the engine's side, so the board may report the same
-  // contract as often as it likes: the ledger is what decides whether the
-  // Gold has already moved.
-  const onEscortSettle = useCallback(
-    (contract: EscortContract) => {
-      act((g, l) => {
-        applyEscortSide(g, contract, me.id, l);
-      });
-    },
-    [act, me.id],
-  );
-  const escort = useEscortContracts(socket, room.id, me.id, onEscortSettle);
-
-  // [D4: Loom: the Refit] The bench's relay, which is the escort's shape
-  // with one fewer number in it: a refit this captain is a side of has been
-  // agreed, and the engine works out what that means for them (see
-  // applyRefitSide). The customer pays and their own garment gets the points
-  // back, both on their own machine, and the seller is paid the price the
-  // two of them named. No third captain is touched.
-  //
-  // There is nothing to mirror into GameState afterwards, which is the
-  // difference between this market and the escort's. A contract has to be
-  // read back into escortCover because the raid roll consults a field; a
-  // refit's whole result is the fee and the garment, and the garment is
-  // already this captain's own state.
-  const onRefitSettle = useCallback(
-    (refit: RefitContract) => {
-      act((g, l) => {
-        applyRefitSide(g, refit, me.id, l);
-      });
-    },
-    [act, me.id],
-  );
-  const refit = useRefitContracts(socket, room.id, me.id, onRefitSettle);
-
-  // [D5: Aroma: the Bazaar Rumor] The bazaar's relay, and it is the
-  // shortest of the three because nothing about a rumor moves anything
-  // between captains. There is no settle report to give and no field on
-  // GameState to mirror into, which is the difference between this board
-  // and the other two: a contract's cover has to be read back into a field
-  // because the raid roll consults one, and a refit's whole result lands on
-  // the customer's own garment. What a rumor does to a price never touches
-  // this hook at all: the lean arrives on the advance frame and is applied
-  // to the market by the engine (see applyMarketLeans in
-  // @/lib/game/engine/market), so all this holds is what the harbor has
-  // been told, for the desk and the board to draw.
-  const bazaar = useBazaarRumors(socket, room.id);
-
-  // [D7: the draft, and switching] The path draft's relay, which is the one
-  // in this room that carries a card addressed to a single captain: the
-  // draft deals every seat its own hand and this hook holds the one it was
-  // dealt (see ./use-path-draft). It takes `act` where the three markets
-  // above take nothing, because the two frames it listens for are writes to
-  // this captain's own save: the settled view is the path they sail on, and
-  // the room's published switch is applied to their own purse and manifest,
-  // which is the same shape useMaroon's result hand-out takes.
-  const draft = usePathDraft(socket, room.id, me.id, act);
 
   // The cover the raid roll consults, mirrored from the board this captain
   // can see. The engine asks one field and never the network (see
   // escortCoverOf), so the board has to be read into that field here, and
   // here is the only place that turns a board into state.
   //
-  // Gated on the load for the reason the pending refunds above are: a board
-  // that arrives before the save does would be written onto the placeholder
-  // and thrown away the moment the real voyage landed, and this effect runs
-  // again when the load finishes. The comparison before the dispatch is what
-  // keeps an ordinary board update, one that has nothing to do with this
-  // captain's cover, from cloning the whole voyage to write a value it
-  // already holds.
+  // Gated on the load for the reason the refunds the boards hook holds back
+  // are: a board that arrives before the save does would be written onto the
+  // placeholder and thrown away the moment the real voyage landed, and this
+  // effect runs again when the load finishes. The comparison before the
+  // dispatch is what keeps an ordinary board update, one that has nothing to
+  // do with this captain's cover, from cloning the whole voyage to write a
+  // value it already holds.
   useEffect(() => {
     if (!state.loaded) return;
     const covered = coverFromBoard(
@@ -1156,119 +835,26 @@ export function GameRoom({
 
   return (
     <div className="pm-canvas min-h-screen w-full flex flex-col">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 px-3 sm:px-5 py-3">
-        <div className="pm-glass rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 max-w-[1600px] mx-auto">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="pm-grad-brand h-9 w-9 rounded-xl flex items-center justify-center shrink-0">
-              <Anchor className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold leading-tight truncate font-display">
-                  {normalizeRoomName(room.name)}
-                </h1>
-                <Pill tone="sea" className="shrink-0">
-                  <Users className="h-3 w-3" /> {members.length}
-                </Pill>
-              </div>
-              <button
-                onClick={copyCode}
-                className="pm-pressable text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-              >
-                <span className="font-mono tracking-widest">{room.code}</span>
-                <Copy className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end">
-            <AgeBanner variant="pill" className="hidden md:inline-flex" />
-            <div className="relative hidden sm:block">
-              <ActionSuggester game={state.game} />
-            </div>
-            <Pill tone="gain" className="hidden sm:inline-flex">
-              <OnlineDot online={connected && authed} size={8} />{" "}
-              {connected && authed ? "Live" : "Linking…"}
-            </Pill>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("rounded-lg", colorblindSafe && "text-gain")}
-              onClick={() => setColorblindSafe(!colorblindSafe)}
-              title={
-                colorblindSafe
-                  ? "Colorblind safe palette on, click to use the default colors"
-                  : "Use a colorblind safe palette for goods"
-              }
-            >
-              <Palette className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("rounded-lg", soundOn && "text-gain")}
-              onClick={toggleSound}
-              title={
-                soundOn
-                  ? "Harbor sounds on, click to mute"
-                  : "Turn on harbor sounds and UI feedback"
-              }
-              aria-label={
-                soundOn ? "Mute harbor sounds" : "Turn on harbor sounds"
-              }
-            >
-              {soundOn ? (
-                <Volume2 className="h-4 w-4" />
-              ) : (
-                <VolumeX className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-lg"
-              onClick={() => setSettingsOpen(true)}
-              title="Settings"
-              aria-label="Open settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-lg relative"
-              onClick={() => {
-                setNotificationsOpen((v) => !v);
-                notifications.markAllRead();
-              }}
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-              {notifications.unreadCount > 0 && (
-                <Pill
-                  tone="alarm"
-                  className="absolute -top-1 -right-1 !px-1 !py-0 min-w-[16px] h-4 justify-center text-[10px]"
-                >
-                  {notifications.unreadCount > 9
-                    ? "9+"
-                    : notifications.unreadCount}
-                </Pill>
-              )}
-            </Button>
-            <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
-              <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-lg"
-                onClick={handleLeave}
-              >
-                <DoorOpen className="h-4 w-4 mr-1.5" /> Leave
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <HarborTopBar
+        room={room}
+        memberCount={members.length}
+        onCopyCode={copyCode}
+        game={state.game}
+        connected={connected}
+        authed={authed}
+        colorblindSafe={colorblindSafe}
+        onToggleColorblind={() => setColorblindSafe(!colorblindSafe)}
+        soundOn={soundOn}
+        onToggleSound={toggleSound}
+        onOpenSettings={() => setSettingsOpen(true)}
+        unreadCount={notifications.unreadCount}
+        onToggleNotifications={() => {
+          setNotificationsOpen((v) => !v);
+          notifications.markAllRead();
+        }}
+        me={me}
+        onLeave={handleLeave}
+      />
 
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
@@ -1319,7 +905,7 @@ export function GameRoom({
         <PortShiftStrip shift={maroon.shift} round={state.game.currentRound} />
         <div className="grid grid-cols-1 lg:grid-cols-[clamp(220px,22vw,300px)_minmax(0,1fr)_clamp(260px,26vw,360px)] gap-3">
           {/* Left: the captain's own rail */}
-          <div className="order-3 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
+          <div className="order-2 lg:order-1 lg:sticky lg:top-20 lg:h-[calc(100dvh-6rem)]">
             <div className="pm-glass h-full rounded-2xl p-3">
               <GameStatusPanel
                 game={state.game}
@@ -1333,7 +919,7 @@ export function GameRoom({
           </div>
 
           {/* Center: phase + controls */}
-          <div className="space-y-3 order-2 lg:order-2 min-w-0">
+          <div className="space-y-3 order-1 lg:order-2 min-w-0">
             <GamePhasePanel
               game={state.game}
               ctx={ctx}
@@ -1413,37 +999,7 @@ export function GameRoom({
               onSwitch={draft.switchPath}
               onDismissError={draft.clearError}
             />
-            {/* Wraps rather than overflowing. These five hint chips and
-                their labels are wider than a phone, and a centred row
-                with no wrap spills off both edges at once, which both
-                hides the first hint and gives the whole page a sideways
-                scrollbar. */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+S
-              </kbd>{" "}
-              Save
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+N
-              </kbd>{" "}
-              Next Phase
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                Ctrl+R
-              </kbd>{" "}
-              Restart
-              <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5">
-                F1
-              </kbd>{" "}
-              Guide
-              <button
-                onClick={() => setShortcutHelpOpen(true)}
-                className="pm-pressable rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5 hover:bg-black/10 dark:hover:bg-white/20"
-                title="Show all keyboard shortcuts"
-              >
-                ?
-              </button>{" "}
-              Shortcuts
-            </div>
+            <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
           </div>
 
           {/* Right: roster + chat. Under the lg breakpoint this column leads
@@ -1453,8 +1009,8 @@ export function GameRoom({
               reading it as missing. The FleetTicker above already carries the
               roster at these widths, so nothing is lost by following with it
               rather than opening with it. */}
-          <div className="order-1 flex flex-col gap-3 min-w-0 lg:order-3 lg:block lg:space-y-3">
-            <div className="order-2 h-[320px]">
+          <div className="order-3 space-y-3 min-w-0">
+            <div className="h-[320px]">
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1466,7 +1022,7 @@ export function GameRoom({
               />
             </div>
             <div
-              className="order-1 pm-glass rounded-2xl overflow-hidden flex flex-col"
+              className="pm-glass rounded-2xl overflow-hidden flex flex-col"
               style={{ height: 380 }}
             >
               <Tabs
@@ -1647,100 +1203,6 @@ export function GameRoom({
           <LifeBuoy className="h-5 w-5" />
         </motion.button>
       )}
-    </div>
-  );
-}
-
-function DmTab({
-  socket,
-  me,
-  target,
-  history,
-  trade,
-  candidates,
-  onPick,
-  onClear,
-}: {
-  socket: unknown;
-  me: PublicUser;
-  target: PublicUser | null;
-  history: ChatMessage[];
-  trade?: ChatTrade;
-  candidates: Array<PublicUser & { roomId?: string | null }>;
-  onPick: (u: PublicUser) => void;
-  onClear: () => void;
-}) {
-  // Deduplicate candidates by id, exclude self.
-  const seen = new Map<string, PublicUser & { roomId?: string | null }>();
-  for (const c of candidates)
-    if (c.id !== me.id && !seen.has(c.id)) seen.set(c.id, c);
-  const list = Array.from(seen.values());
-
-  if (target) {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="px-3 py-2 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
-          <Avatar hue={target.avatarHue} name={target.displayName} size={24} />
-          <span className="text-xs font-medium truncate">
-            {target.displayName}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto h-7 px-2 text-[11px]"
-            onClick={onClear}
-          >
-            Switch
-          </Button>
-        </div>
-        <div className="flex-1 min-h-0">
-          <ChatPanel
-            socket={socket as never}
-            me={me}
-            mode="dm"
-            other={target}
-            initialMessages={history}
-            trade={trade}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="px-3 py-2 border-b border-black/5 dark:border-white/10 text-[11px] text-muted-foreground">
-        Pick a captain to message privately
-      </div>
-      <div className="pm-scroll flex-1 min-h-0 overflow-y-auto">
-        <div className="p-2 space-y-1">
-          {list.length === 0 ? (
-            <p className="text-center text-xs text-muted-foreground py-6 px-4">
-              No other captains available right now. They will appear here once
-              they are online.
-            </p>
-          ) : (
-            list.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => onPick(u)}
-                className="pm-pressable w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-black/5 dark:hover:bg-white/5"
-              >
-                <Avatar hue={u.avatarHue} name={u.displayName} size={28} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {u.displayName}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    @{u.username}
-                  </div>
-                </div>
-                <MessageCircle className="h-4 w-4 text-muted-foreground" />
-              </button>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }

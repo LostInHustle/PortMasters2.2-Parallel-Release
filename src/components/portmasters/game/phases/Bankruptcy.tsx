@@ -1,10 +1,10 @@
 "use client";
 
+import { GameStatusUpdate } from "@/types/realtime/status";
 import { motion } from "framer-motion";
 import { Eye, Trophy, Coins, Anchor } from "lucide-react";
-import type { GameStatusUpdate } from "@/types/realtime";
 import type { PublicUser } from "@/lib/api";
-import type { PhasePanelProps } from "./PhaseShared";
+import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
 
 /**
@@ -61,9 +61,9 @@ export function Bankruptcy({
       >
         💥
       </motion.div>
-      <div className="font-display pm-brush mb-1 text-2xl font-bold text-alarm">
+      <PhaseHeading layout="mb-1" tone="text-alarm" brush>
         Ship Fleet Bankrupt!
-      </div>
+      </PhaseHeading>
       <p className="mb-4 text-sm text-muted-foreground">
         {game.money <= 0
           ? "Funds depleted, unable to pay essential operational costs"

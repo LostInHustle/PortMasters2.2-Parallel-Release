@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { APP_NAME, STARTING_STOCK } from "@/lib/game/constants";
+import { APP_NAME } from "@/lib/game/constants/brand";
+import { STARTING_STOCK } from "@/lib/game/constants/goods";
 import { INCOME_TAX_RATE } from "@/lib/game/engine";
 import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
 import { modeConfig } from "@/lib/game/mode";

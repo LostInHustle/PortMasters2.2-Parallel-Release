@@ -1,8 +1,8 @@
 "use client";
 
+import { PrivateEntry } from "@/types/realtime/private-entry";
 import { useEffect, useRef } from "react";
 import type { VoyageLog } from "@/lib/use-voyage-log";
-import type { PrivateEntry } from "@/types/realtime";
 
 // [B4: the log surfaces] Dusk's two logs, side by side.
 //

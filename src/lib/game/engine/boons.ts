@@ -22,11 +22,10 @@
 import {
   BOON_SWAP_COST,
   BOONS,
-  MAX_SHIP_LEVEL,
-  SHIP_DISCOUNT_PER_LEVEL,
   type Boon,
   type Module,
-} from "../constants";
+} from "../constants/drafts";
+import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
 import { feedCrew } from "../larder";
 import { unlockedBoons, unlockedModules } from "../pools";
@@ -244,8 +243,8 @@ export function swapBoonChoices(state: GameState, logs: string[]) {
 // call that matched nothing must not be allowed to move the voyage on.
 //
 // It used to end by starting the market phase by name, which both pinned the
-// draft to
-// one voyage's leg and made the choice and the advance impossible to separate.
+// draft to one voyage's leg and made the choice and the advance impossible
+// to separate.
 // The advance belongs to lockInBoon in ./lifecycle now, which is the one place
 // allowed to name where a phase leads. The GameContext it used to take went
 // with that call, since opening a phase is the only thing here that ever
@@ -354,8 +353,7 @@ export function finalizeModuleSwap(
 // (phase "module_draft") or the swap picker (phase "module_swap") without
 // committing to anything. Resets the captain to the Shipyard phase, which the
 // leg calls Dusk, and clears the two transients the draft might have parked:
-// the drafted
-// pool itself (`_draftChoices`) and the half chosen swap target
+// the drafted pool itself (`_draftChoices`) and the half chosen swap target
 // (`_newModule`). Reopening the draft afterwards rolls a fresh pool, since
 // `startModuleDrafting` only skips the roll while `_draftChoices` is
 // non undefined.

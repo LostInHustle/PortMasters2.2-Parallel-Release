@@ -20,6 +20,7 @@
 // dressing the two in the same blue would say they cost the same.
 // =====================================================================
 
+import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
@@ -30,7 +31,6 @@ import type { useMaroon } from "@/lib/use-maroon";
 import { tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
-import type { MaroonResult, PortShiftNotice } from "@/types/realtime";
 
 type Maroon = ReturnType<typeof useMaroon>;
 

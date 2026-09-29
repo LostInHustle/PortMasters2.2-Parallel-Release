@@ -238,6 +238,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
       user: { id: "", username: "", displayName: "", avatarHue: 0 },
       roomId: null,
       authed: false,
+      mode: null,
     });
 
     // [J2: the mute and the report] The socket's own frame budget, put in

@@ -28,14 +28,14 @@
 import {
   MEND_GOLD_PER_POINT,
   MEND_POINTS,
-  RAGS,
   RAGS_AT_PORT_COLD,
   RAG_SCRAP_VALUE,
   REFIT_POINTS,
   REWEAVE_GOOD,
   REWEAVE_RAGS,
-} from "../constants";
-import { flagOn } from "../flags";
+} from "../constants/garments";
+import { RAGS } from "../constants/goods";
+import { flagOnFor } from "../flags";
 import {
   garmentsLayerOn,
   garmentRoom,
@@ -84,10 +84,16 @@ export const REFIT_SELLER_PATH: PathId = "loom";
  * The read is written out in full at this line rather than passed by name,
  * which is the browser's rule and not a taste in signatures: a bundle is
  * handed the values it was built with by a substitution that only matches a
- * read written where it happens (see flagOn).
+ * read written where it happens (see flagOnFor).
+ *
+ * The mode joins the chain at the front of it, ahead of this bench's own
+ * switch and ahead of the wardrobe it stands on, so a Classic table is
+ * answered by the first reading and the other two are never taken.
  */
-export function refitsOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_REFITS) && garmentsLayerOn();
+export function refitsOn(mode: unknown): boolean {
+  return (
+    flagOnFor(mode, process.env.NEXT_PUBLIC_REFITS) && garmentsLayerOn(mode)
+  );
 }
 
 /**
@@ -98,8 +104,8 @@ export function refitsOn(): boolean {
  * the path is the captain's identity, and a build with the feature off must
  * refuse a Loom captain as flatly as it refuses everyone else.
  */
-export function canSellRefit(state: Pick<GameState, "path">): boolean {
-  return refitsOn() && state.path === REFIT_SELLER_PATH;
+export function canSellRefit(state: Pick<GameState, "path" | "mode">): boolean {
+  return refitsOn(state.mode) && state.path === REFIT_SELLER_PATH;
 }
 
 /**
@@ -129,10 +135,10 @@ export function refitSellerBusy(
  * row and the number the crew's warmth actually moves by are one number.
  */
 export function refitRoomFor(
-  state: Pick<GameState, "garments">,
+  state: Pick<GameState, "garments" | "mode">,
   good: unknown,
 ): number {
-  if (!refitsOn()) return 0;
+  if (!refitsOn(state.mode)) return 0;
   return Math.min(REFIT_POINTS, garmentRoom(state, good));
 }
 
@@ -162,7 +168,7 @@ export function ragsAtPort(
     "voyageEpoch" | "mode" | "difficulty" | "currentRound"
   >,
 ): number {
-  if (!refitsOn()) return 0;
+  if (!refitsOn(state.mode)) return 0;
   // The weather is asked rather than drawn a second time. A pile that
   // rolled its own cold leg would be a second answer to which legs are cold,
   // and the two would agree right up until one of them moved.
@@ -204,7 +210,7 @@ export function ragsLeftAtPort(state: GameState): number {
  * bolt of silk does.
  */
 export function buyRag(state: GameState, logs: string[]): boolean {
-  if (!refitsOn()) return false;
+  if (!refitsOn(state.mode)) return false;
   if (state.path !== REFIT_SELLER_PATH) {
     logs.push("❌ Only a Loom captain buys rags off the harbor pile.");
     return false;
@@ -251,7 +257,7 @@ export function buyRag(state: GameState, logs: string[]): boolean {
  * refused for room would be refusing to make room.
  */
 export function reweaveRags(state: GameState, logs: string[]): boolean {
-  if (!refitsOn()) return false;
+  if (!refitsOn(state.mode)) return false;
   if (state.path !== REFIT_SELLER_PATH) {
     logs.push("❌ Only a Loom captain knows how to work rags back into cloth.");
     return false;
@@ -293,7 +299,7 @@ export function mendGarment(
   good: unknown,
   logs: string[],
 ): boolean {
-  if (!refitsOn()) return false;
+  if (!refitsOn(state.mode)) return false;
   const spec = garmentSpec(good);
   if (!spec || typeof good !== "string") {
     logs.push("❌ That is not something the harbor can put right.");
@@ -350,7 +356,7 @@ export function applyRefitSide(
   meId: string,
   logs: string[],
 ): boolean {
-  if (!refitsOn()) return false;
+  if (!refitsOn(state.mode)) return false;
   if (contract.status !== "agreed") return false;
   const isSeller = contract.sellerUserId === meId;
   const isBuyer = contract.buyerUserId === meId;

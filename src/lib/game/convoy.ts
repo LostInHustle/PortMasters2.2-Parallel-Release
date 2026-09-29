@@ -20,7 +20,7 @@
 import {
   CONVOY_VENTURE_FAILURE_REFUND_RATE,
   CONVOY_VENTURE_PAYOUT_MULTIPLIER,
-} from "./constants";
+} from "./constants/world";
 
 type VentureContribution = { name: string; amount: number };
 type VentureContributions = Record<string, VentureContribution>;

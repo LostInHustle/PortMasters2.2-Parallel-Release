@@ -103,19 +103,28 @@ export function VoyageTimeline({
 
       {/* Phase timeline */}
       {!isTerminal && (
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-stretch gap-1">
           {steps.map((p, i) => {
             const isCurrent = i === currentIndex;
             const isPast = currentIndex >= 0 && i < currentIndex;
             const isUpcoming = currentIndex >= 0 && i > currentIndex;
             return (
+              // min-w-0 on both the column and the tile, so a lap with more
+              // steps than there is rail narrows the steps rather than
+              // pushing the last one out of the panel. The name below each
+              // tile is the first thing to give way, and it gives way by
+              // truncating rather than by shrinking: 8px was the size this
+              // label had to be to fit seven steps in a rail this wide, and
+              // 8px is a size nobody reads. The full name is on the title
+              // above, the glyph stays legible at any width, and a step
+              // whose name is cut is still a step a captain can count.
               <div
                 key={p.phase}
-                className="flex flex-1 flex-col items-center gap-0.5"
+                className="flex min-w-0 flex-1 flex-col items-center gap-0.5"
               >
                 <motion.div
                   className={cn(
-                    "flex h-7 w-full items-center justify-center rounded-md text-[10px] font-medium transition-all",
+                    "flex h-8 w-full min-w-0 items-center justify-center rounded-md transition-all",
                     isCurrent && "pm-grad-voyage shadow-sm",
                     isPast && "bg-celadon/5 text-celadon dark:text-celadon",
                     isUpcoming &&
@@ -129,11 +138,11 @@ export function VoyageTimeline({
                   }}
                   title={p.label}
                 >
-                  <span className="text-[11px]">{p.icon}</span>
+                  <span className="text-sm">{p.icon}</span>
                 </motion.div>
                 <span
                   className={cn(
-                    "text-[8px] leading-none transition-colors",
+                    "w-full truncate text-center text-[10px] leading-none transition-colors",
                     isCurrent
                       ? "font-bold text-foreground"
                       : "text-muted-foreground",

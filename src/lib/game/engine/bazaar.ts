@@ -30,11 +30,11 @@
 // without opening a server, and the one switch this feature reads is
 // judged in ./flags where the epic keeps that policy.
 // =====================================================================
+import { COMMODITIES } from "../constants/goods";
 import {
-  COMMODITIES,
   RUMOR_COOLDOWN_ROUNDS,
   RUMOR_SHIFT_FRACTION,
-} from "../constants";
+} from "../constants/paths";
 import { bazaarRumorsOn } from "../flags";
 import type { PathId } from "../paths";
 import { unlockedResources } from "../pools";
@@ -112,8 +112,10 @@ export function rumorId(publisherUserId: string, round: number): string {
  * speak *now*, which is the cooldown's question below, so the desk asks
  * both and the two refusals read differently on the screen.
  */
-export function canPublishRumor(state: Pick<GameState, "path">): boolean {
-  return bazaarRumorsOn() && state.path === BAZAAR_SELLER_PATH;
+export function canPublishRumor(
+  state: Pick<GameState, "path" | "mode">,
+): boolean {
+  return bazaarRumorsOn(state.mode) && state.path === BAZAAR_SELLER_PATH;
 }
 
 /**

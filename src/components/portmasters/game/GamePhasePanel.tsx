@@ -1,9 +1,9 @@
 "use client";
 
+import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
 import { motion, AnimatePresence } from "framer-motion";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { phaseFace } from "@/lib/game/phases";
-import type { VoyageResult, VoyageReveal } from "@/types/realtime";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
 import { Market } from "./phases/Market";
@@ -12,6 +12,7 @@ import { Orders } from "./phases/Orders";
 import { Settlement } from "./phases/Settlement";
 import { Shipyard, ModuleDraft, ModuleSwap } from "./phases/Shipyard";
 import { VoyageLogPanel } from "./VoyageLogPanel";
+import { gambitSystemsOn } from "@/lib/game/mode";
 import { Bankruptcy } from "./phases/Bankruptcy";
 import { Endgame } from "./phases/Endgame";
 import type { PhasePanelProps } from "./phases/PhaseShared";
@@ -238,6 +239,13 @@ function ActivePhase(props: Props) {
         // it. The wrapper is a plain block rather than a card: the panel
         // is already inside the phase frame, and a card in a card reads as
         // a mistake.
+        //
+        // The pair is drawn only for a mode that keeps a log. The server
+        // opens none for a Classic harbor (see openVoyageLog's one guarded
+        // call), so both columns would be empty here, and an empty frame
+        // under the yard is a feature a captain can see and cannot use:
+        // the founding mode's Dusk is the yard and nothing else, which is
+        // what it was before the log existed.
         <div className="space-y-4">
           <Shipyard
             game={game}
@@ -246,7 +254,9 @@ function ActivePhase(props: Props) {
             phaseSync={phaseSync}
             members={members}
           />
-          <VoyageLogPanel log={voyageLog} privateLog={privateLog} />
+          {gambitSystemsOn(game.mode) && (
+            <VoyageLogPanel log={voyageLog} privateLog={privateLog} />
+          )}
         </div>
       );
     case "module_draft":

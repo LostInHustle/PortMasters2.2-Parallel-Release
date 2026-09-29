@@ -17,7 +17,7 @@
     "check:private": "tsx scripts/private-scan.ts",
     "report:bands": "tsx scripts/bands.ts",
     "report:gates": "tsx scripts/gates.ts",
-    "test:smoke": "tsx scripts/smoke.ts",
+    "test:smoke": "tsx scripts/smoke/index.ts",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

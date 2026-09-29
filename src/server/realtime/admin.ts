@@ -28,16 +28,16 @@
 // why those harbors' other captains are told and returned to the Lobby
 // before the delete happens.
 // =====================================================================
-import type { Server, Socket } from "socket.io";
-import { db } from "@/lib/db";
-import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
-import { roomIdsForUser } from "@/lib/rooms";
-import type {
+import {
   AdminAccount,
   AdminBulkAction,
   AdminBulkReport,
   AdminRoster,
-} from "@/types/realtime";
+} from "@/types/realtime/admin";
+import type { Server, Socket } from "socket.io";
+import { db } from "@/lib/db";
+import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
+import { roomIdsForUser } from "@/lib/rooms";
 import {
   detachUser,
   emptyRoom,

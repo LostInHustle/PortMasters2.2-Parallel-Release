@@ -29,19 +29,19 @@
 // rules again and it is the server's answer that counts.
 // =====================================================================
 
+import {
+  MaroonResult as MaroonResultPayload,
+  MaroonTally as MaroonTallyPayload,
+  MaroonVote as MaroonVotePayload,
+  PortShiftCall,
+  PortShiftNotice,
+} from "@/types/realtime/maroon";
 import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { maroonSeat } from "@/lib/game/engine";
 import { modeConfig } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
 import type { GameState } from "@/lib/game/types";
-import type {
-  MaroonResult as MaroonResultPayload,
-  MaroonTally as MaroonTallyPayload,
-  MaroonVote as MaroonVotePayload,
-  PortShiftCall,
-  PortShiftNotice,
-} from "@/types/realtime";
 
 export function useMaroon(
   socket: Socket | null,

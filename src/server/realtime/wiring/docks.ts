@@ -2,12 +2,12 @@
 // Word on the Docks: the one frame that claims the round's reward.
 // =====================================================================
 
-import type { Server, Socket } from "socket.io";
-
 import {
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/world";
+import type { Server, Socket } from "socket.io";
+
 import { seated } from "../auth";
 import { hasDocksWinner, setDocksWinner } from "../docks";
 

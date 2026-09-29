@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
-import { CONSENT_FEE_MIN } from "@/lib/game/constants";
+import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   ESCORT_SELLER_PATH,
   canSellEscort,
@@ -62,7 +62,7 @@ export function EscortMarket({
   const [fee, setFee] = useState(CONSENT_FEE_MIN);
   const [targetId, setTargetId] = useState("");
 
-  if (!escortContractsOn()) return null;
+  if (!escortContractsOn(game.mode)) return null;
 
   const canSell = canSellEscort(game);
   const covered = consentPartyBusy(

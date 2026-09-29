@@ -26,9 +26,12 @@
 // as it was rather than drawing a blank row.
 // =====================================================================
 
+import {
+  VoyageLogDelivery,
+  VoyageLogHistory,
+} from "@/types/realtime/voyage-log";
 import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { VoyageLogDelivery, VoyageLogHistory } from "@/types/realtime";
 import {
   appendVoyageLog,
   normalizeVoyageLog,

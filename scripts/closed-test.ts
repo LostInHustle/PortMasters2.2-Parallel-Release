@@ -26,7 +26,7 @@
  *   and the script driving it share one database happens at run time,
  *   and it already exists: the smoke suite refuses to clean up after
  *   itself until it has read back, through its own connection, the
- *   first account the server just wrote (scripts/smoke.ts, the safety
+ *   first account the server just wrote (scripts/smoke/, the safety
  *   interlock). That is the check to point at while the closed test is
  *   actually being driven.
  *
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
     "\nNothing here merges into another database, and nothing here contacts a server. The run time proof that a server",
   );
   console.log(
-    "and the script driving it share this file is the smoke suite's safety interlock (scripts/smoke.ts): it refuses",
+    "and the script driving it share this file is the smoke suite's safety interlock (scripts/smoke/): it refuses",
   );
   console.log(
     "to clean up until it has read back, through its own connection, the account the server just wrote. Point the",

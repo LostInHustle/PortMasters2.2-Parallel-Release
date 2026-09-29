@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Sparkles, X, TrendingUp, Handshake, Coins } from "lucide-react";
 import { useAges } from "@/lib/use-ages";
-import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { ModalCard, ModalOverlay } from "@/components/ui/modal-overlay";
 import type { Age, AgeId } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 
@@ -149,59 +149,47 @@ function AgeDetailDialog({
   const Icon = visual.icon;
   return (
     <ModalOverlay onClose={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="pm-glass-strong pm-crackle relative z-10 w-full max-w-md overflow-hidden rounded-3xl p-6"
-      >
-        <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
-        <div className="relative">
-          <div className="mb-4 flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-2xl",
-                  visual.gradient,
-                )}
-              >
-                <Icon className="h-6 w-6" />
-              </div>
-              <div>
-                <h2
-                  className={cn("font-display text-lg font-bold", visual.ink)}
-                >
-                  {age.name}
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  The harbor leans this way for a fortnight
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-              aria-label="Close age details"
+      <ModalCard>
+        <div className="mb-4 flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex h-12 w-12 items-center justify-center rounded-2xl",
+                visual.gradient,
+              )}
             >
-              <X className="h-5 w-5" />
-            </button>
+              <Icon className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className={cn("font-display text-lg font-bold", visual.ink)}>
+                {age.name}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                The harbor leans this way for a fortnight
+              </p>
+            </div>
           </div>
-          <p className="text-sm leading-relaxed text-foreground">
-            {age.description}
-          </p>
-          <div className="mt-4 rounded-xl bg-black/5 p-3 dark:bg-white/5">
-            <p className="text-xs text-muted-foreground">
-              Every captain in every harbor shares the same Age at the same
-              moment. The rotation cycles through the Lender, the Trader, and
-              the Broker every two weeks, then repeats. An Age only shifts the
-              weight of one already legal action, never the rules, which keeps a
-              voyage that began under one Age from unbalancing when the next
-              takes over.
-            </p>
-          </div>
+          <button
+            onClick={onClose}
+            className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+            aria-label="Close age details"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      </motion.div>
+        <p className="text-sm leading-relaxed text-foreground">
+          {age.description}
+        </p>
+        <div className="mt-4 rounded-xl bg-black/5 p-3 dark:bg-white/5">
+          <p className="text-xs text-muted-foreground">
+            Every captain in every harbor shares the same Age at the same
+            moment. The rotation cycles through the Lender, the Trader, and the
+            Broker every two weeks, then repeats. An Age only shifts the weight
+            of one already legal action, never the rules, which keeps a voyage
+            that began under one Age from unbalancing when the next takes over.
+          </p>
+        </div>
+      </ModalCard>
     </ModalOverlay>
   );
 }

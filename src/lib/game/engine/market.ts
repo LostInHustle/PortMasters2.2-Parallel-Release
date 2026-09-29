@@ -16,14 +16,14 @@
 // generators. They were file private before the split purely because
 // everything lived in one file.
 // =====================================================================
+import { ICONS } from "../constants/brand";
 import {
   COMMODITIES,
-  ICONS,
   PRODUCT_PRICES,
   RECIPES,
   RESOURCES,
   RESOURCE_WEIGHTS,
-} from "../constants";
+} from "../constants/goods";
 import { charterOpensOn, marketCountsFor } from "../difficulty";
 import { bazaarRumorsOn } from "../flags";
 import { lockingPathFor } from "../paths";
@@ -593,7 +593,7 @@ export function startMarket(
   // src/server/realtime/checkpoint.ts), and this is the other end of that
   // pair. A save loaded with a lean in it does not price one either, for
   // the same reason.
-  const rumorLean = bazaarRumorsOn() ? state.bazaarLean : {};
+  const rumorLean = bazaarRumorsOn(state.mode) ? state.bazaarLean : {};
   for (let i = 0; i < purchaseCount; i++) {
     state.resourceCards.push({
       id: i,

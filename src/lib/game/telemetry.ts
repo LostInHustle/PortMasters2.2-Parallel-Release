@@ -16,9 +16,8 @@
 // Four families are instrumented in this build and one is not, and the one
 // that is not is named here rather than left for a reader to notice: the
 // build layer waits on Epic F, and the market family ships without the
-// Chandler and Bale lines because both are Epic G's. A family with no
-// event in it
-// is not a family this table can name, which is why the absent one is
+// Chandler and Bale lines because both are Epic G's. A family with no event
+// in it is not a family this table can name, which is why the absent one is
 // prose here and a value there.
 //
 // Two families that were once named here as absent have landed since, and
@@ -64,7 +63,7 @@ export type TelemetryOutcome = "concluded" | "restarted" | "emptied";
 
 // The families the proposal groups its measurements into. The three the
 // header explains are absent here rather than present and empty.
-export type TelemetryFamily = "loop" | "market" | "social" | "business";
+type TelemetryFamily = "loop" | "market" | "social" | "business";
 
 // Every event this build emits, with the fields it carries. Each one
 // carries its own leg because a record is read by leg, and a leg is the
@@ -465,11 +464,10 @@ export function normalizeRecord(value: unknown): TelemetryRecord | null {
         presentAtEnd: line.presentAtEnd === true,
         // A line written before these reads existed reads as a captain the
         // harbor did not put ashore, was not silenced, and who took nothing
-        // in trade, which is the same absence an unreadable save gives.
-        // That is the
-        // no backfill rule: an old record is read with defaults rather than
-        // rewritten, and no record carries a null a reader would have to
-        // special case.
+        // in trade, which is the same absence an unreadable save gives. That
+        // is the no backfill rule: an old record is read with defaults
+        // rather than rewritten, and no record carries a null a reader would
+        // have to special case.
         marooned: line.marooned === true,
         muted: line.muted === true,
         peerTradeProfit: normalizeProfit(line.peerTradeProfit),

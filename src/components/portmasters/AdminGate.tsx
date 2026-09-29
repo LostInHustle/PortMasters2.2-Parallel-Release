@@ -18,11 +18,16 @@
 // What is this screen's own is the setup code (a field the harbor never
 // asks for), the role check behind the sign in tab, and the console's
 // colors.
+//
+// Its notice is why an operator is looking at this card again rather
+// than at the console they had open: the role was taken away, usually by
+// another operator. The page owns it, because the page is where the
+// refusal was heard.
 // =====================================================================
 
-import { api, type PublicUser } from "@/lib/api";
+import { api } from "@/lib/api";
 import { ShieldCheck, KeyRound } from "lucide-react";
-import { APP_NAME } from "@/lib/game/constants";
+import { APP_NAME } from "@/lib/game/constants/brand";
 import { DISPLAY_NAME_MAX } from "@/lib/credentials";
 import {
   CHOSEN_NAME,
@@ -30,6 +35,7 @@ import {
   CredentialCard,
   SIGN_IN_FIELDS,
   type CredentialFieldSpec,
+  type DoorProps,
 } from "@/components/portmasters/CredentialCard";
 
 // The same sentence the server refuses a non operator with, so the two
@@ -80,18 +86,7 @@ function ConsoleHeader() {
   );
 }
 
-export function AdminGate({
-  onAuthed,
-  notice,
-  onDismissNotice,
-}: {
-  onAuthed: (u: PublicUser, token: string) => void;
-  // Why an operator is looking at this card again rather than at the
-  // console they had open: the role was taken away, usually by another
-  // operator. Owned by the page, which is where the refusal was heard.
-  notice?: string | null;
-  onDismissNotice?: () => void;
-}) {
+export function AdminGate({ onAuthed, notice, onDismissNotice }: DoorProps) {
   return (
     <CredentialCard
       fields={{ login: SIGN_IN_FIELDS, register: REGISTER_FIELDS }}
@@ -127,10 +122,10 @@ export function AdminGate({
       }}
       accent="pm-grad-admin"
       footer={
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+        <>
           Registration needs the setup code the server was configured with.
           Accounts created here are administrators.
-        </p>
+        </>
       }
     />
   );

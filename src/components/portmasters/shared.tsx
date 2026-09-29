@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { MeritId } from "@/lib/game/merits";
-import { ICONS } from "@/lib/game/constants";
+import { ICONS } from "@/lib/game/constants/brand";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

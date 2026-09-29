@@ -40,7 +40,7 @@ import type { Phase, LegPhase } from "./types";
 // gradient per leg. Three tables over one fact is three places for a phase
 // to be renamed in two of them, and the mode that briefs a captain in the
 // words of a phase it does not run is the kind of wrong nothing catches.
-export interface PhaseFace {
+interface PhaseFace {
   // Captain facing name, read on the rail and in a briefing chart.
   label: string;
   // The rail is a strip of six narrow cells, so it prints this instead of

@@ -16,6 +16,8 @@
 // from, so a dialog here is a pure function of its props.
 // =====================================================================
 
+import { VoyageChronicle } from "@/types/realtime/voyage";
+import { HouseStanding } from "@/types/realtime/standings";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -37,7 +39,6 @@ import {
 import type { CaptainLegacySummary, HouseId } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import { HOUSES, type House } from "@/lib/game/engine";
-import type { HouseStanding, VoyageChronicle } from "@/types/realtime";
 
 // Renown, and what it does on the next fresh voyage. The paragraph under
 // the card is the rule as a captain needs it, and it names no number of

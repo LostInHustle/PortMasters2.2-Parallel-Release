@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
+import { ICONS } from "@/lib/game/constants/brand";
 import {
-  ICONS,
   RUMOR_COOLDOWN_ROUNDS,
   RUMOR_SHIFT_FRACTION,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/paths";
 import {
   BAZAAR_SELLER_PATH,
   bazaarGoods,
@@ -72,7 +72,7 @@ export function BazaarRumors({
   const [good, setGood] = useState("");
   const [direction, setDirection] = useState<RumorDirection>(1);
 
-  if (!bazaarRumorsOn()) return null;
+  if (!bazaarRumorsOn(game.mode)) return null;
 
   // The goods the market being priced next will trade, which is the list
   // the server checks a publish against and the only list this desk may

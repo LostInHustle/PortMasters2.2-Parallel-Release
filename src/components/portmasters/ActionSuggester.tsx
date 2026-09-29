@@ -17,7 +17,8 @@ import {
   getIntelCost,
   lockedBehind,
 } from "@/lib/game/engine";
-import { RECIPES, SILK_GOODS, WORKER_TYPES } from "@/lib/game/constants";
+import { WORKER_TYPES } from "@/lib/game/constants/crew";
+import { RECIPES, SILK_GOODS } from "@/lib/game/constants/goods";
 import { TONE_WASH } from "./shared";
 
 /**

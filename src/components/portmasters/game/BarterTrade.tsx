@@ -24,11 +24,11 @@ import { useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ICONS } from "@/lib/game/constants/brand";
 import {
   BARTER_ITEMS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
-  ICONS,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/goods";
 import {
   flexibleBarterUnlocked,
   flexibleOffersLeft,

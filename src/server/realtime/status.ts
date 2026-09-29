@@ -9,8 +9,8 @@
 // finisher loop) and each of those should import from one place
 // rather than reaching into presence's internals.
 // =====================================================================
+import { GameStatusUpdate } from "@/types/realtime/status";
 import type { Server } from "socket.io";
-import type { GameStatusUpdate } from "@/types/realtime";
 
 // roomId -> (userId -> last reported status)
 export const roomStatuses = new Map<string, Map<string, GameStatusUpdate>>();

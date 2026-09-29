@@ -22,7 +22,7 @@
 // modifier, so the banner announced an Age in the present tense and no
 // part of the voyage acted on it.
 // =====================================================================
-import { BROKERS_FAVOR_PAYOUT_CAP } from "../constants";
+import { BROKERS_FAVOR_PAYOUT_CAP } from "../constants/world";
 
 export type AgeId = "lender" | "trader" | "broker";
 

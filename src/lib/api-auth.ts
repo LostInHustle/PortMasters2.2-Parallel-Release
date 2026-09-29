@@ -44,6 +44,20 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   };
 }
 
+// The answer a route gives a request with no session behind it. Twenty two
+// routes refuse the same way, so the sentence and the status code are
+// written down once rather than twenty two times, and the one place to
+// change either of them is here.
+//
+// It is a function rather than a shared response object because
+// NextResponse.json builds its body at the moment it is asked, and one
+// object handed to two requests is one object two requests can both write
+// to. It is named after signedInResponse above for the same reason the two
+// sit together: they are the two answers a session door gives.
+export function unauthorizedResponse(): NextResponse {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
 // Serialize a Set-Cookie header value for the session cookie. Held here
 // rather than exported: the three routes that sign somebody in go through
 // signedInResponse below, so the only thing that ever builds a session

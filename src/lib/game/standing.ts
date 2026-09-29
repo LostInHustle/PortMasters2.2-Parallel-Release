@@ -29,7 +29,8 @@
 // iteration a later slice would do; this one is the set that plays one
 // voyage.
 // =====================================================================
-import { BOONS, MARKET_GOODS, type Boon } from "./constants";
+import { BOONS, type Boon } from "./constants/drafts";
+import { MARKET_GOODS } from "./constants/goods";
 
 /**
  * One line of a captain's shopping list: a good, and the dearest they will

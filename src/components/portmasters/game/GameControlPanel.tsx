@@ -5,6 +5,7 @@ import type { GameState } from "@/lib/game/types";
 import type { PhaseClock } from "@/lib/phase-clock";
 import { phaseLabel } from "@/lib/game/engine";
 import { isGatedPhase } from "@/lib/game/checkpoint";
+import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
 import { cn } from "@/lib/utils";
 import {
@@ -62,7 +63,13 @@ export function GameControlPanel({
   clock?: PhaseClock | null;
   onCancelReady: () => void;
 }) {
-  const ordersLive = standingOrdersLive(game.standingOrders);
+  // [B3] The page is the mode's before it is the captain's. A voyage whose
+  // mode keeps no standing order has none to write, so the button is not
+  // drawn at all and the captain's own switch is read only once there is a
+  // page to read it on (see standingOrdersLive, and the standingOrders
+  // field on the mode record).
+  const ordersOffered = modeConfig(game.mode).standingOrders;
+  const ordersLive = ordersOffered && standingOrdersLive(game.standingOrders);
 
   // Both conditions are the same fact read twice: waiting is only ever set
   // on the recurring Next Phase transition, so the button wears the quiet
@@ -174,22 +181,24 @@ export function GameControlPanel({
             switch on and wrote nothing is sailing the default voyage, and
             a button that glowed for them would be promising a seat that
             nothing is going to play. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "rounded-lg",
-            ordersLive && "text-standing hover:text-standing",
-          )}
-          title={
-            ordersLive
-              ? "Standing orders are written and on"
-              : "Write what your seat should do when the clock plays it"
-          }
-          onClick={onStandingOrders}
-        >
-          <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
-        </Button>
+        {ordersOffered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "rounded-lg",
+              ordersLive && "text-standing hover:text-standing",
+            )}
+            title={
+              ordersLive
+                ? "Standing orders are written and on"
+                : "Write what your seat should do when the clock plays it"
+            }
+            onClick={onStandingOrders}
+          >
+            <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

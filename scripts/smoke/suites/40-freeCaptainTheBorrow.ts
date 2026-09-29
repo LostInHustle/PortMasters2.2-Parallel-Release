@@ -1,0 +1,335 @@
+// PortMasters 2.2 Parallel Release, smoke run: Free Captain: the borrow.
+
+import { SILK_GOODS } from "@/lib/game/constants/goods";
+import {
+  OPPORTUNIST_PENALTY,
+  OPPORTUNIST_USES,
+  PATH_ORDER_SLOTS,
+} from "@/lib/game/constants/paths";
+import {
+  OPPORTUNIST_PATH,
+  calcTransportCost,
+  canFillOrder,
+  completeOrder,
+  lockedBehind,
+  nextPhase,
+  normalizeOpportunistBorrows,
+  opportunistBorrowsLeft,
+  opportunistBorrowsTaken,
+  opportunistLine,
+  opportunistMayBorrow,
+  opportunistPayout,
+  restartGame,
+  snapToCheckpoint,
+} from "@/lib/game/engine";
+import { PATH_IDS, pathLockLine } from "@/lib/game/paths";
+import type { GameState } from "@/lib/game/types";
+import {
+  GAMBIT,
+  carriesADash,
+  check,
+  suffix,
+  voyageState,
+  withEnv,
+} from "../harness";
+
+export async function freeCaptainTheBorrowSuite(): Promise<void> {
+  // ---- the allowance ----
+  // The two numbers the plan sets, and the payout they make. The penalty
+  // is read off the constant rather than typed here, so F6's retune moves
+  // this check with it.
+  check(
+    OPPORTUNIST_USES === 1 &&
+      OPPORTUNIST_PENALTY === 0.4 &&
+      opportunistPayout(100) === 60 &&
+      opportunistPayout(100) === 100 - Math.round(100 * OPPORTUNIST_PENALTY),
+    "a hundred Gold order pays sixty on the borrow, which is the plan's forty percent penalty read off the constant rather than typed into the rule",
+  );
+  // The property, over every face value a card can carry rather than over
+  // one example: the payout never exceeds the face value, never goes
+  // below zero, and never falls as the order grows. The first of those is
+  // the one the smallest orders decide, because a deduction that floored
+  // instead of rounding would leave a two Gold order paying two and the
+  // penalty would stop being real exactly where the plan says the reach
+  // has to cost something.
+  check(
+    Array.from({ length: 200 }, (_, i) => i + 1).every(
+      (face, i, all) =>
+        opportunistPayout(face) <= face &&
+        opportunistPayout(face) >= 0 &&
+        (i === 0 || opportunistPayout(face) >= opportunistPayout(all[i - 1])),
+    ) &&
+      opportunistPayout(2) === 1 &&
+      opportunistPayout(1) === 1 &&
+      opportunistPayout(0) === 0 &&
+      opportunistPayout(-5) === 0,
+    "and the payout is bounded by the face value at every size, so the penalty is charged on a one Gold errand as surely as on a hundred: the deduction is the number rounded and the smallest orders still pay it",
+  );
+  // One path works the borrow and no other does, and the switch is read
+  // before the path rather than beside it: the reading every ability
+  // reader in this tree takes, and the reason a rolled back build refuses
+  // a Free Captain as flatly as it refuses everyone else.
+  check(
+    PATH_IDS.every(
+      (id) =>
+        opportunistMayBorrow(
+          { path: id, opportunistBorrows: 0, mode: GAMBIT },
+          "convoy",
+        ) ===
+        (id === OPPORTUNIST_PATH),
+    ) &&
+      !opportunistMayBorrow(
+        { path: null, opportunistBorrows: 0, mode: GAMBIT },
+        "convoy",
+      ) &&
+      !withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
+        opportunistMayBorrow(
+          { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+          "convoy",
+        ),
+      ) &&
+      !opportunistMayBorrow(
+        { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+        null,
+      ),
+    "one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
+  );
+  // The counter itself: a bound read off the constant, a spent allowance
+  // that reads as none left, and a save carrying more spent than this
+  // build allows reading as none left rather than as a debt.
+  check(
+    opportunistBorrowsLeft({ opportunistBorrows: 0 }) === OPPORTUNIST_USES &&
+      opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES }) === 0 &&
+      opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES + 5 }) ===
+        0 &&
+      opportunistBorrowsTaken({ opportunistBorrows: 2.7 }) === 2 &&
+      opportunistBorrowsTaken({ opportunistBorrows: -4 }) === 0,
+    "the allowance is a count rather than a flag, bounded by the constant F6 retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
+  );
+  // The heal, and the old save it exists for: a voyage written before
+  // this feature carries no counter at all, and the load site reads it
+  // with the module's own reader, so the reading here is the reading the
+  // board gets.
+  check(
+    normalizeOpportunistBorrows(undefined) === 0 &&
+      normalizeOpportunistBorrows(Number.NaN) === 0 &&
+      normalizeOpportunistBorrows("two") === 0 &&
+      normalizeOpportunistBorrows(2.7) === 2 &&
+      normalizeOpportunistBorrows(-1) === 0,
+    "and a save written before the borrow existed reads as a captain who never borrowed anything, rather than as a counter that would turn the first spend into a NaN the record would carry",
+  );
+  // ---- where the counter lives ----
+  // The plan's own clause: "The counter resets with the voyage, not with
+  // the round, and it lives in the same place as the other once per
+  // voyage limits." Both halves are observed rather than asserted: the
+  // rest of the round is walked through the engine's own lap until the
+  // books roll over, and the counter is still spent afterwards; then the
+  // voyage is restarted and it is not.
+  const borrowCarried = voyageState();
+  borrowCarried.money = 400;
+  borrowCarried.opportunistBorrows = 1;
+  borrowCarried.phase = "resolve";
+  borrowCarried.pirateAttackResolved = true;
+  const borrowCtx = {
+    seedBase: `smoke:borrow:${suffix}`,
+    harborId: `smoke-borrow-${suffix}`,
+  };
+  // Bounded rather than a fixed count of presses: the phases a mode runs
+  // between the settlement and the next round are the mode's own, so the
+  // check walks whatever this build's lap is rather than a list of phase
+  // names written here.
+  for (let step = 0; step < 6 && borrowCarried.currentRound === 1; step++) {
+    nextPhase(borrowCarried, borrowCtx, []);
+  }
+  check(
+    borrowCarried.currentRound === 2 && borrowCarried.opportunistBorrows === 1,
+    "a round walked through the engine's own lap leaves the borrow spent, which is what makes it a voyage's allowance rather than a leg's",
+  );
+  restartGame(borrowCarried, [], {});
+  check(
+    borrowCarried.currentRound === 1 && borrowCarried.opportunistBorrows === 0,
+    "and setting sail again hands the allowance back with everything else the voyage holds, because the counter is part of the voyage's own state rather than of the account behind it",
+  );
+
+  // ---- the board, and the fill ----
+  // The board a Free Captain meets, dealt through the engine's own
+  // lifecycle: the tier's draw plus the paths' three, and every one of
+  // the three is locked to a captain who holds none of those paths.
+  const borrowBoard = (label: string): GameState => {
+    const state = voyageState();
+    snapToCheckpoint(
+      state,
+      { seedBase: `smoke:borrow-board:${label}`, harborId: "harbor-a" },
+      1,
+      "orders",
+      [],
+    );
+    state.path = OPPORTUNIST_PATH;
+    return state;
+  };
+  // The card's goods put in the hold, so the only thing standing between
+  // the captain and the order is the lock.
+  const stockFor = (
+    state: GameState,
+    card: GameState["customerCards"][number],
+  ) => {
+    for (const r of card.resources) state.inventory[r.type] = r.required ?? 0;
+  };
+  const lockedCardsOf = (state: GameState) =>
+    state.customerCards.filter((card) => lockedBehind(state, card) !== null);
+
+  withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+    const board = borrowBoard("a");
+    const lockedCards = lockedCardsOf(board);
+    const openCards = board.customerCards.filter(
+      (card) => lockedBehind(board, card) === null,
+    );
+    check(
+      lockedCards.length === PATH_ORDER_SLOTS && openCards.length > 0,
+      `a Free Captain's board carries the paths' three locked cards like everyone else's (${lockedCards.length} locked, ${openCards.length} open)`,
+    );
+    const lockedCard = lockedCards[0]!;
+    check(
+      !canFillOrder(board, lockedCard) &&
+        canFillOrder(board, lockedCard, true) &&
+        board.completedOrders.length === 0,
+      "and the manifest refuses the locked card through its ordinary guard while the same card with the borrow asked for is the captain's to fill",
+    );
+    check(
+      !canFillOrder({ ...board, inventory: {} }, lockedCard, true),
+      "and the borrow is not a way around the hold: a captain carrying none of the goods is refused with the ability asked for as flatly as without it, because the order still has to be filled rather than unlocked",
+    );
+
+    // The fill itself, through the engine's own settlement, with the
+    // freight read the way the settlement reads it so the check is about
+    // the payout rather than about a freight figure typed here.
+    const filled = borrowBoard("b");
+    filled.money = 500;
+    const card = lockedCardsOf(filled)[0]!;
+    stockFor(filled, card);
+    const freight = calcTransportCost(
+      filled,
+      card.totalItems,
+      card.resources.some((r) => SILK_GOODS.includes(r.type)),
+    );
+    const paid = opportunistPayout(card.reward);
+    const lines: string[] = [];
+    completeOrder(filled, card.id, lines, true);
+    check(
+      filled.money === 500 + paid - freight &&
+        filled.completedOrders.includes(card.id) &&
+        filled.opportunistBorrows === 1 &&
+        filled.path === OPPORTUNIST_PATH,
+      "a borrowed order fills through the same settlement as any other, pays the reduced reward down to the coin, spends the allowance, and leaves the captain holding the path they already held: the order is filled without joining its own",
+    );
+    check(
+      lines.includes(opportunistLine(card.reward, paid)) && paid < card.reward,
+      "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the plan says has to cost something real",
+    );
+
+    // The second locked card, with the allowance spent: refused through
+    // the same reader, and refused with the sentence every other captain
+    // is refused with rather than with one written for this path.
+    const spare = lockedCardsOf(filled).find((o) => o.id !== card.id)!;
+    const spareLock = lockedBehind(filled, spare)!;
+    stockFor(filled, spare);
+    const moneyBefore = filled.money;
+    const refused: string[] = [];
+    completeOrder(filled, spare.id, refused, true);
+    check(
+      filled.money === moneyBefore &&
+        !filled.completedOrders.includes(spare.id) &&
+        filled.opportunistBorrows === 1 &&
+        refused.includes(`❌ ${pathLockLine(spareLock)}`),
+      "a second borrow in the same voyage is refused and the order stays standing, with the lock line every other captain reads rather than a sentence written for this path: one action with one counter, which is the plan's own rollback shape",
+    );
+
+    // The flag on a card that was never locked: asked for, and read as
+    // nothing at all. This is the shape the board's borrow button uses
+    // (it asks with the flag on every board it draws), and it is what
+    // keeps an over eager caller from taxing a captain wrongly.
+    const ordinary = borrowBoard("c");
+    ordinary.money = 500;
+    // A raw good order rather than a finished product, because a product
+    // order pays VAT on top of its reward and this check is about the
+    // face value coming through whole.
+    const openCard = ordinary.customerCards.find(
+      (card) => lockedBehind(ordinary, card) === null && !card.isProductOrder,
+    );
+    if (!openCard) {
+      throw new Error(
+        "No open raw order on the board to read the unbought case off.",
+      );
+    }
+    stockFor(ordinary, openCard);
+    const ordinaryFreight = calcTransportCost(
+      ordinary,
+      openCard.totalItems,
+      openCard.resources.some((r) => SILK_GOODS.includes(r.type)),
+    );
+    const ordinaryLines: string[] = [];
+    completeOrder(ordinary, openCard.id, ordinaryLines, true);
+    check(
+      ordinary.money === 500 + openCard.reward - ordinaryFreight &&
+        ordinary.opportunistBorrows === 0 &&
+        !ordinaryLines.some((line) => line.includes("Free Captain")),
+      "while the same flag asked for on an order nobody locked is read as nothing at all: the card pays its full reward, the allowance is untouched and no borrow line is written, so an over eager caller cannot tax a captain for an ability their order never needed",
+    );
+  });
+
+  // ---- the switch, off ----
+  // The rollback the plan asks for, and it is the one switch D2 already
+  // ships: with the locks off the board holds no pathbound card at all,
+  // so there is nothing for the borrow to reach through and the ability
+  // is refused with the cards that carry it.
+  withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () => {
+    const dark = borrowBoard("d");
+    const darkCards = dark.customerCards.filter((card) => card.isPathOrder);
+    const darkLocked = lockedCardsOf(dark);
+    check(
+      darkCards.length === 0 &&
+        darkLocked.length === 0 &&
+        !opportunistMayBorrow(dark, "convoy"),
+      "with the path orders rolled back the board holds none of the paths' three even though the draw wrote them, and the borrow is refused with them: the plan's rollback is one switch, and this one is already the locks'",
+    );
+  });
+
+  // The house rule, over the copy this feature added: every sentence a
+  // captain reads on a borrowed card is written in the module beside the
+  // arithmetic it describes, board and ledger together, so the two files
+  // swept here are where the whole of it lives. The board component is
+  // deliberately not swept whole, and the reason is the tree's own: it
+  // reads its colors through CSS custom properties, and a doubled hyphen
+  // is how that syntax is spelled (see the note on CARRIES_A_DASH above),
+  // so the file cannot be held to a rule about dashes. Every borrow
+  // string it draws is one of the module's own, which is what the check
+  // below is standing on, and the rendered board is read in a browser
+  // where the sentences land rather than here.
+  check(
+    !carriesADash("src/lib/game/engine/opportunist.ts") &&
+      !carriesADash("src/lib/game/engine/orders.ts"),
+    "every file the borrow's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+  );
+
+  // =====================================================================
+  // [D7: the draft, and switching] The plan's clause for this feature, and
+  // the whole of it: "Deal each captain three path cards face down from a
+  // deck seeded so at least two Quartermaster cards are in circulation.
+  // Keep one, pass two to the left, keep one of the two received, pass
+  // one, discard the last. Then switching: once per voyage, at a port,
+  // legs three through nine, forfeiting unfulfilled pathbound orders and
+  // paying a Refit fee scaled to Renown, and the switch is published to
+  // the fleet log where everyone sees it."
+  //
+  // The checks are split the way the feature is. The deal's arithmetic is
+  // read here without a server, because the rule module holds no state and
+  // nothing about a deck needs a room. The deal itself is then played on a
+  // real harbor, because the privacy of a hand is the wire half of this
+  // feature and no reading of a rule module can observe it: two captains
+  // sit down, the voyage sets sail, and every frame both sockets receive
+  // is kept. The switch is read in both halves, the engine's own guard
+  // over a save and the room's publication over the wire, because the
+  // plan's "everyone knows" is a claim about the fleet rather than about
+  // the captain who changed their papers.
+  // =====================================================================
+}

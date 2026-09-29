@@ -32,14 +32,14 @@
 // because the database is the only thing that knows.
 // =====================================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Socket } from "socket.io-client";
-import { api } from "@/lib/api";
-import type {
+import {
   AdminAccount,
   AdminBulkAction,
   AdminBulkReport,
-} from "@/types/realtime";
+} from "@/types/realtime/admin";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
+import { api } from "@/lib/api";
 
 // The five things an operator can do to one account. The four of them a
 // selection can take ride the same socket event, admin:bulk, and are named

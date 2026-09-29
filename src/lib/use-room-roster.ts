@@ -1,13 +1,10 @@
 "use client";
 
+import { RoomMembersPayload } from "@/types/realtime/moderation";
+import { PublicUser, RoomMemberLive } from "@/types/realtime/presence";
+import { GameStatusUpdate } from "@/types/realtime/status";
 import { useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type {
-  GameStatusUpdate,
-  PublicUser,
-  RoomMemberLive,
-  RoomMembersPayload,
-} from "@/types/realtime";
 
 type RoomStatusMap = Record<string, GameStatusUpdate>;
 

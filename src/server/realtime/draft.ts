@@ -42,10 +42,11 @@
 // for the plan's own reason: "draft state is transient per voyage, so
 // nothing durable is at risk."
 // =====================================================================
+import { DraftStep, DraftView, PathSwitched } from "@/types/realtime/draft";
 import { randomUUID } from "node:crypto";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import { DRAFT_STEP_SECONDS } from "@/lib/game/constants";
+import { DRAFT_STEP_SECONDS } from "@/lib/game/constants/paths";
 import {
   DRAFT_AUTO_PICK,
   draftDeck,
@@ -56,7 +57,6 @@ import {
 import { createRng } from "@/lib/game/rng";
 import { pathDraftOn } from "@/lib/game/flags";
 import type { PathId } from "@/lib/game/paths";
-import type { DraftStep, DraftView, PathSwitched } from "@/types/realtime";
 import { emitToUser } from "./presence";
 import { noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
@@ -179,8 +179,9 @@ export async function dealPaths(
   io: Server,
   roomId: string,
   roster: readonly string[],
+  mode: unknown,
 ): Promise<void> {
-  if (!pathDraftOn()) return;
+  if (!pathDraftOn(mode)) return;
   if (drafts.has(roomId)) return;
   if (roster.length === 0) return;
 

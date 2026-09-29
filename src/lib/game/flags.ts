@@ -12,9 +12,32 @@
 // nine, and a policy that nine families depend on belongs beside none of
 // them rather than inside the first one that needed it.
 //
-// Pure: no state, no clock, no socket. The one thing this module touches
-// is the process environment, and that is the whole of what it is for.
+// [The mode boundary] Every switch here answers with two readings, and the
+// order they are taken in is the rule: the mode first, the environment
+// second.
+//
+// The systems this epic built are Ocean Gambit's, and Classic is the
+// shipped release kept exactly as it was. That is a boundary rather than a
+// default, so it is not the operator's to move: a deployment that exported
+// NEXT_PUBLIC_BAZAAR=1 into a process serving both modes must not hand the
+// bazaar to a Classic table, and the mode read is what stops it. The
+// environment value is the switch the plan promises for each family, and it
+// is read inside that boundary rather than beside it, so a switch can only
+// ever take a system away from the mode it belongs to and never hand it to
+// the one it does not.
+//
+// The mode read is folded in here rather than left at each call site for
+// the reason the flag policy itself is here: thirty odd call sites writing
+// two conditions is thirty odd chances to write them in the wrong order,
+// and the order is the whole of the rule.
+//
+// Pure: no state, no clock, no socket. It touches the process environment
+// and the mode record, and both of those are fixed for the life of the
+// process: the environment because it is read from, and the record because
+// it is a constant table rather than anything a voyage can move.
 // =====================================================================
+
+import { modeConfig } from "./mode";
 
 /**
  * The one place a survival switch is judged, for every flag in this epic.
@@ -22,12 +45,10 @@
  * The policy is written here once because nine switches read it now. Six
  * are judged in this file, the provisions layer, C4's split hold, D2's path
  * orders, D3's escort contracts, D5's bazaar rumor and D7's draft, and
- * three read it
- * from their own module, C2's loss rule in ./crew, C3's wardrobe in
- * ./garments and D4's bench in ./engine/refits. The cost of nine copies is
- * a set that drifts: one flag
- * accepting a value another refuses is a bug that only shows the evening an
- * operator tries it.
+ * three read it from their own module, C2's loss rule in ./crew, C3's
+ * wardrobe in ./garments and D4's bench in ./engine/refits. The cost of
+ * nine copies is a set that drifts: one flag accepting a value another
+ * refuses is a bug that only shows the evening an operator tries it.
  *
  * Unset, empty and any value that is not the word off or the digit zero
  * all mean the switch is on, matched after trimming and lowering, so a
@@ -48,9 +69,25 @@
  * to remember when the next switch lands is that its read has to be written
  * out the same way: the name at the read, the judgement here.
  */
-export function flagOn(raw: string | undefined): boolean {
+function flagOn(raw: string | undefined): boolean {
   const value = (raw ?? "").trim().toLowerCase();
   return value !== "off" && value !== "0";
+}
+
+/**
+ * A switch's whole answer: the mode it belongs to, and the operator's
+ * rollback inside it.
+ *
+ * Every switch below is this function with its own environment read at the
+ * call site, which keeps the browser's rule about how a read has to be
+ * written (see flagOn above) while giving the two conditions one spelling.
+ * The mode is taken as unknown for the reason normalizeMode takes it that
+ * way: a room row written before modes existed, a stale save and a
+ * malformed request all land on the founding mode, and the founding mode
+ * carries none of these systems.
+ */
+export function flagOnFor(mode: unknown, raw: string | undefined): boolean {
+  return modeConfig(mode).gambitSystems && flagOn(raw);
 }
 
 /**
@@ -74,8 +111,8 @@ export function flagOn(raw: string | undefined): boolean {
  * nothing, and leaving it live is what lets the suite hold both sides of
  * every switch in a single run rather than one process per value.
  */
-export function survivalLayerOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_SURVIVAL);
+export function survivalLayerOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_SURVIVAL);
 }
 
 /**
@@ -93,8 +130,8 @@ export function survivalLayerOn(): boolean {
  * a table with the provisions layer off plays the base game exactly, no
  * capacity read anywhere, whatever this one says.
  */
-export function splitHoldOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_SPLIT_HOLD);
+export function splitHoldOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_SPLIT_HOLD);
 }
 
 /**
@@ -111,8 +148,8 @@ export function splitHoldOn(): boolean {
  * differently either way: a marked card is a marked card, and this is what
  * decides whether the mark means anything.
  */
-export function pathOrdersOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_PATH_ORDERS);
+export function pathOrdersOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_PATH_ORDERS);
 }
 
 /**
@@ -129,8 +166,8 @@ export function pathOrdersOn(): boolean {
  * room's board is not drawn from and the engine's cover answers null, so
  * the buyer sails on their own luck and no claim can be raised.
  */
-export function escortContractsOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_ESCORT_CONTRACTS);
+export function escortContractsOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_ESCORT_CONTRACTS);
 }
 
 /**
@@ -155,12 +192,20 @@ export function escortContractsOn(): boolean {
  * It is judged here rather than in ./engine/bazaar for the reason the
  * trailing note below gives about D4's bench read the other way around:
  * this feature stands on no other layer. A rumor is a rule about prices,
- * and prices are in the base game, so the plan's own words hold here
- * without a dependency: "this ships in the base mode, not only in Ocean
- * Gambit, and that is a deliberate call rather than an oversight."
+ * and prices are in the base game, so nothing has to be true of another
+ * system before this one can answer.
+ *
+ * The plan's own words for this slice were that it "ships in the base mode,
+ * not only in Ocean Gambit, and that is a deliberate call rather than an
+ * oversight", and the call was reversed after the mode boundary was drawn:
+ * a rumor is a system this branch added, and Classic is the shipped release
+ * with nothing added to it, so the desk is Gambit's and the plan's sentence
+ * is superseded rather than quietly outvoted. A rumor needs the mode read
+ * like every other switch here, and the environment value is the rollback
+ * inside it.
  */
-export function bazaarRumorsOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_BAZAAR);
+export function bazaarRumorsOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_BAZAAR);
 }
 
 /**
@@ -191,8 +236,8 @@ export function bazaarRumorsOn(): boolean {
  * the room's switch handler, and the panel that offers the voyage's one
  * change of papers.
  */
-export function pathDraftOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_PATH_DRAFT);
+export function pathDraftOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_PATH_DRAFT);
 }
 
 /* D4's own switch is not judged here, and the reason is the cycle rather

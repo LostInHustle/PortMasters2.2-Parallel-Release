@@ -8,7 +8,7 @@
 // grantHelperReputation is imported from ./aid rather than duplicated,
 // because lending and backing share one per voyage Reputation ceiling.
 // =====================================================================
-import { BACKING_REPUTATION_PER_GOLD } from "../constants";
+import { BACKING_REPUTATION_PER_GOLD } from "../constants/reputation";
 import type { GameState } from "../types";
 import { ageBackingReputationMultiplier } from "./ages";
 import { grantHelperReputation } from "./aid";

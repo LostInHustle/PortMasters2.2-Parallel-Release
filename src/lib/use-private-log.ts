@@ -16,9 +16,12 @@
 // to a table that no longer exists.
 // =====================================================================
 
+import {
+  PrivateEntry,
+  PrivateEntryDelivery,
+} from "@/types/realtime/private-entry";
 import { useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { PrivateEntry, PrivateEntryDelivery } from "@/types/realtime";
 
 export function usePrivateLog(
   socket: Socket | null,

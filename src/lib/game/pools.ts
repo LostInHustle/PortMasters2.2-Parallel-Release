@@ -4,7 +4,7 @@
 // What a captain can actually see this round, given the room's difficulty
 // and how far the voyage has run. ./constants owns the content, ./difficulty
 // owns the schedule, and this module is the one place the two meet: keeping
-// it separate is what lets constants.ts read difficulty copy without the two
+// it separate is what lets constants/ read difficulty copy without the two
 // importing each other in a cycle.
 //
 // Every pool keys off the same unlockedTierFor, so goods, ports, artisans,
@@ -12,6 +12,7 @@
 // arrived. On Fair Winds the tier is always 0, so every function here returns
 // exactly the founding trade and nothing else.
 // =====================================================================
+import { WORKER_TYPES, type WorkerType } from "./constants/crew";
 import {
   BOONS_TIER0,
   BOONS_TIER1,
@@ -19,9 +20,10 @@ import {
   MODULES_TIER0,
   MODULES_TIER1,
   MODULES_TIER2,
-  PORTS_TIER0,
-  PORTS_TIER1,
-  PORTS_TIER2,
+  type Boon,
+  type Module,
+} from "./constants/drafts";
+import {
   PRODUCTS_TIER0,
   PRODUCTS_TIER1,
   PRODUCTS_TIER2,
@@ -29,11 +31,8 @@ import {
   RESOURCES_TIER1,
   RESOURCES_TIER2,
   RESOURCE_WEIGHTS,
-  WORKER_TYPES,
-  type Boon,
-  type Module,
-  type WorkerType,
-} from "./constants";
+} from "./constants/goods";
+import { PORTS_TIER0, PORTS_TIER1, PORTS_TIER2 } from "./constants/world";
 import { unlockedPool, unlockedTierFor } from "./difficulty";
 
 export function unlockedResources(

@@ -65,7 +65,7 @@ import { roleCard, type GambitRole } from "./gambit";
 // than repeated as a number here: a hold whose size was retuned in
 // ./constants must move the percentage on this page without anybody
 // editing a dashboard.
-import { CARGO_SLOTS, STORES_SLOTS } from "./constants";
+import { CARGO_SLOTS, STORES_SLOTS } from "./constants/supplies";
 // The table size bands, read from the deck's own table rather than
 // repeated here: the fill time below is read one band at a time, and a
 // band the draw knows and the dashboard does not would be a table size

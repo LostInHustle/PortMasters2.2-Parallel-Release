@@ -1,8 +1,8 @@
 "use client";
 
+import { AidRequest } from "@/types/realtime/boards";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { AidRequest } from "@/types/realtime";
 
 export type GrantedLoan = {
   requestId: string;

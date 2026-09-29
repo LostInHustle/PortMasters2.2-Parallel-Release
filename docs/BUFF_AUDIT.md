@@ -25,7 +25,7 @@ Two entries in the last section are deliberately left as they were found. `Capta
 
 ## How the audit was run
 
-The game declares its buffs in one place and applies them in another. A boon is a row in `src/lib/game/constants.ts` with a `modifiers` object. A module is a row in the same file with a `penalty` or a named flag. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a number in `src/lib/game/engine/ages.ts`.
+The game declares its buffs in one place and applies them in another. A boon is a row in `src/lib/game/constants/drafts.ts` with a `modifiers` object. A module is a row in the same module with a `penalty` or a named flag. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a number in `src/lib/game/engine/ages.ts`.
 
 For each one the audit did three things:
 
@@ -41,8 +41,8 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 
 | Family               | Count                | Where it lives                      |
 | -------------------- | -------------------- | ----------------------------------- |
-| Boons                | 14, over three tiers | `src/lib/game/constants.ts`         |
-| Ship modules         | 14, over three tiers | `src/lib/game/constants.ts`         |
+| Boons                | 14, over three tiers | `src/lib/game/constants/drafts.ts`  |
+| Ship modules         | 14, over three tiers | `src/lib/game/constants/drafts.ts`  |
 | Modifier keys        | 15                   | `src/lib/game/types.ts`             |
 | House perks          | 4 fields, 3 Houses   | `src/lib/game/engine/houses.ts`     |
 | Ages                 | 3                    | `src/lib/game/engine/ages.ts`       |
@@ -89,7 +89,7 @@ const hasSilk = order.resources.some((r) =>
 
 The Silk Winds boon and the Silk Road Monopoly module both read this. The list omits Foreign Balm and Pearl String.
 
-Both of those are made with Silk. `RECIPES` at `src/lib/game/constants.ts:158` gives Foreign Balm as `{Spices: 2, Silk: 1}` and Pearl String as `{Pearls: 2, Silk: 1}`. Both carry Silk at the same one to one ratio as Cotton Clothes at `{Hemp: 2, Silk: 1}`, which the list does include. So the list covers a good at a given Silk ratio and misses two others at the identical ratio.
+Both of those are made with Silk. `RECIPES` at `src/lib/game/constants/goods.ts:104` gives Foreign Balm as `{Spices: 2, Silk: 1}` and Pearl String as `{Pearls: 2, Silk: 1}`. Both carry Silk at the same one to one ratio as Cotton Clothes at `{Hemp: 2, Silk: 1}`, which the list does include. So the list covers a good at a given Silk ratio and misses two others at the identical ratio.
 
 The two boons do nothing for the two most valuable goods in the game.
 
@@ -153,7 +153,7 @@ These are display errors rather than rule errors. The rules are right and the te
 | `Purchase.tsx` panel title                     | "Next Round Forecast"                                                    | It showed the pulse already applied to this board |
 | `AgeBanner.tsx` full variant                   | "~2 weeks remaining"                                                     | A fixed string, in a branch nothing renders       |
 | `Welcome.tsx:170`                              | Understates the stake                                                    | The tier's real numbers                           |
-| `constants.ts:765` tutorial                    | "Starting gold is **100**"                                               | Monsoon starts at 90                              |
+| `constants/copy.ts:175` tutorial               | "Starting gold is **100**"                                               | Monsoon starts at 90                              |
 | `DifficultyAdvisor.tsx:48`                     | "three difficulty scoped Merits await"                                   | Only two require Monsoon                          |
 | `partialSight.ts:12` and `docs/PROPOSAL.md:43` | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                      |
 

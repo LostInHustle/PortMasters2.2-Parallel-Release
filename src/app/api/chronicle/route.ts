@@ -8,11 +8,11 @@
 // redundant since the realtime layer started auto writing a chronicle for
 // every finisher (see maybeConcludeVoyage in src/server/realtime/conclusion.ts),
 // so the write path is gone and that auto write is the only one there is.
+import { VoyageChronicle } from "@/types/realtime/voyage";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
-import type { VoyageChronicle } from "@/types/realtime";
 
 // The row as the database holds it. Derived from the wire shape rather than
 // written out a second time, so a field added to one cannot be forgotten in
@@ -47,8 +47,7 @@ function toChronicle(row: ChronicleRow): VoyageChronicle {
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const rows = await db.voyageChronicle.findMany({
     where: { userId: user.id },

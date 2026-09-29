@@ -1,16 +1,10 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: game state types
 // =====================================================================
-import {
-  ITEMS,
-  LARDER_START,
-  STARTING_STOCK,
-  WORKER_TYPE_IDS,
-  type Boon,
-  type FoodId,
-  type Module,
-  type WorkerTypeId,
-} from "./constants";
+import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
+import { type Boon, type Module } from "./constants/drafts";
+import { ITEMS, STARTING_STOCK } from "./constants/goods";
+import { LARDER_START, type FoodId } from "./constants/supplies";
 import {
   DEFAULT_DIFFICULTY,
   difficultyConfig,
