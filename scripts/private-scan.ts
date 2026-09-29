@@ -11,7 +11,7 @@
  * which fields are secret, ESLint does not read payloads, and the smoke
  * suite only sweeps the harbors it happens to sail.
  *
- * Six rules. Each one names a single path and fails when a second
+ * Seven rules. Each one names a single path and fails when a second
  * appears, and each one is worth a sentence about what it cannot catch,
  * because a gate that reads as stronger than it is is worse than none.
  *
@@ -38,6 +38,12 @@
  *      judgement told to the room. What it cannot catch is the event name
  *      retyped at the emit or reached through a variable holding it, which
  *      is why the name is written out in full where it is sent.
+ *   7. The draft frame, which carries a captain's hand, addressed one
+ *      captain at a time. It is the sixth rule's shape for the sixth rule's
+ *      reason: a hand is dealt to a seat, so a draft view sent to a room
+ *      lays every seat's cards in front of the table. What it cannot catch
+ *      is the same thing the sixth rule cannot catch, the event reached
+ *      through a variable rather than written at the emit.
  *
  * Rules 1 to 4 are about the server and the client's one hook. They say
  * nothing about the save path, which the review reads by hand and which
@@ -104,6 +110,22 @@ const SECRET_PAYLOAD_SITES: string[] = [];
    it is the frame losing the captain it was addressed to. */
 const ROSTER_FRAME_EVENT = '"room:members"';
 const PER_RECIPIENT_EMITTERS = ["emitToUser(", "emitPrivate("];
+
+/* Rule 7. The frame that carries a draft hand, and the emitters that may
+   deliver it. It is the sixth rule's shape and for the same reason: a hand
+   of cards belongs to one captain, so a draft view sent to a room channel
+   lays every seat's cards in front of the table, and what leaks is the
+   frame losing the captain it was addressed to rather than a payload that
+   names something it should not. The four names below are the ones that
+   reach exactly one socket: the two named delivery paths, a reply on the
+   asking socket, and a to(socket.id) send, which is the same single
+   recipient spelled the long way. */
+const DRAFT_FRAME_EVENT = '"draft:update"';
+const DRAFT_FRAME_EMITTERS = [
+  ...PER_RECIPIENT_EMITTERS,
+  "socket.emit(",
+  "io.to(socket.id).emit(",
+];
 
 /* The scanner's own file. It holds the rule table above and the doc
    comments that describe it, so it names every token and every excluded
@@ -259,6 +281,31 @@ for (const file of scannedFiles) {
   });
 }
 
+// ========== Rule 7: a draft hand goes to one captain ==========
+for (const file of files) {
+  const relativePath = rel(file);
+  if (!relativePath.startsWith("src/")) continue;
+  const text = lines(file);
+  text.forEach((line, index) => {
+    // Gathered from the emit rather than from the event, which is rule 4's
+    // end of the statement: a delivery is written as a call whose first
+    // argument may be lines below the name of the thing being sent.
+    if (!line.includes(".emit(")) return;
+    const statement = gather(text, index);
+    if (!statement.includes(DRAFT_FRAME_EVENT)) return;
+    if (DRAFT_FRAME_EMITTERS.some((name) => statement.includes(name))) {
+      return;
+    }
+    problems.push({
+      file: relativePath,
+      line: index + 1,
+      message:
+        `delivers ${DRAFT_FRAME_EVENT} to a room. That frame carries a captain's hand, so it goes` +
+        " out one socket at a time (see DRAFT_FRAME_EMITTERS in this script).",
+    });
+  });
+}
+
 function gather(text: readonly string[], from: number): string {
   let out = "";
   let depth = 0;
@@ -280,7 +327,7 @@ function gather(text: readonly string[], from: number): string {
 
 const scanned = `${files.length} files scanned`;
 if (problems.length === 0) {
-  console.log(`The private paths hold. ${scanned}, six rules, no finding.`);
+  console.log(`The private paths hold. ${scanned}, seven rules, no finding.`);
   process.exit(0);
 }
 

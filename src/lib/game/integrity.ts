@@ -222,6 +222,116 @@ type SaveSnapshot = {
 // the liar their own decisions rather than winning them anything, so it is
 // left to the normalizer rather than half bounded in this file.
 
+// [C1: the Larder and Short Rations] A fourth field this pass does not
+// carry, and it is the first one whose reason is neither of the two above.
+// The Larder IS a number, so "a mark is not a number" does not apply, and
+// forging it DOES pay a little, so "a lie here costs the liar nothing" does
+// not apply either. What makes it unbounded is that it has nowhere to
+// accumulate: it is a stock rather than a balance, its legal range is zero
+// to the hold's own ceiling, and that ceiling is declared beside its
+// opening hold rather than in this file. Every value a forged save could
+// claim is therefore also a value an honest captain can hold, reached in
+// one purchase of ten legs' worth, so there is no threshold that separates
+// the two. A check could only be drawn below the ceiling, and the captains
+// it would flag would be the ones who had just done the sensible thing and
+// filled the larder before a long run.
+//
+// What bounds it instead is where it is read. normalizeLarder clamps any
+// save to the hold's two ends on load and floors the fraction, so the most
+// a doctored save can hand its owner is a full larder they did not buy,
+// worth at most one hold's worth of rations' price once. That is a smaller
+// prize than the one this file was built to deny, and it is a prize no
+// ceiling could have denied, so it is left to the normalizer with the
+// sentence written down where the question gets asked rather than half
+// bounded in here. What one hold's worth comes to is C4's answer rather
+// than this paragraph's, and it is written where that feature's own fields
+// are: sixty meals with the split hold off, exactly as it was before that
+// feature existed, and the stores' own capacity in meals with it on.
+//
+// [C2: crew loss by name] A fifth field family this pass does not carry,
+// and it is three shapes at once: the roster with its names on it, the run
+// of hungry legs, and the voyage's list of the hands it lost. None of the
+// three is a balance this guard could bound from above, which is its whole
+// method, and the reasons are the two above it read once more.
+//
+// The roster is bounded by nothing because a lie about it is not a gain.
+// The server never runs the books, so a save claiming two artisans where
+// the client worked seven pays less wages only in the captain's own copy
+// of their own voyage, which is the same place the seven were worked. The
+// direction a cheater would want to lie in, claiming a crew they do not
+// have in order to produce goods they did not make, is already the shape
+// the whole engine is built in rather than something a field could patch:
+// the client computes, the server records. What the roster does have is a
+// reader, and it is the social one every other client side number has: the
+// wages a captain pays are printed on their own ledger, and the harbor
+// reads the standings.
+//
+// The run and the loss list are not gains either. One is a countdown to a
+// cost the liar pays in their own artisans, and the other is the record of
+// having paid it: a save that claims losses it never took has lost the
+// hands it says, by the same normalizer that reads the list back, so the
+// lie costs the liar exactly what the truth would have. Both are read
+// through healCrewIdentity on load (see ./crew), which floors the run,
+// drops anything that could not be a loss, redraws a name it cannot read
+// and caps what it keeps, so the most a doctored save can hand its owner
+// is a roster of names that do not match its own workers, which nothing in
+// the game reads.
+//
+// [C3: garments and the cold] A sixth field family this pass does not carry:
+// the wardrobe the crew wears, the round its settlement last read, and the
+// frostbite mark standing one hand down. It is the two shapes above read
+// together, which is why its reasons are theirs rather than new ones.
+//
+// The wardrobe is a stock rather than a balance, so there is no threshold a
+// forged save could cross that an honest one could not: its legal range is
+// an empty back to GARMENTS_WORN_MAX (twelve), and every entry is a good
+// the captain could have bought by the ordinary path and, on a cold voyage,
+// would have. Buying the clothes is the whole answer to the weather rather
+// than a way around it. A lie about them is not a gain for the reason the
+// roster is not one either: the client computes and the server records, so
+// a save claiming Brocade it never wove keeps the warmth in its own copy of
+// its own voyage and nowhere else.
+//
+// What bounds it instead is where it is read, which is normalizeGarments on
+// load: entries are kept only for goods the catalogue knows, a durability is
+// floored into that garment's own two ends, an entry already in rags is
+// dropped rather than worn, and the list is capped, so the most a doctored
+// save can hand its owner is a full wardrobe of real clothes. The tick stamp
+// is floored the same way, and the frostbite mark needs no bound at all: it
+// is read by equality against the current round (see isFrostbitten), so a
+// mark naming any other round is inert, and the worst a forged one can do is
+// stand a hand down for the leg a genuine frostbite would have cost them
+// anyway.
+//
+// [C4: three foods, spoilage and the split hold] A seventh field family
+// this pass does not carry: the pantry's lots, the leg the spoilage tick
+// last read them, and the two capacities the hold is measured against. It
+// is the two shapes above read once more, with one addition of its own.
+//
+// The lots are a stock rather than a balance, and a doctored one is bounded
+// by the count it adds up to: normalizeLarderLots drops every entry whose
+// food the catalogue does not know and every meal count that is not a
+// positive whole number, floors what it keeps, caps the list at a length no
+// voyage could exceed, and the count is then set to the account's own sum
+// rather than the other way around (see ./foods and the load path in
+// use-game-session). So the most a forged pantry can hand its owner is
+// food the game already sold somebody, in a hold the room checks will not
+// let them overfill, which is the same prize C1's paragraph above already
+// judged not worth a ceiling.
+//
+// The spoilage stamp needs no bound for the reason C3's tick stamp does
+// not: it is read by equality against the current round, so a mark naming
+// any other round is inert, and the worst a forged one can do is skip a
+// single Dusk's rot on the liar's own copy of their own voyage.
+//
+// The two capacities are not fields at all, which is the addition. They are
+// functions of the switches and the constants, read fresh wherever they are
+// asked for (see ./hold and ./larder), so a save cannot claim a hold of a
+// size the build does not have. The only input a save has into them is the
+// count and the roster, and a captain who forges themselves onto short
+// rations has taken a quarter off their own cargo: their own loss rather
+// than their gain, by the same reading the crew family gets above.
+//
 // A save is a free form JSON blob written by a client, so every field here is
 // treated as untrusted input rather than as a number. Null is returned only
 // when the payload is not an object at all, since there is then nothing to

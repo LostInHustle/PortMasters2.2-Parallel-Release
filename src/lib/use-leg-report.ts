@@ -9,12 +9,25 @@
 // any of the three and must not try, so this hook reads them off the
 // voyage state and files them as a claim against the leg they belong to.
 //
-// What is deliberately not here is a hold utilization figure. The plan
-// asks for one, and this tree's hold has no size: an order board of three
-// is three of nothing, and a percentage invented for it would be a number
-// no rule moves. It waits for the split hold in C4, which is where a hold
-// gets a denominator. What ships instead is the variety the hold carried,
-// which is the number the dashboard's staple question actually reads.
+// What is deliberately absent from a base game report is a hold
+// utilization figure. The plan asks for one, and this tree's hold has no
+// size: an order board of three is three of nothing, and a percentage
+// invented for it would be a number no rule moves. It waited on the split
+// hold in C4, which landed the size, and the slots below are what it
+// reads now. The variety the hold carried stays, because it is the number
+// the dashboard's staple question actually reads.
+//
+// [C4: three foods, spoilage and the split hold] The last four figures
+// come off the same state and ride in the same report: the slots the ship
+// is carrying something in, and the meals of each food in the larder.
+// Each is sent only when the switch that gives it meaning is on, so a
+// voyage played without the split hold or without the survival layer
+// files a report with those fields absent rather than with zeroes, and a
+// reader counting food knows whether it is looking at a survival leg. The
+// slots figure is the ceiling of what is in use rather than a fraction,
+// which is the reading the provisions panel prints: a slot with anything
+// in it is a slot in use, and the record and the screen should not be two
+// roundings of one hold.
 //
 // The report is a claim and is treated as one. Nothing in the game reads
 // it, the server bounds its leg against the voyage before keeping it, and
@@ -33,6 +46,19 @@ import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import type { LegReport } from "@/types/realtime";
+import { mealsOf } from "@/lib/game/foods";
+import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
+import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
+import {
+  escortContractsOn,
+  pathOrdersOn,
+  survivalLayerOn,
+} from "@/lib/game/flags";
+import {
+  openOrderCount,
+  opportunistBorrowsTaken,
+  refitsOn,
+} from "@/lib/game/engine";
 
 // The same cadence the captain's own status rides on (see
 // use-game-session.ts): enough to feel immediate, sparse enough that a
@@ -56,7 +82,13 @@ export function useLegReport(
   // the engine resets at the top of every round and appends to on every
   // settlement. Dealt minus filled is the plan's expired count, worked
   // out by whoever reads the record rather than stored a second time.
-  const ordersDealt = game.customerCards.length;
+  //
+  // [D2] Dealt means the orders this captain could act on, so a card locked
+  // behind a path they do not hold is not one of them: the count comes from
+  // openOrderCount, where the lock rule lives, rather than from the length of
+  // the board, because a locked card is not an order anybody expired and
+  // counting it would read three of them against every captain's leg.
+  const ordersDealt = openOrderCount(game);
   const ordersFilled = game.completedOrders.length;
   // The goods the hold closes the leg carrying: a hold full of one thing
   // is the staple the plan's gate watches for, and no key of an empty
@@ -65,9 +97,59 @@ export function useLegReport(
   for (const count of Object.values(game.inventory)) {
     if (count > 0) distinctGoods++;
   }
+  // [C4] The hold and the pantry, read through the two switches rather
+  // than beside them: an undefined here is a field the record will not
+  // carry, which is the honest shape for a leg that was never playing the
+  // rule (see the LegReport type).
+  const holdSlots = holdCapacityOn()
+    ? Math.ceil(usedHoldSlots(game))
+    : undefined;
+  const grainMeals = survivalLayerOn() ? mealsOf(game, "Grain") : undefined;
+  const saltFishMeals = survivalLayerOn()
+    ? mealsOf(game, "Salt Fish")
+    : undefined;
+  const produceMeals = survivalLayerOn() ? mealsOf(game, "Produce") : undefined;
+  // [D3: Convoy: the Escort Contract] The market's three, read off the
+  // captain's own tally and sent only when the switch that gives them
+  // meaning is on. They are this captain's own record of what they sold,
+  // which is the seller's side the plan asks about: a buyer's leg carries no
+  // contract figures, because the market being measured is the seller's.
+  const escortSold = escortContractsOn() ? game.escortSold : undefined;
+  const escortFeesEarned = escortContractsOn()
+    ? game.escortFeesEarned
+    : undefined;
+  const escortAbsorbed = escortContractsOn() ? game.escortAbsorbed : undefined;
+  // [D4: Loom: the Refit] The bench's three, read off the same tally the
+  // panel prints and sent only when the switch that gives them meaning is
+  // on. The seller's side, for the escort's reason: the plan asks what the
+  // market sold, and the customer is on the other side of that number.
+  //
+  // The weather is the odd one out and is deliberately not read through the
+  // bench's switch. A Loom is poor in fair weather and busy in cold, which is
+  // a claim about a run of legs rather than about one of them, so a reader
+  // needs the weather of every leg the voyage sailed including the ones the
+  // bench sat out. It is read through the wardrobe layer instead, which is
+  // where that rule lives (see legIsCold), so a build with no coats reports
+  // no weather rather than reporting every leg fair.
+  const refitsSold = refitsOn() ? game.refitsSold : undefined;
+  const refitFeesEarned = refitsOn() ? game.refitFeesEarned : undefined;
+  const ragsRewoven = refitsOn() ? game.ragsRewoven : undefined;
+  const coldLeg = garmentsLayerOn() ? legIsCold(game) : undefined;
+  // [D6: Free Captain: Opportunist] The borrow counter, the last of the
+  // ability figures and the only one that counts the voyage rather than the
+  // leg: the plan's evaluation is a usage rate, which is a share of voyages,
+  // so what a reader wants is how many borrows the allowance has spent.
+  // It rides the path orders switch, which is the ability's own rollback
+  // rather than a switch of its own: with no locked card on the board there
+  // is nothing to borrow, so a build without locks reports nothing rather
+  // than a zero it could never have moved. A voyage that never borrowed
+  // reports its zero, because zero is a reading of the allowance.
+  const opportunistBorrows = pathOrdersOn()
+    ? opportunistBorrowsTaken(game)
+    : undefined;
 
-  // The four figures are the dependency list, which is the point: the
-  // effect fires when a count moves, not when the captain clicks.
+  // The figures are the dependency list, which is the point: the effect
+  // fires when a count moves, not when the captain clicks.
   useEffect(() => {
     if (!socket || !roomId || leg < 1) return;
     const timer = setTimeout(() => {
@@ -77,9 +159,40 @@ export function useLegReport(
         ordersDealt,
         ordersFilled,
         distinctGoods,
+        holdSlots,
+        grainMeals,
+        saltFishMeals,
+        produceMeals,
+        escortSold,
+        escortFeesEarned,
+        escortAbsorbed,
+        refitsSold,
+        refitFeesEarned,
+        ragsRewoven,
+        coldLeg,
+        opportunistBorrows,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [socket, roomId, leg, ordersDealt, ordersFilled, distinctGoods]);
+  }, [
+    socket,
+    roomId,
+    leg,
+    ordersDealt,
+    ordersFilled,
+    distinctGoods,
+    holdSlots,
+    grainMeals,
+    saltFishMeals,
+    produceMeals,
+    escortSold,
+    escortFeesEarned,
+    escortAbsorbed,
+    refitsSold,
+    refitFeesEarned,
+    ragsRewoven,
+    coldLeg,
+    opportunistBorrows,
+  ]);
 }

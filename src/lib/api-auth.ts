@@ -1,9 +1,15 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: request auth helper for API routes
-// Reads the session cookie and returns the authenticated user (or null).
+// Reads the session cookie and returns the authenticated user (or null),
+// and writes the cookie back when a route signs somebody in.
 // =====================================================================
 import { cookies } from "next/headers";
-import { getUserFromToken, SESSION_COOKIE_NAME } from "./auth";
+import { NextResponse } from "next/server";
+import {
+  getUserFromToken,
+  SESSION_COOKIE_NAME,
+  sessionCookieMaxAge,
+} from "./auth";
 
 // The shape every API route gets back from getCurrentUser below. Kept
 // local to this module: callers take the return type as it comes rather
@@ -38,9 +44,38 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   };
 }
 
-// Serialize a Set-Cookie header value for the session cookie.
-export function sessionCookie(token: string, maxAgeSec: number) {
+// Serialize a Set-Cookie header value for the session cookie. Held here
+// rather than exported: the three routes that sign somebody in go through
+// signedInResponse below, so the only thing that ever builds a session
+// cookie is the function that answers with one.
+function sessionCookie(token: string, maxAgeSec: number) {
   return `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}`;
+}
+
+// The answer every sign in gives: the captain as the wire sees them, when
+// the session runs out, the token the socket will present, and the cookie
+// that carries it. Three routes sign somebody in (login, register, and the
+// operator register) and all three answer in this one shape, so the
+// cookie's flags and the body's three fields are written down once.
+//
+// It takes the captain already shaped, because the shape is the caller's:
+// a captain answers as publicUser, an operator answers the same plus its
+// role, and which of the two it is is a fact about the door.
+export function signedInResponse(input: {
+  user: unknown;
+  token: string;
+  expiresAt: Date;
+}): NextResponse {
+  const res = NextResponse.json({
+    user: input.user,
+    expiresAt: input.expiresAt,
+    token: input.token,
+  });
+  res.headers.set(
+    "Set-Cookie",
+    sessionCookie(input.token, sessionCookieMaxAge),
+  );
+  return res;
 }
 
 export function clearSessionCookie() {

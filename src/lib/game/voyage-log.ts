@@ -25,6 +25,7 @@
 // cannot read one way on one screen and another way on the next.
 // =====================================================================
 
+import { pathConfig, type PathId } from "./paths";
 import { phaseFace } from "./phases";
 import type { Phase } from "./types";
 
@@ -45,11 +46,19 @@ export type VoyageLogKind =
   | "leg_timed_out"
   | "audit_carried"
   | "maroon_carried"
-  | "captain_left";
+  | "captain_left"
+  | "contract_posted"
+  | "contract_agreed"
+  | "contract_claimed"
+  | "refit_posted"
+  | "refit_agreed"
+  | "rumor_published"
+  | "path_taken"
+  | "path_switched";
 
 // One fact, with the fields its sentence needs and no others. The union
 // is discriminated by `kind`, and voyageLogLine below names every arm, so
-// a tenth kind is a compile error there rather than a blank line on a
+// a new kind is a compile error there rather than a blank line on a
 // captain's screen.
 export type VoyageLogFacts =
   | { kind: "voyage_started" }
@@ -80,7 +89,82 @@ export type VoyageLogFacts =
   | { kind: "leg_timed_out"; phase: Phase }
   | { kind: "audit_carried"; target: string }
   | { kind: "maroon_carried"; target: string }
-  | { kind: "captain_left"; captain: string };
+  | { kind: "captain_left"; captain: string }
+  // [D3: Convoy: the Escort Contract] The market's three lines, which are
+  // the plan's own iteration item read as a surface: "a visible history of
+  // paid out claims". The three are what a table would repeat afterwards,
+  // in the order it would tell them: who was selling, who bought, and what
+  // the guns met.
+  //
+  // The posted line carries no buyer, deliberately. A direct offer is
+  // visible only to the two captains it names (see visibleContracts), and a
+  // line naming its target would hand the room the one fact the board is
+  // keeping back. It also carries no target for an open offer, where there
+  // is none to carry, so one sentence serves both and nothing in it says
+  // which of the two was posted.
+  //
+  // The claimed line carries no figure either, and the reason is that there
+  // is no figure the server could honestly write: what a raid took from the
+  // covered captain is the covered captain's report, and what the guns ate
+  // is worked out on the seller's own client against the seller's own purse
+  // (see applyEscortSide). A number on this line would be the server's
+  // second opinion of both. What it says instead is the fact the whole
+  // table can see for itself: the boarding party went to the guns.
+  | { kind: "contract_posted"; captain: string; fee: number }
+  | { kind: "contract_agreed"; captain: string; taker: string; fee: number }
+  | { kind: "contract_claimed"; captain: string; taker: string }
+  // [D4: Loom: the Refit] The bench's two lines, and there are two rather
+  // than three because this trade has no claim: a refit is finished when
+  // the customer takes it, so the third line a contract needs has nothing
+  // to say here. Both lines carry the garment, which is this trade's term
+  // the way "one leg of protection" is the market's, and both carry the fee
+  // for the reason the two lines above do: what was agreed in the open is
+  // the room's business.
+  | { kind: "refit_posted"; captain: string; good: string; fee: number }
+  | {
+      kind: "refit_agreed";
+      captain: string;
+      taker: string;
+      good: string;
+      fee: number;
+    }
+  // [D5: Aroma: the Bazaar Rumor] The bazaar's one line, and the one line
+  // here that is deliberately incomplete. It carries the captain and the
+  // good they named and no direction, because the direction is the whole
+  // of what the rumor keeps: a public line naming it would hand the table
+  // the one fact the feature exists to hold, and it would do it in the
+  // room's own record, which is the surface the fleet trusts most.
+  //
+  // Where the direction does become readable is the bazaar board, one leg
+  // later, when the market the rumor moved has been drawn (see
+  // publicRumors). That is a row with a leg on it rather than a line in
+  // the log, and the two are different shapes on purpose: the log is what
+  // the room saw happen, and the board is what the room can work out.
+  | { kind: "rumor_published"; captain: string; good: string }
+  // [D7: the draft, and switching] The identity lines, and the plan asks
+  // for the second one by name: "the switch is published to the fleet log
+  // where everyone sees it... the publication is the real design: the
+  // price of changing your identity is that everyone knows."
+  //
+  // Both carry the path's id and not its name: the writer below reads the
+  // name out of pathConfig, which is the table the panels read, so the line
+  // and the chip say the same words about the same path.
+  //
+  // Neither carries the path the captain left. The room's logs are written
+  // from what the room saw, and the room sees the identity a captain takes
+  // up rather than the one they were holding: a "from" field would be the
+  // server repeating a claim it cannot check, since the path a captain
+  // holds lives in their own save and this server has never read one (the
+  // same line the bazaar's desk draws about who may speak). The news the
+  // plan wants published is that a captain is not who they were, and the
+  // new name is the whole of that fact.
+  //
+  // The name is read through pathConfig off the union's own id, so the
+  // assertion cannot fire: a PathId is a key of the record the lookup
+  // answers from (the same reading the order board takes of the id it was
+  // handed, and the one that keeps a crest and a name in step).
+  | { kind: "path_taken"; captain: string; path: PathId }
+  | { kind: "path_switched"; captain: string; path: PathId };
 
 // One line as it travels and as it is kept: the leg it happened on, what
 // kind of thing it was, and the sentence itself. The round is the room's
@@ -128,6 +212,22 @@ export function voyageLogLine(facts: VoyageLogFacts): string {
       return `The harbor maroons ${facts.target}.`;
     case "captain_left":
       return `${facts.captain} leaves the harbor.`;
+    case "contract_posted":
+      return `${facts.captain} offers one leg of protection for ${facts.fee} Gold.`;
+    case "contract_agreed":
+      return `${facts.taker} buys a leg of protection from ${facts.captain} for ${facts.fee} Gold.`;
+    case "contract_claimed":
+      return `Raiders bound for ${facts.taker} met ${facts.captain}'s guns.`;
+    case "refit_posted":
+      return `${facts.captain} offers to put a ${facts.good} right for ${facts.fee} Gold.`;
+    case "refit_agreed":
+      return `${facts.taker} pays ${facts.captain} ${facts.fee} Gold to put the ${facts.good} right.`;
+    case "rumor_published":
+      return `${facts.captain} publishes a rumor about ${facts.good} at the bazaar.`;
+    case "path_taken":
+      return `${facts.captain} takes up the ${pathConfig(facts.path)!.name} path.`;
+    case "path_switched":
+      return `${facts.captain} sets aside their old papers and takes up the ${pathConfig(facts.path)!.name} path.`;
   }
   // Named rather than defaulted, so a kind added to the union above stops
   // the build here instead of printing an empty line in the middle of a
@@ -176,6 +276,14 @@ export const VOYAGE_LOG_KINDS: readonly VoyageLogKind[] = [
   "audit_carried",
   "maroon_carried",
   "captain_left",
+  "contract_posted",
+  "contract_agreed",
+  "contract_claimed",
+  "refit_posted",
+  "refit_agreed",
+  "rumor_published",
+  "path_taken",
+  "path_switched",
 ];
 
 // One door for a line arriving from outside this process: a frame off the

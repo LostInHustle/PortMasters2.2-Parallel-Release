@@ -105,7 +105,12 @@ export function Welcome({
   // One shape or the other, and the mode record is what decides which:
   // the screen renders the briefing a mode hands it rather than choosing
   // a shape on the mode's behalf. See ModeBriefing in src/lib/game/mode.
-  const briefing = modeConfig(game.mode).briefing;
+  //
+  // The record itself is read once and its fields are used below, so the
+  // panel that names the mode and the panel that charts its round cannot
+  // describe two different voyages.
+  const play = modeConfig(game.mode);
+  const briefing = play.briefing;
   // The InfoCard numbers derive from the room's difficulty tier rather
   // than the old hardcoded founding trade figures. Fair Winds reads
   // exactly like the original (20% raid, 15 Gold maintenance), while
@@ -128,10 +133,16 @@ export function Welcome({
       <p className="text-sm text-muted-foreground mb-4">
         {/* The voyage's own length, read from the state the captain is
             sailing rather than from the tier: a Gambit voyage is twelve
-            legs on every tier, so the tier's ladder would greet the crew
+            rounds on every tier, so the tier's ladder would greet the crew
             with the length of a voyage they are not on (see voyageLegs in
-            src/lib/game/mode). */}
-        🌊 {game.maxRounds} Voyages await, become the Sea Master!
+            src/lib/game/mode).
+
+            It counts rounds, and it used to call them voyages, which is
+            the one word this game cannot afford to blur: a voyage is the
+            whole run and a round is one lap of it, and a captain reading
+            "8 Voyages await" on the first screen of an eight round voyage
+            had been told the wrong thing about the game before it began. */}
+        🌊 {game.maxRounds} rounds await, become the Sea Master!
       </p>
       <div className="flex flex-col items-center gap-3 mb-6">
         <HarborRoster members={members} ids={harborIds} />
@@ -198,7 +209,7 @@ export function Welcome({
           tone="alarm"
           title="🧾 Taxes Explained"
           rows={[
-            "VAT: 5% of finished good profit margin",
+            "VAT: 5% of finished goods profit margin",
             `Income Tax: ${Math.round(taxRate * 100)}% income tax`,
           ]}
         />
@@ -240,6 +251,20 @@ export function Welcome({
           ) : (
             <RoundFlow legs={briefing.legs} closes={briefing.closes} />
           )}
+        </div>
+        {/* The mode's own line, above the tip and below the round, because
+            this is the screen a captain reads once before the first Dawn
+            and the two questions it has to answer are what they are
+            playing and what it costs them to fail. Both come out of the
+            record. The list of what a mode changes is not printed here:
+            it belongs on the surfaces built for lists, and this panel
+            says where it is rather than carrying a fifth copy of it. */}
+        <div className="rounded-lg bg-charter/[0.06] border border-charter/15 px-3.5 py-2.5 text-xs">
+          <strong>🧭 {play.badge}:</strong> {play.tagline} {play.failureRule}
+          {/* It points at the button without a direction, because the
+              button sits above this panel rather than below it. */}
+          {play.differences.length > 0 &&
+            " The New Player Tutorial lists everything this mode changes."}
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
           <strong>💡 New Player Tip:</strong> Rely on raw material orders early.

@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameContext, GameState } from "@/lib/game/types";
 import {
-  applyHarborPulse,
+  applyMarketLeans,
   autoCommit,
   restartGame,
   startBoonDrafting,
   tallyPurchasesByResource,
 } from "@/lib/game/engine";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
+import type { PortShift } from "@/lib/game/maroon";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { normalizeMode } from "@/lib/game/mode";
 import { checkpointRank } from "@/lib/game/checkpoint";
@@ -223,13 +224,23 @@ export function usePhaseSync(
       roomId: string;
       round: number;
       phase: string;
-      // Only ever present when the phase being left is Dawn, meaning every
-      // captain just readied up out of the boon draft and is about to run
-      // startMarket for this round. Computed server side from last round's
-      // room wide purchase tally and delivered on this same broadcast so it
-      // lands before genResourceCard runs, never as a separate race prone
-      // round trip.
+      // [D5: Aroma: the Bazaar Rumor] The market's three hands, all of them
+      // present only on the advance that opens a port market, because that
+      // is the only seat any of them is about: the harbor's pulse (this
+      // comment's own field, computed from last round's room wide purchase
+      // tally), the Harbormaster's shift, and the bazaar's lean. Each lands
+      // on the client's state before the market is drawn so that
+      // genResourceCard prices the cards the server's numbers say, rather
+      // than on a second round trip that could arrive after the draw.
+      //
+      // They are named as three fields of one frame rather than read one at
+      // a time, which is what the engine's own MarketLeans type is for: the
+      // port shift used to be carried on this frame and read by nobody, and
+      // a frame whose fields are enumerated in one place is the shape in
+      // which that cannot happen quietly again.
       harborPulse?: Record<string, number>;
+      portShift?: PortShift | null;
+      bazaarLean?: Record<string, number>;
     }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
@@ -267,7 +278,7 @@ export function usePhaseSync(
       setWaiting(false);
       if (fn) {
         act((state, logs) => {
-          if (data.harborPulse) applyHarborPulse(state, data.harborPulse);
+          applyMarketLeans(state, data);
           fn(state, logs);
         });
         return;
@@ -282,7 +293,7 @@ export function usePhaseSync(
       // pulse rides it, so the round that opens next is drawn the same way
       // for everybody.
       act((state, logs) => {
-        if (data.harborPulse) applyHarborPulse(state, data.harborPulse);
+        applyMarketLeans(state, data);
         autoCommit(state, ctx, logs);
       });
     };

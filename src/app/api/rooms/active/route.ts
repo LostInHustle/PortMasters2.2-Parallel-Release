@@ -18,7 +18,7 @@
 // would put up to a hundred rows on every single page load for a caller
 // that throws them away.
 import { NextResponse } from "next/server";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
+import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import { serializeRoom } from "@/lib/rooms";
 
@@ -39,18 +39,7 @@ export async function GET() {
 
   const room = await db.room.findUnique({
     where: { id: membership.roomId },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_WITH_MEMBERS,
   });
   // A membership row whose room is gone should not happen (the relation
   // cascades on delete), but report "no active room" rather than a 404:

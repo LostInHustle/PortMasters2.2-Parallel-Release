@@ -21,12 +21,12 @@ export function contributeToVenture(
   if (amount <= 0) return;
   if (state.money < amount) {
     logs.push(
-      `❌ Need ${amount} Gold to back that Convoy Venture, have ${state.money}`,
+      `❌ Need ${amount} Gold to back that Venture, have ${state.money}`,
     );
     return;
   }
   state.money -= amount;
-  logs.push(`⚓ Backed a Convoy Venture with ${amount} Gold`);
+  logs.push(`⚓ Backed a Venture with ${amount} Gold`);
 }
 
 // [MANIFEST 04: Convoy Ventures] The payout side, for any of three outcomes.
@@ -50,9 +50,9 @@ export function receiveVentureSettlement(
   state.money += amount;
   logs.push(
     outcome === "filled"
-      ? `⚓ Convoy Venture filled! Your share: ${amount} Gold`
+      ? `⚓ Venture filled! Your share: ${amount} Gold`
       : outcome === "failed"
-        ? `⚓ Convoy Venture missed its deadline. Partial refund: ${amount} Gold`
-        : `⚓ Convoy Venture cancelled: another venture in the harbor already claimed this voyage's one chance. Full refund: ${amount} Gold`,
+        ? `⚓ Venture missed its deadline. Partial refund: ${amount} Gold`
+        : `⚓ Venture cancelled: another venture in the harbor already claimed this voyage's one chance. Full refund: ${amount} Gold`,
   );
 }

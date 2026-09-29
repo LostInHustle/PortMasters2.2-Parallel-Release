@@ -31,12 +31,15 @@
 // window would be an archive of somebody's whole voyage that no feature
 // asked for and a later one could quietly start reading.
 //
-// One clause of the plan's reveal is not here. It says the audit also
-// shows the audited captain's current Larder, and this tree has no Larder:
-// provisions are epic C1's, none of it is built, and a save carries no
-// food, no stores and no upkeep. Inventing a field for the audit to read
-// would put a number on screen that no game rule ever moves. The clause
-// lands with C1, and until then the reveal is the fulfillments alone.
+// The plan's second clause, the audited captain's current Larder, landed
+// with C1 and it lands on the server rather than here. It could not be
+// written into this file before C1: the plan named a number this tree did
+// not have, and a save carried no food, so a reveal that printed one would
+// have put a figure on screen that no rule ever moved. The reading itself
+// belongs to ./server/realtime/audit, which is the side that holds the
+// save the Larder is written into, and this module stays what it was: the
+// sample, its seed, and the shape a manifest line may take. Nothing here
+// reads a Larder, and it should not start.
 //
 // Pure: no socket, no database, no clock. The server owns the vote; this
 // module owns the arithmetic of one.

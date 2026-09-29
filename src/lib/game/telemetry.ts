@@ -13,13 +13,22 @@
 // family" then asks the table rather than matching on strings, and an
 // event cannot be added without deciding what it measures.
 //
-// Four families are instrumented in this build and three are not, and the
-// three that are not are named here rather than left for a reader to
-// notice: the survival layer waits on Epic C, the paths on Epic D, the
-// build layer on Epic F, and the market family ships without the Chandler
-// and Bale lines because both are Epic G's. A family with no event in it
-// is not a family this table can name, which is why the three absent ones
-// are prose here and values there.
+// Four families are instrumented in this build and one is not, and the one
+// that is not is named here rather than left for a reader to notice: the
+// build layer waits on Epic F, and the market family ships without the
+// Chandler and Bale lines because both are Epic G's. A family with no
+// event in it
+// is not a family this table can name, which is why the absent one is
+// prose here and a value there.
+//
+// Two families that were once named here as absent have landed since, and
+// where their numbers went is worth the line rather than the silence: the
+// survival layer (Epic C) reports through the leg report's own fields,
+// because what it measures is per captain per leg, and the paths (Epic D)
+// read the same way except at their two discrete moments, which are the
+// events D7 added below. Neither needed a family of its own, because a
+// family is a group of events and both are a handful of numbers inside one
+// captain's leg.
 //
 // The business family's return numbers, day one and day seven and the
 // second session on the evening, are not events either, and deliberately
@@ -79,18 +88,118 @@ export interface TelemetryPayloads {
   // and is kept as one: this is a measurement of what a captain played,
   // not a score, and nothing in the game reads it.
   //
-  // Two of the proposal's market numbers are deliberately not here. Median
-  // hold utilization needs a hold with a size, and this tree's hold is
-  // unbounded: a denominator invented for it would be a percentage of
-  // nothing, which is the same reason the audit refuses to show a Larder
-  // that C4 has not built yet. Chandler share and Bale usage are Epic G's,
-  // and the survival family they belong to has no source at all.
+  // Two of the proposal's market numbers are deliberately not here.
+  // Chandler share and Bale usage are Epic G's, and they are absent for
+  // that reason rather than because nobody got to them. The third, median
+  // hold utilization, used to be absent beside them and is not any more:
+  // it needed a hold with a size and this tree's hold was unbounded, which
+  // is what C4's split hold answered. The four fields below are that
+  // answer and the pantry reading that came with it.
+  //
+  // This paragraph used to explain the hold's absence by pointing at the
+  // audit's, which it described as refusing to print a Larder that C4 had
+  // not built. Both halves of that were wrong and the correction is worth
+  // the two lines: the Larder is C1's rather than C4's, and C1 has now
+  // landed it, so the audit prints one and the analogy has nothing left to
+  // stand on. The hold's reason was the hold's own, and the split hold has
+  // now landed the size that reason was waiting on.
+  //
+  // The survival family is undeclared above, and this is where that is
+  // answered rather than left as a gap for a reader to guess at. Four
+  // numbers belong to it: short rationed legs, crew losses, frostbite, and
+  // the Supply Barge's share of food spending. The first has a source,
+  // because C1 landed and a shortage can really happen, and the pantry
+  // below now reports what the shortage is a shortage of. What has still
+  // not landed is the reason to write an event for it: nothing in this
+  // build reads the family, C1's own evaluation watches what the room says
+  // in the leg after a captain visibly goes hungry rather than a stored
+  // count of it, and a family declared ahead of the events that would fill
+  // it is a schema with no rows in it. It arrives with the epic that
+  // measures it.
+  //
+  // [C4: three foods, spoilage and the split hold] The last four fields
+  // are one reading the plan asks for and three it does not, and the
+  // difference is which of them a dashboard divides by something. The
+  // slots are the numerator the utilization row reads, and they are absent
+  // on any leg whose voyage was not playing the split hold, because a
+  // hold with no size has no utilization to report and a zero there would
+  // read as an empty ship rather than as an unmeasured one. The three
+  // meal counts are the plan's own evaluation of this feature, "watch the
+  // mix of foods actually carried", and they are a record rather than a
+  // gate: no threshold in the plan puts one food's share inside a band, so
+  // a later reader compares the three against each other rather than
+  // against a line this reader would have had to invent. All four are
+  // absent together on a leg sailed with the survival layer off, for the
+  // reason every field of a switched off layer is absent: the record says
+  // what happened rather than what the build could have measured.
   leg_report: {
     leg: number;
     actor: string;
     ordersDealt: number;
     ordersFilled: number;
     distinctGoods: number;
+    holdSlots?: number;
+    grainMeals?: number;
+    saltFishMeals?: number;
+    produceMeals?: number;
+    // [D3: Convoy: the Escort Contract] The plan's own evaluation of this
+    // feature, "contracts sold per leg per Convoy captain and the ratio of
+    // fees collected to losses absorbed", read off the three figures that
+    // decide it: how many contracts this captain settled this leg, the fees
+    // they collected for them, and the Gold those contracts absorbed when a
+    // raid met their guns. The ratio is the quotient of the last two, worked
+    // out by whoever reads the record rather than stored here, for the same
+    // reason the expired order count is not stored: a number that is a
+    // division of two fields is one more thing that can disagree with them.
+    //
+    // The three ride together and are absent together on a leg sailed with
+    // the switch off, exactly as C4's four do, so a reader summing absorbed
+    // Gold across a voyage never has to guess whether a zero was a quiet leg
+    // or a build without the feature. The buyer's side is deliberately not
+    // recorded here: the plan asks what the market sold and what the market
+    // ate, and a captain who bought protection is on the other side of both
+    // numbers.
+    escortSold?: number;
+    escortFeesEarned?: number;
+    escortAbsorbed?: number;
+    // [D4: Loom: the Refit] The bench's own three, on the escort's rule: how
+    // many refits this captain settled this leg, the fees those collected,
+    // and how many rags came back off their loom as cloth. The plan's
+    // evaluation of this feature is adoption and what the reweave is worth,
+    // and those three figures are the whole of it. They ride together and are
+    // absent together on a leg sailed with the switch off, exactly as D3's
+    // three are, so a reader summing a voyage's takings never has to guess
+    // whether a zero was a quiet leg or a build without the bench.
+    //
+    // The fourth is the leg's weather and is the one field in this record
+    // that is not behind this feature's switch, because it is not this
+    // feature's reading: a Loom is poor in fair weather and busy in cold, so
+    // the plan's own measure of the path is a comparison between legs, and a
+    // reader cannot make it without knowing which legs were cold. It is drawn
+    // from the voyage's own numbers rather than announced (see legIsCold), so
+    // it is the same reading the harbor's pile and the crew's warmth are
+    // drawn from. It is a truth rather than a tally, so it is carried as one:
+    // a fair leg says false rather than saying nothing.
+    //
+    // The customer's side is deliberately not recorded, for the reason
+    // D3's buyer is not: the plan asks what the bench sold, and one captain
+    // is on the other side of the number.
+    refitsSold?: number;
+    refitFeesEarned?: number;
+    ragsRewoven?: number;
+    coldLeg?: boolean;
+    // [D6: Free Captain: Opportunist] The plan's evaluation of this feature
+    // is usage rate first, and then the harder question of how often the
+    // borrow lands on the order that would have been the best fit for an
+    // actual path. The second question cannot be answered from this record
+    // and is not pretended to be: it needs tables with strangers, where an
+    // order can be compared against a path its reader does not hold. What
+    // this field carries is the first question's whole answer, which is how
+    // many borrows a voyage spent, read against the voyages that could have
+    // spent one. It rides the path orders switch, the same one the locked
+    // cards and the ability itself ride, so a build without locks reports
+    // nothing rather than reporting a zero it could never have moved.
+    opportunistBorrows?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally
@@ -105,6 +214,32 @@ export interface TelemetryPayloads {
   // no sockets is not moved by its clock; see the fire path in
   // src/server/realtime/checkpoint.ts.
   leg_timed_out: { leg: number; ready: number; required: number };
+  // [D7: the draft, and switching] The two moments a path has, and the
+  // three readings the plan asks for are all off the first of them.
+  //
+  // Draft time is `seconds`, measured by the server from the deal to the
+  // captain's last pick rather than reported by the client, because the
+  // draft's clock is the server's and a claim about how long a captain
+  // took is worth nothing from the captain. The plan's target is forty
+  // five seconds, which is the three step clocks added up, so this number
+  // reads against that target directly.
+  //
+  // The other two readings are counts over the same event rather than
+  // fields on it: the share of drafts where the Quartermaster card was
+  // taken is the count with `path` of quartermaster over the count of all
+  // of them, and the pick rate spread is that count done once per path and
+  // read against the plan's twelve to twenty eight percent band. One
+  // event, three numbers, and no field that has to be kept in step with
+  // another.
+  path_taken: { leg: number; actor: string; path: string; seconds: number };
+  // The one change of papers a voyage allows. The path is the one taken up
+  // rather than the one set aside, for the reason the log line carries the
+  // same field: the room sees the identity a captain sails on as, and the
+  // engine's own line carries both (see applyPathSwitch). The plan's
+  // iteration for this feature wants the switch watched as usage, which is
+  // this event counted per voyage against the voyages that could have
+  // switched one.
+  path_switched: { leg: number; actor: string; path: string };
   // ---- market ----
   // The barter board's three outcomes. All three count the same side of an
   // offer, the units its poster put up, so the three add up: what was
@@ -163,6 +298,8 @@ export const TELEMETRY_FAMILY: Record<TelemetryName, TelemetryFamily> = {
   leg_advanced: "loop",
   leg_report: "loop",
   leg_timed_out: "loop",
+  path_taken: "loop",
+  path_switched: "loop",
   offer_posted: "market",
   offer_filled: "market",
   offer_expired: "market",

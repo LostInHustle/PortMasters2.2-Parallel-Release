@@ -4,7 +4,17 @@
 // and cryptographically random session tokens stored in the DB.
 // =====================================================================
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { db, type PublicUser } from "./db";
+import {
+  DISPLAY_NAME_MAX,
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  USERNAME_ERROR,
+  USERNAME_MAX,
+  USERNAME_MIN,
+  USERNAME_PATTERN,
+} from "./credentials";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
@@ -64,6 +74,26 @@ export async function createSession(
 // routes refuse with it, for the same reason BANNED_ACCOUNT_ERROR is shared:
 // the two cannot then describe the same refusal differently.
 export const USERNAME_TAKEN_ERROR = "That captain name is already registered";
+
+// The rule for the three fields every account has, written once because
+// two routes create accounts and a captain name the harbor accepts has to
+// be a captain name the console accepts. The setup code is deliberately
+// not in here: it belongs to the operator door alone, and that route
+// extends this rather than restating it.
+//
+// The bounds are not written here either. They are the captain's rule in
+// lib/credentials.ts, which the two credential cards also print beside
+// their fields, so the sentence a captain reads and the check they are
+// held to cannot drift apart.
+export const captainCredentials = z.object({
+  username: z
+    .string()
+    .min(USERNAME_MIN)
+    .max(USERNAME_MAX)
+    .regex(USERNAME_PATTERN, USERNAME_ERROR),
+  password: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
+  displayName: z.string().min(1).max(DISPLAY_NAME_MAX).optional(),
+});
 
 // A captain account, made and signed in. The order is the part worth
 // holding in one place: the name is checked before anything is written, the

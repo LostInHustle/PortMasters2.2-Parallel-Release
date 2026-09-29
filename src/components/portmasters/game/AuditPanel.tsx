@@ -24,8 +24,11 @@ import { AUDIT_FROM_ROUND, fulfillmentLine } from "@/lib/game/audit";
 import { normalizeMode } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
+import { cn } from "@/lib/utils";
 import { tallyRows } from "@/lib/voteTally";
+import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import type { AuditReveal } from "@/types/realtime";
+import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
 
@@ -101,19 +104,7 @@ export function AuditVoteCard({
               harbor.
             </p>
           )}
-          {rows.length > 0 && (
-            <div className="mt-3 space-y-0.5 text-center">
-              {rows.map((row) => (
-                <p key={row.targetId} className="text-[11px]">
-                  <span className="font-medium">{row.name}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    {row.voters.length}: {row.voters.join(", ")}
-                  </span>
-                </p>
-              ))}
-            </div>
-          )}
+          <VoteTallyRows rows={rows} />
           <p className="text-center text-[10px] text-muted-foreground/80 mt-2">
             A majority is more than half of the captains still in the voyage.
           </p>
@@ -169,6 +160,35 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
               {fulfillmentLine(fill)}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* [C1: the Larder and Short Rations] The second half of the plan's
+          audit clause: the sample of fulfillments, plus the captain's
+          current Larder. Drawn only when the layer reports one, so a
+          voyage with the provisions switch off shows the reveal this strip
+          has always shown rather than a number nothing moves. The red is
+          the meaning red rather than the strip's own hue, because an empty
+          larder is the finding the room is looking for and it should be
+          readable before the count is. */}
+      {reveal.larder !== undefined && (
+        <div className="mt-1.5">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+              reveal.larder === 0
+                ? "border-alarm/30 bg-alarm/5 text-alarm"
+                : "border-intel/25 text-foreground",
+            )}
+          >
+            <Utensils className="h-3 w-3" />
+            Larder {reveal.larder}
+          </span>
+          <span className="ml-1.5 text-[10px] text-muted-foreground/80">
+            {reveal.larder === 0
+              ? "an empty larder: this captain's crew is on short rations."
+              : "rations aboard, eaten one a head each leg."}
+          </span>
         </div>
       )}
 

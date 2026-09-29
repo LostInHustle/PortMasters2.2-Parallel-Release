@@ -21,6 +21,7 @@
 // by which goods return to a hold.
 // =====================================================================
 import { useState } from "react";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import {
@@ -263,8 +264,6 @@ export function TradeComposer({
   onPosted?: () => void;
 }) {
   const draft = useOfferDraft(game, barter, act, true, fixedTarget?.id);
-  const selectClass =
-    "h-8 rounded-md border border-input bg-transparent px-1.5 text-xs";
 
   // Below the unlock level there is no form worth drawing. The server
   // would refuse every post, and handing a captain a full composer whose
@@ -296,10 +295,10 @@ export function TradeComposer({
           aria-label="Amount to offer"
           className="h-8 w-14"
         />
-        <select
+        <Select
           value={draft.offerItem}
           onChange={(e) => draft.setOfferItem(e.target.value)}
-          className={cn(selectClass, "flex-1")}
+          className="h-8 px-1.5 text-xs flex-1"
           aria-label="Item to offer"
         >
           {draft.items.map((it) => (
@@ -307,7 +306,7 @@ export function TradeComposer({
               {ICONS[it]} {it}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="flex items-center gap-1.5 text-xs">
         <span className="w-12 shrink-0 text-muted-foreground">I want</span>
@@ -318,10 +317,10 @@ export function TradeComposer({
           aria-label="Amount to request"
           className="h-8 w-14"
         />
-        <select
+        <Select
           value={draft.requestItem}
           onChange={(e) => draft.setRequestItem(e.target.value)}
-          className={cn(selectClass, "flex-1")}
+          className="h-8 px-1.5 text-xs flex-1"
           aria-label="Item to request"
         >
           {draft.items.map((it) => (
@@ -329,17 +328,17 @@ export function TradeComposer({
               {ICONS[it]} {it}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       {fixedTarget ? (
         <p className="text-[11px] text-muted-foreground">
           Offered to {fixedTarget.displayName} alone.
         </p>
       ) : (
-        <select
+        <Select
           value={draft.targetUserId}
           onChange={(e) => draft.setChosenTargetId(e.target.value)}
-          className={cn(selectClass, "w-full")}
+          className="h-8 px-1.5 text-xs w-full"
           aria-label="Direct this offer to a specific captain"
         >
           <option value="">🌊 Anyone in the harbor</option>
@@ -350,7 +349,7 @@ export function TradeComposer({
                 🔒 {m.displayName} only
               </option>
             ))}
-        </select>
+        </Select>
       )}
       {draft.sameItem && (
         <p className="text-[11px] text-alarm">

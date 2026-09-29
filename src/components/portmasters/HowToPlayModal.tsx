@@ -5,6 +5,7 @@ import {
   BookOpen,
   X,
   Ship,
+  Compass,
   Handshake,
   Wrench,
   Package,
@@ -17,6 +18,7 @@ import {
 import { useState } from "react";
 import { ModalOverlay } from "@/components/ui/modal-overlay";
 import { BOON_SWAP_COST } from "@/lib/game/constants";
+import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,13 @@ import { cn } from "@/lib/utils";
  * game room (they need a difficulty to render the tuned numbers). This
  * component is a higher level, visual first read that covers the shape
  * of a voyage without requiring a room.
+ *
+ * It takes the mode rather than assuming one, because it is the first
+ * manual a captain opens and the lobby is where they choose between the
+ * modes: a manual that answered every question with the founding voyage's
+ * rules was teaching half the harbor the wrong game before they set sail.
+ * What it says about a mode comes out of the record, so the page a
+ * captain reads here and the pages they read in the room cannot disagree.
  */
 
 type Step = {
@@ -36,6 +45,12 @@ type Step = {
   title: string;
   gradient: string;
   body: string;
+  // A list under the body, for a page whose content is a set of rules
+  // rather than a paragraph. One page uses it today: the mode's own page,
+  // which prints the differences the mode record lists. Written as an
+  // array of sentences rather than as one long paragraph so that a reader
+  // can count what a mode changes, which is the question they came with.
+  points?: readonly string[];
   tip: string;
   // [H9: the unlock code] The manual's own appendix, printed on the step it
   // belongs to rather than in a panel of its own. It is prose from the
@@ -94,7 +109,12 @@ const STEPS: Step[] = [
     icon: Skull,
     title: "Survive Settlement",
     gradient: "pm-grad-resolve",
-    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance. If you cannot cover the bills, you go bankrupt.",
+    // The last sentence this page used to end on stated the founding
+    // mode's rule for a failed seat as if it were the game's, so a Gambit
+    // captain was told here that failing the bills ends the voyage. What
+    // happens instead is the mode's own rule, and it is stated on the
+    // mode's page rather than repeated on this one.
+    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Round End Obligations panel before you spend anything.",
     tip: "Ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
   {
@@ -117,15 +137,55 @@ const STEPS: Step[] = [
   },
 ];
 
+/**
+ * The mode's own page, which every mode has and only some of them fill.
+ *
+ * It states the two things a captain needs before the first round and
+ * cannot get from the phase pages: what this voyage is, in the mode's own
+ * words, and what happens to a seat whose books fail. The list under it is
+ * the record's array of differences, which is empty for the founding
+ * voyage, and a mode with an empty list is a mode that is what the others
+ * differ from rather than a mode with nothing to say.
+ *
+ * The tip is the sentence the list cannot carry, and it is the one the
+ * tutorial's mode page ends on too: a captain who has sailed Classic
+ * already knows how to play. That is the answer to the second half of
+ * their question, and it is the half a list of rules never answers.
+ */
+function voyagePage(mode: GameMode): Step {
+  const play = modeConfig(mode);
+  return {
+    icon: Compass,
+    title: `${play.badge}: The Voyage You Are Sailing`,
+    gradient: "pm-grad-guide",
+    body: `${play.tagline} ${play.failureRule}`,
+    points: play.differences,
+    tip: play.differences.length
+      ? "Everything else is the voyage you would sail in Classic, so the rest of this manual reads the same for both."
+      : "This is the voyage every other mode is measured against, and the one the rest of these pages describe.",
+  };
+}
+
 export function HowToPlayModal({
   open,
   onOpenChange,
+  mode,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  mode: GameMode;
 }) {
   const [step, setStep] = useState(0);
-  const current = STEPS[step];
+  // The mode's page is second, right after the harbor, because it answers
+  // the question a captain arrives with before the pages that answer the
+  // questions they have not asked yet.
+  const pages = [STEPS[0], voyagePage(mode), ...STEPS.slice(1)];
+  // The mode can change while this manual is closed, and a shorter list
+  // would leave the reader on a page that no longer exists: the index is
+  // clamped where it is read rather than reset, so the state stays what the
+  // reader left it as and a page they come back to is the page they left.
+  const at = Math.min(step, pages.length - 1);
+  const current = pages[at];
   const Icon = current.icon;
 
   // The test sits inside the AnimatePresence rather than above it, so the
@@ -157,7 +217,7 @@ export function HowToPlayModal({
                       How to Play
                     </h2>
                     <p className="text-[11px] text-muted-foreground">
-                      Step {step + 1} of {STEPS.length}: {current.title}
+                      Step {at + 1} of {pages.length}: {current.title}
                     </p>
                   </div>
                 </div>
@@ -176,7 +236,7 @@ export function HowToPlayModal({
               <motion.div
                 className="h-full bg-gradient-to-r from-celadon to-jade"
                 initial={false}
-                animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                animate={{ width: `${((at + 1) / pages.length) * 100}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
@@ -184,7 +244,7 @@ export function HowToPlayModal({
             {/* Content */}
             <div className="flex-1 min-h-0 overflow-y-auto p-6 pm-scroll">
               <motion.div
-                key={step}
+                key={at}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.2 }}
@@ -206,6 +266,16 @@ export function HowToPlayModal({
                 <p className="text-sm leading-relaxed text-foreground">
                   {current.body}
                 </p>
+                {/* The rules a mode changes, listed rather than folded
+                    into the paragraph above, because a reader asking what
+                    is different is counting as much as reading. */}
+                {current.points && current.points.length > 0 && (
+                  <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-foreground">
+                    {current.points.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                )}
                 <div className="rounded-xl bg-warn/[0.07] border border-warn/20 p-3">
                   <p className="text-xs text-warn">
                     <span className="font-semibold">Tip: </span>
@@ -229,13 +299,13 @@ export function HowToPlayModal({
             {/* Step dots: pinned below the scroll area, above the navigation,
                 so they are always centred regardless of content height. */}
             <div className="flex items-center justify-center gap-1.5 py-2 border-t border-border/20">
-              {STEPS.map((s, i) => (
+              {pages.map((s, i) => (
                 <button
                   key={i}
                   onClick={() => setStep(i)}
                   className={cn(
                     "h-1.5 rounded-full transition-all",
-                    i === step
+                    i === at
                       ? "w-5 bg-celadon"
                       : "w-1.5 bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30",
                   )}
@@ -250,20 +320,20 @@ export function HowToPlayModal({
               <div className="justify-self-start">
                 <button
                   onClick={() => setStep((s) => Math.max(0, s - 1))}
-                  disabled={step === 0}
+                  disabled={at === 0}
                   className="pm-pressable rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   Back
                 </button>
               </div>
               <span className="justify-self-center text-xs text-muted-foreground tabular-nums">
-                {step + 1} / {STEPS.length}
+                {at + 1} / {pages.length}
               </span>
               <div className="justify-self-end">
-                {step < STEPS.length - 1 ? (
+                {at < pages.length - 1 ? (
                   <button
                     onClick={() =>
-                      setStep((s) => Math.min(STEPS.length - 1, s + 1))
+                      setStep((s) => Math.min(pages.length - 1, s + 1))
                     }
                     className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
                   >

@@ -2,7 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { lapPhases } from "@/lib/game/checkpoint";
-import { ICONS, RECIPES } from "@/lib/game/constants";
+import {
+  COLD_LEG_WARMTH,
+  GARMENTS,
+  ICONS,
+  RAG_SCRAP_VALUE,
+  RECIPES,
+} from "@/lib/game/constants";
 import {
   assignTask,
   fireWorker,
@@ -10,6 +16,17 @@ import {
   hireWorker,
   nextPhase,
 } from "@/lib/game/engine";
+import {
+  garmentWarmth,
+  garmentsLayerOn,
+  isFrostbitten,
+  legIsCold,
+  shortOfWarmth,
+  warmthScore,
+  warmthText,
+  wearGarment,
+} from "@/lib/game/garments";
+import { crewSize } from "@/lib/game/larder";
 import { isLegPhase, phaseFace } from "@/lib/game/phases";
 import {
   unlockedProducts,
@@ -58,6 +75,7 @@ function WorkerList({
   name,
   tasks,
   cost,
+  round,
   act,
 }: {
   type: string;
@@ -69,6 +87,10 @@ function WorkerList({
       Passed in rather than looked up here, because the display used to read
       the raw WAGES table while fireWorker charged getHireCost. */
   cost: number;
+  /** [C3: garments and the cold] The leg in progress, read here so the row
+      can say which hand the cold has taken. Passed in rather than pulled off
+      a state this component does not hold, the same as cost above. */
+  round: number;
   act: (fn: (g: GameState, logs: string[]) => void) => void;
 }) {
   if (!list.length) return null;
@@ -87,11 +109,25 @@ function WorkerList({
           key={i}
           className="flex items-center justify-between bg-background/70 rounded-md px-3 py-1.5 my-1 text-xs border border-black/5 dark:border-white/10"
         >
+          {/* The row leads with the person rather than with their trade.
+              It used to read "Weaver 3:", which is a count wearing a
+              name's clothes: the heading above already says the trade,
+              and the number said nothing a captain could hold on to.
+              C2's whole point is that a name going off this list says
+              something a number cannot, which it can only do if the name
+              was on it.
+
+              [C3: garments and the cold] A hand the cold has taken says so
+              where their work would have been, because that is the one
+              thing that changed about them: they are still aboard, still
+              eating and still on the payroll. */}
           <span>
-            {name} {i + 1}:{" "}
-            {w.task
-              ? `Working on: ${w.task}${w.isSkilled ? " (Skilled)" : ""}`
-              : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`}
+            {w.name}:{" "}
+            {isFrostbitten(w, round)
+              ? "🥶 Out of action this leg"
+              : w.task
+                ? `Working on: ${w.task}${w.isSkilled ? " (Skilled)" : ""}`
+                : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`}
           </span>
           {!w.task && (
             // Quiet until you reach for it, but still edged so it reads as a
@@ -128,6 +164,153 @@ function WorkerList({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// The Wardrobe. The clothes the crew wears into the cold.
+//
+// [C3: garments and the cold] It sits on the artisan bench rather than on
+// the port board, and the reason is the inventory block above it: this is
+// the one screen where a captain sees the crew and the hold together, and
+// the goods this panel draws from are the finished goods that block already
+// lists. Nothing here is bought or sold, which is the other half of the
+// reason it is not a market board panel: a garment reaches the wardrobe by
+// being made at this bench, and the plan's own sentence about the Loom path
+// is that there is no other way to get one.
+//
+// The panel is the whole of the durability mechanic a captain reads, and it
+// is deliberately not a bar. What it prints is the multiplier the plan asks
+// for: what each worn garment is worth today and what the crew's total comes
+// to against what this leg asks. The decision is the button, and the line
+// under the heading says what pressing it commits to, because a garment that
+// goes on stays on until the sea has had it.
+//
+// Runs only when the layer is on. With the switch off the panel is not
+// drawn, the wardrobe is not read and no button is offered, which is the
+// base game.
+function Wardrobe({
+  game,
+  act,
+  colorFor,
+}: Pick<PhasePanelProps, "game" | "act" | "colorFor">) {
+  if (!garmentsLayerOn()) return null;
+  const resolveColor = itemColorResolver(colorFor);
+  const crew = crewSize(game);
+  const worn = game.garments ?? [];
+  const score = warmthScore(game);
+  const cold = legIsCold(game);
+  const short = shortOfWarmth(game);
+  // The grades the hold actually carries, in the catalogue's own order, so
+  // the button a captain reaches for is where it was last leg rather than
+  // wherever the hold happens to have put it.
+  const carried = Object.keys(GARMENTS).filter(
+    (good) => (game.inventory[good] || 0) > 0,
+  );
+
+  return (
+    <div className="rounded-xl border border-wardrobe/15 bg-wardrobe/[0.03] px-3.5 py-2.5 mb-4">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-wardrobe mb-1.5">
+        🧥 Wardrobe
+        <span className="font-normal text-muted-foreground ml-1">
+          a garment worn stays on until it wears out
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-[11px]">
+          <span className="text-muted-foreground">This leg </span>
+          <span
+            className={cn(
+              "font-bold",
+              cold ? "text-sea" : "text-muted-foreground",
+            )}
+          >
+            {cold ? "❄️ Cold" : "mild"}
+          </span>
+        </span>
+        <span className="text-[11px]">
+          <span className="text-muted-foreground">Warmth </span>
+          <span
+            className={cn("font-bold", short ? "text-alarm" : "text-wardrobe")}
+          >
+            {warmthText(score)}
+          </span>
+          {cold && (
+            <span className="text-muted-foreground">
+              {" "}
+              / {COLD_LEG_WARMTH} asked
+            </span>
+          )}
+        </span>
+        {/* Each worn garment's own number, which is the multiplier itself:
+            a fresh Brocade is three, and a Brocade three cold legs old is
+            less. Nothing here is a durability meter. */}
+        {worn.map((garment, i) => (
+          <span
+            key={`${garment.good}-${i}`}
+            className="flex items-center gap-1 text-[11px]"
+          >
+            <ItemIcon item={garment.good} className="h-3.5 w-3.5" />
+            <span style={{ color: resolveColor(garment.good) }}>
+              {garment.good}
+            </span>
+            <b className="text-wardrobe">
+              {warmthText(garmentWarmth(garment))}
+            </b>
+          </span>
+        ))}
+      </div>
+      {cold && crew > 0 && (
+        <div
+          className={cn(
+            "mt-1.5 text-[10px]",
+            short ? "text-alarm" : "text-muted-foreground",
+          )}
+        >
+          {short
+            ? "⚠️ The crew is short of warm clothes. The cold takes the newest hand, who is out of action for the next leg."
+            : "The crew is dressed for the cold this leg."}
+        </div>
+      )}
+      {crew > 0 && carried.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* The panel's own hue rather than the bench's, on the same
+              reasoning the Provisions panel's buttons carry at the port:
+              painting these in the artisan chip colour would say a garment
+              is part of the trade it came from. */}
+          {carried.map((good) => (
+            <Button
+              key={good}
+              size="sm"
+              className="rounded-lg"
+              onClick={() => act((g, l) => wearGarment(g, good, l))}
+            >
+              🧥 Wear {good} ({game.inventory[good]} in the hold,{" "}
+              {GARMENTS[good].warmth} warmth)
+            </Button>
+          ))}
+        </div>
+      )}
+      {crew === 0 && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          No crew aboard, so there is nobody to wear them. Hire artisans and the
+          cold starts to matter.
+        </div>
+      )}
+      {crew > 0 && carried.length === 0 && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          The hold carries no clothes. Linen Clothes, Cotton Clothes and Brocade
+          are made right here at the bench, and the ones the crew wears are the
+          ones it cannot sell.
+        </div>
+      )}
+      {crew > 0 && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          A garment the sea has worn out becomes rags and is scrapped for{" "}
+          {RAG_SCRAP_VALUE} Gold. Frostbite costs the newest hand one leg of
+          work rather than their place aboard.
+        </div>
+      )}
     </div>
   );
 }
@@ -263,6 +446,8 @@ export function WorkerMgmt({
           </div>
         </div>
       </div>
+
+      <Wardrobe game={game} act={act} colorFor={colorFor} />
 
       {/* Payroll is money leaving the purse, so this box keeps the colour
           that means a cost rather than wearing the Worker Management
@@ -403,6 +588,7 @@ export function WorkerMgmt({
               name={r.label}
               tasks={r.tasks}
               cost={r.cost}
+              round={game.currentRound}
               act={act}
             />
           ))}

@@ -184,8 +184,8 @@ Every system of the earlier build is still here and still working the same way, 
 |                        | The earlier build | PortMasters 2.2 Parallel Release |
 | ---------------------- | ----------------- | -------------------------------- |
 | Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 26 modules                       |
-| Interface components   | 29                | 67                               |
+| Realtime layer         | one long file     | 57 modules                       |
+| Interface components   | 29                | 79                               |
 | Database models        | 10                | 15                               |
 | The port it answers on | 2232              | 8080                             |
 

@@ -251,17 +251,81 @@ export function noteLegReport(
     ordersDealt: number;
     ordersFilled: number;
     distinctGoods: number;
+    holdSlots?: number;
+    grainMeals?: number;
+    saltFishMeals?: number;
+    produceMeals?: number;
+    escortSold?: number;
+    escortFeesEarned?: number;
+    escortAbsorbed?: number;
+    refitsSold?: number;
+    refitFeesEarned?: number;
+    ragsRewoven?: number;
+    coldLeg?: boolean;
+    opportunistBorrows?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
   if (!Number.isInteger(leg) || leg < 1 || leg > voyage.leg + 1) return;
+  // [C4: three foods, spoilage and the split hold] The hold's four figures
+  // are carried only when the client sent them, which is only when the
+  // switch that gives them meaning was on (see LegReport). The record keeps
+  // the shape the wire had rather than filling the gaps, so a reader
+  // counting voyage food can tell a base game leg from a survival one, and
+  // a field that arrived unreadable stays absent instead of landing as a
+  // zero that would read as an empty hold.
+  const held = (value: number | undefined): number | undefined =>
+    value === undefined ? undefined : Math.max(0, Math.floor(value));
+  const holdSlots = held(figures.holdSlots);
+  const grainMeals = held(figures.grainMeals);
+  const saltFishMeals = held(figures.saltFishMeals);
+  const produceMeals = held(figures.produceMeals);
+  // [D3: Convoy: the Escort Contract] The market's three figures ride the
+  // same rule, and "held" is the right reader for all three: a fee is Gold
+  // and an absorbed raid is Gold, so neither can be negative, and a count of
+  // contracts is a count. The buyer's side is not here and is not merely
+  // unrecorded: nothing on the wire carries it, since the plan's evaluation
+  // is about what the seller's market did.
+  const escortSold = held(figures.escortSold);
+  const escortFeesEarned = held(figures.escortFeesEarned);
+  const escortAbsorbed = held(figures.escortAbsorbed);
+  // [D4: Loom: the Refit] The bench's three ride the same rule, and `held`
+  // reads all three for the reason it reads the escort's: a fee is Gold, a
+  // reweave is a count, and neither can be negative. The leg's weather is not
+  // a count and is deliberately not read through it. A cold leg is a truth
+  // rather than a tally, so false is a reading and not an absence, and
+  // flooring it would turn every fair leg in the record into a leg nobody
+  // measured: the reader below keeps the answer the client gave, either way,
+  // and drops only what arrived as something other than a boolean.
+  const refitsSold = held(figures.refitsSold);
+  const refitFeesEarned = held(figures.refitFeesEarned);
+  const ragsRewoven = held(figures.ragsRewoven);
+  const coldLeg =
+    typeof figures.coldLeg === "boolean" ? figures.coldLeg : undefined;
+  // [D6: Free Captain: Opportunist] One count, and `held` is the right
+  // reader for it for the reason it reads the escort's and the bench's: a
+  // borrow is a count and cannot be negative. The tally is the voyage's
+  // rather than the leg's, which the field's own note explains.
+  const opportunistBorrows = held(figures.opportunistBorrows);
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
     ordersDealt: Math.max(0, Math.floor(figures.ordersDealt)),
     ordersFilled: Math.max(0, Math.floor(figures.ordersFilled)),
     distinctGoods: Math.max(0, Math.floor(figures.distinctGoods)),
+    ...(holdSlots === undefined ? {} : { holdSlots }),
+    ...(grainMeals === undefined ? {} : { grainMeals }),
+    ...(saltFishMeals === undefined ? {} : { saltFishMeals }),
+    ...(produceMeals === undefined ? {} : { produceMeals }),
+    ...(escortSold === undefined ? {} : { escortSold }),
+    ...(escortFeesEarned === undefined ? {} : { escortFeesEarned }),
+    ...(escortAbsorbed === undefined ? {} : { escortAbsorbed }),
+    ...(refitsSold === undefined ? {} : { refitsSold }),
+    ...(refitFeesEarned === undefined ? {} : { refitFeesEarned }),
+    ...(ragsRewoven === undefined ? {} : { ragsRewoven }),
+    ...(coldLeg === undefined ? {} : { coldLeg }),
+    ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather

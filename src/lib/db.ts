@@ -19,6 +19,25 @@ export const PUBLIC_USER_SELECT = {
   avatarHue: true,
 } as const;
 
+/**
+ * The room shape every read of a harbor asks for: the roster, each row
+ * carrying the public side of its captain, and the host. Four reads want
+ * it (the harbor list, one harbor, the harbor a captain is standing in,
+ * and the row a create hands back) and each of them goes on to draw the
+ * same screen from it through serializeRoom, so a read that asked for
+ * half of it would answer with a harbor that cannot be shown.
+ */
+export const ROOM_WITH_MEMBERS = {
+  members: {
+    include: {
+      user: { select: PUBLIC_USER_SELECT },
+    },
+  },
+  host: {
+    select: PUBLIC_USER_SELECT,
+  },
+} as const;
+
 export type PublicUser = {
   id: string;
   username: string;

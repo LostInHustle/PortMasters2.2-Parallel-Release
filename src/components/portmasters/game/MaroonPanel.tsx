@@ -28,6 +28,7 @@ import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
 import { tallyRows } from "@/lib/voteTally";
+import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 import type { MaroonResult, PortShiftNotice } from "@/types/realtime";
 
@@ -118,19 +119,7 @@ export function MaroonVoteCard({
               harbor.
             </p>
           )}
-          {rows.length > 0 && (
-            <div className="mt-3 space-y-0.5 text-center">
-              {rows.map((row) => (
-                <p key={row.targetId} className="text-[11px]">
-                  <span className="font-medium">{row.name}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    {row.voters.length}: {row.voters.join(", ")}
-                  </span>
-                </p>
-              ))}
-            </div>
-          )}
+          <VoteTallyRows rows={rows} />
           <p className="text-center text-[10px] text-muted-foreground/80 mt-2">
             Two thirds of the captains still in the voyage carries it.
           </p>

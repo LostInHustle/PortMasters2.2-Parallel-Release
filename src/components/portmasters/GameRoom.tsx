@@ -36,6 +36,16 @@ import { useAudit } from "@/lib/use-audit";
 import { useMaroon } from "@/lib/use-maroon";
 import { useBarter, type BarterOffer } from "@/lib/use-barter";
 import {
+  useEscortContracts,
+  type EscortContract,
+} from "@/lib/use-escort-contracts";
+import {
+  useRefitContracts,
+  type RefitContract,
+} from "@/lib/use-refit-contracts";
+import { useBazaarRumors } from "@/lib/use-bazaar-rumors";
+import { usePathDraft } from "@/lib/use-path-draft";
+import {
   useAid,
   type GrantedLoan,
   type RepaidLoan,
@@ -58,6 +68,8 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
+import { PathDraft } from "./game/PathDraft";
+import { PathPanel } from "./game/PathPanel";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
 import { ObjectivePanel } from "./game/ObjectivePanel";
 import { AuditRevealStrip } from "./game/AuditPanel";
@@ -103,10 +115,13 @@ import { useRoomRoster } from "@/lib/use-room-roster";
 import { renownProgress } from "@/lib/game/legacy";
 import {
   acceptBarterOffer,
+  applyEscortSide,
+  applyRefitSide,
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
   clearRedirectedLoan,
   contributeToVenture,
+  coverFromBoard,
   grantLoan,
   nextPhase,
   pledgeBacking,
@@ -371,17 +386,17 @@ export function GameRoom({
       if (!mine) return;
       act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
       if (outcome === "filled") {
-        toast.success("⚓ Convoy Venture filled!", {
+        toast.success("⚓ Venture filled!", {
           description: `Your share: +${mine.amount} Gold.`,
         });
         playSound("coin");
       } else if (outcome === "failed") {
-        toast("⚓ Convoy Venture missed its deadline", {
+        toast("⚓ Venture missed its deadline", {
           description: `Partial refund: +${mine.amount} Gold.`,
         });
         playSound("warn");
       } else {
-        toast("⚓ Convoy Venture cancelled", {
+        toast("⚓ Venture cancelled", {
           description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
         });
       }
@@ -394,6 +409,128 @@ export function GameRoom({
     onVentureContributed,
     onVentureSettled,
   );
+
+  // [D3: Convoy: the Escort Contract] The tenth relay, and the last of the
+  // ones that only ever touch this captain's own purse: a contract this
+  // captain is a side of has moved, and the engine works out what that
+  // means for them (see applyEscortSide). Both sides of a contract run this
+  // same callback against their own state, which is what keeps the fee and
+  // the absorbed raid on the two purses that agreed to them rather than on
+  // any other captain's.
+  //
+  // It is idempotent on the engine's side, so the board may report the same
+  // contract as often as it likes: the ledger is what decides whether the
+  // Gold has already moved.
+  const onEscortSettle = useCallback(
+    (contract: EscortContract) => {
+      act((g, l) => {
+        applyEscortSide(g, contract, me.id, l);
+      });
+    },
+    [act, me.id],
+  );
+  const escort = useEscortContracts(socket, room.id, me.id, onEscortSettle);
+
+  // [D4: Loom: the Refit] The bench's relay, which is the escort's shape
+  // with one fewer number in it: a refit this captain is a side of has been
+  // agreed, and the engine works out what that means for them (see
+  // applyRefitSide). The customer pays and their own garment gets the points
+  // back, both on their own machine, and the seller is paid the price the
+  // two of them named. No third captain is touched.
+  //
+  // There is nothing to mirror into GameState afterwards, which is the
+  // difference between this market and the escort's. A contract has to be
+  // read back into escortCover because the raid roll consults a field; a
+  // refit's whole result is the fee and the garment, and the garment is
+  // already this captain's own state.
+  const onRefitSettle = useCallback(
+    (refit: RefitContract) => {
+      act((g, l) => {
+        applyRefitSide(g, refit, me.id, l);
+      });
+    },
+    [act, me.id],
+  );
+  const refit = useRefitContracts(socket, room.id, me.id, onRefitSettle);
+
+  // [D5: Aroma: the Bazaar Rumor] The bazaar's relay, and it is the
+  // shortest of the three because nothing about a rumor moves anything
+  // between captains. There is no settle report to give and no field on
+  // GameState to mirror into, which is the difference between this board
+  // and the other two: a contract's cover has to be read back into a field
+  // because the raid roll consults one, and a refit's whole result lands on
+  // the customer's own garment. What a rumor does to a price never touches
+  // this hook at all: the lean arrives on the advance frame and is applied
+  // to the market by the engine (see applyMarketLeans in
+  // @/lib/game/engine/market), so all this holds is what the harbor has
+  // been told, for the desk and the board to draw.
+  const bazaar = useBazaarRumors(socket, room.id);
+
+  // [D7: the draft, and switching] The path draft's relay, which is the one
+  // in this room that carries a card addressed to a single captain: the
+  // draft deals every seat its own hand and this hook holds the one it was
+  // dealt (see ./use-path-draft). It takes `act` where the three markets
+  // above take nothing, because the two frames it listens for are writes to
+  // this captain's own save: the settled view is the path they sail on, and
+  // the room's published switch is applied to their own purse and manifest,
+  // which is the same shape useMaroon's result hand-out takes.
+  const draft = usePathDraft(socket, room.id, me.id, act);
+
+  // The cover the raid roll consults, mirrored from the board this captain
+  // can see. The engine asks one field and never the network (see
+  // escortCoverOf), so the board has to be read into that field here, and
+  // here is the only place that turns a board into state.
+  //
+  // Gated on the load for the reason the pending refunds above are: a board
+  // that arrives before the save does would be written onto the placeholder
+  // and thrown away the moment the real voyage landed, and this effect runs
+  // again when the load finishes. The comparison before the dispatch is what
+  // keeps an ordinary board update, one that has nothing to do with this
+  // captain's cover, from cloning the whole voyage to write a value it
+  // already holds.
+  useEffect(() => {
+    if (!state.loaded) return;
+    const covered = coverFromBoard(
+      escort.contracts,
+      me.id,
+      state.game.currentRound,
+    );
+    if (
+      state.game.escortCover?.contractId === covered?.contractId &&
+      state.game.escortCover?.sellerName === covered?.sellerName
+    ) {
+      return;
+    }
+    act((g) => {
+      g.escortCover = covered;
+    });
+  }, [
+    escort.contracts,
+    state.loaded,
+    state.game.currentRound,
+    state.game.escortCover,
+    me.id,
+    act,
+  ]);
+
+  // The claim a covered raid leaves behind, relayed to the room and cleared.
+  // The raid itself stays a pure engine mutation (it sets the field rather
+  // than reaching for a socket it does not have), so this is the one place
+  // the covered captain's own report of what the pirates would have taken
+  // becomes a frame, which is also the one place it can be.
+  //
+  // Cleared before it is sent rather than after: a claim that the server
+  // refuses, because the leg moved on or the contract is already claimed,
+  // is still a raid that happened, and re-sending it every render would only
+  // be a way to keep asking.
+  useEffect(() => {
+    const pending = state.game.pendingEscortClaim;
+    if (!pending || !socket) return;
+    act((g) => {
+      g.pendingEscortClaim = null;
+    });
+    escort.claim(pending.contractId, pending.raidGold);
+  }, [state.game.pendingEscortClaim, socket, act, escort.claim]);
 
   // The six effects: join the room channel on every reconnect, watch for
   // voyage conclusion, relay the engine's pending debt settlements, relay
@@ -1135,6 +1272,22 @@ export function GameRoom({
 
       {/* Main layout */}
       <main className="flex-1 px-3 sm:px-5 pb-4 max-w-[1600px] w-full mx-auto">
+        {/* [D7: the draft, and switching] The deal, at the very top of the
+            voyage's own column because of when it happens rather than what
+            it is: it is dealt as the voyage leaves the dock, over the
+            opening leg, so a captain who is reading this panel is also
+            reading their first market behind it. Renders nothing at all
+            outside a live draft (see PathDraft), and the hook holding the
+            hand is fed by the server rather than by anything on this
+            screen. */}
+        {draft.view && (
+          <PathDraft
+            view={draft.view}
+            error={draft.error}
+            onKeep={draft.keep}
+            onDismissError={draft.clearError}
+          />
+        )}
         <FleetTicker
           socket={socket}
           roomId={room.id}
@@ -1190,6 +1343,9 @@ export function GameRoom({
               barter={barter}
               aid={aid}
               backing={backing}
+              escort={escort}
+              refit={refit}
+              bazaar={bazaar}
               audit={audit}
               maroon={maroon}
               voyageLog={voyageLog}
@@ -1244,6 +1400,19 @@ export function GameRoom({
                 peerTradeProfit={state.game.peerTradeProfit}
               />
             ))}
+            {/* [D7: the draft, and switching] What this captain sails as,
+                beside the card they hold alone because the two are one
+                fact seen at two moments: a hand the table is not shown
+                while it is being read, and the path that hand leaves,
+                which the fleet is told when the draft settles and told
+                again on the one time a captain changes their papers. It
+                draws nothing at all with the draft switched off. */}
+            <PathPanel
+              game={state.game}
+              error={draft.error}
+              onSwitch={draft.switchPath}
+              onDismissError={draft.clearError}
+            />
             {/* Wraps rather than overflowing. These five hint chips and
                 their labels are wider than a phone, and a centred row
                 with no wrap spills off both edges at once, which both

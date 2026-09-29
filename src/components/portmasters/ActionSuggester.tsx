@@ -10,10 +10,12 @@ import {
   priceRatio,
   brokersFavorCommission,
   calcTransportCost,
+  canFillOrder,
   explainVAT,
   getCardFinalCost,
   getHireCost,
   getIntelCost,
+  lockedBehind,
 } from "@/lib/game/engine";
 import { RECIPES, SILK_GOODS, WORKER_TYPES } from "@/lib/game/constants";
 import { TONE_WASH } from "./shared";
@@ -357,10 +359,13 @@ function analyzeOrders(game: GameState): Suggestion | null {
   let bestProfit = -Infinity;
   for (const o of orders) {
     if (game.completedOrders.includes(o.id)) continue;
-    const canComplete = o.resources.every(
-      (r) => (game.inventory[r.type] || 0) >= (r.required ?? 0),
-    );
-    if (!canComplete) continue;
+    // The engine's own reader rather than a second copy of the hold test,
+    // because it now answers both halves of the question: the hold covers
+    // the order and the order is not locked behind a path. A card the board
+    // greys out can therefore never be suggested here, and the two surfaces
+    // cannot come to disagree about which orders are a captain's (see [D2]
+    // in ./engine/orders).
+    if (!canFillOrder(game, o)) continue;
     const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
     const transport = calcTransportCost(game, o.totalItems, hasSilk);
     let net = o.reward - transport;
@@ -399,6 +404,11 @@ function analyzeOrders(game: GameState): Suggestion | null {
   // No completable order
   const closeOrders = orders.filter((o) => {
     if (game.completedOrders.includes(o.id)) return false;
+    // A locked card is never close, however full the hold is. This branch
+    // tells a captain to go and find the one good they are missing, and
+    // there is no good to find for a card that waits on somebody else's
+    // path (see [D2] in ./engine/orders).
+    if (lockedBehind(game, o)) return false;
     const missing = o.resources.filter(
       (r) => (game.inventory[r.type] || 0) < (r.required ?? 0),
     );

@@ -120,6 +120,9 @@ function ActivePhase(props: Props) {
     phaseSync,
     barter,
     aid,
+    escort,
+    refit,
+    bazaar,
     backing,
     audit,
     maroon,
@@ -168,8 +171,15 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           phaseSync={phaseSync}
+          me={me}
           members={members}
           colorFor={colorFor}
+          // [D4: Loom: the Refit] The bench is a station of this phase, so
+          // the port board is what draws it. The escort market above is a
+          // whole screen's because it opens at the Parley table, which has
+          // one panel; the Market has two stations and this one is the
+          // port's.
+          refit={refit}
           onRumorBoardOpen={onRumorBoardOpen}
         />
       );
@@ -180,6 +190,12 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           barter={barter}
+          escort={escort}
+          // [D5: Aroma: the Bazaar Rumor] The desk, which is a whole
+          // screen's like the escort market above it rather than a station
+          // of a phase's, because it opens where that market does: at the
+          // Parley table.
+          bazaar={bazaar}
           audit={audit}
           maroon={maroon}
           me={me}

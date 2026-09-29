@@ -269,6 +269,57 @@ const WIDGETS: Widget[] = [
     what: "Market Depth",
   },
   { name: "pulse", hue: 90, screens: ["phase:market"], what: "Market Pulse" },
+  /* [C1: the Larder and Short Rations] The provisions panel is the fourth
+     thing to open inside the Market, and it had to find a rung on a screen
+     that already carries four: the phase tag at 154, the Advisor at 197,
+     the Depth at 347 and the Pulse at 90, plus the five session surfaces a
+     captain is looking past. 270 is the one wide gap left, and it is wide
+     in both directions: Ledger at 304 is its nearest session neighbour at
+     34 degrees and Chat at 240 is next at 30, where the floor is twenty.
+     Everything else on the screen is further off than those two. */
+  {
+    name: "larder",
+    hue: 270,
+    screens: ["phase:market"],
+    what: "The Larder, and the provisions it buys",
+  },
+  /* [C3: garments and the cold] The Wardrobe is the fifth panel to open
+     inside the Market, and the Larder's note above leaves it one window:
+     217 to 220, between the Advisor at 197 and Chat at 240, which the
+     session rule checks against every phase. 219 takes it, 22 degrees from
+     the Advisor and 21 from Chat, where the floor is twenty. It is not
+     moved onto 218, which three widgets already wear, because what keeps
+     those apart is the screen string rather than the hue.
+     The cold chip in the status panel needs no rung at all: it wears the
+     sea when the crew is dressed for the weather and the alarm when it is
+     not, and those are meaning colours rather than widgets. */
+  {
+    name: "wardrobe",
+    hue: 219,
+    screens: ["phase:market"],
+    what: "The Wardrobe, and the clothes the crew wears",
+  },
+  /* [D4: Loom: the Refit] The bench is the sixth panel to open inside the
+     Market, and by the time it arrived the screen's rungs were nearly all
+     spoken for: the phase tag at 154, the Advisor at 197, the Depth at 347,
+     the Pulse at 90, the Larder at 270, the Wardrobe at 219, and the five
+     session surfaces every phase is checked against. What is left on a
+     screen that dense is three windows, 67 to 70, 131 to 134 and 324 to 327,
+     which are the gaps between Voyage and Pulse, Ship and the phase tag, and
+     Ledger and Depth. 133 takes the middle one: 22 degrees from Ship and 21
+     from the Market tag, where the floor is twenty, and it is not moved to
+     either end of its window because the window is only four wide.
+     The bench wears no fill. The Larder and the Wardrobe took no fill either
+     and their reason is the same: a fill is a widget claiming a rung, this
+     panel already has one of its own, and painting its buttons in the
+     market's green would say the bench is part of the board it opens beside
+     rather than a panel on it. */
+  {
+    name: "refit",
+    hue: 133,
+    screens: ["phase:market"],
+    what: "The Loom's bench, and the work it sells",
+  },
   {
     name: "planner",
     hue: 132,

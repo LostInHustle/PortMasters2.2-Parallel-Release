@@ -21,7 +21,6 @@ import { useSound } from "@/lib/use-sound";
 import {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
-  difficultyConfig,
   type Difficulty,
 } from "@/lib/game/difficulty";
 import {
@@ -32,35 +31,27 @@ import {
   voyageRoundsFor,
   type GameMode,
 } from "@/lib/game/mode";
-// The labels of the doors a harbor can be opened through, so a room card
-// names the code that made it rather than an id this screen would have to
-// translate. The phrase itself is not read here.
-import { UNLOCKS } from "@/lib/unlock";
 import { Avatar, OnlineDot, Pill } from "./shared";
 import { ChatPanel } from "./ChatPanel";
-import { CaptainLegacyCard } from "./CaptainLegacyCard";
 import { CaptainProfileModal } from "./CaptainProfileModal";
 import { AgeBanner } from "./AgeBanner";
 import { HowToPlayModal } from "./HowToPlayModal";
-import { HouseLeaderboard } from "./HouseLeaderboard";
-import { HOUSE_CREST, HOUSE_FALLBACK } from "./house-colours";
 import { SettingsModal } from "./SettingsModal";
 import { DifficultyAdvisor } from "./DifficultyAdvisor";
 import { HarborActivityFeed } from "./HarborActivityFeed";
 import { LeaderboardModal } from "./LeaderboardModal";
+import { HarborBoard } from "./lobby/HarborBoard";
+import {
+  LegacyDialog,
+  CheckInDialog,
+  ChronicleDialog,
+  HousesDialog,
+} from "./lobby/LobbyDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   Anchor,
   LogOut,
@@ -70,7 +61,6 @@ import {
   Users,
   KeyRound,
   Loader2,
-  ArrowRight,
   MessageCircle,
   RefreshCw,
   Gift,
@@ -85,9 +75,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn, formatDate, normalizeRoomName } from "@/lib/utils";
-import { roomLockedFor } from "@/lib/rooms";
+import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/game/constants";
+import { HOUSES } from "@/lib/game/engine";
 import {
   DEFAULT_LEGACY_SUMMARY,
   renownProgress,
@@ -95,7 +85,6 @@ import {
   type HouseId,
 } from "@/lib/game/legacy";
 import { checkInStatus, type CheckInStatus } from "@/lib/game/checkin";
-import { HOUSES, type House } from "@/lib/game/engine";
 import type { HouseStanding, VoyageChronicle } from "@/types/realtime";
 
 // =====================================================================
@@ -1291,162 +1280,13 @@ export function Lobby({
                         list lands. The rows are hidden from assistive tech and
                         the sentence they replace is kept, so the wait is
                         announced once instead of three times. */}
-                    {loadingRooms && rooms.length === 0 ? (
-                      <div>
-                        <span className="sr-only">Scanning the horizon</span>
-                        <div className="space-y-2" aria-hidden>
-                          {[0, 1, 2].map((row) => (
-                            <div key={row} className="pm-row pm-glass">
-                              <div className="pm-seal animate-pulse bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
-                              <div className="min-w-0 flex-1 space-y-1.5">
-                                <div className="h-4 w-1/3 animate-pulse rounded bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
-                                <div className="h-3 w-1/2 animate-pulse rounded bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
-                              </div>
-                              <div className="h-10 w-20 shrink-0 animate-pulse rounded-xl bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : rooms.length === 0 ? (
-                      /* An empty board is the first thing a captain sees and
-                         the likeliest reason to close the tab, so it says what
-                         to do next rather than only reporting that there is
-                         nothing. Both ways in are named, because either one is
-                         a real answer, and both of them live on this side of
-                         the switch. */
-                      <div className="flex flex-col items-center px-4 py-10 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/5 dark:bg-white/10">
-                          <Ship className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="mt-3 font-display text-sm font-semibold">
-                          No harbors open yet
-                        </p>
-                        <p className="mt-1 max-w-[22rem] text-[11px] leading-relaxed text-muted-foreground">
-                          Hit Quick Start above to be paired with the next
-                          captain looking, or switch to Chart a new harbor and
-                          open a room of your own.
-                        </p>
-                      </div>
-                    ) : (
-                      rooms.map((room) => {
-                        const locked = roomLockedFor(
-                          room.started,
-                          room.members.map((m) => m.id),
-                          me.id,
-                        );
-                        return (
-                          <motion.div
-                            key={room.id}
-                            layout
-                            className="pm-row pm-glass"
-                          >
-                            <div className="pm-seal pm-grad-harbors">
-                              <Ship className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              {/* Wraps rather than overflows. On a narrow
-                                  phone this column is about 165px wide, and
-                                  the difficulty, Host and Sailing pills
-                                  together need roughly 280px. Without the
-                                  wrap the row spilled out of the column and
-                                  the pills landed on top of the Enter button
-                                  beside it. */}
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="pm-truncate font-display text-sm font-semibold">
-                                  {normalizeRoomName(room.name)}
-                                </span>
-                                <Pill tone="sea">
-                                  {difficultyConfig(room.difficulty).icon}{" "}
-                                  {difficultyConfig(room.difficulty).badge}
-                                </Pill>
-                                {/* Only the exceptions carry a chip. Every
-                                    harbor a captain has seen so far is
-                                    Classic, so labelling that one would be
-                                    noise, and the voyage worth flagging is
-                                    the one that plays by a different clock.
-                                    Its colour is the meaning token rather
-                                    than a widget hue, the same way the
-                                    Sailing status below is coloured: this
-                                    says what the harbor IS, not which panel
-                                    it belongs to. */}
-                                {room.mode !== DEFAULT_MODE && (
-                                  <Pill
-                                    tone="none"
-                                    className="bg-warn/5 text-warn"
-                                  >
-                                    {modeConfig(room.mode).icon}{" "}
-                                    {modeConfig(room.mode).badge}
-                                  </Pill>
-                                )}
-                                {/* [H9: the unlock code] What opened the
-                                    harbor, worn beside the voyage it opened.
-                                    It takes the charter colour rather than
-                                    the caution above it, because it is not a
-                                    warning about the room: it is how the room
-                                    was charted, which is what that token
-                                    means everywhere else on this screen. A
-                                    captain reading a room list can see which
-                                    tables were opened with a phrase rather
-                                    than found. */}
-                                {room.unlock && (
-                                  <Pill
-                                    tone="none"
-                                    className="bg-charter/[0.07] text-charter"
-                                  >
-                                    🔑 {UNLOCKS[room.unlock].label}
-                                  </Pill>
-                                )}
-                                {room.host.id === me.id && (
-                                  <Pill tone="gold">Host</Pill>
-                                )}
-                                {!room.isPublic && (
-                                  <Pill tone="default">Private</Pill>
-                                )}
-                                {room.started && (
-                                  <Pill
-                                    tone="none"
-                                    className="bg-sailing/5 text-sailing"
-                                  >
-                                    ⛵ Sailing
-                                  </Pill>
-                                )}
-                              </div>
-                              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                                <span>Hosted by {room.host.displayName}</span>
-                                <span>·</span>
-                                <span className="font-mono">{room.code}</span>
-                                <span>·</span>
-                                <span className="flex items-center gap-1">
-                                  <Users className="h-3 w-3" />{" "}
-                                  {room.memberCount}
-                                </span>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => enterRoom(room)}
-                              disabled={joining === room.id || locked}
-                              title={
-                                locked
-                                  ? "This voyage has already set sail"
-                                  : undefined
-                              }
-                              className="pm-grad-harbors h-10 shrink-0 rounded-xl text-white"
-                            >
-                              {joining === room.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : locked ? (
-                                "Locked"
-                              ) : (
-                                <>
-                                  Enter <ArrowRight className="ml-1 h-4 w-4" />
-                                </>
-                              )}
-                            </Button>
-                          </motion.div>
-                        );
-                      })
-                    )}
+                    <HarborBoard
+                      rooms={rooms}
+                      loading={loadingRooms}
+                      meId={me.id}
+                      joining={joining}
+                      onEnter={enterRoom}
+                    />
                   </div>
                 </motion.div>
               </TabsContent>
@@ -1776,242 +1616,47 @@ export function Lobby({
         </aside>
       </main>
 
-      <Dialog open={legacyOpen} onOpenChange={setLegacyOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-display">
-              <Star className="h-5 w-5 text-legacy" />
-              Captain's Legacy
-            </DialogTitle>
-            <DialogDescription>
-              Renown carries across every voyage this account ever sails, in any
-              harbor.
-            </DialogDescription>
-          </DialogHeader>
-          <CaptainLegacyCard legacy={legacy} className="p-5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Every Renown level grants a small Gold bonus at the start of your
-            next fresh voyage. It grows from the Reputation you bank on the way
-            to Round 8, so it only ever goes up, even on a voyage that ends in
-            bankruptcy.
-          </p>
-        </DialogContent>
-      </Dialog>
+      <LegacyDialog
+        open={legacyOpen}
+        onOpenChange={setLegacyOpen}
+        legacy={legacy}
+      />
 
-      <Dialog open={checkInOpen} onOpenChange={setCheckInOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-display">
-              <Gift className="h-5 w-5 text-checkin" />
-              Daily Check In
-            </DialogTitle>
-            <DialogDescription>
-              Claim a Renown reward each day. The 7 day cycle picks up where you
-              left off, even after a missed day, and restarts once Day 7 is
-              claimed.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-            {checkIn.rewards.map((xp, i) => {
-              const day = i + 1;
-              const claimed = day <= checkIn.claimedThisCycle;
-              const isCurrent = day === checkIn.currentDay;
-              return (
-                <div
-                  key={day}
-                  className={cn(
-                    "rounded-lg border px-1 py-2 text-center",
-                    claimed
-                      ? "border-gain/40 bg-gain/[0.07] opacity-70"
-                      : isCurrent
-                        ? "border-checkin/50 bg-checkin/[0.09]"
-                        : "border-black/10 dark:border-white/10 bg-background/40",
-                  )}
-                >
-                  <div className="text-[10px] text-muted-foreground">
-                    Day {day}
-                  </div>
-                  <div className="text-sm font-bold leading-tight">+{xp}</div>
-                  <div className="text-[9px] text-muted-foreground">
-                    {claimed ? "✓ XP" : "XP"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <Button
-            className="pm-grad-checkin font-semibold rounded-lg w-full"
-            disabled={!checkIn.canClaimToday || claiming}
-            onClick={claimCheckIn}
-          >
-            {claiming
-              ? "Claiming…"
-              : checkIn.canClaimToday
-                ? `Claim Day ${checkIn.currentDay}: +${checkIn.rewards[checkIn.currentDay - 1]} Renown XP`
-                : "Checked in today · back tomorrow"}
-          </Button>
-        </DialogContent>
-      </Dialog>
+      <CheckInDialog
+        open={checkInOpen}
+        onOpenChange={setCheckInOpen}
+        checkIn={checkIn}
+        claiming={claiming}
+        onClaim={claimCheckIn}
+      />
 
-      {/* [MANIFEST: Voyage Chronicle] Lists the captain's past chronicles,
-          newest first, with headline, body, and creation date. */}
-      <Dialog open={chronicleOpen} onOpenChange={setChronicleOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-display">
-              <BookOpen className="h-5 w-5 text-chronicles" />
-              Voyage Chronicles
-            </DialogTitle>
-            <DialogDescription>
-              The harbour master's ledger of your finished voyages, newest
-              first.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="pm-scroll-capped max-h-[60vh] pr-2">
-            {chronicleLoading ? (
-              <div className="py-8 flex items-center justify-center text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading
-                chronicles…
-              </div>
-            ) : chronicles.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No chronicles yet. Finish a voyage and your headline will be
-                inscribed here.
-              </p>
-            ) : (
-              <ol className="space-y-3">
-                {chronicles.map((c) => (
-                  <li
-                    key={c.id}
-                    className="rounded-lg border border-black/10 dark:border-white/10 bg-background/40 p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-sm font-semibold font-display">
-                        {c.headline}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatDate(c.createdAt)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
-                      {c.body}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <ChronicleDialog
+        open={chronicleOpen}
+        onOpenChange={setChronicleOpen}
+        loading={chronicleLoading}
+        chronicles={chronicles}
+      />
 
-      {/* [MANIFEST: Great Houses] Pick or switch your House allegiance.
-          House definitions come from @/lib/game/engine (forwarded from
-          engine/houses); standings and the current pledge come from
-          /api/houses/standings; pledging writes through /api/house. */}
-      <Dialog open={houseOpen} onOpenChange={setHouseOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto pm-scroll">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-display">
-              <Landmark className="h-5 w-5 text-houses" />
-              Great Houses
-            </DialogTitle>
-            <DialogDescription>
-              Pledge to one House. Its perk applies on your next fresh voyage.
-              Switch any time between voyages.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {houseLoading ? (
-              <div className="py-8 flex items-center justify-center text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading
-                standings…
-              </div>
-            ) : (
-              HOUSES.map((house: House) => {
-                const standing = houseStandings.find(
-                  (s) => s.houseId === house.id,
-                );
-                const isMine = myHouseId === house.id;
-                return (
-                  <div
-                    key={house.id}
-                    className={cn(
-                      "rounded-xl border p-3 flex items-start gap-3",
-                      isMine
-                        ? "border-houses/50 bg-houses/[0.07]"
-                        : "border-black/10 dark:border-white/10 bg-background/40",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "h-10 w-10 rounded-lg flex items-center justify-center shrink-0 text-lg",
-                        HOUSE_CREST[house.id] ?? HOUSE_FALLBACK,
-                      )}
-                    >
-                      <span aria-hidden>{house.icon}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold font-display">
-                          {house.name}
-                        </span>
-                        {isMine && (
-                          <Pill tone="none" className="bg-houses/5 text-houses">
-                            Pledged
-                          </Pill>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-                        {house.perk}
-                      </p>
-                      {standing && (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-1">
-                          <span>👑 {standing.crowns}</span>
-                          <span>·</span>
-                          <span>⛵ {standing.voyages}</span>
-                          <span>·</span>
-                          <span>★ {standing.bestScore}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      disabled={isMine || pledgingHouse !== null}
-                      onClick={() => pledge(house.id)}
-                      className="rounded-lg pm-grad-houses font-semibold shrink-0"
-                    >
-                      {pledgingHouse === house.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isMine ? (
-                        "Pledged"
-                      ) : (
-                        "Pledge"
-                      )}
-                    </Button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Harbor wide leaderboard */}
-          {!houseLoading && houseStandings.length > 0 && (
-            <div className="mt-4 border-t border-border/30 pt-4">
-              <HouseLeaderboard
-                standings={houseStandings}
-                myHouseId={myHouseId}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <HousesDialog
+        open={houseOpen}
+        onOpenChange={setHouseOpen}
+        loading={houseLoading}
+        standings={houseStandings}
+        myHouseId={myHouseId}
+        pledgingHouse={pledgingHouse}
+        onPledge={pledge}
+      />
 
       <CaptainProfileModal
         open={profileOpen}
         onOpenChange={setProfileOpen}
         me={me}
       />
-      <HowToPlayModal open={howToPlayOpen} onOpenChange={setHowToPlayOpen} />
+      <HowToPlayModal
+        open={howToPlayOpen}
+        onOpenChange={setHowToPlayOpen}
+        mode={mode}
+      />
       <SettingsModal
         open={settingsOpen}
         onOpenChange={setSettingsOpen}

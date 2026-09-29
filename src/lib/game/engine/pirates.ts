@@ -6,9 +6,26 @@
 // which is why they belong together. Whichever runs first closes the
 // round's waters, so hiring an escort after the roll is refused and rolling
 // again after an escort cannot happen.
+//
+// [D3: Convoy: the Escort Contract] There are three ways a raid can meet a
+// captain now rather than two, and the third is the one this feature added:
+// a raider can find a hold covered by a contract sold to its owner. The
+// roll itself is untouched, since a contract does not change the odds of a
+// raid arriving, only what the raid takes when it does; the branch below is
+// read after the roll and before the Gold moves, which is the only place
+// the two answers about one raid can be told apart.
+//
+// The covered branch does not pay the seller here, and the reason is worth
+// the sentence. This module runs on the captain the raiders found, and the
+// seller is another machine: what this client can do is keep its own Gold
+// and leave a claim behind (state.pendingEscortClaim) for the React layer
+// to relay to the room, which is the same division of labour the whole
+// contract runs on (see ./contracts). The claim carries the Gold the raid
+// would have taken, because the seller is the one who prices what they eat.
 // =====================================================================
 import { difficultyConfig, pirateChanceFor } from "../difficulty";
 import type { GameState } from "../types";
+import { escortClaimFrom, escortCoverOf } from "./contracts";
 import { hasModule } from "./core";
 
 // Resolved once per round, right after production and before wages or
@@ -66,6 +83,32 @@ export function resolvePirateAttack(state: GameState, logs: string[]) {
   if (state.pirateAttackResolved) return;
   state.pirateAttackResolved = true;
   if (Math.random() < pirateChance(state)) {
+    // [D3] The contract's one moment. The cover is read after the roll and
+    // before the Gold moves, because the roll is what decides whether there
+    // is a raid at all and the cover is what decides who pays for it. A
+    // covered hit leaves the captain's Gold exactly where it stands and
+    // writes the claim the React layer relays, which is the whole of what
+    // this client can do about a bill that belongs to another machine.
+    const cover = escortCoverOf(state);
+    if (cover !== null) {
+      const raidGold = state.money;
+      const claim = escortClaimFrom(cover, raidGold);
+      if (claim !== null) {
+        state.pendingEscortClaim = claim;
+        logs.push(
+          `🛡️ Pirates closed on your hold and met ${cover.sellerName}'s guns. All ${raidGold} Gold saved, and the boarding party is theirs to answer for.`,
+        );
+        return;
+      }
+      // A covered hold with nothing in it. The raiders are still turned
+      // away, which is the contract being honoured, but there is no claim
+      // to raise: a claim of zero Gold would put a loss on the seller's
+      // ledger that never happened. See escortClaimFrom in ./contracts.
+      logs.push(
+        `🛡️ Pirates boarded and found the hold already bare. ${cover.sellerName}'s escort turned them away for nothing.`,
+      );
+      return;
+    }
     const lost = state.money;
     state.money = 0;
     logs.push(`🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold.`);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants";
@@ -11,6 +12,8 @@ import { Term } from "../../Term";
 import { AuditVoteCard } from "../AuditPanel";
 import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
+import { EscortMarket } from "../EscortContracts";
+import { BazaarRumors } from "../BazaarRumors";
 import { PhaseError, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
 
 // The Parley panel: the Captain's Exchange, and with it the two votes the
@@ -23,6 +26,8 @@ export function Parley({
   ctx,
   act,
   barter,
+  escort,
+  bazaar,
   audit,
   maroon,
   phaseSync,
@@ -36,6 +41,8 @@ export function Parley({
   | "ctx"
   | "act"
   | "barter"
+  | "escort"
+  | "bazaar"
   | "audit"
   | "maroon"
   | "phaseSync"
@@ -80,9 +87,6 @@ export function Parley({
     phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
   }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
 
-  const selectClass =
-    "h-9 rounded-md border border-input bg-transparent px-2 text-sm";
-
   return (
     <div className="max-w-3xl mx-auto">
       <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
@@ -109,10 +113,9 @@ export function Parley({
             aria-label="Amount to offer"
             className="w-16 h-9"
           />
-          <select
+          <Select
             value={draft.offerItem}
             onChange={(e) => draft.setOfferItem(e.target.value)}
-            className={selectClass}
             aria-label="Item to offer"
           >
             {draft.items.map((it) => (
@@ -120,7 +123,7 @@ export function Parley({
                 {ICONS[it]} {it}
               </option>
             ))}
-          </select>
+          </Select>
           <span className="text-muted-foreground">for</span>
           <QuantityInput
             value={draft.requestAmount}
@@ -129,10 +132,9 @@ export function Parley({
             aria-label="Amount to request"
             className="w-16 h-9"
           />
-          <select
+          <Select
             value={draft.requestItem}
             onChange={(e) => draft.setRequestItem(e.target.value)}
-            className={selectClass}
             aria-label="Item to request"
           >
             {draft.items.map((it) => (
@@ -140,7 +142,7 @@ export function Parley({
                 {ICONS[it]} {it}
               </option>
             ))}
-          </select>
+          </Select>
           <Button
             className={cn("rounded-lg", draft.canPost && "pm-grad-parley")}
             variant={draft.canPost ? "default" : "secondary"}
@@ -152,10 +154,9 @@ export function Parley({
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm mt-2">
           <span className="text-muted-foreground">With</span>
-          <select
+          <Select
             value={draft.targetUserId}
             onChange={(e) => draft.setChosenTargetId(e.target.value)}
-            className={selectClass}
             aria-label="Direct this offer to a specific captain"
           >
             <option value="">🌊 Anyone in the harbor</option>
@@ -164,7 +165,7 @@ export function Parley({
                 🔒 {m.displayName} only
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         {draft.targetUserId && (
           <p className="text-center text-[11px] text-muted-foreground mt-1.5">
@@ -233,6 +234,20 @@ export function Parley({
           </div>
         )}
       </div>
+
+      {/* [D3: Convoy: the Escort Contract] The protection market, under the
+          exchange because it is the other thing sold at this table and it
+          sells on the same terms: a price agreed in the open, and one leg
+          of it. It draws nothing at all in a build with the switch off. */}
+      <EscortMarket game={game} escort={escort} me={me} members={members} />
+
+      {/* [D5: Aroma: the Bazaar Rumor] The desk, under the protection
+          market for the reason that market sits under the exchange: this
+          table is where the port's three trades are made, and this is the
+          third of them. It draws nothing at all in a build with the switch
+          off, and a captain who holds no path of their own still reads the
+          board below the desk. */}
+      <BazaarRumors game={game} bazaar={bazaar} me={me} />
 
       <ReadyFooter
         phaseSync={phaseSync}

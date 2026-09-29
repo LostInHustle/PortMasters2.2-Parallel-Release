@@ -27,9 +27,13 @@ import {
   type Boon,
   type Module,
 } from "../constants";
+import { settleHunger } from "../crew";
+import { feedCrew } from "../larder";
 import { unlockedBoons, unlockedModules } from "../pools";
 import { weightedPick } from "../rng";
 import type { GameState } from "../types";
+import { resetEscortLeg } from "./contracts";
+import { resetConsentLedger } from "./consent";
 
 function draftBoons(state: GameState): Boon[] {
   const gs = {
@@ -171,6 +175,22 @@ function equipModule(
 
 export function startBoonDrafting(state: GameState, logs: string[]) {
   state.phase = "dawn";
+  // [C1: the Larder and Short Rations] The crew eats at the top of the leg,
+  // and this is the one function every leg opens through: the host's start
+  // reaches it from the departure, the round that rolls over reaches it from
+  // endRound, and a client catching up to the room reaches it through
+  // enterPhase. Putting the meal here rather than at any of those three is
+  // what makes it once a leg by construction; the stamp the meal itself
+  // keeps is what makes it once a leg anyway, since two of those paths can
+  // meet on one client for one Dawn (see feedCrew in ../larder).
+  //
+  // [C2: crew loss by name] The price of hunger is paid at the same moment
+  // and off the same stamp: the meal answers whether this call was the
+  // leg's, and only then does the run of hungry legs advance. Settled
+  // beside the meal rather than inside it because the Larder counts the
+  // mouths and the roster is who they are, so the rule that takes a hand
+  // lives in ../crew and reads the Larder rather than the other way around.
+  if (feedCrew(state, logs)) settleHunger(state, logs);
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;
@@ -178,6 +198,22 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   state.pirateAttackResolved = false;
   state.escortHired = false;
   state.brokerTippedPirates = false;
+  // [D3: the escort contract] The leg's cover, the leg's pending claim and
+  // the leg's settlement ledger go with the rest of the round's facts. A
+  // contract covers one leg (see resetEscortLeg in ./contracts), and this is
+  // the one function every leg opens through, which is the same reason the
+  // meal above is taken here rather than at any of the three entries.
+  //
+  // [D4: Loom: the Refit] The ledger is the consent primitive's rather than
+  // the escort's, so it is emptied by its own function and not inside the
+  // call above, and the two stand together here because this is the one place
+  // a leg opens. Emptying it is not load bearing for correctness, since the
+  // stamp it carries makes a stale list answer for nothing either way (see
+  // movementApplied in ./consent), and that is exactly why it has to be
+  // written down: what the call buys is that a voyage where nothing more is
+  // agreed stops carrying the last leg's keys in every save it writes.
+  resetEscortLeg(state);
+  resetConsentLedger(state);
   logs.push("\n🧭=== The Navigator's Compass ===");
   logs.push("Choose a Boon to bend the rules of the upcoming voyage...");
 }

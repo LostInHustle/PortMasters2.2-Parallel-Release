@@ -171,7 +171,7 @@ model VoyageRole {
   // One of the roles in src/lib/game/gambit.ts: honest, pirate, broker.
   role     String
   // The personal goal an Honest card was dealt, by id, out of the flourish
-  // deck in src/lib/game/gambit.ts. Null on a Variable card, on a captain
+  // deck in src/lib/game/gambit.ts. Null on a hidden card, on a captain
   // who joined a voyage already under way and was handed the majority card
   // without a hand to draw from, and on every row written before this
   // column existed. A nullable addition rather than a table of its own,

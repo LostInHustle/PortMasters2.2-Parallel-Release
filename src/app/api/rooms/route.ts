@@ -2,7 +2,7 @@
 // POST /api/rooms: create a room
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
+import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api-auth";
 import {
   generateRoomCode,
@@ -21,18 +21,7 @@ export async function GET() {
 
   const rooms = await db.room.findMany({
     where: { isPublic: true },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_WITH_MEMBERS,
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -114,18 +103,7 @@ export async function POST(req: NextRequest) {
       unlock: unlock ?? "",
       members: { create: [{ userId: user.id }] },
     },
-    include: {
-      members: {
-        include: {
-          user: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
-      },
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
+    include: ROOM_WITH_MEMBERS,
   });
 
   return NextResponse.json({

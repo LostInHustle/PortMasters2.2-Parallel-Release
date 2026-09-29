@@ -127,3 +127,31 @@ export function requireAuth(socket: Socket): SocketState | null {
   }
   return s;
 }
+
+/**
+ * The seat a frame speaks from: an authenticated socket, and the room the
+ * frame names checked against the room that socket is actually in.
+ *
+ * Thirty two frames open with the same four lines this replaces. They
+ * open with them because they are the same rule: a frame that names no
+ * room is taken to mean the one the socket is seated in, and a frame that
+ * names some other captain's harbor is not answered at all rather than
+ * answered against the caller's own. That last part is the one worth
+ * having in a single place, since a handler that forgot it would not look
+ * broken, it would look like a captain reading a room they are not in.
+ *
+ * The room is returned as a plain string rather than the nullable one on
+ * the socket, because the whole point of passing through here is that the
+ * question has been asked. Callers that need the captain read the same
+ * fields they always did (see SocketState).
+ */
+export function seated(
+  socket: Socket,
+  payload: { roomId?: string } | undefined,
+): (SocketState & { roomId: string }) | null {
+  const s = requireAuth(socket);
+  if (!s) return null;
+  const roomId = payload?.roomId ?? s.roomId;
+  if (!roomId || roomId !== s.roomId) return null;
+  return { ...s, roomId };
+}

@@ -10,9 +10,15 @@
 // =====================================================================
 
 import type { Difficulty } from "@/lib/game/difficulty";
+import type {
+  EscortContract,
+  PublicRumor,
+  RefitContract,
+} from "@/lib/game/engine";
 import type { GambitRole } from "@/lib/game/gambit";
 import type { HouseId } from "@/lib/game/legacy";
 import type { Objective } from "@/lib/game/objectives";
+import type { PathId } from "@/lib/game/paths";
 import type { ObjectiveTraceEntry, OrderFill, Phase } from "@/lib/game/types";
 import type { VoyageLogEntry } from "@/lib/game/voyage-log";
 
@@ -150,6 +156,17 @@ export type ObjectiveReport = {
  * else. `leg` is the client's own, because only the client knows which
  * leg it was playing; the server bounds it against the voyage before
  * recording anything.
+ *
+ * [C4: three foods, spoilage and the split hold] The four optional fields
+ * are the captain's own reading of the hold they closed the leg with: how
+ * many slots of the ship were carrying something, and how many meals of
+ * each food were aboard. They are optional on the wire rather than
+ * defaulted, because they mean something only under the switches that
+ * create them: the slots belong to the split hold, the meal counts to the
+ * survival layer, and a leg sailed without those carrying a zero would be
+ * a report of an empty ship rather than of an unmeasured one. The server
+ * keeps a field it can read, drops one it cannot, and bounds both (see
+ * the telemetry:leg handler).
  */
 export type LegReport = {
   roomId: string;
@@ -157,6 +174,39 @@ export type LegReport = {
   ordersDealt: number;
   ordersFilled: number;
   distinctGoods: number;
+  holdSlots?: number;
+  grainMeals?: number;
+  saltFishMeals?: number;
+  produceMeals?: number;
+  // [D3: Convoy: the Escort Contract] The Convoy's own figures for the leg,
+  // sent only when the switch that gives them meaning is on, for the reason
+  // the four above are: a leg sailed without the market reports no market
+  // rather than a market of zeroes.
+  escortSold?: number;
+  escortFeesEarned?: number;
+  escortAbsorbed?: number;
+  // [D4: Loom: the Refit] The bench's own figures, sent only when the switch
+  // that gives them meaning is on, exactly as the three above are. The
+  // fourth is the leg's weather rather than the bench's trade, and it rides
+  // a different switch: a Loom is poor in fair weather and busy in cold, so
+  // the reader comparing one leg's takings with the next needs to know which
+  // legs were cold, and that reading belongs to the wardrobe rather than to
+  // the bench. It is a truth rather than a tally, so a fair leg reports false
+  // rather than reporting nothing.
+  refitsSold?: number;
+  refitFeesEarned?: number;
+  ragsRewoven?: number;
+  coldLeg?: boolean;
+  // [D6: Free Captain: Opportunist] How many borrows this voyage has spent,
+  // sent only when the switch that gives the ability meaning is on, exactly
+  // as the three blocks above are sent. It is a count of the once a voyage
+  // allowance rather than a leg's takings, which is what the plan's
+  // evaluation needs: the usage rate is a share of voyages, so a reader
+  // counts the voyages that spent one against the voyages that could have.
+  // A voyage that never borrowed reports a zero here rather than reporting
+  // nothing, because zero is a reading of the allowance and not an absence
+  // of the feature.
+  opportunistBorrows?: number;
 };
 
 /**
@@ -233,6 +283,26 @@ export type AuditReveal = {
    */
   target: { userId: string; name: string };
   fulfillments: OrderFill[];
+  /**
+   * [C1: the Larder and Short Rations] The audited captain's Larder, which
+   * the plan's audit clause opens alongside the sample.
+   *
+   * It is on this frame and on no other, and that is the design rather than
+   * an accident of where it was easy to read. The Larder count travels to
+   * the server in the captain's own save, so the reveal can read it without
+   * the room being handed it continuously: what the fleet sees all voyage
+   * is whether a crew is hungry (see GameStatusUpdate.shortRations, which
+   * the plan does ask to be public), and the count itself is opened by the
+   * majority that voted for it. Servering it on the status frame instead
+   * would have made this clause a number the room already had.
+   *
+   * Undefined when the provisions layer is switched off, for the same
+   * reason the badge above is: a voyage with the switch off carries a
+   * Larder field that no rule moves, and printing it would put a number in
+   * front of the table that means nothing. A reader draws the line on a
+   * number and never on a placeholder.
+   */
+  larder?: number;
 };
 
 // =====================================================================
@@ -385,6 +455,15 @@ export type PlayerReportAck = {
 // either, reads as neither: the roster badges a captain only on an
 // explicit true, and the server refuses to maroon a captain it has been
 // told is already written off.
+//
+// [C1: the Larder and Short Rations] shortRations rides the same frame and
+// for the same kind of reason. The plan asks for the shortage to be
+// visible to the fleet and not only to the captain feeling it, and a
+// captain's own books are the only place this engine can read it from: the
+// Larder lives in the browser's GameState, so the browser is what reports
+// it, exactly as it reports gold and reputation. Optional, like the two
+// marks above, so a client that predates this slice reads as a fed crew
+// rather than as a hungry one, and only an explicit true draws a badge.
 export type GameStatusUpdate = {
   roomId: string;
   user: PublicUser;
@@ -399,6 +478,7 @@ export type GameStatusUpdate = {
   renownLevel?: number;
   bankrupt?: boolean;
   marooned?: boolean;
+  shortRations?: boolean;
 };
 
 // An open barter offer. The optional targetUserId fields are set only
@@ -450,6 +530,144 @@ export type AidRequest = {
   fromName: string;
   amount: number;
   round: number;
+};
+
+// [D3: Convoy: the Escort Contract] The escort market's board, as one
+// captain receives it.
+//
+// The row type is the game layer's (see EscortContract in
+// @/lib/game/engine/contracts) rather than a second copy declared here,
+// which is the rule this file keeps for everything the engine already
+// knows how to read: a contract that has been applied to a purse and a
+// contract that arrived over a socket have to be the same shape, and the
+// surest way for that to stay true is for them to be one type.
+//
+// The board is personalized by the server before it is ever sent, the way
+// the barter board is: a direct offer belongs to two captains and a claimed
+// contract's raid figure belongs to its seller, so two captains in one room
+// can legitimately receive two different boards and the filtering happens
+// where the rows are held rather than on the client that draws them.
+export type EscortBoard = {
+  roomId: string;
+  contracts: EscortContract[];
+};
+
+// [D4: Loom: the Refit] The bench's board, as one captain receives it.
+//
+// The same shape as the escort board above and personalized the same way,
+// which is why its rows are the consent primitive's rather than a second
+// row type: what a client does with a board, draw it, ask whether an offer
+// is theirs, apply a settled agreement to a purse, reads the same fields
+// whichever market sent it. What differs is the term a row carries, and
+// that lives on the row.
+export type RefitBoard = {
+  roomId: string;
+  refits: RefitContract[];
+};
+
+// [D5: Aroma: the Bazaar Rumor] The bazaar's board, as one captain
+// receives it.
+//
+// The same shape as the two boards above and the same rule about rows: the
+// type is the game layer's (see PublicRumor in
+// @/lib/game/engine/bazaar) rather than a second copy declared here, so a
+// row the server decided the fleet may read and a row this client draws are
+// one shape.
+//
+// It is personalized more sharply than either of the other two, and that is
+// the feature rather than a detail of it. A standing rumor's direction
+// belongs to its publisher, so two captains in one room are sent two boards
+// that differ in a field rather than in which rows they carry, and the
+// filtering happens where the rows and the room's leg are both in hand (see
+// publicRumors). That is also why the type says the direction may be null:
+// a null there is not a missing answer, it is the server saying this row's
+// answer is not yours yet.
+export type BazaarBoard = {
+  roomId: string;
+  rumors: PublicRumor[];
+};
+
+// [D7: the draft, and switching] The draft, as one captain sees it.
+//
+// This is the one frame in the tree that is private in its whole shape
+// rather than in a field, and that is the plan's own reason for the
+// feature being dealt by the server at all: "a hand of cards is private
+// information and the client cannot be trusted to deal it." So the view is
+// addressed to one captain through emitToUser and never broadcast: the
+// hand below is that captain's own, and no frame that reaches a room
+// carries a card nobody has played yet. The private scan holds the
+// delivery rather than this comment (rule seven of
+// scripts/private-scan.ts), and the suite holds the shape from the other
+// end: the draft's pass in scripts/smoke.ts keeps every frame the two
+// sockets at its table receive, on every event rather than on the three
+// the feature names, and reads them for a hand that is not the one that
+// seat was dealt.
+//
+// The step is the draft's clock as well as its beat: three steps, fifteen
+// seconds each, which is the plan's forty five second interface read as
+// three decisions rather than one. `deadline` is an epoch stamp rather
+// than a countdown so two clients cannot disagree about how much time is
+// left, and it is the server's clock in both cases.
+//
+// `open` is how many captains at the table have still to choose this step,
+// which is a count and never a card, so it is safe to put in front of the
+// table and it is what makes the clock legible: a captain knows whether
+// they are waiting on four people or on one.
+//
+// `path` is the whole of the result and is null until the draft is done.
+// A finished view is sent once more to every seat when the last step
+// closes, which is how a client that reloaded mid draft, or one that never
+// answered at all, still learns what it sails on: the path rides the
+// view rather than a frame of its own.
+export type DraftStep = "first" | "second" | "last" | "done";
+
+// The four steps as a list, for the reason VOYAGE_LOG_KINDS is one (see
+// voyage-log.ts): a step arrives off the wire as a string, so the client
+// that reads a view has to ask whether the string it was handed is one of
+// these, and a reader that asked by writing the four out again in its own
+// file would be a second answer to that question. Written out rather than
+// derived from the type for the same reason: a step added to the union
+// above and forgotten here is a step the client drops on the floor, and
+// this list is where that would show.
+export const DRAFT_STEPS: readonly DraftStep[] = [
+  "first",
+  "second",
+  "last",
+  "done",
+];
+
+export type DraftView = {
+  roomId: string;
+  step: DraftStep;
+  deadline: number;
+  hand: PathId[];
+  open: number;
+  path: PathId | null;
+};
+
+// [D7: the draft, and switching] The one change of papers a voyage allows,
+// as the room is told about it.
+//
+// This one is room wide, unlike the draft's own frame, and the difference
+// is the design rather than the plumbing: the plan's clause for switching
+// is "the switch is published to the fleet log where everyone sees it...
+// the price of changing your identity is that everyone knows." So the same
+// fact travels twice, deliberately: the log line is the record the fleet
+// reads back at Dusk, and this frame is the room watching it happen.
+//
+// The switching captain's own client applies the change off this frame
+// rather than off its own press (see pathSwitchBlocked and
+// applyPathSwitch), which is what makes the room's answer the authority:
+// a switch the server refused is a switch that cost nobody anything.
+//
+// It carries the path taken up and not the one set aside, for the reason
+// the log line does: the server has never read a captain's save, so a
+// "from" here would be the room repeating a claim it cannot check.
+export type PathSwitched = {
+  roomId: string;
+  userId: string;
+  name: string;
+  path: PathId;
 };
 
 // An outstanding loan between two captains. The optional backer and

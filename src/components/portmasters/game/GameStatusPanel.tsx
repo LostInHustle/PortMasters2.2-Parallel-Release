@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  COLD_LEG_WARMTH,
   CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
@@ -10,6 +11,15 @@ import {
   SHIP_DISCOUNT_PER_LEVEL,
 } from "@/lib/game/constants";
 import { basePriceRange, getHireCost } from "@/lib/game/engine";
+import { onShortRations } from "@/lib/game/larder";
+import { survivalLayerOn } from "@/lib/game/flags";
+import {
+  garmentsLayerOn,
+  legIsCold,
+  shortOfWarmth,
+  warmthScore,
+  warmthText,
+} from "@/lib/game/garments";
 import {
   computeVentureDeadlineBounds,
   ventureAlreadySpentReason,
@@ -78,6 +88,22 @@ export function GameStatusPanel({
   const resolveColor = itemColorResolver(colorFor);
   const discount = game.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
+  // [C1: the Larder and Short Rations] Read once for the two decisions
+  // below, since it is the same answer to both: whether the layer is
+  // running decides whether the stat exists at all, and if it is running,
+  // whether the crew is short decides what colour the number wears.
+  const larderOn = survivalLayerOn();
+  const shortRations = larderOn && onShortRations(game);
+  // [C3: garments and the cold] The weather and the wardrobe, read once
+  // each for the chip below. The layer decides whether there is a chip at
+  // all, the tag decides whether this leg is one worth saying anything
+  // about, and the score is the same sum the settlement tick freezes
+  // against, so the warning printed here and the check that bites the crew
+  // cannot read differently.
+  const garmentsOn = garmentsLayerOn();
+  const coldLeg = garmentsOn && legIsCold(game);
+  const warmth = warmthScore(game);
+  const shortWarmth = shortOfWarmth(game);
 
   // Summed across the whole unlocked roster, not the three founding types.
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
@@ -154,7 +180,12 @@ export function GameStatusPanel({
             {cfg.icon} {cfg.name}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div
+          className={cn(
+            "grid gap-1.5",
+            larderOn ? "grid-cols-4" : "grid-cols-3",
+          )}
+        >
           <Stat
             label="Funds"
             value={`${game.money}`}
@@ -178,7 +209,44 @@ export function GameStatusPanel({
               className="text-sea"
             />
           )}
+          {/* [C1: the Larder and Short Rations] Drawn only when the layer
+              is running, so a voyage with the switch off shows the same
+              three columns at the same width it always had rather than a
+              fourth cell reporting a number no rule moves. The colour is
+              the whole readout: the Larder's own hue while there is food
+              aboard, the meaning red the moment the crew is going without,
+              which is the hunger the captain is meant to notice from here
+              rather than only from a log line they may have scrolled past. */}
+          {larderOn && (
+            <Stat
+              label="Larder"
+              value={`${game.larder}`}
+              className={cn(shortRations ? "text-alarm" : "text-larder")}
+            />
+          )}
         </div>
+        {/* [C3: garments and the cold] The weather is readable from here in
+            every phase, which is the whole point of it: a captain decides
+            what to wear at the bench before the leg resolves, and the tag
+            is worth nothing if it only surfaces in the settlement that has
+            already happened. It is drawn on a cold leg alone, because a
+            mild one asks nothing of anybody, and it wears the meaning
+            colours rather than a hue of its own: the sea while the crew is
+            dressed for the weather, the alarm red the moment the clothes
+            on their backs are not enough. The Wardrobe panel on the bench
+            prints the same sum from the same function. */}
+        {coldLeg && (
+          <div
+            className={cn(
+              "mt-2 rounded-md py-1 text-center text-[10px]",
+              shortWarmth ? "bg-alarm/5 text-alarm" : "bg-sea/5 text-sea",
+            )}
+          >
+            {shortWarmth
+              ? `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, so the cold will take a hand.`
+              : `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, and the crew is dressed for it.`}
+          </div>
+        )}
         <VoyageTimeline
           currentRound={game.currentRound}
           maxRounds={game.maxRounds}
@@ -614,7 +682,7 @@ function ConvoyVenturesSection({
   return (
     <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
       <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
-        ━━ Convoy Ventures ━━
+        ━━ Ventures ━━
       </div>
 
       {convoy.error && (
@@ -629,8 +697,8 @@ function ConvoyVenturesSection({
         </p>
       ) : tooLateToPost ? (
         <p className="mb-2 rounded bg-black/[0.03] px-2 py-1.5 text-[10px] text-muted-foreground dark:bg-white/[0.04]">
-          Too late in this voyage to post a new Convoy Venture: there is no
-          round left that would leave time to spend the reward.
+          Too late in this voyage to post a new Venture: there is no round left
+          that would leave time to spend the reward.
         </p>
       ) : (
         <>

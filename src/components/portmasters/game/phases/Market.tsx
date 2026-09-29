@@ -51,8 +51,10 @@ export function Market({
   ctx,
   act,
   phaseSync,
+  me,
   members,
   colorFor,
+  refit,
   onRumorBoardOpen,
 }: Pick<
   PhasePanelProps,
@@ -60,8 +62,10 @@ export function Market({
   | "ctx"
   | "act"
   | "phaseSync"
+  | "me"
   | "members"
   | "colorFor"
+  | "refit"
   | "onRumorBoardOpen"
 >) {
   const [station, setStation] = useState<Station>("port");
@@ -101,6 +105,9 @@ export function Market({
             game={game}
             act={act}
             colorFor={colorFor}
+            refit={refit}
+            me={me}
+            members={members}
             onRumorBoardOpen={onRumorBoardOpen}
             onContinue={() => setStation("bench")}
           />
