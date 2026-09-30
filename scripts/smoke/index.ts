@@ -75,6 +75,8 @@ import { aromaTheBazaarRumorSuite } from "./suites/39-aromaTheBazaarRumor";
 import { freeCaptainTheBorrowSuite } from "./suites/40-freeCaptainTheBorrow";
 import { pathDraftSuite } from "./suites/41-pathDraft";
 import { signingOutSuite } from "./suites/42-signingOut";
+import { supplyBargeSuite } from "./suites/43-supplyBarge";
+import { tagVocabularySuite } from "./suites/44-tagVocabulary";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -374,6 +376,18 @@ async function main(): Promise<void> {
     await pathDraftSuite(run, { telWaitForOne });
     console.log("\nSigning out");
     await signingOutSuite({ guest });
+    // The vendor's article is arithmetic over records and needs no harbor,
+    // no socket and no captain, which is why it is the one article that can
+    // run after the run has put its captains away. It is handed the
+    // dashboard suite's own record builder rather than carrying a second
+    // copy of the shape the spine writes.
+    console.log("\nThe Supply Barge");
+    await supplyBargeSuite({ dashRecord });
+    // The vocabulary's article is the other one that needs no harbor: the
+    // content is static data and the rule over it is a pure function, so it
+    // reads the same whether a table is sailing or not.
+    console.log("\nThe tag vocabulary");
+    await tagVocabularySuite();
   } finally {
     await cleanupSuite(run, { host, guest, third, roomId, quickStartRoomId });
   }

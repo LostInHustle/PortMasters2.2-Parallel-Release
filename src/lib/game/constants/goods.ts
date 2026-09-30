@@ -9,6 +9,8 @@
 // empty: a difficulty that unlocks tier 2 today simply gains nothing yet,
 // rather than referencing goods that have no price or recipe.
 // =====================================================================
+import type { TagList } from "./tags";
+
 export const RESOURCES_TIER0 = ["Hemp", "Silk", "Tea"] as const;
 export const RESOURCES_TIER1 = ["Porcelain Clay", "Copper Ore"] as const;
 export const RESOURCES_TIER2 = ["Spices", "Pearls"] as const;
@@ -54,6 +56,50 @@ export const RAGS = "Rags";
 // which is the difference between the price reference and the Ledger.
 export const MARKET_GOODS = [...RESOURCES, ...PRODUCTS] as const;
 export const ITEMS = [...MARKET_GOODS, RAGS] as const;
+
+// [F1: the tag vocabulary, and the two tag rule] What each good is, in
+// the vocabulary of ./tags. Typed as a Record over ITEMS rather than as a
+// plain table, which is what makes coverage structural: a good added to
+// the catalogue above cannot ship untagged, because the missing row is a
+// type error before it is a check finding.
+//
+// The assignment is a reading of each good rather than a balance dial, and
+// where the tree already keeps a number about a good the tag is read
+// against it. Three of these rows are held to their number by the rule
+// module: every garment in GARMENTS carries cold, because a cold leg asks
+// the wardrobe for warmth and the wardrobe's own table is where that
+// question lives, and Rags carries woven because it is what a garment
+// comes to when the sea has had all of it.
+//
+// The rest are authored, and two of them are the readings a second author
+// would most likely make differently, so they are written down instead of
+// left to be inferred. Hemp is bulk and woven together: it is the cheap
+// fibre, the good a hold fills with, and it is also the thread Linen
+// Clothes is spun from, so a card about the cloth trade and a card about
+// the heavy trade both have a claim on it. Tea and Spices are perishable
+// because both are aromatics, which is the one property a merchant of
+// this catalogue would actually worry about on a long haul, and neither
+// is held to a number here because no rule in this tree ages a trade
+// good: the tag is a claim about the good, and the day a rule reads it is
+// the day it becomes checkable (see G3's perishability axis).
+export const GOOD_TAGS: Record<(typeof ITEMS)[number], TagList> = {
+  Hemp: ["bulk", "woven"],
+  Silk: ["woven", "luxury"],
+  Tea: ["perishable"],
+  "Porcelain Clay": ["bulk"],
+  "Copper Ore": ["bulk"],
+  Spices: ["luxury", "perishable"],
+  Pearls: ["luxury"],
+  "Linen Clothes": ["woven", "cold"],
+  "Cotton Clothes": ["woven", "cold"],
+  Brocade: ["woven", "cold"],
+  Sachet: ["sealed", "luxury"],
+  "Bronze Mirror": ["luxury"],
+  "Celadon Ware": ["luxury", "sealed"],
+  "Foreign Balm": ["sealed", "luxury"],
+  "Pearl String": ["luxury"],
+  Rags: ["woven"],
+};
 
 // The stock a captain begins a voyage with. Anything not named here starts at
 // zero; the hold is filled in from ITEMS rather than listed by hand, so a good

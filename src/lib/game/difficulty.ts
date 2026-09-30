@@ -21,6 +21,8 @@
 // three tiers sit side by side in the README, under Difficulty tiers.
 // =====================================================================
 
+import type { TagList } from "./constants/tags";
+
 export type Difficulty = "fair_winds" | "open_waters" | "monsoon";
 
 export const DEFAULT_DIFFICULTY: Difficulty = "fair_winds";
@@ -29,6 +31,17 @@ export interface DifficultyConfig {
   // Display metadata, read by the lobby switch, the room card chip, and the
   // in game status chip, so copy and numbers never drift from one source.
   name: string;
+  // [F1: the tag vocabulary, and the two tag rule] What water this charter
+  // is, in the vocabulary of ./constants/tags, read by the rule module
+  // against the two numbers in this same record that make two of the tags
+  // checkable rather than authored: a charter carries armed exactly when
+  // its raid chance steps up partway through the voyage, and a charter
+  // carries contraband exactly when a corrupt broker sails with it. Both
+  // are biconditionals rather than one way implications, because the
+  // vocabulary's job is to describe the content rather than to allow it:
+  // a tier that gains teeth and does not say so is the drift the check
+  // exists to catch.
+  tags: TagList;
   badge: string;
   icon: string;
   tagline: string;
@@ -87,6 +100,7 @@ export interface DifficultyConfig {
 export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   fair_winds: {
     name: "Fair Winds",
+    tags: ["public"],
     badge: "Fair Winds",
     icon: "🌤️",
     tagline: "A gentle passage for new captains.",
@@ -109,6 +123,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   },
   open_waters: {
     name: "Open Waters",
+    tags: ["public", "armed"],
     badge: "Open Waters",
     icon: "🌊",
     tagline: "The full trade opens as the harbor grows busy.",
@@ -131,6 +146,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   },
   monsoon: {
     name: "Monsoon Season",
+    tags: ["armed", "contraband"],
     badge: "Monsoon",
     icon: "⛈️",
     tagline: "A long, adversarial haul for seasoned captains.",

@@ -206,8 +206,10 @@ export async function balanceDashboardSuite(inputs: {
   check(
     emptyReading.frontPage.label ===
       "Barge revenue share of all food spending" &&
-      emptyReading.frontPage.target === "waits on Epic E",
-    "and the front page number is named as the share of all food spending the proposal identifies, waiting on the epic that would measure it",
+      emptyReading.frontPage.target === "no threshold in the plan" &&
+      emptyReading.frontPage.verdict === "unplayed" &&
+      emptyReading.frontPage.value === "no leg report from a provisions harbor",
+    "and the front page number is named as the share of all food spending the proposal identifies, reading as no report rather than as a share of zero until a voyage files what it spent",
   );
 
   // ---- The window ----
@@ -519,8 +521,14 @@ export async function balanceDashboardSuite(inputs: {
     liveReading !== undefined &&
       liveReading.panels.map((panel) => panel.id).join(",") ===
         "seat,staples,variance,floor" &&
-      liveReading.frontPage.verdict === "unmeasured",
-    "carrying the four panels in the plan's order, with the front page number held in its slot",
+      // The front page number is read now rather than held as a slot, and
+      // the plan sets no band on it: what a reader must never see is a
+      // share judged inside or outside a threshold nobody wrote, so the
+      // verdict is the absence of a report or a measured number left
+      // unjudged, and never a band verdict.
+      (liveReading.frontPage.verdict === "unplayed" ||
+        liveReading.frontPage.verdict === "ungated"),
+    "carrying the four panels in the plan's order, with the front page number read from the record and judged against no invented band",
   );
   check(
     liveReading !== undefined &&

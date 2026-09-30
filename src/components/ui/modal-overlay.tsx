@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
@@ -59,8 +60,8 @@ export function ModalOverlay({
  * drifts the first time one of them is retouched, so the classes below are
  * written once: change them here and both dialogs move together.
  *
- * The heading and the close button are the caller's, because those are the
- * two things the callers do not agree about.
+ * The heading is the caller's, because that is the one thing the callers do
+ * not agree about.
  */
 export function ModalCard({ children }: { children: ReactNode }) {
   return (
@@ -74,5 +75,36 @@ export function ModalCard({ children }: { children: ReactNode }) {
       <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
       <div className="relative">{children}</div>
     </motion.div>
+  );
+}
+
+/**
+ * The button that closes a dialog: the same circle, the same hover, the same
+ * icon, and nothing chosen by the caller but the two words a screen reader
+ * reads out.
+ *
+ * It is here because the note above used to say the close button was the
+ * caller's business, on the grounds that the callers did not agree about it.
+ * They agree completely: five dialogs had each written this button out, and
+ * the five were identical down to the icon's size, with the label the only
+ * part any of them had actually picked. Five copies of a look is how a look
+ * drifts, and the drift is invisible until two dialogs are open side by side.
+ */
+export function ModalClose({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+      aria-label={label}
+    >
+      <X className="h-5 w-5" />
+    </button>
   );
 }

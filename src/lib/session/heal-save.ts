@@ -20,6 +20,7 @@ import {
   type GameState,
 } from "@/lib/game/types";
 import {
+  normalizeBargeState,
   normalizeConsentLedger,
   normalizeEscortState,
   normalizeOpportunistBorrows,
@@ -102,6 +103,13 @@ export function healLoadedVoyage(
   healWardrobe(game);
   healPapers(game);
   healConsentBoards(game);
+  // [E1: the Supply Barge] The vendor's per leg tally and the voyage's two
+  // food counters, healed the way every other added field is. A voyage
+  // saved before this feature holds none of the three, so it loads as a
+  // captain who has never bought from the Barge and whose food spending
+  // starts being counted now: the first leg after loading is one the
+  // vendor is full for rather than one the captain reads as already spent.
+  normalizeBargeState(game);
   refreshVoyageFacts(game, facts);
 }
 

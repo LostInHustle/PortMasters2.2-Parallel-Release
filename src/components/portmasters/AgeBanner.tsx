@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Sparkles, X, TrendingUp, Handshake, Coins } from "lucide-react";
+import { Sparkles, TrendingUp, Handshake, Coins } from "lucide-react";
 import { useAges } from "@/lib/use-ages";
-import { ModalCard, ModalOverlay } from "@/components/ui/modal-overlay";
+import {
+  ModalCard,
+  ModalClose,
+  ModalOverlay,
+} from "@/components/ui/modal-overlay";
 import type { Age, AgeId } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 
@@ -169,13 +173,7 @@ function AgeDetailDialog({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-            aria-label="Close age details"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <ModalClose label="Close age details" onClick={onClose} />
         </div>
         <p className="text-sm leading-relaxed text-foreground">
           {age.description}

@@ -16,6 +16,7 @@ import { escortContractsOn } from "@/lib/game/flags";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
 import type { Escort } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than
@@ -196,23 +197,16 @@ function ContractRow({
       : null;
 
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
-        mine
-          ? "bg-due/[0.06] border-due/20"
-          : "bg-background/60 border-black/5 dark:border-white/10",
-        contract.status === "claimed" && "opacity-70",
-      )}
+    <PathDeskRow
+      mine={mine}
+      className={cn(contract.status === "claimed" && "opacity-70")}
     >
       <span className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium">
           {crest} {contractLine(contract, me)}
         </span>
         {contract.status === "offered" && contract.buyerUserId && (
-          <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
-            🔒 {isBuyer ? "Just for you" : `Just for ${contract.buyerName}`}
-          </span>
+          <JustForChip forMe={isBuyer} name={contract.buyerName} />
         )}
       </span>
 
@@ -247,7 +241,7 @@ function ContractRow({
             )}
           </span>
         ))}
-    </div>
+    </PathDeskRow>
   );
 }
 

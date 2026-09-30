@@ -81,6 +81,17 @@ export type LegReport = {
   // nothing, because zero is a reading of the allowance and not an absence
   // of the feature.
   opportunistBorrows?: number;
+  // [E1: the Supply Barge] The voyage's two food counters, sent only when
+  // the switch that gives them meaning is on, for the reason every block
+  // above is: a leg sailed with no provisions layer has no food spending
+  // to divide. They are the voyage's running totals rather than the leg's,
+  // because the plan's share is a share of a voyage's food spending, and
+  // they are the front page number read as a fraction: what the table
+  // spent on food at its ports, and how much of that went to the vendor.
+  // Both move together and are absent together, so a reader dividing one
+  // by the other never has to guess which of the two it is holding.
+  foodSpend?: number;
+  bargeSpend?: number;
 };
 
 /**

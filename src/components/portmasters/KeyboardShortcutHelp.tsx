@@ -1,8 +1,12 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
-import { Keyboard, X } from "lucide-react";
-import { ModalCard, ModalOverlay } from "@/components/ui/modal-overlay";
+import { Keyboard } from "lucide-react";
+import {
+  ModalCard,
+  ModalClose,
+  ModalOverlay,
+} from "@/components/ui/modal-overlay";
 
 /**
  * Keyboard Shortcut Help overlay. Shows all available keyboard shortcuts
@@ -68,13 +72,10 @@ export function KeyboardShortcutHelp({
                   Keyboard Shortcuts
                 </h2>
               </div>
-              <button
+              <ModalClose
+                label="Close shortcut help"
                 onClick={() => onOpenChange(false)}
-                className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-                aria-label="Close shortcut help"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              />
             </div>
 
             <div className="space-y-4">

@@ -106,15 +106,19 @@ export interface TelemetryPayloads {
   // The survival family is undeclared above, and this is where that is
   // answered rather than left as a gap for a reader to guess at. Four
   // numbers belong to it: short rationed legs, crew losses, frostbite, and
-  // the Supply Barge's share of food spending. The first has a source,
-  // because C1 landed and a shortage can really happen, and the pantry
-  // below now reports what the shortage is a shortage of. What has still
-  // not landed is the reason to write an event for it: nothing in this
-  // build reads the family, C1's own evaluation watches what the room says
-  // in the leg after a captain visibly goes hungry rather than a stored
-  // count of it, and a family declared ahead of the events that would fill
-  // it is a schema with no rows in it. It arrives with the epic that
-  // measures it.
+  // the Supply Barge's share of food spending. Two of the four now have a
+  // source and neither of them is here. The shortage and the pantry ride
+  // the loop family's report below, because a leg is where both of them
+  // happen and a captain is who they happen to, and the Barge's two
+  // counters ride it for the same reason: what the plan measures about
+  // this feature is what a captain spent at the till, which is a fact
+  // about a leg of a voyage rather than a family of its own. What has
+  // still not landed is the reason to write a survival event at all:
+  // nothing in this build reads the family, C1's own evaluation watches
+  // what the room says in the leg after a captain visibly goes hungry
+  // rather than a stored count of it, and a family declared ahead of the
+  // events that would fill it is a schema with no rows in it. It arrives
+  // with the epic that measures it.
   //
   // [C4: three foods, spoilage and the split hold] The last four fields
   // are one reading the plan asks for and three it does not, and the
@@ -199,6 +203,26 @@ export interface TelemetryPayloads {
     // cards and the ability itself ride, so a build without locks reports
     // nothing rather than reporting a zero it could never have moved.
     opportunistBorrows?: number;
+    // [E1: the Supply Barge] The plan's two readings for this feature, and
+    // they are one fraction rather than two numbers: "the headline number
+    // is the share of lobbies that sail without the Barge, with a target
+    // above seventy percent, and the second number is Barge revenue as a
+    // share of all food spending". The numerator of the second is what the
+    // vendor took and its denominator is what every port and the vendor
+    // took together, both counted at the till where the Gold leaves the
+    // purse rather than summed later out of the log lines. The share is not
+    // stored, for the reason the expired order count is not: a number that
+    // is a division of two fields is one more thing that can disagree with
+    // them, and the first reading is a count of voyages that spent nothing
+    // at the vendor, which is a reduction over the same two fields.
+    //
+    // They are both voyage totals rather than leg takings, which is the one
+    // place in this report that a figure is cumulative, and the plan is why:
+    // a share of a voyage's food spending is not a share of a leg's. A
+    // reader takes the last report each captain filed rather than summing
+    // the legs, since each leg's copy carries the running total.
+    foodSpend?: number;
+    bargeSpend?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally

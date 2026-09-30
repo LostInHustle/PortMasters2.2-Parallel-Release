@@ -42,6 +42,8 @@ import { AuditReveal } from "@/types/realtime/audit";
 import { PORTS_TIER2 } from "@/lib/game/constants/world";
 import { tipsText } from "@/lib/game/constants/tips";
 import {
+  BARGE_PRICE_MULTIPLIER,
+  BARGE_RATIONS_PER_LEG,
   CARGO_SLOTS,
   FOODS,
   FOODS_DRAW_ORDER,
@@ -78,6 +80,7 @@ import {
 import {
   COMMODITIES,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
+  GOOD_TAGS,
   ITEMS,
   MARKET_GOODS,
   PRODUCTS_TIER0,
@@ -154,6 +157,7 @@ import {
 import {
   WIN_RATE_TARGETS,
   bandVerdict,
+  ratePercent,
   readSwings,
   readWinRates,
   type VoyageOutcome,
@@ -207,7 +211,7 @@ import {
   portShiftMultiplier,
   type PortShift,
 } from "@/lib/game/maroon";
-import { marketCountsFor } from "@/lib/game/difficulty";
+import { DIFFICULTIES, marketCountsFor } from "@/lib/game/difficulty";
 import { unlockedPorts } from "@/lib/game/pools";
 import {
   BROKER_PAYOUT_TARGET,
@@ -393,6 +397,21 @@ import {
   pathSwitchWindow,
 } from "@/lib/game/draft";
 import { createRng } from "@/lib/game/rng";
+// [E1: the Supply Barge] The vendor's own block, imported beside the
+// draft's for the reason every feature's block is imported here: the rule
+// and the numbers it is read off are one subject. BARGE_PRICE_MULTIPLIER
+// and BARGE_RATIONS_PER_LEG are added to the supplies block above rather
+// than imported twice, and ratePercent joins the balance block for the
+// same reason the dashboard's own rows are printed through it.
+import {
+  bargeLeftAtPort,
+  bargeLotAtPort,
+  bargeOn,
+  bargePortAtLeg,
+  bargeRationPrice,
+  buyFromBarge,
+  normalizeBargeState,
+} from "@/lib/game/engine";
 // [D5: Aroma: the Bazaar Rumor] The bazaar's own block, imported beside the
 // bench's for the reason that one is imported here at all: the record the
 // table hears and what the market does with it are one subject, and the
@@ -479,6 +498,29 @@ import {
 import { RENOWN_MAX_LEVEL, RENOWN_TITLES } from "@/lib/game/legacy";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
+// [F1: the tag vocabulary, and the two tag rule] The vocabulary's own
+// block. It is one subject: the twelve words, what each one means, which
+// entries carry which, and the rule that holds the assignments to the
+// plan's line. GOOD_TAGS and FOOD_TAGS are the two tag tables and are
+// added to the goods and supplies blocks above rather than imported twice,
+// and DIFFICULTIES joins the difficulty line for the same reason, since
+// each of those three files already owns the content its rows tag.
+import {
+  MAX_TAGS_PER_ENTRY,
+  TAGS,
+  TAG_MEANINGS,
+  type Tag,
+} from "@/lib/game/constants/tags";
+import {
+  TAGGED_KINDS,
+  entriesWithTag,
+  shippedTagging,
+  taggedEntries,
+  tagsOf,
+  validateTagging,
+  type TaggedEntry,
+  type TaggingSubject,
+} from "@/lib/game/tags";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { io as connect, type Socket } from "socket.io-client";
@@ -10173,6 +10215,11 @@ async function main(): Promise<void> {
       // the reason the hold figures do: a report is a claim, and what the
       // checks below are about is what the spine does with one.
       ability?: { opportunistBorrows?: unknown },
+      // [E1: the Supply Barge] The two counters the page's share is divided
+      // from, filed here for the same reason and checked for one of their
+      // own: they are kept as a pair, so a report carrying half of one is a
+      // report the spine has nothing to divide and drops the half of.
+      barge?: { foodSpend?: unknown; bargeSpend?: unknown },
     ) =>
       socket.emit("telemetry:leg", {
         roomId: sailRoomId,
@@ -10182,6 +10229,7 @@ async function main(): Promise<void> {
         distinctGoods,
         ...(hold ?? {}),
         ...(ability ?? {}),
+        ...(barge ?? {}),
       });
     telLegReport(sailHome, 1, 3, 1, 2);
     // The same captain, the same leg, reporting again after filling another
@@ -10241,7 +10289,19 @@ async function main(): Promise<void> {
       // captain and one leg replaces the first, which would take the hold
       // figures off the record rather than add a figure to it.
       { opportunistBorrows: -2 },
+      // [E1: the Supply Barge] The two counters the page's own share is
+      // divided from, filed here as a fraction and a negative for the same
+      // reason the figures above are: what the spine does with a claim has
+      // to be exercised rather than read off the reader.
+      { foodSpend: 240.9, bargeSpend: -3 },
     );
+    // A claim carrying half the pair, filed about a leg the voyage reached,
+    // which is the case the pair rule exists for: a lone numerator beside a
+    // missing denominator is a number nobody can divide, so the spine drops
+    // the half rather than keeping it and letting a reader divide by zero.
+    telLegReport(sailHome, 2, 2, 1, 1, undefined, undefined, {
+      foodSpend: 120,
+    });
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // ---- the two votes, at their own rungs ----
@@ -10442,12 +10502,13 @@ async function main(): Promise<void> {
       (event) => `${event.actor}:${event.leg}`,
     );
     check(
-      sailReports.length === 3 &&
+      sailReports.length === 4 &&
         new Set(sailReportLines).size === sailReports.length &&
         sailReportLines.includes(`${telHome.id}:1`) &&
+        sailReportLines.includes(`${telHome.id}:2`) &&
         sailReportLines.includes(`${telMate.id}:1`) &&
         sailReportLines.includes(`${telMate.id}:3`),
-      "one line per captain per leg is kept, and the three that were filed are the three that are there",
+      "one line per captain per leg is kept, and the four that were filed are the four that are there",
     );
     const homeLegOne = sailReports.find(
       (event) => event.actor === telHome.id && event.leg === 1,
@@ -10493,6 +10554,26 @@ async function main(): Promise<void> {
         mateLegThree?.opportunistBorrows === 0 &&
         mateLegOne?.opportunistBorrows === undefined,
       "and the borrow counter rides the same reader, so a fraction floors to the whole borrows it stands for, a negative clamps to the voyage that spent none, and a value that is not a number is dropped rather than landing as a zero a reader could take for an unspent allowance",
+    );
+    // [E1: the Supply Barge] The two counters the page's share is divided
+    // from are read by that same rule, and the fourth figure is the pair
+    // rule itself: half a pair is dropped, so a reader dividing the two can
+    // never be handed a numerator without its denominator.
+    const homeLegTwo = sailReports.find(
+      (event) => event.actor === telHome.id && event.leg === 2,
+    );
+    check(
+      mateLegThree?.foodSpend === 240 &&
+        mateLegThree?.bargeSpend === 0 &&
+        homeLegOne?.foodSpend === undefined &&
+        homeLegOne?.bargeSpend === undefined,
+      "and the two food counters ride the same reader, so a fraction floors, a negative clamps to the voyage that spent nothing at the vendor, and a leg that measured neither carries neither rather than a pair of zeroes",
+    );
+    check(
+      homeLegTwo?.foodSpend === undefined &&
+        homeLegTwo?.bargeSpend === undefined &&
+        homeLegTwo?.ordersDealt === 2,
+      "while a claim carrying half the pair is dropped to nothing at all and takes nothing else with it, because a share of food spending is one number divided by another and the spine keeps neither half of a pair it cannot divide",
     );
     check(
       !sailReportLines.some(
@@ -10871,8 +10952,11 @@ async function main(): Promise<void> {
     check(
       emptyReading.frontPage.label ===
         "Barge revenue share of all food spending" &&
-        emptyReading.frontPage.target === "waits on Epic E",
-      "and the front page number is named as the share of all food spending the proposal identifies, waiting on the epic that would measure it",
+        emptyReading.frontPage.target === "no threshold in the plan" &&
+        emptyReading.frontPage.verdict === "unplayed" &&
+        emptyReading.frontPage.value ===
+          "no leg report from a provisions harbor",
+      "and the front page number is named as the share of all food spending the proposal identifies, reading as no report rather than as a share of zero until a voyage files what it spent",
     );
 
     // ---- The window ----
@@ -11193,8 +11277,14 @@ async function main(): Promise<void> {
       liveReading !== undefined &&
         liveReading.panels.map((panel) => panel.id).join(",") ===
           "seat,staples,variance,floor" &&
-        liveReading.frontPage.verdict === "unmeasured",
-      "carrying the four panels in the plan's order, with the front page number held in its slot",
+        // The front page number is read now rather than held as a slot, and
+        // the plan sets no band on it: what a reader must never see is a
+        // share judged inside or outside a threshold nobody wrote, so the
+        // verdict is the absence of a report or a measured number left
+        // unjudged, and never a band verdict.
+        (liveReading.frontPage.verdict === "unplayed" ||
+          liveReading.frontPage.verdict === "ungated"),
+      "carrying the four panels in the plan's order, with the front page number read from the record and judged against no invented band",
     );
     check(
       liveReading !== undefined &&
@@ -17915,6 +18005,706 @@ async function main(): Promise<void> {
     check(
       afterOut.body?.user === null,
       "the session is gone after signing out",
+    );
+
+    // ---- The Supply Barge ----
+    // [E1] The anonymous vendor the plan builds as the fail safe for a
+    // table that never took the Quartermaster: one lot a leg, eight of them
+    // at the most, at a markup, drawn from the voyage's own numbers so the
+    // rule needs no state that has to be kept in step. It runs here, after
+    // the captains are put away, because it is the one article of this run
+    // that is arithmetic over records and needs no harbor, no socket and no
+    // captain. The wire half of the feature, which is what the record does
+    // with the pair of counters a captain files, is checked in the spine's
+    // own section above for the reason every other field's claim rule is.
+    const bargeVoyage = (money = 1000): GameState => {
+      const state = voyageState();
+      state.money = money;
+      hireWorker(state, "weaver", []);
+      state.larder = 0;
+      reconcileLarder(state);
+      return state;
+    };
+
+    // The plan's own clause is a markup on the port's price, so the two
+    // numbers are read off each other rather than written down twice.
+    check(
+      bargeRationPrice() === Math.ceil(RATION_PRICE * BARGE_PRICE_MULTIPLIER) &&
+        bargeRationPrice() > RATION_PRICE,
+      "a barge ration costs the port's own price marked up by the published multiplier, so the premium is one number read off another rather than a second price that could drift from it",
+    );
+
+    const bargeHome = bargeVoyage();
+    const firstPort = bargePortAtLeg(bargeHome);
+    check(
+      firstPort !== null &&
+        unlockedPorts(bargeHome.difficulty, bargeHome.currentRound).includes(
+          firstPort,
+        ) &&
+        bargePortAtLeg({ ...bargeHome }) === firstPort,
+      "the vendor stands at a port the voyage can reach on that leg, and the same state draws the same quay, because what the plan asks for is a rule rather than a coin the server flips",
+    );
+    const bargeLegs = Array.from({ length: 12 }, (_, index) => index + 1);
+    const bargePorts = bargeLegs.map((round) =>
+      bargePortAtLeg({ ...bargeHome, currentRound: round }),
+    );
+    check(
+      bargePorts.every(
+        (port, index) =>
+          port !== null &&
+          unlockedPorts(bargeHome.difficulty, bargeLegs[index]).includes(port),
+      ),
+      "and every leg of a voyage draws a quay the table can actually sail to, so the fallback is never a harbor the ship cannot reach",
+    );
+    check(
+      new Set(bargePorts).size > 1,
+      "and it is not one harbor's vendor: the quay moves through the voyage with the leg it is drawn from",
+    );
+    const bargeLots = bargeLegs.map((round) =>
+      bargeLotAtPort({ ...bargeHome, currentRound: round }),
+    );
+    // The plan's own ceiling, said out loud here as the sentence the check
+    // below is about rather than as a number typed twice: the lot is read from
+    // the constant, and this is the promise it is being held to.
+    const PLAN_CEILING = 8;
+    check(
+      bargeLots.every(
+        (lot) =>
+          Number.isInteger(lot) && lot >= 1 && lot <= BARGE_RATIONS_PER_LEG,
+      ) && BARGE_RATIONS_PER_LEG === PLAN_CEILING,
+      "the lot is a whole count between one and the ceiling the plan names, so the promise of never more than eight a leg is a bound the rule cannot cross rather than a number the panel prints",
+    );
+    check(
+      new Set(bargeLots).size > 1,
+      "and the lot is drawn rather than fixed, so a table wanting all eight has legs where that is possible and legs where it is not",
+    );
+    check(
+      bargeLeftAtPort(bargeHome) === bargeLotAtPort(bargeHome),
+      "and nothing has been bought on a fresh leg, so what is left of the lot is the lot",
+    );
+
+    // The sale, at the till and at each of the three ceilings it is held
+    // to, read on its own state so one ceiling cannot be mistaken for
+    // another.
+    const bargeBuyer = bargeVoyage();
+    const bargePrice = bargeRationPrice();
+    const bargePurse = bargeBuyer.money;
+    const bargeMeals = mealsOf(bargeBuyer, "Grain");
+    const bargeSaleLines: string[] = [];
+    const boughtRation = buyFromBarge(bargeBuyer, 1, bargeSaleLines);
+    check(
+      boughtRation === 1 &&
+        bargeBuyer.money === bargePurse - bargePrice &&
+        mealsOf(bargeBuyer, "Grain") === bargeMeals + 1 &&
+        bargeBuyer.larder === 1 &&
+        bargeBuyer.roundCosts === bargePrice &&
+        bargeBuyer.totalCosts === bargePrice,
+      "one ration is one meal of grain for the premium on the label, booked at the till the way every other purchase in this game is booked",
+    );
+    check(
+      bargeBuyer.foodSpend === bargePrice &&
+        bargeBuyer.bargeSpend === bargePrice &&
+        bargeBuyer.bargeTaken === 1 &&
+        bargeBuyer.bargeRound === bargeBuyer.currentRound,
+      "and the Gold lands in both counters the page's share is divided from, stamped with the leg it was spent in",
+    );
+    const bargeEager = bargeVoyage(10_000);
+    const bargeLot = bargeLotAtPort(bargeEager);
+    const bargeEagerLines: string[] = [];
+    const tookTheLot = buyFromBarge(
+      bargeEager,
+      BARGE_RATIONS_PER_LEG * 4,
+      bargeEagerLines,
+    );
+    const pressedAgain = buyFromBarge(bargeEager, 1, bargeEagerLines);
+    check(
+      tookTheLot === bargeLot &&
+        bargeLeftAtPort(bargeEager) === 0 &&
+        pressedAgain === 0 &&
+        bargeEagerLines[bargeEagerLines.length - 1] ===
+          "⛵ The barge has nothing left for you this leg.",
+      "a press for more than a leg's lot buys the lot and stops there, and a second press in the same leg is told the vendor has nothing left rather than being sold a shelf the plan does not have",
+    );
+    // The stamp. A leg is the unit of the lot and of the tally, so the next
+    // leg is both a fresh shelf and a fresh count, which is the whole of
+    // the state this feature added.
+    const bargeStamp = bargeVoyage(10_000);
+    buyFromBarge(bargeStamp, 1, []);
+    const firstLegTaken = bargeStamp.bargeTaken;
+    bargeStamp.currentRound += 1;
+    const freshLegLeft = bargeLeftAtPort(bargeStamp);
+    buyFromBarge(bargeStamp, 1, []);
+    check(
+      firstLegTaken === 1 &&
+        bargeStamp.bargeTaken === 1 &&
+        bargeStamp.bargeRound === bargeStamp.currentRound &&
+        freshLegLeft === bargeLotAtPort(bargeStamp),
+      "the tally is stamped with the leg it belongs to, so the next leg draws a fresh lot and starts the count again rather than leaving the quay bare for the rest of the voyage",
+    );
+    const bargeFull = bargeVoyage(10_000);
+    provisionFood(bargeFull, "Grain", 999, []);
+    const bargeFullLines: string[] = [];
+    check(
+      foodRoomMeals(bargeFull, "Grain") < 1 &&
+        buyFromBarge(bargeFull, 1, bargeFullLines) === 0 &&
+        bargeFullLines[bargeFullLines.length - 1] === "🧺 The larder is full.",
+      "a stores with no room takes no rations, and the vendor says so in the same words the port counter uses, because there is one larder and one answer to a full one",
+    );
+    // The purse is drawn down after the crew is aboard rather than handed to
+    // the fixture, because a voyage that cannot pay its own crew is a voyage
+    // with nobody aboard, and that captain is answered by the crewless line
+    // below rather than by this one. What this check is about is the
+    // sentence a vendor whose price is over the purse gives the captain.
+    const bargeThin = bargeVoyage();
+    bargeThin.money = 1;
+    const bargeThinLines: string[] = [];
+    check(
+      bargePrice > 1 &&
+        buyFromBarge(bargeThin, 1, bargeThinLines) === 0 &&
+        bargeThin.money === 1 &&
+        bargeThinLines[bargeThinLines.length - 1] ===
+          `❌ The barge charges ${bargePrice} Gold a ration, and the purse cannot cover one.`,
+      "and a purse that cannot cover one ration buys nothing rather than going into debt to the vendor, told the price it is short of",
+    );
+    const bargeCrewless = voyageState();
+    bargeCrewless.money = 1000;
+    bargeCrewless.larder = 0;
+    reconcileLarder(bargeCrewless);
+    const bargeCrewlessLines: string[] = [];
+    check(
+      crewSize(bargeCrewless) === 0 &&
+        buyFromBarge(bargeCrewless, 1, bargeCrewlessLines) === 0 &&
+        bargeCrewlessLines[bargeCrewlessLines.length - 1] ===
+          "⚓ No crew aboard, so there is nothing to provision.",
+      "while a captain with nobody aboard has nobody to feed and is told so in one line, which is the answer that case already gives a buyer at the port",
+    );
+    const bargeOdd = bargeVoyage();
+    const bargeOddLines: string[] = [];
+    check(
+      buyFromBarge(bargeOdd, 0.4, bargeOddLines) === 0 &&
+        bargeOdd.money === 1000 &&
+        bargeOddLines[bargeOddLines.length - 1] ===
+          "❌ Name how many rations to buy from the barge.",
+      "and a press that names no ration at all is refused in words rather than read as a zero it would quietly take and charge nothing for",
+    );
+
+    // The invariant the page's headline rests on: every Gold the vendor
+    // takes is a Gold of food spending, so the numerator is inside the
+    // denominator whatever a voyage buys and wherever it buys it.
+    const bargeSpender = bargeVoyage(10_000);
+    provisionFood(bargeSpender, "Grain", 2, []);
+    const bargePortSpend = bargeSpender.foodSpend;
+    buyFromBarge(bargeSpender, 1, []);
+    check(
+      bargePortSpend === 2 * RATION_PRICE &&
+        bargeSpender.foodSpend === bargePortSpend + bargePrice &&
+        bargeSpender.bargeSpend === bargePrice &&
+        bargeSpender.bargeSpend <= bargeSpender.foodSpend,
+      "every Gold the vendor takes is booked in the denominator its share is divided by, so the page's headline can never read above one hundred percent however a voyage spends",
+    );
+
+    // A save this build did not write, and one it cannot read at all.
+    const bargeNonsense = {
+      ...voyageState(),
+      bargeTaken: -3,
+      bargeRound: 2.7,
+      foodSpend: Number.NaN,
+      bargeSpend: "six",
+    } as unknown as GameState;
+    normalizeBargeState(bargeNonsense);
+    const bargeLegacy = { ...voyageState() } as unknown as Record<
+      string,
+      unknown
+    >;
+    delete bargeLegacy.bargeTaken;
+    delete bargeLegacy.bargeRound;
+    delete bargeLegacy.foodSpend;
+    delete bargeLegacy.bargeSpend;
+    normalizeBargeState(bargeLegacy as unknown as GameState);
+    check(
+      bargeNonsense.bargeTaken === 0 &&
+        bargeNonsense.bargeRound === 2 &&
+        bargeNonsense.foodSpend === 0 &&
+        bargeNonsense.bargeSpend === 0 &&
+        bargeLegacy.bargeTaken === 0 &&
+        bargeLegacy.bargeRound === 0 &&
+        bargeLegacy.foodSpend === 0 &&
+        bargeLegacy.bargeSpend === 0,
+      "a tally this build cannot read heals to a voyage that never bought at the vendor, and a save written before the vendor existed reads the same way rather than as a captain who spent Gold nobody can account for",
+    );
+
+    // The switch, and the mode boundary behind it.
+    check(
+      withEnv(
+        "NEXT_PUBLIC_SURVIVAL",
+        "1",
+        () => bargeOn(GAMBIT) && !bargeOn(CLASSIC),
+      ),
+      "the vendor belongs to the survival layer, so a Classic table never meets one whatever the environment says",
+    );
+    check(
+      withEnv("NEXT_PUBLIC_SURVIVAL", "off", () => {
+        const dark = bargeVoyage();
+        const darkLines: string[] = [];
+        const sold = buyFromBarge(dark, 1, darkLines);
+        return (
+          !bargeOn(GAMBIT) &&
+          bargePortAtLeg(dark) === null &&
+          bargeLotAtPort(dark) === 0 &&
+          bargeLeftAtPort(dark) === 0 &&
+          sold === 0 &&
+          dark.money === 1000 &&
+          dark.foodSpend === 0 &&
+          dark.bargeSpend === 0 &&
+          darkLines.length === 0
+        );
+      }),
+      "and with the switch off there is no quay, no lot and no sale, so the base game is exactly as it was",
+    );
+
+    // The page's two numbers, reduced out of records shaped the way the
+    // spine writes one. Each captain files two legs, because the counters
+    // are the voyage's running totals: the reader takes the report at their
+    // greatest leg, and the numbers below say which of the two rules was
+    // applied.
+    const bargeReport = (
+      roomId: string,
+      actor: string,
+      leg: number,
+      foodSpend: number,
+      bargeSpend: number,
+    ) =>
+      telemetryEvent("leg_report", voyageIdFor(roomId, 1), 0, {
+        leg,
+        actor,
+        ordersDealt: 0,
+        ordersFilled: 0,
+        distinctGoods: 0,
+        foodSpend,
+        bargeSpend,
+      });
+    const dashedWith = dashRecord("barge-with", {
+      events: [
+        bargeReport("barge-with", "one", 1, 240, 48),
+        bargeReport("barge-with", "one", 2, 300, 60),
+        bargeReport("barge-with", "two", 1, 100, 0),
+      ],
+    });
+    const dashedWithout = dashRecord("barge-without", {
+      events: [
+        bargeReport("barge-without", "one", 3, 200, 0),
+        bargeReport("barge-without", "two", 3, 150, 0),
+      ],
+    });
+    // A voyage whose captains filed a report and no pair of counters, which
+    // is a harbor that was not playing the provisions layer at all.
+    const dashedDark = dashRecord("barge-dark", {
+      events: [
+        telemetryEvent("leg_report", voyageIdFor("barge-dark", 1), 0, {
+          leg: 1,
+          actor: "one",
+          ordersDealt: 2,
+          ordersFilled: 2,
+          distinctGoods: 2,
+        }),
+      ],
+    });
+    const bargeWindow = readDashboard({
+      records: [dashedWith, dashedWithout, dashedDark],
+      outcomes: [],
+      unreadable: 0,
+    });
+    const bargeShare = bargeWindow.frontPage;
+    const bargeWithout = bargeWindow.panels[0]?.readings[1];
+    check(
+      bargeWindow.panels[0]?.readings[0] === bargeWindow.frontPage,
+      "the front page number and the seat panel's first reading are one object rather than two copies of one number, which is what keeps the page from printing a share the panel beside it disagrees with",
+    );
+    check(
+      bargeShare.label === "Barge revenue share of all food spending" &&
+        bargeShare.value ===
+          `${ratePercent(60 / 750)} of 750 Gold over 2 voyages`,
+      "and the share is the vendor's Gold over the whole window's food spending, read at each captain's greatest leg rather than by adding their legs up, and over the two voyages that filed the pair rather than the three in the window",
+    );
+    check(
+      bargeShare.target === "no threshold in the plan" &&
+        bargeShare.verdict === "ungated",
+      "with the plan setting no band on it, so the page reads it as measured and unjudged rather than inventing a threshold the proposal never wrote",
+    );
+    check(
+      bargeWithout?.label === "Lobbies that sailed without the Barge" &&
+        bargeWithout?.value === `${ratePercent(1 / 2)} of 2 lobbies` &&
+        bargeWithout?.target === "above 70%" &&
+        bargeWithout?.verdict === "under",
+      "while the number the plan does gate is the share of lobbies that sailed without the vendor, read over the tables rather than over the captains and judged under its own band",
+    );
+    check(
+      bargeWindow.panels[0]?.answer.startsWith(
+        "1 of 1 gates sit outside theirs",
+      ) === true &&
+        bargeWindow.panels[0]?.answer.includes(
+          "Lobbies that sailed without the Barge",
+        ) === true,
+      "and the share of food spending is not one of the sixteen gates, so the panel counts the one gate it can read rather than two",
+    );
+    // A window where every table avoided the vendor, which is the plan's own
+    // target met: the headline reads as the target held, and the share reads
+    // as no denominator rather than as a share of zero.
+    const bargeAvoided = readDashboard({
+      records: [
+        dashRecord("barge-none", {
+          events: [bargeReport("barge-none", "one", 2, 0, 0)],
+        }),
+      ],
+      outcomes: [],
+      unreadable: 0,
+    });
+    check(
+      bargeAvoided.frontPage.value === "no food bought in the window" &&
+        bargeAvoided.frontPage.verdict === "ungated" &&
+        bargeAvoided.panels[0]?.readings[1]?.value ===
+          `${ratePercent(1)} of 1 lobby` &&
+        bargeAvoided.panels[0]?.readings[1]?.verdict === "in" &&
+        bargeAvoided.panels[0]?.answer ===
+          "Every gate this window can read sits inside it, 1 of 1.",
+      "a window where nobody bought food reads as no denominator rather than as a share of zero, while a table that avoided the vendor is the plan's target met rather than a number the page hedges",
+    );
+    // And the window nothing has been played in, which is where the two rows
+    // have to read as an absence rather than as a vendor that sold nothing.
+    const bargeEmpty = readDashboard({
+      records: [],
+      outcomes: [],
+      unreadable: 0,
+    });
+    check(
+      bargeEmpty.frontPage.value === "no leg report from a provisions harbor" &&
+        bargeEmpty.frontPage.verdict === "unplayed" &&
+        bargeEmpty.panels[0]?.readings[1]?.value ===
+          "no leg report from a provisions harbor" &&
+        bargeEmpty.panels[0]?.readings[1]?.verdict === "unplayed",
+      "and a window no voyage filed in reads as no report on both rows rather than as a vendor that sold nothing to nobody",
+    );
+    check(
+      bargeEmpty.panels[0]?.state === "no reading" &&
+        bargeEmpty.panels[0]?.answer ===
+          "No reading yet: the seat's three readings are counts over an event the record carries and this page does not reduce. The Barge's own two numbers are read below.",
+      "with the seat panel still reading as nothing to read on an empty window, because the vendor's two rows are reports and a report nobody filed is not a rate",
+    );
+
+    // The house rule, over the row a captain presses and the files this
+    // feature lands in. The panel is read with its comments taken out,
+    // because the check is about what it prints rather than what it says.
+    const bargePanelCode = withoutComments(
+      readFileSync(
+        join(
+          import.meta.dirname,
+          "..",
+          "src/components/portmasters/game/phases/PurchaseProvisions.tsx",
+        ),
+        "utf8",
+      ),
+    );
+    check(
+      bargePanelCode.includes("Supply Barge") &&
+        bargePanelCode.includes("buyFromBarge") &&
+        bargePanelCode.includes("bargePortAtLeg") &&
+        bargePanelCode.includes("bargeLeftAtPort") &&
+        bargePanelCode.includes("bargeRationPrice") &&
+        bargePanelCode.includes("RATION_PRICE") &&
+        !CARRIES_A_DASH.test(bargePanelCode),
+      "the row a captain presses reads the quay, the lot, the price and what a press would buy from the engine's own readers and from the port's own price constant, and what it prints carries no dash of any kind",
+    );
+    check(
+      !carriesADash("src/lib/game/engine/barge.ts") &&
+        !carriesADash("src/lib/game/dashboard.ts") &&
+        !carriesADash("src/lib/use-leg-report.ts") &&
+        !carriesADash("src/server/realtime/wiring/leg-report.ts"),
+      "with every file this feature lands in carrying the house rule in its comments as well as in its code",
+    );
+
+    // ---- The tag vocabulary ----
+    // [F1] The plan's sentence for this goal is that no effect ever names an
+    // item key, and the vocabulary it names things from instead is twelve
+    // closed words. What is checked here is the wording half of that goal:
+    // which twelve, what each one means, which entries carry which, and that
+    // a caller can ask the question an effect will ask. Then the rule half,
+    // which is the half the plan insists on rather than trusts: the two tag
+    // maximum is held by validation at load time rather than by review, and
+    // every one of the nine things that validation states is watched firing
+    // here, against a subject built by hand carrying the one thing wrong
+    // that rule is about. It runs beside the vendor's block for the same
+    // reason: the content is static data and the rule over it is a pure
+    // function, so it needs no harbor, no socket and no captain.
+    //
+    // What it deliberately does not check is the scan the plan puts in G4,
+    // the one that walks the shipped cards for a named good. That goal owns
+    // the content validator's home, and the cards that still name a good are
+    // its first customers rather than this goal's leftovers.
+    //
+    // The plan's own list, written here as the sentence this goal is being
+    // held to rather than read back off the constant the check is about.
+    const PLAN_VOCABULARY = [
+      "cold",
+      "bulk",
+      "perishable",
+      "preserved",
+      "woven",
+      "luxury",
+      "armed",
+      "crewed",
+      "contraband",
+      "sealed",
+      "public",
+      "debt",
+    ];
+    check(
+      TAGS.length === PLAN_VOCABULARY.length &&
+        TAGS.every((tag, at) => tag === PLAN_VOCABULARY[at]),
+      "the vocabulary is the plan's twelve words in the plan's own order, because a closed list is the thing every card will be authored against and an order two readers can compare without a second alphabet",
+    );
+    const tagMeanings = TAGS.map((tag) => TAG_MEANINGS[tag]);
+    check(
+      tagMeanings.every((meaning) => meaning.trim().length > 0) &&
+        new Set(tagMeanings).size === TAGS.length,
+      "and each of the twelve says what it means, in words that are not another tag's words, since a meaning a reader has to guess is a tag that will be applied by taste",
+    );
+    check(
+      MAX_TAGS_PER_ENTRY === 2,
+      "the ceiling is the plan's two, so every assignment in the tree is at or under the number the rule module enforces rather than under a second number kept beside it",
+    );
+
+    const tagEntries = taggedEntries();
+    const entriesOfKind = (kind: string) =>
+      tagEntries.filter((entry) => entry.kind === kind).length;
+    check(
+      TAGGED_KINDS.length === 5 &&
+        entriesOfKind("good") === ITEMS.length &&
+        entriesOfKind("food") === Object.keys(FOODS).length &&
+        entriesOfKind("module") === MODULES.length &&
+        entriesOfKind("boon") === BOONS.length &&
+        entriesOfKind("charter") === Object.keys(DIFFICULTIES).length,
+      "the walk covers every item of all five catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
+    );
+    check(
+      tagEntries.length ===
+        ITEMS.length +
+          Object.keys(FOODS).length +
+          MODULES.length +
+          BOONS.length +
+          Object.keys(DIFFICULTIES).length &&
+        TAGGED_KINDS.every((kind) => entriesOfKind(kind) > 0),
+      "with nothing walked twice and no catalogue empty, which is the same count read the other way round",
+    );
+    check(
+      tagEntries.every(
+        (entry) =>
+          entry.tags.length >= 1 && entry.tags.length <= MAX_TAGS_PER_ENTRY,
+      ),
+      "and every entry the tree ships carries a set of one or two, so the rule is not merely enforceable against the content but true of it",
+    );
+    const carriedTags = new Set<Tag>();
+    for (const entry of tagEntries) {
+      for (const tag of entry.tags) carriedTags.add(tag);
+    }
+    check(
+      TAGS.every((tag) => carriedTags.has(tag)),
+      "while every one of the twelve is carried by something, because a tag nothing carries is a tag no card can name and the dead schema this tree refuses to ship anywhere else",
+    );
+    check(
+      validateTagging().length === 0,
+      "and the whole of the rule holds over the shipped content, which is the reading the build acts on: the same call, over the same walk, is what scripts/tags.ts runs before it lets a page be compiled",
+    );
+
+    check(
+      tagsOf("good", "Silk") === GOOD_TAGS["Silk"] &&
+        tagsOf("good", "Rags")?.includes("woven") === true,
+      "a caller asking a good what it carries is handed the table's own list rather than a copy of it, so what a card reads and what the rule checks cannot drift apart",
+    );
+    check(
+      tagsOf("good", "Fair Winds") === null &&
+        tagsOf("boon", "no_such_boon") === null,
+      "an id from the wrong catalogue and an id from no catalogue both answer null, because a reader handed an empty list for either would report a missing entry as a tagless one",
+    );
+    check(
+      tagEntries.every((entry) => tagsOf(entry.kind, entry.id) !== null),
+      "and every entry the tree ships can be read back by its own kind and id, so the answer for real content is a list and never the absence that means a missing entry",
+    );
+
+    const coldGoods = entriesWithTag("cold").map((entry) => entry.id);
+    const wardrobe = Object.keys(GARMENTS);
+    check(
+      coldGoods.length === wardrobe.length &&
+        wardrobe.every((garment) => coldGoods.includes(garment)),
+      "the cold tag gathers exactly the wardrobe and nothing else, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question",
+    );
+    const pantryOf = (tag: Tag) =>
+      entriesWithTag(tag)
+        .filter((entry) => entry.kind === "food")
+        .map((entry) => entry.id);
+    check(
+      pantryOf("preserved").join(", ") === "Grain, Salt Fish" &&
+        pantryOf("perishable").join(", ") === "Produce" &&
+        FOODS["Salt Fish"].keeps !== null &&
+        FOODS.Produce.keeps !== null &&
+        FOODS["Salt Fish"].keeps > FOODS.Produce.keeps,
+      "the pantry's two sides are the sides its own keepings make: grain and salt fish are preserved and produce is the one that turns, with the salt fish that keeps six legs against the produce's two as the row the rule bites on, so the split is read off the numbers rather than off a list somebody wrote of which foods spoil",
+    );
+    check(
+      entriesWithTag("perishable").some((entry) => entry.kind === "good") &&
+        entriesWithTag("preserved").every((entry) => entry.kind === "food"),
+      "while the same tag reaches past the pantry into the trade, where tea and spices carry it as a reading about what a slot is worth rather than as a clock, and nothing at all outside the pantry claims to be preserved: only food has a keeping for that word to be measured against",
+    );
+    const armedEntries = entriesWithTag("armed").map(
+      (entry) => `${entry.kind}:${entry.id}`,
+    );
+    check(
+      armedEntries.length === 4 &&
+        armedEntries.includes("charter:open_waters") &&
+        armedEntries.includes("charter:monsoon") &&
+        armedEntries.includes("boon:deep_sea_escort_pact") &&
+        armedEntries.includes("module:persian_dome_compass"),
+      "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort and the compass that turns a raid, which is the query shape the single card record is being built to answer",
+    );
+    check(
+      DIFFICULTIES.monsoon.pirateChance.length === 2 &&
+        tagsOf("charter", "monsoon")?.includes("armed") === true &&
+        DIFFICULTIES.monsoon.brokerCorruption &&
+        tagsOf("charter", "monsoon")?.includes("contraband") === true &&
+        DIFFICULTIES.fair_winds.pirateChance.length === 1 &&
+        tagsOf("charter", "fair_winds")?.includes("armed") === false,
+      "and the hardest water carries both of its own tags, read off the two numbers in its record rather than out of the prose: what gains teeth partway through the voyage says so, and what sails a corrupt broker says that too",
+    );
+    const namedThings = new Set<string>([
+      ...ITEMS.map((item) => item.toLowerCase()),
+      ...Object.keys(FOODS).map((food) => food.toLowerCase()),
+    ]);
+    check(
+      TAGS.every((tag) => !namedThings.has(tag)),
+      "and not one of the twelve is the name of a good or a food, even read case blind, which is the plan's rule about item keys applied to the vocabulary itself: a tag a captain cannot point at on a shelf is what keeps an effect about a class of trade rather than about Silk",
+    );
+
+    // Every rule, watched firing. The subject is a parameter for exactly
+    // this: each rule below is handed the shipped content with one thing
+    // changed, and each is asked for its finding and for nothing else,
+    // since a rule that fires alongside three others could be firing for
+    // the wrong reason.
+    const tagSubject = shippedTagging();
+    const withTagRow = (
+      kind: TaggedEntry["kind"],
+      id: string,
+      tags: readonly Tag[],
+    ): TaggingSubject => ({
+      ...tagSubject,
+      entries: tagSubject.entries.map((entry) =>
+        entry.kind === kind && entry.id === id ? { ...entry, tags } : entry,
+      ),
+    });
+    const soleFinding = (subject: TaggingSubject): string | null => {
+      const found = validateTagging(subject);
+      return found.length === 1 ? found[0] : null;
+    };
+
+    check(
+      soleFinding(
+        withTagRow("good", "Silk", [
+          "woven",
+          "silk",
+        ] as unknown as readonly Tag[]),
+      )?.includes("not one of the twelve") === true,
+      "a tag outside the closed list is caught, because the failure that matters here is not a tag that behaves oddly but a tag no effect will ever look up, and a typo is exactly that. The cast is the point: TypeScript refuses this word in a literal, so the only way to hand the rule a subject carrying one is from outside the type system, which is where a good read out of a content file comes from",
+    );
+    check(
+      soleFinding(
+        withTagRow("good", "Silk", ["woven", "luxury", "cold"]),
+      )?.includes("at most 2") === true,
+      "a third tag on an entry is caught, which is the plan's own ceiling and the reason it is enforced rather than reviewed: every tag a good carries doubles the space a balance pass has to cover",
+    );
+    check(
+      soleFinding(withTagRow("good", "Silk", []))?.includes(
+        "carries no tags",
+      ) === true,
+      "an entry carrying nothing is caught, which is the clause that holds content the compiler did not check: the type cannot express an empty set, so content read out of a file, or a row cast past the type, is how an entry arrives bare and this is the finding that catches it",
+    );
+    check(
+      soleFinding(withTagRow("good", "Silk", ["woven", "woven"]))?.includes(
+        "twice",
+      ) === true,
+      "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        entries: tagSubject.entries.filter(
+          (entry) => !(entry.kind === "boon" && entry.id === "emergency_loan"),
+        ),
+      })?.includes('no entry carries "debt"') === true,
+      "a tag of the twelve that no entry carries is caught, since it would otherwise be a word in the vocabulary with nothing a card could be about",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        entries: [
+          ...tagSubject.entries,
+          { kind: "boon", id: "silk_wind", tags: ["woven"] },
+        ],
+      })?.includes("share the id") === true,
+      "two entries answering to one kind and id are caught, because the second would shadow the first on every read the vocabulary offers",
+    );
+    check(
+      soleFinding(withTagRow("good", "Brocade", ["woven"]))?.includes(
+        "carries no cold tag",
+      ) === true,
+      "a garment that lost its cold tag is caught against the wardrobe's own table, so a garment added to the cold rule and forgotten by the vocabulary fails the build rather than quietly becoming a card nothing can name",
+    );
+    check(
+      soleFinding(
+        withTagRow("food", "Produce", ["preserved", "perishable"]),
+      )?.includes("both preserved and perishable") === true,
+      "a food on both sides of the pantry at once is caught, because a thing that keeps and spoils in the same breath is a contradiction rather than a nuance",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        keepings: { ...tagSubject.keepings, Produce: 9 },
+      })?.includes("the tag and the keeping disagree") === true,
+      "and a preserved food that keeps for less than a perishable one is caught, which is the half of this rule that reads the pantry's own numbers rather than its tags: the two must agree, and the row that makes it bite is salt fish, which neither keeps forever nor turns quickly",
+    );
+    check(
+      validateTagging({
+        ...tagSubject,
+        keepings: { ...tagSubject.keepings, Grain: null, "Salt Fish": 3 },
+      }).length === 0,
+      "while a keeping of null is read as never turning rather than as a zero, so the grain that outlasts the voyage stays on the preserved side and the rule holds it together with a food that turns in three legs without inventing a finding",
+    );
+    check(
+      soleFinding(
+        withTagRow("charter", "fair_winds", ["public", "armed"]),
+      )?.includes("never steps up") === true,
+      "a charter that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
+    );
+    check(
+      soleFinding(withTagRow("charter", "open_waters", ["public"]))?.includes(
+        "gains teeth partway through the voyage and does not carry armed",
+      ) === true,
+      "and one that gains teeth without saying so is caught in the other direction, because a charter that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
+    );
+    check(
+      soleFinding(withTagRow("charter", "monsoon", ["armed"]))?.includes(
+        "sails a corrupt broker and does not carry contraband",
+      ) === true,
+      "as is the water that sails a corrupt broker without carrying contraband, read off the same record's own flag rather than off a list kept in the checker",
+    );
+    check(
+      [
+        "src/lib/game/constants/tags.ts",
+        "src/lib/game/tags.ts",
+        "src/lib/game/constants/goods.ts",
+        "src/lib/game/constants/supplies.ts",
+        "src/lib/game/constants/drafts.ts",
+        "src/lib/game/difficulty.ts",
+        "scripts/tags.ts",
+      ].every((file) => !carriesADash(file)),
+      "and every file this feature lands in is free of em dashes, en dashes and doubled hyphens, in its comments as well as in the words a captain reads",
     );
   } finally {
     for (const socket of run.sockets) {

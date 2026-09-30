@@ -55,6 +55,7 @@ import {
   survivalLayerOn,
 } from "@/lib/game/flags";
 import {
+  bargeOn,
   openOrderCount,
   opportunistBorrowsTaken,
   refitsOn,
@@ -155,6 +156,22 @@ export function useLegReport(
   const opportunistBorrows = pathOrdersOn(game.mode)
     ? opportunistBorrowsTaken(game)
     : undefined;
+  // [E1: the Supply Barge] The voyage's two food counters, read off the
+  // captain's own save and sent only when the switch that gives them
+  // meaning is on, which is the same switch the vendor stands on: a leg
+  // sailed with no provisions layer has no food spending for a share to be
+  // taken of. Both are the voyage's totals rather than the leg's, which is
+  // the plan's own reading ("Barge revenue as a share of all food
+  // spending") and the reason a reader takes the last report a captain
+  // filed rather than adding the legs up.
+  //
+  // The vendor's port and its lot are deliberately not sent. They are
+  // drawn from the voyage's own numbers on every client (see
+  // bargePortAtLeg), so the server could only ever be told what it could
+  // already work out, and a field that exists to say it again is a field
+  // that can disagree.
+  const foodSpend = bargeOn(game.mode) ? game.foodSpend : undefined;
+  const bargeSpend = bargeOn(game.mode) ? game.bargeSpend : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -179,6 +196,8 @@ export function useLegReport(
         ragsRewoven,
         coldLeg,
         opportunistBorrows,
+        foodSpend,
+        bargeSpend,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -202,5 +221,7 @@ export function useLegReport(
     ragsRewoven,
     coldLeg,
     opportunistBorrows,
+    foodSpend,
+    bargeSpend,
   ]);
 }

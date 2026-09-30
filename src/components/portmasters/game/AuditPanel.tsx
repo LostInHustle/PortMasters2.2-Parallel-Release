@@ -20,6 +20,7 @@
 import { AuditReveal } from "@/types/realtime/audit";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { fulfillmentLine } from "@/lib/game/audit";
 import { auditOpensAt } from "@/lib/game/mode";
@@ -83,10 +84,9 @@ export function AuditVoteCard({
             more this leg.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            <select
+            <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
               aria-label="Captain to audit"
             >
               <option value="">Choose a captain</option>
@@ -95,7 +95,7 @@ export function AuditVoteCard({
                   {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button
               variant="outline"
               disabled={!target || !audit.canVote}

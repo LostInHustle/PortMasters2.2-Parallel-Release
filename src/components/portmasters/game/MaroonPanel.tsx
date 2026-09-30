@@ -23,6 +23,7 @@
 import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { portShiftLine } from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
@@ -90,10 +91,9 @@ export function MaroonVoteCard({
             captain who loses it keeps their seat at the table.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            <select
+            <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
               aria-label="Captain to maroon"
             >
               <option value="">Choose a captain</option>
@@ -104,7 +104,7 @@ export function MaroonVoteCard({
                     {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
                   </option>
                 ))}
-            </select>
+            </Select>
             <Button
               variant="outline"
               disabled={!target || !maroon.canVote}
@@ -248,10 +248,9 @@ export function HarbormasterConsole({
         public, and the market that opens next leg is the one that answers it.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-        <select
+        <Select
           value={port}
           onChange={(e) => setPort(e.target.value)}
-          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
           aria-label="Port to lean"
         >
           <option value="">Choose a port</option>
@@ -260,7 +259,7 @@ export function HarbormasterConsole({
               {p}
             </option>
           ))}
-        </select>
+        </Select>
         <Button
           variant="outline"
           disabled={!port}

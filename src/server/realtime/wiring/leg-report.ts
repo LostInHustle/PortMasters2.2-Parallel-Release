@@ -76,6 +76,14 @@ export function wireLegReport(socket: Socket): void {
       // optional reader as the figures above: a count the client kept,
       // kept only if it arrived readable.
       opportunistBorrows: optional(payload?.opportunistBorrows),
+      // [E1: the Supply Barge] The voyage's two food counters on the same
+      // optional reader, and they are the pair the plan's share is read
+      // from. Kept as a pair rather than as two independent figures: a
+      // report carrying one and not the other is a report that cannot be
+      // divided, and the reader below drops a lone half rather than
+      // letting it stand beside a missing denominator.
+      foodSpend: optional(payload?.foodSpend),
+      bargeSpend: optional(payload?.bargeSpend),
     });
   });
 }

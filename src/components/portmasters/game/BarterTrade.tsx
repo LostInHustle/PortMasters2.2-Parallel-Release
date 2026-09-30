@@ -41,6 +41,7 @@ import { itemColorResolver } from "@/lib/use-color-preference";
 import type { BarterOffer } from "@/lib/use-barter";
 import { cn } from "@/lib/utils";
 import { ItemIcon } from "../shared";
+import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
 import type { Barter } from "./phases/PhaseShared";
 
 type Act = (fn: (g: GameState, logs: string[]) => void) => void;
@@ -180,17 +181,7 @@ export function OfferCard({
     canAfford && (!offer.flexible || flexibleBarterUnlocked(game.renownLevel));
 
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
-        mine
-          ? "bg-due/[0.06] border-due/20"
-          : isDirect
-            ? "bg-sea/[0.06] border-sea/25"
-            : "bg-background/60 border-black/5 dark:border-white/10",
-        className,
-      )}
-    >
+    <PathDeskRow mine={mine} direct={isDirect} className={className}>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium">{mine ? "You" : offer.fromName}</span>
         <span className="text-muted-foreground">offer</span>
@@ -203,11 +194,7 @@ export function OfferCard({
           <ItemIcon item={offer.requestItem} className="h-3.5 w-3.5" />{" "}
           {offer.requestAmount} {offer.requestItem}
         </span>
-        {isDirect && (
-          <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
-            🔒 {mine ? `Just for ${offer.targetName}` : "Just for you"}
-          </span>
-        )}
+        {isDirect && <JustForChip forMe={!mine} name={offer.targetName} />}
       </div>
       {mine ? (
         <Button
@@ -232,7 +219,7 @@ export function OfferCard({
           🤝 Trade
         </Button>
       )}
-    </div>
+    </PathDeskRow>
   );
 }
 

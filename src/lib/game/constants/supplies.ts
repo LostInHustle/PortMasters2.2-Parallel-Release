@@ -17,6 +17,8 @@
 // without being the line that decides a voyage, and a hold of twelve is
 // three artisans fed for the whole of a short voyage or one artisan fed for
 // as long as any voyage lasts.
+import type { TagList } from "./tags";
+
 export const RATION_PRICE = 2;
 export const LARDER_START = 12;
 export const LARDER_MAX = 60;
@@ -100,6 +102,29 @@ export const FOODS_DRAW_ORDER: readonly FoodId[] = [
   "Grain",
 ];
 
+// [F1: the tag vocabulary, and the two tag rule] What each food is, in
+// the vocabulary of ./tags. The pantry is in the vocabulary because it is
+// cargo: a provision takes a slot of the hold, it is bought at a port and
+// bought again off the Barge, and it is what C4's capacity model is
+// actually about. It is also where two of the twelve tags stop being
+// readings and become facts, because these three rows are the only place
+// in the tree where a good's own table already says how long it lasts.
+//
+// So the assignment is read off the keeping rather than invented beside
+// it: grain and salt fish are preserved, produce is perishable, and the
+// rule module holds the two tags to the numbers in FOODS above. A
+// preserved food must keep at least as long as a perishable one, which
+// grain's null keeping satisfies by never turning at all, and a food may
+// not be both, because a thing that keeps and spoils is a contradiction
+// rather than a nuance. Salt Fish is the row that makes the rule mean
+// something: it keeps six legs, which is neither eternal nor quick, so it
+// is the tag and not the number that decides which side it is on.
+export const FOOD_TAGS: Record<FoodId, TagList> = {
+  Grain: ["preserved"],
+  "Salt Fish": ["preserved"],
+  Produce: ["perishable"],
+};
+
 // The two hold capacities. Cargo is the opening tune, set against what a
 // captain actually carries: a fresh hold starts with sixteen units of
 // hemp, silk and tea (see STARTING_STOCK), a market lot is two to five
@@ -124,3 +149,33 @@ export const SHORT_RATIONS_CARGO = 0.75;
 // what a captain pays for it.
 export const PRESERVE_MEALS_IN = 3;
 export const PRESERVE_MEALS_OUT = 2;
+
+// [E1: the Supply Barge] The anonymous vendor's two numbers, kept here
+// beside every other price in the game rather than in the module that
+// reads them (see ../engine/barge), for the reason this file's own header
+// gives: a balance pass edits them knowing they are prices rather than
+// rules, and the rules that read them live beside the rest of the food
+// trade.
+//
+// The plan names both of them, and this is the only place it names
+// either: "an anonymous vendor at every port selling rations at one
+// hundred eighty percent of market, never more than eight per leg". So
+// the multiplier is the first number and the ceiling is the second, and
+// the two of them are the whole of what the vendor is tuned by.
+//
+// The first is a multiplier rather than a price, and what a ration costs
+// at the Barge is worked out from it against RATION_PRICE where the
+// vendor is read. Written down as four Gold it would be a second home for
+// a number that already has one, and the day a balance pass moved what a
+// ration costs at a port, the Barge would have gone on charging the old
+// premium without anything failing to say so.
+//
+// The second is not a shelf. It is the size of the lot the vendor has for
+// a captain on a leg, and it is stored nowhere: the lot is drawn from the
+// port and the leg, the way the harbor's rag pile is drawn from the
+// voyage's own weather (see ragsAtPort). A stock two clients could not
+// see each other spending is a desynchronization dressed as a shared
+// shelf, and what bounds this trade instead is a number both captains can
+// already read for themselves.
+export const BARGE_PRICE_MULTIPLIER = 1.8;
+export const BARGE_RATIONS_PER_LEG = 8;

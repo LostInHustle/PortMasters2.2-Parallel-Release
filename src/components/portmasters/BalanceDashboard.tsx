@@ -298,11 +298,14 @@ function GapList({ gaps }: { gaps: string[] }) {
 }
 
 // The plan's front page number, in the plan's own slot: the tile says what
-// the number is, what it reads today and what it waits on, which is the
-// whole of what can be said about a gate whose epic is unbuilt. Every part
-// of it is taken from the line rather than written here, the chip included,
-// which is what keeps the tile from going on saying "no source" on the day
-// the Barge ships and the number starts reading inside a band.
+// the number is, what it reads today and what it is judged against. Every
+// part of it is taken from the line rather than written here, the chip
+// included, which is what let the tile start reading a real share the day
+// the Barge shipped without a line of this file changing, and what keeps it
+// honest now that the number is reduced out of the leg reports: the plan
+// sets no band on the share of food spending, so the chip reads measured
+// rather than good or bad, and a window with no report in it still reads as
+// nothing to read rather than as a zero.
 function FrontNumber({ line }: { line: DashboardReadingLine }) {
   const chip = VERDICT[line.verdict];
   return (

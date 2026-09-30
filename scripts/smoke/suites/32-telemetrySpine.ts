@@ -446,6 +446,11 @@ export async function telemetrySpineSuite(
     // the reason the hold figures do: a report is a claim, and what the
     // checks below are about is what the spine does with one.
     ability?: { opportunistBorrows?: unknown },
+    // [E1: the Supply Barge] The two counters the page's share is divided
+    // from, filed here for the same reason and checked for one of their
+    // own: they are kept as a pair, so a report carrying half of one is a
+    // report the spine has nothing to divide and drops the half of.
+    barge?: { foodSpend?: unknown; bargeSpend?: unknown },
   ) =>
     socket.emit("telemetry:leg", {
       roomId: sailRoomId,
@@ -455,6 +460,7 @@ export async function telemetrySpineSuite(
       distinctGoods,
       ...(hold ?? {}),
       ...(ability ?? {}),
+      ...(barge ?? {}),
     });
   telLegReport(sailHome, 1, 3, 1, 2);
   // The same captain, the same leg, reporting again after filling another
@@ -514,7 +520,19 @@ export async function telemetrySpineSuite(
     // captain and one leg replaces the first, which would take the hold
     // figures off the record rather than add a figure to it.
     { opportunistBorrows: -2 },
+    // [E1: the Supply Barge] The two counters the page's own share is
+    // divided from, filed here as a fraction and a negative for the same
+    // reason the figures above are: what the spine does with a claim has
+    // to be exercised rather than read off the reader.
+    { foodSpend: 240.9, bargeSpend: -3 },
   );
+  // A claim carrying half the pair, filed about a leg the voyage reached,
+  // which is the case the pair rule exists for: a lone numerator beside a
+  // missing denominator is a number nobody can divide, so the spine drops
+  // the half rather than keeping it and letting a reader divide by zero.
+  telLegReport(sailHome, 2, 2, 1, 1, undefined, undefined, {
+    foodSpend: 120,
+  });
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   // ---- the two votes, at their own rungs ----
@@ -713,12 +731,13 @@ export async function telemetrySpineSuite(
     (event) => `${event.actor}:${event.leg}`,
   );
   check(
-    sailReports.length === 3 &&
+    sailReports.length === 4 &&
       new Set(sailReportLines).size === sailReports.length &&
       sailReportLines.includes(`${telHome.id}:1`) &&
+      sailReportLines.includes(`${telHome.id}:2`) &&
       sailReportLines.includes(`${telMate.id}:1`) &&
       sailReportLines.includes(`${telMate.id}:3`),
-    "one line per captain per leg is kept, and the three that were filed are the three that are there",
+    "one line per captain per leg is kept, and the four that were filed are the four that are there",
   );
   const homeLegOne = sailReports.find(
     (event) => event.actor === telHome.id && event.leg === 1,
@@ -764,6 +783,26 @@ export async function telemetrySpineSuite(
       mateLegThree?.opportunistBorrows === 0 &&
       mateLegOne?.opportunistBorrows === undefined,
     "and the borrow counter rides the same reader, so a fraction floors to the whole borrows it stands for, a negative clamps to the voyage that spent none, and a value that is not a number is dropped rather than landing as a zero a reader could take for an unspent allowance",
+  );
+  // [E1: the Supply Barge] The two counters the page's share is divided
+  // from are read by that same rule, and the fourth figure is the pair
+  // rule itself: half a pair is dropped, so a reader dividing the two can
+  // never be handed a numerator without its denominator.
+  const homeLegTwo = sailReports.find(
+    (event) => event.actor === telHome.id && event.leg === 2,
+  );
+  check(
+    mateLegThree?.foodSpend === 240 &&
+      mateLegThree?.bargeSpend === 0 &&
+      homeLegOne?.foodSpend === undefined &&
+      homeLegOne?.bargeSpend === undefined,
+    "and the two food counters ride the same reader, so a fraction floors, a negative clamps to the voyage that spent nothing at the vendor, and a leg that measured neither carries neither rather than a pair of zeroes",
+  );
+  check(
+    homeLegTwo?.foodSpend === undefined &&
+      homeLegTwo?.bargeSpend === undefined &&
+      homeLegTwo?.ordersDealt === 2,
+    "while a claim carrying half the pair is dropped to nothing at all and takes nothing else with it, because a share of food spending is one number divided by another and the spine keeps neither half of a pair it cannot divide",
   );
   check(
     !sailReportLines.some(

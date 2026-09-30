@@ -263,6 +263,8 @@ export function noteLegReport(
     ragsRewoven?: number;
     coldLeg?: boolean;
     opportunistBorrows?: number;
+    foodSpend?: number;
+    bargeSpend?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -308,6 +310,20 @@ export function noteLegReport(
   // borrow is a count and cannot be negative. The tally is the voyage's
   // rather than the leg's, which the field's own note explains.
   const opportunistBorrows = held(figures.opportunistBorrows);
+  // [E1: the Supply Barge] The voyage's two food counters, and they are the
+  // one pair in this report that is kept or dropped together. They are the
+  // two halves of a division rather than two readings: what a voyage spent
+  // on food, and how much of it went to the vendor. A report carrying one
+  // without the other cannot be read at all, so a lone half is dropped
+  // rather than kept, which is what makes the record's own shape the
+  // invariant the dashboard reads it by. `held` reads both for the reason
+  // it reads every count above: Gold spent cannot be negative.
+  const foodSpend = held(figures.foodSpend);
+  const bargeSpend = held(figures.bargeSpend);
+  const bargeFigures =
+    foodSpend === undefined || bargeSpend === undefined
+      ? {}
+      : { foodSpend, bargeSpend };
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
@@ -326,6 +342,7 @@ export function noteLegReport(
     ...(ragsRewoven === undefined ? {} : { ragsRewoven }),
     ...(coldLeg === undefined ? {} : { coldLeg }),
     ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
+    ...bargeFigures,
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather

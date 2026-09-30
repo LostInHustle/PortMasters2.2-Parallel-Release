@@ -25,6 +25,12 @@ import {
   usedStoreSlots,
 } from "@/lib/game/hold";
 import { survivalLayerOn } from "@/lib/game/flags";
+import {
+  bargeLeftAtPort,
+  bargePortAtLeg,
+  bargeRationPrice,
+  buyFromBarge,
+} from "@/lib/game/engine";
 import { Utensils } from "lucide-react";
 import {
   HuePanel,
@@ -90,6 +96,16 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
  * the header line reads exactly as it read before this feature, which is
  * the shape every part of the survival layer keeps when its switch is off.
  *
+ * [E1: the Supply Barge] One row at the foot of the panel is not a port
+ * counter at all: the anonymous vendor the plan builds as the fallback for
+ * a table that never took the Quartermaster. It is drawn here rather than
+ * on a board of its own because it is the same decision one rung worse,
+ * and a captain should meet it while looking at the prices it is worse
+ * than. Everything on the row is read from the voyage's own numbers and
+ * from the constants, and what a press would buy is held to the same three
+ * ceilings the sale applies, so the row describes what is about to happen
+ * exactly as the food rows above it do.
+ *
  * Runs only when the layer is on. With the switch off the panel is not
  * drawn at all, the larder is not read and no button is offered, which is
  * the base game.
@@ -112,6 +128,24 @@ export function Provisions({
   const aboard = new Map(pantryLines(game).map((line) => [line.food, line]));
   const anyRoom = FOODS_DRAW_ORDER.some((food) => legsFor(food) > 0);
   const batches = Math.floor(mealsOf(game, "Produce") / PRESERVE_MEALS_IN);
+  // [E1: the Supply Barge] The fallback, read the way the rows above are:
+  // the port and the lot come off the voyage's own numbers, the price off
+  // the constants, and what a press would actually buy is held to the same
+  // three ceilings the sale applies, so the cost on the button is the cost
+  // the captain is charged.
+  const bargePort = bargePortAtLeg(game);
+  const bargePrice = bargeRationPrice();
+  const bargeLeft = bargeLeftAtPort(game);
+  // A ration is a meal of grain and a slot of grain is a meal (see FOODS in
+  // ./constants), so the stores' room in meals is the room in rations and
+  // there is no second conversion to get wrong here.
+  const bargeRoom = Math.max(0, foodRoomMeals(game, "Grain"));
+  const bargePurse = bargePrice > 0 ? Math.floor(game.money / bargePrice) : 0;
+  const bargeOpen = crew > 0 && bargeLeft > 0;
+  const bargeOne = bargeOpen
+    ? Math.min(1, bargeLeft, bargeRoom, bargePurse)
+    : 0;
+  const bargeLot = bargeOpen ? Math.min(bargeLeft, bargeRoom, bargePurse) : 0;
 
   return (
     <HuePanel tone="larder">
@@ -242,6 +276,57 @@ export function Provisions({
             🐟 Preserve {batches * PRESERVE_MEALS_IN} Produce into{" "}
             {batches * PRESERVE_MEALS_OUT} Salt Fish
           </Button>
+        </div>
+      )}
+
+      {/* [E1: the Supply Barge] The fallback, and it is drawn last on this
+          panel because that is what it is: the row a captain reads after
+          the three foods above have turned out not to be enough. Nothing
+          here is decided on the screen. The port and the lot are drawn from
+          the voyage's own numbers, the price comes off the constants
+          through the module that sells, and what each button would buy is
+          the same three ceilings the sale applies, so a press cannot cost
+          more than the label said.
+
+          The one thing it does say out loud is the premium. The plan's
+          own iteration clause is that the Barge exists so a table gets
+          fleeced once and fights over the card next time, and a captain
+          who cannot see the price they are paying cannot be fleeced by
+          it: the row names what a ration costs against what the port
+          above charges for one. */}
+      {bargePort !== null && (
+        <div className="mt-2 rounded-lg border border-larder/15 bg-background/40 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-[11px]">
+              <span className="mr-1">⛵</span>
+              <span className="font-medium">Supply Barge</span>
+              <span className="text-muted-foreground"> at {bargePort}</span>
+            </span>
+            <Button
+              size="sm"
+              className="h-7 rounded-lg px-2.5 text-[11px]"
+              variant={bargeOne > 0 ? "default" : "secondary"}
+              disabled={bargeOne <= 0}
+              onClick={() => act((g, l) => buyFromBarge(g, 1, l))}
+            >
+              🌾 Buy {bargeOne > 0 ? `1 Ration (${bargePrice}💰)` : "Rations"}
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 rounded-lg px-2.5 text-[11px]"
+              variant={bargeLot > 1 ? "default" : "secondary"}
+              disabled={bargeLot <= 1}
+              onClick={() => act((g, l) => buyFromBarge(g, bargeLeft, l))}
+            >
+              Take the Lot
+              {bargeLot > 1 ? ` (${bargeLot}, ${bargeLot * bargePrice}💰)` : ""}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            {bargeLeft < 1
+              ? "The barge has nothing left for you this leg, and it is a fresh lot tomorrow."
+              : `An unnamed trader on the quay, charging ${bargePrice} Gold a ration against the port's ${RATION_PRICE}. ${bargeLeft} ${bargeLeft === 1 ? "ration is" : "rations are"} left for you this leg.`}
+          </p>
         </div>
       )}
       {crew === 0 && (

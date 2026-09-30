@@ -294,6 +294,13 @@ export function provisionFood(
   addLot(state, food, rations, state.currentRound);
   state.roundCosts += cost;
   state.totalCosts += cost;
+  // [E1: the Supply Barge] The voyage's food spending, counted where the
+  // Gold actually leaves the purse rather than summed later out of the log
+  // lines. It is the denominator the Barge's share of food spending is
+  // read against, and the Barge writes the other half of the same pair in
+  // ./engine/barge: two counters, both written at the till, and the share
+  // between them is the plan's front page number.
+  state.foodSpend += cost;
   logs.push(
     `🧺 Provisioned ${rations} ${rations === 1 ? "ration" : "rations"} of ${food} for ${crew} aboard (${cost} Gold). ${state.larder} in the larder.`,
   );

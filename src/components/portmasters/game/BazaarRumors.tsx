@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { ICONS } from "@/lib/game/constants/brand";
 import {
@@ -107,10 +108,9 @@ export function BazaarRumors({
           {canSpeak ? (
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
               <span className="text-muted-foreground">Speak for</span>
-              <select
+              <Select
                 value={chosen}
                 onChange={(e) => setGood(e.target.value)}
-                className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
                 aria-label="Good the rumor is about"
               >
                 {goods.map((g) => (
@@ -118,7 +118,7 @@ export function BazaarRumors({
                     {ICONS[g]} {g}
                   </option>
                 ))}
-              </select>
+              </Select>
               <span className="text-muted-foreground">leaning</span>
               {/* Both directions are buttons rather than a toggle, for the
                   reason the Harbormaster's console gives: the two are the

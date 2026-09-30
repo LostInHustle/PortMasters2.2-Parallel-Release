@@ -337,3 +337,69 @@ export function IntelBanner({
     </div>
   );
 }
+
+/**
+ * A row on one of the mode's path desks. The escort market, the refit bench
+ * and the barter board all draw what they are offering as the same row, and
+ * the three had written it out three times, base classes and tint alike.
+ *
+ * The tint is the part that had to stop being three copies. An offer of this
+ * captain's own is tinted due and everyone else's is left on the panel, so
+ * three copies were three chances for a captain's own row to read as their
+ * own on one desk and not on the next. `direct` is the barter board's third
+ * tone, which the other two have no use for: an offer aimed at one captain
+ * rather than at the table is tinted sea.
+ */
+export function PathDeskRow({
+  mine,
+  direct = false,
+  className,
+  children,
+}: {
+  mine: boolean;
+  direct?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
+        mine
+          ? "bg-due/[0.06] border-due/20"
+          : direct
+            ? "bg-sea/[0.06] border-sea/25"
+            : "bg-background/60 border-black/5 dark:border-white/10",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The chip an offer wears when it is aimed at one captain rather than at the
+ * table, on all three of the desks that can aim one. The name is read from
+ * the offer rather than from the reader, so the captain it is aimed at reads
+ * the same words as the captain who aimed it, in the same voice.
+ *
+ * The name is optional because an offer can outlive the captain it was aimed
+ * at: the row stays on the desk with its aim still on it, and the member it
+ * named is no longer in the room to be named. "a captain" is what the escort
+ * row's own sentence already calls that captain, so the two agree rather
+ * than the chip inventing a second way to say it.
+ */
+export function JustForChip({
+  forMe,
+  name,
+}: {
+  forMe: boolean;
+  name?: string | null;
+}) {
+  return (
+    <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
+      🔒 {forMe ? "Just for you" : `Just for ${name ?? "a captain"}`}
+    </span>
+  );
+}

@@ -385,6 +385,32 @@ export {
   type RefitContract,
 } from "./engine/refits";
 
+// ========== The Supply Barge ==========
+// [E1: the Supply Barge] The mode's fallback vendor, and the whole of the
+// feature is one sale: buyFromBarge, at a premium the constants set and
+// out of a lot drawn from the port and the leg. bargePortAtLeg,
+// bargeLotAtPort, bargeRationPrice and bargeLeftAtPort are the four
+// questions the provisions panel asks before it draws the row; bargeOn is
+// the layer the vendor stands on, which is the provisions layer itself
+// rather than a switch of its own, because the plan's rollback for this
+// goal is reverting the mode (see barge); and normalizeBargeState is the
+// load site's, healing the per leg tally and the voyage's two food
+// counters.
+//
+// The two counters are read back off the leg report rather than exported
+// to a reader here, for the reason every other feature's figures are: a
+// number only one surface reads is a number that belongs to that surface
+// (see dashboard).
+export {
+  bargeLeftAtPort,
+  bargeLotAtPort,
+  bargeOn,
+  bargePortAtLeg,
+  bargeRationPrice,
+  buyFromBarge,
+  normalizeBargeState,
+} from "./engine/barge";
+
 // ========== Cross captain Gold: loans, backing, convoy ventures ==========
 export {
   clearRedirectedLoan,

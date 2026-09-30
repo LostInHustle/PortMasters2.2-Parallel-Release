@@ -298,5 +298,7 @@ export {
   PanelTotal,
   StatTile,
   IntelBanner,
+  PathDeskRow,
+  JustForChip,
 } from "./PhasePanels";
 export { TradeCard, DraftGrid, DraftCard, DraftSwapButton } from "./PhaseCards";

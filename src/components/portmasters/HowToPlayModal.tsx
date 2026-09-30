@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BookOpen,
-  X,
   Ship,
   Compass,
   Handshake,
@@ -16,7 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
-import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { ModalClose, ModalOverlay } from "@/components/ui/modal-overlay";
 import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
@@ -221,13 +220,10 @@ export function HowToPlayModal({
                     </p>
                   </div>
                 </div>
-                <button
+                <ModalClose
+                  label="Close guide"
                   onClick={() => onOpenChange(false)}
-                  className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-                  aria-label="Close guide"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                />
               </div>
             </div>
 
