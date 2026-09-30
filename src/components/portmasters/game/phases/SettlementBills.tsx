@@ -1,7 +1,7 @@
 "use client";
 
 import { WORKER_TYPES } from "@/lib/game/constants/crew";
-import { getHireCost, nextPhase } from "@/lib/game/engine";
+import { getHireCost, leavePhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -207,7 +207,7 @@ export function SettlementBills({
           </>
         }
         idleClassName={settleClassName}
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

@@ -16,6 +16,7 @@ import {
   type RoomDetail,
 } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import type { GameState } from "@/lib/game/types";
 import { meritById } from "@/lib/game/merits";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 import { useRealtime } from "@/lib/use-realtime";
@@ -73,7 +74,7 @@ import {
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
   coverFromBoard,
-  nextPhase,
+  leavePhase,
   purchaseIntel,
   repayLoan,
 } from "@/lib/game/engine";
@@ -81,6 +82,27 @@ import {
 // Browser scoped: the onboarding guide is a "you have played this before"
 // signal, not per room state, so joining a second harbor does not replay it.
 const TUTORIAL_SEEN_KEY = "portmasters_tutorial_seen";
+
+// Why a Next Phase press was refused, in the words of the seat the captain is
+// standing in. Every case here is a seat the engine's canLeavePhase says no
+// to, and every one of them has a way out that is not this button: the host
+// sets sail, a boon is picked, the module draft is finished or skipped. The
+// press is refused rather than sent, so the captain who pressed it is owed the
+// reason: the room would otherwise hold a ready set no departure could carry
+// out, and the bar would say "ready" while the voyage stood still.
+function leaveRefusal(phase: GameState["phase"]): string {
+  switch (phase) {
+    case "harbor":
+      return "A voyage leaves the pier when the host sets sail, not by readying up.";
+    case "dawn":
+      return "Dawn is left by locking in a Boon. Pick one of the cards and it goes with you.";
+    case "bankruptcy":
+    case "endgame":
+      return "This voyage is over for you, so there is no seat left to leave.";
+    default:
+      return "Your own screen has work open on it. Finish or close it and the room moves on.";
+  }
+}
 
 export function GameRoom({
   me,
@@ -715,8 +737,21 @@ export function GameRoom({
     // Leaving a phase settles nothing about the barter board any more: an
     // offer outlives the phase it was posted in and is returned to its owner
     // when the board itself drops it, wherever the voyage has got to by then.
-    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
-  }, [phaseSync, ctx]);
+    //
+    // The departure is leavePhase, which is the seat's own work and then the
+    // lap's step off it, and it is the same one the room's clock runs for a
+    // captain who is not there. It used to be a bare nextPhase, which moves a
+    // captain out of most seats but names no work for the ones that need it:
+    // at Dawn it does nothing at all, so a captain who pressed this readied
+    // the room into an advance nobody could carry out. The press is refused
+    // instead (markReady returns false), and the captain is told why rather
+    // than left pressing a button that looks like it worked.
+    if (!phaseSync.markReady((g, l) => leavePhase(g, ctx, l))) {
+      toast.error("This seat is not left by pressing Next Phase", {
+        description: leaveRefusal(state.game.phase),
+      });
+    }
+  }, [phaseSync, ctx, state.game.phase]);
 
   const handleRestart = useCallback(() => {
     if (!isHost) {

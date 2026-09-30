@@ -450,8 +450,18 @@ export {
 // client runs when the room's clock ran out on a captain who was holding
 // nothing (see [B2] in ./engine/lifecycle.ts). Its one caller is the phase
 // sync hook.
+//
+// leavePhase and canLeavePhase are here for the same reason and have the same
+// caller, with the press a captain makes by hand in place of the clock: they
+// are the departure a generic "I am done with this seat" press makes, and the
+// question of whether there is one. They are two names for one rule read at
+// two moments, which is why they sit together: a press asks whether it may be
+// sent before sending it, and the departure it sends is the same one the clock
+// runs.
 export {
   autoCommit,
+  canLeavePhase,
+  leavePhase,
   lockInBoon,
   nextPhase,
   phaseLabel,

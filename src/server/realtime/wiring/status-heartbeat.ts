@@ -24,6 +24,7 @@ import {
   armPhaseClock,
   broadcastReadyState,
   checkpointRank,
+  clearAdvanceWatch,
   getCheckpoint,
   maybeAdvance,
 } from "../checkpoint";
@@ -236,6 +237,11 @@ async function advanceCheckpointFromReport(
   cp.phase = report.phase;
   cp.readyUserIds.clear();
   cp.advancing = false;
+  // The announcement this report answers has now been answered, so the watch
+  // armed for it is done. Cancelled rather than left to fire, because a fire
+  // would find the room already moved and return, and a timer per seat of
+  // every voyage is a map that only grows.
+  clearAdvanceWatch(roomId);
   // [B2: hard timers, the server as timekeeper] The clock for the
   // seat just entered. Armed from the report rather than from the
   // timer, so the room's deadline is always the one its own

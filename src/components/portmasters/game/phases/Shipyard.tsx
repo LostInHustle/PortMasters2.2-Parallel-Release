@@ -1,7 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { nextPhase, startModuleDrafting, upgradeShip } from "@/lib/game/engine";
+import {
+  leavePhase,
+  startModuleDrafting,
+  upgradeShip,
+} from "@/lib/game/engine";
 import {
   SHIP_DISCOUNT_PER_LEVEL,
   MAX_SHIP_LEVEL,
@@ -118,7 +122,7 @@ export function Shipyard({
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"
-            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+            onClick={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
           >
             ⏭️ Continue Voyage
           </Button>

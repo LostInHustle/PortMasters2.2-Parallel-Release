@@ -259,6 +259,12 @@ async function announceAdvance(
     ...(portShift !== undefined ? { portShift } : {}),
     ...(bazaarLean !== undefined ? { bazaarLean } : {}),
   });
+  // The announcement is out, so the room owes it a report. A seat moves when
+  // a client says it has moved, and this is the only place that promise is
+  // made, which is why the watch is armed here rather than at either of the
+  // two callers above: the vote and the clock announce the same thing and
+  // need the same answer to it. See watchForReports.
+  watchForReports(io, roomId, from);
   // [D5: Aroma: the Bazaar Rumor] And the reveal, at the one instant it
   // is honest: the market that just opened on every client is the market
   // the standing rumors moved, so this is the leg the directions become
@@ -268,6 +274,108 @@ async function announceAdvance(
   if (bazaarLean !== undefined) {
     broadcastBazaar(io, roomId, from.round);
   }
+}
+
+// ---
+//
+// The report an announcement is owed.
+//
+// A seat moves when a client reports the seat it moved to, so an announcement
+// is a promise the room has made and the reports are what keep it. Every
+// client that hears the frame runs the transition it was holding and reports
+// the seat it landed on, and the first report naming somewhere further along
+// moves the checkpoint (see advanceCheckpointFromReport in
+// ./wiring/status-heartbeat).
+//
+// That promise can go unpaid, and this is the half of the protocol that says
+// what happens when it does. Three ways it happens in the field, and one shape
+// covers all three: a report that never leaves a captain's browser (a dropped
+// frame, a tab that was asleep, a connection that died between the announce
+// and the answer), a departure that does not move the seat it is run from (a
+// client one build out of date, or an engine seat that returns without
+// handing off), and a room where every captain's client is simply slower than
+// the table's patience. In all three the room holds a full ready set, every
+// captain's screen says the table is ready, and nothing moves: every later
+// ready vote finds the lock already taken and returns, so no amount of
+// pressing ready can free it.
+//
+// The client's own heartbeat is the first cure and it is not enough. It
+// re-sends a captain's status every eight seconds, which lands a report that
+// never left, and that is why the grace below is longer than one heartbeat
+// rather than shorter: an honest but slow client gets its own retry in before
+// the room decides anything. What the heartbeat cannot do is anything about a
+// captain whose client is standing where it already was, which is exactly the
+// state a dead departure leaves behind, and no client can see the room's lock
+// to clear it. So the room clears its own.
+//
+// The deadline is not a second clock. The clock is a seat's budget, authored
+// per phase and switched on per table, and its expiry is a move: it announces
+// the advance itself and commits every captain who was holding nothing. This
+// is the other thing entirely, an answer to an announcement the room already
+// made, and what it does is hand the seat back to the table: the lock is
+// cleared, the room is told, and the ready check is open again for a vote the
+// captains can actually keep. Nothing about the seat's own rules is decided
+// here, and a room whose report lands in time never sees any of it.
+const ADVANCE_REPORT_GRACE_MS = 12000;
+
+const advanceWatches = new Map<string, NodeJS.Timeout>();
+
+function watchForReports(
+  io: Server,
+  roomId: string,
+  from: { round: number; phase: Phase },
+): void {
+  clearAdvanceWatch(roomId);
+  const timer = setTimeout(() => {
+    void reportNeverArrived(io, roomId, from);
+  }, ADVANCE_REPORT_GRACE_MS);
+  // Like the clock's, this must never be the reason a process stays up.
+  timer.unref();
+  advanceWatches.set(roomId, timer);
+}
+
+// The announcement's report never came, so the seat goes back to the table.
+//
+// The lock is what is cleared and the ready set is not, and the difference is
+// the point: those votes were honest, and throwing them away would make every
+// captain vote again for something they already said. What they were votes for
+// was an announcement that drew no move, so clearing the lock is what lets the
+// next vote announce it again.
+async function reportNeverArrived(
+  io: Server,
+  roomId: string,
+  from: { round: number; phase: Phase },
+): Promise<void> {
+  advanceWatches.delete(roomId);
+  const cp = roomCheckpoints.get(roomId);
+  if (!cp) return;
+  // A report landed and the room is somewhere else now, so this watch is
+  // stale rather than unheeded. It is the ordinary case: every healthy
+  // announcement is followed by its report well inside the grace, and the
+  // watch is cleared by that report; a timer that survives to here with the
+  // lock already down is a leak rather than a stall, so it leaves quietly.
+  if (!cp.advancing) return;
+  if (cp.round !== from.round || cp.phase !== from.phase) return;
+  // A harbor nobody is sitting in is an empty room rather than a table
+  // waiting on a straggler, which is the same rule the clock's fire applies
+  // and for the same reason: nothing moves an empty room, and the next
+  // captain to walk in is served by the status handler arming a fresh seat.
+  if (roomMembers(roomId).length === 0) return;
+  cp.advancing = false;
+  // Nothing is recorded here, and the two records that could have taken this
+  // are why. The spine's leg_timed_out is a phase length being read against
+  // how many captains were still working when the clock ran out, and a report
+  // that never arrived would be counted into exactly that tuning number as if
+  // the seat were too short. The log's line for it says the tide ran out,
+  // which is a sentence a captain reads and would be a false one. The room is
+  // told below, which is what a captain needs; the record is left to the
+  // voyages that actually did something.
+  io.to(`room:${roomId}`).emit("room:system", {
+    roomId,
+    content:
+      "The harbor did not hear that leg move, so the ready check is open again. Press ready when you are done here and the voyage will carry on.",
+  });
+  await broadcastReadyState(io, roomId, cp);
 }
 
 // Once every active member has signaled ready for the checkpoint they're
@@ -463,6 +571,23 @@ export function disarmPhaseClock(roomId: string): void {
   clearPhaseTimer(roomId);
   const cp = roomCheckpoints.get(roomId);
   if (cp) cp.endsAt = null;
+}
+
+/**
+ * Stops the room's watch on an announcement's report, if one is armed.
+ *
+ * Reached by every path that ends the promise the announcement made: the
+ * report that lands it, a voyage starting over, and a room being torn down.
+ * It is exported because two of those three live outside this module, and it
+ * is called rather than left to the timer's own guards so the map holds only
+ * rooms that are actually waiting on a report.
+ */
+export function clearAdvanceWatch(roomId: string): void {
+  const armed = advanceWatches.get(roomId);
+  if (armed !== undefined) {
+    clearTimeout(armed);
+    advanceWatches.delete(roomId);
+  }
 }
 
 // The clock's fire: one seat's budget ran out.

@@ -74,7 +74,7 @@ export function BoonDraft({
             actionLabel="🔒 Lock In Boon"
             actionClassName="pm-grad-dawn"
             onSelect={() =>
-              phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
+              phaseSync.markChoiceReady((g, l) => lockInBoon(g, ctx, b.id, l))
             }
           />
         ))}

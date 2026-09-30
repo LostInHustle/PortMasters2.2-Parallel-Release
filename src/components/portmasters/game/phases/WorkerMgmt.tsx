@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { RECIPES } from "@/lib/game/constants/goods";
-import { getHireCost, hireWorker, nextPhase } from "@/lib/game/engine";
+import { getHireCost, hireWorker, leavePhase } from "@/lib/game/engine";
 import { phaseFace } from "@/lib/game/phases";
 import { unlockedProducts, unlockedWorkerTypes } from "@/lib/game/pools";
 import { cn } from "@/lib/utils";
@@ -143,7 +143,7 @@ export function WorkerMgmt({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Market, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

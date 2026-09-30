@@ -77,6 +77,7 @@ import { pathDraftSuite } from "./suites/41-pathDraft";
 import { signingOutSuite } from "./suites/42-signingOut";
 import { supplyBargeSuite } from "./suites/43-supplyBarge";
 import { tagVocabularySuite } from "./suites/44-tagVocabulary";
+import { readyCheckThatStallsSuite } from "./suites/45-theReadyCheckThatStalls";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -388,6 +389,12 @@ async function main(): Promise<void> {
     // reads the same whether a table is sailing or not.
     console.log("\nThe tag vocabulary");
     await tagVocabularySuite();
+    // The ready check's article is the one that needs a harbor and a wall
+    // clock rather than a table: its cure is a grace the room has to be
+    // watched through, so it is the last thing the run does and it opens a
+    // harbor of its own to spend that time in.
+    console.log("\nThe ready check that stalls");
+    await readyCheckThatStallsSuite(run);
   } finally {
     await cleanupSuite(run, { host, guest, third, roomId, quickStartRoomId });
   }

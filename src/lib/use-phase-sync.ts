@@ -6,6 +6,7 @@ import type { GameContext, GameState } from "@/lib/game/types";
 import {
   applyMarketLeans,
   autoCommit,
+  canLeavePhase,
   restartGame,
   startBoonDrafting,
   tallyPurchasesByResource,
@@ -452,9 +453,11 @@ export function usePhaseSync({
     });
   }, [game._pendingPulseTally, game.currentRound, socket, roomId, act]);
 
-  const markReady = useCallback(
+  // The vote itself, in one place: the two presses below differ only in what
+  // they ask before sending it. Both return whether the vote went out.
+  const sendReady = useCallback(
     (fn: (g: GameState, logs: string[]) => void) => {
-      if (!socket) return;
+      if (!socket) return false;
       pendingFn.current = fn;
       setWaiting(true);
       socket.emit("phase:ready", {
@@ -462,8 +465,33 @@ export function usePhaseSync({
         round: game.currentRound,
         phase: game.phase,
       });
+      return true;
     },
     [socket, roomId, game.currentRound, game.phase],
+  );
+
+  // The press that commits a choice: locking in a boon, where the choice is
+  // the departure itself, so there is nothing to check and nothing to
+  // refuse. See markReady below for the press that has no choice in it.
+  const markChoiceReady = useCallback(
+    (fn: (g: GameState, logs: string[]) => void) => sendReady(fn),
+    [sendReady],
+  );
+
+  const markReady = useCallback(
+    (fn: (g: GameState, logs: string[]) => void) => {
+      // The seat has to have a departure before a press can be a promise the
+      // table can keep. The room announces the advance once every captain has
+      // readied, and each client then runs the transition it was holding, so
+      // a captain who readies in a seat no departure can leave (the pier,
+      // Dawn, a personal or terminal screen) leaves the room holding a full
+      // ready set that nothing carries out. The press is refused here, before
+      // anything is sent, and the caller says why. See canLeavePhase in the
+      // engine's lifecycle for which seats those are and why each one is.
+      if (!canLeavePhase(gameRef.current)) return false;
+      return sendReady(fn);
+    },
+    [sendReady],
   );
 
   const cancelReady = useCallback(() => {
@@ -518,6 +546,7 @@ export function usePhaseSync({
     requiredCount,
     phaseClock,
     markReady,
+    markChoiceReady,
     cancelReady,
     startGame,
     restartVoyage,

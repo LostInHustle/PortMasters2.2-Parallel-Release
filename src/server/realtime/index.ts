@@ -34,7 +34,11 @@ import {
   type DepartureCleanup,
 } from "./presence";
 import { clearRoomStatuses } from "./status";
-import { roomCheckpoints, disarmPhaseClock } from "./checkpoint";
+import {
+  clearAdvanceWatch,
+  disarmPhaseClock,
+  roomCheckpoints,
+} from "./checkpoint";
 import {
   removeUserBarterOffers,
   clearBarterSilent,
@@ -107,6 +111,12 @@ function clearRoomAllMaps(roomId: string): void {
   // function just deleted and a timer whose seat is gone has nothing left to
   // fire at.
   disarmPhaseClock(roomId);
+  // And the watch on the last announcement this room ever made, which is a
+  // timer for the same reason and outlives its room the same way. See
+  // watchForReports in ./checkpoint: a fire here would find no checkpoint to
+  // hand back and no members to hand it to, so it is stopped rather than
+  // left to spend itself.
+  clearAdvanceWatch(roomId);
   clearRoomStatuses(roomId);
   clearBarterSilent(roomId);
   escortContracts.clearSilent(roomId);

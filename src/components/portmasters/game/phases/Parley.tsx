@@ -5,7 +5,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
-import { nextPhase } from "@/lib/game/engine";
+import { leavePhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
@@ -91,7 +91,7 @@ export function Parley({
   useEffect(() => {
     if (revealedRound === undefined) return;
     if (game.phase !== "parley" || game.currentRound !== revealedRound) return;
-    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
+    phaseSync.markReady((g, l) => leavePhase(g, ctx, l));
   }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
 
   return (
@@ -256,7 +256,7 @@ export function Parley({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Done Bartering, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

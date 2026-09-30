@@ -319,6 +319,7 @@ import {
   autoCommit,
   calcTransportCost,
   canFillOrder,
+  canLeavePhase,
   canSellEscort,
   completeOrder,
   consentFeeFor,
@@ -331,6 +332,7 @@ import {
   failSeat,
   handleModuleSelect,
   hireWorker,
+  leavePhase,
   lockedBehind,
   maroonSeat,
   nextPhase,
@@ -18706,6 +18708,408 @@ async function main(): Promise<void> {
       ].every((file) => !carriesADash(file)),
       "and every file this feature lands in is free of em dashes, en dashes and doubled hyphens, in its comments as well as in the words a captain reads",
     );
+
+    // ---- The ready check that stalls ----
+    // The field report this block is for is one sentence long: both captains
+    // clicked ready in a Gambit harbor and the voyage did not proceed. The
+    // protocol answers that sentence with one shape, and both halves of it
+    // are held down here.
+    //
+    // The first half is the vote. A room advances when every captain in the
+    // active roster has said ready, and what each vote promises is a
+    // departure: the client hears the room move, runs its transition and
+    // reports the seat it landed on, and that report is what moves the
+    // checkpoint. A vote whose departure cannot leave the seat it is cast
+    // from, or a departure whose report never lands, leaves the room holding
+    // a full ready set and a lock nobody can lift: the bar reads ready on
+    // every screen and nothing moves. So the engine's answer to "can this
+    // press leave this seat" is checked here seat by seat, against both
+    // laps, because that answer is what the bar and every panel's own button
+    // now gate their press on.
+    //
+    // The second half is the room's own cure, and it is the half that has to
+    // be watched over a live harbor rather than read: an announcement the
+    // room never hears answered is handed back to the table after a grace
+    // longer than the client's own heartbeat, with the honest votes kept and
+    // the lock cleared, so the next report can announce the same seat again.
+    // Both directions are checked, because the cure that fired on a healthy
+    // table would be a second bug: a room whose report lands is never spoken
+    // to at all.
+    //
+    // What it deliberately does not check is the press sites themselves,
+    // which are React panels. The engine's answer they gate on is here, the
+    // server's half is here, and the two of them together are what the
+    // client model outside the repository was run against to prove the field
+    // report closed.
+    {
+      const rchkGambit = "ocean_gambit";
+      const rchkLaps = ["ocean_gambit", "classic"] as const;
+      // The seats a press cannot leave, named rather than derived, because
+      // this is the list the bug was made of: the pier is the host's, Dawn is
+      // the draft's, the two module seats belong to the draft's own screens,
+      // and the last two are a voyage that is already over for that captain.
+      // Dawn is on both laps and is still on this list, which is the
+      // distinction the whole block turns on: a step a captain leaves by
+      // choosing a card is not a step a press can leave.
+      const rchkNoPress: Phase[] = [
+        "harbor",
+        "dawn",
+        "module_draft",
+        "module_swap",
+        "bankruptcy",
+        "endgame",
+      ];
+      // The cure's own sentence, read off the wire as a fragment rather than
+      // as the whole line, so the check is that the harbor named the ready
+      // check it was opening rather than that somebody once wrote a
+      // particular sentence.
+      const rchkCure = "did not hear that leg move";
+      const rchkCtx: GameContext = {
+        seedBase: "smoke:ready-check",
+        harborId: "smoke-ready-check",
+      };
+      const rchkLogs: string[] = [];
+      const rchkFresh = (mode: "ocean_gambit" | "classic") =>
+        createInitialGameState({ mode, difficulty: "fair_winds" });
+
+      for (const mode of rchkLaps) {
+        const pressable = lapPhases(mode).filter(
+          (phase) => phase !== "harbor" && phase !== "dawn",
+        );
+        for (const phase of pressable) {
+          check(
+            canLeavePhase({ mode, phase, gameOver: false }) === true,
+            `${mode} sails out of ${phase} by pressing, since it is a seat the leg walks through`,
+          );
+        }
+        for (const phase of rchkNoPress) {
+          check(
+            canLeavePhase({ mode, phase, gameOver: false }) === false,
+            `${mode} refuses a press at ${phase}, so a ready vote for a departure that cannot be made is never sent`,
+          );
+        }
+      }
+      check(
+        canLeavePhase({
+          mode: rchkGambit,
+          phase: "market",
+          gameOver: true,
+        }) === false,
+        "and a captain whose voyage is over cannot ready anywhere, whatever seat they are standing in",
+      );
+
+      // A press at Dawn, run rather than asked about: it has to report that
+      // it did nothing AND leave the round where it was, because a press that
+      // settled something on its way to refusing would be worse than one that
+      // moves.
+      const rchkDawn = rchkFresh(rchkGambit);
+      rchkDawn.phase = "dawn";
+      const rchkDawnRound = rchkDawn.currentRound;
+      check(
+        leavePhase(rchkDawn, rchkCtx, rchkLogs) === false &&
+          rchkDawn.phase === "dawn" &&
+          rchkDawn.currentRound === rchkDawnRound,
+        "a departure pressed at Dawn refuses and moves nothing, which is the press every Ctrl+N in a Gambit harbor used to send",
+      );
+
+      // The same press at a seat that IS a departure, in both laps, read
+      // against the lap's own successor rather than a name typed here.
+      for (const mode of rchkLaps) {
+        const state = rchkFresh(mode);
+        state.phase = "market";
+        const moved = leavePhase(state, rchkCtx, rchkLogs);
+        check(
+          moved === true && state.phase === lapSuccessor(mode, "market"),
+          `${mode} leaves the Market for the seat its own lap names next when the same press is made there`,
+        );
+      }
+
+      // And the auto path, which is what a captain who missed the
+      // announcement runs: it takes the seat's defaults and leaves in one
+      // call, so a room that moves without a vote is not left standing where
+      // it was.
+      const rchkAuto = rchkFresh(rchkGambit);
+      rchkAuto.phase = "market";
+      autoCommit(rchkAuto, rchkCtx, rchkLogs);
+      check(
+        rchkAuto.phase === lapSuccessor(rchkGambit, "market"),
+        "a captain who never voted still leaves the seat when the room moves on without them",
+      );
+
+      // The live half. Two captains, a private Gambit harbor, and two
+      // sockets that are raw on purpose: nothing here runs a client, so the
+      // room's own grace is the only thing that can answer an announcement.
+      const rchkOpening = await signUp("rchka");
+      const rchkCrewmate = await signUp("rchkb");
+      run.extraAccounts.push(rchkOpening, rchkCrewmate);
+      const rchkOpened = await call<{ room: { id: string; code: string } }>(
+        "/api/rooms",
+        {
+          method: "POST",
+          cookie: rchkOpening.cookie,
+          body: JSON.stringify({
+            name: `Smoke ready check ${suffix}`,
+            isPublic: false,
+            mode: rchkGambit,
+            unlock: LEDGER_PHRASE,
+          }),
+        },
+      );
+      if (rchkOpened.status !== 200) {
+        throw new Error(
+          "No Gambit harbor to stall a ready check in, stopping here.",
+        );
+      }
+      const rchkRoom = rchkOpened.body.room.id;
+      run.lapRoomIds.push(rchkRoom);
+      const rchkJoined = await call("/api/rooms/join", {
+        method: "POST",
+        cookie: rchkCrewmate.cookie,
+        body: JSON.stringify({ code: rchkOpened.body.room.code }),
+      });
+      check(
+        rchkJoined.status === 200,
+        "the second captain joins the harbor this block stalls",
+      );
+
+      // What each socket heard, kept apart. Every frame below is the room's,
+      // so both captains in the harbor hear the same one, and the checks read
+      // both lists: a frame that reached one socket and not the other is a
+      // difference this block exists to see rather than to average away.
+      //
+      // Only the cure's own lines are collected. The harbor talks to its room
+      // about other things on this channel, a captain walking in being the
+      // loudest of them, and a list that held those would count a hello as a
+      // stalled leg.
+      type RchkSeat = { round: number; phase: Phase };
+      type RchkFrame = {
+        roomId?: string;
+        round?: number;
+        phase?: Phase;
+        readyUserIds?: string[];
+        requiredUserIds?: string[];
+      };
+      const rchkHeard: Array<{
+        advances: RchkSeat[];
+        rescues: string[];
+        standing: RchkFrame | null;
+        errors: string[];
+      }> = [];
+      const rchkCrew: Array<{ socket: Socket }> = [];
+      for (const captain of [rchkOpening, rchkCrewmate]) {
+        const socket = await openAuthedSocket(captain);
+        run.sockets.push(socket);
+        const mine = {
+          advances: [] as RchkSeat[],
+          rescues: [] as string[],
+          standing: null as RchkFrame | null,
+          errors: [] as string[],
+        };
+        rchkHeard.push(mine);
+        socket.on("phase:advance", (payload: RchkFrame) => {
+          if (payload?.roomId !== rchkRoom) return;
+          mine.advances.push({
+            round: payload.round ?? 0,
+            phase: (payload.phase ?? "harbor") as Phase,
+          });
+        });
+        socket.on("phase:ready_update", (payload: RchkFrame) => {
+          if (payload?.roomId !== rchkRoom) return;
+          mine.standing = payload;
+        });
+        socket.on(
+          "room:system",
+          (payload: { roomId?: string; content?: string }) => {
+            if (payload?.roomId !== rchkRoom) return;
+            const line = String(payload.content ?? "");
+            if (line.includes(rchkCure)) mine.rescues.push(line);
+          },
+        );
+        socket.on(
+          "room:error",
+          (payload: { roomId?: string; error?: string }) => {
+            if (payload?.roomId !== rchkRoom) return;
+            mine.errors.push(String(payload.error ?? ""));
+          },
+        );
+        const aboard = waitForEvent(socket, "chat:history", undefined, 15000);
+        socket.emit("room:join", { roomId: rchkRoom });
+        if (!(await aboard)) {
+          throw new Error(
+            "A captain never boarded the harbor this block opens.",
+          );
+        }
+        rchkCrew.push({ socket });
+      }
+      const rchkDepartures = rchkCrew.map((seat) =>
+        waitForEvent(seat.socket, "room:started", undefined, 15000),
+      );
+      rchkCrew[0].socket.emit("room:start", { roomId: rchkRoom });
+      await Promise.all(rchkDepartures);
+
+      const rchkReport = (seat: (typeof rchkCrew)[number], step: RchkSeat) => {
+        seat.socket.emit("game:status", {
+          roomId: rchkRoom,
+          round: step.round,
+          phase: step.phase,
+          phaseLabel: step.phase,
+          gold: 100,
+          reputation: 10,
+          shipLevel: 0,
+          gameOver: false,
+        });
+      };
+      const rchkStanding = (step: RchkSeat) =>
+        rchkHeard[0].standing?.round === step.round &&
+        rchkHeard[0].standing?.phase === step.phase;
+      // Both captains stand where the block says they stand, and the room
+      // says so back before anything else happens: a vote is judged against
+      // the checkpoint the server is holding, so a vote that overtook the
+      // report behind it would stall this block on its own haste rather than
+      // on anything the harbor does.
+      const rchkStand = async (step: RchkSeat): Promise<boolean> => {
+        for (let waited = 0; waited < 15000; waited += 50) {
+          if (rchkStanding(step)) return true;
+          if (waited % 500 === 0) {
+            for (const seat of rchkCrew) rchkReport(seat, step);
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return rchkStanding(step);
+      };
+      const rchkReady = (step: RchkSeat) => {
+        for (const seat of rchkCrew) {
+          seat.socket.emit("phase:ready", {
+            roomId: rchkRoom,
+            round: step.round,
+            phase: step.phase,
+          });
+        }
+      };
+      const rchkSettled = async (read: () => boolean, ms: number) => {
+        for (let waited = 0; waited < ms; waited += 100) {
+          if (read()) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return read();
+      };
+      const rchkBoth = (
+        count: (mine: (typeof rchkHeard)[number]) => number,
+        want: number,
+      ) =>
+        rchkHeard.length === 2 &&
+        rchkHeard.every((mine) => count(mine) === want);
+
+      const rchkStood = await rchkStand({ round: 1, phase: "dawn" });
+      check(
+        rchkStood,
+        "both captains stand at the first seat of the leg in the harbor this block opened",
+      );
+      rchkReady({ round: 1, phase: "dawn" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 1),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 1) &&
+          rchkHeard.every((mine) => mine.advances[0].phase === "dawn"),
+        "a full ready set at Dawn announces the departure to every captain in the harbor, which is the frame both captains in the field report were waiting for",
+      );
+      check(
+        rchkHeard.every((mine) => mine.advances[0].round === 1),
+        "and the announcement names the seat being left rather than the one being entered",
+      );
+
+      // The healthy direction: one captain reports the seat the announcement
+      // was about, the checkpoint moves, and the room must then say nothing
+      // at all. The wait is longer than the room's own grace, so a watch left
+      // armed by a report that landed would be caught here as a harbor
+      // talking to itself.
+      rchkReport(rchkCrew[0], { round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkStanding({ round: 1, phase: "market" }),
+        8000,
+      );
+      check(
+        rchkStanding({ round: 1, phase: "market" }),
+        "the room stands at the seat that report named, so the departure was answered",
+      );
+      await new Promise((r) => setTimeout(r, 14000));
+      check(
+        rchkHeard.every((mine) => mine.rescues.length === 0),
+        "a room whose departure was reported is never told the harbor did not hear it, since a cure that fired on a healthy table would be its own bug",
+      );
+
+      // The stalled direction: both captains ready at the Market and then
+      // nobody reports. This is every captain's transport dying between the
+      // announcement and the answer, and it is the shape the field report
+      // describes from the other side of the screen.
+      const rchkStoodAgain = await rchkStand({ round: 1, phase: "market" });
+      check(
+        rchkStoodAgain,
+        "both captains stand at the seat the harbor moved them to",
+      );
+      rchkReady({ round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 2),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 2),
+        "the ready set at the Market announces its departure as well",
+      );
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.rescues.length, 1),
+        20000,
+      );
+      check(
+        rchkBoth((mine) => mine.rescues.length, 1),
+        "and an announcement nobody answers is handed back to the room after its grace, which is the cure for the stall the field report describes",
+      );
+      check(
+        rchkHeard[0].rescues[0] === rchkHeard[1].rescues[0] &&
+          String(rchkHeard[0].rescues[0]).includes("ready check is open again"),
+        "and it is one line said to the room rather than one per socket in it, naming the ready check rather than a leg the harbor moved",
+      );
+
+      // The cure with its two halves held apart: the votes that were cast are
+      // still counted, and the lock is gone. The first is read off the ready
+      // state the room rebroadcasts, and the second can only be read off the
+      // behavior it exists for, so a captain reports the seat again and the
+      // harbor has to announce it a second time.
+      check(
+        rchkHeard[0].standing?.round === 1 &&
+          rchkHeard[0].standing?.phase === "market" &&
+          rchkHeard[0].standing?.readyUserIds?.length === 2 &&
+          rchkHeard[0].standing?.requiredUserIds?.length === 2,
+        "the ready check is open again on the same seat with both votes still counted, because the votes were honest and what was missing was the move",
+      );
+      rchkReport(rchkCrew[0], { round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 3),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 3),
+        "so the very next report announces the same seat again, which is the harbor carrying on rather than waiting on a lock nobody can see",
+      );
+
+      // And the voyage lands: the other side of the same promise, which is a
+      // report naming somewhere further along moving the room there.
+      rchkReport(rchkCrew[1], { round: 1, phase: "orders" });
+      await rchkSettled(
+        () => rchkStanding({ round: 1, phase: "orders" }),
+        8000,
+      );
+      check(
+        rchkStanding({ round: 1, phase: "orders" }),
+        "and the harbor stands where that report put it, with the leg behind it settled rather than re opened",
+      );
+      check(
+        rchkHeard.every((mine) => mine.errors.length === 0),
+        "with nothing in this block refused along the way, so none of the above was the harbor declining to be spoken to",
+      );
+    }
   } finally {
     for (const socket of run.sockets) {
       socket.removeAllListeners();

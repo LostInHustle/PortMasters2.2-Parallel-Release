@@ -23,7 +23,7 @@
 // =====================================================================
 import { APP_NAME } from "../constants/brand";
 import { merchantRatingForScore } from "../constants/reputation";
-import { closesRound, lapSuccessor } from "../checkpoint";
+import { closesRound, isGatedPhase, lapSuccessor } from "../checkpoint";
 import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
 import { modeConfig } from "../mode";
@@ -372,6 +372,65 @@ export function lockInBoon(
 // books), so this is that plus a margin rather than a number tuned to anything.
 const AUTO_COMMIT_PRESSES = 3;
 
+// Whether a generic "I am done with this seat" press has a departure to make
+// from where this captain stands.
+//
+// The room gates five seats, and every one of them is left by doing the seat's
+// work and then stepping off it: the market settles, the parley closes, the
+// orders are counted, the raid and then the books are settled, the yard is
+// skipped. Two seats are not left that way and have no generic departure at
+// all. The pier is left by the host setting sail, which is an order rather
+// than a vote. Dawn is left by choosing: a boon is not confirmed, it is
+// picked, so the only departure from it is lockInBoon with a card in hand.
+// A captain standing anywhere else (inside the module draft, at the terminal
+// screens) is not standing at a seat the room is waiting on at all.
+//
+// This is asked before a ready vote rather than after one, because the vote is
+// a promise the whole table pays for. The room announces the advance once
+// every captain has readied, and each client then runs the transition it was
+// holding: a captain who readies with nothing that can move leaves the room
+// holding a full ready set that no departure will carry out, which is a table
+// where the bar reads "2/2 ready" and the voyage never proceeds. A press that
+// cannot move is refused instead of sent.
+export function canLeavePhase(state: {
+  mode: unknown;
+  phase: Phase;
+  gameOver: boolean;
+}): boolean {
+  return (
+    !state.gameOver &&
+    state.phase !== "dawn" &&
+    isGatedPhase(state.mode, state.phase)
+  );
+}
+
+// The generic departure: the seat's own work, then the lap's step off it.
+//
+// This is the loop autoCommit has always run, named and lifted out of it so
+// the press a captain makes by hand and the press the clock makes for them are
+// one routine rather than two copies of one. It walks rather than naming a
+// phase because two seats take more than one press to leave (Resolve is the
+// raid and then the books), and the cap is what makes a departure that will
+// not move a captain who stands still instead of a loop that never ends.
+//
+// Returns whether the seat was actually left. The false answer is a real one
+// and its callers check it: a captain standing where canLeavePhase says no,
+// or in a seat whose departure failed, is a captain whose press must not be
+// sent to the room.
+export function leavePhase(
+  state: GameState,
+  ctx: GameContext,
+  logs: string[],
+): boolean {
+  if (!canLeavePhase(state)) return false;
+  const from = state.phase;
+  for (let press = 0; press < AUTO_COMMIT_PRESSES; press++) {
+    nextPhase(state, ctx, logs);
+    if (state.phase !== from || state.gameOver) return true;
+  }
+  return false;
+}
+
 // The clock's departure: what a captain who was holding nothing commits when
 // the seat they were standing in runs out. [B3] What a captain who wrote
 // standing orders commits is their own instructions, and the defaults below
@@ -389,9 +448,11 @@ const AUTO_COMMIT_PRESSES = 3;
 // It walks the seat rather than naming a phase, in the same spirit as
 // nextPhase above: two seats take more than one press to leave (Resolve is the
 // raid and then the books), and a captain standing in the module draft is
-// inside Dusk rather than at a seat of its own. The cap is what makes a
-// departure that will not move a captain who stands still instead of a loop
-// that never ends; the room's clock is what tries again.
+// inside Dusk rather than at a seat of its own. That walk is leavePhase, one
+// definition under this one and the one a captain's own press makes; the cap
+// it carries is what makes a departure that will not move a captain who
+// stands still instead of a loop that never ends, and the room's clock is what
+// tries again.
 export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
   // The draft and the swap are the two phases that are inside a seat rather
   // than a seat: the room's checkpoint waits at Dusk while a captain is in
@@ -430,15 +491,19 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
     return;
   }
   // The three seats whose work is a set of presses rather than the departure
-  // itself: the captain's instructions do what they can, and the handoff
+  // itself: the captain's instructions do what they can, and the departure
   // below then leaves the seat on the lap's own terms, exactly as it does for
-  // a captain who pressed everything by hand.
+  // a captain who pressed everything by hand. That departure is leavePhase,
+  // which is the same one a captain's own press makes: this function was the
+  // only place it was written down, and a second copy of it beside the press
+  // is how the two came to disagree about which seats can be left at all.
+  //
+  // The cancel above is why the guard inside leavePhase is read after it
+  // rather than before: a captain the clock found inside the module draft has
+  // just been put back at Dusk, which is a seat the room gates and which this
+  // departure can therefore leave.
   if (orders) workStandingOrders(state, orders, logs);
-  const from = state.phase;
-  for (let press = 0; press < AUTO_COMMIT_PRESSES; press++) {
-    nextPhase(state, ctx, logs);
-    if (state.phase !== from || state.gameOver) return;
-  }
+  leavePhase(state, ctx, logs);
 }
 
 // Opens a phase directly, without moving the round.

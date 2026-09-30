@@ -14,6 +14,7 @@ import { clearBarter, clearFlexibleAccepted } from "../barter";
 import { clearMutedUsers, clearSessionChat, emitRoomMembers } from "../chat";
 import {
   broadcastReadyState,
+  clearAdvanceWatch,
   disarmPhaseClock,
   getCheckpoint,
   roomCheckpoints,
@@ -88,6 +89,10 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // this timer alive would have it fire into a lobby nobody is
       // standing in a phase of.
       disarmPhaseClock(roomId);
+      // And the watch on the ended voyage's last announcement, which
+      // belongs to the seat this restart just cleared. Reopened harbors are
+      // the pier, and the pier waits on nobody's report.
+      clearAdvanceWatch(roomId);
       clearRoomStatuses(roomId);
       clearBarter(io, roomId);
       // [D3: Convoy: the Escort Contract] And the market's board, which
