@@ -52,7 +52,7 @@ import { expireConsent, type ConsentTerms } from "@/lib/game/engine";
 import type { Phase } from "@/lib/game/types";
 import { sockets } from "./presence";
 
-export type ConsentBoard<T extends ConsentTerms> = {
+type ConsentBoard<T extends ConsentTerms> = {
   /** The room's rows. An absent key and an empty list mean the same thing. */
   list(roomId: string): T[];
   /** Writes the list back, keeping one representation of an empty board. */

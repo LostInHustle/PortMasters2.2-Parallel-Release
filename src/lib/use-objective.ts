@@ -39,6 +39,10 @@
 // repair path rather than a hazard.
 // =====================================================================
 
+import {
+  ObjectiveProgress as ObjectiveProgressPayload,
+  ObjectiveReport as ObjectiveReportPayload,
+} from "@/types/realtime/objectives";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import {
@@ -56,10 +60,6 @@ import {
 } from "@/lib/game/engine";
 import { normalizeMode } from "@/lib/game/mode";
 import type { GameContext, GameState } from "@/lib/game/types";
-import type {
-  ObjectiveProgress as ObjectiveProgressPayload,
-  ObjectiveReport as ObjectiveReportPayload,
-} from "@/types/realtime";
 
 // The same cadence the captain's own status rides on (see
 // use-game-session.ts): enough to feel immediate, sparse enough that a

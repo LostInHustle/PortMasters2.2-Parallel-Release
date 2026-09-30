@@ -4,14 +4,13 @@
 // voyage conclusion check in the realtime layer and the check in
 // route; this route is read only.
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { legacySummaryFor } from "@/lib/captain-legacy";
 import { checkInStatus, utcDayKey } from "@/lib/game/checkin";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const { legacy, summary } = await legacySummaryFor(user.id);
 

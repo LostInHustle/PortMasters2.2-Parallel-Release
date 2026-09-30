@@ -18,8 +18,8 @@
 // and never a result.
 // =====================================================================
 
+import { VoyageReveal } from "@/types/realtime/voyage";
 import type { Server } from "socket.io";
-import type { VoyageReveal } from "@/types/realtime";
 
 // One room's reveal, for as long as the finished voyage stands. There is
 // exactly one per room: a voyage concludes once, and only a restart, which

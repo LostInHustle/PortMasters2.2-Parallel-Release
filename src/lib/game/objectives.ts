@@ -19,7 +19,7 @@
 // that six captains could finish without talking is rejected outright.
 // That is enforced as a property of the data rather than as a note here:
 // every entry below asks for at least as many items as a captain begins
-// the voyage holding (STARTING_STOCK in ./constants.ts comes to 16), and
+// the voyage holding (STARTING_STOCK in ./constants/goods.ts comes to 16), and
 // every entry asks for at least two different goods. A hold cannot cover
 // one, so the fleet has to buy, trade, or both, and it has to do it over
 // more than one round.
@@ -135,7 +135,7 @@ export const OBJECTIVE_DECK: readonly Objective[] = [
 // lives on. A table larger than six sails on the top band: the deal itself
 // is authored for six (see ./gambit.ts), and a seventh seat is a size this
 // rung has no measurement for.
-export type SeatBand = {
+type SeatBand = {
   // The fewest captains in this band. 0 is the anchor's own floor, and the
   // reading for a voyage that was never pinned.
   min: number;

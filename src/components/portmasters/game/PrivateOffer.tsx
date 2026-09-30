@@ -28,7 +28,7 @@ import type { ReactNode } from "react";
 import type { PublicUser } from "@/lib/api";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants";
+import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 
 export function PrivateOffer({
   lead,

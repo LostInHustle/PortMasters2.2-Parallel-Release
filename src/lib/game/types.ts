@@ -1,16 +1,10 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: game state types
 // =====================================================================
-import {
-  ITEMS,
-  LARDER_START,
-  STARTING_STOCK,
-  WORKER_TYPE_IDS,
-  type Boon,
-  type FoodId,
-  type Module,
-  type WorkerTypeId,
-} from "./constants";
+import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
+import { type Boon, type Module } from "./constants/drafts";
+import { ITEMS, STARTING_STOCK } from "./constants/goods";
+import { LARDER_START, type FoodId } from "./constants/supplies";
 import {
   DEFAULT_DIFFICULTY,
   difficultyConfig,
@@ -677,6 +671,29 @@ export type GameState = {
   ragsRewoven: number;
   ragsTaken: number;
   ragsRound: number;
+  // [E1: the Supply Barge] The vendor's per leg tally, and the voyage's
+  // two food counters. The tally is the shape the harbor's pile uses and
+  // reads the same way: the leg the captain last bought in and how many
+  // rations they took off the vendor in it, so a stamp from an earlier leg
+  // subtracts nothing from this one's. It is the one piece of state this
+  // feature adds, and the plan's "no new state" is what it is a deviation
+  // from rather than a violation of: what the plan rules out is a vendor
+  // the server has to hold, and a captain's own record of their own
+  // spending is a field on their own save, healed at the load site like
+  // every other one this build has added (see engine/barge).
+  //
+  // The two counters are the voyage's, not the leg's, and they are the
+  // whole of the measurement the plan asks for: what the table spent on
+  // food at ports, and how much of that went to the Barge. The share of
+  // one in the other is the mode's front page number, and both halves of
+  // it are counted where the Gold actually leaves the purse: the ports'
+  // rations and the preserve in ./larder, and the Barge's own sale in
+  // engine/barge. Neither is ever reset inside a voyage, because a share
+  // of a voyage's spending is not a share of a leg's.
+  bargeTaken: number;
+  bargeRound: number;
+  foodSpend: number;
+  bargeSpend: number;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
   // at the end of Round 8 (see settleOutstandingDebts in
@@ -984,6 +1001,16 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     ragsRewoven: 0,
     ragsTaken: 0,
     ragsRound: 0,
+    // [E1: the Supply Barge] A voyage leaves the pier having bought
+    // nothing from the vendor and with the leg stamp at zero, which is a
+    // leg no voyage has: the first leg after departure is one the vendor
+    // is full for, exactly as the harbor's pile is. Both spend counters
+    // start at nothing and are never reset inside the voyage they belong
+    // to.
+    bargeTaken: 0,
+    bargeRound: 0,
+    foodSpend: 0,
+    bargeSpend: 0,
     debts: [],
     loansGiven: [],
     defaultedDebt: false,

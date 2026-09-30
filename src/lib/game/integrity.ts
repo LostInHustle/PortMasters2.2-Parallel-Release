@@ -18,7 +18,8 @@
 // so the rule can be exercised by a fast deterministic test instead of only
 // against a live server.
 // =====================================================================
-import { PRODUCT_PRICES, WORD_ON_THE_DOCKS_REWARD } from "./constants";
+import { PRODUCT_PRICES } from "./constants/goods";
+import { WORD_ON_THE_DOCKS_REWARD } from "./constants/world";
 import { DIFFICULTIES } from "./difficulty";
 import { WIDEST_BROKERS_FAVOR_PAYOUT_CAP } from "./engine";
 import { widestObjectivePayout } from "./objectives";

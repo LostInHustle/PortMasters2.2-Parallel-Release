@@ -6,15 +6,15 @@ import { Button } from "@/components/ui/button";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import {
-  CONSENT_FEE_MIN,
   MEND_GOLD_PER_POINT,
   MEND_POINTS,
-  RAGS,
   RAG_SCRAP_VALUE,
   REFIT_POINTS,
   REWEAVE_GOOD,
   REWEAVE_RAGS,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/garments";
+import { RAGS } from "@/lib/game/constants/goods";
+import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
   buyRag,
@@ -30,8 +30,8 @@ import {
 import { garmentRoom, garmentSpec } from "@/lib/game/garments";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { cn } from "@/lib/utils";
 import { Shirt } from "lucide-react";
+import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
 import type { Refit } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than on
@@ -95,7 +95,7 @@ export function RefitBench({
   const [good, setGood] = useState<string>(SELLER_PATH.goods[0] ?? "");
   const [targetId, setTargetId] = useState("");
 
-  if (!refitsOn()) return null;
+  if (!refitsOn(game.mode)) return null;
 
   const canSell = canSellRefit(game);
   const others = members.filter((m) => m.id !== me.id);
@@ -341,20 +341,11 @@ function RefitRow({
         : null;
 
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
-        mine
-          ? "bg-due/[0.06] border-due/20"
-          : "bg-background/60 border-black/5 dark:border-white/10",
-      )}
-    >
+    <PathDeskRow mine={mine}>
       <span className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium">{refitLine(row, me)}</span>
         {row.status === "offered" && row.buyerUserId && (
-          <span className="rounded-full bg-sea/5 px-1.5 py-0.5 text-[9px] font-medium text-sea">
-            🔒 {isBuyer ? "Just for you" : `Just for ${row.buyerName}`}
-          </span>
+          <JustForChip forMe={isBuyer} name={row.buyerName} />
         )}
       </span>
 
@@ -386,7 +377,7 @@ function RefitRow({
             )}
           </span>
         ))}
-    </div>
+    </PathDeskRow>
   );
 }
 

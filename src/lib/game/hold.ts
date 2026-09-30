@@ -39,14 +39,14 @@
 // Pure: no clock, no socket, no database, and no flags of its own beyond
 // the two it is switched by.
 // =====================================================================
+import { ITEMS } from "./constants/goods";
 import {
   CARGO_SLOTS,
   FOODS,
   type FoodId,
-  ITEMS,
   SHORT_RATIONS_CARGO,
   STORES_SLOTS,
-} from "./constants";
+} from "./constants/supplies";
 import { splitHoldOn, survivalLayerOn } from "./flags";
 import type { GameState } from "./types";
 
@@ -60,8 +60,8 @@ import type { GameState } from "./types";
  * answers is unbounded and food is capped by the Larder's own ceiling in
  * ./larder, which is what this game has always done.
  */
-export function holdCapacityOn(): boolean {
-  return survivalLayerOn() && splitHoldOn();
+export function holdCapacityOn(mode: unknown): boolean {
+  return survivalLayerOn(mode) && splitHoldOn(mode);
 }
 
 /**

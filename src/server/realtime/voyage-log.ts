@@ -33,9 +33,12 @@
 // opened has said nothing yet.
 // =====================================================================
 
+import {
+  VoyageLogDelivery,
+  VoyageLogHistory,
+} from "@/types/realtime/voyage-log";
 import type { Server, Socket } from "socket.io";
 import type { Phase } from "@/lib/game/types";
-import type { VoyageLogDelivery, VoyageLogHistory } from "@/types/realtime";
 import {
   appendVoyageLog,
   voyageLogEntry,

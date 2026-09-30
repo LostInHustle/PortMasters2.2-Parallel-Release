@@ -6,6 +6,7 @@ import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
+import { gambitSystemsOn } from "@/lib/game/mode";
 import { seated } from "../auth";
 import { clearMutedUsers, emitRoomMembers } from "../chat";
 import {
@@ -122,7 +123,17 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // move into a seat that no report makes: the anchor line for the
       // phase the voyage opens in is written by the same note that writes
       // every other one, so the log's spine has no gap at its first link.
-      openVoyageLog(io, roomId, cp.round, cp.phase);
+      //
+      // It opens only for a mode that keeps one, and that single gate is
+      // the whole of the feature's reach: every note and every history
+      // request in ../voyage-log already does nothing against a room with no
+      // log, so a Classic harbor records nothing, sends nothing and answers
+      // nothing by the same path a lobby that never set sail takes, rather
+      // than by a second check on each of the twelve facts that write a
+      // line.
+      if (gambitSystemsOn(room.mode)) {
+        openVoyageLog(io, roomId, cp.round, cp.phase);
+      }
       // [B2: hard timers, the server as timekeeper] The voyage's first
       // clock. A departure is the one seat that is never entered by a
       // report, so this is the one place the clock is armed from something
@@ -155,7 +166,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // minute later, because membership can change mid voyage and a deck
       // cannot be re dealt around it: a captain who joins a voyage under
       // way sails pathless, which the harbor already has a reading for.
-      await dealPaths(io, roomId, roster);
+      await dealPaths(io, roomId, roster, room.mode);
       await broadcastReadyState(io, roomId, cp);
     } finally {
       startingRooms.delete(roomId);

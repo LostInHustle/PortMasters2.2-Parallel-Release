@@ -1,8 +1,8 @@
 "use client";
 
+import { OnlineUser, PublicUser } from "@/types/realtime/presence";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSocket, getAuthToken } from "@/lib/realtime";
-import type { OnlineUser, PublicUser } from "@/types/realtime";
 
 /**
  * App wide realtime connection + presence. The socket is a singleton; this

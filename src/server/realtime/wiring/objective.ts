@@ -2,9 +2,9 @@
 // The fleet commission's one frame, reaching ../objective.
 // =====================================================================
 
+import { type ObjectiveReport } from "@/types/realtime/objectives";
 import type { Server, Socket } from "socket.io";
 
-import { type ObjectiveReport } from "@/types/realtime";
 import { seated } from "../auth";
 import { recordObjectiveReport } from "../objective";
 

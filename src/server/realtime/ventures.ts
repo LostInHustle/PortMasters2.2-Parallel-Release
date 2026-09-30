@@ -23,8 +23,9 @@ import {
   ventureTotal,
   type VentureOutcome,
 } from "@/lib/game/convoy";
+import type { VentureSummary } from "@/types/realtime/ventures";
 
-export function ventureSummary(v: {
+function ventureSummary(v: {
   id: string;
   posterId: string;
   posterName: string;
@@ -52,25 +53,44 @@ export function ventureSummary(v: {
   };
 }
 
-export async function broadcastVentures(
-  io: Server,
+/* The board as one socket reads it: the open ventures of the room's current
+   voyage, and the switch that says whether the room's one payout has been
+   claimed. The same shape the broadcast sends to the room, read once because
+   there are two readers of it: the room at large when the board moves, and
+   the single captain who asks for it on walking in. A second reader that
+   rebuilt this payload would be a second answer to what is on the board. */
+type VentureBoard = {
+  roomId: string;
+  ventures: VentureSummary[];
+  locked: boolean;
+};
+
+export async function ventureBoardFor(
   roomId: string,
-): Promise<void> {
+): Promise<VentureBoard | null> {
   const room = await db.room.findUnique({
     where: { id: roomId },
     select: { voyageEpoch: true },
   });
-  if (!room) return;
+  if (!room) return null;
   const ventures = await db.convoyVenture.findMany({
     where: { roomId, voyageEpoch: room.voyageEpoch, status: "open" },
     orderBy: { createdAt: "asc" },
   });
-  const locked = await hasRoomClaimedVenture(roomId, room.voyageEpoch);
-  io.to(`room:${roomId}`).emit("venture:update", {
+  return {
     roomId,
     ventures: ventures.map(ventureSummary),
-    locked,
-  });
+    locked: await hasRoomClaimedVenture(roomId, room.voyageEpoch),
+  };
+}
+
+export async function broadcastVentures(
+  io: Server,
+  roomId: string,
+): Promise<void> {
+  const board = await ventureBoardFor(roomId);
+  if (!board) return;
+  io.to(`room:${roomId}`).emit("venture:update", board);
 }
 
 // Two captains could otherwise post a venture, both instantly self fund

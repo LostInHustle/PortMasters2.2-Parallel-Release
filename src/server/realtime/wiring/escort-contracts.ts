@@ -3,10 +3,10 @@
 // from during Parley, ordered over ../contracts' own board.
 // =====================================================================
 
+import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants";
 import {
   agreeConsent,
   consentFeeFor,
@@ -58,8 +58,8 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("contract:error", { roomId, error });
       };
-      if (!escortContractsOn()) {
-        fail("The escort market is not running in this build.");
+      if (!escortContractsOn(s.mode)) {
+        fail("The escort market is not running in this harbor.");
         return;
       }
       // The fee is read through the same reader the panel reads it
@@ -147,8 +147,8 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("contract:error", { roomId, error });
       };
-      if (!escortContractsOn()) {
-        fail("The escort market is not running in this build.");
+      if (!escortContractsOn(s.mode)) {
+        fail("The escort market is not running in this harbor.");
         return;
       }
       const cp = await getCheckpoint(roomId);
@@ -209,8 +209,8 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("contract:error", { roomId, error });
       };
-      if (!escortContractsOn()) {
-        fail("The escort market is not running in this build.");
+      if (!escortContractsOn(s.mode)) {
+        fail("The escort market is not running in this harbor.");
         return;
       }
       const board = escortContracts.list(roomId);
@@ -248,7 +248,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("contract:error", { roomId, error });
       };
-      if (!escortContractsOn()) return;
+      if (!escortContractsOn(s.mode)) return;
       const raidGold = payload?.raidGold;
       // A raid that would have taken nothing is not a claim: the covered
       // captain keeps their empty hold and the seller owes nothing (see

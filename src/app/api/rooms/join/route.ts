@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { admitToRoom } from "@/lib/rooms";
 import { readJson } from "@/lib/api-json";
 
@@ -10,8 +10,7 @@ const Schema = z.object({ code: z.string().length(6) });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const body = await readJson(
     req,

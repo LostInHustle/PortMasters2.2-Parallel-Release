@@ -5,7 +5,7 @@
 import type { Server, Socket } from "socket.io";
 
 import { seated } from "../auth";
-import { getCheckpoint } from "../checkpoint";
+import { parleyCheckpoint } from "../checkpoint";
 import { recordMaroonVote, recordPortShift } from "../maroon";
 
 export function wireMaroon(io: Server, socket: Socket): void {
@@ -25,8 +25,8 @@ export function wireMaroon(io: Server, socket: Socket): void {
       const targetUserId = payload?.targetUserId;
       if (!targetUserId) return;
       void (async () => {
-        const cp = await getCheckpoint(roomId);
-        if (cp.phase !== "parley" || cp.round !== payload?.round) return;
+        const cp = await parleyCheckpoint(roomId, payload?.round);
+        if (!cp) return;
         await recordMaroonVote(io, roomId, s.userId, cp.round, targetUserId);
       })();
     },
@@ -49,8 +49,8 @@ export function wireMaroon(io: Server, socket: Socket): void {
       const { roomId } = s;
       if (typeof payload?.port !== "string" || !payload.port) return;
       void (async () => {
-        const cp = await getCheckpoint(roomId);
-        if (cp.phase !== "parley" || cp.round !== payload?.round) return;
+        const cp = await parleyCheckpoint(roomId, payload?.round);
+        if (!cp) return;
         await recordPortShift(
           io,
           roomId,

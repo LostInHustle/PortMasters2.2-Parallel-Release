@@ -55,28 +55,55 @@ export function RoundFlow({
           const face = phaseFace(leg.phase);
           return (
             <li key={leg.phase}>
+              {/* Three columns rather than a flex row, because the rail
+                  below has to be told what to line up with and a column is
+                  how it is told: the tile column is exactly as wide as the
+                  tile, so the rail is centred on it by being centred in
+                  its own column, with no offset arithmetic to rot.
+
+                  The button carries no vertical padding for the same
+                  reason. The padding lives on the words instead, so the
+                  tile column spans the whole row and the rail is free to
+                  run from one tile to the next rather than from one
+                  padded box to the next, which is what left the line
+                  floating short of both tiles when the two were measured
+                  apart. */}
               <button
                 type="button"
                 onClick={() => setFocused(index)}
                 aria-expanded={open}
                 className={cn(
-                  "flex w-full items-start gap-2.5 rounded-md px-1.5 py-1 text-left transition-colors",
+                  "grid w-full grid-cols-[1.25rem_1fr_auto] items-stretch gap-x-2.5 rounded-md px-1.5 text-left transition-colors",
                   open ? "bg-sea/[0.09]" : "hover:bg-sea/[0.05]",
                 )}
               >
-                <span
-                  className={cn(
-                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold",
-                    face.gradient,
+                <span className="flex flex-col items-center">
+                  <span
+                    className={cn(
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] font-semibold",
+                      face.gradient,
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  {/* The rail between two legs, drawn rather than written,
+                      so the legs read as one run instead of seven rows. It
+                      is the rest of the tile column, less the 2px that
+                      keeps the line off the tile's own edge, and it
+                      reaches the row's bottom, which is where the next
+                      tile's top is. */}
+                  {index < legs.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 w-px flex-1 bg-sea/25"
+                    />
                   )}
-                >
-                  {index + 1}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 py-1.5">
                   <span className="font-semibold">
                     {face.icon} {face.label}
                   </span>
-                  <span className="block text-[11px] leading-snug text-muted-foreground">
+                  <span className="block text-xs leading-snug text-muted-foreground">
                     {leg.body}
                   </span>
                 </span>
@@ -87,13 +114,6 @@ export function RoundFlow({
                   )}
                 />
               </button>
-              {/* The rail between two legs, drawn rather than written, so
-                  the legs read as one run instead of seven rows. The
-                  offset is the number tile's centre: the button pads by
-                  1.5 and the tile is 5 wide. */}
-              {index < legs.length - 1 && (
-                <span aria-hidden className="ml-4 block h-2.5 w-px bg-sea/25" />
-              )}
             </li>
           );
         })}
@@ -109,7 +129,7 @@ export function RoundFlow({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 4 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
-          className="mt-2 flex items-start gap-1.5 rounded-md border border-sea/15 bg-sea/[0.07] px-2.5 py-1.5 text-left text-[11px] leading-relaxed"
+          className="mt-2 flex items-start gap-1.5 rounded-md border border-sea/15 bg-sea/[0.07] px-2.5 py-1.5 text-left text-xs leading-relaxed"
         >
           <span aria-hidden className="mt-px text-sea">
             ↳
@@ -118,7 +138,7 @@ export function RoundFlow({
         </motion.p>
       </AnimatePresence>
 
-      <p className="mt-2 flex items-start gap-1.5 border-t border-sea/15 pt-1.5 text-left text-[11px] leading-relaxed text-muted-foreground">
+      <p className="mt-2 flex items-start gap-1.5 border-t border-sea/15 pt-1.5 text-left text-xs leading-relaxed text-muted-foreground">
         <span aria-hidden className="mt-px">
           ↺
         </span>

@@ -5,7 +5,7 @@
 // CaptainLegacy row is ever written.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import {
   DEFAULT_LEGACY_SUMMARY,
   levelForRenownXP,
@@ -37,8 +37,7 @@ function stateOf(row: LegacyRow | null): CheckInState {
 
 export async function POST() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const today = utcDayKey();
   const prior = (await db.captainLegacy.findUnique({

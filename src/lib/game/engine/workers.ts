@@ -15,13 +15,9 @@
 // where severance read the raw WAGES table and so ignored both surcharges
 // and discounts, was a balance inconsistency that this refactor closes.
 // =====================================================================
-import {
-  ICONS,
-  RECIPES,
-  WORKER_TYPES,
-  workerType,
-  type WorkerTypeId,
-} from "../constants";
+import { ICONS } from "../constants/brand";
+import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
+import { RECIPES } from "../constants/goods";
 import { onShortRations, shortRationsYield } from "../larder";
 import { newCrewIdentity } from "../crew";
 import { isFrostbitten } from "../garments";

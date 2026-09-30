@@ -28,16 +28,15 @@
 // be thrown away.
 // =====================================================================
 
-import { useCallback, useEffect, useState } from "react";
-import type { Socket } from "socket.io-client";
-import { AUDIT_FROM_ROUND } from "@/lib/game/audit";
-import { normalizeMode } from "@/lib/game/mode";
-import type { GameState } from "@/lib/game/types";
-import type {
+import {
   AuditReveal as AuditRevealPayload,
   AuditTally as AuditTallyPayload,
   AuditVote as AuditVotePayload,
-} from "@/types/realtime";
+} from "@/types/realtime/audit";
+import { useCallback, useEffect, useState } from "react";
+import type { Socket } from "socket.io-client";
+import { auditOpensAt } from "@/lib/game/mode";
+import type { GameState } from "@/lib/game/types";
 
 export function useAudit(
   socket: Socket | null,
@@ -111,12 +110,18 @@ export function useAudit(
   // audit spends the rest of that leg's trading, so the button is offered
   // only where the room is standing at the checkpoint the vote is called
   // from.
+  //
+  // The rung is read off the mode record rather than off a constant, for
+  // the reason the panel gives: a mode whose rung is null opens no
+  // manifest, so the first term below is the whole of the mode gate and
+  // there is no second one to keep in step with it.
+  const opensAt = auditOpensAt(game.mode);
   const canVote =
     !!socket &&
     !!roomId &&
-    normalizeMode(game.mode) === "ocean_gambit" &&
+    opensAt !== null &&
     game.phase === "parley" &&
-    game.currentRound >= AUDIT_FROM_ROUND &&
+    game.currentRound >= opensAt &&
     !thisReveal &&
     !myVote;
 

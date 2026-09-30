@@ -3,7 +3,7 @@
 // the two cannot disagree about who may come aboard.
 import { NextRequest, NextResponse } from "next/server";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { admitToRoom } from "@/lib/rooms";
 
 export async function POST(
@@ -11,8 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const { id } = await params;
 
   const room = await db.room.findUnique({

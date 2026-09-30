@@ -25,10 +25,11 @@
 // into barter, aid, chat, conclusion, and the cross module room
 // teardown. Passing them in keeps the dependency graph acyclic.
 // =====================================================================
+import { PrivateEntry } from "@/types/realtime/private-entry";
+import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { leaveRoomForUser } from "@/lib/rooms";
-import type { PublicUser, PrivateEntry } from "@/types/realtime";
 import type { SocketState } from "./types";
 import { forgetStatusIfLastSocket } from "./status";
 import { closeVoyageTelemetry, noteCaptainLeft } from "./telemetry";

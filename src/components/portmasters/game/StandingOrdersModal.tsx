@@ -30,7 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ScrollText } from "lucide-react";
-import { ICONS, type Boon } from "@/lib/game/constants";
+import { ICONS } from "@/lib/game/constants/brand";
+import { type Boon } from "@/lib/game/constants/drafts";
 import { basePriceRange } from "@/lib/game/engine";
 import {
   unlockedBoons,

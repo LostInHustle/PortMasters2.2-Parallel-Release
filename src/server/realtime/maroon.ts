@@ -28,6 +28,11 @@
 // captain readies up for the next checkpoint with everyone else.
 // =====================================================================
 
+import {
+  MaroonResult,
+  MaroonTally,
+  PortShiftNotice,
+} from "@/types/realtime/maroon";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
@@ -38,11 +43,6 @@ import { activeRosterSet } from "./checkpoint";
 import { roomStatuses } from "./status";
 import { noteCaptainMarooned, noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
-import type {
-  MaroonResult,
-  MaroonTally,
-  PortShiftNotice,
-} from "@/types/realtime";
 
 // One room's maroon, for as long as the voyage lasts. The nominations
 // belong to a leg and are replaced when the leg turns, like the audit's.

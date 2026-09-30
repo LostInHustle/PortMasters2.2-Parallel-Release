@@ -35,6 +35,16 @@ function DialogOverlay(
 // Every dialog in the app wanted the close button, so there is no switch
 // for it: the app is desktop first and a modal a captain cannot dismiss is
 // the worse default of the two.
+//
+// It is capped to the live viewport and scrolls, and that part is not
+// cosmetic: a dialog is centred on the viewport, so one taller than the
+// screen it opens on is clipped at BOTH ends at once and no amount of
+// scrolling inside it can reach what was cut off. That is worst where the
+// content is longest, which is the tutorial, on the smallest screen, which
+// is a phone in landscape. The cap is in dvh rather than vh because a
+// phone's browser chrome moves as it hides and shows, and a dialog sized
+// to the viewport it was opened at is a dialog that loses its last line
+// when the address bar returns.
 function DialogContent({
   className,
   children,
@@ -46,7 +56,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto",
           className,
         )}
         {...props}

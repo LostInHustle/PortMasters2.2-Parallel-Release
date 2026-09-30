@@ -1,11 +1,11 @@
 "use client";
 
+import { DraftStep, DraftView } from "@/types/realtime/draft";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { pathConfig } from "@/lib/game/paths";
 import { phaseClockLabel, secondsRemaining } from "@/lib/phase-clock";
-import type { DraftStep, DraftView } from "@/types/realtime";
 import { PhaseError } from "./phases/PhaseShared";
 
 // The three beats, in the words a captain reads them in.
@@ -116,7 +116,13 @@ export function PathDraft({
     : `Cards still out: ${view.open}`;
 
   return (
-    <div className="pm-glass rounded-2xl p-4 mb-3 border border-voyage/15">
+    // Capped and centred, because this panel is a strip across the whole
+    // table while its contents are three cards and two lines. Left to the
+    // full width of a desktop the caption sits on one edge and the step
+    // counter on the other, with nothing between them, which reads as a
+    // broken row rather than as a deal. The cap is the width the three
+    // cards need, so the header sits over them instead of beside them.
+    <div className="pm-glass mx-auto mb-3 max-w-3xl rounded-2xl border border-voyage/15 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="min-w-0">
           <h2 className="font-display text-sm font-semibold">
@@ -153,7 +159,12 @@ export function PathDraft({
         </p>
       ) : (
         <>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Three cards in one row wherever there is a row to put them
+              in. The panel this row sits in is capped to the width the
+              three want, so nothing here repeats that cap: a second one
+              would be the same number written twice, and the panel's is
+              the one that binds. */}
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {view.hand.map((path, index) => {
               // The cards in a hand are PathIds, the reader above having
               // answered null for anything else (see readDraftView in
@@ -173,17 +184,26 @@ export function PathDraft({
                     delay: index * 0.05,
                   }}
                   whileHover={{ y: -4 }}
-                  className="pm-glass rounded-2xl p-4 flex flex-col items-center text-center border border-voyage/15"
+                  className="pm-glass flex flex-col items-center rounded-xl border border-voyage/15 p-2.5 text-center sm:p-3"
                 >
-                  <div className="text-4xl mb-1">{card.crest}</div>
-                  <div className="font-semibold text-sm text-foreground">
-                    {card.name}
+                  {/* The crest rides beside the name rather than above it:
+                      a line of its own costs a line on every card, and on
+                      a phone the three cards are stacked, so that line is
+                      paid three times. */}
+                  <div className="flex items-center justify-center gap-2">
+                    <span aria-hidden className="text-2xl">
+                      {card.crest}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {card.name}
+                    </span>
                   </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground flex-1">
+                  <div className="mt-1 flex-1 text-[11px] leading-snug text-muted-foreground">
                     {card.signature}
                   </div>
                   <Button
-                    className="pm-grad-voyage mt-3 w-full rounded-xl font-semibold"
+                    size="sm"
+                    className="pm-grad-voyage mt-2 w-full rounded-lg font-semibold"
                     onClick={() => {
                       setPicked({ roomId: view.roomId, step: view.step });
                       onKeep(index);

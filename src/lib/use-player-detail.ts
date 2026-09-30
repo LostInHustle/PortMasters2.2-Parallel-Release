@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
-import type { Module } from "@/lib/game/constants";
+import type { Module } from "@/lib/game/constants/drafts";
 
 // A lighter snapshot than the full GameState, just what the detail popup
 // (and the bankrupt player spectator view, which reuses the same popup)

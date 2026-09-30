@@ -8,7 +8,7 @@
 // shared membership. The check in state stays private to the owner.
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { legacySummaryFor } from "@/lib/captain-legacy";
 
 export async function GET(
@@ -16,8 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const { userId } = await params;
 
   const other = await db.user.findUnique({

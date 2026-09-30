@@ -17,7 +17,7 @@ import type { ConsentTerms } from "@/lib/game/engine";
  * read here as the string the server sent rather than inferred from the
  * kind.
  */
-export type ConsentChannel = {
+type ConsentChannel = {
   /** The event a personalized board arrives on. */
   update: string;
   /** The event a refusal arrives on. */

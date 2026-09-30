@@ -4,16 +4,16 @@
 // `rivalSummary` from the engine, projecting the outcome so the
 // position "a" is always the viewer. The partner's PublicUser is
 // included so the Legacy card can render a name alongside the counts.
+import { PublicUser } from "@/types/realtime/presence";
+import { RivalEntry } from "@/types/realtime/standings";
 import { NextResponse } from "next/server";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { rivalSummary, type RivalOutcome } from "@/lib/game/engine";
-import type { RivalEntry, PublicUser } from "@/types/realtime";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const rows = await db.captainRival.findMany({
     where: { OR: [{ userAId: user.id }, { userBId: user.id }] },

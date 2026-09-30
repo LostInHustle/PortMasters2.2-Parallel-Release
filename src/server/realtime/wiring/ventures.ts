@@ -2,9 +2,6 @@
 // Convoy Ventures: the shared pot's frames, over ../ventures' own book.
 // =====================================================================
 
-import type { Server, Socket } from "socket.io";
-
-import { db } from "@/lib/db";
 import {
   CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
@@ -12,7 +9,10 @@ import {
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
   CONVOY_VENTURE_MIN_TARGET,
   CONVOY_VENTURE_PAYOUT_MULTIPLIER,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/world";
+import type { Server, Socket } from "socket.io";
+
+import { db } from "@/lib/db";
 import {
   computeAcceptedContribution,
   computeVentureDeadlineBounds,
@@ -27,28 +27,16 @@ import {
   destroyOtherOpenVentures,
   hasRoomClaimedVenture,
   settleVenture,
-  ventureSummary,
+  ventureBoardFor,
 } from "../ventures";
 
 export function wireVentures(io: Server, socket: Socket): void {
   socket.on("venture:state:request", async (payload: { roomId?: string }) => {
     const s = seated(socket, payload);
     if (!s) return;
-    const { roomId } = s;
-    const room = await db.room.findUnique({
-      where: { id: roomId },
-      select: { voyageEpoch: true },
-    });
-    if (!room) return;
-    const ventures = await db.convoyVenture.findMany({
-      where: { roomId, voyageEpoch: room.voyageEpoch, status: "open" },
-      orderBy: { createdAt: "asc" },
-    });
-    socket.emit("venture:update", {
-      roomId,
-      ventures: ventures.map(ventureSummary),
-      locked: await hasRoomClaimedVenture(roomId, room.voyageEpoch),
-    });
+    const board = await ventureBoardFor(s.roomId);
+    if (!board) return;
+    socket.emit("venture:update", board);
   });
 
   socket.on(

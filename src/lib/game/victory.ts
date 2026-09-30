@@ -43,7 +43,7 @@ export const BROKER_PAYOUT_TARGET = 2200;
 
 // Where a Pirate's standing has to land. Fifty is the line the Endgame
 // screen already calls a Qualified Trader (see MERCHANT_RATINGS in
-// ./constants.ts), so the floor reads as "you were at least a working
+// ./constants/reputation.ts), so the floor reads as "you were at least a working
 // merchant this voyage" rather than as a number invented for the mode. A
 // Pirate who ends below it spent the voyage hiding, and hiding is the one
 // way the rewritten role forbids them to play.
@@ -69,7 +69,7 @@ export type CaptainEnding = {
 
 // The three numbers the finish report carries. Named as one type because
 // they travel together and are never read apart.
-export type ReportedFinish = {
+type ReportedFinish = {
   gold: number;
   reputation: number;
   bankrupt: boolean;

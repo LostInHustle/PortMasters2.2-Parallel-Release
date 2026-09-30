@@ -2,10 +2,11 @@
 // Room join and leave: taking a seat at a table, and giving it up.
 // =====================================================================
 
+import { type ObjectiveProgress } from "@/types/realtime/objectives";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
-import { type ObjectiveProgress } from "@/types/realtime";
+import { normalizeMode } from "@/lib/game/mode";
 import { aidList, removeUserAidRequest } from "../aid";
 import { auditRevealFor } from "../audit";
 import { requireAuth } from "../auth";
@@ -40,9 +41,16 @@ export function wireRoomJoin(
     const roomId = payload?.roomId;
     if (!roomId) return;
 
-    // Verify membership in DB.
+    // Verify membership in DB, and take the room's mode in the same read.
+    // The mode is a room property rather than a frame's claim, and every
+    // switch the handlers below read has to be answered with the room's own
+    // (see SocketState in ../types). It rides along on the membership
+    // select rather than being a second query, because this is the one
+    // moment a socket learns which harbor it is sitting in and the row is
+    // already in hand.
     const member = await db.roomMember.findUnique({
       where: { userId_roomId: { userId: s.userId, roomId } },
+      include: { room: { select: { mode: true } } },
     });
     if (!member) {
       socket.emit("room:error", {
@@ -57,6 +65,7 @@ export function wireRoomJoin(
       const previousRoomId = s.roomId;
       socket.leave(`room:${previousRoomId}`);
       s.roomId = null;
+      s.mode = null;
       // Unconditional, the same rule room:leave applies below and the
       // same rule the barter and aid sweeps just under this line apply.
       // It used to ask whether this was the captain's last socket, which
@@ -85,6 +94,10 @@ export function wireRoomJoin(
     const wasReconnecting = cancelDeparture(roomId, s.userId);
 
     s.roomId = roomId;
+    // Read through the normalizer rather than trusted, the same way the
+    // room's mode is read everywhere else: a room row written before modes
+    // existed answers the founding mode.
+    s.mode = normalizeMode(member.room.mode);
     socket.join(`room:${roomId}`);
     if (!wasReconnecting) {
       io.to(`room:${roomId}`).emit("room:system", {

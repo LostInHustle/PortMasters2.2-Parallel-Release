@@ -26,7 +26,7 @@
 // with the escort off but the refit on is an ordinary build and the two
 // switches answer for their own rows (see escortContractsOn in ../flags).
 // =====================================================================
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "../constants";
+import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "../constants/paths";
 import type { GameState, Phase } from "../types";
 
 /**

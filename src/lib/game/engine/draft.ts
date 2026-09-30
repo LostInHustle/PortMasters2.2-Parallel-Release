@@ -24,7 +24,10 @@
 // with the good, since the reason is the only part of a refusal worth
 // printing.
 // =====================================================================
-import { PATH_SWITCH_FROM_ROUND, PATH_SWITCH_TO_ROUND } from "../constants";
+import {
+  PATH_SWITCH_FROM_ROUND,
+  PATH_SWITCH_TO_ROUND,
+} from "../constants/paths";
 import {
   pathSwitchFee,
   pathSwitchPhase,
@@ -179,7 +182,7 @@ function forfeitPathOrders(state: GameState, path: PathId): number {
   const before = state.customerCards.length;
   state.customerCards = state.customerCards.filter((card) => {
     if (state.completedOrders.includes(card.id)) return true;
-    return pathOrderOf(card) !== path;
+    return pathOrderOf(card, state.mode) !== path;
   });
   return before - state.customerCards.length;
 }

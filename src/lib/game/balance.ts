@@ -59,7 +59,7 @@ export const WIN_RATE_TARGETS: Record<
 const ROLE_ORDER: readonly GambitRole[] = ["honest", "broker", "pirate"];
 
 // One cell of the grid: how a role did at one table size.
-export type BandReading = {
+type BandReading = {
   alignment: GambitRole;
   // The band's own label, taken from the deck's table rather than written
   // again, so a report and the rung cannot disagree about what a band is
@@ -116,7 +116,7 @@ export function readWinRates(rows: readonly VoyageOutcome[]): BandReading[] {
 // does not exist, and a role with fewer than two played bands has no
 // swing to read at all: `points` is null there rather than 0.0, which is
 // the same rule `rate` follows one cell up.
-export type SwingReading = {
+type SwingReading = {
   alignment: GambitRole;
   // How many bands of this role saw play, so "one played band at most"
   // and "no band played" can be told apart by whatever prints it.

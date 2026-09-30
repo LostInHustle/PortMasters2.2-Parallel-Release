@@ -29,9 +29,10 @@
 // voyage that outgrows it loses its oldest lines, which is the same
 // trade the REST history routes already made.
 // =====================================================================
+import { RoomMembersPayload } from "@/types/realtime/moderation";
+import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import type { PublicUser, RoomMembersPayload } from "@/types/realtime";
 import { emitToUser, roomMembers } from "./presence";
 
 // [J2: the mute and the report] Whether a write failed because the row it

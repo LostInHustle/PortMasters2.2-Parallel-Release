@@ -17,17 +17,18 @@
 // somebody knows is not chrome, and giving it a widget hue would put a
 // thirteenth colour on a wheel that already has twelve.
 
+import { AuditReveal } from "@/types/realtime/audit";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
-import { AUDIT_FROM_ROUND, fulfillmentLine } from "@/lib/game/audit";
-import { normalizeMode } from "@/lib/game/mode";
+import { fulfillmentLine } from "@/lib/game/audit";
+import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
 import { tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
-import type { AuditReveal } from "@/types/realtime";
 import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
@@ -50,10 +51,16 @@ export function AuditVoteCard({
   // Before the rung it explains itself, at the Parley of a rung round it
   // offers the vote, and after the audit is spent it says so rather than
   // going quiet.
-  if (normalizeMode(game.mode) !== "ocean_gambit") return null;
+  //
+  // The rung is read off the mode's own record rather than compared against
+  // a constant, so this panel and the server's vote ask one question: a
+  // mode whose rung is null has no manifest to open, and that is what
+  // draws nothing here (see auditOpensAt in @/lib/game/mode).
+  const opensAt = auditOpensAt(game.mode);
+  if (opensAt === null) return null;
   if (game.phase !== "parley") return null;
   const spent = audit.reveal !== null;
-  const open = game.currentRound >= AUDIT_FROM_ROUND;
+  const open = game.currentRound >= opensAt;
   const rows = tallyRows(audit.votes, members);
   const nameOf = (id: string) =>
     members.find((m) => m.id === id)?.displayName ?? "a captain";
@@ -67,7 +74,7 @@ export function AuditVoteCard({
         <p className="text-center text-xs text-muted-foreground leading-relaxed">
           {spent
             ? "This voyage's audit has been called. The harbor gets one."
-            : `From leg ${AUDIT_FROM_ROUND}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
+            : `From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
         </p>
       ) : (
         <>
@@ -77,10 +84,9 @@ export function AuditVoteCard({
             more this leg.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            <select
+            <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
               aria-label="Captain to audit"
             >
               <option value="">Choose a captain</option>
@@ -89,7 +95,7 @@ export function AuditVoteCard({
                   {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button
               variant="outline"
               disabled={!target || !audit.canVote}
@@ -123,7 +129,7 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
   if (dismissed === key) return null;
 
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-intel/40 bg-intel/[0.06] ring-1 ring-intel/20">
+    <div className="rounded-2xl px-3 py-2 border border-intel/40 bg-intel/[0.06] ring-1 ring-intel/20">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🔎

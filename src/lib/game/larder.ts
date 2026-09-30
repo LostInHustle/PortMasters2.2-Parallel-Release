@@ -59,7 +59,7 @@ import {
   RATION_PRICE,
   SHORT_RATIONS_YIELD,
   type FoodId,
-} from "./constants";
+} from "./constants/supplies";
 import {
   cargoSlots,
   holdCapacityOn,
@@ -95,9 +95,9 @@ export function crewSize(state: Pick<GameState, "workers">): number {
  * running.
  */
 export function onShortRations(
-  state: Pick<GameState, "workers" | "larder">,
+  state: Pick<GameState, "workers" | "larder" | "mode">,
 ): boolean {
-  if (!survivalLayerOn()) return false;
+  if (!survivalLayerOn(state.mode)) return false;
   return state.larder <= 0 && crewSize(state) > 0;
 }
 
@@ -152,7 +152,7 @@ export function shortRationsYield(amount: number): number {
  * as well, since the rules that would read it are not running.
  */
 export function feedCrew(state: GameState, logs: string[]): boolean {
-  if (!survivalLayerOn()) return false;
+  if (!survivalLayerOn(state.mode)) return false;
   if (state.larderFedRound === state.currentRound) return false;
   state.larderFedRound = state.currentRound;
   const crew = crewSize(state);
@@ -203,7 +203,7 @@ export function feedCrew(state: GameState, logs: string[]): boolean {
  * capacity is decided and no counter grows a modifier of its own.
  */
 export function cargoCapacity(state: GameState): number {
-  if (!holdCapacityOn()) return Number.POSITIVE_INFINITY;
+  if (!holdCapacityOn(state.mode)) return Number.POSITIVE_INFINITY;
   return Math.floor(
     cargoSlots(onShortRations(state)) * pathCargoModifier(state.path),
   );
@@ -266,7 +266,7 @@ export function provisionFood(
   legs: number,
   logs: string[],
 ): number {
-  if (!survivalLayerOn()) return 0;
+  if (!survivalLayerOn(state.mode)) return 0;
   const crew = crewSize(state);
   if (crew === 0) {
     logs.push("⚓ No crew aboard, so there is nothing to provision.");
@@ -294,6 +294,13 @@ export function provisionFood(
   addLot(state, food, rations, state.currentRound);
   state.roundCosts += cost;
   state.totalCosts += cost;
+  // [E1: the Supply Barge] The voyage's food spending, counted where the
+  // Gold actually leaves the purse rather than summed later out of the log
+  // lines. It is the denominator the Barge's share of food spending is
+  // read against, and the Barge writes the other half of the same pair in
+  // ./engine/barge: two counters, both written at the till, and the share
+  // between them is the plan's front page number.
+  state.foodSpend += cost;
   logs.push(
     `🧺 Provisioned ${rations} ${rations === 1 ? "ration" : "rations"} of ${food} for ${crew} aboard (${cost} Gold). ${state.larder} in the larder.`,
   );
@@ -321,10 +328,10 @@ export function provisionFood(
  * from ./hold, and it is an end and not a tune: nothing in play reaches
  * it, because the room checks stop a purchase first.
  */
-export function normalizeLarder(raw: unknown): number {
+export function normalizeLarder(raw: unknown, mode: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return LARDER_START;
   const whole = Math.floor(raw);
-  const ceiling = holdCapacityOn() ? storesMealCeiling() : LARDER_MAX;
+  const ceiling = holdCapacityOn(mode) ? storesMealCeiling() : LARDER_MAX;
   return Math.min(ceiling, Math.max(0, whole));
 }
 

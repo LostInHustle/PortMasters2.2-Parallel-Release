@@ -22,7 +22,7 @@
 // reads is the one its locked cards already read, and it is judged in
 // ./flags, which is where the epic keeps that policy.
 // =====================================================================
-import { OPPORTUNIST_PENALTY, OPPORTUNIST_USES } from "../constants";
+import { OPPORTUNIST_PENALTY, OPPORTUNIST_USES } from "../constants/paths";
 import { pathOrdersOn } from "../flags";
 import type { PathId } from "../paths";
 import type { GameState } from "../types";
@@ -88,13 +88,13 @@ export function opportunistBorrowsLeft(
  * The flag read is written out in full at this line rather than passed by
  * name, which is the browser's rule and not a taste in signatures: a
  * bundle is handed the values it was built with by a substitution that
- * only matches a read written where it happens (see flagOn).
+ * only matches a read written where it happens (see flagOnFor).
  */
 export function opportunistMayBorrow(
-  state: Pick<GameState, "path" | "opportunistBorrows">,
+  state: Pick<GameState, "path" | "opportunistBorrows" | "mode">,
   locked: PathId | null,
 ): boolean {
-  if (!pathOrdersOn()) return false;
+  if (!pathOrdersOn(state.mode)) return false;
   if (state.path !== OPPORTUNIST_PATH) return false;
   if (locked === null) return false;
   return opportunistBorrowsLeft(state) > 0;

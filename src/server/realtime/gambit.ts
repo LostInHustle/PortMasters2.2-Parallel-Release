@@ -242,7 +242,7 @@ export async function clearAlignments(roomId: string): Promise<void> {
 
 // One captain's card as the victory rules read it: the alignment, and the
 // goal the card carried resolved to the record rather than left as an id.
-export type HeldCard = {
+type HeldCard = {
   role: GambitRole;
   flourish: Flourish | null;
 };

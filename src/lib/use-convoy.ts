@@ -1,8 +1,8 @@
 "use client";
 
+import { VentureSummary } from "@/types/realtime/ventures";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { VentureSummary } from "@/types/realtime";
 import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
 
 // The wire shape for a venture lives in @/types/realtime as VentureSummary.

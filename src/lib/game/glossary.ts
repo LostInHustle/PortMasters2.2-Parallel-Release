@@ -6,7 +6,8 @@
 // label across the status panel, the phase screens, and the player
 // detail popup.
 // =====================================================================
-import { BOONS, FLEXIBLE_BARTER_UNLOCK_LEVEL, MODULES } from "./constants";
+import { BOONS, MODULES } from "./constants/drafts";
+import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "./constants/goods";
 import { DIFFICULTIES, pirateOddsLabel } from "./difficulty";
 import { INCOME_TAX_RATE, VAT_RATE } from "./engine";
 

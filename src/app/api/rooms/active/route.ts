@@ -19,13 +19,12 @@
 // that throws them away.
 import { NextResponse } from "next/server";
 import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { serializeRoom } from "@/lib/rooms";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   // Nothing stops a captain holding seats in more than one room (RoomMember
   // is unique per user and room, not per user), so pick the seat they took

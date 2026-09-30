@@ -25,15 +25,15 @@
 //
 // The second is what the page owes a reader when a gate has no source.
 // Sixteen numbers are launch gates (goal I4) and most of them belong to
-// epics this tree has not built: the seat, the paths and the Barge are
-// Epics C, D and E, the card and charter gates are F, the market gates
-// are G, and hold utilization waits on C4. Every one of those appears
-// below as a reading with no source and the epic it waits on beside it,
-// never as a zero, because a dashboard that prints 0.0% for something
-// nobody has measured is the instrument the plan warns about. What the
-// spine can already read, it reads: the win rate bands and the swing
-// across them, session length, the lobby fill time by table size, where
-// voyages stopped, maroon retention and bankruptcy.
+// epics this tree has not built: the card and charter gates are F and the
+// market gates are G. Every one of those appears below as a reading with no
+// source and the epic it waits on beside it, never as a zero, because a
+// dashboard that prints 0.0% for something nobody has measured is the
+// instrument the plan warns about. What the record can already answer, it
+// answers: the win rate bands and the swing across them, session length,
+// the lobby fill time by table size, where voyages stopped, hold
+// utilization, maroon retention, bankruptcy, and the Barge's own two
+// numbers, which is where this module's reading of Epic E lands.
 //
 // A reading is judged by one of five verdicts. A gate a window could
 // compare reads `in`, `under` or `over`; a gate whose band saw no voyage
@@ -65,7 +65,7 @@ import { roleCard, type GambitRole } from "./gambit";
 // than repeated as a number here: a hold whose size was retuned in
 // ./constants must move the percentage on this page without anybody
 // editing a dashboard.
-import { CARGO_SLOTS, STORES_SLOTS } from "./constants";
+import { CARGO_SLOTS, STORES_SLOTS } from "./constants/supplies";
 // The table size bands, read from the deck's own table rather than
 // repeated here: the fill time below is read one band at a time, and a
 // band the draw knows and the dashboard does not would be a table size
@@ -212,10 +212,11 @@ export type DashboardInput = {
 export type DashboardReading = {
   // The plan's front page number: the Barge revenue share of all food
   // spending, which is the early warning for the Quartermaster seat going
-  // wrong. It is a slot rather than a reading until Epic E ships, and it
-  // is carried here on its own rather than only inside the seat panel,
-  // because the plan says front page and a panel three screens down is
-  // not the front page.
+  // wrong. It is read from the leg reports now rather than held as a slot,
+  // and it is carried here as well as inside the seat panel rather than
+  // only there, because the plan says front page and a panel three screens
+  // down is not the front page. The page and the panel hold the same
+  // object, built once in readDashboard, so the two cannot drift apart.
   frontPage: DashboardReadingLine;
   window: DashboardWindow;
   panels: DashboardPanel[];
@@ -225,17 +226,100 @@ export type DashboardReading = {
 // page cannot show two words for one absence.
 const NO_SOURCE = "not measurable";
 
-// The plan's front page number, and the seat's early warning: a table
-// buying its food from the Barge instead of from a captain is the seat
-// having failed to be worth taking. There is no source for it until Epic
-// E ships the Barge itself, and saying so in the slot is what keeps the
-// number's place on the page rather than dropping it.
-const BARGE_SHARE: DashboardReadingLine = {
-  label: "Barge revenue share of all food spending",
-  value: NO_SOURCE,
-  target: "waits on Epic E",
-  verdict: "unmeasured",
+// The Barge's two rows, built together off one pass over the records.
+type BargeReadings = {
+  share: DashboardReadingLine;
+  without: DashboardReadingLine;
 };
+
+/**
+ * The two numbers the plan judges the Barge by, read off the leg reports.
+ *
+ * The plan's evaluation names them as a pair that is only worth anything
+ * read together: the share of all food spending that went over the vendor's
+ * counter, which is the early warning for the seat going wrong, and the
+ * share of lobbies that sailed without it, which is the same question asked
+ * from the table's side. They move in opposite directions, and a window
+ * where one is healthy and the other is not is the reading that says
+ * whether the Barge is a fallback or the market.
+ *
+ * Both come off two figures a captain files with the leg: what the voyage
+ * has spent on food and what of that went to the Barge. The figures are the
+ * voyage's running totals rather than the leg's, so the reader takes each
+ * captain's report at their greatest leg instead of adding the legs up,
+ * which would count every purchase once per leg it survived. A voyage whose
+ * captains filed no such pair was not playing the provisions layer, and it
+ * is left out of the sample rather than counted as a lobby that avoided the
+ * vendor: the honest reading of a switched off layer is that it was never
+ * played, which is the line every other switched reading on this page
+ * draws.
+ *
+ * The lobby in the second number is one voyage's table, because the plan's
+ * question is about tables and not about captains: a lobby sailed without
+ * the Barge when nobody at it bought from the vendor, however many of the
+ * captains aboard looked at the price.
+ */
+function readBarge(records: readonly TelemetryRecord[]): BargeReadings {
+  let voyages = 0;
+  let without = 0;
+  let food = 0;
+  let barge = 0;
+  for (const record of records) {
+    const latest = new Map<
+      string,
+      { leg: number; food: number; barge: number }
+    >();
+    for (const event of record.events) {
+      if (event.name !== "leg_report") continue;
+      const { foodSpend, bargeSpend } = event;
+      if (foodSpend === undefined || bargeSpend === undefined) continue;
+      const seen = latest.get(event.actor);
+      if (seen === undefined || event.leg > seen.leg) {
+        latest.set(event.actor, {
+          leg: event.leg,
+          food: foodSpend,
+          barge: bargeSpend,
+        });
+      }
+    }
+    if (latest.size === 0) continue;
+    voyages++;
+    let atBarge = 0;
+    for (const report of latest.values()) {
+      food += report.food;
+      barge += report.barge;
+      atBarge += report.barge;
+    }
+    if (atBarge === 0) without++;
+  }
+
+  const share: DashboardReadingLine = {
+    label: "Barge revenue share of all food spending",
+    value:
+      voyages === 0
+        ? "no leg report from a provisions harbor"
+        : food === 0
+          ? "no food bought in the window"
+          : `${ratePercent(barge / food)} of ${food} Gold over ${voyages} ${voyages === 1 ? "voyage" : "voyages"}`,
+    // The plan sets no band on this number. It is the page's front page
+    // figure and its early warning, and a threshold invented for it here
+    // would be a gate the plan never made, which is why it reads measured
+    // and unjudged rather than inside or outside anything.
+    target: "no threshold in the plan",
+    verdict: voyages === 0 ? "unplayed" : "ungated",
+  };
+  const rate = voyages === 0 ? null : Math.round((without / voyages) * 100);
+  const withoutRow: DashboardReadingLine = {
+    label: "Lobbies that sailed without the Barge",
+    value:
+      voyages === 0
+        ? "no leg report from a provisions harbor"
+        : `${sharePercent(without, voyages)} of ${voyages} ${voyages === 1 ? "lobby" : "lobbies"}`,
+    target: "above 70%",
+    verdict: rate === null ? "unplayed" : rate < 70 ? "under" : "in",
+  };
+  return { share, without: withoutRow };
+}
 
 /**
  * The whole reading: every panel, and the window they were read over.
@@ -263,11 +347,17 @@ export function readDashboard(input: DashboardInput): DashboardReading {
     unreadable: input.unreadable,
   };
 
+  // The Barge's two rows are read once, here, and handed to the seat panel
+  // rather than read inside it: the first of them is also the page's front
+  // page number, and one object reaching both places is what makes the two
+  // the same reading rather than two readings that agree today.
+  const barge = readBarge(records);
+
   return {
-    frontPage: BARGE_SHARE,
+    frontPage: barge.share,
     window,
     panels: [
-      seatPanel(),
+      seatPanel(barge),
       staplesPanel(records),
       variancePanel(records, outcomes),
       floorPanel(records, outcomes),
@@ -277,15 +367,21 @@ export function readDashboard(input: DashboardInput): DashboardReading {
 
 /* === The four panels === */
 
-// The seat, the paths that compete with it, and the Barge that catches a
-// table where nobody took it. All four gates belong to epics this tree
-// has not built, so the panel is four slots and a reason: it is the one
-// panel that measures nothing yet and is not missing anything, because
-// there is nothing in the record that could stand in for a seat no voyage
-// has.
-function seatPanel(): DashboardPanel {
+// The seat, the paths that compete with it, and the two numbers the Barge
+// is judged by: the share of all food spending that went over its counter,
+// and the share of lobbies that sailed without it.
+//
+// The Barge's two rows are read from the record and handed in, so the first
+// of them can stand as the front page number at the same time. The seat's
+// three gates are slots still, and the reason is the reading rather than the
+// source: the record carries the path each captain sailed, filed once per
+// captain when the draft settles, and this page does not reduce that event
+// into a pick rate or a share of the fleet yet. A slot says so rather than
+// printing a zero, which is the rule the whole page is built on.
+function seatPanel(barge: BargeReadings): DashboardPanel {
   const readings: DashboardReadingLine[] = [
-    BARGE_SHARE,
+    barge.share,
+    barge.without,
     {
       label: "Quartermaster fill",
       value: NO_SOURCE,
@@ -313,11 +409,14 @@ function seatPanel(): DashboardPanel {
     title: "The Quartermaster seat",
     question: "Is the Quartermaster seat healthy?",
     state: stateOf(readings),
-    answer:
-      "No reading yet: the seat ships with Epic C, the paths that compete for it with Epic D, and the Barge with Epic E.",
+    answer: summarize(
+      readings,
+      "No reading yet: the seat's three readings are counts over an event the record carries and this page does not reduce. The Barge's own two numbers are read below.",
+    ),
     readings,
     gaps: [
-      "The seat, its path cards and the Barge belong to Epics C, D and E, so none of these four gates has a source yet. The spine is built to carry them: the survival family, which is where Barge revenue and food spending land, has no event in it for the same reason the seat has no players yet.",
+      "Three of the seat's readings are counts over an event the record already carries: the path each captain sailed is filed once per captain when the draft settles, with the seconds the table took to choose, and both the pick rate and the Quartermaster's share of the fleet are counted from it. The page does not reduce that event yet, so the three read as not measurable rather than as zeroes: a rate nobody computed is not a zero, and this is a reading to write rather than a source that is missing.",
+      "The Barge's two numbers are read from the leg reports: each captain files the voyage's running food spending and Barge spending with the leg, and the page takes the report at their greatest leg rather than adding the legs up, because the figures are the voyage's totals and counting them per leg would count every purchase once per leg it survived. A voyage whose captains filed no such pair was not playing the provisions layer, and it is left out of the sample rather than counted as a lobby that avoided the vendor.",
     ],
   };
 }

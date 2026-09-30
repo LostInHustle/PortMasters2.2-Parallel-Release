@@ -14,7 +14,7 @@
 // sail from: a port exists per market card and per order, not per captain.
 // =====================================================================
 
-import { ICONS } from "../constants";
+import { ICONS } from "../constants/brand";
 import type { GameState, Phase } from "../types";
 import { objectiveTaking, type Objective } from "../objectives";
 

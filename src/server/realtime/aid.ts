@@ -11,8 +11,8 @@
 // on their own client against their own GameState, same as a barter
 // offer's affordability.
 // =====================================================================
+import { AidRequest } from "@/types/realtime/boards";
 import type { Server } from "socket.io";
-import type { AidRequest } from "@/types/realtime";
 import { roomCheckpoints } from "./checkpoint";
 
 const roomAidRequests = new Map<string, AidRequest[]>();

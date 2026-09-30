@@ -1,11 +1,16 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
-import { BOON_SWAP_COST } from "@/lib/game/constants";
-import { Term } from "../../Term";
-import { PhaseClockBar, type PhasePanelProps } from "./PhaseShared";
+import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
+import {
+  CancelReadyButton,
+  DraftCard,
+  DraftGrid,
+  DraftSwapButton,
+  PhaseClockBar,
+  PhaseHeading,
+  type PhasePanelProps,
+} from "./PhaseShared";
 
 export function BoonDraft({
   game,
@@ -22,9 +27,9 @@ export function BoonDraft({
   if (phaseSync.waiting) {
     return (
       <div className="max-w-md mx-auto text-center py-10">
-        <div className="text-2xl font-bold mb-1 text-dawn">
+        <PhaseHeading layout="mb-1" tone="text-dawn">
           🧭 Boon Locked In
-        </div>
+        </PhaseHeading>
         <p className="text-sm text-muted-foreground mb-5">
           The voyage begins once every captain has chosen.
         </p>
@@ -33,80 +38,47 @@ export function BoonDraft({
           members={members}
           className="mb-5"
         />
-        <Button
-          variant="secondary"
-          className="rounded-xl"
-          onClick={phaseSync.cancelReady}
-        >
+        <CancelReadyButton phaseSync={phaseSync}>
           ↩️ Choose a different Boon
-        </Button>
+        </CancelReadyButton>
       </div>
     );
   }
   const canSwap = !game.boonSwapUsed && game.money >= BOON_SWAP_COST;
   return (
     <div className="max-w-4xl mx-auto text-center py-2">
-      <div className="text-2xl font-bold mb-1 text-dawn">
+      <PhaseHeading layout="mb-1" tone="text-dawn">
         🧭 The Navigator's Compass
-      </div>
+      </PhaseHeading>
       <p className="text-sm text-muted-foreground mb-2">
         Draft a Boon to synergize with your strategy
       </p>
       <PhaseClockBar phaseSync={phaseSync} members={members} className="mb-3" />
-      <div className="flex justify-center mb-4">
-        <Button
-          size="sm"
-          variant="secondary"
-          className="rounded-lg"
-          disabled={!canSwap}
-          onClick={() => act((g, l) => swapBoonChoices(g, l))}
-        >
-          {game.boonSwapUsed
-            ? "✅ Boons Swapped This Round"
-            : `🔄 Swap Boons (${BOON_SWAP_COST}💰, 1 use/round)`}
-        </Button>
-      </div>
-      <motion.div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: {},
-          visible: { transition: { staggerChildren: 0.06 } },
-        }}
+      <DraftSwapButton
+        disabled={!canSwap}
+        onClick={() => act((g, l) => swapBoonChoices(g, l))}
       >
+        {game.boonSwapUsed
+          ? "✅ Boons Swapped This Round"
+          : `🔄 Swap Boons (${BOON_SWAP_COST}💰, 1 use/round)`}
+      </DraftSwapButton>
+      <DraftGrid>
         {picks.map((b) => (
-          <motion.div
+          <DraftCard
             key={b.id}
-            variants={{
-              hidden: { opacity: 0, y: 16 },
-              visible: {
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.22, ease: "easeOut" },
-              },
-            }}
-            whileHover={{ y: -6 }}
-            className="pm-glass rounded-2xl p-5 flex flex-col items-center text-center border border-dawn/15"
-          >
-            <div className="text-5xl mb-2">{b.icon}</div>
-            <div className="font-semibold text-foreground mb-2">
-              <Term term={b.name}>{b.name}</Term>
-            </div>
-            <div className="text-xs text-muted-foreground leading-relaxed flex-1 mb-4">
-              {b.desc}
-            </div>
-            <Button
-              className="pm-grad-dawn font-semibold rounded-xl w-full"
-              onClick={() =>
-                phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
-              }
-            >
-              🔒 Lock In Boon
-            </Button>
-          </motion.div>
+            tone="border-dawn/15"
+            icon={b.icon}
+            name={b.name}
+            nameClassName="text-foreground"
+            desc={b.desc}
+            actionLabel="🔒 Lock In Boon"
+            actionClassName="pm-grad-dawn"
+            onSelect={() =>
+              phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
+            }
+          />
         ))}
-      </motion.div>
+      </DraftGrid>
     </div>
   );
 }

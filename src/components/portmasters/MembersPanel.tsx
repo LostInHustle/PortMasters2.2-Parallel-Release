@@ -1,40 +1,20 @@
 "use client";
 
+import { PlayerReportAck } from "@/types/realtime/moderation";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
 import { useRoomRoster } from "@/lib/use-room-roster";
-import { Avatar, OnlineDot, Pill } from "./shared";
-import { cn } from "@/lib/utils";
-import {
-  Ship,
-  Coins,
-  Trophy,
-  Crown,
-  SkullIcon,
-  Anchor,
-  VolumeX,
-  Volume2,
-  Eye,
-  Flag,
-  Loader2,
-  Utensils,
-} from "lucide-react";
 import { toast } from "sonner";
-import type { PlayerReportAck } from "@/types/realtime";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  usePlayerDetail,
-  type PlayerDetailData,
-} from "@/lib/use-player-detail";
-import { bandFor, canSeeDetail } from "@/lib/game/engine";
-import { seatMarks } from "@/lib/seatMarks";
+import { usePlayerDetail } from "@/lib/use-player-detail";
+import { RosterHeader } from "./roster/RosterHeader";
+import { RosterRow } from "./roster/RosterRow";
+import { SystemNotices } from "./roster/SystemNotices";
 
+// The panel itself is the wiring and nothing else: the roster hook, the
+// notice feed, the run of actions this viewer has taken, and the sort. The
+// heading, the row and the notices under it are drawn by the three
+// components under ./roster, each handed only the fields it draws.
 /**
  * Live roster of room members, collapsed down to what matters at a glance:
  * gold, reputation, and whether they're still in the run. Click a row to
@@ -159,207 +139,28 @@ export function MembersPanel({
 
   return (
     <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
-      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Ship className="h-4 w-4 text-members" /> Harbor Roster
-        </h3>
-        <Pill tone="sea">
-          {members.length} captain{members.length !== 1 ? "s" : ""}
-        </Pill>
-      </div>
+      <RosterHeader memberCount={members.length} />
 
       <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">
-        {sorted.map((m) => {
-          const st = statuses[m.id];
-          const isMe = m.id === me.id;
-          const isHost = m.id === hostId;
-          // [H7: Maroon and the Harbormaster] The two marks a failed
-          // voyage leaves on a seat, read through the one place that
-          // states the rule (see seatMarks). Both are read from the
-          // broadcast status for the reason the bankruptcy mark always
-          // was: in Ocean Gambit a failed seat sails on, so the phase
-          // alone would badge nobody.
-          const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
-          const isMuted = mutedUserIds.has(m.id);
-          // [MANIFEST: Partial Sight] The target's Renown level arrives
-          // with the roster status when the server reports it. If it is
-          // missing, we treat it as zero, which makes canSeeDetail return
-          // false and the peek button stays hidden.
-          const theirRenownLevel = st?.renownLevel ?? 0;
-          const canPeek = canSeeDetail(myRenownLevel, theirRenownLevel);
-          return (
-            <motion.div
-              key={m.id}
-              layout
-              role="button"
-              tabIndex={0}
-              whileHover={{ scale: 1.01, y: -1 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.12, ease: "easeOut" }}
-              onClick={() => onSelectPlayer(m.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectPlayer(m.id);
-                }
-              }}
-              className={cn(
-                "w-full flex items-center gap-2.5 rounded-xl p-2 border text-left transition-colors cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.05]",
-                isMe
-                  ? "border-members/30 bg-members/[0.06]"
-                  : "border-black/5 dark:border-white/10 bg-background/40",
-              )}
-            >
-              <div className="relative shrink-0">
-                <Avatar hue={m.avatarHue} name={m.displayName} size={32} ring />
-                <OnlineDot
-                  online
-                  size={9}
-                  className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background rounded-full"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium truncate">
-                    {m.displayName}
-                  </span>
-                  {isHost && (
-                    <Crown className="h-3.5 w-3.5 text-gold-ink shrink-0" />
-                  )}
-                  {isMe && (
-                    <Pill tone="default" className="!py-0">
-                      you
-                    </Pill>
-                  )}
-                  {isMuted && (
-                    <Pill tone="alarm" className="!py-0">
-                      <VolumeX className="h-2.5 w-2.5" /> muted
-                    </Pill>
-                  )}
-                </div>
-                <div className="text-[10px] text-muted-foreground truncate">
-                  {st ? st.phaseLabel : "loading…"}
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {isBankrupt ? (
-                  <Pill tone="alarm">
-                    <SkullIcon className="h-3 w-3" /> Bankrupt
-                  </Pill>
-                ) : (
-                  <>
-                    {/* A marooned captain still has real books, so the
-                        gold and reputation pills stay; the badge says what
-                        happened to the ship, not to the purse. */}
-                    {isMarooned && (
-                      <Pill tone="alarm">
-                        <Anchor className="h-3 w-3" /> Ashore
-                      </Pill>
-                    )}
-                    {/* [C1: the Larder and Short Rations] The plan asks for
-                        the shortage to be visible to the fleet, not just to
-                        the captain living it, and this is the board the
-                        fleet reads. It wears the meaning red rather than
-                        the Larder's own hue: the Larder's colour names the
-                        panel on the Market screen, while a status is drawn
-                        from the meaning half of the palette wherever it
-                        appears (see Pill). Not folded into seatMarks, which
-                        is about the two marks that write a seat off: a
-                        hungry captain is neither of those, and a badge that
-                        rode writtenOff would quietly take them out of the
-                        running for a vote they are still entitled to. */}
-                    {st?.shortRations && (
-                      <span title="Going hungry: the crew is on short rations and working at a slower pace">
-                        <Pill tone="alarm">
-                          <Utensils className="h-3 w-3" /> Short Rations
-                        </Pill>
-                      </span>
-                    )}
-                    <Pill tone="gold">
-                      <Coins className="h-3 w-3" /> {st ? st.gold : "…"}
-                    </Pill>
-                    <Pill tone="favor">
-                      <Trophy className="h-3 w-3" /> {st ? st.reputation : "…"}
-                    </Pill>
-                  </>
-                )}
-
-                {/* [MANIFEST: Partial Sight] Read only peek at a partner's
-                    banded cargo. Hidden on my own row, on a bankrupt
-                    captain's row, and whenever the trust threshold is not
-                    met. */}
-                {!isMe && !isBankrupt && canPeek && (
-                  <PeekButton
-                    targetName={m.displayName}
-                    onPeek={() => requestDetail(m.id)}
-                    loading={Boolean(loading[m.id])}
-                    snapshot={detail[m.id] ?? null}
-                  />
-                )}
-
-                {/* [MANIFEST 14: Harbor Watch] Host only, never on my own
-                    row: the host can mute anyone else, never themselves. */}
-                {viewerIsHost && !isMe && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      socket?.emit(isMuted ? "chat:unmute" : "chat:mute", {
-                        roomId,
-                        targetUserId: m.id,
-                      });
-                    }}
-                    title={
-                      isMuted ? "Unmute this captain" : "Mute this captain"
-                    }
-                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground"
-                  >
-                    {isMuted ? (
-                      <Volume2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <VolumeX className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                )}
-
-                {/* [J2: the mute and the report] Every captain on every
-                    other captain's row, host or not, because this is the
-                    remedy for a harbor somebody else is running and a mode
-                    that seats strangers needs one. It settles once it has
-                    been used, since the server writes one row per pair per
-                    voyage and a second raise would only earn a notice that
-                    it was already on the record. */}
-                {!isMe && (
-                  <button
-                    type="button"
-                    disabled={reportedIds.has(m.id)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      socket?.emit("player:report", {
-                        roomId,
-                        targetUserId: m.id,
-                      });
-                    }}
-                    aria-label={`Report ${m.displayName}`}
-                    title={
-                      reportedIds.has(m.id)
-                        ? "You have reported this captain this voyage"
-                        : `Report ${m.displayName}`
-                    }
-                    className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    <Flag
-                      className={cn(
-                        "h-3.5 w-3.5",
-                        reportedIds.has(m.id) && "fill-current text-alarm",
-                      )}
-                    />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
+        {sorted.map((m) => (
+          <RosterRow
+            key={m.id}
+            member={m}
+            status={statuses[m.id]}
+            isMe={m.id === me.id}
+            isHost={m.id === hostId}
+            isMuted={mutedUserIds.has(m.id)}
+            reported={reportedIds.has(m.id)}
+            viewerIsHost={viewerIsHost}
+            myRenownLevel={myRenownLevel}
+            roomId={roomId}
+            socket={socket}
+            onSelectPlayer={onSelectPlayer}
+            onPeek={requestDetail}
+            peekLoading={Boolean(loading[m.id])}
+            peekSnapshot={detail[m.id] ?? null}
+          />
+        ))}
         {members.length === 0 && (
           <div className="text-center text-xs text-muted-foreground py-6">
             No captains in this harbor yet.
@@ -367,113 +168,7 @@ export function MembersPanel({
         )}
       </div>
 
-      {/* System notices */}
-      {systemNotes.length > 0 && (
-        <div className="border-t border-black/5 dark:border-white/10 px-3 py-2 max-h-16 overflow-y-auto pm-scroll">
-          <AnimatePresence initial={false}>
-            {systemNotes.slice(-2).map((n, i) => (
-              <motion.div
-                key={systemNotes.length - 2 + i}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[10px] text-muted-foreground italic"
-              >
-                {n}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+      <SystemNotices notes={systemNotes} />
     </div>
-  );
-}
-
-// The Partial Sight peek button and its popover. Renders the eye icon as
-// the trigger, then a small grid of banded cargo counts inside the
-// popover. The popover is read only: clicking the row itself still opens
-// the full PlayerDetailModal in GameRoom.
-function PeekButton({
-  targetName,
-  onPeek,
-  loading,
-  snapshot,
-}: {
-  targetName: string;
-  onPeek: () => void;
-  loading: boolean;
-  snapshot: PlayerDetailData | null;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Peek at ${targetName}'s cargo`}
-          title={`Partial sight peek at ${targetName}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPeek();
-          }}
-          className="p-1 rounded-lg hover:bg-black/[0.05] dark:hover:bg-white/10 text-muted-foreground"
-        >
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Eye className="h-3.5 w-3.5" />
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-64 text-xs"
-        align="end"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-1.5 flex items-center gap-1.5">
-          <Eye className="h-3.5 w-3.5 text-members" />
-          <span className="font-semibold">{targetName}</span>
-          <span className="ml-auto text-[10px] text-muted-foreground">
-            partial sight
-          </span>
-        </div>
-        {!snapshot ? (
-          <p className="text-muted-foreground py-2 text-center">
-            {loading
-              ? "Asking the harbor…"
-              : "No snapshot yet. Tap the eye again."}
-          </p>
-        ) : (
-          <div className="space-y-0.5">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Gold</span>
-              <b className="capitalize">{bandFor(snapshot.money)}</b>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Reputation</span>
-              <b className="capitalize">{bandFor(snapshot.score)}</b>
-            </div>
-            <div className="mt-1 border-t border-black/5 dark:border-white/10 pt-1">
-              {Object.entries(snapshot.inventory)
-                .filter(([, n]) => n > 0)
-                .slice(0, 6)
-                .map(([item, n]) => (
-                  <div key={item} className="flex justify-between">
-                    <span className="text-muted-foreground truncate">
-                      {item}
-                    </span>
-                    <b className="capitalize">{bandFor(n)}</b>
-                  </div>
-                ))}
-              {Object.values(snapshot.inventory).every((n) => n === 0) && (
-                <p className="text-muted-foreground italic">Hold is empty.</p>
-              )}
-            </div>
-          </div>
-        )}
-        <p className="mt-1.5 text-[10px] text-muted-foreground">
-          Bands are read from {targetName}'s live snapshot. The harbor master
-          only shares what your standing allows.
-        </p>
-      </PopoverContent>
-    </Popover>
   );
 }

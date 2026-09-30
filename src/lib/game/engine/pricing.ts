@@ -23,15 +23,15 @@
 // splitting them would mean copying the whole body to buy a separation
 // that had already gone, and a second copy is where a drift would start.
 // =====================================================================
+import { WAGES } from "../constants/crew";
+import { BOONS } from "../constants/drafts";
 import {
-  BOONS,
   COMMODITIES,
   PRODUCT_PRICES,
   RECIPES,
   RESOURCES,
-  SHIP_DISCOUNT_PER_LEVEL,
-  WAGES,
-} from "../constants";
+} from "../constants/goods";
+import { SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import type { GameState, ResourceCard } from "../types";
 import { brokersFavorPayoutCap } from "./ages";
 import { hasModule } from "./core";

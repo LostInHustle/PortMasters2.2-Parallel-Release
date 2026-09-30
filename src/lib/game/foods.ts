@@ -53,7 +53,7 @@ import {
   LARDER_MAX,
   PRESERVE_MEALS_IN,
   PRESERVE_MEALS_OUT,
-} from "./constants";
+} from "./constants/supplies";
 import { survivalLayerOn } from "./flags";
 import { holdCapacityOn, storeRoomMeals } from "./hold";
 import type { GameState, LarderLot } from "./types";
@@ -274,7 +274,7 @@ export function reconcileLarder(state: GameState): void {
  * account, in the same statement, so the two cannot part over a loss.
  */
 export function tickSpoilage(state: GameState, logs: string[]): void {
-  if (!survivalLayerOn()) return;
+  if (!survivalLayerOn(state.mode)) return;
   if (state.larderSpoilRound === state.currentRound) return;
   state.larderSpoilRound = state.currentRound;
   state.larderLots = state.larderLots ?? [];
@@ -326,7 +326,7 @@ export function tickSpoilage(state: GameState, logs: string[]): void {
  * Returns the batches converted, so the caller can report what happened.
  */
 export function preserveFood(state: GameState, logs: string[]): number {
-  if (!survivalLayerOn()) return 0;
+  if (!survivalLayerOn(state.mode)) return 0;
   reconcileLarder(state);
   const produce = mealsOf(state, "Produce");
   const batches = Math.floor(produce / PRESERVE_MEALS_IN);
@@ -363,7 +363,8 @@ export function preserveFood(state: GameState, logs: string[]): number {
  * however far over the ceiling the hold happens to be.
  */
 export function foodRoomMeals(state: GameState, food: FoodId): number {
-  if (!holdCapacityOn()) return Math.max(0, LARDER_MAX - state.larder);
+  if (!holdCapacityOn(state.mode))
+    return Math.max(0, LARDER_MAX - state.larder);
   return Math.max(0, storeRoomMeals(state, food));
 }
 

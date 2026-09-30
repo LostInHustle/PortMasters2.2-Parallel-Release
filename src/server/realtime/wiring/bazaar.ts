@@ -71,8 +71,8 @@ export function wireBazaar(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("bazaar:error", { roomId, error });
       };
-      if (!bazaarRumorsOn()) {
-        fail("The bazaar is not running in this build.");
+      if (!bazaarRumorsOn(s.mode)) {
+        fail("The bazaar is not running in this harbor.");
         return;
       }
       // The lean itself, checked before anything is read: a row whose

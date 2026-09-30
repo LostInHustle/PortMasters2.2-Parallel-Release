@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import {
   generateRoomCode,
   normalizeRoomName,
@@ -16,8 +16,7 @@ import { readJson } from "@/lib/api-json";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const rooms = await db.room.findMany({
     where: { isPublic: true },
@@ -49,8 +48,7 @@ const CreateSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const body = await readJson(req, CreateSchema);
   if (!body.ok) return body.response;

@@ -31,36 +31,40 @@
 // anything else happens, and a mismatch stops the run immediately.
 // =====================================================================
 import "@/server/env";
-import { loadServerConfig } from "@/lib/config";
-import { db } from "@/lib/db";
 import {
-  BOONS,
+  PlayerReportAck,
+  RoomMembersPayload,
+} from "@/types/realtime/moderation";
+import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
+import { DraftView, PathSwitched } from "@/types/realtime/draft";
+import { BazaarBoard, EscortBoard, RefitBoard } from "@/types/realtime/boards";
+import { AuditReveal } from "@/types/realtime/audit";
+import { PORTS_TIER2 } from "@/lib/game/constants/world";
+import { tipsText } from "@/lib/game/constants/tips";
+import {
+  BARGE_PRICE_MULTIPLIER,
+  BARGE_RATIONS_PER_LEG,
   CARGO_SLOTS,
-  COLD_LEG_CHANCE,
-  COLD_LEG_WARMTH,
-  COMMODITIES,
+  FOODS,
+  FOODS_DRAW_ORDER,
+  LARDER_MAX,
+  LARDER_START,
+  PRESERVE_MEALS_IN,
+  PRESERVE_MEALS_OUT,
+  RATION_PRICE,
+  SHORT_RATIONS_CARGO,
+  SHORT_RATIONS_YIELD,
+  STORES_SLOTS,
+} from "@/lib/game/constants/supplies";
+import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
+import {
   CONSENT_FEE_MAX,
   CONSENT_FEE_MIN,
   CONVOY_CANNON_SLOTS,
   CONVOY_RAID_COVERAGE,
-  CREW_LOSS_AFTER_HUNGRY_LEGS,
-  CREW_NAMES,
   DRAFT_DEAL,
   DRAFT_QUARTERMASTER_MIN,
   DRAFT_STEP_SECONDS,
-  FLEXIBLE_BARTER_UNLOCK_LEVEL,
-  FOODS,
-  FOODS_DRAW_ORDER,
-  GARMENTS,
-  GARMENT_DECAY_COLD_LEG,
-  GARMENT_DECAY_PER_LEG,
-  ITEMS,
-  LARDER_MAX,
-  LARDER_START,
-  MARKET_GOODS,
-  MAX_SHIP_LEVEL,
-  MEND_GOLD_PER_POINT,
-  MODULES,
   OPPORTUNIST_PENALTY,
   OPPORTUNIST_USES,
   PATH_ORDER_SLOTS,
@@ -69,34 +73,47 @@ import {
   PATH_SWITCH_FEE_PER_LEVEL,
   PATH_SWITCH_FROM_ROUND,
   PATH_SWITCH_TO_ROUND,
-  PORTS_TIER2,
-  PRESERVE_MEALS_IN,
-  PRESERVE_MEALS_OUT,
-  PRODUCT_PRICES,
-  PRODUCTS_TIER0,
   QUARTERMASTER_HOLD_GAIN,
+  RUMOR_COOLDOWN_ROUNDS,
+  RUMOR_SHIFT_FRACTION,
+} from "@/lib/game/constants/paths";
+import {
+  COMMODITIES,
+  FLEXIBLE_BARTER_UNLOCK_LEVEL,
+  GOOD_TAGS,
+  ITEMS,
+  MARKET_GOODS,
+  PRODUCTS_TIER0,
+  PRODUCT_PRICES,
   RAGS,
-  RAGS_AT_PORT_COLD,
-  RAG_SCRAP_VALUE,
-  RATION_PRICE,
   RECIPES,
-  REFIT_POINTS,
   RESOURCES,
   RESOURCES_TIER0,
   RESOURCES_TIER1,
-  REWEAVE_GOOD,
-  REWEAVE_RAGS,
-  RUMOR_COOLDOWN_ROUNDS,
-  RUMOR_SHIFT_FRACTION,
-  SHORT_RATIONS_CARGO,
-  SHORT_RATIONS_YIELD,
   SILK_GOODS,
   STARTING_STOCK,
-  STORES_SLOTS,
-  guideText,
-  tipsText,
-  tutorialSteps,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/goods";
+import {
+  COLD_LEG_CHANCE,
+  COLD_LEG_WARMTH,
+  GARMENTS,
+  GARMENT_DECAY_COLD_LEG,
+  GARMENT_DECAY_PER_LEG,
+  MEND_GOLD_PER_POINT,
+  RAGS_AT_PORT_COLD,
+  RAG_SCRAP_VALUE,
+  REFIT_POINTS,
+  REWEAVE_GOOD,
+  REWEAVE_RAGS,
+} from "@/lib/game/constants/garments";
+import { BOONS, MODULES } from "@/lib/game/constants/drafts";
+import {
+  CREW_LOSS_AFTER_HUNGRY_LEGS,
+  CREW_NAMES,
+} from "@/lib/game/constants/crew";
+import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
+import { loadServerConfig } from "@/lib/config";
+import { db } from "@/lib/db";
 import {
   allyFor,
   dealCards,
@@ -140,6 +157,7 @@ import {
 import {
   WIN_RATE_TARGETS,
   bandVerdict,
+  ratePercent,
   readSwings,
   readWinRates,
   type VoyageOutcome,
@@ -155,6 +173,7 @@ import { checkSave, snapshotFromSave } from "@/lib/game/integrity";
 import {
   MODES,
   MODE_ORDER,
+  auditOpensAt,
   modeConfig,
   voyageRoundsFor,
   type GameMode,
@@ -192,7 +211,7 @@ import {
   portShiftMultiplier,
   type PortShift,
 } from "@/lib/game/maroon";
-import { marketCountsFor } from "@/lib/game/difficulty";
+import { DIFFICULTIES, marketCountsFor } from "@/lib/game/difficulty";
 import { unlockedPorts } from "@/lib/game/pools";
 import {
   BROKER_PAYOUT_TARGET,
@@ -290,18 +309,6 @@ import {
   splitHoldOn,
 } from "@/lib/game/flags";
 import { cargoCapacity, cargoRoom, provisionFood } from "@/lib/game/larder";
-import type {
-  AuditReveal,
-  BazaarBoard,
-  DraftView,
-  EscortBoard,
-  MaroonResult,
-  PathSwitched,
-  PlayerReportAck,
-  PortShiftNotice,
-  RefitBoard,
-  RoomMembersPayload,
-} from "@/types/realtime";
 import {
   acceptBarterOffer,
   agreeConsent,
@@ -390,6 +397,21 @@ import {
   pathSwitchWindow,
 } from "@/lib/game/draft";
 import { createRng } from "@/lib/game/rng";
+// [E1: the Supply Barge] The vendor's own block, imported beside the
+// draft's for the reason every feature's block is imported here: the rule
+// and the numbers it is read off are one subject. BARGE_PRICE_MULTIPLIER
+// and BARGE_RATIONS_PER_LEG are added to the supplies block above rather
+// than imported twice, and ratePercent joins the balance block for the
+// same reason the dashboard's own rows are printed through it.
+import {
+  bargeLeftAtPort,
+  bargeLotAtPort,
+  bargeOn,
+  bargePortAtLeg,
+  bargeRationPrice,
+  buyFromBarge,
+  normalizeBargeState,
+} from "@/lib/game/engine";
 // [D5: Aroma: the Bazaar Rumor] The bazaar's own block, imported beside the
 // bench's for the reason that one is imported here at all: the record the
 // table hears and what the market does with it are one subject, and the
@@ -476,6 +498,29 @@ import {
 import { RENOWN_MAX_LEVEL, RENOWN_TITLES } from "@/lib/game/legacy";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
+// [F1: the tag vocabulary, and the two tag rule] The vocabulary's own
+// block. It is one subject: the twelve words, what each one means, which
+// entries carry which, and the rule that holds the assignments to the
+// plan's line. GOOD_TAGS and FOOD_TAGS are the two tag tables and are
+// added to the goods and supplies blocks above rather than imported twice,
+// and DIFFICULTIES joins the difficulty line for the same reason, since
+// each of those three files already owns the content its rows tag.
+import {
+  MAX_TAGS_PER_ENTRY,
+  TAGS,
+  TAG_MEANINGS,
+  type Tag,
+} from "@/lib/game/constants/tags";
+import {
+  TAGGED_KINDS,
+  entriesWithTag,
+  shippedTagging,
+  taggedEntries,
+  tagsOf,
+  validateTagging,
+  type TaggedEntry,
+  type TaggingSubject,
+} from "@/lib/game/tags";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { io as connect, type Socket } from "socket.io-client";
@@ -667,9 +712,12 @@ function walkSrc(dir: string): string[] {
  * working directory, so the check holds wherever the suite is run from.
  */
 function carriesADash(relative: string): boolean {
-  return CARRIES_A_DASH.test(
-    readFileSync(join(import.meta.dirname, "..", relative), "utf8"),
-  );
+  // A directory is read as all of it, for the file that became one: the
+  // wire's shapes moved into src/types/realtime/, and a rule that read one
+  // of the new modules would pass while the other fourteen carried a dash.
+  const full = join(import.meta.dirname, "..", relative);
+  const files = statSync(full).isDirectory() ? walkSrc(full) : [full];
+  return files.some((file) => CARRIES_A_DASH.test(readFileSync(file, "utf8")));
 }
 
 /**
@@ -705,6 +753,51 @@ function withoutComments(source: string): string {
  * the same reason: the check that reads a switch has to name the one it is
  * actually testing.
  */
+// The two harbors a switch is read in, named once each.
+//
+// Every switch this release added is Gambit's, so the feature blocks below
+// read them in Gambit: a check that held a switch on in the shipped mode
+// would be checking that a Classic table received a system the mode does
+// not have, which is the bug the mode boundary exists to prevent rather
+// than the behaviour any of them are about. CLASSIC is read by the one
+// block that holds the boundary itself, at the end of the family.
+const GAMBIT: GameMode = "ocean_gambit";
+const CLASSIC: GameMode = "classic";
+
+// One switch, read in one mode, as a thunk withEnv can hand an environment
+// value to. The mode is bound here rather than written at each of the forty
+// odd call sites below, which is the same reason the switch itself takes it
+// as an argument: one place to get the reading right.
+function switchFor(
+  mode: GameMode,
+  read: (mode: unknown) => boolean,
+): () => boolean {
+  return () => read(mode);
+}
+
+// A voyage of the mode the switches below belong to, which is the fixture
+// every one of them is read against.
+//
+// It is a helper rather than a `mode` argument written out at each of the
+// seventy odd call sites for the reason the switch's own reading is: one
+// place to get it right. The failure it prevents is specific and it is the
+// one this boundary makes possible, which is a check that reads a Classic
+// state while claiming to read a switch. Every one of the nine layers is
+// off in the founding mode whatever the environment says, so a fixture
+// built without a mode measures the boundary and reports it as the rule
+// under test: the layer would look switched off when it was merely outside
+// its mode, and the check would pass for a reason that has nothing to do
+// with what it says.
+//
+// An explicit `mode` in the init still wins, because the spread puts it
+// last, which is what lets the couple of checks that compare the two modes
+// build both of them through this one helper.
+function voyageState(
+  init: Parameters<typeof createInitialGameState>[0] = {},
+): GameState {
+  return createInitialGameState({ mode: GAMBIT, ...init });
+}
+
 function withEnv<T>(name: string, value: string | undefined, read: () => T): T {
   const was = process.env[name];
   if (value === undefined) delete process.env[name];
@@ -4267,8 +4360,12 @@ async function main(): Promise<void> {
       String.fromCodePoint(0x1f3f4, 0x2620),
     ];
     const pirateSites = walkSrc(join(import.meta.dirname, "..", "src"));
+    // The panel that draws the flag, which the settlement phase renders
+    // before its bills come due. The phase is written across more than one
+    // file, and this names the one that holds the glyph rather than the one
+    // that routes to it.
     const settlementSource = pirateSites.find((file) =>
-      file.endsWith(join("phases", "Settlement.tsx")),
+      file.endsWith(join("phases", "PirateAttack.tsx")),
     );
     check(
       settlementSource !== undefined &&
@@ -4810,10 +4907,13 @@ async function main(): Promise<void> {
     console.log("\nThe harbor clock");
     // [B2: hard timers, the server as timekeeper] A leg is a segment of real
     // time, and a table is not held hostage to a captain who closed a
-    // laptop. Three harbors go through one window at once, because the
+    // laptop. Four harbors go through one window at once, because the
     // window is real time and a fact each would otherwise cost a minute of
-    // it. What they differ in is who is still sitting in the room when the
-    // clock runs out:
+    // it. The first three sail the mode the clock belongs to, because the
+    // clock is the mode's before it is the operator's: a Classic table has
+    // no seat that ends on a timer whatever PHASE_CLOCK says, which is what
+    // the fourth harbor below is here to hold. What A, B and Q differ in is
+    // who is still sitting in the room when the clock runs out:
     //
     //   A: two captains, both aboard and neither doing anything, so the
     //      clock is the only thing in the room that can end the leg.
@@ -4821,6 +4921,8 @@ async function main(): Promise<void> {
     //      to the laptop that closed.
     //   Q: nobody at all, because an empty room is not a table waiting on a
     //      straggler and its clock does not move it.
+    //   C: one captain under way in the founding mode, which the clock does
+    //      not reach at all, on a server that is timing the other three.
     //
     // What only this section can hold is that the expiry announces the same
     // advance a unanimous ready set announces. The captains here are raw
@@ -4838,7 +4940,7 @@ async function main(): Promise<void> {
     if (loadServerConfig().phaseClockScale <= 0) {
       throw new Error(
         "The clock checks need the server under test to be timing its legs, so PHASE_CLOCK must be a number above zero.\n" +
-          "Start the server and this script with the same value, or run them in the same shell.",
+          "It is off unless it is asked for, and the section below is the asking, so start the server and this script with the same value, or run them in the same shell.",
       );
     }
     const clockSeconds = (phase: Phase) =>
@@ -4882,7 +4984,12 @@ async function main(): Promise<void> {
     // clock recorded as it arrives. The same shape the lap walk uses to get
     // a voyage sailing, since a harbor reaches the clock the way it reaches
     // anything else: by being started.
-    const openClockRoom = async (label: string, tag: string, seats: number) => {
+    const openClockRoom = async (
+      label: string,
+      tag: string,
+      seats: number,
+      mode: GameMode,
+    ) => {
       const captains: Captain[] = [];
       for (let seat = 0; seat < seats; seat++) {
         captains.push(await signUp(`${tag}${seat}`));
@@ -4896,12 +5003,19 @@ async function main(): Promise<void> {
           body: JSON.stringify({
             name: `Smoke clock ${label} ${suffix}`,
             isPublic: false,
-            mode: "classic",
+            mode,
+            // The experimental voyage is sealed behind its phrase, the way
+            // the lap walk opens one: a room that could not be chartered
+            // would otherwise fail here as a harbor that does not exist
+            // rather than as a door that was not opened.
+            ...(mode === "ocean_gambit" ? { unlock: LEDGER_PHRASE } : {}),
           }),
         },
       );
       if (opened.status !== 200) {
-        throw new Error(`No ${label} harbor to run a clock in, stopping here.`);
+        throw new Error(
+          `No ${label} harbor to run a clock in, stopping here (${opened.status}).`,
+        );
       }
       const roomId = opened.body.room.id;
       run.lapRoomIds.push(roomId);
@@ -5018,9 +5132,13 @@ async function main(): Promise<void> {
       return null;
     };
 
-    const clockA = await openClockRoom("A", "clka", 2);
-    const clockB = await openClockRoom("B", "clkb", 2);
-    const clockQ = await openClockRoom("Q", "clkq", 1);
+    const clockA = await openClockRoom("A", "clka", 2, GAMBIT);
+    const clockB = await openClockRoom("B", "clkb", 2, GAMBIT);
+    const clockQ = await openClockRoom("Q", "clkq", 1, GAMBIT);
+    // The mode boundary, on the same server and inside the same window: a
+    // founding-mode harbor whose seat is walked by hand. Nothing is closed
+    // on it below, because there is nothing to wait for.
+    const clockC = await openClockRoom("C", "clkc", 1, CLASSIC);
     // The two absences a clock has to survive: a captain who closed the tab
     // (B's crewmate) and a harbor with nobody left in it at all (Q's only
     // captain). Both are a socket closing, and neither is a vote.
@@ -5059,6 +5177,23 @@ async function main(): Promise<void> {
         opening.endsAt <= clockA.sailedAt + dawnSeconds * 1000 + 2000,
       `the seat a voyage opens at publishes both halves of its countdown (${dawnSeconds}s of Dawn)`,
     );
+    // The same seat, on the same server, in the other mode. Read beside the
+    // check above rather than on its own, because the two together are the
+    // claim: one server, timing its legs, hands a clock to one harbor and
+    // none to the other, and the difference between them is the mode rather
+    // than anything the operator set.
+    const cOpening = await waitForFrame(
+      clockC.crew[0],
+      (frame) =>
+        frame.event === "phase:ready_update" && frame.phase !== "harbor",
+      5000,
+    );
+    check(
+      cOpening?.phase === "dawn" &&
+        cOpening.endsAt === null &&
+        cOpening.seconds === null,
+      "a harbor in the founding mode stands at the same seat with no clock on it, on a server that is timing the other three",
+    );
 
     // The long wait, and the only one this section spends: every clock
     // above was armed within a couple of seconds of the others, so the
@@ -5076,6 +5211,16 @@ async function main(): Promise<void> {
     check(
       advancedA?.round === 1 && advancedA?.phase === "dawn",
       "a harbor nobody has voted in is moved on by the clock it was given",
+    );
+    // The other half of the boundary, taken at the only moment it can be:
+    // the other three harbors have now been standing at Dawn for longer
+    // than its whole budget, so a founding mode harbor that had a clock
+    // would have been moved by now, and this one never was.
+    check(
+      clockC.crew.every((seat) =>
+        seat.frames.every((frame) => frame.event !== "phase:advance"),
+      ),
+      "and a harbor in the founding mode is not moved by it at all, however long it is left standing",
     );
     check(
       clockA.crew.every((seat) =>
@@ -5656,7 +5801,7 @@ async function main(): Promise<void> {
     const pathboundSeat = (withPath: boolean) => {
       const state = deal("orders");
       const card = state.customerCards.find((o) => o.isPathOrder);
-      const owner = card ? pathOrderOf(card) : null;
+      const owner = card ? pathOrderOf(card, GAMBIT) : null;
       if (!card || !owner)
         throw new Error(
           "The pathbound order checks need a marked card on the trade board.",
@@ -10070,6 +10215,11 @@ async function main(): Promise<void> {
       // the reason the hold figures do: a report is a claim, and what the
       // checks below are about is what the spine does with one.
       ability?: { opportunistBorrows?: unknown },
+      // [E1: the Supply Barge] The two counters the page's share is divided
+      // from, filed here for the same reason and checked for one of their
+      // own: they are kept as a pair, so a report carrying half of one is a
+      // report the spine has nothing to divide and drops the half of.
+      barge?: { foodSpend?: unknown; bargeSpend?: unknown },
     ) =>
       socket.emit("telemetry:leg", {
         roomId: sailRoomId,
@@ -10079,6 +10229,7 @@ async function main(): Promise<void> {
         distinctGoods,
         ...(hold ?? {}),
         ...(ability ?? {}),
+        ...(barge ?? {}),
       });
     telLegReport(sailHome, 1, 3, 1, 2);
     // The same captain, the same leg, reporting again after filling another
@@ -10138,7 +10289,19 @@ async function main(): Promise<void> {
       // captain and one leg replaces the first, which would take the hold
       // figures off the record rather than add a figure to it.
       { opportunistBorrows: -2 },
+      // [E1: the Supply Barge] The two counters the page's own share is
+      // divided from, filed here as a fraction and a negative for the same
+      // reason the figures above are: what the spine does with a claim has
+      // to be exercised rather than read off the reader.
+      { foodSpend: 240.9, bargeSpend: -3 },
     );
+    // A claim carrying half the pair, filed about a leg the voyage reached,
+    // which is the case the pair rule exists for: a lone numerator beside a
+    // missing denominator is a number nobody can divide, so the spine drops
+    // the half rather than keeping it and letting a reader divide by zero.
+    telLegReport(sailHome, 2, 2, 1, 1, undefined, undefined, {
+      foodSpend: 120,
+    });
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // ---- the two votes, at their own rungs ----
@@ -10339,12 +10502,13 @@ async function main(): Promise<void> {
       (event) => `${event.actor}:${event.leg}`,
     );
     check(
-      sailReports.length === 3 &&
+      sailReports.length === 4 &&
         new Set(sailReportLines).size === sailReports.length &&
         sailReportLines.includes(`${telHome.id}:1`) &&
+        sailReportLines.includes(`${telHome.id}:2`) &&
         sailReportLines.includes(`${telMate.id}:1`) &&
         sailReportLines.includes(`${telMate.id}:3`),
-      "one line per captain per leg is kept, and the three that were filed are the three that are there",
+      "one line per captain per leg is kept, and the four that were filed are the four that are there",
     );
     const homeLegOne = sailReports.find(
       (event) => event.actor === telHome.id && event.leg === 1,
@@ -10390,6 +10554,26 @@ async function main(): Promise<void> {
         mateLegThree?.opportunistBorrows === 0 &&
         mateLegOne?.opportunistBorrows === undefined,
       "and the borrow counter rides the same reader, so a fraction floors to the whole borrows it stands for, a negative clamps to the voyage that spent none, and a value that is not a number is dropped rather than landing as a zero a reader could take for an unspent allowance",
+    );
+    // [E1: the Supply Barge] The two counters the page's share is divided
+    // from are read by that same rule, and the fourth figure is the pair
+    // rule itself: half a pair is dropped, so a reader dividing the two can
+    // never be handed a numerator without its denominator.
+    const homeLegTwo = sailReports.find(
+      (event) => event.actor === telHome.id && event.leg === 2,
+    );
+    check(
+      mateLegThree?.foodSpend === 240 &&
+        mateLegThree?.bargeSpend === 0 &&
+        homeLegOne?.foodSpend === undefined &&
+        homeLegOne?.bargeSpend === undefined,
+      "and the two food counters ride the same reader, so a fraction floors, a negative clamps to the voyage that spent nothing at the vendor, and a leg that measured neither carries neither rather than a pair of zeroes",
+    );
+    check(
+      homeLegTwo?.foodSpend === undefined &&
+        homeLegTwo?.bargeSpend === undefined &&
+        homeLegTwo?.ordersDealt === 2,
+      "while a claim carrying half the pair is dropped to nothing at all and takes nothing else with it, because a share of food spending is one number divided by another and the spine keeps neither half of a pair it cannot divide",
     );
     check(
       !sailReportLines.some(
@@ -10768,8 +10952,11 @@ async function main(): Promise<void> {
     check(
       emptyReading.frontPage.label ===
         "Barge revenue share of all food spending" &&
-        emptyReading.frontPage.target === "waits on Epic E",
-      "and the front page number is named as the share of all food spending the proposal identifies, waiting on the epic that would measure it",
+        emptyReading.frontPage.target === "no threshold in the plan" &&
+        emptyReading.frontPage.verdict === "unplayed" &&
+        emptyReading.frontPage.value ===
+          "no leg report from a provisions harbor",
+      "and the front page number is named as the share of all food spending the proposal identifies, reading as no report rather than as a share of zero until a voyage files what it spent",
     );
 
     // ---- The window ----
@@ -11090,8 +11277,14 @@ async function main(): Promise<void> {
       liveReading !== undefined &&
         liveReading.panels.map((panel) => panel.id).join(",") ===
           "seat,staples,variance,floor" &&
-        liveReading.frontPage.verdict === "unmeasured",
-      "carrying the four panels in the plan's order, with the front page number held in its slot",
+        // The front page number is read now rather than held as a slot, and
+        // the plan sets no band on it: what a reader must never see is a
+        // share judged inside or outside a threshold nobody wrote, so the
+        // verdict is the absence of a report or a measured number left
+        // unjudged, and never a band verdict.
+        (liveReading.frontPage.verdict === "unplayed" ||
+          liveReading.frontPage.verdict === "ungated"),
+      "carrying the four panels in the plan's order, with the front page number read from the record and judged against no invented band",
     );
     check(
       liveReading !== undefined &&
@@ -11347,12 +11540,12 @@ async function main(): Promise<void> {
     // chronicle row and the integrity ceiling all read, so it is checked
     // where it is minted rather than only where each of them uses it.
     check(
-      createInitialGameState({ mode: "ocean_gambit", difficulty: "fair_winds" })
+      voyageState({ mode: "ocean_gambit", difficulty: "fair_winds" })
         .maxRounds === 12 &&
-        createInitialGameState({ mode: "ocean_gambit", difficulty: "monsoon" })
+        voyageState({ mode: "ocean_gambit", difficulty: "monsoon" })
           .maxRounds === 12 &&
-        createInitialGameState({ mode: "classic", difficulty: "fair_winds" })
-          .maxRounds === 8,
+        voyageState({ mode: "classic", difficulty: "fair_winds" }).maxRounds ===
+          8,
       "a Gambit voyage is handed twelve legs whatever tier it is charted at, while the founding voyage still sails its tier's own ladder",
     );
 
@@ -11472,19 +11665,85 @@ async function main(): Promise<void> {
     // second one.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_SURVIVAL", value, survivalLayerOn),
+        withEnv(
+          "NEXT_PUBLIC_SURVIVAL",
+          value,
+          switchFor(GAMBIT, survivalLayerOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
-          (value) => !withEnv("NEXT_PUBLIC_SURVIVAL", value, survivalLayerOn),
+          (value) =>
+            !withEnv(
+              "NEXT_PUBLIC_SURVIVAL",
+              value,
+              switchFor(GAMBIT, survivalLayerOn),
+            ),
         ),
       "the provisions layer is on for every value except the word off and the digit zero, so a typo in the switch leaves the game playable rather than quietly deleting a system",
+    );
+
+    // [The mode boundary] And the other half of every switch's answer, held
+    // here rather than inside each family's own block.
+    //
+    // The families below each check their own switch against the
+    // environment, because that is the dial their slice of the plan
+    // promised. What none of them can check is the rule that stands in
+    // front of all nine, because the rule is about them together: Classic
+    // is the shipped release and no system this branch added may reach it,
+    // whatever an operator exported into the process. A check written per
+    // family would be nine copies of one sentence, and the ninth is the one
+    // a later feature would forget.
+    //
+    // So the nine are listed once, with the environment forced on rather
+    // than left to whatever the runner exported, and every one of them has
+    // to answer no in the shipped mode. The environment value is a real one
+    // rather than undefined on purpose: a switch that answered no here
+    // because the runner happened to leave the variable unset would be a
+    // check that passes for the wrong reason.
+    check(
+      (
+        [
+          ["NEXT_PUBLIC_SURVIVAL", survivalLayerOn],
+          ["NEXT_PUBLIC_CREW_LOSS", crewLossRuleOn],
+          ["NEXT_PUBLIC_GARMENTS", garmentsLayerOn],
+          ["NEXT_PUBLIC_SPLIT_HOLD", splitHoldOn],
+          ["NEXT_PUBLIC_PATH_ORDERS", pathOrdersOn],
+          ["NEXT_PUBLIC_ESCORT_CONTRACTS", escortContractsOn],
+          ["NEXT_PUBLIC_REFITS", refitsOn],
+          ["NEXT_PUBLIC_BAZAAR", bazaarRumorsOn],
+          ["NEXT_PUBLIC_PATH_DRAFT", pathDraftOn],
+        ] as ReadonlyArray<[string, (mode: unknown) => boolean]>
+      ).every(
+        ([name, read]) =>
+          withEnv(name, "1", () => read(CLASSIC) === false) &&
+          withEnv(name, undefined, () => read(CLASSIC) === false) &&
+          withEnv(name, "1", () => read(GAMBIT) === true),
+      ),
+      "every switch of this release answers no in the shipped mode whatever the environment says, and yes in the mode that owns it: the boundary is the mode rather than the operator's export, so a deployment serving both harbors cannot hand a Classic table a system the mode does not have",
+    );
+
+    // The same boundary for the systems that have no switch of their own,
+    // because they are gated by the mode record rather than by a dial: the
+    // audit's rung, the standing order and the leg clock. A rung of null is
+    // the whole of the first, and the two booleans below are the whole of
+    // the other two.
+    check(
+      auditOpensAt(CLASSIC) === null &&
+        auditOpensAt(GAMBIT) === AUDIT_FROM_ROUND &&
+        modeConfig(CLASSIC).standingOrders === false &&
+        modeConfig(GAMBIT).standingOrders === true &&
+        modeConfig(CLASSIC).phaseClock === false &&
+        modeConfig(GAMBIT).phaseClock === true &&
+        modeConfig(CLASSIC).gambitSystems === false &&
+        modeConfig(GAMBIT).gambitSystems === true,
+      "the systems with no switch of their own go off with the mode as well: the shipped voyage opens no manifest, keeps no standing order and runs on no clock, and both records carry the two rungs they gate and the boundary every switch reads",
     );
 
     // Held on for every rule below, so this block reads the same rules
     // whatever the operator set at the door.
     const survivalLines: string[] = [];
     withEnv("NEXT_PUBLIC_SURVIVAL", "1", () => {
-      const larderCrew = createInitialGameState();
+      const larderCrew = voyageState();
       larderCrew.money = 1000;
       check(
         crewSize(larderCrew) === 0 && !onShortRations(larderCrew),
@@ -11559,7 +11818,7 @@ async function main(): Promise<void> {
       };
       const shops: Array<{ state: GameState; label: string }> = [];
       for (const label of ["fed", "hungry", "workshop"]) {
-        const state = createInitialGameState();
+        const state = voyageState();
         state.money = 1000;
         hireWorker(state, "weaver", []);
         state.workers.weaver[0].isSkilled = true;
@@ -11578,7 +11837,19 @@ async function main(): Promise<void> {
       const before = shops.map(
         (shop) => shop.state.inventory["Linen Clothes"] ?? 0,
       );
-      for (const shop of shops) nextPhase(shop.state, larderCtx, []);
+      // Pressed until the books are settled rather than pressed once, because
+      // which phase follows Orders is the mode's own decision: the founding
+      // lap goes straight from the manifest to the settlement, and the lap
+      // this layer belongs to puts the exchange between them. A single press
+      // would walk one of those two modes into a leg that makes nothing and
+      // the check would read the empty hold as the rule under test. The bound
+      // is the longest lap plus a margin, and it is a bound rather than a
+      // count so that a lap that grows a leg still walks.
+      for (const shop of shops) {
+        for (let step = 0; step < 8 && shop.state.phase !== "resolve"; step++) {
+          nextPhase(shop.state, larderCtx, []);
+        }
+      }
       const made = shops.map(
         (shop, index) =>
           (shop.state.inventory["Linen Clothes"] ?? 0) - before[index],
@@ -11594,7 +11865,7 @@ async function main(): Promise<void> {
 
       // Buying. Two ceilings and a floor, each read on its own state so one
       // cannot be mistaken for another.
-      const buyer = createInitialGameState();
+      const buyer = voyageState();
       buyer.money = 1000;
       hireWorker(buyer, "weaver", []);
       hireWorker(buyer, "weaver", []);
@@ -11628,7 +11899,7 @@ async function main(): Promise<void> {
         "a request past the hold's room fills it and stops there, and a full larder says so rather than taking a press and returning nothing",
       );
 
-      const thin = createInitialGameState();
+      const thin = voyageState();
       thin.money = 100;
       hireWorker(thin, "weaver", []);
       thin.money = 1;
@@ -11637,7 +11908,7 @@ async function main(): Promise<void> {
         provisionFood(thin, "Grain", 1, thinLines) === 0 && thin.money === 1,
         "and a purse that cannot cover one leg of rations buys nothing rather than going into debt for it",
       );
-      const crewless = createInitialGameState();
+      const crewless = voyageState();
       crewless.money = 100;
       const crewlessLines: string[] = [];
       check(
@@ -11656,14 +11927,16 @@ async function main(): Promise<void> {
       // ceiling under the split and the Larder's old sixty without it. The
       // check reads that end from the model rather than writing it down,
       // so it follows the hold rather than a number the split left behind.
-      const larderEnd = holdCapacityOn() ? storesMealCeiling() : LARDER_MAX;
+      const larderEnd = holdCapacityOn(GAMBIT)
+        ? storesMealCeiling()
+        : LARDER_MAX;
       check(
-        normalizeLarder(undefined) === LARDER_START &&
-          normalizeLarder("seven") === LARDER_START &&
-          normalizeLarder(NaN) === LARDER_START &&
-          normalizeLarder(7.8) === 7 &&
-          normalizeLarder(-4) === 0 &&
-          normalizeLarder(larderEnd + 90) === larderEnd &&
+        normalizeLarder(undefined, GAMBIT) === LARDER_START &&
+          normalizeLarder("seven", GAMBIT) === LARDER_START &&
+          normalizeLarder(NaN, GAMBIT) === LARDER_START &&
+          normalizeLarder(7.8, GAMBIT) === 7 &&
+          normalizeLarder(-4, GAMBIT) === 0 &&
+          normalizeLarder(larderEnd + 90, GAMBIT) === larderEnd &&
           normalizeLarderFedRound(undefined) === 0 &&
           normalizeLarderFedRound(-2) === 0 &&
           normalizeLarderFedRound(2.5) === 2,
@@ -11702,10 +11975,19 @@ async function main(): Promise<void> {
     // fields have to heal to the state of a captain who never went hungry.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_CREW_LOSS", value, crewLossRuleOn),
+        withEnv(
+          "NEXT_PUBLIC_CREW_LOSS",
+          value,
+          switchFor(GAMBIT, crewLossRuleOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
-          (value) => !withEnv("NEXT_PUBLIC_CREW_LOSS", value, crewLossRuleOn),
+          (value) =>
+            !withEnv(
+              "NEXT_PUBLIC_CREW_LOSS",
+              value,
+              switchFor(GAMBIT, crewLossRuleOn),
+            ),
         ),
       "the crew loss rule is on for every value except the word off and the digit zero, read through the same policy the provisions layer is read through rather than through a second copy of it",
     );
@@ -11726,7 +12008,7 @@ async function main(): Promise<void> {
         // The run, the hand, and the ledger. The round is set rather than
         // inherited, so the leg on the record is a number this check chose
         // and a record that wrote the wrong one cannot pass.
-        const hungry = createInitialGameState();
+        const hungry = voyageState();
         hungry.money = 1000;
         hungry.currentRound = 7;
         hireWorker(hungry, "weaver", survivalLines);
@@ -11773,7 +12055,7 @@ async function main(): Promise<void> {
         );
 
         // A fed leg resets the run rather than pausing it.
-        const fed = createInitialGameState();
+        const fed = voyageState();
         fed.money = 1000;
         hireWorker(fed, "weaver", survivalLines);
         fed.larder = 0;
@@ -11793,7 +12075,7 @@ async function main(): Promise<void> {
 
         // The price is settled at the one moment the leg's meal is, through
         // the function every leg opens through.
-        const dawn = createInitialGameState();
+        const dawn = voyageState();
         dawn.money = 1000;
         hireWorker(dawn, "weaver", survivalLines);
         dawn.larder = 0;
@@ -11812,7 +12094,7 @@ async function main(): Promise<void> {
 
         // A save written before the crew had names. Every member is written
         // the way the build before this one wrote them: no identity at all.
-        const legacy = createInitialGameState();
+        const legacy = voyageState();
         legacy.money = 1000;
         hireWorker(legacy, "weaver", []);
         hireWorker(legacy, "potter", []);
@@ -11840,7 +12122,7 @@ async function main(): Promise<void> {
 
         // Two hands claiming one name, which the draw exists to prevent and
         // a hand written save can still produce.
-        const twins = createInitialGameState();
+        const twins = voyageState();
         twins.money = 1000;
         hireWorker(twins, "weaver", survivalLines);
         hireWorker(twins, "weaver", survivalLines);
@@ -11874,7 +12156,7 @@ async function main(): Promise<void> {
         // anyone to, and the check would be measuring that instead.
         check(
           withEnv("NEXT_PUBLIC_CREW_LOSS", "off", () => {
-            const spared = createInitialGameState();
+            const spared = voyageState();
             spared.money = 1000;
             hireWorker(spared, "weaver", []);
             spared.larder = 0;
@@ -11882,7 +12164,7 @@ async function main(): Promise<void> {
             settleHunger(spared, sparedLines);
             settleHunger(spared, sparedLines);
             return (
-              !crewLossRuleOn() &&
+              !crewLossRuleOn(GAMBIT) &&
               spared.hungryLegs === 0 &&
               spared.crewLost.length === 0 &&
               spared.workers.weaver.length === 1 &&
@@ -11897,14 +12179,14 @@ async function main(): Promise<void> {
         // are separate readings rather than one.
         check(
           withEnv("NEXT_PUBLIC_SURVIVAL", "off", () => {
-            const unfed = createInitialGameState();
+            const unfed = voyageState();
             unfed.money = 1000;
             hireWorker(unfed, "weaver", []);
             unfed.larder = 0;
             settleHunger(unfed, []);
             settleHunger(unfed, []);
             return (
-              crewLossRuleOn() &&
+              crewLossRuleOn(GAMBIT) &&
               unfed.hungryLegs === 0 &&
               unfed.crewLost.length === 0 &&
               unfed.workers.weaver.length === 1
@@ -11934,7 +12216,7 @@ async function main(): Promise<void> {
     // stay about the rules rather than about the flag.
     check(
       withEnv("NEXT_PUBLIC_SURVIVAL", "off", () => {
-        const dark = createInitialGameState();
+        const dark = voyageState();
         dark.money = 100;
         hireWorker(dark, "weaver", []);
         dark.larder = 0;
@@ -11942,7 +12224,7 @@ async function main(): Promise<void> {
         feedCrew(dark, darkLines);
         const boughtNothing = provisionFood(dark, "Grain", 3, darkLines) === 0;
         return (
-          !survivalLayerOn() &&
+          !survivalLayerOn(GAMBIT) &&
           !onShortRations(dark) &&
           dark.larder === 0 &&
           dark.larderFedRound === 0 &&
@@ -12051,10 +12333,19 @@ async function main(): Promise<void> {
     // exactly the defect that check exists to catch.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_GARMENTS", value, garmentsLayerOn),
+        withEnv(
+          "NEXT_PUBLIC_GARMENTS",
+          value,
+          switchFor(GAMBIT, garmentsLayerOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
-          (value) => !withEnv("NEXT_PUBLIC_GARMENTS", value, garmentsLayerOn),
+          (value) =>
+            !withEnv(
+              "NEXT_PUBLIC_GARMENTS",
+              value,
+              switchFor(GAMBIT, garmentsLayerOn),
+            ),
         ),
       "the garments layer is on for every value except the word off and the digit zero, read through the same policy the two switches above it are read through rather than through a third copy of it",
     );
@@ -12085,7 +12376,7 @@ async function main(): Promise<void> {
         // Wearing, and the three ways it refuses. The hire writes into a
         // throwaway log so the four lines counted below are the wardrobe's
         // own.
-        const wardrobe = createInitialGameState();
+        const wardrobe = voyageState();
         wardrobe.money = 1000;
         const dressLines: string[] = [];
         const crewless = wearGarment(wardrobe, "Brocade", dressLines) === false;
@@ -12110,7 +12401,7 @@ async function main(): Promise<void> {
         );
 
         // The sum, and the multiplier under it.
-        const tailor = createInitialGameState();
+        const tailor = voyageState();
         tailor.money = 1000;
         hireWorker(tailor, "weaver", []);
         for (const good of ["Linen Clothes", "Cotton Clothes", "Brocade"]) {
@@ -12123,7 +12414,7 @@ async function main(): Promise<void> {
         const partWorn = warmthScore(tailor);
         check(
           aWholeBack &&
-            warmthText(warmthScore(createInitialGameState())) === "0" &&
+            warmthText(warmthScore(voyageState())) === "0" &&
             Math.abs(garmentWarmth(tailor.garments[2]) - 2.4) < 1e-9 &&
             Math.abs(partWorn - 4.4) < 1e-9 &&
             warmthText(partWorn) === "4.4",
@@ -12131,11 +12422,11 @@ async function main(): Promise<void> {
         );
 
         // The tag: drawn, deterministic, room wide and replayable.
-        const weather = createInitialGameState();
+        const weather = voyageState();
         weather.voyageEpoch = 4242;
         weather.currentRound = 4;
         const thisLeg = legIsCold(weather);
-        const mate = createInitialGameState();
+        const mate = voyageState();
         mate.voyageEpoch = 4242;
         mate.currentRound = 4;
         mate.money = 77;
@@ -12154,7 +12445,7 @@ async function main(): Promise<void> {
         // file states rather than against a number written down here. The
         // bounds are wide enough to hold the rate and far too narrow to hold
         // a tag that always says the same thing.
-        const weatherRun = createInitialGameState();
+        const weatherRun = voyageState();
         weatherRun.voyageEpoch = 4242;
         let coldLegs = 0;
         for (let leg = 1; leg <= 100; leg++) {
@@ -12169,7 +12460,7 @@ async function main(): Promise<void> {
 
         // The two rounds the checks below stand on, found by asking the rule
         // rather than written down as numbers that were cold once.
-        const calendar = createInitialGameState();
+        const calendar = voyageState();
         calendar.voyageEpoch = 4242;
         const findRound = (cold: boolean) => {
           for (let round = 1; round <= 60; round++) {
@@ -12186,7 +12477,7 @@ async function main(): Promise<void> {
         );
 
         // The same cold leg, sailed bare.
-        const freezing = createInitialGameState();
+        const freezing = voyageState();
         freezing.voyageEpoch = 4242;
         freezing.money = 1000;
         freezing.currentRound = coldRound;
@@ -12215,7 +12506,7 @@ async function main(): Promise<void> {
 
         // And the same leg again, dressed. Two of warmth is what the leg
         // asks, so this is the check read on its other side.
-        const warmCrew = createInitialGameState();
+        const warmCrew = voyageState();
         warmCrew.voyageEpoch = 4242;
         warmCrew.money = 1000;
         warmCrew.currentRound = coldRound;
@@ -12261,7 +12552,7 @@ async function main(): Promise<void> {
         );
 
         // The wear, in the plan's units, and once a leg.
-        const sea = createInitialGameState();
+        const sea = voyageState();
         sea.voyageEpoch = 4242;
         sea.money = 1000;
         sea.currentRound = mildRound;
@@ -12286,7 +12577,7 @@ async function main(): Promise<void> {
         );
 
         // The rags at the bottom of that, and what they pay.
-        const ragged = createInitialGameState();
+        const ragged = voyageState();
         ragged.voyageEpoch = 4242;
         ragged.money = 100;
         ragged.currentRound = mildRound;
@@ -12304,7 +12595,7 @@ async function main(): Promise<void> {
         );
 
         // And the whole of it through the engine's own Resolve.
-        const settling = createInitialGameState();
+        const settling = voyageState();
         settling.money = 1000;
         settling.voyageEpoch = 4242;
         settling.currentRound = coldRound;
@@ -12347,7 +12638,7 @@ async function main(): Promise<void> {
         // the rules rather than about the flag.
         check(
           withEnv("NEXT_PUBLIC_GARMENTS", "off", () => {
-            const dark = createInitialGameState();
+            const dark = voyageState();
             dark.voyageEpoch = 4242;
             dark.money = 1000;
             dark.currentRound = coldRound;
@@ -12360,7 +12651,7 @@ async function main(): Promise<void> {
             const refused = wearGarment(dark, "Brocade", darkLines) === false;
             tickGarments(dark, darkLines);
             return (
-              !garmentsLayerOn() &&
+              !garmentsLayerOn(GAMBIT) &&
               refused &&
               dark.inventory.Brocade === 1 &&
               dark.garments.length === 1 &&
@@ -12379,7 +12670,7 @@ async function main(): Promise<void> {
         check(
           withEnv("NEXT_PUBLIC_SURVIVAL", "off", () =>
             withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
-              const unfed = createInitialGameState();
+              const unfed = voyageState();
               unfed.voyageEpoch = 4242;
               unfed.money = 1000;
               unfed.currentRound = coldRound;
@@ -12391,7 +12682,7 @@ async function main(): Promise<void> {
                 wearGarment(unfed, "Brocade", unfedLines) === false;
               tickGarments(unfed, unfedLines);
               return (
-                !garmentsLayerOn() &&
+                !garmentsLayerOn(GAMBIT) &&
                 refused &&
                 unfed.garments[0].durability === 5 &&
                 unfed.garmentsTickRound === 0 &&
@@ -12476,19 +12767,40 @@ async function main(): Promise<void> {
     // build without the Larder plays the base game whatever the split says.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_SPLIT_HOLD", value, splitHoldOn),
+        withEnv(
+          "NEXT_PUBLIC_SPLIT_HOLD",
+          value,
+          switchFor(GAMBIT, splitHoldOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
-          (value) => !withEnv("NEXT_PUBLIC_SPLIT_HOLD", value, splitHoldOn),
+          (value) =>
+            !withEnv(
+              "NEXT_PUBLIC_SPLIT_HOLD",
+              value,
+              switchFor(GAMBIT, splitHoldOn),
+            ),
         ) &&
         withEnv("NEXT_PUBLIC_SURVIVAL", "off", () =>
-          withEnv("NEXT_PUBLIC_SPLIT_HOLD", "1", holdCapacityOn),
+          withEnv(
+            "NEXT_PUBLIC_SPLIT_HOLD",
+            "1",
+            switchFor(GAMBIT, holdCapacityOn),
+          ),
         ) === false &&
         withEnv("NEXT_PUBLIC_SURVIVAL", "1", () =>
-          withEnv("NEXT_PUBLIC_SPLIT_HOLD", "off", holdCapacityOn),
+          withEnv(
+            "NEXT_PUBLIC_SPLIT_HOLD",
+            "off",
+            switchFor(GAMBIT, holdCapacityOn),
+          ),
         ) === false &&
         withEnv("NEXT_PUBLIC_SURVIVAL", "1", () =>
-          withEnv("NEXT_PUBLIC_SPLIT_HOLD", "1", holdCapacityOn),
+          withEnv(
+            "NEXT_PUBLIC_SPLIT_HOLD",
+            "1",
+            switchFor(GAMBIT, holdCapacityOn),
+          ),
         ) === true,
       "the split hold is on for every value except the word off and the digit zero, and the provisions layer governs it from above, so a table can be rolled back one switch at a time without a hold size outliving the rule it belonged to",
     );
@@ -12509,7 +12821,7 @@ async function main(): Promise<void> {
       // shipped, which is the continuity the whole split rests on: grain
       // fills one slot with one meal, so the account and the plain number
       // agree to the meal until a captain buys something else.
-      const storeFresh = createInitialGameState();
+      const storeFresh = voyageState();
       check(
         storeFresh.larder === LARDER_START &&
           larderMeals(storeFresh) === LARDER_START &&
@@ -12539,7 +12851,7 @@ async function main(): Promise<void> {
       // one that would show a doubled lot or a count that drifted: the
       // same food bought in the same leg merges into the lot already
       // aboard, and the price of a meal does not move with the food.
-      const buyFoods = createInitialGameState();
+      const buyFoods = voyageState();
       staff(buyFoods);
       const buyFoodLines: string[] = [];
       const firstBuy = provisionFood(buyFoods, "Salt Fish", 2, buyFoodLines);
@@ -12564,7 +12876,7 @@ async function main(): Promise<void> {
       // three foods, walked leg by leg so a reader sees which food fed
       // which leg: produce first because it turns soonest, then salt
       // fish, then the grain nothing can be wrong about.
-      const eatOrder = createInitialGameState();
+      const eatOrder = voyageState();
       eatOrder.money = 1000;
       hireWorker(eatOrder, "weaver", []);
       eatOrder.larder = 17;
@@ -12595,7 +12907,7 @@ async function main(): Promise<void> {
       // asked: a pantry that cannot cover the meal takes what is there and
       // says so, which is the answer the meal above uses to leave a
       // shortage standing rather than to conjure rations.
-      const shortDraw = createInitialGameState();
+      const shortDraw = voyageState();
       shortDraw.larder = 2;
       shortDraw.larderLots = [{ food: "Produce", meals: 2, boughtRound: 0 }];
       check(
@@ -12610,7 +12922,7 @@ async function main(): Promise<void> {
       // than hopeful, the same way the meal's own stamp does, and the
       // second tick in the same leg is written out because that is the
       // shape of the defect it prevents.
-      const turnPot = createInitialGameState();
+      const turnPot = voyageState();
       turnPot.larder = 18;
       turnPot.larderLots = [];
       addLot(turnPot, "Grain", 12, 0);
@@ -12645,7 +12957,7 @@ async function main(): Promise<void> {
       // Salt fish lasts six, so the same walk one food over turns on the
       // seventh leg rather than the third, and grain is never asked at
       // all: a food whose keeping is null is a lot no Dusk can touch.
-      const keepPot = createInitialGameState();
+      const keepPot = voyageState();
       keepPot.larder = 4;
       keepPot.larderLots = [{ food: "Salt Fish", meals: 4, boughtRound: 1 }];
       keepPot.currentRound = 6;
@@ -12663,7 +12975,7 @@ async function main(): Promise<void> {
           keepPotLines[0].includes("🐟"),
         "salt fish keeps six legs from the market it was bought at and turns on the seventh, which is the long clock a preserve buys",
       );
-      const everGrain = createInitialGameState();
+      const everGrain = voyageState();
       everGrain.currentRound = 40;
       const everLines: string[] = [];
       tickSpoilage(everGrain, everLines);
@@ -12677,7 +12989,7 @@ async function main(): Promise<void> {
       // The pantry as a screen reads it, which is the number the market's
       // own keeping line is built from: what is aboard and how many legs
       // the oldest of it has left.
-      const lotScreen = createInitialGameState();
+      const lotScreen = voyageState();
       lotScreen.larder = 3;
       lotScreen.larderLots = [];
       addLot(lotScreen, "Produce", 3, 4);
@@ -12702,7 +13014,7 @@ async function main(): Promise<void> {
       // the same price, so the third meal is what a captain pays for a
       // fresh clock. The trade is about keeping rather than quantity, and
       // the hold it costs is the same hold either way.
-      const cookPot = createInitialGameState();
+      const cookPot = voyageState();
       cookPot.larder = 7;
       cookPot.larderLots = [{ food: "Produce", meals: 7, boughtRound: 0 }];
       const slotsBefore = usedStoreSlots(cookPot);
@@ -12733,7 +13045,7 @@ async function main(): Promise<void> {
       // that finds them full, which is the line C1 shipped and the reason
       // the ration purchase kept its old name: a captain buying rations
       // without naming a food is buying the food that never turns.
-      const fullPot = createInitialGameState();
+      const fullPot = voyageState();
       staff(fullPot);
       const fullPotLines: string[] = [];
       const fillLegs = provisionFood(fullPot, "Produce", 999, fullPotLines);
@@ -12757,7 +13069,7 @@ async function main(): Promise<void> {
       // market rather than by the hold, because the market is the door
       // that sells, and the same card buys without complaint one meal
       // later, which is what makes the shortage a cost rather than a wall.
-      const hungryShip = createInitialGameState();
+      const hungryShip = voyageState();
       staff(hungryShip);
       hungryShip.larder = 0;
       hungryShip.larderLots = [];
@@ -12836,12 +13148,12 @@ async function main(): Promise<void> {
         "a pantry read off a save drops the lots the catalogue does not know, floors what a portion is and what leg it was bought at, keeps the sixty four lots a voyage can legitimately carry, and reads a missing stamp as a leg no voyage has",
       );
       check(
-        normalizeLarder(180) === 180 &&
-          normalizeLarder(-4) === 0 &&
-          normalizeLarder("sixty") === LARDER_START &&
-          normalizeLarder(3.9) === 3 &&
+        normalizeLarder(180, GAMBIT) === 180 &&
+          normalizeLarder(-4, GAMBIT) === 0 &&
+          normalizeLarder("sixty", GAMBIT) === LARDER_START &&
+          normalizeLarder(3.9, GAMBIT) === 3 &&
           withEnv("NEXT_PUBLIC_SPLIT_HOLD", "off", () =>
-            normalizeLarder(180),
+            normalizeLarder(180, GAMBIT),
           ) === LARDER_MAX,
         "a Larder read off a save is clamped to the hold it is actually in: the stores' own ceiling under the split, which is sixty meals of grain or a hundred and eighty of produce, and the old sixty with the split switched off",
       );
@@ -12852,7 +13164,7 @@ async function main(): Promise<void> {
       // what every scenario in this file is: the count is the game's and
       // the account is what a crew eats from, and grain is what absorbs
       // the difference either way.
-      const partedPot = createInitialGameState();
+      const partedPot = voyageState();
       partedPot.larder = 0;
       const partedLines = pantryLines(partedPot);
       reconcileLarder(partedPot);
@@ -12875,7 +13187,7 @@ async function main(): Promise<void> {
       // than on a clock, so the check walks the phase every captain
       // already walks: a leg ends, the settlement tick reads the pantry,
       // and the produce the voyage carried through it is gone.
-      const spoilWalk = createInitialGameState();
+      const spoilWalk = voyageState();
       spoilWalk.money = 1000;
       spoilWalk.larder = 18;
       spoilWalk.larderLots = [];
@@ -12912,7 +13224,7 @@ async function main(): Promise<void> {
       // the Larder's own ceiling again rather than the stores'.
       check(
         withEnv("NEXT_PUBLIC_SURVIVAL", "off", () => {
-          const darkShip = createInitialGameState();
+          const darkShip = voyageState();
           darkShip.money = 1000;
           darkShip.currentRound = 3;
           hireWorker(darkShip, "weaver", []);
@@ -12932,10 +13244,10 @@ async function main(): Promise<void> {
             bought === 0 &&
             preserved === 0 &&
             darkLines.length === 0 &&
-            holdCapacityOn() === false &&
+            holdCapacityOn(GAMBIT) === false &&
             cargoCapacity(darkShip) === Number.POSITIVE_INFINITY &&
             foodRoomMeals(darkShip, "Produce") === LARDER_MAX &&
-            normalizeLarder(180) === LARDER_MAX
+            normalizeLarder(180, GAMBIT) === LARDER_MAX
           );
         }),
         "with the provisions layer off the pantry is a plain number again: no meal drawn, nothing turned, nothing bought or preserved and no stamp written, and the room a captain reads is the Larder's own ceiling rather than a stores the rule is not running",
@@ -12965,7 +13277,7 @@ async function main(): Promise<void> {
         !carriesADash("src/lib/game/dashboard.ts") &&
         !carriesADash("src/lib/game/integrity.ts") &&
         !carriesADash("src/lib/use-leg-report.ts") &&
-        !carriesADash("src/types/realtime.ts") &&
+        !carriesADash("src/types/realtime") &&
         !carriesADash("src/server/realtime/index.ts") &&
         !carriesADash("src/components/portmasters/game/phases/Purchase.tsx"),
       "and the four screens and the wire the split reaches, the market that refuses a lot for room, the dashboard that reads the hold, the integrity note, the leg report and its server side, and the Provisions panel a captain buys from, hold it too",
@@ -13231,7 +13543,7 @@ async function main(): Promise<void> {
     console.log("\nThe pathbound order board");
 
     const dealOrders = (suffix: string) => {
-      const state = createInitialGameState();
+      const state = voyageState();
       snapToCheckpoint(
         state,
         { seedBase: `smoke:path-orders:${suffix}`, harborId: "harbor-a" },
@@ -13247,10 +13559,19 @@ async function main(): Promise<void> {
     // switched.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_PATH_ORDERS", value, pathOrdersOn),
+        withEnv(
+          "NEXT_PUBLIC_PATH_ORDERS",
+          value,
+          switchFor(GAMBIT, pathOrdersOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
-          (value) => !withEnv("NEXT_PUBLIC_PATH_ORDERS", value, pathOrdersOn),
+          (value) =>
+            !withEnv(
+              "NEXT_PUBLIC_PATH_ORDERS",
+              value,
+              switchFor(GAMBIT, pathOrdersOn),
+            ),
         ),
       "the pathbound board is on for every value except the word off and the digit zero, which is the policy every switch in this tree is read through",
     );
@@ -13285,7 +13606,7 @@ async function main(): Promise<void> {
             o.resources.length === 1 &&
             lockingPathFor(o.resources[0].type) !== null &&
             (ITEMS as readonly string[]).includes(o.resources[0].type) &&
-            pathOrderOf(o) === lockingPathFor(o.resources[0].type),
+            pathOrderOf(o, GAMBIT) === lockingPathFor(o.resources[0].type),
         ),
         "each of the three demands exactly one good, a good some path's pool claims and a good the hold itself trades, so a pathbound card is an errand the manifest could really post and a captain could really fill once they hold the path",
       );
@@ -13293,7 +13614,7 @@ async function main(): Promise<void> {
       // which is what makes the good the whole of the label.
       check(
         pathCards.every((o) => {
-          const config = pathConfig(pathOrderOf(o));
+          const config = pathConfig(pathOrderOf(o, GAMBIT));
           return (
             config !== null &&
             config.crest.length > 0 &&
@@ -13321,19 +13642,22 @@ async function main(): Promise<void> {
       // one, so this is the state of the table this build ships: the rule
       // teaches by being true rather than by being staged.
       const marked = pathCards[0];
-      const owner = marked ? pathOrderOf(marked) : null;
+      const owner = marked ? pathOrderOf(marked, GAMBIT) : null;
       check(
         marked !== undefined &&
-          pathCards.every((o) => lockedBehind(board, o) === pathOrderOf(o)) &&
+          pathCards.every(
+            (o) => lockedBehind(board, o) === pathOrderOf(o, GAMBIT),
+          ) &&
           lockedBehind(board, marked) !== null,
         "a captain who holds no path is locked out of all three, which is the ordinary table until the draft that deals a path lands",
       );
       check(
         owner !== null &&
           pathCards.every((o) =>
-            pathOrderOf(o) === owner
+            pathOrderOf(o, GAMBIT) === owner
               ? lockedBehind({ ...board, path: owner }, o) === null
-              : lockedBehind({ ...board, path: owner }, o) === pathOrderOf(o),
+              : lockedBehind({ ...board, path: owner }, o) ===
+                pathOrderOf(o, GAMBIT),
           ),
         "and holding one path opens the cards it posted while leaving the other path's cards locked, which is what makes the board a set of doors rather than one door",
       );
@@ -13394,7 +13718,7 @@ async function main(): Promise<void> {
       check(
         pooledPath !== undefined &&
           lockingPathFor(pooledGood) === pooledPath &&
-          pathOrderOf(ordinary) === null &&
+          pathOrderOf(ordinary, GAMBIT) === null &&
           lockedBehind(board, ordinary) === null &&
           lockedBehind({ ...board, path: pooledPath }, ordinary) === null,
         "and an ordinary order demanding the very same good is open to every captain, marker and all, so the lock is the marker's doing and never the good's",
@@ -13408,7 +13732,7 @@ async function main(): Promise<void> {
           openOrderCount(board) === scheduled &&
           openOrderCount({ ...board, path: owner }) ===
             scheduled +
-              pathCards.filter((o) => pathOrderOf(o) === owner).length,
+              pathCards.filter((o) => pathOrderOf(o, GAMBIT) === owner).length,
         "and the dealt count a leg report files leaves the locked cards out, counting the tier's own draw when the captain holds no path and adding back exactly the cards the path they hold posted",
       );
     });
@@ -13442,7 +13766,8 @@ async function main(): Promise<void> {
     check(
       pathOffBoard.customerCards.every(
         (o) =>
-          pathOrderOf(o) === null && lockedBehind(pathOffBoard, o) === null,
+          pathOrderOf(o, GAMBIT) === null &&
+          lockedBehind(pathOffBoard, o) === null,
       ) && openOrderCount(pathOffBoard) === pathOffBoard.customerCards.length,
       "and a board dealt with the switch off carries no locked card at all, which is the base game exactly",
     );
@@ -13455,7 +13780,8 @@ async function main(): Promise<void> {
         withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
           markedCards.every(
             (o) =>
-              pathOrderOf(o) === null && lockedBehind(pathOnBoard, o) === null,
+              pathOrderOf(o, GAMBIT) === null &&
+              lockedBehind(pathOnBoard, o) === null,
           ),
         ),
       "and a card already dealt by a build with the switch on is an ordinary order to a build with it off, so rolling the feature back mid voyage leaves nobody holding a card no one can fill",
@@ -13474,7 +13800,7 @@ async function main(): Promise<void> {
         );
         return (
           carriedMarks.length === PATH_ORDER_SLOTS &&
-          carriedMarks.every((o) => pathOrderOf(o) !== null) &&
+          carriedMarks.every((o) => pathOrderOf(o, GAMBIT) !== null) &&
           openOrderCount(carriedBoard) ===
             carriedBoard.customerCards.length - PATH_ORDER_SLOTS
         );
@@ -13482,7 +13808,8 @@ async function main(): Promise<void> {
         withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
           carriedBoard.customerCards.every(
             (o) =>
-              pathOrderOf(o) === null && lockedBehind(carriedBoard, o) === null,
+              pathOrderOf(o, GAMBIT) === null &&
+              lockedBehind(carriedBoard, o) === null,
           ),
         ),
       "a dealt board round trips through a save with its marks intact, and the same board carried back under the switch off is nine ordinary orders with nobody locked out of any of them",
@@ -13529,11 +13856,19 @@ async function main(): Promise<void> {
     // switched.
     check(
       [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-        withEnv("NEXT_PUBLIC_ESCORT_CONTRACTS", value, escortContractsOn),
+        withEnv(
+          "NEXT_PUBLIC_ESCORT_CONTRACTS",
+          value,
+          switchFor(GAMBIT, escortContractsOn),
+        ),
       ) &&
         ["off", "0", "OFF", " off ", "Off"].every(
           (value) =>
-            !withEnv("NEXT_PUBLIC_ESCORT_CONTRACTS", value, escortContractsOn),
+            !withEnv(
+              "NEXT_PUBLIC_ESCORT_CONTRACTS",
+              value,
+              switchFor(GAMBIT, escortContractsOn),
+            ),
         ),
       "the escort market is on for every value except the word off and the digit zero, which is the policy every switch in this tree is read through",
     );
@@ -13580,16 +13915,18 @@ async function main(): Promise<void> {
     check(
       withEnv("NEXT_PUBLIC_ESCORT_CONTRACTS", "1", () =>
         PATH_IDS.every(
-          (id) => canSellEscort({ path: id }) === (id === ESCORT_SELLER_PATH),
+          (id) =>
+            canSellEscort({ path: id, mode: GAMBIT }) ===
+            (id === ESCORT_SELLER_PATH),
         ),
       ) &&
         withEnv(
           "NEXT_PUBLIC_ESCORT_CONTRACTS",
           "1",
-          () => !canSellEscort({ path: null }),
+          () => !canSellEscort({ path: null, mode: GAMBIT }),
         ) &&
         !withEnv("NEXT_PUBLIC_ESCORT_CONTRACTS", "off", () =>
-          canSellEscort({ path: ESCORT_SELLER_PATH }),
+          canSellEscort({ path: ESCORT_SELLER_PATH, mode: GAMBIT }),
         ),
       "one path sells protection and no other does, and the switch refuses a Convoy captain as flatly as it refuses everyone else, because the flag is the operator's rollback and the path is the captain's identity",
     );
@@ -13601,14 +13938,16 @@ async function main(): Promise<void> {
       withEnv(
         "NEXT_PUBLIC_ESCORT_CONTRACTS",
         "1",
-        () => escortCoverOf({ escortCover: aCover })?.contractId === "c1",
+        () =>
+          escortCoverOf({ escortCover: aCover, mode: GAMBIT })?.contractId ===
+          "c1",
       ) &&
         withEnv(
           "NEXT_PUBLIC_ESCORT_CONTRACTS",
           "off",
-          () => escortCoverOf({ escortCover: aCover }) === null,
+          () => escortCoverOf({ escortCover: aCover, mode: GAMBIT }) === null,
         ) &&
-        escortCoverOf({ escortCover: null }) === null,
+        escortCoverOf({ escortCover: null, mode: GAMBIT }) === null,
       "the raid roll's cover is the mirror itself while the market runs, nothing at all with the switch off whatever the mirror still says, and nothing at all on a captain nobody covered",
     );
 
@@ -13735,7 +14074,7 @@ async function main(): Promise<void> {
     // state and to nobody else's, which is this tree's standing model for
     // cross captain Gold.
     const purseOf = (gold: number): GameState => {
-      const state = createInitialGameState();
+      const state = voyageState();
       state.money = gold;
       return state;
     };
@@ -13912,7 +14251,7 @@ async function main(): Promise<void> {
     );
 
     // ---- The heal, and the save ----
-    const ancient = createInitialGameState();
+    const ancient = voyageState();
     const stripped = ancient as unknown as Record<string, unknown>;
     for (const field of [
       "escortCover",
@@ -13928,7 +14267,7 @@ async function main(): Promise<void> {
     ]) {
       stripped[field] = undefined;
     }
-    const wounded = createInitialGameState();
+    const wounded = voyageState();
     wounded.escortSold = -3;
     wounded.escortAbsorbed = Number.NaN;
     wounded.settledMovements = ["c1:fee", 7] as unknown as string[];
@@ -13961,7 +14300,7 @@ async function main(): Promise<void> {
         wounded.pendingEscortClaim === null,
       "and a save carrying the fields in shapes the engine would not survive is healed to the same reading: counts floored, the ledger filtered to strings rather than left holding a key that would never match, and a cover or a claim missing its own fields dropped outright",
     );
-    const keptWhole = createInitialGameState();
+    const keptWhole = voyageState();
     keptWhole.escortCover = aCover;
     keptWhole.pendingEscortClaim = { contractId: "c1", raidGold: 250 };
     keptWhole.escortSold = 2;
@@ -13989,6 +14328,12 @@ async function main(): Promise<void> {
     // Three captains at a table of their own, so nothing here leans on the
     // harbor the rest of this run shares: that harbor is still standing at
     // the end of this section, and the checks after it read it.
+    //
+    // The harbor is a Gambit one, and that is the fixture rather than a
+    // preference: the exchange is a system of that mode, so a founding mode
+    // table would refuse every post below for a reason the checks would
+    // report as the board's own rule. The phrase is the one every sealed
+    // harbor in this script is opened with.
     const escortSeller = await signUp("esc_s");
     const escortBuyer = await signUp("esc_b");
     const escortForeigner = await signUp("esc_f");
@@ -14002,6 +14347,8 @@ async function main(): Promise<void> {
         body: JSON.stringify({
           name: `Smoke escort ${suffix}`,
           isPublic: false,
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
         }),
       },
     );
@@ -14416,16 +14763,21 @@ async function main(): Promise<void> {
     withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
       check(
         [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-          withEnv("NEXT_PUBLIC_REFITS", value, refitsOn),
+          withEnv("NEXT_PUBLIC_REFITS", value, switchFor(GAMBIT, refitsOn)),
         ) &&
           ["off", "0", "OFF", " off ", "Off"].every(
-            (value) => !withEnv("NEXT_PUBLIC_REFITS", value, refitsOn),
+            (value) =>
+              !withEnv(
+                "NEXT_PUBLIC_REFITS",
+                value,
+                switchFor(GAMBIT, refitsOn),
+              ),
           ),
         "the Loom's bench is on for every value of its own switch except the word off and the digit zero, which is the policy every switch in this tree is read through",
       );
       check(
         !withEnv("NEXT_PUBLIC_GARMENTS", "off", () =>
-          withEnv("NEXT_PUBLIC_REFITS", "1", refitsOn),
+          withEnv("NEXT_PUBLIC_REFITS", "1", switchFor(GAMBIT, refitsOn)),
         ),
         "and it stands on the wardrobe rather than beside it: a table with no clothes layer has nothing to put right, so the bench's own switch cannot open it alone",
       );
@@ -14435,7 +14787,7 @@ async function main(): Promise<void> {
       // answers yes or no and says why, so the checks below hold the sentence
       // as well as the answer: a captain who presses a button is owed one.
       const benchState = (over: Partial<GameState> = {}): GameState => ({
-        ...createInitialGameState({ voyageEpoch: 7 }),
+        ...voyageState({ voyageEpoch: 7 }),
         path: REFIT_SELLER_PATH,
         money: 500,
         ...over,
@@ -14451,8 +14803,10 @@ async function main(): Promise<void> {
       withEnv("NEXT_PUBLIC_REFITS", "1", () => {
         check(
           PATH_IDS.every(
-            (id) => canSellRefit({ path: id }) === (id === REFIT_SELLER_PATH),
-          ) && !canSellRefit({ path: null }),
+            (id) =>
+              canSellRefit({ path: id, mode: GAMBIT }) ===
+              (id === REFIT_SELLER_PATH),
+          ) && !canSellRefit({ path: null, mode: GAMBIT }),
           "one path works the bench and no other does, so the question a captain asks before offering is answered by the path record rather than by a name written into a screen",
         );
 
@@ -14822,7 +15176,7 @@ async function main(): Promise<void> {
         );
 
         // The load site, where every field this build added is healed.
-        const ancient = createInitialGameState();
+        const ancient = voyageState();
         const stripped = ancient as unknown as Record<string, unknown>;
         for (const field of [
           "refitsSold",
@@ -14848,7 +15202,7 @@ async function main(): Promise<void> {
             ancient.ragsRound === 0,
           "a save written before this feature reads as a captain who has never mended anything, bought a rag or sold a refit, and both stamps heal to a leg no voyage has rather than to one that reads as already spent",
         );
-        const wounded = createInitialGameState();
+        const wounded = voyageState();
         wounded.refitsSold = -3;
         wounded.refitFeesEarned = Number.NaN;
         wounded.mendsMade = 2.7;
@@ -14881,7 +15235,7 @@ async function main(): Promise<void> {
       const offLeg = benchState();
       check(
         !withEnv("NEXT_PUBLIC_REFITS", "off", () =>
-          canSellRefit({ path: REFIT_SELLER_PATH }),
+          canSellRefit({ path: REFIT_SELLER_PATH, mode: GAMBIT }),
         ) &&
           withEnv("NEXT_PUBLIC_REFITS", "off", () =>
             refitRoomFor(offLeg, REWEAVE_GOOD),
@@ -14921,6 +15275,8 @@ async function main(): Promise<void> {
         body: JSON.stringify({
           name: `Smoke loom ${suffix}`,
           isPublic: false,
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
         }),
       },
     );
@@ -15345,22 +15701,33 @@ async function main(): Promise<void> {
     withEnv("NEXT_PUBLIC_BAZAAR", "1", () => {
       check(
         [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
-          withEnv("NEXT_PUBLIC_BAZAAR", value, bazaarRumorsOn),
+          withEnv(
+            "NEXT_PUBLIC_BAZAAR",
+            value,
+            switchFor(GAMBIT, bazaarRumorsOn),
+          ),
         ) &&
           ["off", "0", "OFF", " off ", "Off"].every(
-            (value) => !withEnv("NEXT_PUBLIC_BAZAAR", value, bazaarRumorsOn),
+            (value) =>
+              !withEnv(
+                "NEXT_PUBLIC_BAZAAR",
+                value,
+                switchFor(GAMBIT, bazaarRumorsOn),
+              ),
           ),
         "the bazaar is on for every value of its own switch except the word off and the digit zero, which is the policy every switch in this tree is read through",
       );
       check(
         PATH_IDS.every(
-          (id) => canPublishRumor({ path: id }) === (id === BAZAAR_SELLER_PATH),
-        ) && !canPublishRumor({ path: null }),
+          (id) =>
+            canPublishRumor({ path: id, mode: GAMBIT }) ===
+            (id === BAZAAR_SELLER_PATH),
+        ) && !canPublishRumor({ path: null, mode: GAMBIT }),
         "one path works the bazaar and no other does, so the question a captain asks before speaking is answered by the path record rather than by a name written into a screen",
       );
       check(
         !withEnv("NEXT_PUBLIC_BAZAAR", "off", () =>
-          canPublishRumor({ path: BAZAAR_SELLER_PATH }),
+          canPublishRumor({ path: BAZAAR_SELLER_PATH, mode: GAMBIT }),
         ),
         "and the switch is read before the path rather than beside it: a build with the bazaar rolled back refuses an Aroma captain as flatly as it refuses everyone else",
       );
@@ -15611,7 +15978,7 @@ async function main(): Promise<void> {
         harborId: "harbor-b",
       };
       const marketUnder = (leans: MarketLeans) => {
-        const state = createInitialGameState({ difficulty: "fair_winds" });
+        const state = voyageState({ difficulty: "fair_winds" });
         applyMarketLeans(state, leans);
         snapToCheckpoint(state, marketCtx, 6, "market", []);
         return state;
@@ -15772,6 +16139,8 @@ async function main(): Promise<void> {
           name: `Smoke bazaar ${suffix}`,
           isPublic: false,
           difficulty: "fair_winds",
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
         }),
       },
     );
@@ -16305,23 +16674,23 @@ async function main(): Promise<void> {
       PATH_IDS.every(
         (id) =>
           opportunistMayBorrow(
-            { path: id, opportunistBorrows: 0 },
+            { path: id, opportunistBorrows: 0, mode: GAMBIT },
             "convoy",
           ) ===
           (id === OPPORTUNIST_PATH),
       ) &&
         !opportunistMayBorrow(
-          { path: null, opportunistBorrows: 0 },
+          { path: null, opportunistBorrows: 0, mode: GAMBIT },
           "convoy",
         ) &&
         !withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
           opportunistMayBorrow(
-            { path: OPPORTUNIST_PATH, opportunistBorrows: 0 },
+            { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
             "convoy",
           ),
         ) &&
         !opportunistMayBorrow(
-          { path: OPPORTUNIST_PATH, opportunistBorrows: 0 },
+          { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
           null,
         ),
       "one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
@@ -16358,7 +16727,7 @@ async function main(): Promise<void> {
     // rest of the round is walked through the engine's own lap until the
     // books roll over, and the counter is still spent afterwards; then the
     // voyage is restarted and it is not.
-    const borrowCarried = createInitialGameState();
+    const borrowCarried = voyageState();
     borrowCarried.money = 400;
     borrowCarried.opportunistBorrows = 1;
     borrowCarried.phase = "resolve";
@@ -16391,7 +16760,7 @@ async function main(): Promise<void> {
     // lifecycle: the tier's draw plus the paths' three, and every one of
     // the three is locked to a captain who holds none of those paths.
     const borrowBoard = (label: string): GameState => {
-      const state = createInitialGameState();
+      const state = voyageState();
       snapToCheckpoint(
         state,
         { seedBase: `smoke:borrow-board:${label}`, harborId: "harbor-a" },
@@ -16727,7 +17096,7 @@ async function main(): Promise<void> {
     );
 
     // ---- what a kept card writes into a save ----
-    const kept = createInitialGameState();
+    const kept = voyageState();
     const keptLines: string[] = [];
     check(
       kept.path === null &&
@@ -16750,7 +17119,7 @@ async function main(): Promise<void> {
     // locked card only exists while that switch is on and a fixture that
     // forgot it would be reading a manifest with nothing in it to forfeit.
     const switched = withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
-      const state = createInitialGameState({ mode: "ocean_gambit" });
+      const state = voyageState({ mode: "ocean_gambit" });
       snapToCheckpoint(
         state,
         { seedBase: `smoke:d7:switch:${suffix}`, harborId: "harbor-a" },
@@ -16761,7 +17130,7 @@ async function main(): Promise<void> {
       state.money = 500;
       state.renownLevel = 4;
       const locked = state.customerCards
-        .map((card) => ({ card, lock: pathOrderOf(card) }))
+        .map((card) => ({ card, lock: pathOrderOf(card, GAMBIT) }))
         .filter(
           (row): row is { card: OrderCard; lock: PathId } => row.lock !== null,
         );
@@ -16778,7 +17147,7 @@ async function main(): Promise<void> {
       const filled = mine.length > 1 ? mine.slice(0, 1) : [];
       const open = mine.filter((card) => !filled.includes(card));
       const loose = state.customerCards.filter(
-        (card) => pathOrderOf(card) === null,
+        (card) => pathOrderOf(card, GAMBIT) === null,
       );
       state.path = from;
       state.pathSwitchLeg = 0;
@@ -16841,7 +17210,7 @@ async function main(): Promise<void> {
     // not do, so a manifest with none of it left has nothing to lose and
     // says so by leaving the sentence off rather than by printing a zero.
     withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
-      const carried = createInitialGameState({ mode: "ocean_gambit" });
+      const carried = voyageState({ mode: "ocean_gambit" });
       snapToCheckpoint(
         carried,
         { seedBase: `smoke:d7:carried:${suffix}`, harborId: "harbor-a" },
@@ -16850,14 +17219,16 @@ async function main(): Promise<void> {
         [],
       );
       const anyLocked = carried.customerCards.find(
-        (card) => pathOrderOf(card) !== null,
+        (card) => pathOrderOf(card, GAMBIT) !== null,
       );
       const abandoned =
-        anyLocked === undefined ? null : (pathOrderOf(anyLocked) ?? null);
+        anyLocked === undefined
+          ? null
+          : (pathOrderOf(anyLocked, GAMBIT) ?? null);
       carried.path = abandoned ?? PATH_IDS[0];
       carried.money = 500;
       const marked = carried.customerCards.filter(
-        (card) => pathOrderOf(card) === abandoned,
+        (card) => pathOrderOf(card, GAMBIT) === abandoned,
       );
       carried.completedOrders = [
         ...carried.completedOrders,
@@ -16892,7 +17263,7 @@ async function main(): Promise<void> {
       path: PathId,
       money: number,
     ) => {
-      const state = createInitialGameState();
+      const state = voyageState();
       state.currentRound = round;
       state.phase = phase;
       state.path = path;
@@ -16905,7 +17276,7 @@ async function main(): Promise<void> {
     const wantedPath = PATH_IDS[1];
     const atPort = atSea(4, "orders", heldPath, 500);
     check(
-      pathSwitchBlocked(createInitialGameState(), wantedPath) ===
+      pathSwitchBlocked(voyageState(), wantedPath) ===
         "You hold no path to set aside." &&
         pathSwitchBlocked(atPort, heldPath) === "You already hold that path." &&
         pathSwitchBlocked({ ...atPort, pathSwitchLeg: 3 }, wantedPath) ===
@@ -16959,9 +17330,9 @@ async function main(): Promise<void> {
     // says so in its first sentence rather than in a rule written for the
     // rolled back build.
     check(
-      withEnv("NEXT_PUBLIC_PATH_DRAFT", "off", () => !pathDraftOn()) &&
-        withEnv("NEXT_PUBLIC_PATH_DRAFT", "on", () => pathDraftOn()) &&
-        pathSwitchBlocked(createInitialGameState(), "loom") ===
+      withEnv("NEXT_PUBLIC_PATH_DRAFT", "off", () => !pathDraftOn(GAMBIT)) &&
+        withEnv("NEXT_PUBLIC_PATH_DRAFT", "on", () => pathDraftOn(GAMBIT)) &&
+        pathSwitchBlocked(voyageState(), "loom") ===
           "You hold no path to set aside.",
       "the draft's own switch reads off the environment and defaults to on, and the pathless captain it leaves behind is refused by the same first sentence a captain who never drew one meets, so the rolled back build needs no second rule",
     );
@@ -16983,6 +17354,8 @@ async function main(): Promise<void> {
         body: JSON.stringify({
           name: `Smoke draft harbor ${suffix}`,
           isPublic: false,
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
         }),
       },
     );
@@ -17497,6 +17870,8 @@ async function main(): Promise<void> {
       body: JSON.stringify({
         name: `Smoke draft wipe harbor ${suffix}`,
         isPublic: false,
+        mode: "ocean_gambit",
+        unlock: LEDGER_PHRASE,
       }),
     });
     if (soloRoom.status !== 200) {
@@ -17614,7 +17989,7 @@ async function main(): Promise<void> {
         !carriesADash("src/server/realtime/draft.ts") &&
         !carriesADash("src/lib/use-path-draft.ts") &&
         !carriesADash("src/components/portmasters/game/PathDraft.tsx") &&
-        !carriesADash("src/components/portmasters/game/PathPanel.tsx"),
+        !carriesADash("src/components/portmasters/game/status/PathChip.tsx"),
       "every file the draft's and the switch's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
     );
 
@@ -17630,6 +18005,706 @@ async function main(): Promise<void> {
     check(
       afterOut.body?.user === null,
       "the session is gone after signing out",
+    );
+
+    // ---- The Supply Barge ----
+    // [E1] The anonymous vendor the plan builds as the fail safe for a
+    // table that never took the Quartermaster: one lot a leg, eight of them
+    // at the most, at a markup, drawn from the voyage's own numbers so the
+    // rule needs no state that has to be kept in step. It runs here, after
+    // the captains are put away, because it is the one article of this run
+    // that is arithmetic over records and needs no harbor, no socket and no
+    // captain. The wire half of the feature, which is what the record does
+    // with the pair of counters a captain files, is checked in the spine's
+    // own section above for the reason every other field's claim rule is.
+    const bargeVoyage = (money = 1000): GameState => {
+      const state = voyageState();
+      state.money = money;
+      hireWorker(state, "weaver", []);
+      state.larder = 0;
+      reconcileLarder(state);
+      return state;
+    };
+
+    // The plan's own clause is a markup on the port's price, so the two
+    // numbers are read off each other rather than written down twice.
+    check(
+      bargeRationPrice() === Math.ceil(RATION_PRICE * BARGE_PRICE_MULTIPLIER) &&
+        bargeRationPrice() > RATION_PRICE,
+      "a barge ration costs the port's own price marked up by the published multiplier, so the premium is one number read off another rather than a second price that could drift from it",
+    );
+
+    const bargeHome = bargeVoyage();
+    const firstPort = bargePortAtLeg(bargeHome);
+    check(
+      firstPort !== null &&
+        unlockedPorts(bargeHome.difficulty, bargeHome.currentRound).includes(
+          firstPort,
+        ) &&
+        bargePortAtLeg({ ...bargeHome }) === firstPort,
+      "the vendor stands at a port the voyage can reach on that leg, and the same state draws the same quay, because what the plan asks for is a rule rather than a coin the server flips",
+    );
+    const bargeLegs = Array.from({ length: 12 }, (_, index) => index + 1);
+    const bargePorts = bargeLegs.map((round) =>
+      bargePortAtLeg({ ...bargeHome, currentRound: round }),
+    );
+    check(
+      bargePorts.every(
+        (port, index) =>
+          port !== null &&
+          unlockedPorts(bargeHome.difficulty, bargeLegs[index]).includes(port),
+      ),
+      "and every leg of a voyage draws a quay the table can actually sail to, so the fallback is never a harbor the ship cannot reach",
+    );
+    check(
+      new Set(bargePorts).size > 1,
+      "and it is not one harbor's vendor: the quay moves through the voyage with the leg it is drawn from",
+    );
+    const bargeLots = bargeLegs.map((round) =>
+      bargeLotAtPort({ ...bargeHome, currentRound: round }),
+    );
+    // The plan's own ceiling, said out loud here as the sentence the check
+    // below is about rather than as a number typed twice: the lot is read from
+    // the constant, and this is the promise it is being held to.
+    const PLAN_CEILING = 8;
+    check(
+      bargeLots.every(
+        (lot) =>
+          Number.isInteger(lot) && lot >= 1 && lot <= BARGE_RATIONS_PER_LEG,
+      ) && BARGE_RATIONS_PER_LEG === PLAN_CEILING,
+      "the lot is a whole count between one and the ceiling the plan names, so the promise of never more than eight a leg is a bound the rule cannot cross rather than a number the panel prints",
+    );
+    check(
+      new Set(bargeLots).size > 1,
+      "and the lot is drawn rather than fixed, so a table wanting all eight has legs where that is possible and legs where it is not",
+    );
+    check(
+      bargeLeftAtPort(bargeHome) === bargeLotAtPort(bargeHome),
+      "and nothing has been bought on a fresh leg, so what is left of the lot is the lot",
+    );
+
+    // The sale, at the till and at each of the three ceilings it is held
+    // to, read on its own state so one ceiling cannot be mistaken for
+    // another.
+    const bargeBuyer = bargeVoyage();
+    const bargePrice = bargeRationPrice();
+    const bargePurse = bargeBuyer.money;
+    const bargeMeals = mealsOf(bargeBuyer, "Grain");
+    const bargeSaleLines: string[] = [];
+    const boughtRation = buyFromBarge(bargeBuyer, 1, bargeSaleLines);
+    check(
+      boughtRation === 1 &&
+        bargeBuyer.money === bargePurse - bargePrice &&
+        mealsOf(bargeBuyer, "Grain") === bargeMeals + 1 &&
+        bargeBuyer.larder === 1 &&
+        bargeBuyer.roundCosts === bargePrice &&
+        bargeBuyer.totalCosts === bargePrice,
+      "one ration is one meal of grain for the premium on the label, booked at the till the way every other purchase in this game is booked",
+    );
+    check(
+      bargeBuyer.foodSpend === bargePrice &&
+        bargeBuyer.bargeSpend === bargePrice &&
+        bargeBuyer.bargeTaken === 1 &&
+        bargeBuyer.bargeRound === bargeBuyer.currentRound,
+      "and the Gold lands in both counters the page's share is divided from, stamped with the leg it was spent in",
+    );
+    const bargeEager = bargeVoyage(10_000);
+    const bargeLot = bargeLotAtPort(bargeEager);
+    const bargeEagerLines: string[] = [];
+    const tookTheLot = buyFromBarge(
+      bargeEager,
+      BARGE_RATIONS_PER_LEG * 4,
+      bargeEagerLines,
+    );
+    const pressedAgain = buyFromBarge(bargeEager, 1, bargeEagerLines);
+    check(
+      tookTheLot === bargeLot &&
+        bargeLeftAtPort(bargeEager) === 0 &&
+        pressedAgain === 0 &&
+        bargeEagerLines[bargeEagerLines.length - 1] ===
+          "⛵ The barge has nothing left for you this leg.",
+      "a press for more than a leg's lot buys the lot and stops there, and a second press in the same leg is told the vendor has nothing left rather than being sold a shelf the plan does not have",
+    );
+    // The stamp. A leg is the unit of the lot and of the tally, so the next
+    // leg is both a fresh shelf and a fresh count, which is the whole of
+    // the state this feature added.
+    const bargeStamp = bargeVoyage(10_000);
+    buyFromBarge(bargeStamp, 1, []);
+    const firstLegTaken = bargeStamp.bargeTaken;
+    bargeStamp.currentRound += 1;
+    const freshLegLeft = bargeLeftAtPort(bargeStamp);
+    buyFromBarge(bargeStamp, 1, []);
+    check(
+      firstLegTaken === 1 &&
+        bargeStamp.bargeTaken === 1 &&
+        bargeStamp.bargeRound === bargeStamp.currentRound &&
+        freshLegLeft === bargeLotAtPort(bargeStamp),
+      "the tally is stamped with the leg it belongs to, so the next leg draws a fresh lot and starts the count again rather than leaving the quay bare for the rest of the voyage",
+    );
+    const bargeFull = bargeVoyage(10_000);
+    provisionFood(bargeFull, "Grain", 999, []);
+    const bargeFullLines: string[] = [];
+    check(
+      foodRoomMeals(bargeFull, "Grain") < 1 &&
+        buyFromBarge(bargeFull, 1, bargeFullLines) === 0 &&
+        bargeFullLines[bargeFullLines.length - 1] === "🧺 The larder is full.",
+      "a stores with no room takes no rations, and the vendor says so in the same words the port counter uses, because there is one larder and one answer to a full one",
+    );
+    // The purse is drawn down after the crew is aboard rather than handed to
+    // the fixture, because a voyage that cannot pay its own crew is a voyage
+    // with nobody aboard, and that captain is answered by the crewless line
+    // below rather than by this one. What this check is about is the
+    // sentence a vendor whose price is over the purse gives the captain.
+    const bargeThin = bargeVoyage();
+    bargeThin.money = 1;
+    const bargeThinLines: string[] = [];
+    check(
+      bargePrice > 1 &&
+        buyFromBarge(bargeThin, 1, bargeThinLines) === 0 &&
+        bargeThin.money === 1 &&
+        bargeThinLines[bargeThinLines.length - 1] ===
+          `❌ The barge charges ${bargePrice} Gold a ration, and the purse cannot cover one.`,
+      "and a purse that cannot cover one ration buys nothing rather than going into debt to the vendor, told the price it is short of",
+    );
+    const bargeCrewless = voyageState();
+    bargeCrewless.money = 1000;
+    bargeCrewless.larder = 0;
+    reconcileLarder(bargeCrewless);
+    const bargeCrewlessLines: string[] = [];
+    check(
+      crewSize(bargeCrewless) === 0 &&
+        buyFromBarge(bargeCrewless, 1, bargeCrewlessLines) === 0 &&
+        bargeCrewlessLines[bargeCrewlessLines.length - 1] ===
+          "⚓ No crew aboard, so there is nothing to provision.",
+      "while a captain with nobody aboard has nobody to feed and is told so in one line, which is the answer that case already gives a buyer at the port",
+    );
+    const bargeOdd = bargeVoyage();
+    const bargeOddLines: string[] = [];
+    check(
+      buyFromBarge(bargeOdd, 0.4, bargeOddLines) === 0 &&
+        bargeOdd.money === 1000 &&
+        bargeOddLines[bargeOddLines.length - 1] ===
+          "❌ Name how many rations to buy from the barge.",
+      "and a press that names no ration at all is refused in words rather than read as a zero it would quietly take and charge nothing for",
+    );
+
+    // The invariant the page's headline rests on: every Gold the vendor
+    // takes is a Gold of food spending, so the numerator is inside the
+    // denominator whatever a voyage buys and wherever it buys it.
+    const bargeSpender = bargeVoyage(10_000);
+    provisionFood(bargeSpender, "Grain", 2, []);
+    const bargePortSpend = bargeSpender.foodSpend;
+    buyFromBarge(bargeSpender, 1, []);
+    check(
+      bargePortSpend === 2 * RATION_PRICE &&
+        bargeSpender.foodSpend === bargePortSpend + bargePrice &&
+        bargeSpender.bargeSpend === bargePrice &&
+        bargeSpender.bargeSpend <= bargeSpender.foodSpend,
+      "every Gold the vendor takes is booked in the denominator its share is divided by, so the page's headline can never read above one hundred percent however a voyage spends",
+    );
+
+    // A save this build did not write, and one it cannot read at all.
+    const bargeNonsense = {
+      ...voyageState(),
+      bargeTaken: -3,
+      bargeRound: 2.7,
+      foodSpend: Number.NaN,
+      bargeSpend: "six",
+    } as unknown as GameState;
+    normalizeBargeState(bargeNonsense);
+    const bargeLegacy = { ...voyageState() } as unknown as Record<
+      string,
+      unknown
+    >;
+    delete bargeLegacy.bargeTaken;
+    delete bargeLegacy.bargeRound;
+    delete bargeLegacy.foodSpend;
+    delete bargeLegacy.bargeSpend;
+    normalizeBargeState(bargeLegacy as unknown as GameState);
+    check(
+      bargeNonsense.bargeTaken === 0 &&
+        bargeNonsense.bargeRound === 2 &&
+        bargeNonsense.foodSpend === 0 &&
+        bargeNonsense.bargeSpend === 0 &&
+        bargeLegacy.bargeTaken === 0 &&
+        bargeLegacy.bargeRound === 0 &&
+        bargeLegacy.foodSpend === 0 &&
+        bargeLegacy.bargeSpend === 0,
+      "a tally this build cannot read heals to a voyage that never bought at the vendor, and a save written before the vendor existed reads the same way rather than as a captain who spent Gold nobody can account for",
+    );
+
+    // The switch, and the mode boundary behind it.
+    check(
+      withEnv(
+        "NEXT_PUBLIC_SURVIVAL",
+        "1",
+        () => bargeOn(GAMBIT) && !bargeOn(CLASSIC),
+      ),
+      "the vendor belongs to the survival layer, so a Classic table never meets one whatever the environment says",
+    );
+    check(
+      withEnv("NEXT_PUBLIC_SURVIVAL", "off", () => {
+        const dark = bargeVoyage();
+        const darkLines: string[] = [];
+        const sold = buyFromBarge(dark, 1, darkLines);
+        return (
+          !bargeOn(GAMBIT) &&
+          bargePortAtLeg(dark) === null &&
+          bargeLotAtPort(dark) === 0 &&
+          bargeLeftAtPort(dark) === 0 &&
+          sold === 0 &&
+          dark.money === 1000 &&
+          dark.foodSpend === 0 &&
+          dark.bargeSpend === 0 &&
+          darkLines.length === 0
+        );
+      }),
+      "and with the switch off there is no quay, no lot and no sale, so the base game is exactly as it was",
+    );
+
+    // The page's two numbers, reduced out of records shaped the way the
+    // spine writes one. Each captain files two legs, because the counters
+    // are the voyage's running totals: the reader takes the report at their
+    // greatest leg, and the numbers below say which of the two rules was
+    // applied.
+    const bargeReport = (
+      roomId: string,
+      actor: string,
+      leg: number,
+      foodSpend: number,
+      bargeSpend: number,
+    ) =>
+      telemetryEvent("leg_report", voyageIdFor(roomId, 1), 0, {
+        leg,
+        actor,
+        ordersDealt: 0,
+        ordersFilled: 0,
+        distinctGoods: 0,
+        foodSpend,
+        bargeSpend,
+      });
+    const dashedWith = dashRecord("barge-with", {
+      events: [
+        bargeReport("barge-with", "one", 1, 240, 48),
+        bargeReport("barge-with", "one", 2, 300, 60),
+        bargeReport("barge-with", "two", 1, 100, 0),
+      ],
+    });
+    const dashedWithout = dashRecord("barge-without", {
+      events: [
+        bargeReport("barge-without", "one", 3, 200, 0),
+        bargeReport("barge-without", "two", 3, 150, 0),
+      ],
+    });
+    // A voyage whose captains filed a report and no pair of counters, which
+    // is a harbor that was not playing the provisions layer at all.
+    const dashedDark = dashRecord("barge-dark", {
+      events: [
+        telemetryEvent("leg_report", voyageIdFor("barge-dark", 1), 0, {
+          leg: 1,
+          actor: "one",
+          ordersDealt: 2,
+          ordersFilled: 2,
+          distinctGoods: 2,
+        }),
+      ],
+    });
+    const bargeWindow = readDashboard({
+      records: [dashedWith, dashedWithout, dashedDark],
+      outcomes: [],
+      unreadable: 0,
+    });
+    const bargeShare = bargeWindow.frontPage;
+    const bargeWithout = bargeWindow.panels[0]?.readings[1];
+    check(
+      bargeWindow.panels[0]?.readings[0] === bargeWindow.frontPage,
+      "the front page number and the seat panel's first reading are one object rather than two copies of one number, which is what keeps the page from printing a share the panel beside it disagrees with",
+    );
+    check(
+      bargeShare.label === "Barge revenue share of all food spending" &&
+        bargeShare.value ===
+          `${ratePercent(60 / 750)} of 750 Gold over 2 voyages`,
+      "and the share is the vendor's Gold over the whole window's food spending, read at each captain's greatest leg rather than by adding their legs up, and over the two voyages that filed the pair rather than the three in the window",
+    );
+    check(
+      bargeShare.target === "no threshold in the plan" &&
+        bargeShare.verdict === "ungated",
+      "with the plan setting no band on it, so the page reads it as measured and unjudged rather than inventing a threshold the proposal never wrote",
+    );
+    check(
+      bargeWithout?.label === "Lobbies that sailed without the Barge" &&
+        bargeWithout?.value === `${ratePercent(1 / 2)} of 2 lobbies` &&
+        bargeWithout?.target === "above 70%" &&
+        bargeWithout?.verdict === "under",
+      "while the number the plan does gate is the share of lobbies that sailed without the vendor, read over the tables rather than over the captains and judged under its own band",
+    );
+    check(
+      bargeWindow.panels[0]?.answer.startsWith(
+        "1 of 1 gates sit outside theirs",
+      ) === true &&
+        bargeWindow.panels[0]?.answer.includes(
+          "Lobbies that sailed without the Barge",
+        ) === true,
+      "and the share of food spending is not one of the sixteen gates, so the panel counts the one gate it can read rather than two",
+    );
+    // A window where every table avoided the vendor, which is the plan's own
+    // target met: the headline reads as the target held, and the share reads
+    // as no denominator rather than as a share of zero.
+    const bargeAvoided = readDashboard({
+      records: [
+        dashRecord("barge-none", {
+          events: [bargeReport("barge-none", "one", 2, 0, 0)],
+        }),
+      ],
+      outcomes: [],
+      unreadable: 0,
+    });
+    check(
+      bargeAvoided.frontPage.value === "no food bought in the window" &&
+        bargeAvoided.frontPage.verdict === "ungated" &&
+        bargeAvoided.panels[0]?.readings[1]?.value ===
+          `${ratePercent(1)} of 1 lobby` &&
+        bargeAvoided.panels[0]?.readings[1]?.verdict === "in" &&
+        bargeAvoided.panels[0]?.answer ===
+          "Every gate this window can read sits inside it, 1 of 1.",
+      "a window where nobody bought food reads as no denominator rather than as a share of zero, while a table that avoided the vendor is the plan's target met rather than a number the page hedges",
+    );
+    // And the window nothing has been played in, which is where the two rows
+    // have to read as an absence rather than as a vendor that sold nothing.
+    const bargeEmpty = readDashboard({
+      records: [],
+      outcomes: [],
+      unreadable: 0,
+    });
+    check(
+      bargeEmpty.frontPage.value === "no leg report from a provisions harbor" &&
+        bargeEmpty.frontPage.verdict === "unplayed" &&
+        bargeEmpty.panels[0]?.readings[1]?.value ===
+          "no leg report from a provisions harbor" &&
+        bargeEmpty.panels[0]?.readings[1]?.verdict === "unplayed",
+      "and a window no voyage filed in reads as no report on both rows rather than as a vendor that sold nothing to nobody",
+    );
+    check(
+      bargeEmpty.panels[0]?.state === "no reading" &&
+        bargeEmpty.panels[0]?.answer ===
+          "No reading yet: the seat's three readings are counts over an event the record carries and this page does not reduce. The Barge's own two numbers are read below.",
+      "with the seat panel still reading as nothing to read on an empty window, because the vendor's two rows are reports and a report nobody filed is not a rate",
+    );
+
+    // The house rule, over the row a captain presses and the files this
+    // feature lands in. The panel is read with its comments taken out,
+    // because the check is about what it prints rather than what it says.
+    const bargePanelCode = withoutComments(
+      readFileSync(
+        join(
+          import.meta.dirname,
+          "..",
+          "src/components/portmasters/game/phases/PurchaseProvisions.tsx",
+        ),
+        "utf8",
+      ),
+    );
+    check(
+      bargePanelCode.includes("Supply Barge") &&
+        bargePanelCode.includes("buyFromBarge") &&
+        bargePanelCode.includes("bargePortAtLeg") &&
+        bargePanelCode.includes("bargeLeftAtPort") &&
+        bargePanelCode.includes("bargeRationPrice") &&
+        bargePanelCode.includes("RATION_PRICE") &&
+        !CARRIES_A_DASH.test(bargePanelCode),
+      "the row a captain presses reads the quay, the lot, the price and what a press would buy from the engine's own readers and from the port's own price constant, and what it prints carries no dash of any kind",
+    );
+    check(
+      !carriesADash("src/lib/game/engine/barge.ts") &&
+        !carriesADash("src/lib/game/dashboard.ts") &&
+        !carriesADash("src/lib/use-leg-report.ts") &&
+        !carriesADash("src/server/realtime/wiring/leg-report.ts"),
+      "with every file this feature lands in carrying the house rule in its comments as well as in its code",
+    );
+
+    // ---- The tag vocabulary ----
+    // [F1] The plan's sentence for this goal is that no effect ever names an
+    // item key, and the vocabulary it names things from instead is twelve
+    // closed words. What is checked here is the wording half of that goal:
+    // which twelve, what each one means, which entries carry which, and that
+    // a caller can ask the question an effect will ask. Then the rule half,
+    // which is the half the plan insists on rather than trusts: the two tag
+    // maximum is held by validation at load time rather than by review, and
+    // every one of the nine things that validation states is watched firing
+    // here, against a subject built by hand carrying the one thing wrong
+    // that rule is about. It runs beside the vendor's block for the same
+    // reason: the content is static data and the rule over it is a pure
+    // function, so it needs no harbor, no socket and no captain.
+    //
+    // What it deliberately does not check is the scan the plan puts in G4,
+    // the one that walks the shipped cards for a named good. That goal owns
+    // the content validator's home, and the cards that still name a good are
+    // its first customers rather than this goal's leftovers.
+    //
+    // The plan's own list, written here as the sentence this goal is being
+    // held to rather than read back off the constant the check is about.
+    const PLAN_VOCABULARY = [
+      "cold",
+      "bulk",
+      "perishable",
+      "preserved",
+      "woven",
+      "luxury",
+      "armed",
+      "crewed",
+      "contraband",
+      "sealed",
+      "public",
+      "debt",
+    ];
+    check(
+      TAGS.length === PLAN_VOCABULARY.length &&
+        TAGS.every((tag, at) => tag === PLAN_VOCABULARY[at]),
+      "the vocabulary is the plan's twelve words in the plan's own order, because a closed list is the thing every card will be authored against and an order two readers can compare without a second alphabet",
+    );
+    const tagMeanings = TAGS.map((tag) => TAG_MEANINGS[tag]);
+    check(
+      tagMeanings.every((meaning) => meaning.trim().length > 0) &&
+        new Set(tagMeanings).size === TAGS.length,
+      "and each of the twelve says what it means, in words that are not another tag's words, since a meaning a reader has to guess is a tag that will be applied by taste",
+    );
+    check(
+      MAX_TAGS_PER_ENTRY === 2,
+      "the ceiling is the plan's two, so every assignment in the tree is at or under the number the rule module enforces rather than under a second number kept beside it",
+    );
+
+    const tagEntries = taggedEntries();
+    const entriesOfKind = (kind: string) =>
+      tagEntries.filter((entry) => entry.kind === kind).length;
+    check(
+      TAGGED_KINDS.length === 5 &&
+        entriesOfKind("good") === ITEMS.length &&
+        entriesOfKind("food") === Object.keys(FOODS).length &&
+        entriesOfKind("module") === MODULES.length &&
+        entriesOfKind("boon") === BOONS.length &&
+        entriesOfKind("charter") === Object.keys(DIFFICULTIES).length,
+      "the walk covers every item of all five catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
+    );
+    check(
+      tagEntries.length ===
+        ITEMS.length +
+          Object.keys(FOODS).length +
+          MODULES.length +
+          BOONS.length +
+          Object.keys(DIFFICULTIES).length &&
+        TAGGED_KINDS.every((kind) => entriesOfKind(kind) > 0),
+      "with nothing walked twice and no catalogue empty, which is the same count read the other way round",
+    );
+    check(
+      tagEntries.every(
+        (entry) =>
+          entry.tags.length >= 1 && entry.tags.length <= MAX_TAGS_PER_ENTRY,
+      ),
+      "and every entry the tree ships carries a set of one or two, so the rule is not merely enforceable against the content but true of it",
+    );
+    const carriedTags = new Set<Tag>();
+    for (const entry of tagEntries) {
+      for (const tag of entry.tags) carriedTags.add(tag);
+    }
+    check(
+      TAGS.every((tag) => carriedTags.has(tag)),
+      "while every one of the twelve is carried by something, because a tag nothing carries is a tag no card can name and the dead schema this tree refuses to ship anywhere else",
+    );
+    check(
+      validateTagging().length === 0,
+      "and the whole of the rule holds over the shipped content, which is the reading the build acts on: the same call, over the same walk, is what scripts/tags.ts runs before it lets a page be compiled",
+    );
+
+    check(
+      tagsOf("good", "Silk") === GOOD_TAGS["Silk"] &&
+        tagsOf("good", "Rags")?.includes("woven") === true,
+      "a caller asking a good what it carries is handed the table's own list rather than a copy of it, so what a card reads and what the rule checks cannot drift apart",
+    );
+    check(
+      tagsOf("good", "Fair Winds") === null &&
+        tagsOf("boon", "no_such_boon") === null,
+      "an id from the wrong catalogue and an id from no catalogue both answer null, because a reader handed an empty list for either would report a missing entry as a tagless one",
+    );
+    check(
+      tagEntries.every((entry) => tagsOf(entry.kind, entry.id) !== null),
+      "and every entry the tree ships can be read back by its own kind and id, so the answer for real content is a list and never the absence that means a missing entry",
+    );
+
+    const coldGoods = entriesWithTag("cold").map((entry) => entry.id);
+    const wardrobe = Object.keys(GARMENTS);
+    check(
+      coldGoods.length === wardrobe.length &&
+        wardrobe.every((garment) => coldGoods.includes(garment)),
+      "the cold tag gathers exactly the wardrobe and nothing else, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question",
+    );
+    const pantryOf = (tag: Tag) =>
+      entriesWithTag(tag)
+        .filter((entry) => entry.kind === "food")
+        .map((entry) => entry.id);
+    check(
+      pantryOf("preserved").join(", ") === "Grain, Salt Fish" &&
+        pantryOf("perishable").join(", ") === "Produce" &&
+        FOODS["Salt Fish"].keeps !== null &&
+        FOODS.Produce.keeps !== null &&
+        FOODS["Salt Fish"].keeps > FOODS.Produce.keeps,
+      "the pantry's two sides are the sides its own keepings make: grain and salt fish are preserved and produce is the one that turns, with the salt fish that keeps six legs against the produce's two as the row the rule bites on, so the split is read off the numbers rather than off a list somebody wrote of which foods spoil",
+    );
+    check(
+      entriesWithTag("perishable").some((entry) => entry.kind === "good") &&
+        entriesWithTag("preserved").every((entry) => entry.kind === "food"),
+      "while the same tag reaches past the pantry into the trade, where tea and spices carry it as a reading about what a slot is worth rather than as a clock, and nothing at all outside the pantry claims to be preserved: only food has a keeping for that word to be measured against",
+    );
+    const armedEntries = entriesWithTag("armed").map(
+      (entry) => `${entry.kind}:${entry.id}`,
+    );
+    check(
+      armedEntries.length === 4 &&
+        armedEntries.includes("charter:open_waters") &&
+        armedEntries.includes("charter:monsoon") &&
+        armedEntries.includes("boon:deep_sea_escort_pact") &&
+        armedEntries.includes("module:persian_dome_compass"),
+      "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort and the compass that turns a raid, which is the query shape the single card record is being built to answer",
+    );
+    check(
+      DIFFICULTIES.monsoon.pirateChance.length === 2 &&
+        tagsOf("charter", "monsoon")?.includes("armed") === true &&
+        DIFFICULTIES.monsoon.brokerCorruption &&
+        tagsOf("charter", "monsoon")?.includes("contraband") === true &&
+        DIFFICULTIES.fair_winds.pirateChance.length === 1 &&
+        tagsOf("charter", "fair_winds")?.includes("armed") === false,
+      "and the hardest water carries both of its own tags, read off the two numbers in its record rather than out of the prose: what gains teeth partway through the voyage says so, and what sails a corrupt broker says that too",
+    );
+    const namedThings = new Set<string>([
+      ...ITEMS.map((item) => item.toLowerCase()),
+      ...Object.keys(FOODS).map((food) => food.toLowerCase()),
+    ]);
+    check(
+      TAGS.every((tag) => !namedThings.has(tag)),
+      "and not one of the twelve is the name of a good or a food, even read case blind, which is the plan's rule about item keys applied to the vocabulary itself: a tag a captain cannot point at on a shelf is what keeps an effect about a class of trade rather than about Silk",
+    );
+
+    // Every rule, watched firing. The subject is a parameter for exactly
+    // this: each rule below is handed the shipped content with one thing
+    // changed, and each is asked for its finding and for nothing else,
+    // since a rule that fires alongside three others could be firing for
+    // the wrong reason.
+    const tagSubject = shippedTagging();
+    const withTagRow = (
+      kind: TaggedEntry["kind"],
+      id: string,
+      tags: readonly Tag[],
+    ): TaggingSubject => ({
+      ...tagSubject,
+      entries: tagSubject.entries.map((entry) =>
+        entry.kind === kind && entry.id === id ? { ...entry, tags } : entry,
+      ),
+    });
+    const soleFinding = (subject: TaggingSubject): string | null => {
+      const found = validateTagging(subject);
+      return found.length === 1 ? found[0] : null;
+    };
+
+    check(
+      soleFinding(
+        withTagRow("good", "Silk", [
+          "woven",
+          "silk",
+        ] as unknown as readonly Tag[]),
+      )?.includes("not one of the twelve") === true,
+      "a tag outside the closed list is caught, because the failure that matters here is not a tag that behaves oddly but a tag no effect will ever look up, and a typo is exactly that. The cast is the point: TypeScript refuses this word in a literal, so the only way to hand the rule a subject carrying one is from outside the type system, which is where a good read out of a content file comes from",
+    );
+    check(
+      soleFinding(
+        withTagRow("good", "Silk", ["woven", "luxury", "cold"]),
+      )?.includes("at most 2") === true,
+      "a third tag on an entry is caught, which is the plan's own ceiling and the reason it is enforced rather than reviewed: every tag a good carries doubles the space a balance pass has to cover",
+    );
+    check(
+      soleFinding(withTagRow("good", "Silk", []))?.includes(
+        "carries no tags",
+      ) === true,
+      "an entry carrying nothing is caught, which is the clause that holds content the compiler did not check: the type cannot express an empty set, so content read out of a file, or a row cast past the type, is how an entry arrives bare and this is the finding that catches it",
+    );
+    check(
+      soleFinding(withTagRow("good", "Silk", ["woven", "woven"]))?.includes(
+        "twice",
+      ) === true,
+      "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        entries: tagSubject.entries.filter(
+          (entry) => !(entry.kind === "boon" && entry.id === "emergency_loan"),
+        ),
+      })?.includes('no entry carries "debt"') === true,
+      "a tag of the twelve that no entry carries is caught, since it would otherwise be a word in the vocabulary with nothing a card could be about",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        entries: [
+          ...tagSubject.entries,
+          { kind: "boon", id: "silk_wind", tags: ["woven"] },
+        ],
+      })?.includes("share the id") === true,
+      "two entries answering to one kind and id are caught, because the second would shadow the first on every read the vocabulary offers",
+    );
+    check(
+      soleFinding(withTagRow("good", "Brocade", ["woven"]))?.includes(
+        "carries no cold tag",
+      ) === true,
+      "a garment that lost its cold tag is caught against the wardrobe's own table, so a garment added to the cold rule and forgotten by the vocabulary fails the build rather than quietly becoming a card nothing can name",
+    );
+    check(
+      soleFinding(
+        withTagRow("food", "Produce", ["preserved", "perishable"]),
+      )?.includes("both preserved and perishable") === true,
+      "a food on both sides of the pantry at once is caught, because a thing that keeps and spoils in the same breath is a contradiction rather than a nuance",
+    );
+    check(
+      soleFinding({
+        ...tagSubject,
+        keepings: { ...tagSubject.keepings, Produce: 9 },
+      })?.includes("the tag and the keeping disagree") === true,
+      "and a preserved food that keeps for less than a perishable one is caught, which is the half of this rule that reads the pantry's own numbers rather than its tags: the two must agree, and the row that makes it bite is salt fish, which neither keeps forever nor turns quickly",
+    );
+    check(
+      validateTagging({
+        ...tagSubject,
+        keepings: { ...tagSubject.keepings, Grain: null, "Salt Fish": 3 },
+      }).length === 0,
+      "while a keeping of null is read as never turning rather than as a zero, so the grain that outlasts the voyage stays on the preserved side and the rule holds it together with a food that turns in three legs without inventing a finding",
+    );
+    check(
+      soleFinding(
+        withTagRow("charter", "fair_winds", ["public", "armed"]),
+      )?.includes("never steps up") === true,
+      "a charter that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
+    );
+    check(
+      soleFinding(withTagRow("charter", "open_waters", ["public"]))?.includes(
+        "gains teeth partway through the voyage and does not carry armed",
+      ) === true,
+      "and one that gains teeth without saying so is caught in the other direction, because a charter that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
+    );
+    check(
+      soleFinding(withTagRow("charter", "monsoon", ["armed"]))?.includes(
+        "sails a corrupt broker and does not carry contraband",
+      ) === true,
+      "as is the water that sails a corrupt broker without carrying contraband, read off the same record's own flag rather than off a list kept in the checker",
+    );
+    check(
+      [
+        "src/lib/game/constants/tags.ts",
+        "src/lib/game/tags.ts",
+        "src/lib/game/constants/goods.ts",
+        "src/lib/game/constants/supplies.ts",
+        "src/lib/game/constants/drafts.ts",
+        "src/lib/game/difficulty.ts",
+        "scripts/tags.ts",
+      ].every((file) => !carriesADash(file)),
+      "and every file this feature lands in is free of em dashes, en dashes and doubled hyphens, in its comments as well as in the words a captain reads",
     );
   } finally {
     for (const socket of run.sockets) {

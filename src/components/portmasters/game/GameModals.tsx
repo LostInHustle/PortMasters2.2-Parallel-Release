@@ -11,12 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  APP_NAME,
-  guideText,
-  tipsText,
-  tutorialSteps,
-} from "@/lib/game/constants";
+import { APP_NAME } from "@/lib/game/constants/brand";
+import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
+import { tipsText } from "@/lib/game/constants/tips";
 import type { Difficulty } from "@/lib/game/difficulty";
 // The two modals below that quote a voyage's length take the mode as well
 // as the tier, because the length is the voyage's rather than the tier's
@@ -414,8 +411,17 @@ export function TutorialModal({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      {/* The modal is a column with three fixed parts and one that moves.
+          The title, the progress bar, the pager and the skip link all stay
+          where they are while the step's own text scrolls between them,
+          which is what makes the tour readable on a phone: a captain on a
+          short screen reads a step by scrolling inside it and still has
+          Continue under their thumb, rather than scrolling the whole
+          dialog to find it. The outer cap is the dialog's own (see
+          DialogContent), so this adds a shape rather than a second limit
+          that could disagree with it. */}
+      <DialogContent className="max-w-lg flex flex-col gap-3 p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-base leading-tight pr-6">
             {s.title}
           </DialogTitle>
@@ -423,12 +429,12 @@ export function TutorialModal({
             Tutorial step {step + 1} of {total}
           </DialogDescription>
         </DialogHeader>
-        <Progress value={pct} className="h-1.5 mb-4" />
+        <Progress value={pct} className="h-1.5 shrink-0" />
         <div
-          className="text-[13.5px] leading-relaxed text-foreground min-h-[160px] [&_p]:mb-2 [&_div]:mb-1"
+          className="min-h-0 flex-1 overflow-y-auto pr-1 text-[13.5px] leading-relaxed text-foreground [&_p]:mb-2 [&_div]:mb-1"
           dangerouslySetInnerHTML={{ __html: s.content }}
         />
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mt-3 pt-3 border-t">
+        <div className="shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-3 pt-3 border-t">
           <Button
             variant="outline"
             size="sm"
@@ -459,7 +465,7 @@ export function TutorialModal({
             </Button>
           )}
         </div>
-        <div className="text-center mt-2">
+        <div className="shrink-0 text-center">
           <button
             onClick={close}
             className="text-[11px] text-muted-foreground hover:text-muted-foreground underline underline-offset-2"

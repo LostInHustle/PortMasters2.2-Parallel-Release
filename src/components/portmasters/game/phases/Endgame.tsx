@@ -1,30 +1,17 @@
 "use client";
 
+import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
+import { RivalEntry } from "@/types/realtime/standings";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Trophy,
-  Coins,
-  Crown,
-  Skull,
-  Anchor,
-  Receipt,
-  Handshake,
-  Heart,
-  Users,
-} from "lucide-react";
+import { Trophy, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants";
 import { merchantRatingForScore } from "@/lib/game/engine";
-import { meritById } from "@/lib/game/merits";
-import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import type { RivalEntry, VoyageResult, VoyageReveal } from "@/types/realtime";
-import { cn } from "@/lib/utils";
-import { Avatar, MeritIcon } from "../../shared";
-import { CaptainLegacyCard } from "../../CaptainLegacyCard";
-import { RevealPanel } from "../RevealPanel";
-import type { PhasePanelProps } from "./PhaseShared";
+import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
+import { FinancialSummary, PeerEconomySummary } from "./EndgameSummaries";
+import { CrewSummary } from "./EndgameCrewSummary";
+import { EndgameResults } from "./EndgameResults";
 
 // The head to head line the Legacy card draws when both captains are in
 // the room. The account has one rivalry list (see /api/rivals), so this
@@ -110,9 +97,9 @@ export function Endgame({
   const rival = useRivalHere(myUserId, voyageResult);
   return (
     <div className="max-w-md mx-auto text-center py-4">
-      <div className="text-2xl font-bold mb-4 font-display text-endgame pm-brush">
+      <PhaseHeading layout="mb-4" tone="text-endgame" brush>
         🎮 Game Over!
-      </div>
+      </PhaseHeading>
       <div className="text-xl font-bold text-favor my-3 flex items-center justify-center gap-2">
         <Trophy className="h-5 w-5" />
         Final Reputation: {game.score}
@@ -134,139 +121,14 @@ export function Endgame({
       {/* Crew Management Summary */}
       <CrewSummary game={game} />
 
-      {voyageResult ? (
-        <div className="space-y-3 mb-5 text-left">
-          {mine?.crowned && (
-            <div className="pm-grad-gold rounded-xl px-4 py-3 text-center">
-              <div className="text-lg font-bold flex items-center justify-center gap-2">
-                <Crown className="h-5 w-5" /> Crowned Sea Master!
-              </div>
-              <div className="text-xs opacity-80 mt-0.5">
-                Highest Reputation in this harbor&apos;s voyage.
-              </div>
-            </div>
-          )}
-          {mine?.brokersFavorUnlocked && (
-            <div className="rounded-xl border-2 border-favor/40 bg-favor/5 px-4 py-3 text-center">
-              <div className="text-lg font-bold text-favor flex items-center justify-center gap-2">
-                🤝 Broker&apos;s Favor Unlocked!
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL} reached. Starting next
-                voyage, call one in from the Trade Manifest to summon a
-                guaranteed buyer.
-              </div>
-            </div>
-          )}
-          {mine?.newMerits.map((meritId) => {
-            const merit = meritById(meritId);
-            if (!merit) return null;
-            return (
-              <div
-                key={meritId}
-                className="pm-grad-endgame rounded-xl px-4 py-3 text-center"
-              >
-                <div className="text-lg font-bold flex items-center justify-center gap-2">
-                  <MeritIcon id={merit.id} className="h-5 w-5" /> Captain&apos;s
-                  Merit: {merit.name}
-                </div>
-                <div className="text-xs opacity-80 mt-0.5">{merit.desc}</div>
-              </div>
-            );
-          })}
-          {/* [H8: the reveal and the replay ledger] The cards come down
-              before the standings, because the reveal is what the evening
-              was for and the standings are the record of it. A harbor that
-              dealt no cards, which is every Classic harbor, is sent no
-              reveal and matches none of this. */}
-          {reveal && <RevealPanel reveal={reveal} myUserId={myUserId} />}
-          <div className="rounded-xl border border-black/5 dark:border-white/10 overflow-hidden">
-            <div className="px-3 py-2 text-xs font-semibold bg-black/[0.03] dark:bg-white/[0.05]">
-              🏁 Final Standings
-            </div>
-            <div className="divide-y divide-black/5 dark:divide-white/10">
-              {voyageResult.standings.map((s, i) => (
-                <div
-                  key={s.userId}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm",
-                    s.userId === myUserId && "bg-endgame/[0.06]",
-                  )}
-                >
-                  <span className="text-xs text-muted-foreground w-4 shrink-0">
-                    {i + 1}
-                  </span>
-                  <Avatar hue={s.avatarHue} name={s.displayName} size={22} />
-                  <span className="flex-1 truncate font-medium">
-                    {s.displayName}
-                  </span>
-                  {s.crowned && (
-                    <Crown className="h-3.5 w-3.5 text-gold-ink shrink-0" />
-                  )}
-                  {s.bankrupt && (
-                    <Skull className="h-3.5 w-3.5 text-alarm shrink-0" />
-                  )}
-                  {/* [H7: Maroon and the Harbormaster] The other way a
-                      voyage can go wrong, and a different icon rather
-                      than a second use of the skull: a captain can be
-                      put ashore and still be solvent, and the standings
-                      are the last place that should blur the two. */}
-                  {s.marooned && (
-                    <Anchor className="h-3.5 w-3.5 text-alarm shrink-0" />
-                  )}
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {s.reputation} Rep.
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {myLegacy && (
-            <div>
-              {mine && (
-                <div className="text-xs text-center text-muted-foreground mb-1.5">
-                  +{mine.xpGained} Renown XP this voyage
-                  {mine.leveledUp ? " · Renown level up!" : ""}
-                </div>
-              )}
-              <CaptainLegacyCard
-                legacy={myLegacy}
-                rival={
-                  rival
-                    ? {
-                        displayName: rival.partner.displayName,
-                        meetings: rival.meetings,
-                        // The route projects the viewer as position "a", so
-                        // its wins are this captain's and its losses are the
-                        // partner's (see /api/rivals).
-                        myWins: rival.wins,
-                        theirWins: rival.losses,
-                        ties: rival.ties,
-                      }
-                    : null
-                }
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3 mb-5 text-left">
-          {/* A captain who reloads onto a finished voyage is handed the
-              reveal and nothing else of the conclusion, since the standings
-              are a frame and not a record. They have not been waiting on
-              the harbor by then, so the waiting line is what is wrong on
-              that screen rather than what is missing. */}
-          {reveal ? (
-            <RevealPanel reveal={reveal} myUserId={myUserId} />
-          ) : (
-            <div className="text-sm text-center text-muted-foreground">
-              ⏳ Waiting on the rest of the harbor to finish their voyage before
-              Sea Master is crowned…
-            </div>
-          )}
-        </div>
-      )}
+      <EndgameResults
+        voyageResult={voyageResult}
+        reveal={reveal}
+        myLegacy={myLegacy}
+        myUserId={myUserId}
+        mine={mine}
+        rival={rival}
+      />
 
       {isHost ? (
         <Button
@@ -280,299 +142,6 @@ export function Endgame({
         <p className="text-sm text-muted-foreground">
           Waiting for the host to restart the voyage…
         </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * Financial Summary. A breakdown of the voyage's income and expenses,
- * shown at the end of a voyage so a captain can see where their Gold
- * came from and where it went.
- *
- * Income: totalRevenue (trade orders), plus any emergency loan boon
- * Gold if it was taken. Expenses: totalCosts (purchases, transport),
- * workerWages, maintenanceCosts, vatPaid, incomeTaxPaid.
- *
- * The net figure should roughly track the final Gold minus the
- * starting Gold, though rounding and per round resets mean it is a
- * summary rather than a precise reconciliation.
- */
-function FinancialSummary({ game }: { game: GameState }) {
-  const income = [
-    {
-      label: "Trade Revenue",
-      value: game.totalRevenue,
-      icon: "🤝",
-      tone: "text-gain",
-    },
-    {
-      label: "Emergency Loan",
-      value: game.modifierFlags.instant_gold ?? 0,
-      icon: "💰",
-      tone: "text-due",
-    },
-  ].filter((r) => r.value > 0);
-
-  const expenses = [
-    {
-      label: "Purchases & Transport",
-      value: game.totalCosts,
-      icon: "📦",
-      tone: "text-alarm",
-    },
-    {
-      label: "Worker Wages",
-      value: game.workerWages,
-      icon: "👥",
-      tone: "text-due",
-    },
-    {
-      label: "Ship Maintenance",
-      value: game.maintenanceCosts,
-      icon: "🔧",
-      tone: "text-due",
-    },
-    {
-      label: "VAT Paid",
-      value: game.vatPaid,
-      icon: "🧾",
-      tone: "text-alarm",
-    },
-    {
-      label: "Income Tax",
-      value: game.incomeTaxPaid,
-      icon: "🏛️",
-      tone: "text-alarm",
-    },
-  ].filter((r) => r.value > 0);
-
-  const totalIncome = income.reduce((s, r) => s + r.value, 0);
-  const totalExpenses = expenses.reduce((s, r) => s + r.value, 0);
-  const net = totalIncome - totalExpenses;
-
-  return (
-    <div className="rounded-xl border border-border/40 bg-background/40 px-4 py-3 my-4 text-left">
-      <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-        <Receipt className="h-3.5 w-3.5" />
-        Financial Summary
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {/* Income column */}
-        <div>
-          <div className="text-[10px] font-medium text-gain mb-1">Income</div>
-          <div className="space-y-0.5">
-            {income.map((r) => (
-              <div
-                key={r.label}
-                className="flex items-center justify-between text-[11px]"
-              >
-                <span className="text-muted-foreground">
-                  {r.icon} {r.label}
-                </span>
-                <span className={cn("font-semibold tabular-nums", r.tone)}>
-                  +{r.value}
-                </span>
-              </div>
-            ))}
-            {income.length === 0 && (
-              <div className="text-[10px] text-muted-foreground">
-                No income recorded
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Expenses column */}
-        <div>
-          <div className="text-[10px] font-medium text-alarm mb-1">
-            Expenses
-          </div>
-          <div className="space-y-0.5">
-            {expenses.map((r) => (
-              <div
-                key={r.label}
-                className="flex items-center justify-between text-[11px]"
-              >
-                <span className="text-muted-foreground">
-                  {r.icon} {r.label}
-                </span>
-                <span className={cn("font-semibold tabular-nums", r.tone)}>
-                  -{r.value}
-                </span>
-              </div>
-            ))}
-            {expenses.length === 0 && (
-              <div className="text-[10px] text-muted-foreground">
-                No expenses recorded
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Net total */}
-      <div className="mt-2 pt-2 border-t border-border/30 flex items-center justify-between">
-        <span className="text-xs font-semibold">Net Cash Flow</span>
-        <span
-          className={cn(
-            "font-display text-sm font-bold tabular-nums",
-            net >= 0 ? "text-gain" : "text-alarm",
-          )}
-        >
-          {net >= 0 ? "+" : ""}
-          {net} Gold
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Peer Economy Summary. Shows the captain's lending and borrowing
- * activity across the voyage: total Gold lent, total Gold borrowed,
- * loans still outstanding, and the Reputation earned from helping
- * other captains (lending and backing combined, subject to the helper
- * reputation cap).
- */
-function PeerEconomySummary({ game }: { game: GameState }) {
-  const loansGiven = game.loansGiven;
-  const debts = game.debts;
-  const totalLent = loansGiven.reduce((s, l) => s + l.amount, 0);
-  const totalBorrowed = debts.reduce((s, l) => s + l.amount, 0);
-  const outstandingLent = loansGiven.length;
-  const outstandingBorrowed = debts.length;
-  const helperRep = game.helperReputationEarned;
-
-  // Only show if there was any peer economy activity
-  if (totalLent === 0 && totalBorrowed === 0 && helperRep === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-intel/20 bg-intel/[0.03] px-4 py-3 my-3 text-left">
-      <div className="text-xs font-semibold text-intel mb-2 flex items-center gap-1.5">
-        <Handshake className="h-3.5 w-3.5" />
-        Peer Economy
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {/* Lending */}
-        <div className="rounded-lg bg-gain/5 border border-gain/10 p-2.5">
-          <div className="text-[10px] font-medium text-gain mb-1">Lending</div>
-          <div className="font-display text-lg font-bold text-gain">
-            {totalLent}
-            <span className="text-[10px] font-normal text-muted-foreground ml-0.5">
-              Gold
-            </span>
-          </div>
-          {outstandingLent > 0 && (
-            <div className="text-[10px] text-muted-foreground mt-0.5">
-              {outstandingLent} loan{outstandingLent === 1 ? "" : "s"} still out
-            </div>
-          )}
-        </div>
-        {/* Borrowing */}
-        <div className="rounded-lg bg-due/5 border border-due/10 p-2.5">
-          <div className="text-[10px] font-medium text-due mb-1">Borrowing</div>
-          <div className="font-display text-lg font-bold text-due">
-            {totalBorrowed}
-            <span className="text-[10px] font-normal text-muted-foreground ml-0.5">
-              Gold
-            </span>
-          </div>
-          {outstandingBorrowed > 0 && (
-            <div className="text-[10px] text-muted-foreground mt-0.5">
-              {outstandingBorrowed} loan{outstandingBorrowed === 1 ? "" : "s"}{" "}
-              still owed
-            </div>
-          )}
-        </div>
-      </div>
-      {helperRep > 0 && (
-        <div className="mt-2 pt-2 border-t border-intel/10 flex items-center justify-between text-[11px]">
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Heart className="h-3 w-3" />
-            Helper Reputation earned
-          </span>
-          <span className="font-bold text-favor">
-            +{Math.round(helperRep)} Rep
-          </span>
-        </div>
-      )}
-      {game.defaultedDebt && (
-        <div className="mt-1.5 text-[10px] text-alarm font-medium">
-          Loan defaulted, no Renown banked this voyage.
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Crew Management Summary. Shows worker productivity stats at voyage
- * end: the crew still aboard, how many reached skilled status, total
- * items produced, and the wages paid. [C2: crew loss by name] The first
- * tile says "Crew Aboard" rather than "Workers Hired" because the two
- * stopped being the same number the moment a hand could be lost or
- * dismissed, and the line under the tiles is where the names of the lost
- * are read back: the log said each one as it happened, and a summary that
- * let a permanent loss go unmentioned would be the one screen pretending
- * it had not.
- */
-function CrewSummary({ game }: { game: GameState }) {
-  const allWorkers = flatWorkerRoster(game);
-  // Read as the crew aboard rather than as the hands hired, which is the
-  // number the tile under it has always been showing: the two stopped
-  // agreeing the moment an artisan could leave the roster, and the name of
-  // this one is where that shows.
-  const crewAboard = allWorkers.length;
-  const skilledCount = allWorkers.filter((w) => w.isSkilled).length;
-  const totalWages = game.workerWages;
-  const lost = game.crewLost ?? [];
-
-  // Estimate total items produced from worker producedCount
-  const totalProduced = allWorkers.reduce(
-    (s, w) => s + (w.producedCount ?? 0),
-    0,
-  );
-
-  if (crewAboard === 0) return null;
-
-  return (
-    <div className="rounded-xl border border-due/20 bg-due/[0.03] px-4 py-3 my-3 text-left">
-      <div className="text-xs font-semibold text-due mb-2 flex items-center gap-1.5">
-        <Users className="h-3.5 w-3.5" />
-        Crew Summary
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-          <div className="font-display text-lg font-bold text-due">
-            {crewAboard}
-          </div>
-          <div className="text-[9px] text-muted-foreground">Crew Aboard</div>
-        </div>
-        <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-          <div className="font-display text-lg font-bold text-gain">
-            {skilledCount}
-          </div>
-          <div className="text-[9px] text-muted-foreground">Skilled</div>
-        </div>
-        <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-          <div className="font-display text-lg font-bold text-sea">
-            {totalProduced}
-          </div>
-          <div className="text-[9px] text-muted-foreground">Items Made</div>
-        </div>
-      </div>
-      <div className="mt-2 pt-2 border-t border-due/10 flex items-center justify-between text-[11px]">
-        <span className="text-muted-foreground">Total Wages Paid</span>
-        <span className="font-bold text-due">{totalWages} Gold</span>
-      </div>
-      {lost.length > 0 && (
-        <div className="mt-1.5 flex items-baseline justify-between gap-2 text-[11px]">
-          <span className="text-muted-foreground shrink-0">
-            ⚰️ Lost over the voyage
-          </span>
-          <span className="font-bold text-alarm text-right">
-            {lost.map((loss) => `${loss.name} (leg ${loss.round})`).join(", ")}
-          </span>
-        </div>
       )}
     </div>
   );

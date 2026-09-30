@@ -49,6 +49,7 @@
 // Pure: no clock, no socket, no database. The one environment read is
 // deliberate and it is documented where it happens.
 // =====================================================================
+import { workerType } from "./constants/crew";
 import {
   COLD_LEG_CHANCE,
   COLD_LEG_WARMTH,
@@ -56,12 +57,11 @@ import {
   GARMENT_DECAY_COLD_LEG,
   GARMENT_DECAY_PER_LEG,
   RAG_SCRAP_VALUE,
-  workerType,
   type GarmentSpec,
-} from "./constants";
+} from "./constants/garments";
 import { newestAboard } from "./crew";
 import { crewSize } from "./larder";
-import { flagOn, survivalLayerOn } from "./flags";
+import { flagOnFor, survivalLayerOn } from "./flags";
 import { createRng } from "./rng";
 import {
   flatWorkerRoster,
@@ -83,8 +83,8 @@ const GARMENTS_WORN_MAX = 12;
  *
  * The plan's rollback for this feature is one flag, and this is it, read
  * through the same policy function every other switch in the family uses
- * (see flagOn in ./flags, which carries the note about how a read has to be
- * written for a browser bundle to see it). It is a rule of the survival
+ * (see flagOnFor in ./flags, which carries the note about how a read has to
+ * be written for a browser bundle to see it). It is a rule of the survival
  * family rather than a layer of its own, so the layer governs it from
  * above: a build with the provisions off has no cold either, whatever this
  * says.
@@ -92,9 +92,17 @@ const GARMENTS_WORN_MAX = 12;
  * With the switch off nothing is read of the wardrobe, nothing decays and
  * nobody freezes, and a save carrying one reads back as the same voyage with
  * its clothes still on it, unread rather than rewritten.
+ *
+ * It takes the mode as its first reading (see flagOnFor), so the layered
+ * shape above becomes a three part answer: the mode, then this layer's own
+ * switch, then the provisions layer it stands on. A Classic table stops at
+ * the first of them, which is what keeps the whole family off the shipped
+ * voyage without a second list of what is and is not in Classic.
  */
-export function garmentsLayerOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_GARMENTS) && survivalLayerOn();
+export function garmentsLayerOn(mode: unknown): boolean {
+  return (
+    flagOnFor(mode, process.env.NEXT_PUBLIC_GARMENTS) && survivalLayerOn(mode)
+  );
 }
 
 /**
@@ -169,7 +177,7 @@ function warmthOf(garment: WornGarment, spec: GarmentSpec): number {
  */
 export function shortOfWarmth(state: GameState): boolean {
   return (
-    garmentsLayerOn() &&
+    garmentsLayerOn(state.mode) &&
     legIsCold(state) &&
     warmthScore(state) < COLD_LEG_WARMTH
   );
@@ -249,7 +257,7 @@ export function wearGarment(
   good: unknown,
   logs: string[],
 ): boolean {
-  if (!garmentsLayerOn()) return false;
+  if (!garmentsLayerOn(state.mode)) return false;
   const spec = garmentSpec(good);
   if (!spec || typeof good !== "string") {
     logs.push("❌ That is not something the crew can wear.");
@@ -331,7 +339,7 @@ export function restoreGarment(
   points: number,
   logs: string[],
 ): number {
-  if (!garmentsLayerOn()) return 0;
+  if (!garmentsLayerOn(state.mode)) return 0;
   const spec = garmentSpec(good);
   if (!spec || typeof good !== "string") return 0;
   const worn = state.garments ?? [];
@@ -378,7 +386,7 @@ export function restoreGarment(
  * frostbitten two legs ago is not carrying a sentence whose leg is over.
  */
 export function tickGarments(state: GameState, logs: string[]): void {
-  if (!garmentsLayerOn()) return;
+  if (!garmentsLayerOn(state.mode)) return;
   if (state.garmentsTickRound === state.currentRound) return;
   state.garmentsTickRound = state.currentRound;
 

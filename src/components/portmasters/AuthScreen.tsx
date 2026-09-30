@@ -12,12 +12,17 @@
 // is signed in exactly like anyone else and then told so by the console
 // they were trying to reach, which is AdminGate's business rather than
 // this screen's.
+//
+// Its notice is why this captain is looking at the sign in screen rather
+// than at the harbor they were in a moment ago: a session that ran out, a
+// ban, or an account an operator deleted. The page owns it, because the
+// page is where the realtime layer's refusal was heard.
 // =====================================================================
 
 import { motion } from "framer-motion";
-import { api, type PublicUser } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Anchor, Ship, Waves } from "lucide-react";
-import { APP_NAME } from "@/lib/game/constants";
+import { APP_NAME } from "@/lib/game/constants/brand";
 import { DISPLAY_NAME_MAX } from "@/lib/credentials";
 import {
   CHOSEN_NAME,
@@ -25,6 +30,7 @@ import {
   CredentialCard,
   SIGN_IN_FIELDS,
   type CredentialFieldSpec,
+  type DoorProps,
 } from "@/components/portmasters/CredentialCard";
 
 // The register tab: the captain's own two fields with the app's display
@@ -139,19 +145,7 @@ function HarborHeader() {
   );
 }
 
-export function AuthScreen({
-  onAuthed,
-  notice,
-  onDismissNotice,
-}: {
-  onAuthed: (u: PublicUser, token: string) => void;
-  // Why this captain is looking at the sign in screen rather than at the
-  // harbor they were in a moment ago: a session that ran out, a ban, or an
-  // account an operator deleted. Owned by the page, which is where the
-  // realtime layer's refusal was heard.
-  notice?: string | null;
-  onDismissNotice?: () => void;
-}) {
+export function AuthScreen({ onAuthed, notice, onDismissNotice }: DoorProps) {
   return (
     <CredentialCard
       fields={{ login: SIGN_IN_FIELDS, register: REGISTER_FIELDS }}
@@ -179,10 +173,10 @@ export function AuthScreen({
       }}
       accent="pm-grad-brand shadow-brand/20"
       footer={
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+        <>
           Open this page in another browser to register a second captain and see
           them appear online in real time.
-        </p>
+        </>
       }
     />
   );

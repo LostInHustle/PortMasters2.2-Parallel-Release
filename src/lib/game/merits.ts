@@ -11,7 +11,7 @@
 // power of its own, purely bragging rights, so this list can grow freely
 // without ever touching the voyage economy.
 // =====================================================================
-import { MERCHANT_RATINGS } from "./constants";
+import { MERCHANT_RATINGS } from "./constants/reputation";
 import { RENOWN_TITLES } from "./legacy";
 import { DIFFICULTIES, type Difficulty } from "./difficulty";
 

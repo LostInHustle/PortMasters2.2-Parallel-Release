@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { DEFAULT_DIFFICULTY } from "@/lib/game/difficulty";
 import { DEFAULT_MODE } from "@/lib/game/mode";
 import {
@@ -21,8 +21,7 @@ import { readJson } from "@/lib/api-json";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const roomId = req.nextUrl.searchParams.get("roomId");
   if (!roomId) return NextResponse.json({ state: null });
 
@@ -107,8 +106,7 @@ const SAVE_BODY_MAX = 64 * 1024;
 
 export async function PUT(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const body = await readJson(req, SaveSchema);
   if (!body.ok) return body.response;

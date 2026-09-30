@@ -1,8 +1,8 @@
 "use client";
 
+import { BarterOffer } from "@/types/realtime/boards";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { BarterOffer } from "@/types/realtime";
 
 // Forwarded so the Parley panel can import the wire shape
 // from the same place it imports the hook. The canonical home is

@@ -45,7 +45,7 @@
 // of what already happened and the ledger of movements already applied,
 // both of which are records rather than agreements.
 // =====================================================================
-import { CONVOY_RAID_COVERAGE } from "../constants";
+import { CONVOY_RAID_COVERAGE } from "../constants/paths";
 import { escortContractsOn } from "../flags";
 import type { PathId } from "../paths";
 import type { EscortClaim, EscortCover, GameState } from "../types";
@@ -75,8 +75,10 @@ export const ESCORT_SELLER_PATH: PathId = "convoy";
  * path is the captain's identity, and a build with the feature off must
  * refuse a Convoy captain as flatly as it refuses everyone else.
  */
-export function canSellEscort(state: Pick<GameState, "path">): boolean {
-  return escortContractsOn() && state.path === ESCORT_SELLER_PATH;
+export function canSellEscort(
+  state: Pick<GameState, "path" | "mode">,
+): boolean {
+  return escortContractsOn(state.mode) && state.path === ESCORT_SELLER_PATH;
 }
 
 /**
@@ -127,9 +129,9 @@ function escortEats(raidGold: number): number {
  * rather than only at the moment a contract is posted.
  */
 export function escortCoverOf(
-  state: Pick<GameState, "escortCover">,
+  state: Pick<GameState, "escortCover" | "mode">,
 ): EscortCover | null {
-  return escortContractsOn() ? state.escortCover : null;
+  return escortContractsOn(state.mode) ? state.escortCover : null;
 }
 
 /**
@@ -240,7 +242,7 @@ export function applyEscortSide(
   meId: string,
   logs: string[],
 ): boolean {
-  if (!escortContractsOn()) return false;
+  if (!escortContractsOn(state.mode)) return false;
   const isSeller = contract.sellerUserId === meId;
   const isBuyer = contract.buyerUserId === meId;
   if (!isSeller && !isBuyer) return false;

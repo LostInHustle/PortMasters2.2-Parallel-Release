@@ -59,17 +59,16 @@
 // note ./convoy.ts carries rather than a second rename: the model is
 // persisted and a persisted name is a migration, not a copy change.
 // =====================================================================
+import { GARMENTS } from "./constants/garments";
+import { COMMODITIES } from "./constants/goods";
 import {
-  CARGO_SLOTS,
-  COMMODITIES,
   CONVOY_CANNON_SLOTS,
-  FOODS,
-  GARMENTS,
   QUARTERMASTER_HOLD_GAIN,
-} from "./constants";
+} from "./constants/paths";
+import { CARGO_SLOTS, FOODS } from "./constants/supplies";
 import { RENOWN_MAX_LEVEL, RENOWN_TITLES } from "./legacy";
 
-export interface PathConfig {
+interface PathConfig {
   // The name a captain reads on the card and the chip. Written here rather
   // than derived from the id, the way ./mode.ts writes its own badge: the
   // id is a key the code holds and this is what a screen prints.
@@ -268,11 +267,11 @@ export const PATH_IDS = Object.keys(PATHS) as PathId[];
  * Null is the absence of a path rather than a failure: D7's draft deals one
  * to every seat at the dock, so the captains who read null here are the
  * ones who arrived after the deal, and a save written before paths existed
- * is a captain who never drew. The
- * house shape for an unknown value (normalizeMode, normalizeDifficulty,
- * normalizeRole) falls back to a default; this one deliberately does not,
- * because the fallback would be an identity nobody chose and the draft's
- * whole design is that an identity is a choice somebody makes.
+ * is a captain who never drew. The house shape for an unknown value
+ * (normalizeMode, normalizeDifficulty, normalizeRole) falls back to a
+ * default; this one deliberately does not, because the fallback would be an
+ * identity nobody chose and the draft's whole design is that an identity is
+ * a choice somebody makes.
  *
  * The membership test is `Object.hasOwn` rather than an `in` check, which
  * is a defence rather than a style choice: `in` walks the prototype chain,

@@ -23,6 +23,7 @@
 // backwards.
 // =====================================================================
 
+import { ObjectiveProgress } from "@/types/realtime/objectives";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { normalizeMode } from "@/lib/game/mode";
@@ -32,7 +33,6 @@ import {
   objectiveSeed,
   type Objective,
 } from "@/lib/game/objectives";
-import type { ObjectiveProgress } from "@/types/realtime";
 
 // room -> captain -> what that captain has handed over, by good.
 export const roomObjectiveTallies = new Map<

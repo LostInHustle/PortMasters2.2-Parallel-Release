@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Settings,
-  X,
   Volume2,
   Palette,
   Keyboard,
@@ -14,7 +13,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { ModalClose, ModalOverlay } from "@/components/ui/modal-overlay";
 import {
   notifCategoryPref,
   setNotifCategoryPref,
@@ -23,7 +22,7 @@ import {
 import {
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/world";
 import { cn } from "@/lib/utils";
 
 /**
@@ -108,13 +107,10 @@ export function SettingsModal({
                     Settings
                   </h2>
                 </div>
-                <button
+                <ModalClose
+                  label="Close settings"
                   onClick={() => onOpenChange(false)}
-                  className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-                  aria-label="Close settings"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                />
               </div>
             </div>
 

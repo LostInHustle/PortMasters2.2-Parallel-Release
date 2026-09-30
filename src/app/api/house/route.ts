@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { HOUSE_IDS } from "@/lib/game/legacy";
 import { readJson } from "@/lib/api-json";
 
@@ -20,8 +20,7 @@ const PledgeSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const body = await readJson(req, PledgeSchema);
   if (!body.ok) return body.response;

@@ -44,7 +44,7 @@ import {
   PATH_SWITCH_FEE_PER_LEVEL,
   PATH_SWITCH_FROM_ROUND,
   PATH_SWITCH_TO_ROUND,
-} from "./constants";
+} from "./constants/paths";
 import { PATH_IDS, type PathId } from "./paths";
 import { phaseFace } from "./phases";
 import { type Rng } from "./rng";

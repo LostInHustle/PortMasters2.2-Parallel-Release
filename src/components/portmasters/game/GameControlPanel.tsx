@@ -5,6 +5,7 @@ import type { GameState } from "@/lib/game/types";
 import type { PhaseClock } from "@/lib/phase-clock";
 import { phaseLabel } from "@/lib/game/engine";
 import { isGatedPhase } from "@/lib/game/checkpoint";
+import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
 import { cn } from "@/lib/utils";
 import {
@@ -62,7 +63,13 @@ export function GameControlPanel({
   clock?: PhaseClock | null;
   onCancelReady: () => void;
 }) {
-  const ordersLive = standingOrdersLive(game.standingOrders);
+  // [B3] The page is the mode's before it is the captain's. A voyage whose
+  // mode keeps no standing order has none to write, so the button is not
+  // drawn at all and the captain's own switch is read only once there is a
+  // page to read it on (see standingOrdersLive, and the standingOrders
+  // field on the mode record).
+  const ordersOffered = modeConfig(game.mode).standingOrders;
+  const ordersLive = ordersOffered && standingOrdersLive(game.standingOrders);
 
   // Both conditions are the same fact read twice: waiting is only ever set
   // on the recurring Next Phase transition, so the button wears the quiet
@@ -158,7 +165,14 @@ export function GameControlPanel({
       <div className="relative sm:hidden">
         <ActionSuggester game={game} />
       </div>
-      <div className="flex items-center gap-2">
+      {/* The four voyage buttons and the line about the save, in a group
+          that wraps like the bar it sits in. It used to be one line that
+          could not break, which was invisible on a desktop and a sideways
+          page on a phone: "Standing orders" alone is wider than a third of
+          a phone, and four of them plus their icons and gaps are wider than
+          the viewport itself, so the row pushed the whole page 35 pixels
+          wide and every screen in the harbor scrolled sideways with it. */}
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -174,22 +188,24 @@ export function GameControlPanel({
             switch on and wrote nothing is sailing the default voyage, and
             a button that glowed for them would be promising a seat that
             nothing is going to play. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "rounded-lg",
-            ordersLive && "text-standing hover:text-standing",
-          )}
-          title={
-            ordersLive
-              ? "Standing orders are written and on"
-              : "Write what your seat should do when the clock plays it"
-          }
-          onClick={onStandingOrders}
-        >
-          <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
-        </Button>
+        {ordersOffered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "rounded-lg",
+              ordersLive && "text-standing hover:text-standing",
+            )}
+            title={
+              ordersLive
+                ? "Standing orders are written and on"
+                : "Write what your seat should do when the clock plays it"
+            }
+            onClick={onStandingOrders}
+          >
+            <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

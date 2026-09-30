@@ -60,9 +60,9 @@ import {
   workerType,
   WORKER_TYPE_IDS,
   type WorkerTypeId,
-} from "./constants";
+} from "./constants/crew";
 import { crewSize, onShortRations } from "./larder";
-import { flagOn } from "./flags";
+import { flagOnFor } from "./flags";
 import {
   flatWorkerRoster,
   type CrewLoss,
@@ -93,9 +93,14 @@ const CREW_LOST_MAX = 24;
  * Answering true here does not promise a loss can happen, only that this
  * switch is on: the shortage the rule needs comes from the layer above, so
  * a build with the provisions off loses nobody whatever this says.
+ *
+ * The mode is the first of the two readings it takes (see flagOnFor), so a
+ * Classic table loses nobody whatever the environment says: the rule is one
+ * of the systems this release added, and the shipped voyage keeps the crew
+ * it has always kept.
  */
-export function crewLossRuleOn(): boolean {
-  return flagOn(process.env.NEXT_PUBLIC_CREW_LOSS);
+export function crewLossRuleOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_CREW_LOSS);
 }
 
 /**
@@ -139,7 +144,7 @@ export function newCrewIdentity(state: GameState): {
  * moment an operator turns it back on.
  */
 export function settleHunger(state: GameState, logs: string[]): void {
-  if (!crewLossRuleOn() || !onShortRations(state)) {
+  if (!crewLossRuleOn(state.mode) || !onShortRations(state)) {
     state.hungryLegs = 0;
     return;
   }

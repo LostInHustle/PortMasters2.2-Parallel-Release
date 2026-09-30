@@ -1,5 +1,6 @@
 "use client";
 
+import { PrivateEntry } from "@/types/realtime/private-entry";
 import { Compass } from "lucide-react";
 import {
   allyLine,
@@ -8,7 +9,6 @@ import {
   roleCard,
 } from "@/lib/game/gambit";
 import { BROKER_PAYOUT_TARGET, victoryLine } from "@/lib/game/victory";
-import type { PrivateEntry } from "@/types/realtime";
 
 // The one card a captain holds that nobody else at the table can see.
 //

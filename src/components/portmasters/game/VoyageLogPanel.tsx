@@ -1,8 +1,8 @@
 "use client";
 
+import { PrivateEntry } from "@/types/realtime/private-entry";
 import { useEffect, useRef } from "react";
 import type { VoyageLog } from "@/lib/use-voyage-log";
-import type { PrivateEntry } from "@/types/realtime";
 
 // [B4: the log surfaces] Dusk's two logs, side by side.
 //
@@ -60,9 +60,13 @@ export function VoyageLogPanel({
           {entries.length} in the harbor, {privateLog.length} to you alone
         </span>
       </div>
+      {/* The two columns split once the stage is wide enough to hold them
+          side by side, and stack before that. Read off the window instead,
+          the split would happen on a screen where the room's middle column
+          is narrower than the window and leave two columns of four words. */}
       <div
         ref={scrollRef}
-        className="pm-scroll mt-2 max-h-64 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3"
+        className="pm-scroll mt-2 max-h-64 overflow-y-auto pr-1 grid grid-cols-1 @2xl:grid-cols-2 gap-x-4 gap-y-3"
       >
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">

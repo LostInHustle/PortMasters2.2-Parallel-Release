@@ -20,8 +20,10 @@
 // dressing the two in the same blue would say they cost the same.
 // =====================================================================
 
+import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { portShiftLine } from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
@@ -30,7 +32,6 @@ import type { useMaroon } from "@/lib/use-maroon";
 import { tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
-import type { MaroonResult, PortShiftNotice } from "@/types/realtime";
 
 type Maroon = ReturnType<typeof useMaroon>;
 
@@ -90,10 +91,9 @@ export function MaroonVoteCard({
             captain who loses it keeps their seat at the table.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-            <select
+            <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
               aria-label="Captain to maroon"
             >
               <option value="">Choose a captain</option>
@@ -104,7 +104,7 @@ export function MaroonVoteCard({
                     {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
                   </option>
                 ))}
-            </select>
+            </Select>
             <Button
               variant="outline"
               disabled={!target || !maroon.canVote}
@@ -146,7 +146,7 @@ export function MaroonResultStrip({ result }: { result: MaroonResult | null }) {
   if (dismissed === key) return null;
 
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-alarm/40 bg-alarm/[0.06] ring-1 ring-alarm/20">
+    <div className="rounded-2xl px-3 py-2 border border-alarm/40 bg-alarm/[0.06] ring-1 ring-alarm/20">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🏝️
@@ -194,7 +194,7 @@ export function PortShiftStrip({
   if (!shift) return null;
   const landed = shift.round < round;
   return (
-    <div className="rounded-2xl px-3 py-2 mb-3 border border-alarm/30 bg-alarm/[0.05]">
+    <div className="rounded-2xl px-3 py-2 border border-alarm/30 bg-alarm/[0.05]">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm leading-none" aria-hidden>
           🧭
@@ -248,10 +248,9 @@ export function HarbormasterConsole({
         public, and the market that opens next leg is the one that answers it.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-        <select
+        <Select
           value={port}
           onChange={(e) => setPort(e.target.value)}
-          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
           aria-label="Port to lean"
         >
           <option value="">Choose a port</option>
@@ -260,7 +259,7 @@ export function HarbormasterConsole({
               {p}
             </option>
           ))}
-        </select>
+        </Select>
         <Button
           variant="outline"
           disabled={!port}

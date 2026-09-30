@@ -1,8 +1,8 @@
 "use client";
 
+import { HouseStanding } from "@/types/realtime/standings";
 import { motion } from "framer-motion";
 import { Crown, Ship, Star, TrendingUp } from "lucide-react";
-import type { HouseStanding } from "@/types/realtime";
 import { cn } from "@/lib/utils";
 import { RANK_MEDALS } from "./shared";
 import {

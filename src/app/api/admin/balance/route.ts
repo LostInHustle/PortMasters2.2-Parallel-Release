@@ -14,15 +14,13 @@
 // own check is a convenience that keeps a captain from being shown a
 // dashboard, and this is the lock.
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { readDashboard } from "@/lib/game/dashboard";
 import { readOperatorWindow } from "@/server/telemetry-window";
 
 export async function GET() {
   const me = await getCurrentUser();
-  if (!me) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!me) return unauthorizedResponse();
   // The same sentence the realtime layer refuses a captain with, so the
   // two surfaces cannot describe one refusal two ways.
   if (me.role !== "admin") {

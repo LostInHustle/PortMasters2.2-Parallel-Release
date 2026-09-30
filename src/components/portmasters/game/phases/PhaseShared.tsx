@@ -1,5 +1,6 @@
 "use client";
 
+import { PrivateEntry } from "@/types/realtime/private-entry";
 import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
 import type { usePhaseSync } from "@/lib/use-phase-sync";
@@ -13,7 +14,6 @@ import type { useAudit } from "@/lib/use-audit";
 import type { useMaroon } from "@/lib/use-maroon";
 import type { useRoomRoster } from "@/lib/use-room-roster";
 import type { VoyageLog } from "@/lib/use-voyage-log";
-import type { PrivateEntry } from "@/types/realtime";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
@@ -143,6 +143,68 @@ export function PhaseClockBar({
   );
 }
 
+/**
+ * The button that takes a ready vote back. Every waiting screen on the
+ * harbour carries one, and the three that do (the phase footer, the
+ * shipyard and the boon draft) had grown a copy each of the same variant,
+ * the same radius and the same cancel call.
+ */
+export function CancelReadyButton({
+  phaseSync,
+  className,
+  children,
+}: {
+  phaseSync: PhaseSync;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      variant="secondary"
+      className={cn("rounded-xl", className)}
+      onClick={phaseSync.cancelReady}
+    >
+      {children}
+    </Button>
+  );
+}
+
+/**
+ * The body of a screen whose captain has voted and is waiting on the rest
+ * of the harbour: the line, the clock, and the way back out of the vote.
+ *
+ * One component because the three screens that wait (a phase footer, the
+ * shipyard, the boon draft) were drawing the same three elements, and the
+ * only differences between them ever were a word of the line and a glyph
+ * on the button. Those are props; the shape is not.
+ *
+ * The line is not always the same sentence, so it is passed: the shipyard
+ * says it is waiting on the crew with a countdown in front of it, and the
+ * boon draft has its own reason to be waiting. The default is the footer's
+ * wording, which is the one every other screen uses.
+ */
+export function PhaseWaiting({
+  phaseSync,
+  members,
+  title = "Waiting for the rest of the crew",
+  cancelLabel = "Not ready yet",
+  className,
+}: {
+  phaseSync: PhaseSync;
+  members: PublicUser[];
+  title?: string;
+  cancelLabel?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn(className, "space-y-3 text-center")}>
+      <div className="text-sm font-medium text-warn">{title}</div>
+      <PhaseClockBar phaseSync={phaseSync} members={members} />
+      <CancelReadyButton phaseSync={phaseSync}>{cancelLabel}</CancelReadyButton>
+    </div>
+  );
+}
+
 export function ReadyFooter({
   phaseSync,
   members,
@@ -163,19 +225,7 @@ export function ReadyFooter({
 }) {
   if (phaseSync.waiting) {
     return (
-      <div className="mt-5 space-y-3 text-center">
-        <div className="text-sm font-medium text-warn">
-          Waiting for the rest of the crew
-        </div>
-        <PhaseClockBar phaseSync={phaseSync} members={members} />
-        <Button
-          variant="secondary"
-          className="rounded-xl"
-          onClick={phaseSync.cancelReady}
-        >
-          Not ready yet
-        </Button>
-      </div>
+      <PhaseWaiting phaseSync={phaseSync} members={members} className="mt-5" />
     );
   }
   return (
@@ -227,3 +277,28 @@ export function PhaseError({
     </div>
   );
 }
+
+// The fittings the panel bodies are built from and the two card frames the
+// boards and the drafts are drawn on live beside this file, and are
+// re-exported here, which is the path every phase panel imports them from.
+// Two module splits rather than one file because a single shared file had
+// grown past what any one of its readers was looking for: the chrome a
+// screen waits behind stays here, and the pieces a screen is drawn from
+// sit in PhasePanels and PhaseCards.
+export {
+  artisanTint,
+  PhaseHeading,
+  PanelTitle,
+  PanelHeading,
+  HuePanel,
+  PanelLabel,
+  SummaryHeading,
+  PanelNote,
+  PanelStat,
+  PanelTotal,
+  StatTile,
+  IntelBanner,
+  PathDeskRow,
+  JustForChip,
+} from "./PhasePanels";
+export { TradeCard, DraftGrid, DraftCard, DraftSwapButton } from "./PhaseCards";

@@ -26,18 +26,18 @@
 //
 // Nothing here renders in a harbor that dealt no cards.
 
+import { RevealedCaptain, VoyageReveal } from "@/types/realtime/voyage";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Anchor, Coins, Crown, Eye, ScrollText, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../shared";
-import { ICONS } from "@/lib/game/constants";
+import { ICONS } from "@/lib/game/constants/brand";
 import { fulfillmentLine } from "@/lib/game/audit";
 import { flourishById, flourishLine, roleCard } from "@/lib/game/gambit";
 import { objectiveProgress } from "@/lib/game/objectives";
 import { victoryLine } from "@/lib/game/victory";
-import type { RevealedCaptain, VoyageReveal } from "@/types/realtime";
 
 // How long the table sits with one card before the next one turns over.
 // Six captains is a little under half a minute, which is the length the

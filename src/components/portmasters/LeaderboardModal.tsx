@@ -1,12 +1,12 @@
 "use client";
 
+import { LeaderboardEntry } from "@/types/realtime/standings";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Crown, Star, Ship, Loader2, X } from "lucide-react";
+import { Trophy, Crown, Star, Ship, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { LeaderboardEntry } from "@/types/realtime";
 import { Avatar, Pill, RANK_MEDALS } from "./shared";
-import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { ModalClose, ModalOverlay } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 
 type SortKey =
@@ -127,13 +127,10 @@ export function LeaderboardModal({
                 </p>
               </div>
             </div>
-            <button
+            <ModalClose
+              label="Close leaderboard"
               onClick={() => onOpenChange(false)}
-              className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-              aria-label="Close leaderboard"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            />
           </div>
         </div>
 

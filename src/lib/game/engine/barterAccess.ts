@@ -25,7 +25,7 @@
 import {
   FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
-} from "../constants";
+} from "../constants/goods";
 
 // Whether this captain has reached flexible bartering at all. A captain
 // below the level still trades freely through the Captain's Exchange, so

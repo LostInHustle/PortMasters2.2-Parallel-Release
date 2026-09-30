@@ -33,7 +33,7 @@ import { Loader2 } from "lucide-react";
 import { PASSWORD_HINT, USERNAME_HINT } from "@/lib/credentials";
 import type { PublicUser } from "@/lib/api";
 
-export type CredentialMode = "login" | "register";
+type CredentialMode = "login" | "register";
 
 /**
  * One input of the form. Everything the underlying CredentialField takes
@@ -109,7 +109,24 @@ export const CHOSEN_PASSWORD: CredentialFieldSpec = {
   autoComplete: "new-password",
 };
 
-export interface CredentialCardProps {
+/**
+ * The contract every door into the game shares.
+ *
+ * Both doors are the same shape: the page owns where the captain goes
+ * next, the door hands back the captain and the token the server gave it,
+ * and each of them carries the page's notice when there is a sentence
+ * explaining why the door is in front of this person again. Declared once
+ * here rather than restated above each door, because a prop added to one
+ * door and not the other is how two doors drift.
+ */
+export interface DoorProps {
+  onAuthed: (user: PublicUser, token: string) => void;
+  /** Why the captain is back at this card rather than where they were. */
+  notice?: string | null;
+  onDismissNotice?: () => void;
+}
+
+interface CredentialCardProps {
   /** The fields of each tab, in the order that tab draws them. */
   fields: { login: CredentialFieldSpec[]; register: CredentialFieldSpec[] };
   /** The block above the form: the door's own logo and name. */
@@ -138,7 +155,11 @@ export interface CredentialCardProps {
    * doors can be told apart by their color and by nothing else.
    */
   accent: string;
-  /** The sentence under the form, which is the door's own too. */
+  /**
+   * The sentence under the form, which is the door's own. The card draws
+   * the small print around it, the same size and spacing under both
+   * doors, so a call site hands over the sentence and nothing else.
+   */
   footer: ReactNode;
 }
 
@@ -282,7 +303,9 @@ export function CredentialCard({
             </form>
           </Tabs>
 
-          {footer}
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+            {footer}
+          </p>
         </motion.div>
       </div>
     </div>

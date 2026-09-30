@@ -7,17 +7,16 @@
 // Mirrors the shape of GET /api/house so the frontend's
 // `getHouseStandings` wrapper reads both the standings and the viewer's
 // own pledge in one request.
+import { HouseStanding } from "@/types/realtime/standings";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { HOUSES } from "@/lib/game/engine";
 import { HOUSE_IDS, normalizeHouseId, type HouseId } from "@/lib/game/legacy";
-import type { HouseStanding } from "@/types/realtime";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
 
   const rows = await db.captainLegacy.findMany({
     where: { houseId: { not: null } },

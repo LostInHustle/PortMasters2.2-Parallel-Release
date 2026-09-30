@@ -3,10 +3,10 @@
 // a port, ordered over ../refits' own board.
 // =====================================================================
 
+import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants";
 import {
   agreeConsent,
   consentFeeFor,
@@ -69,8 +69,8 @@ export function wireRefits(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("refit:error", { roomId, error });
       };
-      if (!refitsOn()) {
-        fail("The refit bench is not running in this build.");
+      if (!refitsOn(s.mode)) {
+        fail("The refit bench is not running in this harbor.");
         return;
       }
       // The fee is read through the same reader the panel reads it
@@ -179,8 +179,8 @@ export function wireRefits(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("refit:error", { roomId, error });
       };
-      if (!refitsOn()) {
-        fail("The refit bench is not running in this build.");
+      if (!refitsOn(s.mode)) {
+        fail("The refit bench is not running in this harbor.");
         return;
       }
       const cp = await getCheckpoint(roomId);
@@ -246,8 +246,8 @@ export function wireRefits(io: Server, socket: Socket): void {
       const fail = (error: string): void => {
         socket.emit("refit:error", { roomId, error });
       };
-      if (!refitsOn()) {
-        fail("The refit bench is not running in this build.");
+      if (!refitsOn(s.mode)) {
+        fail("The refit bench is not running in this harbor.");
         return;
       }
       const board = refitContracts.list(roomId);

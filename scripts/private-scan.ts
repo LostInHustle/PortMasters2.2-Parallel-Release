@@ -59,24 +59,32 @@ import { join, relative } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
 
-/* Rule 1. The private channel, end to end: the one emitter, the type that
+/* Rule 1. The private channel, end to end: the one emitter, the module that
    declares the payload and names the event in its own doc, the client's
-   one hook, and the suite that sweeps the wire for leaks. */
+   one hook, and the suite that sweeps the wire for leaks. The types live in
+   a directory now, one module per slice of the wire, so the rule names the
+   module that carries this channel rather than the one file it was. */
 const PRIVATE_ENTRY_FILES = [
   "src/server/realtime/presence.ts",
-  "src/types/realtime.ts",
+  "src/types/realtime/private-entry.ts",
   "src/lib/use-private-log.ts",
-  "scripts/smoke.ts",
 ];
 
 /* Rule 2. The alignment table's one reader. The smoke reads rows back to
    check what was dealt, which is a test of the module rather than a
    second production reader, and it is named here so the exception is
    deliberate rather than discovered. */
-const ALIGNMENT_TABLE_FILES = [
-  "src/server/realtime/gambit.ts",
-  "scripts/smoke.ts",
-];
+const ALIGNMENT_TABLE_FILES = ["src/server/realtime/gambit.ts"];
+
+/* The smoke suite, which the split moved from one file into scripts/smoke/.
+   It is the exception the two rules above name either way: what they guard
+   is a second production path, and a test that sweeps the wire for leaks is
+   not one. The whole directory is covered because the suite is one suite
+   however many files it is written across, and the one file is named beside
+   it because the split left it in place while the new suite was read
+   against it. */
+const isSmoke = (file: string): boolean =>
+  file === "scripts/smoke.ts" || file.startsWith("scripts/smoke/");
 
 /* Rule 3. Where the win verdict is a property: the balance reader that
    counts it, the operator window that reads the count, and the wire type
@@ -84,7 +92,7 @@ const ALIGNMENT_TABLE_FILES = [
 const VERDICT_PROPERTY_FILES = [
   "src/lib/game/balance.ts",
   "src/server/telemetry-window.ts",
-  "src/types/realtime.ts",
+  "src/types/realtime/voyage.ts",
 ];
 
 /* Rule 4. The shapes a payload must not take. Each one is a token rather
@@ -162,7 +170,7 @@ const scannedFiles = files.filter((file) => rel(file) !== SELF);
 
 // ========== Rule 1: one delivery path ==========
 for (const file of scannedFiles) {
-  if (PRIVATE_ENTRY_FILES.includes(rel(file))) continue;
+  if (PRIVATE_ENTRY_FILES.includes(rel(file)) || isSmoke(rel(file))) continue;
   lines(file).forEach((text, index) => {
     if (!text.includes("private:entry")) return;
     problems.push({
@@ -177,7 +185,7 @@ for (const file of scannedFiles) {
 
 // ========== Rule 2: one reader of the alignment table ==========
 for (const file of scannedFiles) {
-  if (ALIGNMENT_TABLE_FILES.includes(rel(file))) continue;
+  if (ALIGNMENT_TABLE_FILES.includes(rel(file)) || isSmoke(rel(file))) continue;
   lines(file).forEach((text, index) => {
     if (!text.includes("voyageRole")) return;
     problems.push({

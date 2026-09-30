@@ -99,7 +99,7 @@ export const captainCredentials = z.object({
 // holding in one place: the name is checked before anything is written, the
 // password is hashed rather than stored, and the session is minted from the
 // row that came back.
-export type AccountCreation =
+type AccountCreation =
   | {
       created: true;
       // The created row, which carries more than the wire does. Each route

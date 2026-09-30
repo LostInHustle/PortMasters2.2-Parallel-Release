@@ -3,7 +3,7 @@
 // host crown if the leaving captain was holding it, and removes the
 // room entirely once nobody is left in it.
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { leaveRoomForUser } from "@/lib/rooms";
 
 export async function POST(
@@ -11,8 +11,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const { id } = await params;
 
   await leaveRoomForUser(user.id, id);

@@ -1,0 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import type { PublicUser } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { CHAT_MESSAGE_MAX } from "@/lib/realtime-endpoint";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SendHorizontal, Search, Handshake } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { TradeComposer } from "../game/BarterTrade";
+import type { ChatTrade } from "../ChatPanel";
+
+// The handshake button and the composer it opens. Mounted only where there
+// is a shared board to post to, which is what keeps the draft's state out
+// of a conversation that could never use it.
+function TradeButton({
+  trade,
+  me,
+  fixedTarget,
+}: {
+  trade: ChatTrade;
+  me: PublicUser;
+  fixedTarget?: PublicUser;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/5 text-muted-foreground dark:bg-white/10"
+          title="Offer a trade"
+          aria-label="Offer a trade"
+        >
+          <Handshake className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-0">
+        <TradeComposer
+          game={trade.game}
+          act={trade.act}
+          barter={trade.barter}
+          me={me}
+          members={trade.members}
+          fixedTarget={fixedTarget}
+          onPosted={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * The strip along the bottom of the panel: the handshake button wherever
+ * there is a board to post to, the search toggle, the message field and the
+ * send button. A captain the host has muted gets the notice instead of the
+ * field, and keeps the handshake button, because trading is not talking.
+ *
+ * The field is held by the caller and handed down as a value, so the words
+ * survive whatever this strip does and the panel that owns the send and the
+ * clearing of it is the only thing that writes them.
+ */
+export function Composer({
+  mode,
+  me,
+  trade,
+  tradeTarget,
+  otherName,
+  disabled,
+  searchOpen,
+  onToggleSearch,
+  input,
+  onInputChange,
+  onSend,
+}: {
+  mode: "room" | "dm" | "lobby";
+  me: PublicUser;
+  trade?: ChatTrade;
+  tradeTarget?: PublicUser;
+  otherName?: string;
+  disabled?: boolean;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
+  input: string;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+}) {
+  return disabled ? (
+    <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center justify-center gap-2">
+      <p className="text-center text-xs text-muted-foreground">
+        The host has muted you in room chat for the rest of this voyage.
+      </p>
+      {/* Trading is not talking, so a mute does not take the board away. */}
+      {trade && <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />}
+    </div>
+  ) : (
+    <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center gap-2">
+      {trade && <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />}
+      <button
+        onClick={onToggleSearch}
+        className={cn(
+          "pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+          searchOpen
+            ? "bg-celadon/5 text-celadon"
+            : "bg-black/5 text-muted-foreground dark:bg-white/10",
+        )}
+        title="Search messages"
+        aria-label="Search messages"
+      >
+        <Search className="h-4 w-4" />
+      </button>
+      <Input
+        value={input}
+        onChange={(e) => onInputChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onSend();
+          }
+        }}
+        placeholder={
+          {
+            room: "Message the harbor…",
+            lobby: "Message the lobby…",
+            dm: `Message ${otherName ?? ""}…`,
+          }[mode]
+        }
+        className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
+        maxLength={CHAT_MESSAGE_MAX}
+      />
+      <Button
+        size="icon"
+        onClick={onSend}
+        disabled={!input.trim()}
+        className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
+      >
+        <SendHorizontal className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}

@@ -24,16 +24,14 @@
 // demands (see pathOrderOf below), the same way the board derives the crest
 // and the lock line it prints.
 // =====================================================================
+import { ICONS } from "../constants/brand";
+import { PRODUCTS, RESOURCES, SILK_GOODS } from "../constants/goods";
+import { PATH_ORDER_SLOTS } from "../constants/paths";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
-  ICONS,
-  PATH_ORDER_SLOTS,
-  PRODUCTS,
-  RESOURCES,
-  SILK_GOODS,
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
-} from "../constants";
+} from "../constants/world";
 import { AUDIT_WINDOW } from "../audit";
 import {
   MANDATE_TEMPLATES,
@@ -111,8 +109,8 @@ function orderShortfall(
  * so a board dealt while the feature was on plays on as six ordinary orders
  * rather than as a table where three cards stay grey forever.
  */
-export function pathOrderOf(order: OrderCard): PathId | null {
-  if (!order.isPathOrder || !pathOrdersOn()) return null;
+export function pathOrderOf(order: OrderCard, mode: unknown): PathId | null {
+  if (!order.isPathOrder || !pathOrdersOn(mode)) return null;
   return lockingPathFor(order.resources[0]?.type ?? "");
 }
 
@@ -130,7 +128,7 @@ export function lockedBehind(
   state: GameState,
   order: OrderCard,
 ): PathId | null {
-  const path = pathOrderOf(order);
+  const path = pathOrderOf(order, state.mode);
   return path === null || path === state.path ? null : path;
 }
 
@@ -598,7 +596,7 @@ export function startOrders(
   // names a good the path's trade lives in and pays what that trade pays, so
   // a captain can see the whole of what holding the path would open without
   // a panel explaining it.
-  if (pathOrdersOn()) {
+  if (pathOrdersOn(state.mode)) {
     const pathOrderRng = createRng(
       `${ctx.seedBase}:V${state.voyageEpoch}:R${state.currentRound}:pathorders`,
     );

@@ -3,7 +3,8 @@
 // scoped to recipientId not null and never appear here.
 import { NextResponse } from "next/server";
 import { db, ROOM_WITH_MEMBERS, PUBLIC_USER_SELECT } from "@/lib/db";
-import { getCurrentUser } from "@/lib/api-auth";
+import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
+import { messageRows } from "@/lib/messages";
 import { serializeRoom } from "@/lib/rooms";
 
 export async function GET(
@@ -11,8 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorizedResponse();
   const { id } = await params;
 
   const room = await db.room.findUnique({
@@ -40,11 +40,6 @@ export async function GET(
 
   return NextResponse.json({
     room: { ...serializeRoom(room, room.members), isMember },
-    messages: room.messages.map((m) => ({
-      id: m.id,
-      content: m.content,
-      createdAt: m.createdAt.toISOString(),
-      sender: m.sender,
-    })),
+    messages: messageRows(room.messages, user.id),
   });
 }

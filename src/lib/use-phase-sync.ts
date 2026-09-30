@@ -42,6 +42,30 @@ export type ReadyState = {
 // the realtime layer never drift on phase order, and a phase value that
 // arrives off the wire is read through @/lib/game/phases for the same reason.
 
+// Everything this hook is handed, as one object rather than as eight
+// positions. The call site names each value it passes, and the two that
+// used to sit beside each other in the list as bare strings (authed and
+// the caller's own captain id) can no longer be handed over the wrong way
+// round by a reader who did not count the commas.
+//
+// The hook's signature is otherwise exactly what it was: the same eight
+// values, the same defaults, and the same return shape. Only the shape of
+// the call changed.
+type PhaseSyncOptions = {
+  roomId: string;
+  socket: Socket | null;
+  game: GameState;
+  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  // The voyage's own seed identity, which autoCommit needs because a departure
+  // is where a boon or a market is drawn from it. Handed in rather than
+  // derived here: it belongs to the session, and this hook has never known
+  // anything about how a voyage seeds.
+  ctx: GameContext;
+  authed: boolean;
+  myUserId: string;
+  startingGoldBonus?: number;
+};
+
 /**
  * Gates the recurring "everyone advances together" phase transitions
  * (locking in a boon, then leaving each of the leg's other five phases)
@@ -68,20 +92,16 @@ export type ReadyState = {
  * transition the room has always run, so every client still lands in the same
  * place, and only one of them had to be there to press the button.
  */
-export function usePhaseSync(
-  roomId: string,
-  socket: Socket | null,
-  game: GameState,
-  act: (fn: (g: GameState, logs: string[]) => void) => void,
-  // The voyage's own seed identity, which autoCommit needs because a departure
-  // is where a boon or a market is drawn from it. Handed in rather than
-  // derived here: it belongs to the session, and this hook has never known
-  // anything about how a voyage seeds.
-  ctx: GameContext,
-  authed: boolean,
-  myUserId: string,
-  startingGoldBonus: number = 0,
-) {
+export function usePhaseSync({
+  roomId,
+  socket,
+  game,
+  act,
+  ctx,
+  authed,
+  myUserId,
+  startingGoldBonus = 0,
+}: PhaseSyncOptions) {
   const [waiting, setWaiting] = useState(false);
   const [ready, setReady] = useState<ReadyState | null>(null);
   const [startError, setStartError] = useState<string | null>(null);

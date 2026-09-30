@@ -2,13 +2,14 @@
 // Realtime layer: the two server only shapes.
 //
 // Every payload this layer puts on a channel is a wire shape, and those
-// live in src/types/realtime.ts so the client hook that reads one and
+// live in src/types/realtime/ so the client hook that reads one and
 // the handler that writes it are looking at the same declaration. What
 // is left here is the state that never crosses the wire and has no
 // client counterpart: one connected socket's state, and the room
 // checkpoint.
 // =====================================================================
-import type { PublicUser } from "@/types/realtime";
+import { PublicUser } from "@/types/realtime/presence";
+import type { GameMode } from "@/lib/game/mode";
 import type { Phase } from "@/lib/game/types";
 
 // One connected socket's server side state. A socket starts unauthed
@@ -20,6 +21,19 @@ export type SocketState = {
   user: PublicUser;
   roomId: string | null;
   authed: boolean;
+  // The mode of the room this socket is sitting in, or null while it is in
+  // none. Filled in by room:join from the membership row it already reads,
+  // so no handler that has a socket has to ask the database what kind of
+  // voyage it is looking at: the switches this layer reads run on the
+  // browser too, and the reading they take has to be the room's rather than
+  // whatever a frame happens to claim (see ./wiring/room-join, which is
+  // the one writer).
+  //
+  // Null and not a default, because a socket in no room has no mode rather
+  // than the founding one: a handler that read it before joining would
+  // otherwise run a Classic voyage's rules over a room it has not checked
+  // the caller into.
+  mode: GameMode | null;
 };
 
 // The room's shared checkpoint: the round and phase every active
@@ -42,4 +56,16 @@ export type Checkpoint = {
   // the ready payload carries to the clients; the timer itself is the
   // mechanism behind it and stays private to the module that arms it.
   endsAt: number | null;
+  // The mode of the room this checkpoint belongs to. It rides here rather
+  // than being asked of the database at arming time because the checkpoint
+  // is already the room's own record, read from the room row on the one
+  // cache miss there is, and because the question the clock asks of it is
+  // asked on every seat of every leg: a second read would be a second
+  // answer to which voyage this is, on the path where a disagreement would
+  // put a clock on a room whose mode keeps none.
+  //
+  // The map is emptied whenever the room's voyage is restarted or the room
+  // itself goes, so this cannot outlive the row it was read from (see the
+  // two roomCheckpoints.delete calls).
+  mode: GameMode;
 };

@@ -27,11 +27,11 @@
 // captain accept it first). A direct offer is only ever visible to its
 // poster and its one named target.
 // =====================================================================
+import { BarterOffer } from "@/types/realtime/boards";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants";
+import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants/goods";
 import { DEFAULT_LEGACY_SUMMARY } from "@/lib/game/legacy";
-import type { BarterOffer } from "@/types/realtime";
 import { sockets, userSockets } from "./presence";
 
 // ========== Flexible bartering gate ==========
@@ -71,7 +71,7 @@ export async function authoritativeRenownLevel(
 // so the accept handler can run the same checks on both sides of its
 // database reads and be certain the second pass saw the board the first
 // one did.
-export type OfferInspection =
+type OfferInspection =
   { ok: true; offer: BarterOffer } | { ok: false; reason: string };
 
 export function inspectOfferForAccept(

@@ -40,6 +40,7 @@ import {
   openingPhase,
 } from "@/lib/game/checkpoint";
 import { normalizePhase, phaseFace } from "@/lib/game/phases";
+import { modeConfig, normalizeMode } from "@/lib/game/mode";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
 import { bazaarRumorsOn } from "@/lib/game/flags";
 import { rumorLean } from "@/lib/game/engine";
@@ -75,11 +76,16 @@ export async function getCheckpoint(roomId: string): Promise<Checkpoint> {
   if (cp) return cp;
   const room = await db.room.findUnique({
     where: { id: roomId },
-    select: { currentRound: true, currentPhase: true },
+    select: { currentRound: true, currentPhase: true, mode: true },
   });
   cp = {
     round: room?.currentRound ?? 1,
     phase: normalizePhase(room?.currentPhase),
+    // Normalized rather than trusted, on the same terms as the phase above
+    // and for the same reason: this is a column read straight out of the
+    // database, and a row written before the mode existed holds nothing at
+    // all. The founding mode is what a missing one reads as.
+    mode: normalizeMode(room?.mode),
     readyUserIds: new Set(),
     advancing: false,
     // The one checkpoint with no deadline behind it. The room's row holds a
@@ -90,6 +96,27 @@ export async function getCheckpoint(roomId: string): Promise<Checkpoint> {
     endsAt: null,
   };
   roomCheckpoints.set(roomId, cp);
+  return cp;
+}
+
+// The checkpoint a captain's frame belongs to, or null where the room is
+// not on the round that frame names. The room's three vote handlers open
+// this way (the audit's vote, the maroon's, and the marooned captain's own
+// port shift), and they opened it by hand until this existed: three copies
+// of one two clause gate is three chances to write the phase half without
+// the round half, which is the hole a stale round reaches the room through.
+//
+// The round is read against the checkpoint rather than trusted from the
+// payload, so a frame that names a round the room has already left is
+// refused. Null rather than a thrown refusal, because every caller answers
+// a frame from the wrong round with the same silence: it is not the room's
+// business that somebody is a round behind.
+export async function parleyCheckpoint(
+  roomId: string,
+  round: unknown,
+): Promise<Checkpoint | null> {
+  const cp = await getCheckpoint(roomId);
+  if (cp.phase !== "parley" || cp.round !== round) return null;
   return cp;
 }
 
@@ -135,7 +162,7 @@ export async function readyStatePayload(roomId: string, cp: Checkpoint) {
     round: cp.round,
     phase: cp.phase,
     phaseEndsAt: cp.endsAt,
-    phaseSeconds: phaseBudgetSeconds(cp.phase),
+    phaseSeconds: phaseBudgetSeconds(cp.phase, cp.mode),
     readyUserIds: Array.from(cp.readyUserIds).filter((id) =>
       roster.includes(id),
     ),
@@ -220,7 +247,7 @@ async function announceAdvance(
       unlockedResources(room?.difficulty, from.round),
     );
     portShift = portShiftFor(roomId, from.round);
-    bazaarLean = bazaarRumorsOn()
+    bazaarLean = bazaarRumorsOn(room?.mode)
       ? rumorLean(bazaarList(roomId), from.round)
       : undefined;
   }
@@ -351,15 +378,22 @@ function clockScale(): number {
 // The budget, in whole seconds, of the seat a checkpoint is standing at: the
 // phase's own authored seconds (PHASE_FACES in @/lib/game/phases) scaled by
 // PHASE_CLOCK. Null when that seat has no clock at all, which is the pier,
-// the phases that are not steps of the leg, and every seat on a server with
-// the clock switched off.
+// the phases that are not steps of the leg, a room whose mode keeps no clock,
+// and every seat on a server with the clock switched off.
+//
+// The mode is read first and it is the outer question, because it is the
+// one that cannot be answered by an operator: a mode whose lap is walked by
+// hand has no clock whatever the environment says, and PHASE_CLOCK is left
+// to mean only what it always meant on a mode that has one (see phaseClock
+// on the mode record).
 //
 // One second is the floor, and it is there for a scale small enough to round
 // a budget away: a clock that fires on the next tick is not a shorter phase,
 // it is no phase, and a table that asked for shorter legs did not ask for
 // that. Switching the clock off entirely is what zero is for, and it is read
 // before the arithmetic rather than after it.
-function phaseBudgetSeconds(phase: Phase): number | null {
+function phaseBudgetSeconds(phase: Phase, mode: unknown): number | null {
+  if (!modeConfig(mode).phaseClock) return null;
   const authored = phaseFace(phase).seconds;
   if (authored === null) return null;
   const scale = clockScale();
@@ -390,7 +424,7 @@ export function armPhaseClock(
   roomId: string,
   cp: Checkpoint,
 ): void {
-  const seconds = phaseBudgetSeconds(cp.phase);
+  const seconds = phaseBudgetSeconds(cp.phase, cp.mode);
   if (seconds === null) {
     disarmPhaseClock(roomId);
     return;

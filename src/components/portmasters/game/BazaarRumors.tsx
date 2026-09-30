@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
+import { ICONS } from "@/lib/game/constants/brand";
 import {
-  ICONS,
   RUMOR_COOLDOWN_ROUNDS,
   RUMOR_SHIFT_FRACTION,
-} from "@/lib/game/constants";
+} from "@/lib/game/constants/paths";
 import {
   BAZAAR_SELLER_PATH,
   bazaarGoods,
@@ -72,7 +73,7 @@ export function BazaarRumors({
   const [good, setGood] = useState("");
   const [direction, setDirection] = useState<RumorDirection>(1);
 
-  if (!bazaarRumorsOn()) return null;
+  if (!bazaarRumorsOn(game.mode)) return null;
 
   // The goods the market being priced next will trade, which is the list
   // the server checks a publish against and the only list this desk may
@@ -107,10 +108,9 @@ export function BazaarRumors({
           {canSpeak ? (
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
               <span className="text-muted-foreground">Speak for</span>
-              <select
+              <Select
                 value={chosen}
                 onChange={(e) => setGood(e.target.value)}
-                className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
                 aria-label="Good the rumor is about"
               >
                 {goods.map((g) => (
@@ -118,7 +118,7 @@ export function BazaarRumors({
                     {ICONS[g]} {g}
                   </option>
                 ))}
-              </select>
+              </Select>
               <span className="text-muted-foreground">leaning</span>
               {/* Both directions are buttons rather than a toggle, for the
                   reason the Harbormaster's console gives: the two are the

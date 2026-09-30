@@ -13,6 +13,13 @@ import { cn } from "@/lib/utils";
  * className comes last: tailwind-merge lets a board ask for a different
  * height without any of them restating the border.
  *
+ * Three boards came later and wrote the utilities out by hand again: the
+ * manifest audit, the bazaar's desk and the maroon vote, four pickers
+ * between them. A component that a later caller can miss is a component
+ * that has to say where it belongs, so this note names the rule rather
+ * than the boards: a dropdown in this game is this component, and a board
+ * that needs a different height asks for it in className.
+ *
  * Props are the element's own, so a caller still passes value, onChange
  * and the aria-label that names what the picker is choosing.
  */
