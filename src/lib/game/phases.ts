@@ -55,6 +55,19 @@ interface PhaseFace {
   // this is what the rail draws and what a briefing chart covers; the
   // harbor and the personal and terminal phases are what it leaves out.
   leg: boolean;
+  // The seat of the leg this phase is a screen inside, carried by the two
+  // personal sub states and by nothing else. A captain drafting a module has
+  // not left the yard, and the rail has folded both screens into Dusk since
+  // the six phase leg landed; this is that same fold written down as data
+  // rather than left in the rail's drawing code, so the one reader that has
+  // to place a captain against the room can read it (see seatOf below).
+  //
+  // A fact about the phase, which is why it is named here and not in
+  // ./mode.ts: both modes reach their yard through Dusk, and the lap that
+  // does not would say so on its own shipyard record rather than by putting
+  // a second answer beside the phase's name. Nothing that asks where a room
+  // stands reads this, because a room never stands at a personal screen.
+  inside?: LegPhase;
   // How long the room may stand here before the server moves it on, in
   // seconds. Null for everything that is not a seat of the leg: the pier is
   // opened by the host rather than by a clock, and the personal and terminal
@@ -162,15 +175,17 @@ export const PHASE_FACES: Record<Phase, PhaseFace> = {
     seconds: 60,
   },
   // The shipyard's two sub states. A captain who is drafting or swapping a
-  // module is still standing in the yard, so both wear its face: the rail
-  // folds them into dusk rather than drawing a step for work the room is
-  // not waiting on.
+  // module is still standing in the yard, so both wear its face and both
+  // carry the yard as their seat: the rail folds them into dusk rather than
+  // drawing a step for work the room is not waiting on, and the seat field
+  // above says the same thing to the protocol that has to place them.
   module_draft: {
     label: "Drafting Module",
     short: "Draft",
     icon: "🧩",
     gradient: "pm-grad-module-draft",
     leg: false,
+    inside: "dusk",
     // The four below are null for one reason, stated once: none of them is
     // a seat the room waits on. A captain drafting a module, swapping one,
     // or sitting at either terminal is standing inside a phase of the leg
@@ -184,6 +199,7 @@ export const PHASE_FACES: Record<Phase, PhaseFace> = {
     icon: "♻️",
     gradient: "pm-grad-module-swap",
     leg: false,
+    inside: "dusk",
     seconds: null,
   },
   bankruptcy: {
@@ -275,4 +291,31 @@ export function phaseFace(value: unknown): PhaseFace {
 export function isLegPhase(value: unknown): value is LegPhase {
   const phase = normalizePhase(value);
   return PHASE_FACES[phase].leg;
+}
+
+/**
+ * The seat of the leg a captain standing in this phase is standing at.
+ *
+ * For the six seats and for the pier that is the phase itself. For the two
+ * personal sub states it is the seat they are a screen inside: a captain
+ * drafting a module has not left the yard, which the rest of the engine
+ * already acts on (a departure from the draft closes it and leaves Dusk, see
+ * autoCommit in ./engine/lifecycle).
+ *
+ * This is the answer to "where is this captain", which is a different
+ * question from "does the room wait here" and was read as the same one until
+ * it cost a table a voyage. A personal screen is not gated by the ready
+ * check and must not be (see isGatedPhase), and a captain standing in one is
+ * still standing somewhere the room can be compared against. Folded here so
+ * the one place that comparison is made, checkpointRank, reads it, rather
+ * than a phase name being special cased at each of the four guards that
+ * compare a captain against the room.
+ *
+ * A terminal answers with itself rather than with a seat, which is the
+ * honest reading for a captain who is out of the voyage: what a lap makes of
+ * a phase it does not list is the lap's decision, not this one's.
+ */
+export function seatOf(value: unknown): Phase {
+  const phase = normalizePhase(value);
+  return PHASE_FACES[phase].inside ?? phase;
 }

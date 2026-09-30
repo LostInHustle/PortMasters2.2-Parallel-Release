@@ -15,7 +15,7 @@ import { TIDEWATCH_SURGE_THRESHOLD } from "@/lib/game/constants/world";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
-import { normalizePhase } from "@/lib/game/phases";
+import { normalizePhase, seatOf } from "@/lib/game/phases";
 import { type Phase } from "@/lib/game/types";
 import { clearAid } from "../aid";
 import { requireAuth } from "../auth";
@@ -234,7 +234,16 @@ async function advanceCheckpointFromReport(
   report: GameStatusUpdate,
 ): Promise<void> {
   cp.round = report.round;
-  cp.phase = report.phase;
+  // The seat this report is standing at rather than the screen it named. A
+  // captain reading the module draft is standing in Dusk (see seatOf), and
+  // the report ranks as Dusk's, so the checkpoint moved by it has to be Dusk
+  // and not the personal screen: a room standing at a screen no lap lists
+  // would be a room with no gated seat to vote at and no clock of its own,
+  // and every later vote would be refused for naming a round and phase the
+  // room is not on. Guarded at the door, where the move happens, so the
+  // checkpoint holds a seat of the lap by construction rather than by which
+  // report happened to arrive first.
+  cp.phase = seatOf(report.phase);
   cp.readyUserIds.clear();
   cp.advancing = false;
   // The announcement this report answers has now been answered, so the watch

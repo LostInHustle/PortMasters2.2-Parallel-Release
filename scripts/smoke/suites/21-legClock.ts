@@ -1,6 +1,7 @@
 // PortMasters 2.2 Parallel Release, smoke run: The leg clock.
 
 import {
+  checkpointRank,
   closesRound,
   isGatedPhase,
   lapPhases,
@@ -15,6 +16,7 @@ import {
   isLegPhase,
   normalizePhase,
   phaseFace,
+  seatOf,
 } from "@/lib/game/phases";
 import type { Phase } from "@/lib/game/types";
 import { CARRIES_A_DASH, check } from "../harness";
@@ -141,4 +143,47 @@ export async function legClockSuite(): Promise<void> {
       .every((line) => !CARRIES_A_DASH.test(line)),
     "and none of the words a captain reads on one carries an en dash, an em dash or a doubled hyphen",
   );
+
+  // Where a captain stands and where the room waits are two questions, and
+  // the release keeps them apart on purpose. A captain inside the shipyard's
+  // draft or swap is standing in Dusk: the rail has folded both screens into
+  // Dusk since the six phase leg landed, the engine leaves Dusk when a
+  // departure walks out of a draft, and folding the two onto Dusk is what
+  // lets the room place a captain against itself at all. Their screen is not
+  // a seat the ready check gates, and that pair is the shape of the stall
+  // held shut below: a roster that waited on a captain whose screen draws no
+  // ready bar left a table holding a full set of votes it could not spend.
+  for (const mode of MODE_ORDER) {
+    const badge = MODES[mode].badge;
+    check(
+      faces.every((phase) =>
+        PHASE_FACES[phase].inside
+          ? seatOf(phase) === PHASE_FACES[phase].inside
+          : seatOf(phase) === phase,
+      ),
+      `the ${badge} reading of where a captain stands is the phase itself, or the one seat it is a screen inside`,
+    );
+    check(
+      seatOf("module_draft") === "dusk" &&
+        seatOf("module_swap") === "dusk" &&
+        !isGatedPhase(mode, "module_draft") &&
+        !isGatedPhase(mode, "module_swap"),
+      `a captain at either shipyard screen is placed in Dusk by the ${badge} room and waited on by nobody`,
+    );
+    check(
+      checkpointRank(mode, 1, "module_draft") ===
+        checkpointRank(mode, 1, "dusk") &&
+        checkpointRank(mode, 1, "module_swap") ===
+          checkpointRank(mode, 1, "dusk") &&
+        checkpointRank(mode, 1, "dusk") !== null,
+      "and ranks as the seat they are standing in, so a room that has moved on is a room they are behind",
+    );
+    check(
+      (["bankruptcy", "endgame"] as Phase[]).every(
+        (phase) =>
+          seatOf(phase) === phase && checkpointRank(mode, 1, phase) === null,
+      ),
+      "while a captain at either terminal is placed nowhere at all",
+    );
+  }
 }
