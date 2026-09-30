@@ -16,93 +16,64 @@
 // it out of the pool. Reversing those two would duplicate a module or
 // lose one.
 //
-// draftBoons weights the offer against the captain's own position, which
-// is why it reads inventory and roster before picking.
+// [F2: the card record, and the mode weighting field] The offer weights are
+// the cards' own now rather than a table here: each record carries the
+// condition it answers, the lean toward a path and the weight its mode runs
+// (see ./constants/cards and ../cards), so this file holds the two drafts
+// and the flow between them and nothing about any particular card.
 // =====================================================================
 import {
-  BOON_SWAP_COST,
-  BOONS,
-  type Boon,
-  type Module,
-} from "../constants/drafts";
+  cardById,
+  cardLead,
+  cardName,
+  drawOffer,
+  noteCardOffer,
+  noteCardPick,
+  offerPool,
+} from "../cards";
+import type { CardRecord } from "../constants/cards";
+import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
 import { feedCrew } from "../larder";
-import { unlockedBoons, unlockedModules } from "../pools";
-import { weightedPick } from "../rng";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
 
-function draftBoons(state: GameState): Boon[] {
-  const gs = {
-    money: state.money,
-    inventory: state.inventory,
-    weavers: state.workers.weaver ?? [],
-    master_weavers: state.workers.master ?? [],
-    sachet_makers: state.workers.sachet_maker ?? [],
-    coppersmiths: state.workers.coppersmith ?? [],
-    potters: state.workers.potter ?? [],
-    perfumers: state.workers.perfumer ?? [],
-    jewelers: state.workers.jeweler ?? [],
-  };
-  const weightFuncs: Record<string, () => number> = {
-    silk_wind: () =>
-      (gs.inventory["Silk"] || 0) > 2 || gs.master_weavers.length > 0
-        ? 2.5
-        : 0.8,
-    favorable_tides: () => 1.5,
-    merchant_charm: () => (gs.money > 40 ? 2.0 : 0.5),
-    artisan_inspiration: () =>
-      gs.weavers.length + gs.master_weavers.length + gs.sachet_makers.length > 0
-        ? 3.0
-        : 0.0,
-    emergency_loan: () => (gs.money < 30 ? 4.0 : 0.2),
-    tax_shelter: () => 1.5,
-    hemp_monopoly: () =>
-      (gs.inventory["Hemp"] || 0) < 5 || gs.weavers.length > 0 ? 2.0 : 1.0,
-    master_apprentice: () => 1.5,
-    // Tier 1 unlocks only once the first charter has opened, so a captain
-    // who hasn't reached that round yet simply never sees them. Once
-    // unlocked, their weights are tuned to the conditions they reward.
-    farsight: () => (gs.money < 40 ? 2.5 : 1.2),
-    kiln_and_forge_guild: () =>
-      (gs.inventory["Copper Ore"] ?? 0) > 1 ||
-      (gs.inventory["Porcelain Clay"] ?? 0) > 1
-        ? 2.8
-        : 1.0,
-    frontier_tariff_relief: () =>
-      gs.sachet_makers.length > 0 || gs.master_weavers.length > 0 ? 3.0 : 0.8,
-    // Tier 2 preferences, same gating contract as tier 1 above.
-    exotic_treasures: () =>
-      (gs.inventory["Spices"] ?? 0) > 1 || (gs.inventory["Pearls"] ?? 0) > 1
-        ? 3.0
-        : 1.0,
-    deep_sea_escort_pact: () => (gs.money > 60 ? 1.8 : 3.2),
-    merchants_converge: () => 1.6,
-  };
-  const available = unlockedBoons(state.difficulty, state.currentRound)
-    .map((b) => [b, weightFuncs[b.id]()] as [Boon, number])
-    .filter(([, w]) => w > 0);
-  const picks: Boon[] = [];
-  const pool = [...available];
-  for (let i = 0; i < 3; i++) {
-    if (!pool.length) break;
-    const chosen = weightedPick(Math.random, pool);
-    picks.push(chosen);
-    pool.splice(
-      pool.findIndex((x) => x[0].id === chosen.id),
-      1,
-    );
-  }
+// The three cards a leg puts in front of a captain.
+//
+// [F2: the card record, and the mode weighting field] What used to be a
+// switch statement here, one arm per card, reading inventory and roster by
+// name, is now the card's own condition (see CardCondition in
+// ./constants/cards and the records in ./constants/drafts). The engine no
+// longer holds a single card's id at the draft: it asks the pool what is on
+// offer for this captain, which is what makes a card added to the content
+// arrive with its own offer behaviour rather than with an edit here.
+//
+// The tally is written where the card is put in front of the captain rather
+// than where it is chosen, because the plan's measure is the pair ("Offer to
+// pick conversion per card, with the appearance count beside it") and the
+// denominator is the offer.
+function draftBoons(state: GameState): CardRecord[] {
+  const picks = drawOffer(offerPool("boon", state), CARDS_PER_OFFER);
+  for (const card of picks) noteCardOffer(state.cardTally, card);
   return picks;
 }
 
-function applyBoon(state: GameState, boon: Boon, logs: string[]) {
-  state.modifierFlags = boon.modifiers;
-  if (boon.modifiers.instant_gold) {
-    state.money += boon.modifiers.instant_gold;
-    logs.push(`💰 Boon applied: Gained ${boon.modifiers.instant_gold} Gold!`);
+// Applies a boon. The flags come off the card's effect, which is where the
+// record keeps them; the guard in front is the union's second arm, which a
+// boon never carries (validateCards holds that line and selectBoon only ever
+// finds a boon) but which the compiler is right to ask about, and a card
+// that somehow arrived here without flags is a card that changes nothing
+// rather than a crash inside a round.
+function applyBoon(state: GameState, card: CardRecord, logs: string[]) {
+  if (card.effect.kind !== "flags") return;
+  state.modifierFlags = card.effect.flags;
+  if (card.effect.flags.instant_gold) {
+    state.money += card.effect.flags.instant_gold;
+    logs.push(
+      `💰 Boon applied: Gained ${card.effect.flags.instant_gold} Gold!`,
+    );
   }
 }
 
@@ -136,14 +107,17 @@ export function upgradeShip(state: GameState, logs: string[]) {
 // these writes are dead and the field is gone from GameState; the
 // discount is read live off the equipped set, so equip and unequip no
 // longer need to keep a parallel field in sync.
-export function unequipModuleAccounting(state: GameState, mod: Module): void {
+export function unequipModuleAccounting(
+  state: GameState,
+  mod: CardRecord,
+): void {
   if (mod.id === "bulk_hauler") state.shipUpgradePenalty -= 15;
   if (mod.id === "overdrive_engine") state.maintenancePenalty -= 10;
 }
 
 function equipModule(
   state: GameState,
-  mod: Module,
+  mod: CardRecord,
   swapIdx: number | null,
   logs: string[],
 ) {
@@ -157,11 +131,16 @@ function equipModule(
     // discount is read live off the equipped set, so equip and unequip no
     // longer need to keep a parallel field in sync.
     state.equippedModules[swapIdx] = mod;
-    logs.push(`🔄 Swapped ${old.name} for ${mod.name}!`);
+    logs.push(`🔄 Swapped ${cardName(old.id)} for ${cardName(mod.id)}!`);
   } else {
     if (state.equippedModules.length < state.shipLevel) {
       state.equippedModules.push(mod);
-      logs.push(`✅ Installed ${mod.name}!`);
+      // The pick is only written down where the card lands, which is the one
+      // place a module actually joins the hull: the swap flow parks a choice
+      // in _newModule and a captain can still back out of it, so counting
+      // there would count cards that were never taken.
+      noteCardPick(state.cardTally, mod);
+      logs.push(`✅ Installed ${cardName(mod.id)}!`);
     } else {
       logs.push("❌ No empty slots! Must swap.");
       return;
@@ -254,27 +233,31 @@ export function selectBoon(
   boonId: string,
   logs: string[],
 ): boolean {
-  const boon = BOONS.find((b) => b.id === boonId);
-  if (!boon) return false;
-  logs.push(`🧭 Boon Locked In: ${boon.icon} ${boon.name}`);
-  applyBoon(state, boon, logs);
+  const card = cardById(boonId);
+  if (!card || card.kind !== "boon") return false;
+  logs.push(`🧭 Boon Locked In: ${cardLead(card.id)}`);
+  noteCardPick(state.cardTally, card);
+  applyBoon(state, card, logs);
   state.boonChoices = [];
   return true;
 }
 
-function rollModuleChoices(state: GameState): Module[] {
-  const MODULES = unlockedModules(state.difficulty, state.currentRound);
-  const available = MODULES.filter(
-    (m) => !state.equippedModules.some((eq) => eq.id === m.id),
+// The shipyard's draw, which is a weighted draw now rather than the uniform
+// one it used to be: the weights are the mode's and the captain's own lean
+// (see offerPool in ../cards), so a module leans toward the path its trade
+// belongs to while the pool itself stays unfiltered. A captain who has
+// already equipped most of what is on offer falls back to the whole pool
+// rather than to two cards, because a draft with empty seats is not a
+// tighter draft, it is a broken screen.
+function rollModuleChoices(state: GameState): CardRecord[] {
+  const pool = offerPool("module", state);
+  const equipped = new Set(state.equippedModules.map((card) => card.id));
+  const available = pool.filter(([card]) => !equipped.has(card.id));
+  const picks = drawOffer(
+    available.length >= CARDS_PER_OFFER ? available : pool,
+    CARDS_PER_OFFER,
   );
-  const pool = available.length >= 3 ? available : MODULES;
-  const picks: Module[] = [];
-  const copy = [...pool];
-  for (let i = 0; i < 3; i++) {
-    if (!copy.length) break;
-    const idx = Math.floor(Math.random() * copy.length);
-    picks.push(copy.splice(idx, 1)[0]);
-  }
+  for (const card of picks) noteCardOffer(state.cardTally, card);
   return picks;
 }
 

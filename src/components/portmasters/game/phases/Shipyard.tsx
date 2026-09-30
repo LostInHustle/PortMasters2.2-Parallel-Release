@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cardText } from "@/lib/game/cards";
 import {
   leavePhase,
   startModuleDrafting,
@@ -57,15 +58,18 @@ export function Shipyard({
         </div>
         {game.equippedModules.length ? (
           <div className="mt-3 space-y-1">
-            {game.equippedModules.map((m) => (
-              <div key={m.id} className="text-xs">
-                {m.icon}{" "}
-                <strong>
-                  <Term term={m.name}>{m.name}</Term>
-                </strong>
-                : {m.desc}
-              </div>
-            ))}
+            {game.equippedModules.map((card) => {
+              const text = cardText(card);
+              return (
+                <div key={card.id} className="text-xs">
+                  {card.icon}{" "}
+                  <strong>
+                    <Term term={text.name}>{text.name}</Term>
+                  </strong>
+                  : {text.desc}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-xs text-muted-foreground mt-2">

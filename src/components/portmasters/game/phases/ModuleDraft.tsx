@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cardText } from "@/lib/game/cards";
 import {
   cancelModuleDraft,
   handleModuleSelect,
@@ -50,22 +51,25 @@ export function ModuleDraft({
               : "🎲 Swap Choices (1 use/round)"}
           </DraftSwapButton>
           <DraftGrid>
-            {picks.map((m, i) => (
-              <DraftCard
-                key={m.id}
-                tone="border-module-draft/20"
-                icon={m.icon}
-                name={m.name}
-                desc={m.desc}
-                actionLabel={
-                  game.equippedModules.length < game.shipLevel
-                    ? "✅ Install"
-                    : "🔄 Swap"
-                }
-                actionClassName="pm-grad-module-draft"
-                onSelect={() => act((g, l) => handleModuleSelect(g, i, l))}
-              />
-            ))}
+            {picks.map((card, i) => {
+              const text = cardText(card);
+              return (
+                <DraftCard
+                  key={card.id}
+                  tone="border-module-draft/20"
+                  icon={card.icon}
+                  name={text.name}
+                  desc={text.desc}
+                  actionLabel={
+                    game.equippedModules.length < game.shipLevel
+                      ? "✅ Install"
+                      : "🔄 Swap"
+                  }
+                  actionClassName="pm-grad-module-draft"
+                  onSelect={() => act((g, l) => handleModuleSelect(g, i, l))}
+                />
+              );
+            })}
           </DraftGrid>
         </>
       )}

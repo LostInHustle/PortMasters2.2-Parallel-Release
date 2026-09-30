@@ -2,7 +2,8 @@
 // PortMasters 2.2 Parallel Release: game state types
 // =====================================================================
 import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
-import { type Boon, type Module } from "./constants/drafts";
+import type { CardTally } from "./cards";
+import type { CardRecord } from "./constants/cards";
 import { ITEMS, STARTING_STOCK } from "./constants/goods";
 import { LARDER_START, type FoodId } from "./constants/supplies";
 import {
@@ -101,15 +102,20 @@ type IntelItem = { item: string; port: string };
 // in PRODUCTS.
 type Product = string;
 
-// The known keys a Boon or module can write into GameState.modifierFlags.
+// The known keys a boon can write into GameState.modifierFlags.
 // Each maps 1:1 to a balance effect the engine reads during a round (see
-// the BOONS / MODULES tables in ./constants for which boon or module writes
-// each key, and the pricing / market / workers / pirates modules for where
-// each is read). A Partial<Record<ModifierKey, number>> is what the field
+// the flags on each card in ./constants/drafts for which card writes which
+// key, and the pricing / market / workers / pirates modules for where each
+// is read). A Partial<Record<ModifierKey, number>> is what the field
 // carries, so a key present without a value reads as undefined and falls
 // back to its default, exactly the way the untyped Record<string, number>
 // did before, just with the universe of legal keys pinned in one place.
-type ModifierKey =
+//
+// Exported because the card record is the other half of this union's
+// contract: a card's effect is written in these keys (see CardEffect in
+// ./constants/cards), so the record needs to name the universe the field
+// here pins.
+export type ModifierKey =
   | "transport_flat_discount"
   | "transport_silk_discount"
   | "purchase_discount"
@@ -339,7 +345,6 @@ export type GameState = {
   pathSwitchLeg: number;
   totalRevenue: number;
   totalCosts: number;
-  materialCosts: number;
   workerWages: number;
   maintenanceCosts: number;
   vatPaid: number;
@@ -582,17 +587,26 @@ export type GameState = {
   // flag rather than in the round's bookkeeping so a reader looking for the
   // voyage's one shot limits finds them together.
   opportunistBorrows: number;
-  equippedModules: Module[];
+  equippedModules: CardRecord[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
   // draft screen, backing out, or reloading the page never re rolls them.
   // The only way to get a new pool mid round is the corresponding swap
   // action below, each capped at one use per round.
-  boonChoices: Boon[];
+  boonChoices: CardRecord[];
   boonSwapUsed: boolean;
-  _draftChoices?: Module[];
+  _draftChoices?: CardRecord[];
   moduleSwapUsed: boolean;
-  _newModule?: Module;
+  _newModule?: CardRecord;
+  // [F2: the card record, and the mode weighting field] How often each card
+  // has been offered to this captain and how often one was taken, which is
+  // the appearance count and the numerator behind the plan's own measure of
+  // the pool ("Offer to pick conversion per card, with the appearance count
+  // beside it"). It rides the save rather than the telemetry stream, which
+  // is I2's precedent for data that must not fight the event cap: a voyage
+  // offers a dozen cards, a season of voyages offers thousands, and the
+  // event stream has a ceiling of its own (see TELEMETRY_EVENT_CAP).
+  cardTally: CardTally;
   // Reset every round in startBoonDrafting, same as boonSwapUsed/
   // moduleSwapUsed above. Resolved once per round, in Resolve, before the
   // wages and maintenance settlement: either a 20% chance of losing every
@@ -901,7 +915,6 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     maxRounds: voyageRoundsFor(mode, difficulty),
     totalRevenue: 0,
     totalCosts: 0,
-    materialCosts: 0,
     workerWages: 0,
     maintenanceCosts: 0,
     vatPaid: 0,
@@ -976,6 +989,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],
+    cardTally: {},
     boonSwapUsed: false,
     moduleSwapUsed: false,
     pirateAttackResolved: false,

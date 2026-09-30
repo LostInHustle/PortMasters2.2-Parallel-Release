@@ -1,5 +1,6 @@
 "use client";
 
+import { cardName } from "@/lib/game/cards";
 import { WORKER_TYPES } from "@/lib/game/constants/crew";
 import { getHireCost, leavePhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
@@ -138,7 +139,7 @@ export function SettlementBills({
         </BillRow>
         {game.maintenancePenalty > 0 && (
           <div className="text-[11px] text-muted-foreground pl-2.5">
-            ↳ Base {game.fixedCost}g + Overdrive Engine penalty{" "}
+            ↳ Base {game.fixedCost}g + {cardName("overdrive_engine")} penalty{" "}
             {game.maintenancePenalty}g
           </div>
         )}

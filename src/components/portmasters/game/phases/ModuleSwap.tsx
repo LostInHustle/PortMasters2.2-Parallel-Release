@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cardText } from "@/lib/game/cards";
 import { finalizeModuleSwap } from "@/lib/game/engine";
 import { Term } from "../../Term";
 import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
@@ -15,38 +16,44 @@ export function ModuleSwap({
   act,
 }: Pick<PhasePanelProps, "game" | "act">) {
   const newMod = game._newModule;
+  const newText = newMod ? cardText(newMod) : null;
   return (
     <div className="max-w-2xl mx-auto text-center">
       <PhaseHeading layout="mb-1" tone="text-module-swap" brush>
         🔄 Select Module to Replace
       </PhaseHeading>
-      {newMod && (
+      {newMod && newText && (
         <p className="text-sm text-muted-foreground mb-4">
-          New: {newMod.icon} {newMod.name}: {newMod.desc}
+          New: {newMod.icon} {newText.name}: {newText.desc}
         </p>
       )}
       <div className="rounded-xl border border-module-swap/15 bg-module-swap/[0.03] p-4 my-4 space-y-2 text-left">
-        {game.equippedModules.map((m, i) => (
-          <div
-            key={m.id}
-            className="flex justify-between items-center bg-background/60 rounded-md p-2.5 border border-black/5 dark:border-white/10"
-          >
-            <div>
-              <strong>
-                {m.icon} <Term term={m.name}>{m.name}</Term>
-              </strong>
-              <div className="text-[11px] text-muted-foreground">{m.desc}</div>
-            </div>
-            <Button
-              size="sm"
-              variant="destructive"
-              className="rounded-lg"
-              onClick={() => act((g, l) => finalizeModuleSwap(g, i, l))}
+        {game.equippedModules.map((card, i) => {
+          const text = cardText(card);
+          return (
+            <div
+              key={card.id}
+              className="flex justify-between items-center bg-background/60 rounded-md p-2.5 border border-black/5 dark:border-white/10"
             >
-              🗑️ Replace
-            </Button>
-          </div>
-        ))}
+              <div>
+                <strong>
+                  {card.icon} <Term term={text.name}>{text.name}</Term>
+                </strong>
+                <div className="text-[11px] text-muted-foreground">
+                  {text.desc}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="rounded-lg"
+                onClick={() => act((g, l) => finalizeModuleSwap(g, i, l))}
+              >
+                🗑️ Replace
+              </Button>
+            </div>
+          );
+        })}
       </div>
       <Button
         variant="secondary"

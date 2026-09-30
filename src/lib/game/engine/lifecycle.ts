@@ -60,7 +60,12 @@ function endRound(state: GameState, logs: string[]) {
     state.roundCosts + state.maintenanceCosts + state.workerWages;
   logs.push(`💸 Total Cost this round: ${totalCost} Gold`);
   logs.push(`   🔧 Maintenance: ${state.maintenanceCosts} Gold`);
-  logs.push(`   📦 Materials: ${state.materialCosts} Gold`);
+  // A Materials line sat here, reading a materialCosts field that nothing in
+  // the engine ever wrote, so it printed 0 Gold every round of every voyage.
+  // Field and line are both gone, and the goods and freight spending they
+  // stood in front of is inside roundCosts above, counted there once: wages
+  // and maintenance used to be added into roundCosts as well as summed here,
+  // which charged them twice against the tax base this ledger feeds.
   logs.push(`   👥 Wages: ${state.workerWages} Gold`);
   const preTax = state.roundRevenue - totalCost;
   logs.push(`📈 Pretax Profit: ${preTax} Gold`);
@@ -86,7 +91,6 @@ function endRound(state: GameState, logs: string[]) {
   state.roundRevenue = 0;
   state.roundCosts = 0;
   state.maintenanceCosts = 0;
-  state.materialCosts = 0;
   state.workerWages = 0;
   state.currentRound++;
   if (state.currentRound > state.maxRounds) {

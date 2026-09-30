@@ -1,6 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: Free Captain: the borrow.
 
-import { SILK_GOODS } from "@/lib/game/constants/goods";
+import { cargoCarriesTag } from "@/lib/game/cards";
 import {
   OPPORTUNIST_PENALTY,
   OPPORTUNIST_USES,
@@ -210,7 +210,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     const freight = calcTransportCost(
       filled,
       card.totalItems,
-      card.resources.some((r) => SILK_GOODS.includes(r.type)),
+      cargoCarriesTag(card.resources, "woven"),
     );
     const paid = opportunistPayout(card.reward);
     const lines: string[] = [];
@@ -265,7 +265,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     const ordinaryFreight = calcTransportCost(
       ordinary,
       openCard.totalItems,
-      openCard.resources.some((r) => SILK_GOODS.includes(r.type)),
+      cargoCarriesTag(openCard.resources, "woven"),
     );
     const ordinaryLines: string[] = [];
     completeOrder(ordinary, openCard.id, ordinaryLines, true);

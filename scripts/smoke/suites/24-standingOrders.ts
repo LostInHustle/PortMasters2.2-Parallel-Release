@@ -1,5 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: Standing orders.
 
+import { cardText } from "@/lib/game/cards";
 import { BOONS } from "@/lib/game/constants/drafts";
 import { ITEMS, MARKET_GOODS, RAGS } from "@/lib/game/constants/goods";
 import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
@@ -227,9 +228,12 @@ export async function standingOrdersSuite(): Promise<void> {
   const orderedDawnLogs: string[] = [];
   autoCommit(orderedDawn, standingCtx, orderedDawnLogs);
   check(
-    took(orderedDawnLogs, writtenPick.name) &&
-      !took(orderedDawnLogs, firstOffer.name) &&
-      orderedDawn.modifierFlags === writtenPick.modifiers &&
+    took(orderedDawnLogs, cardText(writtenPick).name) &&
+      !took(orderedDawnLogs, cardText(firstOffer).name) &&
+      orderedDawn.modifierFlags ===
+        (writtenPick.effect.kind === "flags"
+          ? writtenPick.effect.flags
+          : null) &&
       orderedDawn.boonChoices.length === 0 &&
       orderedDawn.phase !== "dawn",
     "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue",
@@ -247,8 +251,8 @@ export async function standingOrdersSuite(): Promise<void> {
   const missedDawnLogs: string[] = [];
   autoCommit(missedDawn, standingCtx, missedDawnLogs);
   check(
-    took(missedDawnLogs, missedFirst.name) &&
-      !took(missedDawnLogs, offBoard.name) &&
+    took(missedDawnLogs, cardText(missedFirst).name) &&
+      !took(missedDawnLogs, cardText(offBoard).name) &&
       missedDawn.phase !== "dawn",
     "a name the draft did not deal is passed over for the board's first offer, so a written order can never take a boon its captain was not shown",
   );
@@ -267,8 +271,8 @@ export async function standingOrdersSuite(): Promise<void> {
   const rollbackDawnLogs: string[] = [];
   autoCommit(rollbackDawn, standingCtx, rollbackDawnLogs);
   check(
-    took(rollbackDawnLogs, rollbackFirst.name) &&
-      !took(rollbackDawnLogs, rollbackPick.name),
+    took(rollbackDawnLogs, cardText(rollbackFirst).name) &&
+      !took(rollbackDawnLogs, cardText(rollbackPick).name),
     "and with the switch off the same written boon is passed over too, which is the rollback the plan asks for",
   );
 

@@ -16,6 +16,7 @@
 // generators. They were file private before the split purely because
 // everything lived in one file.
 // =====================================================================
+import { cardLead } from "../cards";
 import { ICONS } from "../constants/brand";
 import {
   COMMODITIES,
@@ -544,7 +545,7 @@ export function startMarket(
     const port = openPorts[Math.floor(Math.random() * openPorts.length)];
     state.revealedIntel.push({ item, port });
     logs.push(
-      `🔮 Farsight: 'Word from ${port}: High demand for ${item}!' (free)`,
+      `${cardLead("farsight")}: 'Word from ${port}: High demand for ${item}!' (free)`,
     );
   }
   logs.push(`\n⚓=== Round ${state.currentRound} · Market: Port Purchase ===`);

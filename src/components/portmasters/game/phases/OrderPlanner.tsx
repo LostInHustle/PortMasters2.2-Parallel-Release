@@ -1,6 +1,6 @@
 "use client";
 
-import { SILK_GOODS } from "@/lib/game/constants/goods";
+import { cargoCarriesTag } from "@/lib/game/cards";
 import {
   brokersFavorCommission,
   calcTransportCost,
@@ -46,8 +46,8 @@ export function OrderFulfillmentPlanner({ game }: { game: GameState }) {
           missing.push({ item: r.type, have, need });
         }
       }
-      const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
-      const transport = calcTransportCost(game, o.totalItems, hasSilk);
+      const hasWoven = cargoCarriesTag(o.resources, "woven");
+      const transport = calcTransportCost(game, o.totalItems, hasWoven);
       let net = o.reward - transport;
       if (o.isProductOrder) {
         const product = o.resources[0].type;

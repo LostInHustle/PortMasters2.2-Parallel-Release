@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { SILK_GOODS } from "@/lib/game/constants/goods";
+import { cargoCarriesTag } from "@/lib/game/cards";
 import {
   brokersFavorCommission,
   calcTransportCost,
@@ -75,9 +75,9 @@ function OrderCard({
   const canBorrow = canFillOrder(game, o, true);
   const borrowSpent =
     game.path === OPPORTUNIST_PATH && opportunistBorrowsLeft(game) < 1;
-  const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
-  const transport = calcTransportCost(game, o.totalItems, hasSilk);
-  const transportBreakdown = explainTransportCost(game, o.totalItems, hasSilk);
+  const hasWoven = cargoCarriesTag(o.resources, "woven");
+  const transport = calcTransportCost(game, o.totalItems, hasWoven);
+  const transportBreakdown = explainTransportCost(game, o.totalItems, hasWoven);
   let netProfit = rewardBasis - transport;
   let totalVat = 0;
   let vatBreakdown: PriceBreakdown | null = null;

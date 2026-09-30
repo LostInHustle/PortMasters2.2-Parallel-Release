@@ -1,5 +1,6 @@
 "use client";
 
+import { cardName, cardText } from "@/lib/game/cards";
 import { MODULES } from "@/lib/game/constants/drafts";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,20 @@ import { cn } from "@/lib/utils";
  *
  * These are the only hand written part of the analyzer, because an
  * interaction is exactly the thing neither module's own catalogue entry
- * can state: each is a claim about what two of them do together.
+ * can state: each is a claim about what two of them do together. The
+ * names inside those claims are not hand written: they are asked of the
+ * records through cardName, so a card renamed for its captain is renamed
+ * here the same afternoon. Four labels had drifted before that was true,
+ * calling the Tax Evasion Ledger, the Bulk Hauler Rigging and the
+ * Maritime Bureau Token by shorter forms and the Ocean Interpreter by
+ * the words of its own id.
+ *
+ * Every rule pairs hull cards. A boon cannot be a participant: the
+ * equipped set this analyzer reads holds what is installed on the ship,
+ * and a boon writes the round's flags instead, so the rule that paired
+ * the Persian Dome Compass with the Deep Sea Escort Pact could never
+ * fire and is gone. The pairing is real in play; this panel simply
+ * cannot see the boon half of it.
  */
 const MODULE_SYNERGY_RULES: {
   ids: string[];
@@ -20,51 +34,38 @@ const MODULE_SYNERGY_RULES: {
 }[] = [
   {
     ids: ["smugglers_hold", "tax_evasion"],
-    label:
-      "Double Tax Strategy: Smuggler's Hold reduces purchase costs and Tax Evasion halves both VAT and income tax. A powerful financial combo.",
+    label: `Double Tax Strategy: ${cardName("smugglers_hold")} reduces purchase costs and ${cardName("tax_evasion")} halves both VAT and income tax. A powerful financial combo.`,
     tone: "gain",
   },
   {
     ids: ["bulk_hauler", "silk_monopoly"],
-    label:
-      "Freight Mastery: Bulk Hauler reduces transport per item and Silk Road Monopoly can zero it out for Silk routes. Shipping costs almost nothing.",
+    label: `Freight Mastery: ${cardName("bulk_hauler")} reduces transport per item and ${cardName("silk_monopoly")} can zero it out on any order carrying woven goods. Shipping costs almost nothing.`,
     tone: "gain",
   },
   {
     ids: ["artisans_workshop", "salvage_crane"],
-    label:
-      "Production Engine: Artisan's Workshop boosts worker output and Salvage Crane refunds the freight on most orders. More goods, more Gold back.",
+    label: `Production Engine: ${cardName("artisans_workshop")} boosts worker output and ${cardName("salvage_crane")} refunds the freight on some orders. More goods, more Gold back.`,
     tone: "gain",
   },
   {
     ids: ["brokers_network", "ocean_relay"],
-    label:
-      "Intel Network: Broker's Network drops a rumor to 2 Gold and reveals two, and Ocean Relay adds a third free. Maximum market intelligence.",
+    label: `Intel Network: ${cardName("brokers_network")} drops a rumor to 2 Gold and reveals two, and ${cardName("ocean_relay")} adds a third free. Maximum market intelligence.`,
     tone: "intel",
   },
   {
     ids: ["overdrive_engine", "bulk_hauler"],
-    label:
-      "Penalty Stack: Overdrive Engine adds maintenance and Bulk Hauler raises upgrade cost. Consider swapping one if funds are tight.",
+    label: `Penalty Stack: ${cardName("overdrive_engine")} adds maintenance and ${cardName("bulk_hauler")} raises upgrade cost. Consider swapping one if funds are tight.`,
     tone: "warn",
   },
   {
     ids: ["kiln_cellar", "bureau_token"],
-    label:
-      "Charter Combo: Kiln Cellar discounts Porcelain Clay and Copper Ore, and Bureau Token adds 10% to their order rewards. Buy cheap, sell high.",
+    label: `Charter Combo: ${cardName("kiln_cellar")} discounts every bulk good, and ${cardName("bureau_token")} adds 10% to the rewards on orders for the charter's own goods. Buy cheap, sell high.`,
     tone: "gain",
   },
   {
     ids: ["foreign_quarter_pass", "fleet_of_treasures"],
-    label:
-      "Exotic Trade: Foreign Quarter Pass discounts Spices and Pearls, and Fleet of Treasures discounts freight on Foreign Balm and Pearl String. Tier 2 goods at tier 0 prices.",
+    label: `Exotic Trade: ${cardName("foreign_quarter_pass")} discounts every luxury good, and ${cardName("fleet_of_treasures")} takes three Gold a unit off freight on the same trade. Tier 2 goods at tier 0 prices.`,
     tone: "gain",
-  },
-  {
-    ids: ["persian_dome_compass", "deep_sea_escort_pact"],
-    label:
-      "Safe Passage: Persian Dome Compass reduces pirate risk by 30% and the Deep Sea Escort Pact boon halves it further. Stack for near immunity.",
-    tone: "intel",
   },
 ];
 
@@ -117,14 +118,17 @@ export function ModuleSynergyAnalyzer({
             Active Bonuses
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {activeBonuses.map((b, i) => (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
-              >
-                {b.icon} {b.name}: {b.desc}
-              </span>
-            ))}
+            {activeBonuses.map((card) => {
+              const text = cardText(card);
+              return (
+                <span
+                  key={card.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
+                >
+                  {card.icon} {text.name}: {text.desc}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

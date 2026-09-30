@@ -13,6 +13,7 @@
 // exactly the founding trade and nothing else.
 // =====================================================================
 import { WORKER_TYPES, type WorkerType } from "./constants/crew";
+import type { CardRecord } from "./constants/cards";
 import {
   BOONS_TIER0,
   BOONS_TIER1,
@@ -20,8 +21,6 @@ import {
   MODULES_TIER0,
   MODULES_TIER1,
   MODULES_TIER2,
-  type Boon,
-  type Module,
 } from "./constants/drafts";
 import {
   PRODUCTS_TIER0,
@@ -65,8 +64,15 @@ export function unlockedPorts(difficulty: unknown, roundNo: number): string[] {
   );
 }
 
-export function unlockedBoons(difficulty: unknown, roundNo: number): Boon[] {
-  return unlockedPool<Boon>(
+// Every card of the kind the tier has opened, in the record shape (see
+// ./constants/cards). The two readers are the ladder a draft draws from:
+// what else is on offer for a captain is the card's own condition and the
+// mode's weight, both read in ./cards.
+export function unlockedBoons(
+  difficulty: unknown,
+  roundNo: number,
+): CardRecord[] {
+  return unlockedPool<CardRecord>(
     [BOONS_TIER0, BOONS_TIER1, BOONS_TIER2],
     difficulty,
     roundNo,
@@ -76,8 +82,8 @@ export function unlockedBoons(difficulty: unknown, roundNo: number): Boon[] {
 export function unlockedModules(
   difficulty: unknown,
   roundNo: number,
-): Module[] {
-  return unlockedPool<Module>(
+): CardRecord[] {
+  return unlockedPool<CardRecord>(
     [MODULES_TIER0, MODULES_TIER1, MODULES_TIER2],
     difficulty,
     roundNo,
@@ -122,14 +128,19 @@ export function isCharterGood(item: string): boolean {
 
 // The finished goods of each charter wave, told apart.
 //
-// The two boons that pay on a wave name its goods exactly: Kiln and Forge
-// Guild names Celadon Ware and Bronze Mirror, Exotic Treasures names
-// Foreign Balm and Pearl String. isCharterGood above answers whether a good
-// arrived with a charter at all, which is the right question for the
-// Maritime Bureau Token (its text names no wave) and the wrong one here:
-// gating both boons on it made them the same boon, since a captain holds
-// only one at a time (applyBoon replaces modifierFlags wholesale) and
-// whichever they held paid out on either wave.
+// The two boons that pay on a wave name it in their own text: Kiln and Forge
+// Guild pays on the first charter's goods, Exotic Treasures on the second's.
+// isCharterGood above answers whether a good arrived with a charter at all,
+// which is the right question for the Maritime Bureau Token (its text names
+// no wave) and the wrong one here: gating both boons on it made them the
+// same boon, since a captain holds only one at a time (applyBoon replaces
+// modifierFlags wholesale) and whichever they held paid out on either wave.
+//
+// [F2: the card record, and the mode weighting field] These two readers stay
+// here rather than becoming tag reads, and that is the one place in the
+// engine F1's rule does not reach: which wave a good arrived with is the
+// schedule's fact and not the good's, so a tag would be the same good tagged
+// two ways in two rooms (see the same note in ./engine/orders).
 export function isTier1CharterProduct(item: string): boolean {
   return (PRODUCTS_TIER1 as readonly string[]).includes(item);
 }
