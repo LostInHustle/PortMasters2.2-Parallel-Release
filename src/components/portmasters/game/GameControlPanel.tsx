@@ -32,6 +32,7 @@ export function GameControlPanel({
   waiting,
   readyCount,
   requiredCount,
+  harborCount,
   clock,
   onStandingOrders,
   onCancelReady,
@@ -54,6 +55,18 @@ export function GameControlPanel({
   waiting: boolean;
   readyCount: number;
   requiredCount: number;
+  // The captains in the harbor, which is a fact about room membership and
+  // not about the ready check. The two were the same number until the
+  // waiting roster learned to exclude the pier (see waitingRosterSet in
+  // src/server/realtime/checkpoint.ts, and isGatedPhase behind it): the
+  // harbor is not a seat the room readies out of, so every captain
+  // standing at it fell out of the roster, the count read zero, and the
+  // host's own Set Sail button disabled itself with "Need one captain"
+  // while the server would have accepted the start. The ready check's
+  // denominator is the right answer to "who does this seat wait on" and
+  // the wrong one to "who is in the harbor", so the harbor asks the
+  // roster the room already broadcasts rather than reusing the vote's.
+  harborCount: number;
   /**
    * [B2: hard timers, the server as timekeeper] The room's clock while one is
    * running, so the wait says how long it is worth. Optional: a bar drawn
@@ -90,10 +103,10 @@ export function GameControlPanel({
     if (!isHost) {
       startText = "⏳ Waiting for host…";
       startDisabled = true;
-    } else if (requiredCount < 1) {
+    } else if (harborCount < 1) {
       startText = "Need one captain";
       startDisabled = true;
-    } else if (requiredCount === 1) {
+    } else if (harborCount === 1) {
       startText = "Start Solo Practice";
       startDisabled = false;
     } else {

@@ -37,6 +37,8 @@ export function MembersPanel({
   hostId,
   onSelectPlayer,
   myRenownLevel = 1,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   socket: Socket | null;
   roomId: string;
@@ -45,6 +47,13 @@ export function MembersPanel({
   hostId: string;
   onSelectPlayer: (userId: string) => void;
   myRenownLevel?: number;
+  // The fold, owned by the room rather than by this panel (see
+  // usePanelPrefs in GameRoom): the roster and the chat split the right
+  // rail's height, so folding one is a fact about the column the other
+  // lives in. Defaulted open, which is the panel's own contract without
+  // the room around it.
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   // Roster, per captain status, and the host's mute list all come from the
   // shared hook, which FleetTicker uses too; only the system notice feed
@@ -139,36 +148,49 @@ export function MembersPanel({
 
   return (
     <div className="pm-glass rounded-2xl flex flex-col overflow-hidden h-full">
-      <RosterHeader memberCount={members.length} />
+      <RosterHeader
+        memberCount={members.length}
+        collapsed={collapsed}
+        onToggle={onToggleCollapse}
+      />
 
-      <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">
-        {sorted.map((m) => (
-          <RosterRow
-            key={m.id}
-            member={m}
-            status={statuses[m.id]}
-            isMe={m.id === me.id}
-            isHost={m.id === hostId}
-            isMuted={mutedUserIds.has(m.id)}
-            reported={reportedIds.has(m.id)}
-            viewerIsHost={viewerIsHost}
-            myRenownLevel={myRenownLevel}
-            roomId={roomId}
-            socket={socket}
-            onSelectPlayer={onSelectPlayer}
-            onPeek={requestDetail}
-            peekLoading={Boolean(loading[m.id])}
-            peekSnapshot={detail[m.id] ?? null}
-          />
-        ))}
-        {members.length === 0 && (
-          <div className="text-center text-xs text-muted-foreground py-6">
-            No captains in this harbor yet.
+      {/* Folded, the panel is its head: the list and the notices under it
+          leave the column, and the height they held goes to the chat,
+          which is what the fold is for. One conditional around the pair
+          rather than one around each, because the notices ride under the
+          list as one unit. */}
+      {!collapsed && (
+        <>
+          <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">
+            {sorted.map((m) => (
+              <RosterRow
+                key={m.id}
+                member={m}
+                status={statuses[m.id]}
+                isMe={m.id === me.id}
+                isHost={m.id === hostId}
+                isMuted={mutedUserIds.has(m.id)}
+                reported={reportedIds.has(m.id)}
+                viewerIsHost={viewerIsHost}
+                myRenownLevel={myRenownLevel}
+                roomId={roomId}
+                socket={socket}
+                onSelectPlayer={onSelectPlayer}
+                onPeek={requestDetail}
+                peekLoading={Boolean(loading[m.id])}
+                peekSnapshot={detail[m.id] ?? null}
+              />
+            ))}
+            {members.length === 0 && (
+              <div className="text-center text-xs text-muted-foreground py-6">
+                No captains in this harbor yet.
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <SystemNotices notes={systemNotes} />
+          <SystemNotices notes={systemNotes} />
+        </>
+      )}
     </div>
   );
 }

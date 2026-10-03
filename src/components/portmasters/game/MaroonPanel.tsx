@@ -31,6 +31,7 @@ import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
 import { tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
+import { VoteCardShell } from "./VoteCardShell";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 
 type Maroon = ReturnType<typeof useMaroon>;
@@ -60,7 +61,10 @@ export function MaroonVoteCard({
   // reason the audit's is: a mode whose headline mechanic nobody has heard
   // of is a mechanic nobody uses. Before the rung it explains itself,
   // during it offers the vote, and once the vote has carried it says so
-  // rather than going quiet.
+  // rather than going quiet. The closed states wear one row rather than a
+  // card of prose (see VoteCardShell), the same fold the audit wears: what
+  // this board is for is the market, and the explanation is one chevron
+  // away rather than a screenful above it.
   const rung = modeConfig(game.mode).maroonFrom;
   if (rung === null || game.phase !== "parley") return null;
   const spent = maroon.result !== null;
@@ -75,15 +79,18 @@ export function MaroonVoteCard({
   const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
 
   return (
-    <div className="rounded-xl border border-alarm/25 bg-alarm/[0.04] p-4 mb-4">
-      <h3 className="text-center font-semibold mb-1 text-sm">🏝️ Maroon</h3>
-      {spent || !open ? (
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
-          {spent
-            ? "This voyage's maroon has been called. The harbor gets one."
-            : `From leg ${rung}, two thirds of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
-        </p>
-      ) : (
+    <VoteCardShell
+      tone="alarm"
+      icon="🏝️"
+      title="Maroon"
+      gist={
+        spent
+          ? "This voyage's maroon has been called. The harbor gets one."
+          : `From leg ${rung}: two thirds may put one captain ashore.`
+      }
+      live={open && !spent}
+    >
+      {open && !spent ? (
         <>
           <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
             Two thirds of the captains still sailing can put one captain ashore.
@@ -124,8 +131,12 @@ export function MaroonVoteCard({
             Two thirds of the captains still in the voyage carries it.
           </p>
         </>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground leading-relaxed">
+          {`From leg ${rung}, two thirds of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
+        </p>
       )}
-    </div>
+    </VoteCardShell>
   );
 }
 

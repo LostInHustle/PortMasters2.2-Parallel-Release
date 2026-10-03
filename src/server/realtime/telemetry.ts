@@ -262,6 +262,8 @@ export function noteLegReport(
     refitFeesEarned?: number;
     ragsRewoven?: number;
     coldLeg?: boolean;
+    modulesSold?: number;
+    moduleFeesEarned?: number;
     opportunistBorrows?: number;
     foodSpend?: number;
     bargeSpend?: number;
@@ -305,6 +307,14 @@ export function noteLegReport(
   const ragsRewoven = held(figures.ragsRewoven);
   const coldLeg =
     typeof figures.coldLeg === "boolean" ? figures.coldLeg : undefined;
+  // [F3: modules in the shipyard ladder, and trading them between captains]
+  // The market's two ride the same rule, and `held` reads both for the
+  // reason it reads the two markets above: a count of modules cannot be
+  // negative and a fee is Gold. The buyer's side is not here for the same
+  // reason the two markets' buyers are not: the plan asks what the market
+  // sold.
+  const modulesSold = held(figures.modulesSold);
+  const moduleFeesEarned = held(figures.moduleFeesEarned);
   // [D6: Free Captain: Opportunist] One count, and `held` is the right
   // reader for it for the reason it reads the escort's and the bench's: a
   // borrow is a count and cannot be negative. The tally is the voyage's
@@ -341,6 +351,8 @@ export function noteLegReport(
     ...(refitFeesEarned === undefined ? {} : { refitFeesEarned }),
     ...(ragsRewoven === undefined ? {} : { ragsRewoven }),
     ...(coldLeg === undefined ? {} : { coldLeg }),
+    ...(modulesSold === undefined ? {} : { modulesSold }),
+    ...(moduleFeesEarned === undefined ? {} : { moduleFeesEarned }),
     ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
     ...bargeFigures,
   });

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
 import {
   leavePhase,
+  moduleSlotsOpen,
   startModuleDrafting,
   upgradeShip,
 } from "@/lib/game/engine";
@@ -41,8 +42,12 @@ export function Shipyard({
     : 0;
   const affordable = game.money >= upgCost;
   const canDraft = game.shipLevel > 0;
-  const slotsFull =
-    game.equippedModules.length >= game.shipLevel && game.shipLevel > 0;
+  // The level guard rides along because a hull below its first upgrade has
+  // no slots to fill rather than full ones, and the label below says
+  // "Slots Full" only about a hull that has some. The open count itself is
+  // moduleSlotsOpen's answer, floored, so the label agrees with the draft
+  // screen for a hull a trade pushed one over its slots (see ./engine/core).
+  const slotsFull = canDraft && moduleSlotsOpen(game) === 0;
   return (
     <div className="max-w-2xl mx-auto">
       <PhaseHeading layout="text-center mb-4" tone="text-dusk" brush>

@@ -79,6 +79,7 @@ import { supplyBargeSuite } from "./suites/43-supplyBarge";
 import { tagVocabularySuite } from "./suites/44-tagVocabulary";
 import { readyCheckThatStallsSuite } from "./suites/45-theReadyCheckThatStalls";
 import { cardRecordSuite } from "./suites/46-cardRecord";
+import { moduleTradesSuite } from "./suites/47-moduleTrades";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -370,6 +371,11 @@ async function main(): Promise<void> {
     await escortContractSuite(run, { host });
     console.log("\nLoom: the refit");
     await loomTheRefitSuite(run, { host });
+    // The third consent kind runs beside the two before it for the reason
+    // it exists beside them in the tree: the market is made of the same
+    // primitive, and its harbor block reads the same way theirs do.
+    console.log("\nThe module trade");
+    await moduleTradesSuite(run, { host });
     console.log("\nAroma: the bazaar rumor");
     await aromaTheBazaarRumorSuite(run);
     console.log("\nFree Captain: the borrow");

@@ -56,6 +56,7 @@ import {
 import {
   bazaarRumorsOn,
   escortContractsOn,
+  moduleTradesOn,
   pathDraftOn,
   pathOrdersOn,
   splitHoldOn,
@@ -577,13 +578,13 @@ export async function launchGatesSuite(
   // The families below each check their own switch against the
   // environment, because that is the dial their slice of the plan
   // promised. What none of them can check is the rule that stands in
-  // front of all nine, because the rule is about them together: Classic
+  // front of all ten, because the rule is about them together: Classic
   // is the shipped release and no system this branch added may reach it,
   // whatever an operator exported into the process. A check written per
-  // family would be nine copies of one sentence, and the ninth is the one
+  // family would be ten copies of one sentence, and the tenth is the one
   // a later feature would forget.
   //
-  // So the nine are listed once, with the environment forced on rather
+  // So the ten are listed once, with the environment forced on rather
   // than left to whatever the runner exported, and every one of them has
   // to answer no in the shipped mode. The environment value is a real one
   // rather than undefined on purpose: a switch that answered no here
@@ -601,6 +602,7 @@ export async function launchGatesSuite(
         ["NEXT_PUBLIC_REFITS", refitsOn],
         ["NEXT_PUBLIC_BAZAAR", bazaarRumorsOn],
         ["NEXT_PUBLIC_PATH_DRAFT", pathDraftOn],
+        ["NEXT_PUBLIC_MODULE_TRADES", moduleTradesOn],
       ] as ReadonlyArray<[string, (mode: unknown) => boolean]>
     ).every(
       ([name, read]) =>

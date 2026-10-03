@@ -41,6 +41,7 @@ import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
 import { PathDraft } from "./game/PathDraft";
 import { PathChip } from "./game/status/PathChip";
+import { PanelHeader } from "./PanelHeader";
 import { HarborTopBar } from "./game/HarborTopBar";
 import { ShortcutLegend } from "./game/ShortcutLegend";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
@@ -65,8 +66,11 @@ import { MeritIcon } from "./shared";
 import { NotificationCenter } from "./NotificationCenter";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { MessageCircle, Ship, LifeBuoy } from "lucide-react";
+import { MessageCircle, Ship, LifeBuoy, Anchor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useColorPreference } from "@/lib/use-color-preference";
+import { usePanelPrefs } from "@/lib/use-panel-prefs";
 import { useSound } from "@/lib/use-sound";
 import { useRoomRoster } from "@/lib/use-room-roster";
 import { renownProgress } from "@/lib/game/legacy";
@@ -82,6 +86,30 @@ import {
 // Browser scoped: the onboarding guide is a "you have played this before"
 // signal, not per room state, so joining a second harbor does not replay it.
 const TUTORIAL_SEEN_KEY = "portmasters_tutorial_seen";
+
+// The four ways the room's three columns can stand: both rails open, either
+// folded to its stub, both folded. Each is a whole literal rather than a
+// string built from parts, so the class scan sees every template it has to
+// keep, and the grid lerps between them (the transition on the grid
+// itself). Both rails wear one clamp rather than a pair of near misses:
+// 19vw against 20vw made the captain's own readings the narrower of the
+// two panels it is read beside, at every window, for no reason a captain
+// could see.
+const RAIL_COLS = {
+  open: "lg:grid-cols-[clamp(232px,19vw,292px)_minmax(0,1fr)_clamp(232px,19vw,292px)]",
+  left: "lg:grid-cols-[52px_minmax(0,1fr)_clamp(232px,19vw,292px)]",
+  right: "lg:grid-cols-[clamp(232px,19vw,292px)_minmax(0,1fr)_52px]",
+  both: "lg:grid-cols-[52px_minmax(0,1fr)_52px]",
+} as const;
+
+// What either folded rail leaves standing: the narrow column of icons that
+// is the way back. One shell for the two of them, since the difference
+// between the stubs is which panels they lead back to rather than how they
+// stand. Wide layout only, the same reasoning as the chevrons that fold
+// them: below the breakpoint the rails are full width rows and there is no
+// parcel for a stub to hold.
+const RAIL_STUB =
+  "pm-glass hidden rounded-2xl p-1.5 flex-col items-center gap-1";
 
 // Why a Next Phase press was refused, in the words of the seat the captain is
 // standing in. Every case here is a seat the engine's canLeavePhase says no
@@ -163,19 +191,28 @@ export function GameRoom({
   // before declaration.
   const notifications = useNotificationCenter();
 
-  // The eight boards this room runs outside a save file, and the nine
+  // The nine boards this room runs outside a save file, and the ten
   // relays that close them into this captain's own voyage. They live in
   // one hook because they are one kind of thing: see ./use-harbor-boards
   // for the boards themselves and for what each relay is watching for.
-  const { barter, aid, backing, convoy, escort, refit, bazaar, draft } =
-    useHarborBoards({
-      socket,
-      roomId: room.id,
-      meId: me.id,
-      act,
-      loaded: state.loaded,
-      playSound,
-    });
+  const {
+    barter,
+    aid,
+    backing,
+    convoy,
+    escort,
+    refit,
+    modules,
+    bazaar,
+    draft,
+  } = useHarborBoards({
+    socket,
+    roomId: room.id,
+    meId: me.id,
+    act,
+    loaded: state.loaded,
+    playSound,
+  });
 
   // The cover the raid roll consults, mirrored from the board this captain
   // can see. The engine asks one field and never the network (see
@@ -599,6 +636,20 @@ export function GameRoom({
   // Which chat tab is showing, lifted out of the Tabs component itself so
   // a notification click can jump the user straight to the right one.
   const [chatTab, setChatTab] = useState<"room" | "dm">("room");
+  // Which of the room's foldable panels are folded away: the captain's
+  // rail, and inside the right rail the roster and the chat. The record
+  // is client scoped and persists across visits; see use-panel-prefs for
+  // why it is split into rail keys and widget keys.
+  const {
+    collapsed: panelCollapsed,
+    set: setPanelCollapsed,
+    toggle: togglePanel,
+  } = usePanelPrefs();
+  // The right rail is folded exactly when both of its panels are. Derived
+  // rather than stored: the two widget folds are the whole of the rail's
+  // state, and a stored fourth key could hold a rail that is empty and
+  // yet still standing, with nothing on screen able to have put it there.
+  const rightFolded = panelCollapsed.roster && panelCollapsed.chat;
 
   // Load the room's members on mount. The conversation is deliberately not
   // fetched with them: a session's chat is held in the server's memory and
@@ -987,21 +1038,57 @@ export function GameRoom({
             reads that way: what the boards inside the stage measure
             themselves against is the stage (see the container on it below),
             because a card is as wide as its column and not as wide as the
-            glass. */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-rows-1 lg:grid-cols-[clamp(216px,19vw,268px)_minmax(0,1fr)_clamp(228px,20vw,288px)] gap-3">
+            glass.
+
+            A folded rail leaves a stub rather than nothing (see RAIL_COLS
+            above): the stage takes the whole width, which is what a
+            captain folds a rail to get, and the way back stands at the
+            parcel the rail gave up. Open, folded, and every state between
+            two of the four templates, the stage keeps its seat in the
+            middle column. */}
+        <div
+          className={cn(
+            "flex-1 min-h-0 grid grid-cols-1 lg:grid-rows-1 gap-3 transition-[grid-template-columns] duration-200 motion-reduce:transition-none",
+            RAIL_COLS[
+              panelCollapsed.left
+                ? rightFolded
+                  ? "both"
+                  : "left"
+                : rightFolded
+                  ? "right"
+                  : "open"
+            ],
+          )}
+        >
           {/* Left: the captain's own rail. It takes the height of the row
               and scrolls inside itself, the same shape ./game/GameStatusPanel
               is built for: the numbers a captain checks constantly stay in
               one place while everything beside them moves.
 
-              What this captain sails as is the first line of it, above the
-              voyage header, because an identity is not a panel a captain
-              scrolls to: it dresses everything below it, and the stage it
-              used to sit in is the table's board rather than the captain's
-              own. The chip draws nothing at all in a harbor with the draft
-              switched off, so the rail still opens on the voyage header. */}
+              The head names the rail the way the roster and the chat name
+              themselves, and it holds the chevron that folds the rail to a
+              stub on the wide layout (see use-panel-prefs). What this
+              captain sails as is the first line of the readings, below the
+              head and above the voyage header, because an identity is not
+              a panel a captain scrolls to: it dresses everything below it,
+              and the stage it used to sit in is the table's board rather
+              than the captain's own. The chip draws nothing at all in a
+              harbor with the draft switched off, so the rail still opens
+              on the voyage header. */}
           <div className="order-2 lg:order-1 lg:min-h-0">
-            <div className="pm-glass h-full rounded-2xl p-3 lg:min-h-0 flex flex-col gap-2.5">
+            <div
+              className={cn(
+                "pm-glass h-full rounded-2xl p-3 flex flex-col gap-2.5",
+                panelCollapsed.left && "lg:hidden",
+              )}
+            >
+              <PanelHeader
+                icon={<Anchor className="h-3.5 w-3.5 text-harbor" />}
+                title="Captain"
+                collapsed={panelCollapsed.left}
+                onToggle={() => togglePanel("left")}
+                railLevel
+              />
               <PathChip
                 game={state.game}
                 error={draft.error}
@@ -1018,6 +1105,36 @@ export function GameRoom({
                   colorFor={colorFor}
                 />
               </div>
+            </div>
+            {/* The stub a folded rail leaves: the way back, and the one
+                reading a folded captain still checks, the leg they are on.
+                It exists only on the wide layout, because below the
+                breakpoint the rails are full width rows and a folded row
+                would have no stub to come back from. */}
+            <div
+              className={cn(
+                RAIL_STUB,
+                panelCollapsed.left ? "lg:flex" : "lg:hidden",
+              )}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-harbor"
+                aria-label="Open the captain panel"
+                title="Open the captain panel"
+                onClick={() => setPanelCollapsed("left", false)}
+              >
+                <Anchor className="h-4 w-4" />
+              </Button>
+              <span
+                className="pb-1 text-[11px] font-semibold tabular-nums text-muted-foreground"
+                title={`Leg ${state.game.currentRound}`}
+              >
+                {state.game.currentRound > 0
+                  ? `R${state.game.currentRound}`
+                  : "⚓"}
+              </span>
             </div>
           </div>
 
@@ -1051,6 +1168,7 @@ export function GameRoom({
                 waiting={phaseSync.waiting}
                 readyCount={phaseSync.readyCount}
                 requiredCount={phaseSync.requiredCount}
+                harborCount={members.length}
                 clock={phaseSync.phaseClock}
                 onStandingOrders={() => setStandingOpen(true)}
                 onCancelReady={phaseSync.cancelReady}
@@ -1078,6 +1196,7 @@ export function GameRoom({
                 backing={backing}
                 escort={escort}
                 refit={refit}
+                modules={modules}
                 bazaar={bazaar}
                 audit={audit}
                 maroon={maroon}
@@ -1130,15 +1249,34 @@ export function GameRoom({
               so the pair can follow the stage rather than opening with it.
 
               On a wide window this is the column a captain scrolls least and
-              reads most, so it holds still: the roster keeps a share of the
-              column and the chat takes the rest, and if the two together need
-              more room than the column has, the column scrolls rather than
-              either panel being cut off at the knee. Each panel still scrolls
-              inside itself, which is the behaviour the two of them were
-              always meant to have and the reason seeing them travel with the
-              page read as wrong. */}
+              reads most, so it holds still: the roster and the chat split
+              the column's height two to three, and the split is a ratio
+              rather than a pair of sizes, so it holds at every window. It
+              used to be a share of the column for the roster, capped at
+              320px, which is not a share: the cap pulled the pair to 34/66
+              at one window and 32/68 at another, and two panels closely
+              related enough to be balanced should be balanced the same way
+              at every height. Each panel still scrolls inside itself, and if
+              the two together need more room than the column has, the column
+              scrolls rather than either panel being cut off at the knee.
+
+              Either panel folds to its own head (see PanelHeader), and the
+              fold is why the split is flex rather than fixed: the roster
+              folded hands its two fifths to the chat, the chat folded hands
+              its three fifths to the roster, and the column is fully used
+              however many panels are open. Folding both folds the rail
+              itself (see rightFolded above): the column gives way to a stub
+              holding the two icons, one press each, so the way in names the
+              panel it leads to. */}
           <div className="order-3 min-w-0 flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
-            <div className="h-[320px] shrink-0 lg:h-[26vh] lg:min-h-[150px] lg:max-h-[320px]">
+            <div
+              className={cn(
+                panelCollapsed.roster
+                  ? "h-auto"
+                  : "h-[320px] lg:h-auto lg:flex-[2] lg:min-h-[150px]",
+                rightFolded && "lg:hidden",
+              )}
+            >
               <MembersPanel
                 socket={socket}
                 roomId={room.id}
@@ -1147,25 +1285,44 @@ export function GameRoom({
                 hostId={hostId}
                 onSelectPlayer={handleSelectPlayer}
                 myRenownLevel={myRenownLevel}
+                collapsed={panelCollapsed.roster}
+                onToggleCollapse={() => togglePanel("roster")}
               />
             </div>
-            <div className="pm-glass rounded-2xl overflow-hidden flex flex-col h-[380px] lg:h-auto lg:flex-1 lg:min-h-[260px]">
+            <div
+              className={cn(
+                "pm-glass rounded-2xl overflow-hidden flex flex-col",
+                panelCollapsed.chat
+                  ? "h-auto"
+                  : "h-[380px] lg:h-auto lg:flex-[3] lg:min-h-[240px]",
+                rightFolded && "lg:hidden",
+              )}
+            >
               <Tabs
                 value={chatTab}
                 onValueChange={(v) => setChatTab(v as "room" | "dm")}
                 className="flex flex-col h-full"
               >
-                {/* The panel names itself. The tabs below say which channel
-                    is open, and without a head above them the harbor chat
-                    was only ever legible as a tab label rather than as a
+                {/* The panel names itself, and the head is the shared one
+                    the roster and the captain's rail wear: the title
+                    follows the open channel, and the chevron folds the
+                    panel to this row. The tabs below say which channel is
+                    open; without a head above them the harbor chat was
+                    only ever legible as a tab label rather than as a
                     widget a captain could look for. */}
-                <div className="flex items-center gap-2 px-3 pt-3">
-                  <MessageCircle className="h-3.5 w-3.5 text-chat" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-chat">
-                    {chatTab === "room" ? "Harbor chat" : "Direct messages"}
-                  </span>
-                </div>
-                <TabsList className="grid grid-cols-2 m-2 mb-0">
+                <PanelHeader
+                  className="px-3 pt-3"
+                  icon={<MessageCircle className="h-3.5 w-3.5 text-chat" />}
+                  title={chatTab === "room" ? "Harbor chat" : "Direct messages"}
+                  collapsed={panelCollapsed.chat}
+                  onToggle={() => togglePanel("chat")}
+                />
+                <TabsList
+                  className={cn(
+                    "grid grid-cols-2 m-2 mb-0",
+                    panelCollapsed.chat && "hidden",
+                  )}
+                >
                   <TabsTrigger value="room">
                     <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> Harbor
                   </TabsTrigger>
@@ -1183,7 +1340,10 @@ export function GameRoom({
                 <TabsContent
                   value="room"
                   forceMount
-                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                  className={cn(
+                    "flex-1 min-h-0 mt-0 data-[state=inactive]:hidden",
+                    panelCollapsed.chat && "hidden",
+                  )}
                 >
                   <ChatPanel
                     socket={socket}
@@ -1198,7 +1358,10 @@ export function GameRoom({
                 <TabsContent
                   value="dm"
                   forceMount
-                  className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden"
+                  className={cn(
+                    "flex-1 min-h-0 mt-0 data-[state=inactive]:hidden",
+                    panelCollapsed.chat && "hidden",
+                  )}
                 >
                   <DmTab
                     socket={socket}
@@ -1215,6 +1378,33 @@ export function GameRoom({
                   />
                 </TabsContent>
               </Tabs>
+            </div>
+            {/* The stub a folded rail leaves, the way back shaped like
+                what it leads to: one press each, and the press opens the
+                named panel, which is also what reopens the rail. */}
+            <div
+              className={cn(RAIL_STUB, rightFolded ? "lg:flex" : "lg:hidden")}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-members"
+                aria-label="Open the Harbor Roster"
+                title="Open the Harbor Roster"
+                onClick={() => setPanelCollapsed("roster", false)}
+              >
+                <Ship className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-chat"
+                aria-label="Open the chat"
+                title="Open the chat"
+                onClick={() => setPanelCollapsed("chat", false)}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>

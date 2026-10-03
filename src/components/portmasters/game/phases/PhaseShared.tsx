@@ -7,6 +7,7 @@ import type { usePhaseSync } from "@/lib/use-phase-sync";
 import type { useBarter } from "@/lib/use-barter";
 import type { useEscortContracts } from "@/lib/use-escort-contracts";
 import type { useRefitContracts } from "@/lib/use-refit-contracts";
+import type { useModuleTrades } from "@/lib/use-module-trades";
 import type { useBazaarRumors } from "@/lib/use-bazaar-rumors";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
@@ -32,6 +33,12 @@ export type Escort = ReturnType<typeof useEscortContracts>;
 // layer: the escort's market is a whole phase screen's, and this one is a
 // station of the Market.
 export type Refit = ReturnType<typeof useRefitContracts>;
+// [F3: modules in the shipyard ladder, and trading them between captains]
+// The module market's board, threaded the same way and for the same reason.
+// Exported because the Parley screen's market panel takes it as its own
+// prop, which is where this one sits: the market the plan puts at the
+// table, beside the exchange, the protection market and the rumor desk.
+export type ModuleTrades = ReturnType<typeof useModuleTrades>;
 // [D5: Aroma: the Bazaar Rumor] The bazaar's board, threaded the same way
 // and for the same reason. Exported because the Parley screen's desk panel
 // takes it as its own prop, which is where this one sits: the market the
@@ -64,6 +71,14 @@ export type PhasePanelProps = {
   // what the bench is for, and a build with the switch off draws nothing at
   // all of it.
   refit: Refit;
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The market a captain lists a hull's module from, opened at
+  // the Parley table beside the protection market. Threaded like the two
+  // markets above and drawn in the same circumstances: a captain with an
+  // empty hull still reads the board, because buying a module is what the
+  // market is for, and a build with the switch off draws nothing at all
+  // of it.
+  modules: ModuleTrades;
   // [D5: Aroma: the Bazaar Rumor] The desk an Aroma captain speaks from at
   // the Parley table, and the board the whole fleet reads there. Threaded
   // like the two markets above and drawn in the same circumstances: a

@@ -32,6 +32,7 @@ import { maybeConcludeVoyage } from "../conclusion";
 import { escortContracts } from "../contracts";
 import { sockets } from "../presence";
 import { refitContracts } from "../refits";
+import { moduleTrades } from "../module-trades";
 import { rememberStatus } from "../status";
 import { combinedReputation, hasSurged, markSurged } from "../surge";
 import { noteLegAdvanced, noteTelemetry } from "../telemetry";
@@ -332,6 +333,17 @@ function sweepLegBoards(io: Server, roomId: string, cp: Checkpoint): void {
   // are on the rows (see expireConsent), so the sweep only has to
   // hand the board the checkpoint it is standing at.
   refitContracts.sweep(io, roomId, {
+    phase: cp.phase,
+    round: cp.round,
+  });
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The module market's sweep, which is the escort's rule read
+  // at the same phase: a listing dies with the Parley it was posted in,
+  // and an agreed trade lives the leg it was agreed for, since the two
+  // clients settle it within a tick of the accept. Both facts are on the
+  // rows (see expireConsent), so the sweep only has to hand the board the
+  // checkpoint it is standing at.
+  moduleTrades.sweep(io, roomId, {
     phase: cp.phase,
     round: cp.round,
   });

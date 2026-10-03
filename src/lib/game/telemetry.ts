@@ -191,6 +191,23 @@ export interface TelemetryPayloads {
     refitFeesEarned?: number;
     ragsRewoven?: number;
     coldLeg?: boolean;
+    // [F3: modules in the shipyard ladder, and trading them between
+    // captains] The market's own two, on the escort's rule: how many modules
+    // this captain sold this leg, and the fees those collected. The plan's
+    // evaluation of this feature is "module trade volume between captains",
+    // and the first figure is that volume read at the seller's end; the
+    // second is what the volume was worth, which is the number the report
+    // script's equipped against traded table cannot show on its own (see
+    // readModuleTraffic). They ride together and are absent together on a
+    // leg sailed with the switch off, exactly as the two markets above them
+    // do, so a reader summing a voyage's takings never has to guess whether
+    // a zero was a quiet leg or a build without the market.
+    //
+    // The buyer's side is deliberately not recorded, for the reason both
+    // markets above give: the plan asks what the market sold, and one
+    // captain is on the other side of the number.
+    modulesSold?: number;
+    moduleFeesEarned?: number;
     // [D6: Free Captain: Opportunist] The plan's evaluation of this feature
     // is usage rate first, and then the harder question of how often the
     // borrow lands on the order that would have been the best fit for an

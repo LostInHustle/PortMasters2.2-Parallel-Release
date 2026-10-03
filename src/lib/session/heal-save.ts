@@ -23,6 +23,7 @@ import {
   normalizeBargeState,
   normalizeConsentLedger,
   normalizeEscortState,
+  normalizeModuleTradeState,
   normalizeOpportunistBorrows,
   normalizeRefitState,
   normalizeRumorLean,
@@ -328,6 +329,14 @@ function healConsentBoards(game: GameState): void {
   );
   normalizeEscortState(game);
   normalizeRefitState(game);
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The trade's own tally and its per module ledger. Same
+  // heal as the two kinds above and for the same reason on the
+  // counters; the per module record is the one a stale save cannot
+  // carry at all, so its reader answers an empty ledger rather than
+  // undefined and the first sale writes the first entry (see
+  // normalizeModuleTradeState).
+  normalizeModuleTradeState(game);
 }
 
 // The answers that come from outside the save, applied last so that they

@@ -3,7 +3,7 @@
 // =====================================================================
 // The harbor's boards, as this captain's client holds them.
 //
-// Eight boards and the nine relays that close them, and what makes them
+// Nine boards and the ten relays that close them, and what makes them
 // one module is what they have in common: none of them lives in a save
 // file. Each is real room wide state that no single client's
 // deterministic engine can compute on its own, so each arrives over the
@@ -14,11 +14,11 @@
 //
 // The relays above each board are the whole vocabulary it has: a trade
 // closed, a loan granted or repaid, a backer covering a shortfall, a
-// venture settled, a contract or a refit this captain is a side of, and
-// the two frames the draft writes to their own save. Each one figures
-// out which side of the event this captain is on and then runs the
-// matching engine function, which is what keeps a board a relay rather
-// than a second engine.
+// venture settled, a contract, a refit or a module trade this captain is
+// a side of, and the two frames the draft writes to their own save. Each
+// one figures out which side of the event this captain is on and then
+// runs the matching engine function, which is what keeps a board a relay
+// rather than a second engine.
 // =====================================================================
 
 import { useCallback, useEffect, useRef } from "react";
@@ -48,11 +48,13 @@ import {
   type EscortContract,
 } from "./use-escort-contracts";
 import { useRefitContracts, type RefitContract } from "./use-refit-contracts";
+import { useModuleTrades, type ModuleTrade } from "./use-module-trades";
 import { useBazaarRumors } from "./use-bazaar-rumors";
 import { usePathDraft } from "./use-path-draft";
 import {
   acceptBarterOffer,
   applyEscortSide,
+  applyModuleTradeSide,
   applyRefitSide,
   clearRedirectedLoan,
   contributeToVenture,
@@ -341,6 +343,31 @@ export function useHarborBoards({
   );
   const refit = useRefitContracts(socket, roomId, meId, onRefitSettle);
 
+  // [F3: modules in the shipyard ladder, and trading them between captains]
+  // The market's relay, which is the bench's shape exactly: a trade this
+  // captain is a side of has been agreed, and the engine works out what
+  // that means for them (see applyModuleTradeSide). The buyer pays and
+  // bolts the module on, the seller's hull gives it up and unwinds what it
+  // carried, and both of those land on the two captains' own machines and
+  // nobody else's. No third captain is touched.
+  //
+  // There is nothing to mirror into GameState afterwards, for the bench's
+  // reason: a module trade's whole result is the fee and the hull, and the
+  // hull is already this captain's own state. The one thing this relay
+  // carries that the two above it do not is a durable object changing
+  // hands, which is why its engine side is written the way the plan asked
+  // it to be: the seller's side unequips automatically rather than
+  // refusing, so an agreed trade always completes.
+  const onModuleSettle = useCallback(
+    (trade: ModuleTrade) => {
+      act((g, l) => {
+        applyModuleTradeSide(g, trade, meId, l);
+      });
+    },
+    [act, meId],
+  );
+  const modules = useModuleTrades(socket, roomId, meId, onModuleSettle);
+
   // [D5: Aroma: the Bazaar Rumor] The bazaar's relay, and it is the
   // shortest of the three because nothing about a rumor moves anything
   // between captains. There is no settle report to give and no field on
@@ -364,5 +391,15 @@ export function useHarborBoards({
   // which is the same shape useMaroon's result hand-out takes.
   const draft = usePathDraft(socket, roomId, meId, act);
 
-  return { barter, aid, backing, convoy, escort, refit, bazaar, draft };
+  return {
+    barter,
+    aid,
+    backing,
+    convoy,
+    escort,
+    refit,
+    modules,
+    bazaar,
+    draft,
+  };
 }

@@ -71,6 +71,14 @@ export type LegReport = {
   refitFeesEarned?: number;
   ragsRewoven?: number;
   coldLeg?: boolean;
+  // [F3: modules in the shipyard ladder, and trading them between captains]
+  // The market's own two figures, sent only when the switch that gives them
+  // meaning is on, exactly as the two blocks above are sent: a leg sailed
+  // without the market reports no market rather than a market of zeroes.
+  // The first is the plan's "module trade volume between captains" read at
+  // the seller's end, and the second is what the volume was worth.
+  modulesSold?: number;
+  moduleFeesEarned?: number;
   // [D6: Free Captain: Opportunist] How many borrows this voyage has spent,
   // sent only when the switch that gives the ability meaning is on, exactly
   // as the three blocks above are sent. It is a count of the once a voyage

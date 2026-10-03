@@ -17,6 +17,7 @@ import {
   getHireCost,
   getIntelCost,
   lockedBehind,
+  moduleSlotsOpen,
 } from "@/lib/game/engine";
 import { WORKER_TYPES } from "@/lib/game/constants/crew";
 import { RECIPES } from "@/lib/game/constants/goods";
@@ -501,7 +502,7 @@ function analyzeShipyard(game: GameState): Suggestion | null {
   }
 
   // If ship has empty slots, recommend drafting a module
-  if (game.shipLevel > 0 && game.equippedModules.length < game.shipLevel) {
+  if (game.shipLevel > 0 && moduleSlotsOpen(game) > 0) {
     return {
       icon: "🔧",
       title: "Draft and install a module",

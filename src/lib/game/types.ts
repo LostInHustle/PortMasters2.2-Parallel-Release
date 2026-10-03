@@ -685,6 +685,32 @@ export type GameState = {
   ragsRewoven: number;
   ragsTaken: number;
   ragsRound: number;
+  // [F3: modules in the shipyard ladder, and trading them between captains]
+  // The voyage's module trade tally, seller side and buyer side, and the
+  // per module ledger the plan's second reading is taken from.
+  //
+  // The four counters are the escort's and the bench's shape, one captain's
+  // own record of their own side of every trade they settled: what left
+  // their hull and what it earned, and what joined their hull and what it
+  // cost. The leg report carries the seller's two, because "module trade
+  // volume between captains" is a number about sales, and a buyer is on the
+  // other side of the same trade.
+  //
+  // `modulesTraded` is the one field here with no sibling in either market,
+  // and it is what makes the plan's second reading ("track which modules
+  // are equipped against which are traded away, since a module that is
+  // always equipped is a tax rather than a choice") a report rather than a
+  // guess: the equipped half of the comparison is already in every save as
+  // the hull itself, and this is the other half, keyed by module card id and
+  // counting the times this captain sold each one. It is a voyage record
+  // rather than a leg's, because a module that moves once a voyage and one
+  // that moves every leg are different readings and only the total tells
+  // them apart.
+  modulesSold: number;
+  modulesBought: number;
+  moduleFeesEarned: number;
+  moduleFeesPaid: number;
+  modulesTraded: Record<string, number>;
   // [E1: the Supply Barge] The vendor's per leg tally, and the voyage's
   // two food counters. The tally is the shape the harbor's pile uses and
   // reads the same way: the leg the captain last bought in and how many
@@ -1015,6 +1041,16 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     ragsRewoven: 0,
     ragsTaken: 0,
     ragsRound: 0,
+    // [F3: modules in the shipyard ladder, and trading them between
+    // captains] A voyage leaves the pier having traded no module in either
+    // direction and with nothing sold of anything, which is a save that
+    // reads back as a captain who has never moved a module rather than as
+    // one whose ledger the heal had to rescue.
+    modulesSold: 0,
+    modulesBought: 0,
+    moduleFeesEarned: 0,
+    moduleFeesPaid: 0,
+    modulesTraded: {},
     // [E1: the Supply Barge] A voyage leaves the pier having bought
     // nothing from the vendor and with the leg stamp at zero, which is a
     // leg no voyage has: the first leg after departure is one the vendor

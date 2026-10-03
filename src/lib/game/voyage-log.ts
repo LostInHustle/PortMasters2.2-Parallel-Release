@@ -25,6 +25,7 @@
 // cannot read one way on one screen and another way on the next.
 // =====================================================================
 
+import { cardName } from "./cards";
 import { pathConfig, type PathId } from "./paths";
 import { phaseFace } from "./phases";
 import type { Phase } from "./types";
@@ -52,6 +53,8 @@ export type VoyageLogKind =
   | "contract_claimed"
   | "refit_posted"
   | "refit_agreed"
+  | "module_posted"
+  | "module_sold"
   | "rumor_published"
   | "path_taken"
   | "path_switched";
@@ -126,6 +129,30 @@ export type VoyageLogFacts =
       captain: string;
       taker: string;
       good: string;
+      fee: number;
+    }
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The market's two lines, the same pair a refit writes and for
+  // the same reason: a trade that is finished when the buyer takes it has
+  // no third line to write. Both carry the module the way the two lines
+  // above carry the garment, because the term is what is being agreed and
+  // it is the same fact for an open listing and a direct one; neither
+  // carries the buyer on the posted line, for the reason the escort's own
+  // note gives, and both carry the fee, because a price agreed in the open
+  // is the room's business.
+  //
+  // The module is carried as its card id rather than its name, and the
+  // writer below resolves it through the card pool, which is the same
+  // reading the path lines take of pathConfig: the id is what the engine
+  // and the board hold, the name is what a sentence says, and the one
+  // resolver between them keeps a line and a chip saying the same words
+  // about the same module.
+  | { kind: "module_posted"; captain: string; module: string; fee: number }
+  | {
+      kind: "module_sold";
+      captain: string;
+      taker: string;
+      module: string;
       fee: number;
     }
   // [D5: Aroma: the Bazaar Rumor] The bazaar's one line, and the one line
@@ -222,6 +249,10 @@ export function voyageLogLine(facts: VoyageLogFacts): string {
       return `${facts.captain} offers to put a ${facts.good} right for ${facts.fee} Gold.`;
     case "refit_agreed":
       return `${facts.taker} pays ${facts.captain} ${facts.fee} Gold to put the ${facts.good} right.`;
+    case "module_posted":
+      return `${facts.captain} offers ${cardName(facts.module)} for ${facts.fee} Gold.`;
+    case "module_sold":
+      return `${facts.taker} buys ${cardName(facts.module)} from ${facts.captain} for ${facts.fee} Gold.`;
     case "rumor_published":
       return `${facts.captain} publishes a rumor about ${facts.good} at the bazaar.`;
     case "path_taken":
@@ -281,6 +312,8 @@ export const VOYAGE_LOG_KINDS: readonly VoyageLogKind[] = [
   "contract_claimed",
   "refit_posted",
   "refit_agreed",
+  "module_posted",
+  "module_sold",
   "rumor_published",
   "path_taken",
   "path_switched",

@@ -3,14 +3,15 @@
 //
 // The harbor's boards and the asks that sit on them.
 //
-// Five shapes for one idea, a thing posted for the room to answer: goods
-// wanted in trade, Gold asked for as a loan, and the three markets the server
-// personalizes before it sends, so a board is what one captain may see rather
-// than what the room holds.
+// Six shapes for one idea, a thing posted for the room to answer: goods
+// wanted in trade, Gold asked for as a loan, and the four markets the server
+// personalizes before it sends, so a board is what one captain may see
+// rather than what the room holds.
 // =====================================================================
 
 import type {
   EscortContract,
+  ModuleTrade,
   PublicRumor,
   RefitContract,
 } from "@/lib/game/engine";
@@ -119,4 +120,21 @@ export type RefitBoard = {
 export type BazaarBoard = {
   roomId: string;
   rumors: PublicRumor[];
+};
+
+// [F3: modules in the shipyard ladder, and trading them between captains]
+// The module market's board, as one captain receives it.
+//
+// The fourth personalized market and the sixth shape, and it keeps the
+// rule the other three state: the row type is the game layer's (see
+// ModuleTrade in @/lib/game/engine/modules) rather than a second copy
+// declared here, so a trade this client applies to a hull and a trade the
+// server sent it are one shape. Nothing about this kind widens the board:
+// the term it carries is a card id, which is a string like the two terms
+// before it, and the privacy it needs is the primitive's own rather than
+// a field only it carries, which is the difference between this board and
+// the bazaar's above.
+export type ModuleTradeBoard = {
+  roomId: string;
+  moduleTrades: ModuleTrade[];
 };

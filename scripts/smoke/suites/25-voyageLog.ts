@@ -98,6 +98,23 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       good: "Linen Clothes",
       fee: 12,
     },
+    // [F3: modules in the shipyard ladder, and trading them between
+    // captains] The market's pair, and the rows carry the module as its
+    // card id rather than its name: the writer resolves it through the
+    // pool, which is what the lines below are here to hold.
+    module_posted: {
+      kind: "module_posted",
+      captain: "Smoke logger1",
+      module: "bulk_hauler",
+      fee: 12,
+    },
+    module_sold: {
+      kind: "module_sold",
+      captain: "Smoke logger1",
+      taker: "Smoke logger2",
+      module: "bulk_hauler",
+      fee: 12,
+    },
     // [D5: Aroma: the Bazaar Rumor] The one fact this table carries that
     // is deliberately incomplete, and the line below says the same: the
     // captain and the good, with no direction, because the log is public
@@ -142,6 +159,9 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       "Smoke logger1 offers to put a Linen Clothes right for 12 Gold.",
     refit_agreed:
       "Smoke logger2 pays Smoke logger1 12 Gold to put the Linen Clothes right.",
+    module_posted: "Smoke logger1 offers Bulk Hauler Rigging for 12 Gold.",
+    module_sold:
+      "Smoke logger2 buys Bulk Hauler Rigging from Smoke logger1 for 12 Gold.",
     rumor_published:
       "Smoke logger1 publishes a rumor about Silk at the bazaar.",
     path_taken: "Smoke logger1 takes up the Loom path.",

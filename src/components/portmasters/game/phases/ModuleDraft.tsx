@@ -5,6 +5,7 @@ import { cardText } from "@/lib/game/cards";
 import {
   cancelModuleDraft,
   handleModuleSelect,
+  moduleSlotsOpen,
   swapModuleChoices,
 } from "@/lib/game/engine";
 import {
@@ -61,9 +62,7 @@ export function ModuleDraft({
                   name={text.name}
                   desc={text.desc}
                   actionLabel={
-                    game.equippedModules.length < game.shipLevel
-                      ? "✅ Install"
-                      : "🔄 Swap"
+                    moduleSlotsOpen(game) > 0 ? "✅ Install" : "🔄 Swap"
                   }
                   actionClassName="pm-grad-module-draft"
                   onSelect={() => act((g, l) => handleModuleSelect(g, i, l))}

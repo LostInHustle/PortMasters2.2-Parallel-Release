@@ -46,6 +46,7 @@ import {
 } from "./barter";
 import { escortContracts } from "./contracts";
 import { refitContracts } from "./refits";
+import { moduleTrades } from "./module-trades";
 import { clearBazaarSilent } from "./bazaar";
 import { removeUserAidRequest, clearAidSilent } from "./aid";
 import { hydrateLoans, clearLoansSilent } from "./loans";
@@ -83,6 +84,7 @@ import { wireVentures } from "./wiring/ventures";
 import { wireBarter } from "./wiring/barter";
 import { wireEscortContracts } from "./wiring/escort-contracts";
 import { wireRefits } from "./wiring/refits";
+import { wireModuleTrades } from "./wiring/module-trades";
 import { wireBazaar } from "./wiring/bazaar";
 import { wirePathDraft } from "./wiring/path-draft";
 import { wireVoyageLog } from "./wiring/voyage-log";
@@ -121,6 +123,11 @@ function clearRoomAllMaps(roomId: string): void {
   clearBarterSilent(roomId);
   escortContracts.clearSilent(roomId);
   refitContracts.clearSilent(roomId);
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] And the module market's rows, silent for the reason the two
+  // boards above are: the room row is already gone, so there is nobody
+  // left in a channel to broadcast an empty board to.
+  moduleTrades.clearSilent(roomId);
   // [D5: Aroma: the Bazaar Rumor] The bazaar's rows, which belong to the
   // voyage that ended with the room. Silent like the two boards above it,
   // because the room row is already gone and there is nobody left in the
@@ -162,15 +169,16 @@ function clearRoomAllMaps(roomId: string): void {
   dropVoyageTelemetry(roomId);
 }
 
-// [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] What a departure
-// takes off the room's two consent boards, in one callback because a
-// departure is one event rather than two.
+// [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] [F3: modules in
+// the shipyard ladder, and trading them between captains] What a departure
+// takes off the room's three consent boards, in one callback because a
+// departure is one event rather than three.
 //
-// It lives here rather than in either board module because a board module
-// knows one kind, and this is the only place that knows both: the rule it
-// applies is the factory's (see removeUser in ./consent, which is where the
-// two conditions and the reason for each are written), and what is left for
-// this function to say is which boards the room is holding.
+// It lives here rather than in any board module because a board module
+// knows one kind, and this is the only place that knows all three: the rule
+// it applies is the factory's (see removeUser in ./consent, which is where
+// the two conditions and the reason for each are written), and what is left
+// for this function to say is which boards the room is holding.
 function removeUserConsentBoards(
   io: Server,
   roomId: string,
@@ -178,6 +186,7 @@ function removeUserConsentBoards(
 ): void {
   escortContracts.removeUser(io, roomId, userId);
   refitContracts.removeUser(io, roomId, userId);
+  moduleTrades.removeUser(io, roomId, userId);
 }
 
 // Builds the cleanup callbacks scheduleDeparture needs. Defined once
@@ -259,7 +268,33 @@ export function attachRealtime(httpServer: HttpServer): Server {
     guardInbound(socket);
 
     // Auto authenticate from the handshake cookie (sent with credentials).
-    void authenticate(socket, io);
+    // The attempt is kept rather than dropped for the hold below, and it is
+    // caught here so a connection that never sends another frame cannot
+    // leave the rejection of a failed lookup unhandled. A thrown attempt
+    // reads as no answer at all: the frames the hold was waiting with are
+    // released and refused by their own handlers, which is the same outcome
+    // the throw produced before the hold existed.
+    const authAttempt = authenticate(socket, io).catch(() => null);
+
+    // Frames that arrive before this connection's own authentication has
+    // been answered wait for it rather than run against it. A captain whose
+    // tab reloads emits the frames its screens ask for the moment their
+    // socket connects, which can beat the handshake lookup to the table,
+    // and every one of those frames would then be refused by requireAuth
+    // with "Authenticate first": a string the client cannot tell apart
+    // from a refused credential, so its session lost path takes the whole
+    // screen down for a reload that merely arrived early. The refusals
+    // stay where they are (see requireAuth in ./auth) and the suites that
+    // drive them with raw sockets keep meeting them; the hold is the
+    // ordering rule the rest of this file already assumes, that nothing
+    // but the auth frame itself is handled before the connection has an
+    // identity. Measured on the isolated copy: with the hold out, a reload
+    // after a save loses the race outright and the harbor falls back to
+    // the sign in screen.
+    socket.use(async ([event], next) => {
+      if (event !== "auth") await authAttempt;
+      next();
+    });
 
     socket.on("auth", async (payload: { token?: string } | undefined) => {
       await authenticate(socket, io, payload?.token);
@@ -283,6 +318,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     wireBarter(io, socket);
     wireEscortContracts(io, socket);
     wireRefits(io, socket);
+    wireModuleTrades(io, socket);
     wireBazaar(io, socket);
     wirePathDraft(io, socket);
     wireVoyageLog(socket);
