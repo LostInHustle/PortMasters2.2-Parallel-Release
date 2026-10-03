@@ -37,16 +37,19 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 | Command                     | What it does                                                                                        |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |
 | `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                   |
-| `npm run build`             | Generates the database client and produces a production build                                       |
+| `npm run build`             | Generates the database client, runs the tag and card checks, then produces a build                  |
 | `npm start`                 | Runs the production build on port 8080                                                              |
 | `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                |
 | `npm run lint`              | Runs ESLint across the project                                                                      |
 | `npm run test:smoke`        | Drives a real voyage through a running server and checks it arrived                                 |
 | `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw colour class slipped in |
 | `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one           |
+| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                    |
+| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                   |
 | `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file          |
 | `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size             |
 | `npm run report:gates`      | Prints the plan's sixteen launch gates over the last three hundred voyages, with the ship decision  |
+| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                     |
 | `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                            |
 | `npm run db:generate`       | Regenerates the database client after a schema change                                               |
 | `npm run db:migrate`        | Creates a versioned migration instead of pushing straight to the file                               |

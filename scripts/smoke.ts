@@ -37,7 +37,12 @@ import {
 } from "@/types/realtime/moderation";
 import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { DraftView, PathSwitched } from "@/types/realtime/draft";
-import { BazaarBoard, EscortBoard, RefitBoard } from "@/types/realtime/boards";
+import {
+  BazaarBoard,
+  EscortBoard,
+  ModuleTradeBoard,
+  RefitBoard,
+} from "@/types/realtime/boards";
 import { AuditReveal } from "@/types/realtime/audit";
 import { PORTS_TIER2 } from "@/lib/game/constants/world";
 import { tipsText } from "@/lib/game/constants/tips";
@@ -90,7 +95,6 @@ import {
   RESOURCES,
   RESOURCES_TIER0,
   RESOURCES_TIER1,
-  SILK_GOODS,
   STARTING_STOCK,
 } from "@/lib/game/constants/goods";
 import {
@@ -106,7 +110,53 @@ import {
   REWEAVE_GOOD,
   REWEAVE_RAGS,
 } from "@/lib/game/constants/garments";
-import { BOONS, MODULES } from "@/lib/game/constants/drafts";
+import { BOONS, CARDS_PER_OFFER, MODULES } from "@/lib/game/constants/drafts";
+import {
+  CARD_KINDS,
+  CARD_TRIGGER,
+  LANGUAGES,
+  MODE_POWER_CEILING,
+  SHIPPED_LANGUAGE,
+  type CardCondition,
+  type CardRecord,
+  type CardTrigger,
+} from "@/lib/game/constants/cards";
+import {
+  CARD_CONVERSION_FLOOR,
+  CARDS,
+  cardByFlag,
+  cardById,
+  cardLead,
+  cardName,
+  cardText,
+  cardWeight,
+  cardsOfKind,
+  cargoCarriesTag,
+  carriesTag,
+  conditionWeight,
+  drawOffer,
+  goodsCarryingTag,
+  holdOfTag,
+  normalizeCardTally,
+  noteCardOffer,
+  noteCardPick,
+  offerPool,
+  pathLean,
+  readCardConversion,
+  shippedCards,
+  validateCards,
+  type CardSubject,
+  type CardTally,
+} from "@/lib/game/cards";
+// [F2: the card record, and the mode weighting field] The record's own
+// block, imported beside the drafts it is made of: the pool, its readers,
+// the shipyard's deal, and the load pass that heals the tally back. The
+// boon deal and the pick are both already here, the deal from the barrel's
+// alphabetical run and the pick from the module that owns the draft rather
+// than from the barrel, the way the spine reaches it.
+import { startModuleDrafting } from "@/lib/game/engine";
+import { selectBoon } from "@/lib/game/engine/boons";
+import { healLoadedVoyage } from "@/lib/session/heal-save";
 import {
   CREW_LOSS_AFTER_HUNGRY_LEGS,
   CREW_NAMES,
@@ -187,6 +237,7 @@ import {
   unlockLineFor,
 } from "@/lib/unlock";
 import {
+  checkpointRank,
   closesRound,
   isGatedPhase,
   lapPhases,
@@ -200,6 +251,7 @@ import {
   isLegPhase,
   normalizePhase,
   phaseFace,
+  seatOf,
 } from "@/lib/game/phases";
 import {
   MAROON_SHARE,
@@ -304,6 +356,7 @@ import {
 import {
   bazaarRumorsOn,
   escortContractsOn,
+  moduleTradesOn,
   pathDraftOn,
   pathOrdersOn,
   splitHoldOn,
@@ -319,6 +372,7 @@ import {
   autoCommit,
   calcTransportCost,
   canFillOrder,
+  canLeavePhase,
   canSellEscort,
   completeOrder,
   consentFeeFor,
@@ -331,6 +385,7 @@ import {
   failSeat,
   handleModuleSelect,
   hireWorker,
+  leavePhase,
   lockedBehind,
   maroonSeat,
   nextPhase,
@@ -457,6 +512,23 @@ import {
   REFIT_SELLER_PATH,
   type RefitContract,
 } from "@/lib/game/engine";
+// [F3: modules in the shipyard ladder, and trading them between captains]
+// The market's own block, imported beside the two consent kinds before it
+// for the reason that block gives: the three markets are made of the same
+// primitive, and the checks below are about what only this kind says. The
+// primitive's rules are above, with the escort's and the bench's.
+import {
+  applyModuleTradeSide,
+  canSellModule,
+  isModuleId,
+  moduleListedThisLeg,
+  moduleSlotsOpen,
+  normalizeModulesTraded,
+  normalizeModuleTradeState,
+  readModuleTraffic,
+  shippedModuleTraffic,
+  type ModuleTrade,
+} from "@/lib/game/engine";
 // The record a captain writes and the few readings of it the panel and the
 // engine share. Imported beside the engine for the same reason the checks
 // below sit where they do: what the record means and what the engine does
@@ -510,6 +582,7 @@ import {
   TAGS,
   TAG_MEANINGS,
   type Tag,
+  type TagList,
 } from "@/lib/game/constants/tags";
 import {
   TAGGED_KINDS,
@@ -4592,6 +4665,49 @@ async function main(): Promise<void> {
       "and none of the words a captain reads on one carries an en dash, an em dash or a doubled hyphen",
     );
 
+    // Where a captain stands and where the room waits are two questions, and
+    // the release keeps them apart on purpose. A captain inside the shipyard's
+    // draft or swap is standing in Dusk: the rail has folded both screens into
+    // Dusk since the six phase leg landed, the engine leaves Dusk when a
+    // departure walks out of a draft, and folding the two onto Dusk is what
+    // lets the room place a captain against itself at all. Their screen is not
+    // a seat the ready check gates, and that pair is the shape of the stall
+    // held shut below: a roster that waited on a captain whose screen draws no
+    // ready bar left a table holding a full set of votes it could not spend.
+    for (const mode of MODE_ORDER) {
+      const badge = MODES[mode].badge;
+      check(
+        faces.every((phase) =>
+          PHASE_FACES[phase].inside
+            ? seatOf(phase) === PHASE_FACES[phase].inside
+            : seatOf(phase) === phase,
+        ),
+        `the ${badge} reading of where a captain stands is the phase itself, or the one seat it is a screen inside`,
+      );
+      check(
+        seatOf("module_draft") === "dusk" &&
+          seatOf("module_swap") === "dusk" &&
+          !isGatedPhase(mode, "module_draft") &&
+          !isGatedPhase(mode, "module_swap"),
+        `a captain at either shipyard screen is placed in Dusk by the ${badge} room and waited on by nobody`,
+      );
+      check(
+        checkpointRank(mode, 1, "module_draft") ===
+          checkpointRank(mode, 1, "dusk") &&
+          checkpointRank(mode, 1, "module_swap") ===
+            checkpointRank(mode, 1, "dusk") &&
+          checkpointRank(mode, 1, "dusk") !== null,
+        "and ranks as the seat they are standing in, so a room that has moved on is a room they are behind",
+      );
+      check(
+        (["bankruptcy", "endgame"] as Phase[]).every(
+          (phase) =>
+            seatOf(phase) === phase && checkpointRank(mode, 1, phase) === null,
+        ),
+        "while a captain at either terminal is placed nowhere at all",
+      );
+    }
+
     console.log("\nA voyage end to end on the six phase leg");
     // [B1: the six phase leg, as data] The plan's evaluation for this slice,
     // read over live sockets rather than off the tables. A whole voyage has
@@ -5537,9 +5653,12 @@ async function main(): Promise<void> {
     const orderedDawnLogs: string[] = [];
     autoCommit(orderedDawn, standingCtx, orderedDawnLogs);
     check(
-      took(orderedDawnLogs, writtenPick.name) &&
-        !took(orderedDawnLogs, firstOffer.name) &&
-        orderedDawn.modifierFlags === writtenPick.modifiers &&
+      took(orderedDawnLogs, cardText(writtenPick).name) &&
+        !took(orderedDawnLogs, cardText(firstOffer).name) &&
+        orderedDawn.modifierFlags ===
+          (writtenPick.effect.kind === "flags"
+            ? writtenPick.effect.flags
+            : null) &&
         orderedDawn.boonChoices.length === 0 &&
         orderedDawn.phase !== "dawn",
       "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue",
@@ -5557,8 +5676,8 @@ async function main(): Promise<void> {
     const missedDawnLogs: string[] = [];
     autoCommit(missedDawn, standingCtx, missedDawnLogs);
     check(
-      took(missedDawnLogs, missedFirst.name) &&
-        !took(missedDawnLogs, offBoard.name) &&
+      took(missedDawnLogs, cardText(missedFirst).name) &&
+        !took(missedDawnLogs, cardText(offBoard).name) &&
         missedDawn.phase !== "dawn",
       "a name the draft did not deal is passed over for the board's first offer, so a written order can never take a boon its captain was not shown",
     );
@@ -5577,8 +5696,8 @@ async function main(): Promise<void> {
     const rollbackDawnLogs: string[] = [];
     autoCommit(rollbackDawn, standingCtx, rollbackDawnLogs);
     check(
-      took(rollbackDawnLogs, rollbackFirst.name) &&
-        !took(rollbackDawnLogs, rollbackPick.name),
+      took(rollbackDawnLogs, cardText(rollbackFirst).name) &&
+        !took(rollbackDawnLogs, cardText(rollbackPick).name),
       "and with the switch off the same written boon is passed over too, which is the rollback the plan asks for",
     );
 
@@ -6006,6 +6125,23 @@ async function main(): Promise<void> {
         good: "Linen Clothes",
         fee: 12,
       },
+      // [F3: modules in the shipyard ladder, and trading them between
+      // captains] The market's pair, and the rows carry the module as its
+      // card id rather than its name: the writer resolves it through the
+      // pool, which is what the lines below are here to hold.
+      module_posted: {
+        kind: "module_posted",
+        captain: "Smoke logger1",
+        module: "bulk_hauler",
+        fee: 12,
+      },
+      module_sold: {
+        kind: "module_sold",
+        captain: "Smoke logger1",
+        taker: "Smoke logger2",
+        module: "bulk_hauler",
+        fee: 12,
+      },
       // [D5: Aroma: the Bazaar Rumor] The one fact this table carries that
       // is deliberately incomplete, and the line below says the same: the
       // captain and the good, with no direction, because the log is public
@@ -6051,6 +6187,9 @@ async function main(): Promise<void> {
         "Smoke logger1 offers to put a Linen Clothes right for 12 Gold.",
       refit_agreed:
         "Smoke logger2 pays Smoke logger1 12 Gold to put the Linen Clothes right.",
+      module_posted: "Smoke logger1 offers Bulk Hauler Rigging for 12 Gold.",
+      module_sold:
+        "Smoke logger2 buys Bulk Hauler Rigging from Smoke logger1 for 12 Gold.",
       rumor_published:
         "Smoke logger1 publishes a rumor about Silk at the bazaar.",
       path_taken: "Smoke logger1 takes up the Loom path.",
@@ -11688,13 +11827,13 @@ async function main(): Promise<void> {
     // The families below each check their own switch against the
     // environment, because that is the dial their slice of the plan
     // promised. What none of them can check is the rule that stands in
-    // front of all nine, because the rule is about them together: Classic
+    // front of all ten, because the rule is about them together: Classic
     // is the shipped release and no system this branch added may reach it,
     // whatever an operator exported into the process. A check written per
-    // family would be nine copies of one sentence, and the ninth is the one
+    // family would be ten copies of one sentence, and the tenth is the one
     // a later feature would forget.
     //
-    // So the nine are listed once, with the environment forced on rather
+    // So the ten are listed once, with the environment forced on rather
     // than left to whatever the runner exported, and every one of them has
     // to answer no in the shipped mode. The environment value is a real one
     // rather than undefined on purpose: a switch that answered no here
@@ -11712,6 +11851,7 @@ async function main(): Promise<void> {
           ["NEXT_PUBLIC_REFITS", refitsOn],
           ["NEXT_PUBLIC_BAZAAR", bazaarRumorsOn],
           ["NEXT_PUBLIC_PATH_DRAFT", pathDraftOn],
+          ["NEXT_PUBLIC_MODULE_TRADES", moduleTradesOn],
         ] as ReadonlyArray<[string, (mode: unknown) => boolean]>
       ).every(
         ([name, read]) =>
@@ -15687,6 +15827,875 @@ async function main(): Promise<void> {
     );
 
     // =====================================================================
+    console.log("\nThe module trade");
+
+    // ---- The market, on a captain's own machine ----
+    //
+    // The market's own switch is switched on for everything but the checks
+    // that are about that switch. A run that left it at whatever the
+    // environment happened to say would make the checks below pass for the
+    // wrong reason.
+    withEnv("NEXT_PUBLIC_MODULE_TRADES", "1", () => {
+      check(
+        [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+          withEnv(
+            "NEXT_PUBLIC_MODULE_TRADES",
+            value,
+            switchFor(GAMBIT, moduleTradesOn),
+          ),
+        ) &&
+          ["off", "0", "OFF", " off ", "Off"].every(
+            (value) =>
+              !withEnv(
+                "NEXT_PUBLIC_MODULE_TRADES",
+                value,
+                switchFor(GAMBIT, moduleTradesOn),
+              ),
+          ),
+        "the module market is on for every value of its own switch except the word off and the digit zero, which is the policy every switch in this tree is read through",
+      );
+      check(
+        !withEnv(
+          "NEXT_PUBLIC_MODULE_TRADES",
+          "1",
+          switchFor(CLASSIC, moduleTradesOn),
+        ),
+        "and the mode governs it directly rather than through a layer: a Classic table has no module market whatever the file says, which is the boundary every system this branch added is read behind",
+      );
+
+      // One hull, in whatever shape a check below needs it, and the three
+      // modules the checks are about. The cards come out of the pool rather
+      // than being typed as records here, so a module retuned tomorrow is
+      // read by these checks as it is shipped.
+      const hauler = cardById("bulk_hauler");
+      const overdrive = cardById("overdrive_engine");
+      const smuggler = cardById("smugglers_hold");
+      if (!hauler || !overdrive || !smuggler) {
+        throw new Error("The pool lost a module these checks are about.");
+      }
+      const hullState = (over: Partial<GameState> = {}): GameState => ({
+        ...voyageState({ voyageEpoch: 7 }),
+        money: 500,
+        shipLevel: 3,
+        ...over,
+      });
+
+      check(
+        !canSellModule(hullState()) &&
+          canSellModule(hullState({ equippedModules: [hauler] })) &&
+          canSellModule(hullState({ path: null, equippedModules: [hauler] })) &&
+          !withEnv("NEXT_PUBLIC_MODULE_TRADES", "off", () =>
+            canSellModule(hullState({ equippedModules: [hauler] })),
+          ),
+        "any captain with a module bolted on may list it, whatever path they hold, and a captain with an empty hull has nothing to sell: a module is a thing rather than an ability, which is this kind's departure from the two markets before it",
+      );
+
+      check(
+        cardsOfKind("module").every((card) => isModuleId(card.id)) &&
+          cardsOfKind("boon").every((card) => !isModuleId(card.id)) &&
+          cardsOfKind("charter").every((card) => !isModuleId(card.id)) &&
+          !isModuleId("Sails") &&
+          !isModuleId("") &&
+          !isModuleId(null) &&
+          !isModuleId(42) &&
+          !isModuleId({ id: "bulk_hauler" }),
+        "the pool's own reader answers a module id and nothing else: every shipped module passes, every boon and charter fails, and a good, an empty string, a number, a null and a lookalike object all fail, which is the one thing about a listing the server can check without reading anybody's save",
+      );
+
+      // One row, in whatever shape a check below needs it. The phase is the
+      // one field no check here varies: every row this market holds was
+      // posted at the Parley, which is where the board is drawn.
+      const tradeRow = (
+        over: Partial<Omit<ModuleTrade, "phase">> = {},
+      ): ModuleTrade => ({
+        id: "m1",
+        sellerUserId: "seller",
+        sellerName: "Smoke Seller",
+        buyerUserId: null,
+        buyerName: null,
+        fee: 30,
+        round: 3,
+        phase: "parley",
+        status: "offered",
+        module: "bulk_hauler",
+        ...over,
+      });
+
+      check(
+        moduleListedThisLeg([tradeRow()], "seller", "bulk_hauler", 3) &&
+          moduleListedThisLeg(
+            [
+              tradeRow({
+                status: "agreed",
+                buyerUserId: "buyer",
+                buyerName: "Smoke Buyer",
+              }),
+            ],
+            "seller",
+            "bulk_hauler",
+            3,
+          ) &&
+          !moduleListedThisLeg([tradeRow()], "seller", "bulk_hauler", 4) &&
+          !moduleListedThisLeg([tradeRow()], "seller", "smugglers_hold", 3) &&
+          !moduleListedThisLeg([tradeRow()], "other", "bulk_hauler", 3),
+        "one module is one listing a leg: a row takes the module out of the market whether it is still an offer or already an agreement, the next leg opens it again, and neither a different module nor a different seller is caught by it",
+      );
+
+      check(
+        expireConsent([tradeRow()], { phase: "resolve", round: 3 }).length ===
+          0 &&
+          expireConsent([tradeRow()], { phase: "parley", round: 3 }).length ===
+            1 &&
+          expireConsent([tradeRow({ status: "agreed" })], {
+            phase: "resolve",
+            round: 3,
+          }).length === 1 &&
+          expireConsent([tradeRow({ status: "agreed" })], {
+            phase: "parley",
+            round: 4,
+          }).length === 0,
+        "an offer nobody took dies with the Parley it was posted in, while a trade the two captains agreed survives the rest of the leg and dies with it, which is the same expiry the two markets before it live under because it is the same primitive",
+      );
+
+      check(
+        moduleSlotsOpen(hullState()) === 3 &&
+          moduleSlotsOpen(
+            hullState({ equippedModules: [hauler, overdrive] }),
+          ) === 1 &&
+          moduleSlotsOpen(
+            hullState({ equippedModules: [hauler, overdrive, smuggler] }),
+          ) === 0 &&
+          moduleSlotsOpen(
+            hullState({
+              equippedModules: [hauler, overdrive, smuggler, hauler],
+            }),
+          ) === 0,
+        "a hull's open slots are its level less what is bolted on, floored at nothing: a hull one module over its slots, which is the corner a purchase settles into when two machines cannot see each other's hulls, reads full rather than negative wherever a screen asks",
+      );
+
+      // What a trade does to two states, which is the whole of it.
+      const modAgreed = tradeRow({
+        id: "m2",
+        status: "agreed",
+        buyerUserId: "buyer",
+        buyerName: "Smoke Buyer",
+        fee: 40,
+      });
+      const sellerState = hullState({
+        currentRound: 3,
+        equippedModules: [hauler, overdrive],
+        shipUpgradePenalty: 15,
+        maintenancePenalty: 10,
+      });
+      const sellerLogs: string[] = [];
+      check(
+        applyModuleTradeSide(sellerState, modAgreed, "seller", sellerLogs) &&
+          sellerState.equippedModules.length === 1 &&
+          sellerState.equippedModules[0]?.id === "overdrive_engine" &&
+          sellerState.shipUpgradePenalty === 0 &&
+          sellerState.maintenancePenalty === 10 &&
+          sellerState.money === 540 &&
+          sellerState.modulesSold === 1 &&
+          sellerState.moduleFeesEarned === 40 &&
+          sellerState.modulesTraded.bulk_hauler === 1 &&
+          sellerLogs.some((line) => line.includes("leaves your hull")),
+        "the seller's side is the plan's automatic unequip: the module comes off the hull by itself, the accounting it carried is unwound with it, so the hauler's upgrade surcharge goes while the overdrive's own penalty stays, the agreed fee lands in the purse, and the ledger writes down that this module moved",
+      );
+
+      const ghosted = hullState({
+        currentRound: 3,
+        equippedModules: [overdrive],
+      });
+      const ghostLogs: string[] = [];
+      check(
+        applyModuleTradeSide(ghosted, modAgreed, "seller", ghostLogs) &&
+          ghosted.equippedModules.length === 1 &&
+          ghosted.money === 540 &&
+          ghosted.modulesSold === 1 &&
+          !ghostLogs.some((line) => line.includes("leaves your hull")),
+        "and a seller whose hull no longer carries the module settles as an empty hand: the fee still moves because the agreement was made in the open, and no module is conjured off a hull that never had it",
+      );
+
+      const buyerState = hullState({
+        currentRound: 3,
+        equippedModules: [smuggler],
+      });
+      const buyerLogs: string[] = [];
+      check(
+        applyModuleTradeSide(buyerState, modAgreed, "buyer", buyerLogs) &&
+          buyerState.equippedModules.length === 2 &&
+          buyerState.equippedModules[1]?.id === "bulk_hauler" &&
+          buyerState.money === 460 &&
+          buyerState.modulesBought === 1 &&
+          buyerState.moduleFeesPaid === 40 &&
+          buyerLogs.some((line) => line.includes("paid 40 Gold")) &&
+          buyerLogs.some((line) => line.includes("bolted to the hull")),
+        "the buyer's side pays the price the two captains agreed and bolts the module onto the hull, and the only machine the module ever lands on is the buyer's own",
+      );
+
+      const fullHull = hullState({
+        currentRound: 3,
+        equippedModules: [hauler, overdrive, smuggler],
+      });
+      check(
+        applyModuleTradeSide(
+          fullHull,
+          tradeRow({
+            id: "m3",
+            status: "agreed",
+            buyerUserId: "buyer",
+            buyerName: "Smoke Buyer",
+            module: "artisans_workshop",
+            fee: 12,
+          }),
+          "buyer",
+          [],
+        ) &&
+          fullHull.equippedModules.length === 4 &&
+          moduleSlotsOpen(fullHull) === 0 &&
+          fullHull.money === 488,
+        "a purchase settling onto a hull with every slot full bolts the module on anyway rather than losing it: the two machines cannot see each other's hulls, an agreed trade always completes, and every slot reader floors, so the overfilled hull reads full at the yard until its captain swaps",
+      );
+
+      const broke = hullState({ currentRound: 3, money: 5 });
+      const brokeLogs: string[] = [];
+      check(
+        applyModuleTradeSide(broke, modAgreed, "buyer", brokeLogs) &&
+          broke.money === 0 &&
+          broke.moduleFeesPaid === 5 &&
+          broke.equippedModules.some((card) => card.id === "bulk_hauler") &&
+          brokeLogs.some((line) => line.includes("paid 5 Gold")),
+        "a purse that moved between the accept and the settlement pays what it holds rather than a negative hold, and the module still lands, because the price was agreed in the open and the purse is the buyer's own business",
+      );
+
+      const unknown = hullState({ currentRound: 3 });
+      const unknownLogs: string[] = [];
+      check(
+        applyModuleTradeSide(
+          unknown,
+          tradeRow({
+            id: "m4",
+            status: "agreed",
+            buyerUserId: "buyer",
+            buyerName: "Smoke Buyer",
+            module: "ghost_module",
+          }),
+          "buyer",
+          unknownLogs,
+        ) &&
+          unknown.equippedModules.length === 0 &&
+          unknown.money === 470 &&
+          unknownLogs.some((line) => line.includes("The yard has no")),
+        "and a row naming a module this build's pool has never heard of costs the captain their fee and a sentence rather than a crash or a nameless card on the hull, which is the branch for a save that moved between two builds rather than for an ordinary leg",
+      );
+
+      const again = hullState({
+        currentRound: 3,
+        equippedModules: [hauler],
+      });
+      const onceLogs: string[] = [];
+      check(
+        applyModuleTradeSide(again, modAgreed, "seller", onceLogs) &&
+          !applyModuleTradeSide(again, modAgreed, "seller", onceLogs) &&
+          again.money === 540 &&
+          again.modulesSold === 1 &&
+          again.settledMovements.includes("m2:fee"),
+        "applying the same side twice moves nothing the second time, because the ledger is what keeps a reload between the agreement and the broadcast that carries it from paying the same fee twice",
+      );
+
+      const bystander = hullState({ currentRound: 3 });
+      check(
+        !applyModuleTradeSide(bystander, modAgreed, "other", []) &&
+          bystander.money === 500 &&
+          bystander.modulesBought === 0 &&
+          bystander.equippedModules.length === 0,
+        "and a captain who is neither side of the agreement is not moved by it, which is the whole of what the two names on the row are for",
+      );
+
+      const offeredState = hullState({
+        currentRound: 3,
+        equippedModules: [hauler],
+      });
+      check(
+        !applyModuleTradeSide(offeredState, tradeRow(), "seller", []) &&
+          offeredState.money === 500 &&
+          offeredState.equippedModules.length === 1,
+        "and an offer settles nothing: only a row past the offer stage moves a purse or a hull, so a listing stays a listing until somebody takes it",
+      );
+
+      const secondBuy = hullState({ currentRound: 3 });
+      check(
+        applyModuleTradeSide(secondBuy, modAgreed, "buyer", []) &&
+          applyModuleTradeSide(
+            secondBuy,
+            tradeRow({
+              id: "m5",
+              status: "agreed",
+              buyerUserId: "buyer",
+              buyerName: "Smoke Buyer",
+              module: "smugglers_hold",
+              fee: 10,
+            }),
+            "buyer",
+            [],
+          ) &&
+          secondBuy.modulesBought === 2 &&
+          secondBuy.equippedModules.length === 2 &&
+          secondBuy.money === 450,
+        "and a buyer may take as many as their hull holds: unlike the two markets before it, this kind bounds neither side, because a shelf takes what it holds and one purchase does not block the next",
+      );
+
+      // The load site, where every field this build added is healed.
+      const modAncient = voyageState();
+      const modStripped = modAncient as unknown as Record<string, unknown>;
+      for (const field of [
+        "modulesSold",
+        "modulesBought",
+        "moduleFeesEarned",
+        "moduleFeesPaid",
+        "modulesTraded",
+      ]) {
+        modStripped[field] = undefined;
+      }
+      normalizeModuleTradeState(modAncient);
+      check(
+        modAncient.modulesSold === 0 &&
+          modAncient.modulesBought === 0 &&
+          modAncient.moduleFeesEarned === 0 &&
+          modAncient.moduleFeesPaid === 0 &&
+          Object.keys(modAncient.modulesTraded).length === 0,
+        "a save written before this feature reads as a captain who has never moved a module, count and ledger alike",
+      );
+      const modWounded = voyageState();
+      modWounded.modulesSold = -3;
+      modWounded.moduleFeesEarned = Number.NaN;
+      modWounded.modulesBought = 2.7;
+      modWounded.moduleFeesPaid = Number.POSITIVE_INFINITY;
+      modWounded.modulesTraded = {
+        bulk_hauler: 3.9,
+        smugglers_hold: -1,
+        ghost_module: Number.NaN,
+        bogus: "2",
+      } as unknown as GameState["modulesTraded"];
+      normalizeModuleTradeState(modWounded);
+      const modCarried = JSON.parse(JSON.stringify(modWounded)) as GameState;
+      check(
+        modWounded.modulesSold === 0 &&
+          modWounded.moduleFeesEarned === 0 &&
+          modWounded.modulesBought === 2 &&
+          modWounded.moduleFeesPaid === 0 &&
+          modWounded.modulesTraded.bulk_hauler === 3 &&
+          modWounded.modulesTraded.smugglers_hold === undefined &&
+          modWounded.modulesTraded.ghost_module === undefined &&
+          modWounded.modulesTraded.bogus === undefined &&
+          modCarried.modulesTraded.bulk_hauler === 3,
+        "and a save carrying the fields in shapes the engine would not survive is healed to the same reading, counts floored and the ledger read entry by entry with anything that is not a countable number dropped rather than kept as a zero, and it round trips through a save with the same meaning on the far side",
+      );
+      check(
+        Object.keys(normalizeModulesTraded(null)).length === 0 &&
+          Object.keys(normalizeModulesTraded([1, 2])).length === 0 &&
+          Object.keys(normalizeModulesTraded("bulk_hauler")).length === 0 &&
+          normalizeModulesTraded({
+            bulk_hauler: 2.9,
+            smugglers_hold: 0,
+            artisans_workshop: Number.NaN,
+          }).bulk_hauler === 2 &&
+          normalizeModulesTraded({ smugglers_hold: 0 }).smugglers_hold ===
+            undefined &&
+          normalizeModulesTraded({ artisans_workshop: Number.NaN })
+            .artisans_workshop === undefined,
+        "the ledger's own reader answers an empty ledger for every shape that is not a record, floors what it can count and drops what it cannot, so the report and the save heal through one reader rather than two that could disagree",
+      );
+
+      // The plan's second reading, over saves built by hand.
+      const traffic = readModuleTraffic({
+        modules: [
+          { id: "bulk_hauler", name: "Bulk Hauler Rigging" },
+          { id: "smugglers_hold", name: "Smuggler's Hold" },
+        ],
+        saves: [
+          {
+            equipped: ["bulk_hauler", "smugglers_hold"],
+            traded: { smugglers_hold: 2 },
+          },
+          {
+            equipped: ["bulk_hauler"],
+            traded: { bulk_hauler: 1, smugglers_hold: 1 },
+          },
+        ],
+      });
+      check(
+        traffic[0]?.equipped === 2 &&
+          traffic[0]?.traded === 1 &&
+          traffic[1]?.equipped === 1 &&
+          traffic[1]?.traded === 3,
+        "the plan's second reading pairs the two columns off the saves themselves: what is equipped is the hull each save carries and what was traded away is its ledger, summed across the voyages the report was pointed at",
+      );
+      const shippedRows = shippedModuleTraffic([
+        { equipped: ["bulk_hauler"], traded: { bulk_hauler: 2 } },
+      ]);
+      const haulerRow = shippedRows.find((r) => r.id === "bulk_hauler");
+      check(
+        shippedRows.length === cardsOfKind("module").length &&
+          haulerRow?.name === cardName("bulk_hauler") &&
+          haulerRow?.equipped === 1 &&
+          haulerRow?.traded === 2 &&
+          shippedRows
+            .filter((r) => r.id !== "bulk_hauler")
+            .every((r) => r.equipped === 0 && r.traded === 0),
+        "the report reads the pool this build shipped rather than a list typed beside it, so a module added tomorrow appears in the table the moment it exists, and a module nobody equipped and nobody traded keeps a row of two zeroes rather than dropping out of the reading",
+      );
+
+      const offHull = hullState({ equippedModules: [hauler] });
+      check(
+        !withEnv("NEXT_PUBLIC_MODULE_TRADES", "off", () =>
+          canSellModule(offHull),
+        ) &&
+          !withEnv("NEXT_PUBLIC_MODULE_TRADES", "off", () =>
+            applyModuleTradeSide(offHull, modAgreed, "seller", []),
+          ) &&
+          offHull.money === 500 &&
+          offHull.equippedModules.length === 1,
+        "with the market switched off the two readers that ask the switch answer nothing at all, so the rollback is a market that is gone rather than one that is half running; the heal and the report readers are deliberately not among them, because the fields every save now carries exist whether or not a rule reads them",
+      );
+    });
+
+    // ---- The market, in a real harbor ----
+    //
+    // Three captains at a table of their own, for the reason the two markets
+    // above gave: the harbor this run shares is still standing at the end of
+    // this section, and the checks after it read that one.
+    const modSeller = await signUp("mod_s");
+    const modBuyer = await signUp("mod_b");
+    const modForeigner = await signUp("mod_f");
+    run.extraAccounts.push(modSeller, modBuyer, modForeigner);
+
+    const modRoom = await call<{ room: { id: string; code: string } }>(
+      "/api/rooms",
+      {
+        method: "POST",
+        cookie: modSeller.cookie,
+        body: JSON.stringify({
+          name: `Smoke modules ${suffix}`,
+          isPublic: false,
+          mode: "ocean_gambit",
+          unlock: LEDGER_PHRASE,
+        }),
+      },
+    );
+    if (modRoom.status !== 200) {
+      throw new Error("No harbor to trade a module in.");
+    }
+    const modRoomId = modRoom.body.room.id;
+    const modCrew = [modSeller, modBuyer, modForeigner];
+    const modJoins = await Promise.all(
+      modCrew.slice(1).map((captain) =>
+        call<{ room: { id: string } }>("/api/rooms/join", {
+          method: "POST",
+          cookie: captain.cookie,
+          body: JSON.stringify({ code: modRoom.body.room.code }),
+        }),
+      ),
+    );
+    check(
+      modJoins.every((join) => join.status === 200),
+      "three captains can sit at a table where modules change hands",
+    );
+
+    // Each socket's newest board, and every row that board has ever carried.
+    // The second is what makes the privacy check below a claim about what a
+    // captain was told rather than about what they happened to read last.
+    const modBoards = new Map<string, ModuleTrade[]>();
+    const modSeen = new Map<string, Set<string>>();
+    const modSockets = new Map<string, Socket>();
+    for (const captain of modCrew) {
+      const socket = await openAuthedSocket(captain);
+      run.sockets.push(socket);
+      const seatedHere = waitForEvent<WireHistory>(
+        socket,
+        "chat:history",
+        (payload) => payload?.roomId === modRoomId,
+      );
+      socket.emit("room:join", { roomId: modRoomId });
+      await seatedHere;
+      socket.on("module:update", (payload: ModuleTradeBoard) => {
+        if (payload?.roomId !== modRoomId) return;
+        modBoards.set(captain.id, payload.moduleTrades);
+        const seen = modSeen.get(captain.id) ?? new Set<string>();
+        for (const trade of payload.moduleTrades) seen.add(trade.id);
+        modSeen.set(captain.id, seen);
+      });
+      modSockets.set(captain.id, socket);
+    }
+    const modSocketOf = (captain: Captain): Socket => {
+      const found = modSockets.get(captain.id);
+      if (!found) throw new Error(`No socket for ${captain.username}.`);
+      return found;
+    };
+    const modBoardOf = (captain: Captain): ModuleTrade[] =>
+      modBoards.get(captain.id) ?? [];
+    const modSettle = () => new Promise((resolve) => setTimeout(resolve, 500));
+    // The emit and the wait are one call, for the reason the two markets
+    // above give: a refusal waited for after the fact is a refusal this run
+    // might already have missed.
+    const modRefused = async (
+      captain: Captain,
+      event: string,
+      frame: Record<string, unknown>,
+    ): Promise<string | null> => {
+      const refused = waitForEvent<{ roomId: string; error: string }>(
+        modSocketOf(captain),
+        "module:error",
+        (payload) => payload?.roomId === modRoomId && Boolean(payload.error),
+      );
+      modSocketOf(captain).emit(event, { roomId: modRoomId, ...frame });
+      return (await refused)?.error ?? null;
+    };
+    const modSettles = (
+      captain: Captain,
+      match: (board: ModuleTrade[]) => boolean,
+    ) =>
+      waitForEvent<ModuleTradeBoard>(
+        modSocketOf(captain),
+        "module:update",
+        (payload) =>
+          payload?.roomId === modRoomId && match(payload?.moduleTrades ?? []),
+      );
+
+    modSocketOf(modSeller).emit("room:start", { roomId: modRoomId });
+    await modSettle();
+
+    // The market belongs to the Parley, and the departure puts the room at
+    // its opening seat rather than at one, so this is posted out of season by
+    // construction rather than by a clock the run has to wait on.
+    const modOffSeason = await modRefused(modSeller, "module:post", {
+      fee: 20,
+      module: "bulk_hauler",
+    });
+    check(
+      modOffSeason !== null && modOffSeason.includes(phaseFace("parley").label),
+      "a module cannot be listed outside the Parley, and the refusal names the phase that opens the market, because a module changes hands at the table rather than mid leg",
+    );
+
+    // The room's seat, moved the way this suite moves any room's seat.
+    const modSeat = (captain: Captain, round: number, phase: Phase) =>
+      modSocketOf(captain).emit("game:status", {
+        roomId: modRoomId,
+        round,
+        phase,
+        phaseLabel: phaseFace(phase).label,
+        gold: 0,
+        reputation: 0,
+        shipLevel: 0,
+        gameOver: false,
+      });
+    modSeat(modSeller, 1, "parley");
+    await modSettle();
+
+    const modBadFee = await modRefused(modSeller, "module:post", {
+      fee: CONSENT_FEE_MAX + 1,
+      module: "bulk_hauler",
+    });
+    check(
+      modBadFee !== null &&
+        modBadFee.includes(String(CONSENT_FEE_MIN)) &&
+        modBadFee.includes(String(CONSENT_FEE_MAX)),
+      "a fee outside the bounds is refused by the server rather than clamped, and the refusal states both ends of the range it will take, because the form and the socket go through one reader",
+    );
+
+    const modBoonId = cardsOfKind("boon")[0]?.id ?? "boon";
+    const modNotAModule = await modRefused(modSeller, "module:post", {
+      fee: 20,
+      module: modBoonId,
+    });
+    check(
+      modNotAModule !== null &&
+        modNotAModule.includes("module the yard can bolt on"),
+      "and a listing naming a card nobody can bolt on is refused at the door, because a row no buyer could take would sit on the board for a whole leg",
+    );
+
+    const modSelfSell = await modRefused(modSeller, "module:post", {
+      fee: 20,
+      module: "bulk_hauler",
+      targetUserId: modSeller.id,
+    });
+    check(
+      modSelfSell !== null,
+      "and a captain cannot sell a module to themselves",
+    );
+
+    // A real account standing somewhere else. The membership check is per
+    // harbor, which is the only thing that makes aiming an offer at a captain
+    // a check at all.
+    const modStrangerTarget = await modRefused(modSeller, "module:post", {
+      fee: 20,
+      module: "bulk_hauler",
+      targetUserId: run.host.id,
+    });
+    check(
+      modStrangerTarget !== null,
+      "and an offer cannot be addressed at a captain who is not in this harbor, whoever they are in another one",
+    );
+
+    const modOpenPosted = modSettles(modForeigner, (board) =>
+      board.some(
+        (t) => t.sellerUserId === modSeller.id && t.status === "offered",
+      ),
+    );
+    modSocketOf(modSeller).emit("module:post", {
+      roomId: modRoomId,
+      fee: 21.7,
+      module: "bulk_hauler",
+    });
+    const modOpenRow = ((await modOpenPosted)?.moduleTrades ?? []).find(
+      (t) => t.sellerUserId === modSeller.id && t.status === "offered",
+    );
+    check(
+      modOpenRow !== undefined &&
+        modOpenRow.fee === 21 &&
+        modOpenRow.module === "bulk_hauler" &&
+        modOpenRow.buyerUserId === null &&
+        modOpenRow.phase === "parley" &&
+        modOpenRow.round === 1,
+      "an open listing lands on the whole table's board at the fee the form meant, floored to whole Gold, naming the module, addressed to nobody and stamped with the leg and the phase it was posted in",
+    );
+    check(
+      modOpenRow !== undefined && modBoardOf(modForeigner).length === 1,
+      "and it is the only row the third captain is handed, because a listing to the room is the one every captain may take",
+    );
+
+    const modRelisted = await modRefused(modSeller, "module:post", {
+      fee: 25,
+      module: "bulk_hauler",
+    });
+    check(
+      modRelisted !== null &&
+        modRelisted.includes("already listed that module"),
+      "the same module cannot be listed twice in one leg, whatever price the second row names, because one module is one thing and a second row could not be honoured",
+    );
+
+    const modDoubleOpen = await modRefused(modSeller, "module:post", {
+      fee: 25,
+      module: "smugglers_hold",
+    });
+    check(
+      modDoubleOpen !== null &&
+        modDoubleOpen.includes("already have an offer standing"),
+      "and a second open offer from the same seller is refused by the primitive's own bound, which is the rule that keeps one client from papering the board",
+    );
+
+    const modDirectPosted = modSettles(modBuyer, (board) =>
+      board.some(
+        (t) => t.buyerUserId === modBuyer.id && t.status === "offered",
+      ),
+    );
+    modSocketOf(modSeller).emit("module:post", {
+      roomId: modRoomId,
+      fee: 30,
+      module: "smugglers_hold",
+      targetUserId: modBuyer.id,
+    });
+    const modDirectRow = ((await modDirectPosted)?.moduleTrades ?? []).find(
+      (t) => t.buyerUserId === modBuyer.id && t.status === "offered",
+    );
+    check(
+      modDirectRow !== undefined && modDirectRow.fee === 30,
+      "a direct offer lands for the captain it names, at the price that was asked",
+    );
+    await modSettle();
+    check(
+      modDirectRow !== undefined &&
+        modSeen.get(modBuyer.id)?.has(modDirectRow.id) === true &&
+        modSeen.get(modForeigner.id)?.has(modDirectRow.id) === false,
+      "and no board the third captain was ever handed carried it, which is the privacy a targeted trade is worth",
+    );
+
+    // Asked at a quiet moment, so the next board this captain is handed is
+    // the answer to the question rather than a broadcast that overtook it.
+    const modAskedForBoard = waitForEvent<ModuleTradeBoard>(
+      modSocketOf(modForeigner),
+      "module:update",
+      (payload) => payload?.roomId === modRoomId,
+    );
+    modSocketOf(modForeigner).emit("module:state:request", {
+      roomId: modRoomId,
+    });
+    const modAnsweredBoard = (await modAskedForBoard)?.moduleTrades ?? [];
+    check(
+      modOpenRow !== undefined &&
+        modAnsweredBoard.length === 1 &&
+        modAnsweredBoard[0]?.id === modOpenRow.id,
+      "a captain who asks for the board is handed the same board the room broadcast, personalised by the same rules, so the row addressed to somebody else is absent from the answer as well",
+    );
+
+    const modTakenByThird = await modRefused(modForeigner, "module:accept", {
+      tradeId: modDirectRow?.id ?? "",
+    });
+    check(
+      modTakenByThird !== null &&
+        modTakenByThird.includes("addressed to another"),
+      "an offer addressed to one captain cannot be taken by another, even though the board never showed it to them",
+    );
+    const modSoldBySeller = await modRefused(modSeller, "module:accept", {
+      tradeId: modOpenRow?.id ?? "",
+    });
+    check(
+      modSoldBySeller !== null && modSoldBySeller.includes("the one selling"),
+      "and the captain selling the module is not the captain who takes it",
+    );
+
+    const modAgreedBoard = modSettles(modSeller, (board) =>
+      board.some((t) => t.id === modDirectRow?.id && t.status === "agreed"),
+    );
+    modSocketOf(modBuyer).emit("module:accept", {
+      roomId: modRoomId,
+      tradeId: modDirectRow?.id ?? "",
+    });
+    const modAgreedRow = ((await modAgreedBoard)?.moduleTrades ?? []).find(
+      (t) => t.id === modDirectRow?.id,
+    );
+    // The name the row wears is the one the account is registered under, read
+    // from the row the server itself read it from rather than typed here, so
+    // the check cannot pass on a name this file made up.
+    const modAccount = await db.user.findUnique({
+      where: { id: modBuyer.id },
+      select: { displayName: true },
+    });
+    check(
+      modAgreedRow?.status === "agreed" &&
+        modAgreedRow.buyerUserId === modBuyer.id &&
+        modAgreedRow.buyerName === modAccount?.displayName,
+      "a captain takes a listing by taking the offer, and the row that was an ask is now an agreement with their own name written on it",
+    );
+
+    const modWithdrawRefused = await modRefused(modSeller, "module:cancel", {
+      tradeId: modDirectRow?.id ?? "",
+    });
+    check(
+      modWithdrawRefused !== null &&
+        modWithdrawRefused.includes("can't be withdrawn"),
+      "an agreement the two captains made cannot be withdrawn by the seller, and the refusal says so rather than dropping the press",
+    );
+
+    const modCancelledBoard = modSettles(modForeigner, (board) =>
+      board.every((t) => t.id !== modOpenRow?.id),
+    );
+    modSocketOf(modSeller).emit("module:cancel", {
+      roomId: modRoomId,
+      tradeId: modOpenRow?.id ?? "",
+    });
+    check(
+      (await modCancelledBoard) !== null,
+      "while an offer nobody has taken is the seller's own to take back",
+    );
+
+    const modGoneAccept = await modRefused(modForeigner, "module:accept", {
+      tradeId: modOpenRow?.id ?? "",
+    });
+    check(
+      modGoneAccept !== null && modGoneAccept.includes("already gone"),
+      "and an offer that is off the board cannot be taken from a stale screen, which the server answers with the sentence rather than with a resurrection",
+    );
+
+    // A captain who is not the seller of a row has no button for it, and the
+    // silence is the answer rather than an error: reading a row that is
+    // somebody else's is not a mistake anybody has made.
+    const modSilentForeign = waitForEvent<{ roomId: string; error: string }>(
+      modSocketOf(modForeigner),
+      "module:error",
+      (payload) => Boolean(payload?.error),
+      900,
+    );
+    modSocketOf(modForeigner).emit("module:cancel", {
+      roomId: modRoomId,
+      tradeId: modDirectRow?.id ?? "",
+    });
+    check(
+      (await modSilentForeign) === null,
+      "and a captain who is not the seller of a row cannot take it back, which the server answers with silence rather than with an error",
+    );
+
+    // The room's log, which is the other place the trade is written down.
+    const modLog = waitForEvent<{
+      roomId: string;
+      entries: VoyageLogEntry[];
+    }>(
+      modSocketOf(modForeigner),
+      "voyage:log:history",
+      (payload) => payload?.roomId === modRoomId,
+    );
+    modSocketOf(modForeigner).emit("voyage:log:request", {
+      roomId: modRoomId,
+    });
+    const modLines = ((await modLog)?.entries ?? []).map((entry) => entry.text);
+    // The two lines are built from the rows the server itself broadcast, so
+    // the check is a claim about the board and the log agreeing rather than
+    // about this file's copy of a sentence.
+    const modPostedLine = voyageLogLine({
+      kind: "module_posted",
+      captain: modOpenRow?.sellerName ?? "",
+      module: modOpenRow?.module ?? "",
+      fee: modOpenRow?.fee ?? 0,
+    });
+    const modSoldLine = voyageLogLine({
+      kind: "module_sold",
+      captain: modAgreedRow?.sellerName ?? "",
+      taker: modAgreedRow?.buyerName ?? "",
+      module: modAgreedRow?.module ?? "",
+      fee: modAgreedRow?.fee ?? 0,
+    });
+    check(
+      modOpenRow !== undefined &&
+        modAgreedRow !== undefined &&
+        modLines.includes(modPostedLine) &&
+        modLines.includes(modSoldLine),
+      "the room's log carries the trade as the board wrote it, the listing and the sale, with the price and the module on both lines and the taker named on the second",
+    );
+
+    // The leg moves on. Everything on the board was sold for the leg that
+    // just ended, so the sweep is what takes the whole of it away.
+    modSeat(modSeller, 2, "parley");
+    await modSettle();
+    check(
+      modBoardOf(modSeller).length === 0 &&
+        modBoardOf(modBuyer).length === 0 &&
+        modBoardOf(modForeigner).length === 0,
+      "the leg a trade was made for is the leg it lives, and the move to the next one takes the whole board off every captain's screen",
+    );
+
+    const modReopened = modSettles(modForeigner, (board) =>
+      board.some(
+        (t) => t.sellerUserId === modSeller.id && t.status === "offered",
+      ),
+    );
+    modSocketOf(modSeller).emit("module:post", {
+      roomId: modRoomId,
+      fee: 12,
+      module: "bulk_hauler",
+    });
+    const modReopenedRow = ((await modReopened)?.moduleTrades ?? []).find(
+      (t) => t.sellerUserId === modSeller.id,
+    );
+    check(
+      modReopenedRow?.round === 2 && modReopenedRow?.fee === 12,
+      "and the same module can be listed again on the new leg, which is what makes the one listing a leg a bound the voyage reads a leg at a time rather than a ceiling on the trade",
+    );
+
+    // The house rule, over the copy this feature added: the sentences a
+    // captain reads at the market are the market's own, and the files that
+    // carry them are held whole, comments included.
+    check(
+      !carriesADash("src/lib/game/engine/modules.ts") &&
+        !carriesADash("src/lib/game/engine/consent.ts") &&
+        !carriesADash("src/lib/use-module-trades.ts") &&
+        !carriesADash("src/lib/use-consent-board.ts") &&
+        !carriesADash("src/components/portmasters/game/ModuleMarket.tsx") &&
+        !carriesADash("src/server/realtime/module-trades.ts") &&
+        !carriesADash("src/server/realtime/wiring/module-trades.ts"),
+      "every file the module market's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+    );
+
+    // =====================================================================
     console.log("\nAroma: the bazaar rumor");
 
     // ---- The board, on a captain's own machine ----
@@ -16814,7 +17823,7 @@ async function main(): Promise<void> {
       const freight = calcTransportCost(
         filled,
         card.totalItems,
-        card.resources.some((r) => SILK_GOODS.includes(r.type)),
+        cargoCarriesTag(card.resources, "woven"),
       );
       const paid = opportunistPayout(card.reward);
       const lines: string[] = [];
@@ -16870,7 +17879,7 @@ async function main(): Promise<void> {
       const ordinaryFreight = calcTransportCost(
         ordinary,
         openCard.totalItems,
-        openCard.resources.some((r) => SILK_GOODS.includes(r.type)),
+        cargoCarriesTag(openCard.resources, "woven"),
       );
       const ordinaryLines: string[] = [];
       completeOrder(ordinary, openCard.id, ordinaryLines, true);
@@ -18706,6 +19715,1197 @@ async function main(): Promise<void> {
       ].every((file) => !carriesADash(file)),
       "and every file this feature lands in is free of em dashes, en dashes and doubled hyphens, in its comments as well as in the words a captain reads",
     );
+
+    // ---- The card record ----
+    // [F2] The plan's sentence for this goal is one record shape under every
+    // card, and then the single field that gives the base mode a tighter
+    // pool and Ocean Gambit a wilder one. The record's contents are checked
+    // first, then the field that reads them: both weightings on every card,
+    // the ceiling each mode runs, and the pool a captain is dealt from in
+    // each mode, because a mode weight nothing reads would pass a check
+    // about the records and change nothing about the game.
+    //
+    // Then the parts the record made possible and the parts it has to keep:
+    // the five condition arms with the numbers the authored cards carry, the
+    // lean that weights without filtering, a draw that reads the weights,
+    // the two drafts walked through the engine, the tally that measures the
+    // offer against the pick, the report that reads it, the save that heals
+    // it back, and every clause the card check gates the build on watched
+    // firing against a subject built by hand with one thing wrong in it.
+    //
+    // It sits here, beside the tag walk's block and the vendor's, for their
+    // reason: the pool is static data and its readers are pure functions of
+    // a state, so this needs no harbor, no socket and no captain. The whole
+    // block is scoped, the way the ready check's is, so its local names are
+    // its own rather than names the rest of this run has to avoid.
+    {
+      // The pool holds no card without a name, so a missing one here is a
+      // broken oracle rather than a failed check: throwing is the honest
+      // answer, because every check below would otherwise read a card that
+      // is not there and pass or fail for the wrong reason.
+      function cardOrThrow(id: string): CardRecord {
+        const found = cardById(id);
+        if (!found) throw new Error(`the pool has no card ${id}`);
+        return found;
+      }
+
+      // The Han script, for the check that the second language is written in
+      // the second language rather than copied from the first.
+      const CJK = /\p{Script=Han}/u;
+
+      // ---- The shape ----
+      // The plan's ten fields, written here as the schedule lists them rather
+      // than read back off the interface the check is about, so a field that
+      // moved out of the record is a failed check and not a green one.
+      const PLAN_FIELDS = [
+        "id",
+        "kind",
+        "power",
+        "tags",
+        "pathWeight",
+        "trigger",
+        "condition",
+        "effect",
+        "modes",
+        "strings",
+      ];
+      check(
+        PLAN_FIELDS.every((field) =>
+          CARDS.every(
+            (card) =>
+              (card as unknown as Record<string, unknown>)[field] !== undefined,
+          ),
+        ) && CARDS.every((card) => card.icon.trim().length > 0),
+        "every card carries the plan's ten fields, plus the glyph the record added as its eleventh: the icon is language neutral, so it sits beside the two strings rather than inside either, and a card without one is a card a draft cannot draw",
+      );
+      check(
+        CARDS.length === BOONS.length + MODULES.length &&
+          CARDS.length === 28 &&
+          new Set(CARDS.map((card) => card.id)).size === CARDS.length,
+        "the registry is the two ladders stacked and nothing else, twenty eight records with twenty eight identifiers, so a card cannot be drafted without being in the walk. Two cards sharing an id would be a rename nobody could detect, since the id is what every save, standing order and wire frame stores",
+      );
+      check(
+        CARDS.every(
+          (card) =>
+            CARD_KINDS.includes(card.kind) &&
+            card.trigger === CARD_TRIGGER[card.kind],
+        ) &&
+          cardsOfKind("boon").length === BOONS.length &&
+          cardsOfKind("module").length === MODULES.length &&
+          cardsOfKind("charter").length === 0,
+        "each card's kind is one of the plan's three and each card arrives at the draft its kind promises, read through the one map rather than off a field repeated per record, so a boon offered at the shipyard is a failed build rather than a card nobody can explain. The charter count is zero and says so: F6 drafts the first one, and what this pins is that the shape and the reader are already there for it",
+      );
+      check(
+        CARDS.every((card) =>
+          LANGUAGES.every((language) => {
+            const text = card.strings[language];
+            return (
+              !!text &&
+              text.name.trim().length > 0 &&
+              text.desc.trim().length > 0
+            );
+          }),
+        ) &&
+          SHIPPED_LANGUAGE === "en" &&
+          cardText(cardOrThrow("silk_wind")).name === "Weaver's Winds",
+        "both strings are carried on every card and neither is empty, which is J3's evaluation read forward: the pool had to carry both from the beginning for the translation pass to be a pass rather than a rebuild, and the shipped language is named once so the day a captain picks one it is one value and not a second copy of the pool",
+      );
+      check(
+        CARDS.every((card) => {
+          const en = card.strings.en;
+          const zh = card.strings.zh;
+          return (
+            en.name !== zh.name &&
+            en.desc !== zh.desc &&
+            CJK.test(zh.name) &&
+            CJK.test(zh.desc)
+          );
+        }),
+        "and the second language is a translation rather than a copy: every card names itself differently in the two, and both Chinese strings carry Chinese characters, which is the cheapest honest test that the field was written by somebody writing the words rather than filled by a script duplicating the English",
+      );
+      check(
+        cardById("no_such_card") === null &&
+          cardName("no_such_card") === "no_such_card" &&
+          cardLead("no_such_card") === "no_such_card" &&
+          CARDS.every(
+            (card) =>
+              cardLead(card.id) === `${card.icon} ${card.strings.en.name}`,
+          ),
+        "the door answers null for an id the pool does not hold, and both ledger readers fall back to the id itself rather than to an empty line or a crash: a line naming a card this build does not know is better than a line naming nothing, which is why the two readers answer rather than throw",
+      );
+      check(
+        cardByFlag("transport_silk_discount")?.id === "silk_wind" &&
+          cardByFlag("hemp_price_reduction")?.id === "hemp_monopoly" &&
+          cardByFlag("no_card_writes_this") === null,
+        "the flag reader finds the card that writes a modifier key, which is how the pricing breakdowns name the source of an adjustment now that the flags live on the record: a module carries no flags at all, so the reader walks past every hull card without a special case for them",
+      );
+
+      // ---- The mode field ----
+      check(
+        CARDS.every(
+          (card) =>
+            typeof card.modes.classic === "number" &&
+            typeof card.modes.ocean_gambit === "number",
+        ),
+        "both mode weightings are authored on every card, which is the plan's own rollback: keeping both from the start is what makes switching a mode between the tight pool and the wild one a config change rather than a content pass, and a card that carried only its own mode would leave the other mode's reading to accident",
+      );
+      const MODES = Object.keys(MODE_POWER_CEILING) as GameMode[];
+      check(
+        CARDS.every(
+          (card) => Number.isInteger(card.power) && card.power >= 1,
+        ) &&
+          CARDS.every((card) =>
+            MODES.every(
+              (mode) =>
+                card.modes[mode] === 0 ||
+                card.power <= MODE_POWER_CEILING[mode],
+            ),
+          ),
+        "no mode runs a card above its own ceiling, read over both modes for every record: a card above the ceiling has to carry a zero there, and that pair is what makes the ceiling a ceiling rather than a comment somebody wrote beside the power number",
+      );
+      const classicRuns = CARDS.filter((card) => card.modes.classic > 0);
+      const gambitRuns = CARDS.filter((card) => card.modes.ocean_gambit > 0);
+      const aboveClassic = CARDS.filter(
+        (card) => card.power > MODE_POWER_CEILING.classic,
+      );
+      check(
+        gambitRuns.length === CARDS.length &&
+          classicRuns.length === CARDS.length - aboveClassic.length &&
+          aboveClassic.every(
+            (card) => card.modes.classic === 0 && card.modes.ocean_gambit > 0,
+          ),
+        "the base mode runs a strictly smaller pool than Ocean Gambit and the difference is exactly the cards above the base mode's ceiling, which is the plan's sentence about the variance problem read as a fact about the records: the base competitive mode runs the lower ceiling because there a captain's good luck is somebody else's bad evening, while Ocean Gambit runs the wild pool because its headline objective is shared",
+      );
+      check(
+        MODE_POWER_CEILING.ocean_gambit > MODE_POWER_CEILING.classic &&
+          classicRuns.some(
+            (card) => card.power === MODE_POWER_CEILING.classic,
+          ) &&
+          gambitRuns.some(
+            (card) => card.power === MODE_POWER_CEILING.ocean_gambit,
+          ),
+        "and both ceilings are reached by content rather than holding headroom nobody spends: the widest card each mode runs sits exactly at that mode's number, so the ceiling is the figure the next card has to argue with instead of a limit that happens to be loose",
+      );
+
+      const idsOf = (pool: Array<[CardRecord, number]>): string[] =>
+        pool.map(([card]) => card.id);
+      // Two states that differ in one field. Both are on the same difficult
+      // water at a round where every wave has opened, so the only thing between
+      // the two pools below is the mode.
+      const wide = voyageState({ difficulty: "open_waters" });
+      wide.currentRound = 99;
+      const narrow = voyageState({ mode: CLASSIC, difficulty: "open_waters" });
+      narrow.currentRound = 99;
+      const gambitBoons = idsOf(offerPool("boon", wide));
+      const gambitModules = idsOf(offerPool("module", wide));
+      const classicBoons = idsOf(offerPool("boon", narrow));
+      const classicModules = idsOf(offerPool("module", narrow));
+      const WITHHELD = aboveClassic.map((card) => card.id);
+      check(
+        WITHHELD.length === 3 &&
+          WITHHELD.every(
+            (id) => gambitBoons.includes(id) || gambitModules.includes(id),
+          ) &&
+          WITHHELD.every(
+            (id) => !classicBoons.includes(id) && !classicModules.includes(id),
+          ) &&
+          gambitBoons.length + gambitModules.length ===
+            classicBoons.length + classicModules.length + WITHHELD.length,
+        "three cards are withheld from the base mode and they are exactly the ones above its ceiling, watched at the pool a captain is drafted from rather than in the arithmetic alone: each is offered in Ocean Gambit and absent from the base mode on the same state, so the field is read by the draw instead of merely stored beside it",
+      );
+      const early = voyageState({ difficulty: "open_waters" });
+      const earlyBoons = idsOf(offerPool("boon", early));
+      const earlyModules = idsOf(offerPool("module", early));
+      check(
+        earlyBoons.length > 0 &&
+          earlyModules.length > 0 &&
+          earlyBoons.length < gambitBoons.length &&
+          earlyModules.length < gambitModules.length &&
+          earlyBoons.every((id) => gambitBoons.includes(id)) &&
+          earlyModules.every((id) => gambitModules.includes(id)),
+        "and the round's tier still gates the pool through this new path: a captain on the first leg is offered fewer cards than a voyage with every wave open, and every one of them is inside the wider pool, which is the regression this reader had to keep when it replaced the old table of weights",
+      );
+      check(
+        [
+          ...offerPool("boon", wide),
+          ...offerPool("module", wide),
+          ...offerPool("boon", narrow),
+          ...offerPool("module", narrow),
+        ].every(([, weight]) => weight > 0),
+        "and every weight the pool hands back is positive, which is the half of the zero that matters: a card this mode does not run, or this captain has no use for, is filtered out here rather than drawn with a zero chance, so nothing downstream has to reason about a card that can never come up",
+      );
+
+      // ---- The condition arms ----
+      const condition = (id: string): CardCondition =>
+        cardOrThrow(id).condition;
+      const flat = voyageState();
+      check(
+        conditionWeight(condition("silk_monopoly"), flat) === 1 &&
+          conditionWeight(condition("favorable_tides"), flat) === 1.5,
+        "the first arm answers with its own weight whatever the captain holds, which is the arm a card takes when it wants no say in who it is offered to",
+      );
+      const poor = voyageState();
+      poor.money = 10;
+      const exactly = voyageState();
+      exactly.money = 30;
+      check(
+        conditionWeight(condition("emergency_loan"), poor) === 4.0 &&
+          conditionWeight(condition("emergency_loan"), exactly) === 0.2,
+        "the purse arm answers with the heavier weight while the captain is below the amount and the lighter one from the amount upward: a captain holding exactly thirty is not below thirty, so the boundary belongs to the other side, which is the reading a card that helps a captain who is short has to get right",
+      );
+      const over = voyageState();
+      over.money = 41;
+      const at = voyageState();
+      at.money = 40;
+      check(
+        conditionWeight(condition("merchant_charm"), over) === 2.0 &&
+          conditionWeight(condition("merchant_charm"), at) === 0.5 &&
+          conditionWeight(condition("deep_sea_escort_pact"), poor) === 3.2,
+        "and the other side of the same comparison is strictly above rather than at or above, so the two purse arms meet at the boundary without both answering for it. The pact leans the other way, which is worth reading beside them: it is offered hardest to a captain who cannot afford an escort, so the card does the work its own text describes rather than rewarding the captain who least needs it",
+      );
+      const oneBulk = voyageState();
+      oneBulk.inventory = { "Copper Ore": 1 };
+      const twoBulk = voyageState();
+      twoBulk.inventory = { "Copper Ore": 1, "Porcelain Clay": 1 };
+      const oneKindTwice = voyageState();
+      oneKindTwice.inventory = { "Copper Ore": 2 };
+      check(
+        conditionWeight(condition("kiln_and_forge_guild"), oneBulk) === 1.0 &&
+          conditionWeight(condition("kiln_and_forge_guild"), twoBulk) === 2.8 &&
+          conditionWeight(condition("kiln_and_forge_guild"), oneKindTwice) ===
+            2.8 &&
+          holdOfTag(voyageState(), "bulk") === 8,
+        "the hold arm counts units of the goods carrying its tag rather than kinds of them, so two units of one ore passes the same clause one unit of each passes, and the count is read off the vocabulary rather than off a list kept for this card. The last figure is the starting hold itself: the eight hemp a voyage leaves the pier with are bulk, so a fresh captain already sits inside the guild's clause, and the card's question is about the trade they are in rather than about a shopping trip",
+      );
+      const crewed = voyageState();
+      hireWorker(crewed, "weaver", []);
+      check(
+        crewed.workers.weaver.length === 1 &&
+          conditionWeight(condition("hemp_monopoly"), flat) === 1.0 &&
+          conditionWeight(condition("hemp_monopoly"), crewed) === 2.0 &&
+          conditionWeight(condition("artisan_inspiration"), flat) === 0.0 &&
+          conditionWeight(condition("artisan_inspiration"), crewed) === 3.0,
+        "the roster arm reads the crew a captain has aboard: the bulk monopoly is offered twice as hard to a captain with a weaver and simply offered without one, while the inspiration boon is offered not at all, which is the one zero the shape allows. A card about weaving is nothing to a captain with no weavers, and that is a fact about what they hold rather than about who they are",
+      );
+      check(
+        !offerPool("boon", flat).some(
+          ([card]) => card.id === "artisan_inspiration",
+        ) &&
+          offerPool("boon", crewed).some(
+            ([card]) => card.id === "artisan_inspiration",
+          ),
+        "and that zero is read by the pool rather than left to the draw: the inspiration boon is absent from the table a crewless captain is dealt and present for the captain who hired the weaver, both off the same reader",
+      );
+      check(
+        conditionWeight(
+          { kind: "crew_role", roles: ["astrologer"], weight: 5, otherwise: 1 },
+          crewed,
+        ) === 1,
+        "while a role the roster cannot hold answers the false arm rather than crashing or answering for a crew nobody could have: the role arrives from a card's record, so a typo or a retired trade is a card that is offered plainly rather than a round that ends on a missing key",
+      );
+
+      // ---- The lean and the weight ----
+      check(
+        pathLean(cardOrThrow("silk_wind"), "loom") === 2 &&
+          pathLean(cardOrThrow("silk_wind"), "convoy") === 1 &&
+          pathLean(cardOrThrow("silk_wind"), null) === 1,
+        "the lean reads its own weight toward the path it leans to, one toward a path it does not lean to, and one for a captain who has taken no path at all: a lean is a weight and never a lockout, which is why the winds keep their full place in the pool for a convoy captain",
+      );
+      const leanless = CARDS.filter(
+        (card) => Object.keys(card.pathWeight).length === 0,
+      );
+      check(
+        leanless.length > 0 &&
+          leanless.every((card) =>
+            PATH_IDS.every((path) => pathLean(card, path) === 1),
+          ),
+        "and a card that leans nowhere is written as silence rather than as a map of ones, read back through the same reader as one for every path, so the two ways of saying the same thing cannot drift",
+      );
+      const pathless = voyageState();
+      const loomCaptain = voyageState();
+      loomCaptain.path = "loom";
+      const convoyCaptain = voyageState();
+      convoyCaptain.path = "convoy";
+      check(
+        idsOf(offerPool("boon", loomCaptain)).join(",") ===
+          idsOf(offerPool("boon", pathless)).join(",") &&
+          idsOf(offerPool("boon", convoyCaptain)).join(",") ===
+            idsOf(offerPool("boon", pathless)).join(",") &&
+          cardWeight(cardOrThrow("silk_wind"), loomCaptain) >
+            cardWeight(cardOrThrow("silk_wind"), convoyCaptain),
+        "the lean weights and never filters, which is the plan's own sentence about the field: the same cards are on offer to a loom captain, a convoy captain and a captain with no path at all, and what the path moves is the chance of seeing each of them rather than the list. The ids come back in ladder order because the pool is built off the ladders rather than off the weights",
+      );
+      const rich = voyageState();
+      rich.money = 100;
+      rich.path = "aroma";
+      check(
+        cardText(cardOrThrow("merchant_charm")).name === "Merchant's Charm" &&
+          cardOrThrow("merchant_charm").modes.ocean_gambit === 1 &&
+          cardWeight(cardOrThrow("merchant_charm"), rich) === 1 * 2.0 * 1.5 &&
+          cardWeight(cardOrThrow("merchant_charm"), { ...rich, money: 10 }) ===
+            1 * 0.5 * 1.5 &&
+          cardWeight(cardOrThrow("deep_sea_escort_pact"), wide) ===
+            1 * 1.8 * 1 &&
+          cardWeight(cardOrThrow("deep_sea_escort_pact"), narrow) === 0,
+        "the weight is the product of the three fields and nothing else: the mode's weight, the condition's answer and the path's lean, each read off the record rather than off a table here. The last line is the field doing its whole job, since a gambit only card weighs nothing at all in the base mode and the pool drops it before any draw sees it",
+      );
+
+      // ---- The draw ----
+      const three: Array<[CardRecord, number]> = [
+        [cardOrThrow("silk_wind"), 1],
+        [cardOrThrow("favorable_tides"), 1],
+        [cardOrThrow("tax_shelter"), 1],
+      ];
+      const all = drawOffer(three, 3, () => 0);
+      check(
+        all.length === 3 &&
+          new Set(all.map((card) => card.id)).size === 3 &&
+          all.map((card) => card.id).join(",") ===
+            "silk_wind,favorable_tides,tax_shelter",
+        "a draw of three off a pool of three comes back as three different cards, without replacement: once a card is drawn it leaves the pool, which is what makes the three presented cards three cards. A roll of zero lands on the first card in the pool and the draw walks on from there",
+      );
+      const light: Array<[CardRecord, number]> = [
+        [cardOrThrow("silk_wind"), 1],
+        [cardOrThrow("favorable_tides"), 1],
+      ];
+      const heavy: Array<[CardRecord, number]> = [
+        [cardOrThrow("silk_wind"), 1],
+        [cardOrThrow("favorable_tides"), 3],
+      ];
+      check(
+        drawOffer(light, 1, () => 0.5)[0].id === "silk_wind" &&
+          drawOffer(heavy, 1, () => 0.5)[0].id === "favorable_tides",
+        "and the same roll lands on different cards in two pools that differ only in one weight, which is what makes the draw weighted rather than uniform: raising a card's weight moves the middle of the range onto it, and the random source is passed in rather than assumed so a check can hold the roll still while it watches that happen",
+      );
+      check(
+        drawOffer([], 3, () => 0.5).length === 0 &&
+          drawOffer(light, 5, () => 0.5).length === 2,
+        "asking a pool for more cards than it holds answers with everything it has rather than looping or crashing, and an empty pool is a draw of nothing: both are ordinary states near the end of a voyage, when most of what a captain could be offered is already bolted to the hull",
+      );
+
+      // ---- The two drafts, through the engine ----
+      const voyage = voyageState();
+      startBoonDrafting(voyage, []);
+      check(
+        voyage.boonChoices.length === CARDS_PER_OFFER &&
+          new Set(voyage.boonChoices.map((card) => card.id)).size ===
+            CARDS_PER_OFFER &&
+          voyage.boonChoices.every((card) =>
+            offerPool("boon", voyage).some(([pooled]) => pooled.id === card.id),
+          ),
+        "the boon draft deals three different cards and every one of them is off the pool this captain's own state answers for: the engine no longer holds a single card's id at the draft, so a card added to the content arrives with its own offer behaviour rather than with an edit to the draft",
+      );
+      check(
+        voyage.boonChoices.every(
+          (card) => voyage.cardTally[card.id]?.offered === 1,
+        ),
+        "and every card on the table is counted as offered at the moment it is put in front of the captain rather than when it is chosen, because the plan's measure is the pair and the denominator of that pair is the offer",
+      );
+      const refused = voyageState();
+      startBoonDrafting(refused, []);
+      const standing = refused.boonChoices.map((card) => card.id).join(",");
+      check(
+        selectBoon(refused, "silk_monopoly", []) === false &&
+          selectBoon(refused, "no_such_card", []) === false &&
+          refused.boonChoices.map((card) => card.id).join(",") === standing &&
+          (refused.cardTally.silk_monopoly?.picked ?? 0) === 0,
+        "a module id handed to the boon draft is refused rather than applied, and so is an id no card holds: the table is left standing and nothing is counted as picked, which is the answer its caller needs, since the draft is left by choosing a boon and a call that matched nothing must not move the voyage on",
+      );
+      const first = refused.boonChoices[0];
+      const firstFlags =
+        first.effect.kind === "flags" ? first.effect.flags : null;
+      check(
+        selectBoon(refused, first.id, []) === true &&
+          refused.boonChoices.length === 0 &&
+          refused.cardTally[first.id]?.picked === 1 &&
+          firstFlags !== null &&
+          refused.modifierFlags === firstFlags,
+        "a real boon takes: the flags the record carries land on the round in one write, the table clears, and the card's pick is counted, so the tally holds one offer and one pick for a card that was dealt and taken",
+      );
+      const loaned = voyageState();
+      const purse = loaned.money;
+      selectBoon(loaned, "emergency_loan", []);
+      check(
+        loaned.money === purse + 40 &&
+          loaned.modifierFlags.instant_gold === 40 &&
+          cardOrThrow("emergency_loan").effect.kind === "flags",
+        "and the one boon that pays on the spot pays what its record says, once, at the moment it is applied: the flag it leaves behind is what the endgame summary prints, so the gold and the line about the gold come from the same authored number",
+      );
+      const yard = voyageState();
+      startModuleDrafting(yard);
+      check(
+        yard.phase === "module_draft" &&
+          (yard._draftChoices?.length ?? 0) === CARDS_PER_OFFER &&
+          new Set(yard._draftChoices?.map((card) => card.id)).size ===
+            CARDS_PER_OFFER &&
+          (yard._draftChoices ?? []).every(
+            (card) =>
+              card.kind === "module" &&
+              offerPool("module", yard).some(
+                ([pooled]) => pooled.id === card.id,
+              ),
+          ),
+        "the shipyard deals three different modules off the same weighted reader, so the two drafts share one draw and one tally rather than each keeping its own",
+      );
+      const parked = yard._draftChoices?.[0];
+      const drafted = yard.phase === "module_draft";
+      handleModuleSelect(yard, 0, []);
+      check(
+        parked !== undefined &&
+          drafted &&
+          yard.shipLevel === 0 &&
+          yard.phase === "module_swap" &&
+          yard._newModule?.id === parked.id &&
+          (yard._draftChoices ?? []).length === CARDS_PER_OFFER,
+        "a module picked with no slot open is parked rather than installed: the leg moves to the swap, the choice waits in its own field, and the table still holds all three, so backing out with a look at the draft still shows every original option",
+      );
+      const hull = voyageState();
+      hull.shipLevel = 1;
+      startModuleDrafting(hull);
+      const chosen = hull._draftChoices?.[0];
+      const offeredBefore = chosen
+        ? hull.cardTally[chosen.id]?.offered
+        : undefined;
+      handleModuleSelect(hull, 0, []);
+      check(
+        chosen !== undefined &&
+          hull.phase === "dusk" &&
+          hull.equippedModules.some((card) => card.id === chosen.id) &&
+          (hull.cardTally[chosen.id]?.picked ?? 0) === 1 &&
+          offeredBefore === 1 &&
+          (hull._draftChoices ?? []).every((card) => card.id !== chosen.id),
+        "while a module picked with a slot open installs, moves the leg on, drops out of the table since the pick is final, and is counted as taken where the card actually lands: a module parked for a swap can still be backed out of, and only a card that joined the hull is a card that was taken",
+      );
+
+      // ---- The tally and the report ----
+      check(
+        Object.keys(normalizeCardTally(undefined)).length === 0 &&
+          Object.keys(normalizeCardTally(null)).length === 0 &&
+          Object.keys(normalizeCardTally("nonsense")).length === 0 &&
+          Object.keys(normalizeCardTally({})).length === 0,
+        "a save that carries no tally reads as an empty one, whichever of the four ways it carries nothing: the field is read back out as a measurement, so all four arms are checked rather than trusted",
+      );
+      const salvaged = normalizeCardTally({
+        silk_wind: { offered: 10, picked: 4 },
+        silk_monopoly: { offered: 3, picked: 9 },
+        retired_card: { offered: 5, picked: 1 },
+        favorable_tides: { offered: -2, picked: 1.5 },
+        tax_shelter: { offered: "3", picked: 1 },
+        merchants_converge: { offered: 0, picked: 0 },
+      });
+      check(
+        Object.keys(salvaged).join(",") === "silk_wind,silk_monopoly" &&
+          salvaged.silk_wind.offered === 10 &&
+          salvaged.silk_monopoly.picked === 3,
+        "a count is a whole number of at least zero, a card this build does not know is dropped rather than carried, and a pick count above the offer count is trimmed to it: a card cannot be taken more often than it was put on the table, and a row of zeroes is the absence of a reading rather than a reading of zero",
+      );
+      const tally: CardTally = {};
+      noteCardOffer(tally, cardOrThrow("silk_wind"));
+      noteCardOffer(tally, cardOrThrow("silk_wind"));
+      noteCardPick(tally, cardOrThrow("silk_wind"));
+      check(
+        Object.keys(tally).length === 1 &&
+          tally.silk_wind.offered === 2 &&
+          tally.silk_wind.picked === 1,
+        "the two writes share one entry, so the shape of a tally entry has one home rather than one per site that counts something, and the pair a card carries is always an offer count and a pick count of the same card",
+      );
+      check(
+        CARD_CONVERSION_FLOOR === 40,
+        "the floor a rate is read from is forty appearances, which is the plan's own two numbers read together and F7's combination floor as well, so the two instruments agree about what counts as evidence",
+      );
+      const measured = readCardConversion({
+        silk_wind: { offered: 39, picked: 39 },
+        favorable_tides: { offered: 40, picked: 10 },
+        tax_shelter: { offered: 100, picked: 5 },
+      });
+      check(
+        measured.length === 3 &&
+          measured[0].id === "favorable_tides" &&
+          measured[0].rate === 0.25 &&
+          measured[0].name === "Favorable Tides" &&
+          measured[0].kind === "boon" &&
+          measured[1].id === "tax_shelter" &&
+          measured[1].rate === 0.05 &&
+          measured[2].id === "silk_wind" &&
+          measured[2].rate === null,
+        "one appearance below the floor is not a rate at all, even at a hundred percent, which is the plan's own warning about a high rate over nine appearances. The measurable cards come first and are ordered by rate, so the card worth looking at is the first row, and the row carries the card's name and kind rather than leaving a reader to look them up",
+      );
+      check(
+        readCardConversion({
+          silk_wind: { offered: 5, picked: 2 },
+          favorable_tides: { offered: 9, picked: 1 },
+        })[0].id === "favorable_tides" &&
+          readCardConversion({
+            silk_wind: { offered: 5, picked: 2 },
+          }).every((reading) => reading.rate === null) &&
+          readCardConversion({}).length === 0,
+        "with the unmeasurable ordered by appearances, since the card seen most often is the next one to become measurable, and an empty tally reading as no rows at all rather than as a crash or a row of zeroes",
+      );
+      const saved = voyageState();
+      saved.cardTally = {
+        silk_wind: { offered: 5, picked: 2 },
+        retired_card: { offered: 2, picked: 1 },
+      };
+      healLoadedVoyage(saved, { legacyRenownLevel: null });
+      check(
+        saved.cardTally.silk_wind?.offered === 5 &&
+          saved.cardTally.silk_wind?.picked === 2 &&
+          !("retired_card" in saved.cardTally),
+        "a save that comes back off the server carrying a card this build does not know heals to the cards it does, through the same load pass every other saved field goes through: the tally is a measurement, so a stale id would print as a nameless row in the report rather than as a card nobody can explain",
+      );
+
+      // ---- The tag reads, in production ----
+      check(
+        carriesTag("good", "Hemp", "bulk") &&
+          carriesTag("good", "Silk", "woven") &&
+          !carriesTag("good", "Silk", "bulk") &&
+          !carriesTag("food", "Grain", "bulk") &&
+          !carriesTag("good", "no_such_good", "bulk"),
+        "the tag read answers true for a good carrying the tag, false for the same good under a tag it does not carry, false for a food key read as a good, and false rather than throwing for an id no catalogue holds, which is F1's null read as the false it means",
+      );
+      const hold = voyageState();
+      hold.inventory = { Hemp: 4, "Copper Ore": 3, Tea: 9 };
+      check(
+        holdOfTag(hold, "bulk") === 7 &&
+          holdOfTag(hold, "perishable") === 9 &&
+          holdOfTag(hold, "luxury") === 0 &&
+          goodsCarryingTag("bulk").length === 3 &&
+          goodsCarryingTag("bulk").includes("Copper Ore"),
+        "the hold sums the goods the vocabulary points at rather than a list kept beside it: hemp and ore are bulk and tea is not, the tea is perishable on its own, and no good in that hold is luxury, so one reader answers all three questions the cards ask",
+      );
+      check(
+        cargoCarriesTag([{ type: "Hemp" }], "bulk") &&
+          cargoCarriesTag([{ type: "Hemp" }], "woven") &&
+          !cargoCarriesTag([{ type: "Hemp" }], "luxury") &&
+          !cargoCarriesTag([], "bulk"),
+        "and an order's own manifest is read through the same vocabulary, which is what lets a card pay on the freight a captain actually signed for: an empty manifest carries nothing, for the reason an empty hold holds nothing",
+      );
+
+      // ---- The validator ----
+      const shipped = shippedCards();
+      check(
+        validateCards(shipped).length === 0,
+        "the pool the tree ships passes every clause, which is the run the build itself gates on, so a card that breaks one of the rules below is a failed build rather than a card somebody notices in a draft",
+      );
+      const broken = (patch: Partial<CardRecord>): CardSubject => ({
+        ...shipped,
+        cards: shipped.cards.map((card, at) =>
+          at === 0 ? { ...card, ...patch } : card,
+        ),
+      });
+      const brokenModule = (patch: Partial<CardRecord>): CardSubject => ({
+        ...shipped,
+        cards: shipped.cards.map((card) =>
+          card.id === "silk_monopoly" ? { ...card, ...patch } : card,
+        ),
+      });
+      // A clause is asked for its finding and for nothing else, since a rule
+      // that fired alongside three others could be firing for the wrong reason.
+      const sole = (subject: CardSubject): string | null => {
+        const found = validateCards(subject);
+        return found.length === 1 ? found[0] : null;
+      };
+      check(
+        sole({
+          ...shipped,
+          cards: shipped.cards.map((card, at) =>
+            at === 1 ? { ...card, id: shipped.cards[0].id } : card,
+          ),
+        })?.includes("two cards share this id") === true,
+        "two records sharing an identifier are caught, which is the one failure the pool cannot heal from: every save, standing order and wire frame stores the id, so a second card answering to it would silently take the first card's picks",
+      );
+      check(
+        sole(broken({ id: "" }))?.includes("no identifier") === true,
+        "a card with no identifier at all is caught too, because an id is what the ledger line and the tally row are keyed by",
+      );
+      check(
+        sole(broken({ trigger: "shipyard_draft" as CardTrigger }))?.includes(
+          "arrives at",
+        ) === true,
+        "a card whose trigger disagrees with its kind is caught, since the trigger is read off the map rather than off the record and a card that said otherwise would be a card offered at a draft that never deals it",
+      );
+      check(
+        (() => {
+          const notAKind = validateCards(
+            broken({ kind: "relic" as CardRecord["kind"] }),
+          );
+          return (
+            notAKind.length === 2 &&
+            notAKind.some((finding) =>
+              finding.includes("is not a kind a card can have"),
+            ) &&
+            notAKind.some((finding) => finding.includes("arrives at"))
+          );
+        })(),
+        "and a kind outside the plan's three is caught twice over, once for the kind itself and once for the trigger that follows from it: a kind nothing can offer is a card the pool would carry forever without ever dealing it, and a record whose kind and trigger disagree is a record the validator refuses to read either half of on trust",
+      );
+      check(
+        sole(broken({ tags: [] as unknown as TagList }))?.includes(
+          "carries no tag",
+        ) === true,
+        "an entry carrying no tags is caught, which is the clause that holds content the compiler did not check: the type cannot express an empty set, so a card read out of a file, or a record cast past the type, is how one arrives bare",
+      );
+      check(
+        sole(
+          broken({ tags: ["woven", "luxury", "cold"] as unknown as TagList }),
+        )?.includes("carries 3 tags") === true,
+        "a third tag on a card is caught, which is F1's ceiling asked of the pool the same way it is asked of every catalogue: every tag a card carries doubles the space a balance pass has to cover",
+      );
+      check(
+        sole(
+          broken({ tags: ["woven", "woven"] as unknown as TagList }),
+        )?.includes("carries a tag twice") === true,
+        "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
+      );
+      check(
+        sole(broken({ tags: ["silk"] as unknown as TagList }))?.includes(
+          "is not one of the twelve tags",
+        ) === true,
+        "and a tag outside the closed twelve is caught on the card itself, which is the reading F1's walk takes of every catalogue entry applied to a card shaped subject: a tag no effect will ever look up is a typo whether the pool it sits in is a catalogue or a deck",
+      );
+      check(
+        sole(broken({ power: 0 }))?.includes("at least one") === true &&
+          sole(broken({ power: 2.5 }))?.includes("at least one") === true,
+        "power has to be a whole number of at least one, since it is spent as a budget against a ceiling and a fraction or a zero is a card whose cost nobody can add up",
+      );
+      check(
+        sole(broken({ modes: { classic: 0, ocean_gambit: 0 } }))?.includes(
+          "no mode offers it",
+        ) === true,
+        "a card no mode runs is caught, which is the clause that keeps the mode list honest: a card with a zero in both halves is a record the pool can never draw, and it would sit in the tree looking like content",
+      );
+      check(
+        sole(broken({ power: 4 }))?.includes("above classic's ceiling") ===
+          true,
+        "a card above a mode's ceiling that still carries a weight there is caught, and that pair is what makes the ceiling a ceiling rather than a comment: a card above it has to be zeroed out of that mode rather than merely unlikely in it",
+      );
+      check(
+        sole(
+          broken({ pathWeight: { galleon: 2 } as CardRecord["pathWeight"] }),
+        )?.includes("is not a path") === true,
+        "a lean toward something that is not a path is caught, because a lean nobody can read is a weight that quietly never applies",
+      );
+      check(
+        sole(broken({ pathWeight: { loom: 0 } }))?.includes(
+          "a lean is never a lockout",
+        ) === true,
+        "and a lean of zero is caught rather than treated as a filter, which is the plan's own sentence about this field: the draw is weighted so that a captain is never locked out of the rest of the pool, and a zero here would be exactly that lockout wearing a weight",
+      );
+      check(
+        sole(
+          broken({
+            condition: {
+              kind: "crew_role",
+              roles: ["astrologer"],
+              weight: 1,
+              otherwise: 1,
+            },
+          }),
+        )?.includes("asks for a crew role the roster cannot hold") === true,
+        "a condition asking for a trade the roster cannot hold is caught, because the engine would answer it false for every captain alive and the card would be offered to nobody: the reader is defensive, so this is a content failure rather than a crash, and a content failure has to be caught here instead",
+      );
+      check(
+        sole(broken({ effect: { kind: "hull" } }))?.includes(
+          "a boon writes the round's flags",
+        ) === true,
+        "a boon whose effect is not the flags is caught, since the draft applies a boon by writing what its record carries and a boon carrying a hull would be a card that changes nothing at all",
+      );
+      check(
+        sole(broken({ effect: { kind: "flags", flags: {} } }))?.includes(
+          "writes no flag",
+        ) === true,
+        "and a boon that writes no flags is caught even when its shape is right: an empty flag set is a card a captain can pick, and pay for, and receive nothing from",
+      );
+      check(
+        sole(
+          brokenModule({
+            effect: { kind: "flags", flags: { instant_gold: 1 } },
+          }),
+        )?.includes("a module works by being installed") === true,
+        "a module whose effect is not the hull is caught in the other direction: a hull card's mechanism is its identifier, and a module carrying flags would be a card the engine never reads the flags of",
+      );
+      check(
+        sole(
+          broken({
+            strings: {
+              en: cardOrThrow("silk_wind").strings.en,
+              zh: undefined,
+            } as unknown as CardRecord["strings"],
+          }),
+        )?.includes("carries no zh string") === true,
+        "a card missing a language is caught, which is J3 read forward as a gate rather than as a hope: the pool has to carry both strings from the beginning, so a card that arrives with one fails the build rather than the translation pass",
+      );
+      check(
+        sole(
+          broken({
+            strings: {
+              en: { name: "Weaver's Winds", desc: " " },
+              zh: cardOrThrow("silk_wind").strings.zh,
+            },
+          }),
+        )?.includes("the en string is empty") === true,
+        "as is a card whose string is there but blank, since a name of spaces is a card a captain cannot read and a check looking only for a missing key would pass it",
+      );
+      check(
+        sole(
+          broken({
+            strings: {
+              en: {
+                name: "Silk Wind",
+                desc: "Woven goods cost less this round.",
+              },
+              zh: cardOrThrow("silk_wind").strings.zh,
+            },
+          }),
+        )?.includes("the en text names Silk") === true,
+        "and a card whose text names a good is caught, which is the scan the plan puts in F1's evaluation and F2 carries into the build: the copy a captain reads is held to the same rule the effect is, because a card that names Silk while its tag says woven teaches the wrong lesson twice",
+      );
+      check(
+        validateCards(
+          broken({
+            strings: {
+              en: {
+                name: "Artisan's Workshop",
+                desc: "Workers produce 1 extra item each round.",
+              },
+              zh: cardOrThrow("silk_wind").strings.zh,
+            },
+          }),
+        ).length === 0,
+        "while the same scan reads a name rather than a word: the artisan's workshop says that its workers produce, and Produce is a food, so the scan is case sensitive on purpose. A scan that could not tell those apart would fail the build over a verb",
+      );
+
+      // ---- The house rule ----
+      check(
+        [
+          "src/lib/game/constants/cards.ts",
+          "src/lib/game/cards.ts",
+          "src/lib/game/constants/drafts.ts",
+          "src/lib/game/engine/boons.ts",
+          "src/lib/game/engine/pricing.ts",
+          "src/lib/game/engine/orders.ts",
+          "src/lib/game/glossary.ts",
+          "src/lib/game/standing.ts",
+          "src/lib/game/pools.ts",
+          "scripts/cards.ts",
+          "scripts/cardConversion.ts",
+        ].every((file) => !carriesADash(file)),
+        "and every file this feature lands in is free of em dashes, en dashes and doubled hyphens, in its comments as well as in the words a captain reads",
+      );
+      check(
+        CARDS.every((card) =>
+          LANGUAGES.every((language) => {
+            const text = card.strings[language];
+            return (
+              !CARRIES_A_DASH.test(text.name) && !CARRIES_A_DASH.test(text.desc)
+            );
+          }),
+        ),
+        "which the card text itself keeps, read straight off the records in both languages: every string on the face is a captain's words, so the house rule is held there by the same expression the source files are held by, and a dash the validator never looks for is a dash that ships",
+      );
+    }
+
+    // ---- The ready check that stalls ----
+    // The field report this block is for is one sentence long: both captains
+    // clicked ready in a Gambit harbor and the voyage did not proceed. The
+    // protocol answers that sentence with one shape, and both halves of it
+    // are held down here.
+    //
+    // The first half is the vote. A room advances when every captain in the
+    // active roster has said ready, and what each vote promises is a
+    // departure: the client hears the room move, runs its transition and
+    // reports the seat it landed on, and that report is what moves the
+    // checkpoint. A vote whose departure cannot leave the seat it is cast
+    // from, or a departure whose report never lands, leaves the room holding
+    // a full ready set and a lock nobody can lift: the bar reads ready on
+    // every screen and nothing moves. So the engine's answer to "can this
+    // press leave this seat" is checked here seat by seat, against both
+    // laps, because that answer is what the bar and every panel's own button
+    // now gate their press on.
+    //
+    // The second half is the room's own cure, and it is the half that has to
+    // be watched over a live harbor rather than read: an announcement the
+    // room never hears answered is handed back to the table after a grace
+    // longer than the client's own heartbeat, with the honest votes kept and
+    // the lock cleared, so the next report can announce the same seat again.
+    // Both directions are checked, because the cure that fired on a healthy
+    // table would be a second bug: a room whose report lands is never spoken
+    // to at all.
+    //
+    // What it deliberately does not check is the press sites themselves,
+    // which are React panels. The engine's answer they gate on is here, the
+    // server's half is here, and the two of them together are what the
+    // client model outside the repository was run against to prove the field
+    // report closed.
+    {
+      const rchkGambit = "ocean_gambit";
+      const rchkLaps = ["ocean_gambit", "classic"] as const;
+      // The seats a press cannot leave, named rather than derived, because
+      // this is the list the bug was made of: the pier is the host's, Dawn is
+      // the draft's, the two module seats belong to the draft's own screens,
+      // and the last two are a voyage that is already over for that captain.
+      // Dawn is on both laps and is still on this list, which is the
+      // distinction the whole block turns on: a step a captain leaves by
+      // choosing a card is not a step a press can leave.
+      const rchkNoPress: Phase[] = [
+        "harbor",
+        "dawn",
+        "module_draft",
+        "module_swap",
+        "bankruptcy",
+        "endgame",
+      ];
+      // The cure's own sentence, read off the wire as a fragment rather than
+      // as the whole line, so the check is that the harbor named the ready
+      // check it was opening rather than that somebody once wrote a
+      // particular sentence.
+      const rchkCure = "did not hear that leg move";
+      const rchkCtx: GameContext = {
+        seedBase: "smoke:ready-check",
+        harborId: "smoke-ready-check",
+      };
+      const rchkLogs: string[] = [];
+      const rchkFresh = (mode: "ocean_gambit" | "classic") =>
+        createInitialGameState({ mode, difficulty: "fair_winds" });
+
+      for (const mode of rchkLaps) {
+        const pressable = lapPhases(mode).filter(
+          (phase) => phase !== "harbor" && phase !== "dawn",
+        );
+        for (const phase of pressable) {
+          check(
+            canLeavePhase({ mode, phase, gameOver: false }) === true,
+            `${mode} sails out of ${phase} by pressing, since it is a seat the leg walks through`,
+          );
+        }
+        for (const phase of rchkNoPress) {
+          check(
+            canLeavePhase({ mode, phase, gameOver: false }) === false,
+            `${mode} refuses a press at ${phase}, so a ready vote for a departure that cannot be made is never sent`,
+          );
+        }
+      }
+      check(
+        canLeavePhase({
+          mode: rchkGambit,
+          phase: "market",
+          gameOver: true,
+        }) === false,
+        "and a captain whose voyage is over cannot ready anywhere, whatever seat they are standing in",
+      );
+
+      // A press at Dawn, run rather than asked about: it has to report that
+      // it did nothing AND leave the round where it was, because a press that
+      // settled something on its way to refusing would be worse than one that
+      // moves.
+      const rchkDawn = rchkFresh(rchkGambit);
+      rchkDawn.phase = "dawn";
+      const rchkDawnRound = rchkDawn.currentRound;
+      check(
+        leavePhase(rchkDawn, rchkCtx, rchkLogs) === false &&
+          rchkDawn.phase === "dawn" &&
+          rchkDawn.currentRound === rchkDawnRound,
+        "a departure pressed at Dawn refuses and moves nothing, which is the press every Ctrl+N in a Gambit harbor used to send",
+      );
+
+      // The same press at a seat that IS a departure, in both laps, read
+      // against the lap's own successor rather than a name typed here.
+      for (const mode of rchkLaps) {
+        const state = rchkFresh(mode);
+        state.phase = "market";
+        const moved = leavePhase(state, rchkCtx, rchkLogs);
+        check(
+          moved === true && state.phase === lapSuccessor(mode, "market"),
+          `${mode} leaves the Market for the seat its own lap names next when the same press is made there`,
+        );
+      }
+
+      // And the auto path, which is what a captain who missed the
+      // announcement runs: it takes the seat's defaults and leaves in one
+      // call, so a room that moves without a vote is not left standing where
+      // it was.
+      const rchkAuto = rchkFresh(rchkGambit);
+      rchkAuto.phase = "market";
+      autoCommit(rchkAuto, rchkCtx, rchkLogs);
+      check(
+        rchkAuto.phase === lapSuccessor(rchkGambit, "market"),
+        "a captain who never voted still leaves the seat when the room moves on without them",
+      );
+
+      // The live half. Two captains, a private Gambit harbor, and two
+      // sockets that are raw on purpose: nothing here runs a client, so the
+      // room's own grace is the only thing that can answer an announcement.
+      const rchkOpening = await signUp("rchka");
+      const rchkCrewmate = await signUp("rchkb");
+      run.extraAccounts.push(rchkOpening, rchkCrewmate);
+      const rchkOpened = await call<{ room: { id: string; code: string } }>(
+        "/api/rooms",
+        {
+          method: "POST",
+          cookie: rchkOpening.cookie,
+          body: JSON.stringify({
+            name: `Smoke ready check ${suffix}`,
+            isPublic: false,
+            mode: rchkGambit,
+            unlock: LEDGER_PHRASE,
+          }),
+        },
+      );
+      if (rchkOpened.status !== 200) {
+        throw new Error(
+          "No Gambit harbor to stall a ready check in, stopping here.",
+        );
+      }
+      const rchkRoom = rchkOpened.body.room.id;
+      run.lapRoomIds.push(rchkRoom);
+      const rchkJoined = await call("/api/rooms/join", {
+        method: "POST",
+        cookie: rchkCrewmate.cookie,
+        body: JSON.stringify({ code: rchkOpened.body.room.code }),
+      });
+      check(
+        rchkJoined.status === 200,
+        "the second captain joins the harbor this block stalls",
+      );
+
+      // What each socket heard, kept apart. Every frame below is the room's,
+      // so both captains in the harbor hear the same one, and the checks read
+      // both lists: a frame that reached one socket and not the other is a
+      // difference this block exists to see rather than to average away.
+      //
+      // Only the cure's own lines are collected. The harbor talks to its room
+      // about other things on this channel, a captain walking in being the
+      // loudest of them, and a list that held those would count a hello as a
+      // stalled leg.
+      type RchkSeat = { round: number; phase: Phase };
+      type RchkFrame = {
+        roomId?: string;
+        round?: number;
+        phase?: Phase;
+        readyUserIds?: string[];
+        requiredUserIds?: string[];
+      };
+      const rchkHeard: Array<{
+        advances: RchkSeat[];
+        rescues: string[];
+        standing: RchkFrame | null;
+        errors: string[];
+      }> = [];
+      const rchkCrew: Array<{ socket: Socket }> = [];
+      for (const captain of [rchkOpening, rchkCrewmate]) {
+        const socket = await openAuthedSocket(captain);
+        run.sockets.push(socket);
+        const mine = {
+          advances: [] as RchkSeat[],
+          rescues: [] as string[],
+          standing: null as RchkFrame | null,
+          errors: [] as string[],
+        };
+        rchkHeard.push(mine);
+        socket.on("phase:advance", (payload: RchkFrame) => {
+          if (payload?.roomId !== rchkRoom) return;
+          mine.advances.push({
+            round: payload.round ?? 0,
+            phase: (payload.phase ?? "harbor") as Phase,
+          });
+        });
+        socket.on("phase:ready_update", (payload: RchkFrame) => {
+          if (payload?.roomId !== rchkRoom) return;
+          mine.standing = payload;
+        });
+        socket.on(
+          "room:system",
+          (payload: { roomId?: string; content?: string }) => {
+            if (payload?.roomId !== rchkRoom) return;
+            const line = String(payload.content ?? "");
+            if (line.includes(rchkCure)) mine.rescues.push(line);
+          },
+        );
+        socket.on(
+          "room:error",
+          (payload: { roomId?: string; error?: string }) => {
+            if (payload?.roomId !== rchkRoom) return;
+            mine.errors.push(String(payload.error ?? ""));
+          },
+        );
+        const aboard = waitForEvent(socket, "chat:history", undefined, 15000);
+        socket.emit("room:join", { roomId: rchkRoom });
+        if (!(await aboard)) {
+          throw new Error(
+            "A captain never boarded the harbor this block opens.",
+          );
+        }
+        rchkCrew.push({ socket });
+      }
+      const rchkDepartures = rchkCrew.map((seat) =>
+        waitForEvent(seat.socket, "room:started", undefined, 15000),
+      );
+      rchkCrew[0].socket.emit("room:start", { roomId: rchkRoom });
+      await Promise.all(rchkDepartures);
+
+      const rchkReport = (seat: (typeof rchkCrew)[number], step: RchkSeat) => {
+        seat.socket.emit("game:status", {
+          roomId: rchkRoom,
+          round: step.round,
+          phase: step.phase,
+          phaseLabel: step.phase,
+          gold: 100,
+          reputation: 10,
+          shipLevel: 0,
+          gameOver: false,
+        });
+      };
+      const rchkStanding = (step: RchkSeat) =>
+        rchkHeard[0].standing?.round === step.round &&
+        rchkHeard[0].standing?.phase === step.phase;
+      // Both captains stand where the block says they stand, and the room
+      // says so back before anything else happens: a vote is judged against
+      // the checkpoint the server is holding, so a vote that overtook the
+      // report behind it would stall this block on its own haste rather than
+      // on anything the harbor does.
+      const rchkStand = async (step: RchkSeat): Promise<boolean> => {
+        for (let waited = 0; waited < 15000; waited += 50) {
+          if (rchkStanding(step)) return true;
+          if (waited % 500 === 0) {
+            for (const seat of rchkCrew) rchkReport(seat, step);
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return rchkStanding(step);
+      };
+      const rchkReady = (step: RchkSeat) => {
+        for (const seat of rchkCrew) {
+          seat.socket.emit("phase:ready", {
+            roomId: rchkRoom,
+            round: step.round,
+            phase: step.phase,
+          });
+        }
+      };
+      const rchkSettled = async (read: () => boolean, ms: number) => {
+        for (let waited = 0; waited < ms; waited += 100) {
+          if (read()) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return read();
+      };
+      const rchkBoth = (
+        count: (mine: (typeof rchkHeard)[number]) => number,
+        want: number,
+      ) =>
+        rchkHeard.length === 2 &&
+        rchkHeard.every((mine) => count(mine) === want);
+
+      const rchkStood = await rchkStand({ round: 1, phase: "dawn" });
+      check(
+        rchkStood,
+        "both captains stand at the first seat of the leg in the harbor this block opened",
+      );
+      rchkReady({ round: 1, phase: "dawn" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 1),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 1) &&
+          rchkHeard.every((mine) => mine.advances[0].phase === "dawn"),
+        "a full ready set at Dawn announces the departure to every captain in the harbor, which is the frame both captains in the field report were waiting for",
+      );
+      check(
+        rchkHeard.every((mine) => mine.advances[0].round === 1),
+        "and the announcement names the seat being left rather than the one being entered",
+      );
+
+      // The healthy direction: one captain reports the seat the announcement
+      // was about, the checkpoint moves, and the room must then say nothing
+      // at all. The wait is longer than the room's own grace, so a watch left
+      // armed by a report that landed would be caught here as a harbor
+      // talking to itself.
+      rchkReport(rchkCrew[0], { round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkStanding({ round: 1, phase: "market" }),
+        8000,
+      );
+      check(
+        rchkStanding({ round: 1, phase: "market" }),
+        "the room stands at the seat that report named, so the departure was answered",
+      );
+      await new Promise((r) => setTimeout(r, 14000));
+      check(
+        rchkHeard.every((mine) => mine.rescues.length === 0),
+        "a room whose departure was reported is never told the harbor did not hear it, since a cure that fired on a healthy table would be its own bug",
+      );
+
+      // The stalled direction: both captains ready at the Market and then
+      // nobody reports. This is every captain's transport dying between the
+      // announcement and the answer, and it is the shape the field report
+      // describes from the other side of the screen.
+      const rchkStoodAgain = await rchkStand({ round: 1, phase: "market" });
+      check(
+        rchkStoodAgain,
+        "both captains stand at the seat the harbor moved them to",
+      );
+      rchkReady({ round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 2),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 2),
+        "the ready set at the Market announces its departure as well",
+      );
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.rescues.length, 1),
+        20000,
+      );
+      check(
+        rchkBoth((mine) => mine.rescues.length, 1),
+        "and an announcement nobody answers is handed back to the room after its grace, which is the cure for the stall the field report describes",
+      );
+      check(
+        rchkHeard[0].rescues[0] === rchkHeard[1].rescues[0] &&
+          String(rchkHeard[0].rescues[0]).includes("ready check is open again"),
+        "and it is one line said to the room rather than one per socket in it, naming the ready check rather than a leg the harbor moved",
+      );
+
+      // The cure with its two halves held apart: the votes that were cast are
+      // still counted, and the lock is gone. The first is read off the ready
+      // state the room rebroadcasts, and the second can only be read off the
+      // behavior it exists for, so a captain reports the seat again and the
+      // harbor has to announce it a second time.
+      check(
+        rchkHeard[0].standing?.round === 1 &&
+          rchkHeard[0].standing?.phase === "market" &&
+          rchkHeard[0].standing?.readyUserIds?.length === 2 &&
+          rchkHeard[0].standing?.requiredUserIds?.length === 2,
+        "the ready check is open again on the same seat with both votes still counted, because the votes were honest and what was missing was the move",
+      );
+      rchkReport(rchkCrew[0], { round: 1, phase: "market" });
+      await rchkSettled(
+        () => rchkBoth((mine) => mine.advances.length, 3),
+        8000,
+      );
+      check(
+        rchkBoth((mine) => mine.advances.length, 3),
+        "so the very next report announces the same seat again, which is the harbor carrying on rather than waiting on a lock nobody can see",
+      );
+
+      // And the voyage lands: the other side of the same promise, which is a
+      // report naming somewhere further along moving the room there.
+      rchkReport(rchkCrew[1], { round: 1, phase: "orders" });
+      await rchkSettled(
+        () => rchkStanding({ round: 1, phase: "orders" }),
+        8000,
+      );
+      check(
+        rchkStanding({ round: 1, phase: "orders" }),
+        "and the harbor stands where that report put it, with the leg behind it settled rather than re opened",
+      );
+      check(
+        rchkHeard.every((mine) => mine.errors.length === 0),
+        "with nothing in this block refused along the way, so none of the above was the harbor declining to be spoken to",
+      );
+    }
   } finally {
     for (const socket of run.sockets) {
       socket.removeAllListeners();

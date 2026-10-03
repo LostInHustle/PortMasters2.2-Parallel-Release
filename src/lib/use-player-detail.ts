@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
-import type { Module } from "@/lib/game/constants/drafts";
+import type { CardRecord } from "@/lib/game/constants/cards";
 
 // A lighter snapshot than the full GameState, just what the detail popup
 // (and the bankrupt player spectator view, which reuses the same popup)
@@ -17,7 +17,7 @@ export type PlayerDetailData = {
   gameOver: boolean;
   inventory: GameState["inventory"];
   workers: GameState["workers"];
-  equippedModules: Module[];
+  equippedModules: CardRecord[];
   logs: string[];
 };
 

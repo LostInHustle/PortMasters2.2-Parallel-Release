@@ -23,12 +23,14 @@ import {
   normalizeBargeState,
   normalizeConsentLedger,
   normalizeEscortState,
+  normalizeModuleTradeState,
   normalizeOpportunistBorrows,
   normalizeRefitState,
   normalizeRumorLean,
   noHousePerks,
 } from "@/lib/game/engine";
 import { normalizeOrderFills } from "@/lib/game/audit";
+import { normalizeCardTally } from "@/lib/game/cards";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { normalizePortShift } from "@/lib/game/maroon";
@@ -179,6 +181,15 @@ function healCommissionAndHold(game: GameState): void {
 // engine reads unconditionally on the next action.
 function healVoyageTallies(game: GameState): void {
   game.boonChoices = game.boonChoices ?? [];
+  // [F2: the card record, and the mode weighting field] How often each card
+  // was offered and how often one was taken. A voyage saved before this
+  // field existed carries no tally at all, and the read is a normalizer
+  // rather than a coalesce because the field is read back out as a
+  // measurement: a count that is a fraction, a negative or a string is not
+  // a small number, and the report would print it beside real ones. A card
+  // this build does not know is dropped rather than carried, so a stale id
+  // from a retired card cannot print as a nameless row.
+  game.cardTally = normalizeCardTally(game.cardTally);
   game.boonSwapUsed = game.boonSwapUsed ?? false;
   game.moduleSwapUsed = game.moduleSwapUsed ?? false;
   game.pirateAttackResolved = game.pirateAttackResolved ?? false;
@@ -318,6 +329,14 @@ function healConsentBoards(game: GameState): void {
   );
   normalizeEscortState(game);
   normalizeRefitState(game);
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The trade's own tally and its per module ledger. Same
+  // heal as the two kinds above and for the same reason on the
+  // counters; the per module record is the one a stale save cannot
+  // carry at all, so its reader answers an empty ledger rather than
+  // undefined and the first sale writes the first entry (see
+  // normalizeModuleTradeState).
+  normalizeModuleTradeState(game);
 }
 
 // The answers that come from outside the save, applied last so that they

@@ -51,6 +51,7 @@ import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
 import {
   escortContractsOn,
+  moduleTradesOn,
   pathOrdersOn,
   survivalLayerOn,
 } from "@/lib/game/flags";
@@ -144,6 +145,15 @@ export function useLegReport(
     : undefined;
   const ragsRewoven = refitsOn(game.mode) ? game.ragsRewoven : undefined;
   const coldLeg = garmentsLayerOn(game.mode) ? legIsCold(game) : undefined;
+  // [F3: modules in the shipyard ladder, and trading them between captains]
+  // The market's two, read off the tally the seller's own settle writes and
+  // sent only when the switch that gives them meaning is on. The seller's
+  // side, for the two markets' reason: the plan asks about trade volume
+  // between captains, and the buyer is on the other side of both numbers.
+  const modulesSold = moduleTradesOn(game.mode) ? game.modulesSold : undefined;
+  const moduleFeesEarned = moduleTradesOn(game.mode)
+    ? game.moduleFeesEarned
+    : undefined;
   // [D6: Free Captain: Opportunist] The borrow counter, the last of the
   // ability figures and the only one that counts the voyage rather than the
   // leg: the plan's evaluation is a usage rate, which is a share of voyages,
@@ -195,6 +205,8 @@ export function useLegReport(
         refitFeesEarned,
         ragsRewoven,
         coldLeg,
+        modulesSold,
+        moduleFeesEarned,
         opportunistBorrows,
         foodSpend,
         bargeSpend,
@@ -220,6 +232,8 @@ export function useLegReport(
     refitFeesEarned,
     ragsRewoven,
     coldLeg,
+    modulesSold,
+    moduleFeesEarned,
     opportunistBorrows,
     foodSpend,
     bargeSpend,

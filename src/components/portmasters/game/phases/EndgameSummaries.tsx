@@ -1,6 +1,7 @@
 "use client";
 
 import { Handshake, Heart, Receipt } from "lucide-react";
+import { cardByFlag, cardText } from "@/lib/game/cards";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { SummaryHeading } from "./PhaseShared";
@@ -72,6 +73,10 @@ function LedgerColumn({
  * summary rather than a precise reconciliation.
  */
 export function FinancialSummary({ game }: { game: GameState }) {
+  // The income row names the boon that granted the Gold rather than
+  // spelling it here, the way the pricing breakdowns name the source of
+  // an adjustment: the record is where that name lives.
+  const instantGold = cardByFlag("instant_gold");
   const income: LedgerRow[] = [
     {
       label: "Trade Revenue",
@@ -80,9 +85,9 @@ export function FinancialSummary({ game }: { game: GameState }) {
       tone: "text-gain",
     },
     {
-      label: "Emergency Loan",
+      label: instantGold === null ? "Boon Gold" : cardText(instantGold).name,
       value: game.modifierFlags.instant_gold ?? 0,
-      icon: "💰",
+      icon: instantGold === null ? "💰" : instantGold.icon,
       tone: "text-due",
     },
   ].filter((r) => r.value > 0);

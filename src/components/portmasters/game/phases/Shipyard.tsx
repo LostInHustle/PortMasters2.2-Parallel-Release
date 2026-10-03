@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { nextPhase, startModuleDrafting, upgradeShip } from "@/lib/game/engine";
+import { cardText } from "@/lib/game/cards";
+import {
+  leavePhase,
+  moduleSlotsOpen,
+  startModuleDrafting,
+  upgradeShip,
+} from "@/lib/game/engine";
 import {
   SHIP_DISCOUNT_PER_LEVEL,
   MAX_SHIP_LEVEL,
@@ -36,8 +42,12 @@ export function Shipyard({
     : 0;
   const affordable = game.money >= upgCost;
   const canDraft = game.shipLevel > 0;
-  const slotsFull =
-    game.equippedModules.length >= game.shipLevel && game.shipLevel > 0;
+  // The level guard rides along because a hull below its first upgrade has
+  // no slots to fill rather than full ones, and the label below says
+  // "Slots Full" only about a hull that has some. The open count itself is
+  // moduleSlotsOpen's answer, floored, so the label agrees with the draft
+  // screen for a hull a trade pushed one over its slots (see ./engine/core).
+  const slotsFull = canDraft && moduleSlotsOpen(game) === 0;
   return (
     <div className="max-w-2xl mx-auto">
       <PhaseHeading layout="text-center mb-4" tone="text-dusk" brush>
@@ -53,15 +63,18 @@ export function Shipyard({
         </div>
         {game.equippedModules.length ? (
           <div className="mt-3 space-y-1">
-            {game.equippedModules.map((m) => (
-              <div key={m.id} className="text-xs">
-                {m.icon}{" "}
-                <strong>
-                  <Term term={m.name}>{m.name}</Term>
-                </strong>
-                : {m.desc}
-              </div>
-            ))}
+            {game.equippedModules.map((card) => {
+              const text = cardText(card);
+              return (
+                <div key={card.id} className="text-xs">
+                  {card.icon}{" "}
+                  <strong>
+                    <Term term={text.name}>{text.name}</Term>
+                  </strong>
+                  : {text.desc}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-xs text-muted-foreground mt-2">
@@ -118,7 +131,7 @@ export function Shipyard({
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"
-            onClick={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+            onClick={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
           >
             ⏭️ Continue Voyage
           </Button>

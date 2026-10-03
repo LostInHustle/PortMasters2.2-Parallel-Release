@@ -72,6 +72,13 @@ export function wireLegReport(socket: Socket): void {
       ragsRewoven: optional(payload?.ragsRewoven),
       coldLeg:
         typeof payload?.coldLeg === "boolean" ? payload.coldLeg : undefined,
+      // [F3: modules in the shipyard ladder, and trading them between
+      // captains] The market's own two on the same optional reader, for
+      // the same reason: present but unreadable is dropped rather than
+      // refused, so a market figure can never cost a captain the rest of
+      // their leg.
+      modulesSold: optional(payload?.modulesSold),
+      moduleFeesEarned: optional(payload?.moduleFeesEarned),
       // [D6: Free Captain: Opportunist] The borrow counter on the same
       // optional reader as the figures above: a count the client kept,
       // kept only if it arrived readable.

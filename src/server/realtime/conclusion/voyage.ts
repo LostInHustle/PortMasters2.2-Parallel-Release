@@ -43,6 +43,7 @@ import {
 } from "../loans";
 import { roomMembers, userSockets } from "../presence";
 import { refitContracts } from "../refits";
+import { moduleTrades } from "../module-trades";
 import { recordReveal } from "../reveal";
 import { parseSave } from "../save";
 import { roomStatuses } from "../status";
@@ -139,6 +140,12 @@ export async function clearVoyageBoards(
   // leg nobody is going to sail.
   escortContracts.clear(io, roomId);
   refitContracts.clear(io, roomId);
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] And the module market's, for the fourth time and the same
+  // reason: a voyage that has ended stops moving its checkpoint, so
+  // nothing else would ever sweep it, and a listing left standing would
+  // be one about a leg nobody is going to sail.
+  moduleTrades.clear(io, roomId);
   // [D5: Aroma: the Bazaar Rumor] And the bazaar's rows, for the third time
   // and the same reason. They carry no escrow and no promise, so nothing is
   // left hanging by them, but a row is about a voyage's leg and the voyage

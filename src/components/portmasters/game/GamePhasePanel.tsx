@@ -130,6 +130,7 @@ function ActivePhase(props: Props) {
     aid,
     escort,
     refit,
+    modules,
     bazaar,
     backing,
     audit,
@@ -199,6 +200,11 @@ function ActivePhase(props: Props) {
           act={act}
           barter={barter}
           escort={escort}
+          // [F3: modules in the shipyard ladder, and trading them between
+          // captains] The module market, a whole screen's like the two
+          // markets around it rather than a station of a phase's, because
+          // it opens where they do: at the Parley table.
+          modules={modules}
           // [D5: Aroma: the Bazaar Rumor] The desk, which is a whole
           // screen's like the escort market above it rather than a station
           // of a phase's, because it opens where that market does: at the

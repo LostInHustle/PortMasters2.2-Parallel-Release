@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cardText } from "@/lib/game/cards";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
 import { tipsText } from "@/lib/game/constants/tips";
@@ -779,11 +780,15 @@ export function PlayerDetailModal({
                     </p>
                   ) : (
                     <div className="space-y-1">
-                      {detail.equippedModules.map((m) => (
-                        <div key={m.id} className="text-[12px]">
-                          {m.icon} <strong>{m.name}</strong>: {m.desc}
-                        </div>
-                      ))}
+                      {detail.equippedModules.map((card) => {
+                        const text = cardText(card);
+                        return (
+                          <div key={card.id} className="text-[12px]">
+                            {card.icon} <strong>{text.name}</strong>:{" "}
+                            {text.desc}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

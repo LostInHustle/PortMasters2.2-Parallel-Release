@@ -96,7 +96,17 @@ export function Welcome({
 }: Pick<PhasePanelProps, "game" | "phaseSync" | "members" | "me" | "room"> & {
   onTutorialOpen?: () => void;
 }) {
-  const harborIds = phaseSync.ready?.requiredUserIds ?? [];
+  // The captains in the harbor, read from room membership rather than
+  // from the ready check's roster. The two were the same list until the
+  // waiting roster learned to exclude the pier (the harbor is not a seat
+  // the room readies out of, see waitingRosterSet in
+  // src/server/realtime/checkpoint.ts): every captain standing here fell
+  // out of it, the start button disabled itself with "Need at least one
+  // captain in the harbor" for a host standing in a full one, and the
+  // server's own guard, which counts membership, would have taken the
+  // start. Who is in the harbor is a fact about the room; the roster is
+  // an answer about the seat.
+  const harborIds = members.map((m) => m.id);
   // Solo Practice Mode: a captain may start the voyage alone. The
   // server allows a single captain to set sail so the game is playable
   // without a second human. The ready check protocol advances with

@@ -6,6 +6,7 @@
 // label across the status panel, the phase screens, and the player
 // detail popup.
 // =====================================================================
+import { cardText } from "./cards";
 import { BOONS, MODULES } from "./constants/drafts";
 import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "./constants/goods";
 import { DIFFICULTIES, pirateOddsLabel } from "./difficulty";
@@ -87,5 +88,14 @@ export const GLOSSARY: Record<string, string> = {
   Debt: "Gold you owe another captain after taking a loan. Repay it any time before the voyage ends. If you still can't cover it by the final round, the amount still owed comes straight out of your funds and you're marked bankrupt when the voyage finishes.",
 };
 
-for (const b of BOONS) GLOSSARY[b.name] = b.desc;
-for (const m of MODULES) GLOSSARY[m.name] = m.desc;
+// [F2: the card record, and the mode weighting field] The two card entries a
+// captain can hover, read off the records rather than off copies kept here,
+// so a card renamed or retuned moves its glossary entry with it. The text
+// comes off cardText, which is the one place a card's shipped language is
+// chosen: an entry built from a second read of `strings` would be the first
+// place this build could print a card in one language and describe it in
+// another.
+for (const card of [...BOONS, ...MODULES]) {
+  const text = cardText(card);
+  GLOSSARY[text.name] = text.desc;
+}

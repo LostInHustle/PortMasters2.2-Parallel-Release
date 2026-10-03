@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { cardText, cargoCarriesTag } from "@/lib/game/cards";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import {
   basePriceRange,
@@ -16,9 +17,10 @@ import {
   getHireCost,
   getIntelCost,
   lockedBehind,
+  moduleSlotsOpen,
 } from "@/lib/game/engine";
 import { WORKER_TYPES } from "@/lib/game/constants/crew";
-import { RECIPES, SILK_GOODS } from "@/lib/game/constants/goods";
+import { RECIPES } from "@/lib/game/constants/goods";
 import { TONE_WASH } from "./shared";
 
 /**
@@ -175,9 +177,9 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
   const emergency = choices.find((b) => b.id === "emergency_loan");
   if (emergency && game.money < 30) {
     return {
-      icon: "💰",
-      title: "Take the Emergency Loan",
-      body: `You have ${game.money} Gold. The Emergency Loan gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Resolve.`,
+      icon: emergency.icon,
+      title: `Take the ${cardText(emergency).name}`,
+      body: `You have ${game.money} Gold. The ${cardText(emergency).name} gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Resolve.`,
       tone: "alarm",
     };
   }
@@ -187,29 +189,32 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
   const hasWorkers = flatWorkerRoster(game).length > 0;
   if (apprentice && !hasWorkers && round <= maxRounds - 3) {
     return {
-      icon: "🎓",
-      title: "Pick Master's Apprentice",
-      body: "You have no artisans yet. Master's Apprentice halves hiring costs this round, letting you get a Weaver for 4 Gold instead of 8. Good for establishing production early.",
+      icon: apprentice.icon,
+      title: `Pick ${cardText(apprentice).name}`,
+      body: `You have no artisans yet. ${cardText(apprentice).name} halves hiring costs this round, letting you get a Weaver for 4 Gold instead of 8. Good for establishing production early.`,
       tone: "gain",
     };
   }
 
   // If income is expected to be high, recommend Tax Shelter
-  const taxShelter = choices.find((b) => b.id === "tax_shelter");
+  const taxShelter = choices.find((card) => card.id === "tax_shelter");
   if (taxShelter && score > 50) {
     return {
-      icon: "📜",
-      title: "Grab the Tax Shelter",
-      body: `You have ${score} Reputation. With high earnings expected, the Tax Shelter cuts income tax from 10% to 5%, saving Gold at round end.`,
+      icon: taxShelter.icon,
+      title: `Grab the ${cardText(taxShelter).name}`,
+      body: `You have ${score} Reputation. With high earnings expected, the ${cardText(taxShelter).name} cuts income tax from 10% to 5%, saving Gold at round end.`,
       tone: "warn",
     };
   }
 
-  // Default: recommend the first boon with a brief note
+  // Default: recommend the first boon with a brief note. Every branch
+  // here names its card and draws its glyph off the record through
+  // cardText, so the suggestion and the card agree on words.
+  const first = cardText(choices[0]);
   return {
     icon: "🧭",
-    title: `Consider ${choices[0].name}`,
-    body: choices[0].desc,
+    title: `Consider ${first.name}`,
+    body: first.desc,
     tone: "intel",
   };
 }
@@ -367,8 +372,8 @@ function analyzeOrders(game: GameState): Suggestion | null {
     // cannot come to disagree about which orders are a captain's (see [D2]
     // in ./engine/orders).
     if (!canFillOrder(game, o)) continue;
-    const hasSilk = o.resources.some((r) => SILK_GOODS.includes(r.type));
-    const transport = calcTransportCost(game, o.totalItems, hasSilk);
+    const hasWoven = cargoCarriesTag(o.resources, "woven");
+    const transport = calcTransportCost(game, o.totalItems, hasWoven);
     let net = o.reward - transport;
     if (o.isProductOrder) {
       // Charged exactly as completeOrder charges it, per unit, rather than
@@ -497,7 +502,7 @@ function analyzeShipyard(game: GameState): Suggestion | null {
   }
 
   // If ship has empty slots, recommend drafting a module
-  if (game.shipLevel > 0 && game.equippedModules.length < game.shipLevel) {
+  if (game.shipLevel > 0 && moduleSlotsOpen(game) > 0) {
     return {
       icon: "🔧",
       title: "Draft and install a module",

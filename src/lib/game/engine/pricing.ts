@@ -23,8 +23,8 @@
 // splitting them would mean copying the whole body to buy a separation
 // that had already gone, and a second copy is where a drift would start.
 // =====================================================================
+import { cardByFlag, cardName, cardText, carriesTag } from "../cards";
 import { WAGES } from "../constants/crew";
-import { BOONS } from "../constants/drafts";
 import {
   COMMODITIES,
   PRODUCT_PRICES,
@@ -32,6 +32,7 @@ import {
   RESOURCES,
 } from "../constants/goods";
 import { SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
+import type { Tag } from "../constants/tags";
 import type { GameState, ResourceCard } from "../types";
 import { brokersFavorPayoutCap } from "./ages";
 import { hasModule } from "./core";
@@ -50,33 +51,41 @@ export type ExpectedPrice = {
   modifiers: string[];
 };
 
-// At most one boon's modifiers are ever active at a time (selecting a new
-// one replaces state.modifierFlags wholesale, see applyBoon), so finding
-// whichever boon owns a given modifier key reliably names the source of a
+// At most one boon's flags are ever active at a time (selecting a new one
+// replaces state.modifierFlags wholesale, see applyBoon), so finding
+// whichever card owns a given modifier key reliably names the source of a
 // price adjustment for the breakdowns below.
+//
+// [F2: the card record, and the mode weighting field] The name comes off the
+// card record rather than off a second walk of the boon table, which is what
+// keeps a retune from moving the card and leaving its own breakdown lines
+// saying the old name. It reads the card's own text rather than a copy kept
+// here, so the label a captain reads on the card and the label the tooltip
+// prints for it are one string.
 function boonNameForModifierKey(key: string): string {
-  return BOONS.find((b) => key in b.modifiers)?.name ?? "Active boon";
+  const card = cardByFlag(key);
+  return card === null ? "Active boon" : cardText(card).name;
 }
 
 // ========== Transport ==========
 export function calcTransportCost(
   state: GameState,
   totalItems: number,
-  hasSilk = false,
+  hasWoven = false,
 ): number {
   let base = totalItems * 2;
   let discount = state.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   if (state.modifierFlags.transport_flat_discount)
     discount += state.modifierFlags.transport_flat_discount;
   let cost = Math.max(5, base - discount);
-  if (hasSilk && state.modifierFlags.transport_silk_discount)
+  if (hasWoven && state.modifierFlags.transport_silk_discount)
     cost = Math.max(
       5,
       Math.floor(cost * state.modifierFlags.transport_silk_discount),
     );
   if (hasModule(state, "bulk_hauler")) cost = Math.max(0, cost - totalItems);
   if (hasModule(state, "overdrive_engine")) cost = Math.max(0, cost - 5);
-  if (hasModule(state, "silk_monopoly") && hasSilk) cost = 0;
+  if (hasModule(state, "silk_monopoly") && hasWoven) cost = 0;
   return Math.max(0, cost);
 }
 
@@ -87,7 +96,7 @@ export function calcTransportCost(
 export function explainTransportCost(
   state: GameState,
   totalItems: number,
-  hasSilk = false,
+  hasWoven = false,
 ): PriceBreakdown {
   const steps: PriceStep[] = [];
   const base = totalItems * 2;
@@ -113,30 +122,36 @@ export function explainTransportCost(
     });
     cost = next;
   }
-  if (hasSilk && state.modifierFlags.transport_silk_discount) {
+  if (hasWoven && state.modifierFlags.transport_silk_discount) {
     const next = Math.max(
       5,
       Math.floor(cost * state.modifierFlags.transport_silk_discount),
     );
     steps.push({
-      label: `${boonNameForModifierKey("transport_silk_discount")} on Silk goods`,
+      label: `${boonNameForModifierKey("transport_silk_discount")} on woven goods`,
       delta: next - cost,
     });
     cost = next;
   }
   if (hasModule(state, "bulk_hauler")) {
     const next = Math.max(0, cost - totalItems);
-    steps.push({ label: "Bulk Hauler Rigging module", delta: next - cost });
+    steps.push({
+      label: `${cardName("bulk_hauler")} module`,
+      delta: next - cost,
+    });
     cost = next;
   }
   if (hasModule(state, "overdrive_engine")) {
     const next = Math.max(0, cost - 5);
-    steps.push({ label: "Overdrive Engine module", delta: next - cost });
+    steps.push({
+      label: `${cardName("overdrive_engine")} module`,
+      delta: next - cost,
+    });
     cost = next;
   }
-  if (hasModule(state, "silk_monopoly") && hasSilk) {
+  if (hasModule(state, "silk_monopoly") && hasWoven) {
     steps.push({
-      label: "Silk Road Monopoly module (Silk freight waived)",
+      label: `${cardName("silk_monopoly")} module (woven freight waived)`,
       delta: -cost,
     });
     cost = 0;
@@ -208,7 +223,7 @@ export function explainVAT(
   if (hasModule(state, "tax_evasion")) {
     const next = Math.floor(vat * 0.5);
     steps.push({
-      label: "Tax Evasion Ledger module (down 50%)",
+      label: `${cardName("tax_evasion")} module (down 50%)`,
       delta: next - vat,
     });
     vat = next;
@@ -236,16 +251,29 @@ export function calcIncomeTax(state: GameState, preTax: number): number {
 }
 
 // ========== Market card pricing ==========
-// The two per unit charter module discounts: which goods each one covers,
-// and how many Gold it takes off each unit. Named here because two places
-// apply them, the card charge below and the hover preview in
-// explainExpectedPrice, and keeping the goods and the amounts in one place
-// is what stops the two from drifting apart again. They had: the preview
-// applied neither, so a captain holding the Kiln Cellar saw a Porcelain
-// Clay price two Gold a unit above what the card went on to charge.
-const KILN_CELLAR_GOODS = ["Porcelain Clay", "Copper Ore"];
+// The two per unit module discounts: the tag each one covers, and how many
+// Gold it takes off each unit. Named here because two places apply them, the
+// card charge below and the hover preview in explainExpectedPrice, and
+// keeping the tag and the amount in one place is what stops the two from
+// drifting apart again. They had: the preview applied neither, so a captain
+// holding the Kiln Cellar saw a Porcelain Clay price two Gold a unit above
+// what the card went on to charge.
+//
+// [F2: the card record, and the mode weighting field] They read tags now
+// rather than naming goods (the Kiln Cellar its two, the Foreign Quarter
+// Pass its own two), which is the shape the epic exists to end: with a tag
+// in the line the card's copy and the card's arithmetic agree, and a good
+// added to the catalogue under one of these tags joins the discount the same
+// afternoon. One consequence is worth stating where the numbers are: the
+// Bulk Monopoly boon reads the same tag the Kiln Cellar does, and the two
+// could not overlap before, when each named goods the other did not. A
+// captain holding both now takes four Gold off a bulk unit. That is the
+// trade the card's own new text promises, and it is a pair for the
+// combination instrument F7 describes rather than a reason to keep two
+// disjoint item lists here.
+const KILN_CELLAR_TAG: Tag = "bulk";
 const KILN_CELLAR_PER_UNIT = 2;
-const FOREIGN_QUARTER_GOODS = ["Spices", "Pearls"];
+const FOREIGN_QUARTER_TAG: Tag = "luxury";
 const FOREIGN_QUARTER_PER_UNIT = 3;
 
 // What a market card actually costs, reported as a step by step breakdown
@@ -270,13 +298,21 @@ export function explainCardPrice(
   }
   if (state.modifierFlags.hemp_price_reduction) {
     const hempReduction = state.modifierFlags.hemp_price_reduction;
+    // The card is the Bulk Monopoly and reads the bulk tag. The flag's own
+    // name is a persisted handle (a save carries it, and the ledger reads it
+    // by this key), so it keeps the spelling it has always had rather than
+    // moving with the card's caption: a persisted name is a migration, not a
+    // copy change (see the same note in ./paths.ts).
     const reduction = card.resources.reduce(
-      (sum, r) => (r.type === "Hemp" ? sum + r.quantity! * hempReduction : sum),
+      (sum, r) =>
+        carriesTag("good", r.type, "bulk")
+          ? sum + r.quantity! * hempReduction
+          : sum,
       0,
     );
     if (reduction > 0) {
       steps.push({
-        label: `${boonNameForModifierKey("hemp_price_reduction")} (down ${hempReduction}g per Hemp)`,
+        label: `${boonNameForModifierKey("hemp_price_reduction")} (down ${hempReduction}g per unit)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -285,14 +321,14 @@ export function explainCardPrice(
   if (hasModule(state, "kiln_cellar")) {
     const reduction = card.resources.reduce(
       (sum, r) =>
-        KILN_CELLAR_GOODS.includes(r.type)
+        carriesTag("good", r.type, KILN_CELLAR_TAG)
           ? sum + (r.quantity ?? 0) * KILN_CELLAR_PER_UNIT
           : sum,
       0,
     );
     if (reduction > 0) {
       steps.push({
-        label: `Kiln Cellar module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
+        label: `${cardName("kiln_cellar")} module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -301,14 +337,14 @@ export function explainCardPrice(
   if (hasModule(state, "foreign_quarter_pass")) {
     const reduction = card.resources.reduce(
       (sum, r) =>
-        FOREIGN_QUARTER_GOODS.includes(r.type)
+        carriesTag("good", r.type, FOREIGN_QUARTER_TAG)
           ? sum + (r.quantity ?? 0) * FOREIGN_QUARTER_PER_UNIT
           : sum,
       0,
     );
     if (reduction > 0) {
       steps.push({
-        label: `Foreign Quarter Pass module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
+        label: `${cardName("foreign_quarter_pass")} module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
         delta: -reduction,
       });
       cost -= reduction;
@@ -317,7 +353,7 @@ export function explainCardPrice(
   if (hasModule(state, "smugglers_hold")) {
     const next = Math.floor(cost * 0.85);
     steps.push({
-      label: "Smuggler's Hold module (down 15%)",
+      label: `${cardName("smugglers_hold")} module (down 15%)`,
       delta: next - cost,
     });
     cost = next;
@@ -392,42 +428,45 @@ export function explainExpectedPrice(
         `${boonNameForModifierKey("purchase_discount")} (down ${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
       );
     }
-    if (itemType === "Hemp" && state.modifierFlags.hemp_price_reduction) {
+    if (
+      carriesTag("good", itemType, "bulk") &&
+      state.modifierFlags.hemp_price_reduction
+    ) {
       min = Math.max(0, min - state.modifierFlags.hemp_price_reduction);
       max = Math.max(0, max - state.modifierFlags.hemp_price_reduction);
       modifiers.push(
         `${boonNameForModifierKey("hemp_price_reduction")} (down ${state.modifierFlags.hemp_price_reduction}g per unit)`,
       );
     }
-    // The two per unit charter module discounts. Flat Gold off a single
-    // unit, so they come off the range the same way the Hemp boon above
+    // The two per unit module discounts. Flat Gold off a single unit, so
+    // they come off the range the same way the Bulk Monopoly boon above
     // does rather than scaling it. Applied in the order the card charge
     // applies them (see explainCardPrice), since a percentage taken before
     // a flat subtraction and one taken after settle on different numbers.
     if (
       hasModule(state, "kiln_cellar") &&
-      KILN_CELLAR_GOODS.includes(itemType)
+      carriesTag("good", itemType, KILN_CELLAR_TAG)
     ) {
       min = Math.max(0, min - KILN_CELLAR_PER_UNIT);
       max = Math.max(0, max - KILN_CELLAR_PER_UNIT);
       modifiers.push(
-        `Kiln Cellar module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
+        `${cardName("kiln_cellar")} module (down ${KILN_CELLAR_PER_UNIT}g per unit)`,
       );
     }
     if (
       hasModule(state, "foreign_quarter_pass") &&
-      FOREIGN_QUARTER_GOODS.includes(itemType)
+      carriesTag("good", itemType, FOREIGN_QUARTER_TAG)
     ) {
       min = Math.max(0, min - FOREIGN_QUARTER_PER_UNIT);
       max = Math.max(0, max - FOREIGN_QUARTER_PER_UNIT);
       modifiers.push(
-        `Foreign Quarter Pass module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
+        `${cardName("foreign_quarter_pass")} module (down ${FOREIGN_QUARTER_PER_UNIT}g per unit)`,
       );
     }
     if (hasModule(state, "smugglers_hold")) {
       min = Math.floor(min * 0.85);
       max = Math.floor(max * 0.85);
-      modifiers.push("Smuggler's Hold module (down 15%)");
+      modifiers.push(`${cardName("smugglers_hold")} module (down 15%)`);
     }
   }
 

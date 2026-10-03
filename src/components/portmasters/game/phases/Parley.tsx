@@ -5,7 +5,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
-import { nextPhase } from "@/lib/game/engine";
+import { leavePhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
@@ -13,6 +13,7 @@ import { AuditVoteCard } from "../AuditPanel";
 import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
+import { ModuleMarket } from "../ModuleMarket";
 import { BazaarRumors } from "../BazaarRumors";
 import {
   HuePanel,
@@ -24,7 +25,8 @@ import {
 } from "./PhaseShared";
 
 // The Parley panel: the Captain's Exchange, and with it the two votes the
-// table carries. Named for the phase it is (see @/lib/game/phases), the
+// table carries and the three markets that sell on the same terms the
+// exchange does. Named for the phase it is (see @/lib/game/phases), the
 // same way Market.tsx and Orders.tsx are, rather than for bartering, which
 // is the activity half this screen shares with a chat composer and not the
 // seat the room waits on.
@@ -34,6 +36,7 @@ export function Parley({
   act,
   barter,
   escort,
+  modules,
   bazaar,
   audit,
   maroon,
@@ -49,6 +52,7 @@ export function Parley({
   | "act"
   | "barter"
   | "escort"
+  | "modules"
   | "bazaar"
   | "audit"
   | "maroon"
@@ -91,7 +95,7 @@ export function Parley({
   useEffect(() => {
     if (revealedRound === undefined) return;
     if (game.phase !== "parley" || game.currentRound !== revealedRound) return;
-    phaseSync.markReady((g, l) => nextPhase(g, ctx, l));
+    phaseSync.markReady((g, l) => leavePhase(g, ctx, l));
   }, [revealedRound, game.phase, game.currentRound, phaseSync, ctx]);
 
   return (
@@ -106,6 +110,33 @@ export function Parley({
         open for the rest of the voyage, and you can post to it from either chat
         as well as from here.
       </p>
+
+      {/* The board the exchange is about stands above the form that posts
+          to it: a captain reads what the harbor is selling before writing
+          what they would give for it. The offers used to sit under the
+          form and the two vote cards, which at a middling window put the
+          market itself under the fold. */}
+      <HuePanel tone="ship" className="p-4 mb-4">
+        <PanelHeading className="mb-3 text-sm">📋 Open Offers</PanelHeading>
+        {barter.offers.length === 0 ? (
+          <p className="text-center text-xs text-muted-foreground py-4">
+            No offers on the board yet. Be the first.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {barter.offers.map((o) => (
+              <OfferCard
+                key={o.id}
+                offer={o}
+                me={me}
+                game={game}
+                barter={barter}
+                colorFor={colorFor}
+              />
+            ))}
+          </div>
+        )}
+      </HuePanel>
 
       <HuePanel tone="parley" className="p-4 mb-4">
         <PanelHeading className="mb-3 text-sm">📤 Post an Offer</PanelHeading>
@@ -216,33 +247,20 @@ export function Parley({
         />
       )}
 
-      <HuePanel tone="ship" className="p-4 mb-4">
-        <PanelHeading className="mb-3 text-sm">📋 Open Offers</PanelHeading>
-        {barter.offers.length === 0 ? (
-          <p className="text-center text-xs text-muted-foreground py-4">
-            No offers on the board yet. Be the first.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            {barter.offers.map((o) => (
-              <OfferCard
-                key={o.id}
-                offer={o}
-                me={me}
-                game={game}
-                barter={barter}
-                colorFor={colorFor}
-              />
-            ))}
-          </div>
-        )}
-      </HuePanel>
-
       {/* [D3: Convoy: the Escort Contract] The protection market, under the
           exchange because it is the other thing sold at this table and it
           sells on the same terms: a price agreed in the open, and one leg
           of it. It draws nothing at all in a build with the switch off. */}
       <EscortMarket game={game} escort={escort} me={me} members={members} />
+
+      {/* [F3: modules in the shipyard ladder, and trading them between
+          captains] The module market, under the protection market for the
+          reason that market sits under the exchange: this table is where
+          the port's trades are made, and this one sells on the same terms
+          as the two above it, a price agreed in the open, for a card
+          rather than a leg of cover. It draws nothing at all in a build
+          with the switch off. */}
+      <ModuleMarket game={game} modules={modules} me={me} members={members} />
 
       {/* [D5: Aroma: the Bazaar Rumor] The desk, under the protection
           market for the reason that market sits under the exchange: this
@@ -256,7 +274,7 @@ export function Parley({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Done Bartering, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

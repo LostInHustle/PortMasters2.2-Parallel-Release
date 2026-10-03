@@ -29,6 +29,7 @@ import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
 import { tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
+import { VoteCardShell } from "./VoteCardShell";
 import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
@@ -66,17 +67,18 @@ export function AuditVoteCard({
     members.find((m) => m.id === id)?.displayName ?? "a captain";
 
   return (
-    <div className="rounded-xl border border-intel/25 bg-intel/[0.04] p-4 mb-4">
-      <h3 className="text-center font-semibold mb-1 text-sm">
-        🔎 Manifest Audit
-      </h3>
-      {spent || !open ? (
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
-          {spent
-            ? "This voyage's audit has been called. The harbor gets one."
-            : `From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
-        </p>
-      ) : (
+    <VoteCardShell
+      tone="intel"
+      icon="🔎"
+      title="Manifest Audit"
+      gist={
+        spent
+          ? "This voyage's audit has been called. The harbor gets one."
+          : `From leg ${opensAt}: a majority may open one manifest.`
+      }
+      live={open && !spent}
+    >
+      {open && !spent ? (
         <>
           <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
             A majority of the captains still sailing can open one manifest. What
@@ -115,8 +117,12 @@ export function AuditVoteCard({
             A majority is more than half of the captains still in the voyage.
           </p>
         </>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground leading-relaxed">
+          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
+        </p>
       )}
-    </div>
+    </VoteCardShell>
   );
 }
 

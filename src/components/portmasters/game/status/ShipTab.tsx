@@ -1,6 +1,7 @@
 "use client";
 
-import { type Module } from "@/lib/game/constants/drafts";
+import { cardText } from "@/lib/game/cards";
+import type { CardRecord } from "@/lib/game/constants/cards";
 import { SHIP_DISCOUNT_PER_LEVEL } from "@/lib/game/constants/ships";
 import { Term } from "../../Term";
 import { Row } from "./Rows";
@@ -15,7 +16,7 @@ export function ShipTab({
   modules,
 }: {
   shipLevel: number;
-  modules: Module[];
+  modules: CardRecord[];
 }) {
   const discount = shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   return (
@@ -39,15 +40,18 @@ export function ShipTab({
           slots.
         </p>
       ) : (
-        modules.map((m) => (
-          <div key={m.id} className="py-0.5 text-[11px]">
-            <span className="mr-1">{m.icon}</span>
-            <span className="text-foreground">{m.name}</span>
-            <div className="pl-5 text-[10px] text-muted-foreground">
-              {m.desc}
+        modules.map((card) => {
+          const text = cardText(card);
+          return (
+            <div key={card.id} className="py-0.5 text-[11px]">
+              <span className="mr-1">{card.icon}</span>
+              <span className="text-foreground">{text.name}</span>
+              <div className="pl-5 text-[10px] text-muted-foreground">
+                {text.desc}
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </>
   );

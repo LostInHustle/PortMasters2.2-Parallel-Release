@@ -1,5 +1,6 @@
 "use client";
 
+import { cardText } from "@/lib/game/cards";
 import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
 import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
 import {
@@ -63,21 +64,26 @@ export function BoonDraft({
           : `🔄 Swap Boons (${BOON_SWAP_COST}💰, 1 use/round)`}
       </DraftSwapButton>
       <DraftGrid>
-        {picks.map((b) => (
-          <DraftCard
-            key={b.id}
-            tone="border-dawn/15"
-            icon={b.icon}
-            name={b.name}
-            nameClassName="text-foreground"
-            desc={b.desc}
-            actionLabel="🔒 Lock In Boon"
-            actionClassName="pm-grad-dawn"
-            onSelect={() =>
-              phaseSync.markReady((g, l) => lockInBoon(g, ctx, b.id, l))
-            }
-          />
-        ))}
+        {picks.map((card) => {
+          const text = cardText(card);
+          return (
+            <DraftCard
+              key={card.id}
+              tone="border-dawn/15"
+              icon={card.icon}
+              name={text.name}
+              nameClassName="text-foreground"
+              desc={text.desc}
+              actionLabel="🔒 Lock In Boon"
+              actionClassName="pm-grad-dawn"
+              onSelect={() =>
+                phaseSync.markChoiceReady((g, l) =>
+                  lockInBoon(g, ctx, card.id, l),
+                )
+              }
+            />
+          );
+        })}
       </DraftGrid>
     </div>
   );

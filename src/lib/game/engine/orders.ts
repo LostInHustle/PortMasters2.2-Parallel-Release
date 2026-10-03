@@ -24,8 +24,9 @@
 // demands (see pathOrderOf below), the same way the board derives the crest
 // and the lock line it prints.
 // =====================================================================
+import { cardLead, cargoCarriesTag, carriesTag } from "../cards";
 import { ICONS } from "../constants/brand";
-import { PRODUCTS, RESOURCES, SILK_GOODS } from "../constants/goods";
+import { PRODUCTS, RESOURCES } from "../constants/goods";
 import { PATH_ORDER_SLOTS } from "../constants/paths";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
@@ -203,17 +204,24 @@ export function completeOrder(
     logs.push(`❌ Inventory short! Need ${short.type}×${short.required}`);
     return;
   }
-  // Silk, and everything made from it, read off SILK_GOODS rather than a
+  // Silk, and everything made from it, read off the woven tag rather than a
   // list written out here. The list this replaces had gone stale against
   // the recipe table: it named Cotton Clothes, which uses one Silk, and
   // missed Foreign Balm and Pearl String, which use one Silk each too.
-  const hasSilk = order.resources.some((r) => SILK_GOODS.includes(r.type));
-  let transport = calcTransportCost(state, order.totalItems, hasSilk);
+  //
+  // [F2: the card record, and the mode weighting field] The tag is the
+  // vocabulary the two cards that read this now speak: the Woven Monopoly
+  // module (which waives the freight) and Weaver's Winds (which halves it)
+  // both say woven in their text, so the class of goods they cover is the
+  // class the good carries rather than a second list that has to be kept
+  // beside them.
+  const hasWoven = cargoCarriesTag(order.resources, "woven");
+  let transport = calcTransportCost(state, order.totalItems, hasWoven);
   for (const r of order.resources) state.inventory[r.type] -= r.required!;
   let reward = order.reward;
   // [D6: Free Captain: Opportunist] The borrow's penalty lands here, on the
   // face value and before anything else touches the number, so every step
-  // below (product VAT, the charter percentages, the Silk Monopoly) scales
+  // below (product VAT, the charter percentages, the Woven Monopoly) scales
   // the reduced payout rather than the card's advertised one. That is the
   // order the plan's own price implies: a captain who borrowed the order is
   // paid the borrowed order's reward, and a percentage bonus read off the
@@ -244,30 +252,45 @@ export function completeOrder(
   }
   // Fleet of Treasures discount applied before money moves, so the captain
   // is never charged the pre discount freight.
-  if (
-    hasModule(state, "fleet_of_treasures") &&
-    ["Foreign Balm", "Pearl String"].some((g) =>
-      order.resources.some((r) => r.type === g),
-    )
-  ) {
-    const t2items = order.resources
-      .filter((r) => ["Foreign Balm", "Pearl String"].includes(r.type))
+  //
+  // [F2] The two goods it named are the luxury tag now, which is the class
+  // its own text promises, and the per unit number is the card's: it stays
+  // here because a module's payload is the hull's own arithmetic in this
+  // build (see CardEffect in ../constants/cards), so F2 moves the card's
+  // name and its scope into the record and leaves the numbers it applies to
+  // the engine that applies them.
+  if (hasModule(state, "fleet_of_treasures")) {
+    const luxuryItems = order.resources
+      .filter((r) => carriesTag("good", r.type, "luxury"))
       .reduce((s, r) => s + (r.required ?? 0), 0);
-    transport = Math.max(0, transport - t2items * 3);
-    if (t2items > 0)
-      logs.push(`⛵ Fleet of Treasures: ${t2items * 3}g off freight`);
+    if (luxuryItems > 0) {
+      transport = Math.max(0, transport - luxuryItems * 3);
+      logs.push(
+        `${cardLead("fleet_of_treasures")}: ${luxuryItems * 3}g off freight`,
+      );
+    }
   }
   state.money -= transport;
   state.roundCosts += transport;
   state.totalCosts += transport;
   const origTransport = transport;
-  if (hasModule(state, "silk_monopoly") && hasSilk) {
+  if (hasModule(state, "silk_monopoly") && hasWoven) {
     reward = Math.floor(reward * 1.2);
-    logs.push("👘 Silk Monopoly: +20% Reward!");
+    logs.push(`${cardLead("silk_monopoly")}: +20% Reward!`);
   }
   // Charter lane payouts: the Kiln and Forge Guild boon and the Maritime
   // Bureau Token both reward trading the goods a charter opened, so they only
   // look at orders that actually involve them (see isCharterGood).
+  //
+  // [F2] These three reads are the one place in the engine F1's rule does
+  // not reach, and the reason is that they are not about what a good is but
+  // about when it arrived: a charter good is a good the voyage's schedule
+  // opened, and which wave opened it is the tier's fact rather than the
+  // good's. There is no tag for "arrived with the second charter" and there
+  // should not be one, because a tag that means a schedule would be the same
+  // good tagged differently in two rooms. So the cards name their scope in
+  // their text (the first charter's goods, the second charter's) and the
+  // scope is read here off the pool the schedule unlocks.
   const hasCharterGood = order.resources.some((r) => isCharterGood(r.type));
   // Each charter boon asks about its own wave, not the charter as a whole.
   // The Bureau Token above keeps the any wave test, which is what its text
@@ -284,25 +307,31 @@ export function completeOrder(
   if (hasTier1Good && state.modifierFlags.charter_order_bonus) {
     const pct = state.modifierFlags.charter_order_bonus;
     reward += Math.floor(reward * pct);
-    logs.push(`🏮 Kiln and Forge Guild: +${Math.round(pct * 100)}% Reward!`);
+    logs.push(
+      `${cardLead("kiln_and_forge_guild")}: +${Math.round(pct * 100)}% Reward!`,
+    );
   }
   if (hasCharterGood && hasModule(state, "bureau_token")) {
     reward += Math.floor(reward * 0.1);
-    logs.push("🎫 Maritime Bureau Token: +10% Reward!");
+    logs.push(`${cardLead("bureau_token")}: +10% Reward!`);
   }
   if (hasTier2Good && state.modifierFlags.exotic_order_bonus) {
     const pct = state.modifierFlags.exotic_order_bonus;
     reward += Math.floor(reward * pct);
-    logs.push(`💎 Exotic Treasures: +${Math.round(pct * 100)}% Reward!`);
+    logs.push(
+      `${cardLead("exotic_treasures")}: +${Math.round(pct * 100)}% Reward!`,
+    );
   }
   if (hasModule(state, "salvage_crane") && Math.random() < 0.3) {
     state.money += transport;
-    logs.push(`♻️ Salvage Crane: Refunded ${transport} Gold transport!`);
+    logs.push(
+      `${cardLead("salvage_crane")}: Refunded ${transport} Gold transport!`,
+    );
     transport = 0;
   }
   if (hasModule(state, "tax_evasion") && Math.random() < 0.15) {
     state.money -= 20;
-    logs.push("🚨 AUDIT! Tax Evasion Ledger triggered. Lost 20 Gold!");
+    logs.push(`🚨 AUDIT! ${cardLead("tax_evasion")} triggered. Lost 20 Gold!`);
   }
   if (transport !== origTransport) {
     // Only the Salvage Crane above can move `transport`, and it has already
@@ -523,7 +552,7 @@ export function startOrders(
       id: nextId,
       ...genMixedOrder(orderRng, orderPools),
     });
-    logs.push("🛍️ Merchants Converge: One extra order appeared.");
+    logs.push(`${cardLead("merchants_converge")}: One extra order appeared.`);
   }
   // Broker's Whisper guarantee, applied after the seeded draw above and
   // entirely with this captain's own randomness, so it cannot shift the

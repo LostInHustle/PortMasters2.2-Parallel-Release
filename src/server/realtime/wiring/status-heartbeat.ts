@@ -15,7 +15,7 @@ import { TIDEWATCH_SURGE_THRESHOLD } from "@/lib/game/constants/world";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
-import { normalizePhase } from "@/lib/game/phases";
+import { normalizePhase, seatOf } from "@/lib/game/phases";
 import { type Phase } from "@/lib/game/types";
 import { clearAid } from "../aid";
 import { requireAuth } from "../auth";
@@ -24,6 +24,7 @@ import {
   armPhaseClock,
   broadcastReadyState,
   checkpointRank,
+  clearAdvanceWatch,
   getCheckpoint,
   maybeAdvance,
 } from "../checkpoint";
@@ -31,6 +32,7 @@ import { maybeConcludeVoyage } from "../conclusion";
 import { escortContracts } from "../contracts";
 import { sockets } from "../presence";
 import { refitContracts } from "../refits";
+import { moduleTrades } from "../module-trades";
 import { rememberStatus } from "../status";
 import { combinedReputation, hasSurged, markSurged } from "../surge";
 import { noteLegAdvanced, noteTelemetry } from "../telemetry";
@@ -233,9 +235,23 @@ async function advanceCheckpointFromReport(
   report: GameStatusUpdate,
 ): Promise<void> {
   cp.round = report.round;
-  cp.phase = report.phase;
+  // The seat this report is standing at rather than the screen it named. A
+  // captain reading the module draft is standing in Dusk (see seatOf), and
+  // the report ranks as Dusk's, so the checkpoint moved by it has to be Dusk
+  // and not the personal screen: a room standing at a screen no lap lists
+  // would be a room with no gated seat to vote at and no clock of its own,
+  // and every later vote would be refused for naming a round and phase the
+  // room is not on. Guarded at the door, where the move happens, so the
+  // checkpoint holds a seat of the lap by construction rather than by which
+  // report happened to arrive first.
+  cp.phase = seatOf(report.phase);
   cp.readyUserIds.clear();
   cp.advancing = false;
+  // The announcement this report answers has now been answered, so the watch
+  // armed for it is done. Cancelled rather than left to fire, because a fire
+  // would find the room already moved and return, and a timer per seat of
+  // every voyage is a map that only grows.
+  clearAdvanceWatch(roomId);
   // [B2: hard timers, the server as timekeeper] The clock for the
   // seat just entered. Armed from the report rather than from the
   // timer, so the room's deadline is always the one its own
@@ -317,6 +333,17 @@ function sweepLegBoards(io: Server, roomId: string, cp: Checkpoint): void {
   // are on the rows (see expireConsent), so the sweep only has to
   // hand the board the checkpoint it is standing at.
   refitContracts.sweep(io, roomId, {
+    phase: cp.phase,
+    round: cp.round,
+  });
+  // [F3: modules in the shipyard ladder, and trading them between
+  // captains] The module market's sweep, which is the escort's rule read
+  // at the same phase: a listing dies with the Parley it was posted in,
+  // and an agreed trade lives the leg it was agreed for, since the two
+  // clients settle it within a tick of the accept. Both facts are on the
+  // rows (see expireConsent), so the sweep only has to hand the board the
+  // checkpoint it is standing at.
+  moduleTrades.sweep(io, roomId, {
     phase: cp.phase,
     round: cp.round,
   });

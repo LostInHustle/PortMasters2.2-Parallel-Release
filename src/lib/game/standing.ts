@@ -29,7 +29,8 @@
 // iteration a later slice would do; this one is the set that plays one
 // voyage.
 // =====================================================================
-import { BOONS, type Boon } from "./constants/drafts";
+import { cardById } from "./cards";
+import type { CardRecord } from "./constants/cards";
 import { MARKET_GOODS } from "./constants/goods";
 
 /**
@@ -179,9 +180,15 @@ export function normalizeStandingOrders(raw: unknown): StandingOrders {
  * Whether the boon is on the board this round is a different question and
  * a different reader: see standingBoonId in ./engine/standing.
  */
-export function standingBoon(orders: StandingOrders): Boon | null {
+export function standingBoon(orders: StandingOrders): CardRecord | null {
   if (!orders.boon) return null;
-  return BOONS.find((b) => b.id === orders.boon) ?? null;
+  // [F2: the card record, and the mode weighting field] Resolved through the
+  // walk rather than through a second find over the boon table, and held to
+  // the kind: the id a record names is a boon's or it is nothing, so a
+  // standing order that named a module would be read as unwritten rather
+  // than as an instruction the engine could never take.
+  const card = cardById(orders.boon);
+  return card && card.kind === "boon" ? card : null;
 }
 
 /**

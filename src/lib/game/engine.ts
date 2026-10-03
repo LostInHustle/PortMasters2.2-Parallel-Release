@@ -66,7 +66,13 @@
 // addOwnedAmount is intentionally absent: it was private to the engine
 // before the split and stays private to it now. hasModule is absent for
 // the same reason, every caller sits under ./engine/ and asks it directly.
-export { getOwnedAmount } from "./engine/core";
+// moduleSlotsOpen is here because its callers are exactly the ones that
+// rule was written for: the two shipyard screens outside ./engine/, the
+// nudge in the action suggester, and F3's own trade panel, all of them
+// asking a hull the same question and all of them wanting the same
+// floored answer (see its own comment in ./engine/core for why a
+// subtraction rather than a comparison).
+export { getOwnedAmount, moduleSlotsOpen } from "./engine/core";
 
 // ========== Pricing, taxes and wages ==========
 // The explain* breakdowns are here because the tooltips are: Purchase,
@@ -385,6 +391,51 @@ export {
   type RefitContract,
 } from "./engine/refits";
 
+// ========== The module trade ==========
+// [F3: modules in the shipyard ladder, and trading them between captains]
+// The third consent kind, split the way the two before it were: the rule
+// is here and the two boards that show it are a component and a socket
+// module. Three callers read this block and each reads a different part.
+// The Parley panel asks the seller's question, canSellModule, and the
+// listing lock, moduleListedThisLeg, which is the kind's own bound and
+// bound to the row rather than to a side (see its own comment); the
+// server's post handler asks isModuleId before it publishes a row, since
+// a module id is the one thing about a listing it can check without
+// reading anybody's save; the client layer that owns a captain's side of
+// an agreement reads applyModuleTradeSide, which is both the seller's
+// automatic unequip the plan asked for and the buyer's pay-then-bolt-on.
+//
+// normalizeModuleTradeState is the load site's, healing the tally this
+// build added, and the two traffic readers are the plan's second
+// evaluation: readModuleTraffic pairs what the saves carry against what
+// they traded away, over a subject handed in rather than reached for, and
+// shippedModuleTraffic is that reading against the pool this build
+// shipped, which is what npm run report:modules prints. That report is
+// also normalizeModulesTraded's second caller, which is the one reason
+// the per module ledger's heal is exported on its own rather than staying
+// inside the state heal above it.
+//
+// The sweep of one module listed twice, the one open offer per seller, the
+// fee's shape, the visibility rule, the expiry and the ledger that makes a
+// settle idempotent are the consent primitive's, not this kind's, and a
+// wrapper for each would be a second name for one rule: that is the same
+// sentence the escort block above carries, and it is the point of the
+// primitive rather than a shortcut.
+export {
+  applyModuleTradeSide,
+  canSellModule,
+  isModuleId,
+  moduleListedThisLeg,
+  normalizeModulesTraded,
+  normalizeModuleTradeState,
+  readModuleTraffic,
+  shippedModuleTraffic,
+  type ModuleTrade,
+  type ModuleTrafficRow,
+  type ModuleTrafficSave,
+  type ModuleTrafficSubject,
+} from "./engine/modules";
+
 // ========== The Supply Barge ==========
 // [E1: the Supply Barge] The mode's fallback vendor, and the whole of the
 // feature is one sale: buyFromBarge, at a premium the constants set and
@@ -450,8 +501,18 @@ export {
 // client runs when the room's clock ran out on a captain who was holding
 // nothing (see [B2] in ./engine/lifecycle.ts). Its one caller is the phase
 // sync hook.
+//
+// leavePhase and canLeavePhase are here for the same reason and have the same
+// caller, with the press a captain makes by hand in place of the clock: they
+// are the departure a generic "I am done with this seat" press makes, and the
+// question of whether there is one. They are two names for one rule read at
+// two moments, which is why they sit together: a press asks whether it may be
+// sent before sending it, and the departure it sends is the same one the clock
+// runs.
 export {
   autoCommit,
+  canLeavePhase,
+  leavePhase,
   lockInBoon,
   nextPhase,
   phaseLabel,

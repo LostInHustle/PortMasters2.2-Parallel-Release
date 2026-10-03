@@ -1,7 +1,8 @@
 "use client";
 
+import { cardName } from "@/lib/game/cards";
 import { WORKER_TYPES } from "@/lib/game/constants/crew";
-import { getHireCost, nextPhase } from "@/lib/game/engine";
+import { getHireCost, leavePhase } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -138,7 +139,7 @@ export function SettlementBills({
         </BillRow>
         {game.maintenancePenalty > 0 && (
           <div className="text-[11px] text-muted-foreground pl-2.5">
-            ↳ Base {game.fixedCost}g + Overdrive Engine penalty{" "}
+            ↳ Base {game.fixedCost}g + {cardName("overdrive_engine")} penalty{" "}
             {game.maintenancePenalty}g
           </div>
         )}
@@ -207,7 +208,7 @@ export function SettlementBills({
           </>
         }
         idleClassName={settleClassName}
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

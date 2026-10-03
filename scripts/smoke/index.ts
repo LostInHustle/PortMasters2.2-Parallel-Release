@@ -77,6 +77,9 @@ import { pathDraftSuite } from "./suites/41-pathDraft";
 import { signingOutSuite } from "./suites/42-signingOut";
 import { supplyBargeSuite } from "./suites/43-supplyBarge";
 import { tagVocabularySuite } from "./suites/44-tagVocabulary";
+import { readyCheckThatStallsSuite } from "./suites/45-theReadyCheckThatStalls";
+import { cardRecordSuite } from "./suites/46-cardRecord";
+import { moduleTradesSuite } from "./suites/47-moduleTrades";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -368,6 +371,11 @@ async function main(): Promise<void> {
     await escortContractSuite(run, { host });
     console.log("\nLoom: the refit");
     await loomTheRefitSuite(run, { host });
+    // The third consent kind runs beside the two before it for the reason
+    // it exists beside them in the tree: the market is made of the same
+    // primitive, and its harbor block reads the same way theirs do.
+    console.log("\nThe module trade");
+    await moduleTradesSuite(run, { host });
     console.log("\nAroma: the bazaar rumor");
     await aromaTheBazaarRumorSuite(run);
     console.log("\nFree Captain: the borrow");
@@ -388,6 +396,19 @@ async function main(): Promise<void> {
     // reads the same whether a table is sailing or not.
     console.log("\nThe tag vocabulary");
     await tagVocabularySuite();
+    // The card record's article is the third of the three that need no
+    // harbor, and it is the tag walk's neighbour in the tree as well as in
+    // the run: the same pool the vocabulary is asked about is the one the
+    // record puts a shape under, and both are static data rather than a
+    // table anybody has to be sitting at.
+    console.log("\nThe card record");
+    await cardRecordSuite();
+    // The ready check's article is the one that needs a harbor and a wall
+    // clock rather than a table: its cure is a grace the room has to be
+    // watched through, so it is the last thing the run does and it opens a
+    // harbor of its own to spend that time in.
+    console.log("\nThe ready check that stalls");
+    await readyCheckThatStallsSuite(run);
   } finally {
     await cleanupSuite(run, { host, guest, third, roomId, quickStartRoomId });
   }

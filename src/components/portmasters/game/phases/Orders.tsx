@@ -1,6 +1,6 @@
 "use client";
 
-import { nextPhase } from "@/lib/game/engine";
+import { leavePhase } from "@/lib/game/engine";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Coins } from "lucide-react";
 import {
@@ -43,7 +43,7 @@ export function Orders({
         phaseSync={phaseSync}
         members={members}
         idleLabel="✅ Complete Trades, Continue"
-        onConfirm={() => phaseSync.markReady((g, l) => nextPhase(g, ctx, l))}
+        onConfirm={() => phaseSync.markReady((g, l) => leavePhase(g, ctx, l))}
       />
     </div>
   );

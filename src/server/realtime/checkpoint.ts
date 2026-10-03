@@ -36,6 +36,7 @@ import { loadServerConfig } from "@/lib/config";
 import { roomMemberIds } from "@/lib/rooms";
 import {
   checkpointRank,
+  isGatedPhase,
   lapSuccessor,
   openingPhase,
 } from "@/lib/game/checkpoint";
@@ -145,9 +146,72 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
   return out;
 }
 
+// The captains a seat's ready check actually waits on: the room's active
+// roster, narrowed to the captains whose own screen is at a seat the ready
+// check gates.
+//
+// The two rosters are two questions and were one function until this
+// existed. activeRosterSet asks who is still in the voyage, which is what
+// the maroon mark and the audit's majority are counted against, and its
+// answer is a fact about people. This asks who the room has to hear from
+// before it can move, which is a fact about the seat, and it is the roster
+// the vote in maybeAdvance is counted against and the one the bar's
+// denominator is drawn from so the two never disagree.
+//
+// The gap between them was a deadlock rather than a tidiness. The shipyard's
+// draft and swap screens carry no ready bar and send no vote, while the
+// roster above counted a captain inside one as a captain the seat was
+// waiting for: one captain opening the draft at Dusk left the table holding
+// every vote it could collect and able to move none of them, with the one
+// captain who could have cast the missing vote reading a module card on a
+// screen that draws no bar and no clock. The phase registry has said of
+// those screens that none of them is a seat the room waits on since the six
+// phase leg landed; this is the roster agreeing with it.
+//
+// A member with no status frame yet is waited on rather than skipped, which
+// is the one case not read off a seat: a captain who has just joined has no
+// seat to read, and the frame that places them lands within a heartbeat of
+// their socket. Waiting for them is what the room did before this existed
+// and is the safe direction to be wrong in, where skipping a captain who is
+// standing at the seat but has not been heard from is not.
+//
+// Not exported: the two readers are the two places a seat's vote is counted,
+// both of them here, and a third reader outside this module would be a
+// second answer to who a seat waits on. activeRosterSet above is exported
+// because the audit genuinely reads it; this one has no such reader.
+async function waitingRosterSet(roomId: string): Promise<Set<string>> {
+  const statuses = roomStatuses.get(roomId);
+  const memberIds = await roomMemberIds(roomId);
+  const cp = await getCheckpoint(roomId);
+  const out = new Set<string>();
+  for (const id of memberIds) {
+    const ph = statuses?.get(id)?.phase;
+    // A phase the lap does not gate covers the personal screens and both
+    // terminals, which is the same set the two names above exclude today
+    // plus the screens that were the hole, and it is read off the lap
+    // rather than off a list of names that a sixth personal screen would
+    // have to be added to.
+    if (ph === undefined || isGatedPhase(cp.mode, ph)) out.add(id);
+  }
+  return out;
+}
+
 // Builds the payload for phase:ready_update. readyUserIds is filtered
-// against the active roster so a departed captain's stale vote doesn't
-// linger in the broadcast.
+// against the waiting roster so the bar's fraction can never read past its
+// own denominator, and so a vote from a captain the seat is no longer
+// waiting on (they opened the draft, or they went bankrupt) leaves the
+// payload with the roster that no longer wants it.
+//
+// The room's mode rides along for the reason the round and the phase do: it
+// is one of the three things a captain has to be reading the room's way for
+// a position to mean anything. A rank is an index inside one mode's lap
+// order, so a client comparing its own seat against this frame's seat is
+// only comparing like with like while its own mode is the room's. The client
+// adopts it on arrival (see use-phase-sync), which is the authority rule the
+// load path already applies to a save. No event changes a room's mode after
+// creation, so in a healthy room this field never differs from what the
+// client already holds; carrying it is what makes that a checked assumption
+// rather than an assumed one.
 //
 // [B2: hard timers, the server as timekeeper] The clock rides along, in the
 // two numbers a countdown is drawn from: the moment this seat runs out and
@@ -156,11 +220,12 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
 // rather than a zero a client would draw as a countdown that ran out before
 // it started.
 export async function readyStatePayload(roomId: string, cp: Checkpoint) {
-  const roster = Array.from(await activeRosterSet(roomId));
+  const roster = Array.from(await waitingRosterSet(roomId));
   return {
     roomId,
     round: cp.round,
     phase: cp.phase,
+    mode: cp.mode,
     phaseEndsAt: cp.endsAt,
     phaseSeconds: phaseBudgetSeconds(cp.phase, cp.mode),
     readyUserIds: Array.from(cp.readyUserIds).filter((id) =>
@@ -181,6 +246,54 @@ export async function broadcastReadyState(
   );
 }
 
+// One seat's announcement, held to its promise: whatever the work below
+// does, a room that took the advance lock is never left holding it in
+// silence.
+//
+// Both announcers take the lock, then do fallible work before the frame is
+// out (a room row read for the pulse, the shift and the lean, the clock's
+// own telemetry and log lines, and the emit itself). A throw anywhere in
+// that window used to leave the room with advancing set and no watch armed,
+// and that state has no cure at all: reportNeverArrived can only fire from
+// the timer, the timer is armed at the end of the work that threw, so no
+// cure was ever coming. Every later ready vote found the lock already taken
+// and returned, so no press could help, and the room's bar sat at a full
+// ready set while nothing moved. No captain can see the lock and no frame
+// clears it, which is why the table was dead with every screen on it
+// showing that everyone was ready.
+//
+// The invariant that closes it: a room whose checkpoint is advancing has a
+// watch armed for the seat it is leaving. Armed here, before any of that
+// work, and the failure path hands the seat back through the cure an
+// unanswered announcement already takes, so the state above is not
+// reachable rather than merely unlikely.
+//
+// The frame may or may not have reached the room when this catches, since
+// the emit is one of the steps inside it, and both readings give a captain
+// the same instruction: the ready check is open again, press when you are
+// done here. That is the same sentence, from the same function, that a
+// dropped report produces, which is why it is the repair here rather than a
+// second message saying almost the same thing.
+async function announceGuarded(
+  io: Server,
+  roomId: string,
+  from: { round: number; phase: Phase },
+  build: () => Promise<void>,
+): Promise<void> {
+  watchForReports(io, roomId, from);
+  try {
+    await build();
+  } catch (err) {
+    console.error("[realtime] the advance announcement failed to go out:", err);
+    // Read live rather than handed the checkpoint, because the repair only
+    // releases a lock on a room still standing at the seat this named: a
+    // report that arrived from a captain who raced ahead has already moved
+    // the checkpoint and cleared the lock, and that room is sailing.
+    // reportNeverArrived reads the map and decides that for itself.
+    await reportNeverArrived(io, roomId, from);
+  }
+}
+
 // Announces the transition out of one seat of the lap: the room's own row,
 // read for the pulse and the shift, and the one emit every client's
 // transition hangs off.
@@ -191,6 +304,12 @@ export async function broadcastReadyState(
 // left and carry the same harbor pulse and port shift. A second emit naming
 // the same seat would be a second place the room's transitions were
 // described, which is the shape [B1] spent its whole refactor undoing.
+//
+// Reached only through announceGuarded, which is what arms the watch this
+// frame's report is owed and repairs the lock if the work below throws. The
+// body is handed to it as the work rather than arming its own watch because
+// the promise the room makes has to be guarded from the moment it is made,
+// and the frame is the last thing built rather than the first.
 //
 // [MANIFEST 01: The Harbor Pulse] When the room is leaving Dawn (the boon
 // draft, about to enter the market), the previous
@@ -270,13 +389,116 @@ async function announceAdvance(
   }
 }
 
-// Once every active member has signaled ready for the checkpoint they're
-// all sitting at, tell the room to go. advancing guards against firing
-// twice while everyone's clients are still catching up to the new phase.
+// ---
+//
+// The report an announcement is owed.
+//
+// A seat moves when a client reports the seat it moved to, so an announcement
+// is a promise the room has made and the reports are what keep it. Every
+// client that hears the frame runs the transition it was holding and reports
+// the seat it landed on, and the first report naming somewhere further along
+// moves the checkpoint (see advanceCheckpointFromReport in
+// ./wiring/status-heartbeat).
+//
+// That promise can go unpaid, and this is the half of the protocol that says
+// what happens when it does. Three ways it happens in the field, and one shape
+// covers all three: a report that never leaves a captain's browser (a dropped
+// frame, a tab that was asleep, a connection that died between the announce
+// and the answer), a departure that does not move the seat it is run from (a
+// client one build out of date, or an engine seat that returns without
+// handing off), and a room where every captain's client is simply slower than
+// the table's patience. In all three the room holds a full ready set, every
+// captain's screen says the table is ready, and nothing moves: every later
+// ready vote finds the lock already taken and returns, so no amount of
+// pressing ready can free it.
+//
+// The client's own heartbeat is the first cure and it is not enough. It
+// re-sends a captain's status every eight seconds, which lands a report that
+// never left, and that is why the grace below is longer than one heartbeat
+// rather than shorter: an honest but slow client gets its own retry in before
+// the room decides anything. What the heartbeat cannot do is anything about a
+// captain whose client is standing where it already was, which is exactly the
+// state a dead departure leaves behind, and no client can see the room's lock
+// to clear it. So the room clears its own.
+//
+// The deadline is not a second clock. The clock is a seat's budget, authored
+// per phase and switched on per table, and its expiry is a move: it announces
+// the advance itself and commits every captain who was holding nothing. This
+// is the other thing entirely, an answer to an announcement the room already
+// made, and what it does is hand the seat back to the table: the lock is
+// cleared, the room is told, and the ready check is open again for a vote the
+// captains can actually keep. Nothing about the seat's own rules is decided
+// here, and a room whose report lands in time never sees any of it.
+const ADVANCE_REPORT_GRACE_MS = 12000;
+
+const advanceWatches = new Map<string, NodeJS.Timeout>();
+
+function watchForReports(
+  io: Server,
+  roomId: string,
+  from: { round: number; phase: Phase },
+): void {
+  clearAdvanceWatch(roomId);
+  const timer = setTimeout(() => {
+    void reportNeverArrived(io, roomId, from);
+  }, ADVANCE_REPORT_GRACE_MS);
+  // Like the clock's, this must never be the reason a process stays up.
+  timer.unref();
+  advanceWatches.set(roomId, timer);
+}
+
+// The announcement's report never came, so the seat goes back to the table.
+//
+// The lock is what is cleared and the ready set is not, and the difference is
+// the point: those votes were honest, and throwing them away would make every
+// captain vote again for something they already said. What they were votes for
+// was an announcement that drew no move, so clearing the lock is what lets the
+// next vote announce it again.
+async function reportNeverArrived(
+  io: Server,
+  roomId: string,
+  from: { round: number; phase: Phase },
+): Promise<void> {
+  advanceWatches.delete(roomId);
+  const cp = roomCheckpoints.get(roomId);
+  if (!cp) return;
+  // A report landed and the room is somewhere else now, so this watch is
+  // stale rather than unheeded. It is the ordinary case: every healthy
+  // announcement is followed by its report well inside the grace, and the
+  // watch is cleared by that report; a timer that survives to here with the
+  // lock already down is a leak rather than a stall, so it leaves quietly.
+  if (!cp.advancing) return;
+  if (cp.round !== from.round || cp.phase !== from.phase) return;
+  // A harbor nobody is sitting in is an empty room rather than a table
+  // waiting on a straggler, which is the same rule the clock's fire applies
+  // and for the same reason: nothing moves an empty room, and the next
+  // captain to walk in is served by the status handler arming a fresh seat.
+  if (roomMembers(roomId).length === 0) return;
+  cp.advancing = false;
+  // Nothing is recorded here, and the two records that could have taken this
+  // are why. The spine's leg_timed_out is a phase length being read against
+  // how many captains were still working when the clock ran out, and a report
+  // that never arrived would be counted into exactly that tuning number as if
+  // the seat were too short. The log's line for it says the tide ran out,
+  // which is a sentence a captain reads and would be a false one. The room is
+  // told below, which is what a captain needs; the record is left to the
+  // voyages that actually did something.
+  io.to(`room:${roomId}`).emit("room:system", {
+    roomId,
+    content:
+      "The harbor did not hear that leg move, so the ready check is open again. Press ready when you are done here and the voyage will carry on.",
+  });
+  await broadcastReadyState(io, roomId, cp);
+}
+
+// Once every captain the seat is waiting on has signaled ready for the
+// checkpoint they're all sitting at, tell the room to go. advancing guards
+// against firing twice while everyone's clients are still catching up to
+// the new phase.
 export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
   const cp = await getCheckpoint(roomId);
   if (cp.advancing) return;
-  const roster = await activeRosterSet(roomId);
+  const roster = await waitingRosterSet(roomId);
   if (roster.size === 0) return;
   // Read a second time rather than trusted from the top. The roster read
   // above is a database call, and a database call is somewhere another
@@ -299,7 +521,9 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
   // to move the checkpoint out from under the frame. A transition names the
   // seat the room is leaving, and this is that seat.
   const from = { round: cp.round, phase: cp.phase };
-  await announceAdvance(io, roomId, from);
+  await announceGuarded(io, roomId, from, () =>
+    announceAdvance(io, roomId, from),
+  );
 }
 
 // The clock's way of moving a room: the announcement a unanimous ready set
@@ -325,30 +549,45 @@ async function forceAdvance(
   roomId: string,
   cp: Checkpoint,
 ): Promise<void> {
+  // Taken before the first await below, which is the whole point of it: the
+  // fire cleared this flag a moment ago (see firePhaseClock), and a ready
+  // vote arriving in the window between those two lines would otherwise
+  // announce this same seat first.
   cp.advancing = true;
   const from = { round: cp.round, phase: cp.phase };
-  const roster = await activeRosterSet(roomId);
-  const ready = Array.from(cp.readyUserIds).filter((id) =>
-    roster.has(id),
-  ).length;
-  noteTelemetry(roomId, "leg_timed_out", { ready, required: roster.size });
-  // [B4: the log surfaces] The fire's own line, for the room's log, and it
-  // names the seat the tide ran out on rather than the leg's number: a
-  // captain reads the log in order, and the line above it in that order is
-  // the anchor line that carried them into this phase. It is written
-  // before the announcement below, so the log carries the clock's own
-  // reason for the move ahead of the move itself.
-  noteVoyageLog(io, roomId, { kind: "leg_timed_out", phase: cp.phase });
-  // Said out loud, because a room that moved without a full ready set owes
-  // the captains still sitting in it an explanation of why. It is not a
-  // chat message from a captain: it is the harbor talking, on the same
-  // channel every other harbor announcement uses.
-  io.to(`room:${roomId}`).emit("room:system", {
-    roomId,
-    content:
-      "The tide has run out for this leg, and the harbor moves on. Any captain who had not finished commits the phase's own defaults.",
+  // The clock's accounting and its two lines sit inside the same guard as
+  // the frame itself. Every one of them is work that can throw with the lock
+  // held, and announceGuarded is what makes the lock survivable rather than
+  // a stall.
+  await announceGuarded(io, roomId, from, async () => {
+    // The spine's roster is the active one rather than the waiting one, and
+    // the difference is the question this number answers: leg_timed_out is
+    // read to tune a phase's budget, and a captain who spent the seat inside
+    // the yard's own draft was doing the work of that seat, so a full clock
+    // over them is exactly the reading that says the seat was too short.
+    const roster = await activeRosterSet(roomId);
+    const ready = Array.from(cp.readyUserIds).filter((id) =>
+      roster.has(id),
+    ).length;
+    noteTelemetry(roomId, "leg_timed_out", { ready, required: roster.size });
+    // [B4: the log surfaces] The fire's own line, for the room's log, and it
+    // names the seat the tide ran out on rather than the leg's number: a
+    // captain reads the log in order, and the line above it in that order is
+    // the anchor line that carried them into this phase. It is written
+    // before the announcement below, so the log carries the clock's own
+    // reason for the move ahead of the move itself.
+    noteVoyageLog(io, roomId, { kind: "leg_timed_out", phase: cp.phase });
+    // Said out loud, because a room that moved without a full ready set owes
+    // the captains still sitting in it an explanation of why. It is not a
+    // chat message from a captain: it is the harbor talking, on the same
+    // channel every other harbor announcement uses.
+    io.to(`room:${roomId}`).emit("room:system", {
+      roomId,
+      content:
+        "The tide has run out for this leg, and the harbor moves on. Any captain who had not finished commits the phase's own defaults.",
+    });
+    await announceAdvance(io, roomId, from);
   });
-  await announceAdvance(io, roomId, from);
 }
 
 // ---
@@ -463,6 +702,23 @@ export function disarmPhaseClock(roomId: string): void {
   clearPhaseTimer(roomId);
   const cp = roomCheckpoints.get(roomId);
   if (cp) cp.endsAt = null;
+}
+
+/**
+ * Stops the room's watch on an announcement's report, if one is armed.
+ *
+ * Reached by every path that ends the promise the announcement made: the
+ * report that lands it, a voyage starting over, and a room being torn down.
+ * It is exported because two of those three live outside this module, and it
+ * is called rather than left to the timer's own guards so the map holds only
+ * rooms that are actually waiting on a report.
+ */
+export function clearAdvanceWatch(roomId: string): void {
+  const armed = advanceWatches.get(roomId);
+  if (armed !== undefined) {
+    clearTimeout(armed);
+    advanceWatches.delete(roomId);
+  }
 }
 
 // The clock's fire: one seat's budget ran out.

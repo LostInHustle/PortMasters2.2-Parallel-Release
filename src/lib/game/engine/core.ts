@@ -14,6 +14,27 @@ export function hasModule(state: GameState, id: string): boolean {
   return state.equippedModules.some((m) => m.id === id);
 }
 
+// How many module slots this hull has open, which is the one place the
+// slot ladder is worked out: a hull takes one more module for every level
+// it climbs, so three at level three, four at four and five at five.
+//
+// It was three copies of the same comparison before F3 needed a fourth
+// (the shipyard's own slot line, the draft's install-or-swap label and the
+// nudge that points a captain at an empty slot), and the reason it is a
+// reader rather than a fourth copy is what the copies already disagreed
+// about: a hull can read as over its slots, because a module trade settles
+// on two machines that cannot see each other's hulls and the buyer's side
+// bolts the module on rather than losing it (see applyModuleTradeSide in
+// ./modules). A subtraction floors at zero and says "full" for an
+// overfilled hull, which is the answer every one of those readers wants;
+// a comparison would need each of them to remember which way a negative
+// count reads.
+export function moduleSlotsOpen(
+  state: Pick<GameState, "shipLevel" | "equippedModules">,
+): number {
+  return Math.max(0, state.shipLevel - state.equippedModules.length);
+}
+
 // "Gold" is folded in as just another tradeable item type for bartering
 // (see BARTER_ITEMS in ../constants), so anything that reads or writes an
 // amount by item name goes through these two rather than reaching into

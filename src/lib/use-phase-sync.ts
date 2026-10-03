@@ -6,6 +6,7 @@ import type { GameContext, GameState } from "@/lib/game/types";
 import {
   applyMarketLeans,
   autoCommit,
+  canLeavePhase,
   restartGame,
   startBoonDrafting,
   tallyPurchasesByResource,
@@ -13,7 +14,7 @@ import {
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import type { PortShift } from "@/lib/game/maroon";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
-import { normalizeMode } from "@/lib/game/mode";
+import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { checkpointRank } from "@/lib/game/checkpoint";
 import { normalizePhase } from "@/lib/game/phases";
 import {
@@ -26,6 +27,12 @@ import { api } from "@/lib/api";
 export type ReadyState = {
   round: number;
   phase: string;
+  // The lap the room is keeping, so a captain can be sure the round and the
+  // phase they just read are being compared in the mode they are playing.
+  // Optional because a client can meet a server one build behind during a
+  // rolling restart, and a frame that carries no mode says nothing about the
+  // lap rather than saying the lap is the founding mode.
+  mode?: GameMode;
   // [B2: hard timers, the server as timekeeper] The room's clock as the
   // server publishes it: the epoch millisecond this seat runs out, and the
   // number of seconds the seat was given. Both are null on a seat with no
@@ -161,6 +168,34 @@ export function usePhaseSync({
       setClockNow(Date.now());
       const g = gameRef.current;
 
+      // The room's lap, taken rather than assumed. A rank is an index inside
+      // one mode's phase order, so a comparison between a captain's seat and
+      // the room's seat only means anything while both are read the same way;
+      // a client whose own mode disagrees with the room's is not behind or
+      // ahead of the table, it is playing a different leg, and every guard
+      // below answers null or nonsense for it. That is a livelock rather than
+      // a stumble, because the two laps of this release differ by one
+      // adjacent swap (Orders and Parley, see ./game/mode): a step forward in
+      // one lap is backward in the other, so each captain's report of the
+      // seat they moved to is discarded as stale, the checkpoint never moves,
+      // and the room's own cure hands the same dead announcement back to the
+      // table.
+      //
+      // The room is the authority here for the reason it is at load: the mode
+      // decides the order this captain's phases run in, and the room is what
+      // everyone is synchronizing to (see refreshVoyageFacts, where the
+      // room's mode beats the save's). A room's mode is fixed at its creation
+      // and no event changes it, so in a healthy room this line never fires;
+      // it is here because the alternative is an assumption that four guards
+      // silently rest on.
+      const roomMode =
+        data.mode === undefined ? g.mode : normalizeMode(data.mode);
+      if (roomMode !== g.mode) {
+        act((state) => {
+          state.mode = roomMode;
+        });
+      }
+
       // Desync catch up. When the room's synchronized checkpoint has
       // moved ahead of us (we missed a phase:advance broadcast because of
       // a transport blip, common on tunnelled connections), execute the
@@ -171,20 +206,17 @@ export function usePhaseSync({
       // just left. If the room somehow advanced multiple phases (extremely
       // rare), the next phase:ready_update heartbeat will trigger another
       // catch up step.
-      // Both ranks are read in the lap this captain believes the room is
-      // keeping, which is the room's own mode as it arrived on load or on the
-      // restart broadcast. Comparing them inside one lap is the only way the
-      // comparison means anything: ranks are index times lap length, so two
-      // modes produce numbers of the same magnitude that stand for different
-      // phases. Reading both from the same snapshot is also what keeps a
-      // captain who has somehow drifted onto the wrong mode from being told
-      // they are perfectly in step.
+      // Both ranks are read in the room's own lap, which is what the frame
+      // above just settled: comparing them inside one lap is the only way the
+      // comparison means anything, and the lap it is done in is the one the
+      // room is keeping rather than the one this client happened to be
+      // holding.
       const serverRank = checkpointRank(
-        g.mode,
+        roomMode,
         data.round,
         normalizePhase(data.phase),
       );
-      const clientRank = checkpointRank(g.mode, g.currentRound, g.phase);
+      const clientRank = checkpointRank(roomMode, g.currentRound, g.phase);
       if (
         serverRank !== null &&
         clientRank !== null &&
@@ -211,10 +243,14 @@ export function usePhaseSync({
         act((state, logs) => autoCommit(state, ctx, logs));
         return;
       }
-      // A captain off the lap is not behind anybody. The module draft and the
-      // two terminals have no rank at all, so a comparison against the room
-      // cannot place them, and the advance broadcast is what moves a draft
-      // forward rather than this.
+      // A terminal is not behind anybody: bankruptcy and the endgame screen
+      // are the two phases with no rank at all, and a captain sitting at one
+      // has left the voyage rather than fallen behind it. The personal
+      // screens do have a rank, and the fold that gives them one is what
+      // makes this catch up work for a captain who was reading a module card
+      // when the room moved on: they are standing in Dusk, so the room's move
+      // to the next round is a move past them and is healed here exactly like
+      // any other missed broadcast.
 
       // Self heal a dropped ready vote. A vote emitted the instant a flaky
       // transport blips (common on tunnelled or long polling connections)
@@ -271,11 +307,14 @@ export function usePhaseSync({
       );
       const clientRank = checkpointRank(g.mode, g.currentRound, g.phase);
       if (advanceRank === null) return;
-      // Stale advance for a checkpoint we've already passed, ignore. A
-      // captain off the lap has no rank to compare, and the two phases that
-      // is true of are inside a seat rather than beside one: a captain in
-      // the module draft is standing in Dusk, which is the seat this advance
-      // is leaving, so the frame is theirs to take (see [B2] below).
+      // Stale advance for a checkpoint we've already passed, ignore. The one
+      // case that reads oddly here is the personal screens, and it reads
+      // correctly once the fold is in mind: a captain in the module draft or
+      // the swap picker is standing in Dusk, so their rank is Dusk's rank,
+      // which is the seat this advance is leaving, and the frame is theirs to
+      // take rather than one to refuse as stale (see [B2] below). A terminal
+      // is the only thing with no rank, and the line above is what refuses a
+      // frame naming one.
       if (clientRank !== null && advanceRank < clientRank) return;
       // We are leaving the market phase for good this round (purchasedCards
       // and resourceCards are about to be cleared by the pending
@@ -452,9 +491,11 @@ export function usePhaseSync({
     });
   }, [game._pendingPulseTally, game.currentRound, socket, roomId, act]);
 
-  const markReady = useCallback(
+  // The vote itself, in one place: the two presses below differ only in what
+  // they ask before sending it. Both return whether the vote went out.
+  const sendReady = useCallback(
     (fn: (g: GameState, logs: string[]) => void) => {
-      if (!socket) return;
+      if (!socket) return false;
       pendingFn.current = fn;
       setWaiting(true);
       socket.emit("phase:ready", {
@@ -462,8 +503,33 @@ export function usePhaseSync({
         round: game.currentRound,
         phase: game.phase,
       });
+      return true;
     },
     [socket, roomId, game.currentRound, game.phase],
+  );
+
+  // The press that commits a choice: locking in a boon, where the choice is
+  // the departure itself, so there is nothing to check and nothing to
+  // refuse. See markReady below for the press that has no choice in it.
+  const markChoiceReady = useCallback(
+    (fn: (g: GameState, logs: string[]) => void) => sendReady(fn),
+    [sendReady],
+  );
+
+  const markReady = useCallback(
+    (fn: (g: GameState, logs: string[]) => void) => {
+      // The seat has to have a departure before a press can be a promise the
+      // table can keep. The room announces the advance once every captain has
+      // readied, and each client then runs the transition it was holding, so
+      // a captain who readies in a seat no departure can leave (the pier,
+      // Dawn, a personal or terminal screen) leaves the room holding a full
+      // ready set that nothing carries out. The press is refused here, before
+      // anything is sent, and the caller says why. See canLeavePhase in the
+      // engine's lifecycle for which seats those are and why each one is.
+      if (!canLeavePhase(gameRef.current)) return false;
+      return sendReady(fn);
+    },
+    [sendReady],
   );
 
   const cancelReady = useCallback(() => {
@@ -518,6 +584,7 @@ export function usePhaseSync({
     requiredCount,
     phaseClock,
     markReady,
+    markChoiceReady,
     cancelReady,
     startGame,
     restartVoyage,

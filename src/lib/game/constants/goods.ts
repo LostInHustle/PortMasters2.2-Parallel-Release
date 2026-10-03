@@ -185,18 +185,16 @@ export const RECIPES: Record<
   },
 };
 
-// Silk itself, and every finished good a captain makes from it. Derived
-// from RECIPES rather than listed by hand: the hand written list this
-// replaces named one good at a given Silk ratio and missed two others at
-// the identical ratio, so the Silk Winds boon and the Silk Road Monopoly
-// module quietly did nothing for the two most valuable goods in the game.
-// A good added tomorrow is covered the moment its recipe is written.
-export const SILK_GOODS: readonly string[] = [
-  "Silk",
-  ...Object.entries(RECIPES)
-    .filter(([, recipe]) => (recipe.materials.Silk ?? 0) > 0)
-    .map(([good]) => good),
-];
+// [F2: the card record, and the mode weighting field] A SILK_GOODS list used
+// to stand here: Silk and every finished good whose recipe uses it, read by
+// the two cards that priced Silk freight and by the two screens that drew
+// the same estimate. It is gone rather than kept beside the tag, and the two
+// are not the same set: the goods made from Silk are cotton clothes, brocade
+// and the two tier two luxuries, while the woven tag is those plus hemp,
+// linen and rags. The cards that read it now say woven in their own text, so
+// the class they cover is the class the catalogue carries rather than a list
+// derived here that no card's sentence matches. A good tagged woven tomorrow
+// joins them the same afternoon.
 
 export const COMMODITIES: Record<
   string,

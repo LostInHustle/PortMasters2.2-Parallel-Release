@@ -14,6 +14,7 @@ import { clearBarter, clearFlexibleAccepted } from "../barter";
 import { clearMutedUsers, clearSessionChat, emitRoomMembers } from "../chat";
 import {
   broadcastReadyState,
+  clearAdvanceWatch,
   disarmPhaseClock,
   getCheckpoint,
   roomCheckpoints,
@@ -33,6 +34,7 @@ import {
 } from "../presence";
 import { clearPulseTallies } from "../pulse";
 import { refitContracts } from "../refits";
+import { moduleTrades } from "../module-trades";
 import { clearReveals } from "../reveal";
 import { clearRoomStatuses } from "../status";
 import { clearSurge } from "../surge";
@@ -88,6 +90,10 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // this timer alive would have it fire into a lobby nobody is
       // standing in a phase of.
       disarmPhaseClock(roomId);
+      // And the watch on the ended voyage's last announcement, which
+      // belongs to the seat this restart just cleared. Reopened harbors are
+      // the pier, and the pier waits on nobody's report.
+      clearAdvanceWatch(roomId);
       clearRoomStatuses(roomId);
       clearBarter(io, roomId);
       // [D3: Convoy: the Escort Contract] And the market's board, which
@@ -100,6 +106,12 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // garment in a leg, and the legs of the voyage about to start are
       // not the ones it was promised in.
       refitContracts.clear(io, roomId);
+      // [F3: modules in the shipyard ladder, and trading them between
+      // captains] And the module market's, which is the same sentence
+      // about the same kind of object: a listing is a promise about a
+      // module in a leg, and the legs of the voyage about to start are
+      // not the ones it was promised in.
+      moduleTrades.clear(io, roomId);
       // A restarted voyage is a new voyage, so the flexible allowance
       // starts over with it.
       clearFlexibleAccepted(roomId);

@@ -25,6 +25,7 @@
 // was dealt (see ./reveal.ts).
 // =====================================================================
 import type { Server } from "socket.io";
+import { clearAdvanceWatch } from "./checkpoint";
 import { recordRivalOutcomes } from "./rival";
 import {
   clearVoyageBoards,
@@ -75,6 +76,15 @@ export async function maybeConcludeVoyage(
   if (concludedRooms.has(roomId)) return;
   concludedRooms.add(roomId);
 
+  // The watch on the last announcement of this voyage, stood down. The
+  // promise it guards is that a report naming a later seat will move the
+  // room's checkpoint, and the leg a voyage ends on keeps that promise in
+  // the other currency: every captain who finished is standing on a phase
+  // no lap contains, which has no rank and so can never move anything. Left
+  // armed, it would fire a quarter minute after the crown was handed out
+  // and tell a table that has finished sailing that the harbor is waiting
+  // on them.
+  clearAdvanceWatch(roomId);
   await clearVoyageBoards(io, roomId);
   const harbor = await readHarborSaves(roomId);
   closeVoyageRecord(roomId, harbor.peerTradeProfits);

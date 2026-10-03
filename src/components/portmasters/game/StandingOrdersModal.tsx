@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ScrollText } from "lucide-react";
 import { ICONS } from "@/lib/game/constants/brand";
-import { type Boon } from "@/lib/game/constants/drafts";
+import { cardText } from "@/lib/game/cards";
 import { basePriceRange } from "@/lib/game/engine";
 import {
   unlockedBoons,
@@ -344,17 +344,24 @@ export function StandingOrdersModal({
                 disabled={off}
                 onClick={() => set({ boon: null })}
               />
-              {boons.map((b: Boon) => (
-                <BoonOption
-                  key={b.id}
-                  icon={b.icon}
-                  name={b.name}
-                  desc={b.desc}
-                  active={written?.id === b.id}
-                  disabled={off}
-                  onClick={() => set({ boon: b.id })}
-                />
-              ))}
+              {boons.map((card) => {
+                // [F2: the card record, and the mode weighting field] The
+                // three strings come off the record through cardText, so the
+                // row this panel draws and the card the draft deals are one
+                // card described once.
+                const text = cardText(card);
+                return (
+                  <BoonOption
+                    key={card.id}
+                    icon={card.icon}
+                    name={text.name}
+                    desc={text.desc}
+                    active={written?.id === card.id}
+                    disabled={off}
+                    onClick={() => set({ boon: card.id })}
+                  />
+                );
+              })}
             </div>
           </Section>
 

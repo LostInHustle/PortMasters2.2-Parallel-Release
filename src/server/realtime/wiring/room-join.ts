@@ -25,6 +25,7 @@ import {
 } from "../objective";
 import { broadcastPresence, cancelDeparture } from "../presence";
 import { refitContracts } from "../refits";
+import { moduleTrades } from "../module-trades";
 import { revealFor } from "../reveal";
 import { forgetStatus, sendStatusBatchTo } from "../status";
 import { noteCaptainLeft } from "../telemetry";
@@ -132,6 +133,15 @@ export function wireRoomJoin(
     io.to(socket.id).emit(
       "refit:update",
       refitContracts.payloadFor(roomId, s.userId),
+    );
+    // [F3: modules in the shipyard ladder, and trading them between
+    // captains] And the module market's, on the same reasoning as the two
+    // above: a captain who reloads at the Parley table asks what is on it
+    // and is answered with their own view, because a direct offer is one
+    // captain's business and the room's board is not.
+    io.to(socket.id).emit(
+      "module:update",
+      moduleTrades.payloadFor(roomId, s.userId),
     );
     // [D5: Aroma: the Bazaar Rumor] And the bazaar's, which needs one
     // thing the two boards above do not: the room's leg. A row of this

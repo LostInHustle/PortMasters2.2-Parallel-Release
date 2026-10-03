@@ -6,20 +6,20 @@ Every boon, every ship module, every House perk, every Age, every difficulty mod
 
 Every defect below has since been repaired. The audit is kept in the tense it was written in, because a record of what was found is worth more than a list quietly edited after the fact, so this section is the one place that says what became of each.
 
-| Finding                                                      | Outcome                                                                                                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| The two charter boons are the same boon                      | Split. Kiln and Forge Guild reads a tier 1 gate and Exotic Treasures reads a tier 2 gate, so each pays on the goods it names.               |
-| Silk Winds and Silk Road Monopoly miss two Silk goods        | The Silk list covers Foreign Balm and Pearl String, the two goods whose recipe uses Silk at the same ratio as the ones it already included. |
-| Settlement shows a pirate risk higher than the one rolled    | The panel calls the same chance function and the same modifiers the roll applies.                                                           |
-| Settlement shows an escort price higher than the one charged | The panel calls the accessor `hireEscort` charges through.                                                                                  |
-| Harbor Pulse is calibrated to three goods                    | The baseline is one over the number of goods actually in the tally.                                                                         |
-| The Phase 1 price reference misses two module discounts      | The reference applies the same module discounts the counter applies.                                                                        |
-| A load timeout and a load error both drop the Renown bonus   | A failed load leaves the captain's Renown level where it was.                                                                               |
-| Six numbers the interface states that the game does not      | All six corrected.                                                                                                                          |
-| Three things that are written and read by nothing            | The House perks and the Age effects are wired in and live. The Harbor activity feed is not.                                                 |
-| The pledge that strands                                      | The conclusion sweep treats a bankrupt borrower as absent, so their loan is swept and the pledge riding on it resolves.                     |
-| Dead payload and a dead computation                          | The three unread standings fields, the crown total that was summed and never sent, and the unused ship count are gone.                      |
-| Two comments naming different boards for one surge           | Both name the Purchase board now, which is where the surge is added.                                                                        |
+| Finding                                                      | Outcome                                                                                                                                                               |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The two charter boons are the same boon                      | Split. Kiln and Forge Guild reads a tier 1 gate and Exotic Treasures reads a tier 2 gate, so each pays on the goods it names.                                         |
+| Silk Winds and Silk Road Monopoly miss two Silk goods        | Closed at the root. The list is gone with the card record: both cards read the `woven` tag, which takes Foreign Balm and Pearl String through the goods' own recipes. |
+| Settlement shows a pirate risk higher than the one rolled    | The panel calls the same chance function and the same modifiers the roll applies.                                                                                     |
+| Settlement shows an escort price higher than the one charged | The panel calls the accessor `hireEscort` charges through.                                                                                                            |
+| Harbor Pulse is calibrated to three goods                    | The baseline is one over the number of goods actually in the tally.                                                                                                   |
+| The Phase 1 price reference misses two module discounts      | The reference applies the same module discounts the counter applies.                                                                                                  |
+| A load timeout and a load error both drop the Renown bonus   | A failed load leaves the captain's Renown level where it was.                                                                                                         |
+| Six numbers the interface states that the game does not      | All six corrected.                                                                                                                                                    |
+| Three things that are written and read by nothing            | The House perks and the Age effects are wired in and live. The Harbor activity feed is not.                                                                           |
+| The pledge that strands                                      | The conclusion sweep treats a bankrupt borrower as absent, so their loan is swept and the pledge riding on it resolves.                                               |
+| Dead payload and a dead computation                          | The three unread standings fields, the crown total that was summed and never sent, and the unused ship count are gone.                                                |
+| Two comments naming different boards for one surge           | Both name the Purchase board now, which is where the surge is added.                                                                                                  |
 
 Two entries in the last section are deliberately left as they were found. `CaptainMerit.earnedAt` is still stored and still never printed, and it stays: a timestamp on an achievement is a record of when it was earned rather than a field pretending to be one. The Harbor activity feed still opens onto a panel with nothing behind it, and it will keep doing so until the endpoint it would read from exists.
 

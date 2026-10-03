@@ -38,7 +38,7 @@ const DEAREST_PRODUCT = Math.max(
 // genProductOrder asks for at most three units of one good.
 const MAX_ORDER_QUANTITY = 3;
 
-// Order rewards stack several multipliers in completeOrder: Silk Monopoly's
+// Order rewards stack several multipliers in completeOrder: Woven Monopoly's
 // flat 20%, the two charter lane payouts, and the Maritime Bureau Token.
 // Doubling is comfortably above every combination of those.
 const MODIFIER_STACK_CEILING = 2;

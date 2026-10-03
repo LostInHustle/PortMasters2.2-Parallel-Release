@@ -25,7 +25,7 @@
 // =====================================================================
 
 import { modeConfig } from "./mode";
-import { normalizePhase } from "./phases";
+import { normalizePhase, seatOf } from "./phases";
 import type { Phase } from "./types";
 
 // Where a phase sits on a mode's lap, and how long that lap is.
@@ -97,8 +97,23 @@ export function isGatedPhase(mode: unknown, phase: unknown): boolean {
 // A single comparable integer for a checkpoint, used to detect when the
 // room has moved ahead of a given captain (a missed phase:advance
 // broadcast) so the client can catch up. Returns null for a phase that
-// is not part of the mode's synchronized lap, since those are personal
-// and never compared across captains.
+// is not part of the mode's synchronized lap at all, which after the fold
+// below is the two terminals and nothing else.
+//
+// The phase is folded onto the seat it is standing at first (see seatOf),
+// and that fold is the difference between a captain inside a personal
+// screen being placeable and being invisible. A captain drafting a module
+// is standing in the yard, so their rank is Dusk's. Without it they had no
+// rank, and every comparison a captain makes against the room answered
+// null for them: the catch up above would not fire, so a captain whose
+// advance frame was dropped while the draft was open could never be
+// brought forward again, and a room whose vote went unanswered by them had
+// no way to read why. One fold, in the one function all four guards call,
+// rather than a phase name spelled out at each of them.
+//
+// The fold is safe against a stale frame because the round term dominates:
+// a draft frame from a round the room has left still ranks below it, and a
+// captain can only be in the draft having come from the round's own Dusk.
 //
 // The rank is the lap index plus the round times the mode's lap length,
 // so a rank only means anything within one mode. Every captain in a room
@@ -110,7 +125,7 @@ export function checkpointRank(
   round: number,
   phase: Phase,
 ): number | null {
-  const { seat, count } = lapSeat(mode, phase);
+  const { seat, count } = lapSeat(mode, seatOf(phase));
   if (seat === -1) return null;
   return round * count + seat;
 }

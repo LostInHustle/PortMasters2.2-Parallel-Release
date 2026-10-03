@@ -281,7 +281,13 @@ export function payWages(
   if (state.money >= total) {
     state.money -= total;
     state.workerWages += total;
-    state.roundCosts += total;
+    // The wage bill is its own expense line and is not part of the round's
+    // goods bucket. It used to be added to roundCosts as well, which put the
+    // same Gold into the settlement's Total Cost twice: once through that
+    // field and once through the workerWages term the ledger sums beside it.
+    // The voyage ledger never carried wages at all, and the endgame summary
+    // lists them as their own row, so the round bucket was the one place
+    // that disagreed with the other two.
     for (const b of bills) {
       if (b.due > 0)
         logs.push(
@@ -309,11 +315,14 @@ export function payMaintenance(
   logs: string[],
 ): true | "bankruptcy" {
   const cost = state.fixedCost + state.maintenancePenalty;
+  // Maintenance is its own expense line on both payment paths below, and the
+  // same double count the wage note above describes applied to it: the fee
+  // was added to roundCosts and totalCosts as well, while the settlement
+  // adds maintenanceCosts to Total Cost itself and the endgame summary
+  // prints it as a row beside the purchases row.
   if (state.money >= cost) {
     state.money -= cost;
     state.maintenanceCosts += cost;
-    state.roundCosts += cost;
-    state.totalCosts += cost;
     logs.push(`💸 Paid Ship Maintenance Fee: ${cost} Gold`);
     return true;
   }
@@ -321,8 +330,6 @@ export function payMaintenance(
     const paid = state.money;
     state.money = 0;
     state.maintenanceCosts += paid;
-    state.roundCosts += paid;
-    state.totalCosts += paid;
     logs.push(`⚠️ Forced payment of ${paid} Gold (Needed ${cost} Gold)`);
     // See the note on the wage failure above: this line used to end the
     // voyage in words, which is only half of what it now means.

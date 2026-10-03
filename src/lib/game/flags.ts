@@ -8,9 +8,10 @@
 // reads it. When ./larder wrote it down, two switches read it, the layer
 // itself and C2's loss rule. C3's wardrobe made three, C4's split hold
 // made four, D2's path orders made five, D3's escort contracts made six,
-// D4's refit made seven, D5's bazaar rumor made eight and D7's draft makes
-// nine, and a policy that nine families depend on belongs beside none of
-// them rather than inside the first one that needed it.
+// D4's refit made seven, D5's bazaar rumor made eight, D7's draft makes
+// nine and F3's module trades make ten, and a policy that ten families
+// depend on belongs beside none of them rather than inside the first one
+// that needed it.
 //
 // [The mode boundary] Every switch here answers with two readings, and the
 // order they are taken in is the rule: the mode first, the environment
@@ -42,13 +43,13 @@ import { modeConfig } from "./mode";
 /**
  * The one place a survival switch is judged, for every flag in this epic.
  *
- * The policy is written here once because nine switches read it now. Six
+ * The policy is written here once because ten switches read it now. Seven
  * are judged in this file, the provisions layer, C4's split hold, D2's path
- * orders, D3's escort contracts, D5's bazaar rumor and D7's draft, and
- * three read it from their own module, C2's loss rule in ./crew, C3's
- * wardrobe in ./garments and D4's bench in ./engine/refits. The cost of
- * nine copies is a set that drifts: one flag accepting a value another
- * refuses is a bug that only shows the evening an operator tries it.
+ * orders, D3's escort contracts, D5's bazaar rumor, D7's draft and F3's
+ * module trades, and three read it from their own module, C2's loss rule in
+ * ./crew, C3's wardrobe in ./garments and D4's bench in ./engine/refits.
+ * The cost of ten copies is a set that drifts: one flag accepting a value
+ * another refuses is a bug that only shows the evening an operator tries it.
  *
  * Unset, empty and any value that is not the word off or the digit zero
  * all mean the switch is on, matched after trimming and lowering, so a
@@ -238,6 +239,39 @@ export function bazaarRumorsOn(mode: unknown): boolean {
  */
 export function pathDraftOn(mode: unknown): boolean {
   return flagOnFor(mode, process.env.NEXT_PUBLIC_PATH_DRAFT);
+}
+
+/**
+ * Whether a module may change hands between captains.
+ *
+ * [F3: modules in the shipyard ladder, and trading them between captains]
+ * F3's own rollback, and the plan's clause is "Modules are durable, so the
+ * rollback concern is data: keep the table and disable equipping, rather
+ * than dropping the table and losing equipped modules." The table this
+ * switch keeps is the hull's own: what a captain has bolted on lives in
+ * their save beside their hold and their purse, nothing this feature added
+ * writes to it, and turning the switch off takes the trade and leaves every
+ * equipped module exactly where it was, which is the plan's sentence read
+ * as a rule rather than as a hope.
+ *
+ * With the switch off no module can be listed (the server refuses one, see
+ * the module handlers in src/server/realtime/wiring/module-trades.ts), no
+ * board is drawn, and a row already agreed settles nothing on either side:
+ * the seller keeps their module, the buyer keeps their Gold, and the module
+ * that would have left a hull stays bolted to it. That is the same shape
+ * the escort and the refit roll back in, and it is why the read sits at the
+ * top of applyModuleTradeSide rather than at the panel alone.
+ *
+ * It is judged here rather than in ./engine/modules because the trade
+ * stands on no other layer: a module is base game, the hull that carries
+ * one has existed since the first shipyard, and nothing has to be true of
+ * another system before this one can answer. That is the escort's reading
+ * and not the refit's, and the difference is the point of keeping the
+ * family's switches in one place: a reader can see, at one screen, which
+ * features carry a dependency and which stand alone.
+ */
+export function moduleTradesOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_MODULE_TRADES);
 }
 
 /* D4's own switch is not judged here, and the reason is the cycle rather
