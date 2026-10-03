@@ -20,9 +20,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // so the record cannot hold a rail that is empty and yet still standing.
 const PANELS_KEY = "portmasters_room_panels";
 
-export type RoomPanel = "left" | "roster" | "chat";
+// Both helpers stay module local: the hook's returned object carries them
+// structurally, and no surface outside this file names either one.
+type RoomPanel = "left" | "roster" | "chat";
 
-export type PanelPrefs = Record<RoomPanel, boolean>;
+type PanelPrefs = Record<RoomPanel, boolean>;
 
 // true means folded. Every panel opens expanded, which is the room a
 // captain saw before this record existed.

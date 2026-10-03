@@ -232,9 +232,14 @@
 
      The colour written here is the colour the glass already resolved to once
      the canvas had shown through, so the panel looks like itself and simply
-     stops being see through. The border and the shadow are untouched. */
+     stops being see through. The border and the shadow are untouched.
+
+     The fill is also published as --pm-glass-fill, so a surface that has to
+     redraw it on its own cells, like the register's sticky head, reads the
+     one definition rather than a second copy of it. */
   .pm-glass {
-    background-color: oklch(0.994 0.004 95);
+    --pm-glass-fill: oklch(0.994 0.004 95);
+    background-color: var(--pm-glass-fill);
     box-shadow:
       0 1px 2px oklch(0.2 0.02 260 / 0.04),
       0 8px 24px oklch(0.2 0.02 260 / 0.06),
@@ -242,7 +247,8 @@
     border: 1px solid oklch(1 0 0 / 0.4);
   }
   .dark .pm-glass {
-    background-color: oklch(0.226 0.024 250);
+    --pm-glass-fill: oklch(0.226 0.024 250);
+    background-color: var(--pm-glass-fill);
     box-shadow:
       0 1px 2px oklch(0 0 0 / 0.2),
       0 8px 24px oklch(0 0 0 / 0.3),

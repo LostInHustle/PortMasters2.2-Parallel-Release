@@ -137,8 +137,13 @@ export function BalanceDashboard() {
           Every breakpoint under it used to read the window instead, which
           is how this page came to change shape at 1280 while the column it
           draws in stayed at 1024: the four front page tiles jumped from two
-          across to four across without the room for them changing at all. */}
-      <div className="@container mx-auto max-w-5xl px-4 sm:px-6">
+          across to four across without the room for them changing at all.
+
+          The cap is fluid rather than fixed: the column runs the width of
+          the window up to the point the widest table on the page stops
+          wanting more, so a laptop pays the panels the width they read at
+          and a wall display leaves the page its margins. */}
+      <div className="@container mx-auto max-w-[clamp(56rem,96vw,76rem)] px-4 sm:px-6">
         <header className="pb-2 pt-3">
           <div className="pm-glass pm-panel-bar">
             <div className="flex items-center gap-3">
@@ -149,7 +154,7 @@ export function BalanceDashboard() {
                 <h1 className="font-display text-sm leading-tight font-bold tracking-tight">
                   Balance Dashboard
                 </h1>
-                <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
+                <p className="line-clamp-2 text-[11px] leading-tight text-muted-foreground">
                   {subtitle}
                 </p>
               </div>
@@ -185,7 +190,7 @@ export function BalanceDashboard() {
           {error && <Notice message={error} onDismiss={() => setError(null)} />}
 
           {reading === null && !error && (
-            <div className="pm-glass pm-tile flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <div className="pm-glass flex items-center justify-center gap-2 rounded-2xl py-12 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Reading the window...
             </div>
@@ -312,9 +317,13 @@ function FrontNumber({ line }: { line: DashboardReadingLine }) {
     <div className="pm-glass pm-tile space-y-2">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-xs leading-snug font-semibold">{line.label}</h2>
-        <Pill tone={chip.tone}>{chip.word}</Pill>
+        {/* The chip keeps its width and the label wraps around it: a chip
+            squeezed by a long question would rather break its own word. */}
+        <Pill tone={chip.tone} className="shrink-0">
+          {chip.word}
+        </Pill>
       </div>
-      <p className="font-display text-lg leading-none font-bold tracking-tight">
+      <p className="font-display text-xl leading-none font-bold tracking-tight">
         {line.value}
       </p>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -342,7 +351,9 @@ function FrontTile({
     <div className="pm-glass pm-tile space-y-2">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-xs leading-snug font-semibold">{title}</h2>
-        <Pill tone={state.tone}>{state.word}</Pill>
+        <Pill tone={state.tone} className="shrink-0">
+          {state.word}
+        </Pill>
       </div>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {answer}
@@ -407,14 +418,14 @@ function Panel({ panel }: { panel: DashboardPanel }) {
                 key={line.label}
                 className="border-b border-black/[0.04] last:border-0 dark:border-white/[0.06]"
               >
-                <td className="px-4 py-2 text-xs">{line.label}</td>
-                <td className="px-4 py-2 text-right text-xs tabular-nums">
+                <td className="px-4 py-2.5 text-xs">{line.label}</td>
+                <td className="px-4 py-2.5 text-right text-xs tabular-nums">
                   {line.value}
                 </td>
-                <td className="px-4 py-2 text-xs text-muted-foreground">
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">
                   {line.target}
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-2.5 text-right">
                   {/* Held on one line. A pill is a chip with a rounded
                       background, and text that breaks inside one turns it
                       into a two line lozenge that is taller than the row

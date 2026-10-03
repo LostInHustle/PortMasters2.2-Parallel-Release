@@ -31,7 +31,10 @@
 // boon-ledger.ts).
 // =====================================================================
 
-import { BoonLedger as BoonLedgerPayload } from "@/types/realtime/boons";
+import {
+  BoonLedger as BoonLedgerPayload,
+  type BoonReport,
+} from "@/types/realtime/boons";
 import { useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { gambitSystemsOn } from "@/lib/game/mode";
@@ -81,13 +84,16 @@ export function useBoonLedger(
     const identity = `${roomId}:${record.round}:${record.kept}:${record.shown.join(",")}:${record.moment ?? ""}`;
     if (sent.current === identity) return;
     sent.current = identity;
-    socket.emit("boon:report", {
+    // Typed as the wire file's own report so the claim this hook makes and
+    // the frame the room reads back cannot drift apart.
+    const report: BoonReport = {
       roomId,
       round: record.round,
       shown: record.shown,
       kept: record.kept,
       ...(record.moment !== undefined ? { moment: record.moment } : {}),
-    });
+    };
+    socket.emit("boon:report", report);
   }, [socket, roomId, mode, record]);
 
   // The ledger of the harbor this client is standing in, or an empty

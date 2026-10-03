@@ -40,6 +40,29 @@
 // name of the account they were acting on. A table is the right shape for
 // a register this dense, and a card is the right shape for a hand, so the
 // screen keeps both rather than picking one and dragging it everywhere.
+//
+// Three things shape the screen as it stands now.
+//
+// The column is fluid rather than capped: it runs the width of the window
+// up to a ceiling a register of six columns stops wanting (see the clamp
+// on the column below), so a laptop spends its width on the roster and a
+// wall display leaves the roster its margins.
+//
+// At lg and up the page is a fixed shell rather than a document: the
+// header, the tools and the register's frame all stand still and only the
+// register scrolls inside its frame, so an operator a thousand rows deep
+// can still see the title, the search and the way out. The shell is the
+// room's own shape (see GameRoom). Below lg nothing is pinned and the
+// document scrolls, which is what a hand expects, and the unpinned card
+// list is drawn there anyway.
+//
+// And a register is something an operator looks things up in, so it takes
+// a search box and four counted filters: all, online, admins and bans.
+// Both are views over the roster this screen already holds, decided on
+// the client, and the search is deferred so a keystroke never waits on
+// nine hundred rows. The selection follows the same rule: the header box
+// ticks what the filters leave visible, while the actions answer for
+// everything ticked anywhere in the register.
 // =====================================================================
 
 import {
@@ -47,7 +70,7 @@ import {
   AdminBulkAction,
   AdminBulkReport,
 } from "@/types/realtime/admin";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PublicUser } from "@/lib/api";
 import { useRealtime } from "@/lib/use-realtime";
@@ -70,6 +93,7 @@ import {
   LogOut,
   RefreshCw,
   RotateCcw,
+  Search,
   ShieldCheck,
   ShieldOff,
   Trash2,
@@ -86,19 +110,47 @@ const CHECKBOX =
   "h-4 w-4 cursor-pointer accent-admin disabled:cursor-not-allowed disabled:opacity-40";
 
 // The width at which the register has room to be a table, and the reason it
-// is 60rem rather than a round number out of the scale: the eight column
-// table came to 1034 pixels, folding the Joined column into the identity
-// cell takes 75 of them back and leaves 958, and the table must fit the
-// container with the container's own padding already taken out. 60rem is
-// 960, the first size that clears it. Below it the register is a card per
-// account.
+// is 56rem rather than a round number out of the scale: the six column
+// table below measures 881 pixels wide against this roster, the cells' own
+// padding included, and the table must fit the container with the
+// container's padding taken out as well. 56rem is 896, which clears 881.
+// 54rem was the first guess and the width probe caught it: at a 960 pixel
+// window the table drew and had to be dragged nine pixels sideways to
+// reach the buttons, so the threshold moved up rather than the table
+// moving sideways. Below it the register is a card per account.
 //
 // The variant is spelled out at both call sites rather than held in a
 // constant, because Tailwind reads class names as text and a name assembled
 // from a variable is a name it never emits. The two are exact complements
 // (the table asks for the width, the cards ask for everything under it) so
 // an edit to one is an edit to the other: the table wrapper is
-// `hidden @min-[60rem]:block` and the card list is `@min-[60rem]:hidden`.
+// `hidden @min-[56rem]:flex` and the card list is `@min-[56rem]:hidden`.
+
+// The register's header cells, held to the top of the frame that scrolls
+// under them. A see-through header cell would let the rows show through it
+// as they pass beneath, so the cells wear the glass shell's own fill, read
+// from --pm-glass-fill, which .pm-glass publishes for each theme (see
+// globals.css). The dark value rides along with the property, so a theme
+// switch moves the shell and its head together.
+const STICKY =
+  "sticky top-0 z-10 border-b border-black/[0.06] bg-(--pm-glass-fill) dark:border-white/[0.08]";
+
+// The register's four views and what each one keeps. The counts beside the
+// words on the chips are read from the same roster, so an operator can see
+// the account they are looking for exists before they look.
+type RegisterFilter = "all" | "online" | "admins" | "banned";
+
+const FILTER_ORDER: RegisterFilter[] = ["all", "online", "admins", "banned"];
+
+const FILTERS: Record<
+  RegisterFilter,
+  { label: string; keeps: (a: AdminAccount) => boolean }
+> = {
+  all: { label: "All", keeps: () => true },
+  online: { label: "Online", keeps: (a) => a.online },
+  admins: { label: "Admins", keeps: (a) => a.role === "admin" },
+  banned: { label: "Banned", keeps: (a) => a.bannedAt !== null },
+};
 
 // How a finished bulk action reads. The verb is the console's own word for
 // the action, which is the word on the button that was pressed, so the
@@ -146,6 +198,15 @@ export function AdminConsole({
   const [bulkTargets, setBulkTargets] = useState<string[]>([]);
   const [bulkConfirm, setBulkConfirm] = useState("");
   const headerBox = useRef<HTMLInputElement>(null);
+  // The register's findability tools: a text query and a status filter.
+  // Both are views over the roster this screen already holds, so neither
+  // asks the server for anything.
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<RegisterFilter>("all");
+  // The register is drawn twice and runs to hundreds of rows, so the query
+  // is deferred: the input answers the keystroke immediately while the
+  // rows catch up on React's own schedule.
+  const deferredQuery = useDeferredValue(query);
 
   // A tick outlives the row it was made on, because an account can be
   // deleted by another operator, or by this one, while it is still ticked.
@@ -161,19 +222,52 @@ export function AdminConsole({
     [accounts, ticked],
   );
 
-  const total = accounts?.length ?? 0;
-  const allSelected = total > 0 && selected.length === total;
   const busy = pending.length > 0;
   const onlineCount = accounts?.filter((a) => a.online).length ?? 0;
 
-  // The header box answers for the whole register, so it shows a dash
-  // rather than a tick while only some of it is chosen. The dash is a DOM
-  // property with no attribute, which is why it cannot be a prop.
+  // The register as the search leaves it, then as the filter leaves it.
+  // The chip counts are read off the searched set rather than the raw
+  // roster, so a count tells an operator how many of that kind their
+  // search can see.
+  const trimmed = deferredQuery.trim().toLowerCase();
+  const matching = useMemo(
+    () =>
+      accounts === null
+        ? []
+        : trimmed === ""
+          ? accounts
+          : accounts.filter(
+              (a) =>
+                a.displayName.toLowerCase().includes(trimmed) ||
+                a.username.toLowerCase().includes(trimmed),
+            ),
+    [accounts, trimmed],
+  );
+  const counts: Record<RegisterFilter, number> = {
+    all: matching.length,
+    online: matching.filter((a) => a.online).length,
+    admins: matching.filter((a) => a.role === "admin").length,
+    banned: matching.filter((a) => a.bannedAt !== null).length,
+  };
+  const visible = matching.filter(FILTERS[filter].keeps);
+
+  // The header box answers for what the filters leave visible, because
+  // that is what a press on it acts on. The selection itself is read
+  // through the whole register, so a ticked account the view has hidden
+  // is still selected and still acted on: the selection bar counts it and
+  // Clear clears it.
+  const visibleSelected = visible.filter((a) => ticked.has(a.id)).length;
+  const allVisibleSelected =
+    visible.length > 0 && visibleSelected === visible.length;
+
+  // The dash is a DOM property with no attribute, which is why it cannot
+  // be a prop.
   useEffect(() => {
     if (headerBox.current) {
-      headerBox.current.indeterminate = selected.length > 0 && !allSelected;
+      headerBox.current.indeterminate =
+        visibleSelected > 0 && !allVisibleSelected;
     }
-  }, [selected, allSelected]);
+  }, [visibleSelected, allVisibleSelected]);
 
   const toggleOne = (id: string) => {
     setTicked((current) => {
@@ -183,9 +277,25 @@ export function AdminConsole({
     });
   };
 
+  // The header box, over whatever is visible: ticking selects the rows an
+  // operator can see, and unticking releases them, without touching a
+  // tick that a filter is hiding.
   const toggleAll = () => {
-    if (accounts === null) return;
-    setTicked(allSelected ? new Set() : new Set(accounts.map((a) => a.id)));
+    if (visible.length === 0) return;
+    setTicked((current) => {
+      const next = new Set(current);
+      for (const account of visible) {
+        if (allVisibleSelected) next.delete(account.id);
+        else next.add(account.id);
+      }
+      return next;
+    });
+  };
+
+  // Out of whatever view the register is in and back to the whole roster.
+  const clearView = () => {
+    setQuery("");
+    setFilter("all");
   };
 
   const closePurge = () => {
@@ -209,22 +319,24 @@ export function AdminConsole({
   const bulkCount = bulkTargets.length;
 
   return (
-    <div className="pm-canvas min-h-screen">
+    <div className="pm-canvas flex min-h-screen w-full flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       {/* The column, and the thing every width decision below reads. It
           carries the cap and the padding rather than the two children
           doing it separately, so the container's own width is the width
           the roster actually has, and the bar above the register is
           measured against the same number the register is.
 
-          The cap is a table's rather than a page's, which is the one place
-          this screen and the balance dashboard differ: what is read here is
-          a register of eight columns, and what is read there is prose. At
-          the page cap the identity column had 167 pixels for a line that
-          needs about 170, so every row with a long handle wrapped its date
-          onto a second line and the register came out ragged. The column
-          that fits a table is the width of a table. */}
-      <div className="@container mx-auto max-w-6xl px-4 sm:px-6">
-        <header className="pb-2 pt-3">
+          The cap is fluid rather than fixed: the column runs the width of
+          the window up to the point a register of six columns stops
+          wanting more, so a laptop spends its width on the roster and a
+          wall display leaves the roster its margins.
+
+          At lg the column also takes the page's height, which is what
+          turns the register's frame into the one thing that scrolls (see
+          GameRoom for the same shell). Below lg everything stacks and the
+          document scrolls. */}
+      <div className="@container mx-auto flex w-full max-w-[clamp(56rem,96vw,80rem)] flex-col px-4 sm:px-6 lg:min-h-0 lg:flex-1">
+        <header className="shrink-0 pb-2 pt-3">
           <div className="pm-glass pm-panel-bar">
             <div className="flex items-center gap-3">
               <div className="pm-seal pm-grad-admin">
@@ -234,10 +346,17 @@ export function AdminConsole({
                 <h1 className="font-display text-sm font-bold leading-tight tracking-tight">
                   Operator Console
                 </h1>
-                <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
-                  {accounts === null
-                    ? "Reading the register..."
-                    : `${accounts.length} accounts, ${onlineCount} online, for ${APP_NAME}`}
+                <p className="text-[11px] leading-tight text-muted-foreground">
+                  {accounts === null ? (
+                    "Reading the register..."
+                  ) : (
+                    <>
+                      {accounts.length} accounts, {onlineCount} online
+                      {/* The release name is what a narrow bar drops first:
+                          the counts are the fact, the name is the flourish. */}
+                      <span className="hidden sm:inline">, for {APP_NAME}</span>
+                    </>
+                  )}
                 </p>
               </div>
               {/* The console's one neighbour: the balance dashboard reads
@@ -273,11 +392,11 @@ export function AdminConsole({
           </div>
         </header>
 
-        <main className="space-y-3 pb-10 pt-3">
+        <main className="flex flex-col gap-3 pb-10 lg:min-h-0 lg:flex-1 lg:pb-3">
           {error && <Notice message={error} onDismiss={dismissError} />}
 
           {selected.length > 0 && (
-            <div className="pm-glass pm-panel-bar flex flex-wrap items-center gap-2">
+            <div className="pm-glass pm-panel-bar flex shrink-0 flex-wrap items-center gap-2">
               <span className="text-xs font-medium">
                 {selected.length}{" "}
                 {selected.length === 1 ? "account" : "accounts"} selected
@@ -321,65 +440,152 @@ export function AdminConsole({
             </div>
           )}
 
-          <div className="pm-glass overflow-hidden rounded-2xl">
+          {/* The findability tools, between the selection and the register
+              they act on. The search is a plain substring over the two
+              names an operator would know an account by; the four chips
+              are the states worth looking for, each carrying its count so
+              the shelf is visible before the search is. */}
+          {accounts !== null && accounts.length > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {/* The search runs the width of a row on a phone and grows
+                  with the window to a point, the way every other control
+                  here is sized: past about a hand's reach, a wider input
+                  is a longer line to scan, not a better one. */}
+              <div className="relative w-full min-w-0 sm:w-[clamp(16rem,32vw,26rem)]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setQuery("");
+                  }}
+                  placeholder="Search name or handle"
+                  aria-label="Search accounts"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-10 rounded-xl border-black/10 bg-black/[0.04] pl-9 pr-8 text-xs dark:border-white/10 dark:bg-white/[0.06]"
+                />
+                {query !== "" && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Clear the search"
+                    title="Clear the search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <div
+                role="group"
+                aria-label="Filter the register"
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                {FILTER_ORDER.map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    aria-pressed={filter === key}
+                    className={`pm-tool pm-pressable ${
+                      filter === key
+                        ? "bg-foreground text-background"
+                        : "bg-black/[0.05] text-muted-foreground hover:text-foreground dark:bg-white/10"
+                    }`}
+                  >
+                    {FILTERS[key].label}
+                    <span className="tabular-nums opacity-70">
+                      {counts[key]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="pm-glass flex flex-col overflow-hidden rounded-2xl lg:min-h-0 lg:flex-1">
             {accounts === null ? (
-              <p className="px-4 py-10 text-center text-xs text-muted-foreground">
-                <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
-                Reading the register...
-              </p>
+              <div className="flex flex-1 items-center justify-center px-4 py-12 text-center">
+                <p className="text-xs text-muted-foreground">
+                  <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
+                  Reading the register...
+                </p>
+              </div>
             ) : accounts.length === 0 ? (
-              <p className="px-4 py-10 text-center text-xs text-muted-foreground">
-                There are no accounts to show.
-              </p>
+              <div className="flex flex-1 items-center justify-center px-4 py-12 text-center">
+                <p className="text-xs text-muted-foreground">
+                  There are no accounts to show.
+                </p>
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+                <p className="text-xs text-muted-foreground">
+                  No accounts match this view.
+                </p>
+                <button
+                  onClick={clearView}
+                  className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Clear search and filters</span>
+                </button>
+              </div>
             ) : (
               <>
                 {/* The register as a table, where the column has room for
-                  one. The table carries no minimum width of its own any
-                  more: it is only drawn where it fits, which is what the
-                  width above decides, so a floor here would be a second
-                  copy of that decision waiting to disagree with it. */}
-                <div className="hidden @min-[60rem]:block overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-black/[0.06] text-left dark:border-white/[0.08]">
-                        <th className="w-10 py-2.5 pl-4 pr-2">
-                          <input
-                            ref={headerBox}
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={toggleAll}
-                            disabled={total === 0}
-                            aria-label="Select every account"
-                            title="Select every account"
-                            className={CHECKBOX}
+                  one. The table carries no minimum width of its own: it is
+                  only drawn where it fits, which is what the width above
+                  decides, so a floor here would be a second copy of that
+                  decision waiting to disagree with it.
+
+                  The frame around it is the one thing that scrolls at lg,
+                  and the header cells ride its top so a column is never
+                  read from memory. The overflow is on this inner frame
+                  rather than the shell because a sticky cell binds to the
+                  nearest scrollport, and a cell bound to the shell would
+                  sit still while the rows slid out from under it. */}
+                <div className="hidden flex-col @min-[56rem]:flex lg:min-h-0 lg:flex-1">
+                  <div className="pm-scroll overflow-x-auto lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="text-left">
+                          <th className={`w-10 py-2.5 pl-4 pr-2 ${STICKY}`}>
+                            <input
+                              ref={headerBox}
+                              type="checkbox"
+                              checked={allVisibleSelected}
+                              onChange={toggleAll}
+                              disabled={visible.length === 0}
+                              aria-label="Select every account shown"
+                              title="Select every account shown"
+                              className={CHECKBOX}
+                            />
+                          </th>
+                          <Th className={STICKY}>Captain</Th>
+                          <Th className={STICKY}>Status</Th>
+                          <Th className={`${STICKY} text-right`}>Harbors</Th>
+                          <Th className={`${STICKY} text-right`}>Seats</Th>
+                          <Th className={`${STICKY} text-right`}>Actions</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((a) => (
+                          <RosterRow
+                            key={a.id}
+                            account={a}
+                            isSelf={a.id === me.id}
+                            busy={pending.includes(a.id)}
+                            selected={ticked.has(a.id)}
+                            onToggle={() => toggleOne(a.id)}
+                            onAct={act}
+                            onPurge={() => {
+                              setConfirmText("");
+                              setPurgeTarget(a);
+                            }}
                           />
-                        </th>
-                        <Th>Captain</Th>
-                        <Th>Role</Th>
-                        <Th>Status</Th>
-                        <Th className="text-right">Harbors</Th>
-                        <Th className="text-right">Seats</Th>
-                        <Th className="text-right">Actions</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accounts.map((a) => (
-                        <RosterRow
-                          key={a.id}
-                          account={a}
-                          isSelf={a.id === me.id}
-                          busy={pending.includes(a.id)}
-                          selected={ticked.has(a.id)}
-                          onToggle={() => toggleOne(a.id)}
-                          onAct={act}
-                          onPurge={() => {
-                            setConfirmText("");
-                            setPurgeTarget(a);
-                          }}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 {/* The same register as a card per account, everywhere the
@@ -388,8 +594,8 @@ export function AdminConsole({
                   are shared: an account's role, its status and its four
                   actions are one component each, so a card and a row can
                   never come to describe the same account differently. */}
-                <ul className="@min-[60rem]:hidden">
-                  {accounts.map((a) => (
+                <ul className="pm-scroll @min-[56rem]:hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+                  {visible.map((a) => (
                     <AccountCard
                       key={a.id}
                       account={a}
@@ -409,7 +615,7 @@ export function AdminConsole({
             )}
           </div>
 
-          <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="shrink-0 px-1 text-[11px] leading-relaxed text-muted-foreground">
             Banning ends every session the account holds and clears its seats on
             the spot. Deleting removes the account and every harbor it hosts,
             and cannot be undone. Tick accounts to act on several at once.
@@ -703,14 +909,19 @@ function AccountActions({
 }
 
 // One account's identity, as the two lines both presentations lead with:
-// the name, and under it the handle with the day the account was made. The
-// joined date is here rather than in a column of its own because it is not
-// a fact an operator scans down the register for; it is a qualification on
-// a name, and it costs the table 75 pixels it did not have.
+// the name with the administrator mark beside it, and under them the
+// handle with the day the account was made. Neither of the folded facts
+// earns a column of its own: the joined date is a qualification on a name
+// rather than a fact an operator scans for, and the role is the exception
+// worth marking, so a column that said "Captain" down nine hundred rows
+// was paying a column's width to say nothing.
 function AccountIdentity({ account }: { account: AdminAccount }) {
   return (
     <div className="min-w-0">
-      <div className="truncate font-medium">{account.displayName}</div>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-medium">{account.displayName}</span>
+        {account.role === "admin" && <RoleChip isAdmin />}
+      </div>
       {/* Wrapped rather than truncated, and that is a width decision as
           much as a typographic one. A cell of nowrap text has a minimum
           width of the whole string, so a handle and a date held on one
@@ -747,12 +958,10 @@ function RosterRow({
             hue={account.avatarHue}
             name={account.displayName}
             size={28}
+            sm={32}
           />
           <AccountIdentity account={account} />
         </div>
-      </td>
-      <td className="px-4 py-2.5">
-        <RoleChip isAdmin={account.role === "admin"} />
       </td>
       <td className="px-4 py-2.5">
         <StatusChip isBanned={isBanned} online={account.online} />
@@ -797,7 +1006,7 @@ function AccountCard({
 }: AccountRowProps) {
   const isBanned = account.bannedAt !== null;
   return (
-    <li className="border-b border-black/[0.04] px-3 py-3 last:border-0 dark:border-white/[0.06]">
+    <li className="border-b border-black/[0.04] px-4 py-3.5 last:border-0 dark:border-white/[0.06]">
       <div className="flex items-start gap-2.5">
         <div className="pt-0.5">
           <SelectBox
@@ -806,7 +1015,12 @@ function AccountCard({
             onToggle={onToggle}
           />
         </div>
-        <Avatar hue={account.avatarHue} name={account.displayName} size={28} />
+        <Avatar
+          hue={account.avatarHue}
+          name={account.displayName}
+          size={28}
+          sm={32}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate text-sm font-medium">
