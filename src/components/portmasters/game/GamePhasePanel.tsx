@@ -6,6 +6,7 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { phaseFace } from "@/lib/game/phases";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
+import { MilestoneDraft } from "./phases/MilestoneDraft";
 import { Market } from "./phases/Market";
 import { Parley } from "./phases/Parley";
 import { Orders } from "./phases/Orders";
@@ -67,21 +68,32 @@ export function GamePhasePanel(props: Props) {
   // the engine left a stale key here and a panel wearing the wrong colour.
   // There is nowhere left for the two to disagree.
   const accentGradient = phaseFace(game.phase).gradient;
-  // The 520px floor is what the stage needs while the page is the thing
-  // doing the scrolling, so a short phase does not leave a postage stamp
-  // of a card over a column of buttons. On a wide window the stage owns
-  // its own scroll and the panel fills it instead: the card lands flush
-  // with the two rails beside it rather than floating at whatever height
-  // its content happened to reach, and everything under it waits its turn
-  // in the stage's own scroll rather than pushing the rails around.
+  // The floor under the stage is a share of the viewport rather than the
+  // flat 520px it used to be: the floor exists so a short phase does not
+  // leave a postage stamp of a card over a column of buttons while the
+  // page is the thing doing the scrolling, and what reads as a stage
+  // scales with the window it stands on, the same reasoning the rails
+  // follow. On a wide window the stage owns its own scroll and the panel
+  // fills it instead: the card lands flush with the two rails beside it
+  // rather than floating at whatever height its content happened to
+  // reach, and everything under it waits its turn in the stage's own
+  // scroll rather than pushing the rails around.
   return (
-    <div className="pm-glass relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[520px] lg:min-h-full">
+    <div className="pm-glass relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[clamp(380px,58dvh,560px)] lg:min-h-full">
       {/* Phase accent strip */}
       <motion.div
         className={`absolute inset-x-0 top-0 h-1 ${accentGradient}`}
         layoutId="phaseAccent"
         transition={{ duration: 0.3, ease: "easeOut" }}
       />
+      {/* [F4: boons at milestone moments] The milestone overlay, drawn
+          ahead of whichever board the phase is showing. It sits outside
+          the AnimatePresence below on purpose: the board beneath it still
+          swaps as the fleet moves on, and the moment a captain is
+          answering must not cross fade with it. It draws nothing at all
+          unless a moment is waiting (see milestonePending), so the
+          ordinary screen is the line that follows. */}
+      <MilestoneDraft game={game} act={props.act} />
       <AnimatePresence mode="sync">
         <motion.div
           key={`${game.phase}:${game.currentRound}`}
@@ -134,6 +146,7 @@ function ActivePhase(props: Props) {
     bazaar,
     backing,
     audit,
+    boons,
     maroon,
     voyageLog,
     privateLog,
@@ -170,7 +183,13 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           phaseSync={phaseSync}
+          // [F5: public offers] The draft's own screen reads the fleet's
+          // ledger under the three cards: the picks are made here, so the
+          // table's latest keeps are what a captain stares at while
+          // choosing, which is the plan's teach by watching clause.
+          boons={boons}
           members={members}
+          me={me}
         />
       );
     case "market":
@@ -211,6 +230,10 @@ function ActivePhase(props: Props) {
           // Parley table.
           bazaar={bazaar}
           audit={audit}
+          // [F5: public offers] The fleet's ledger under the two votes:
+          // the plan's evaluation surface, where the table argues about
+          // what each captain passed on.
+          boons={boons}
           maroon={maroon}
           me={me}
           phaseSync={phaseSync}
@@ -303,9 +326,11 @@ function ActivePhase(props: Props) {
       // only reached if a future phase was added to the union without a
       // matching case here. The placeholder copy is intentionally
       // generic so a stranger phase still renders something legible
-      // rather than a blank pane.
+      // rather than a blank pane. Its floor rides just under the stage
+      // floor above so the branch never pushes the card taller than the
+      // stage itself intends to stand.
       return (
-        <div className="flex min-h-[480px] flex-col items-center justify-center text-center px-6">
+        <div className="flex min-h-[clamp(320px,52dvh,480px)] flex-col items-center justify-center text-center px-6">
           <div className="pm-grad-brand mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
             <span className="font-display text-xl">水</span>
           </div>

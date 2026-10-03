@@ -100,6 +100,18 @@ export type LegReport = {
   // by the other never has to guess which of the two it is holding.
   foodSpend?: number;
   bargeSpend?: number;
+  // [F4: boons at milestone moments] The voyage's crew losses so far, sent
+  // only when the switch that gives them meaning is on, exactly as the
+  // four blocks above are sent: a leg sailed without the loss rule has no
+  // losses to report. It is the voyage's running total rather than the
+  // leg's, because the plan's evaluation reads retention across a voyage:
+  // the captains who lost a hand are one cohort and the captains who did
+  // not are the other, and what is compared is how many of each finished
+  // the voyage. One number is enough to sort a captain into a cohort, and
+  // the server keeps it as the boolean that sort needs rather than a tally
+  // nobody reads (see the crewLost captain line in
+  // src/lib/game/telemetry.ts).
+  crewLosses?: number;
 };
 
 /**

@@ -17,6 +17,7 @@
 import { ICONS } from "../constants/brand";
 import type { GameState, Phase } from "../types";
 import { objectiveTaking, type Objective } from "../objectives";
+import { queueMilestoneMoment } from "./milestones";
 
 // The phase the commission is open in. In this mode the trade manifest sits
 // immediately before the cross captain trade board (see the Ocean Gambit
@@ -77,4 +78,11 @@ export function deliverToObjective(
   logs.push(
     `📜 Fleet Commission: delivered ${parts.join(" + ")} for ${paid} Gold. The Emperor's commission is exempt from VAT.`,
   );
+  // [F4: boons at milestone moments] The mandate moment: the plan's
+  // "contributing to a Joint Mandate", read at the first delivery to the
+  // voyage's shared commission, which is the event this function is. It
+  // sits after the ledger line rather than before it so the entry reads
+  // in the order it happened, and the trigger's own latch makes every
+  // delivery after the first one quiet, so nothing here counts them.
+  queueMilestoneMoment(state, logs, "mandate");
 }

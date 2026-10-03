@@ -51,6 +51,13 @@ import { getCardFinalCost } from "./pricing";
 // quantityOverride is only ever set by callBrokersFavor, letting a captain
 // choose exactly how much of a filtered good the guaranteed order asks for
 // instead of leaving it to the usual randInt roll below.
+//
+// portOverride is the intel guarantee's own (see startOrders): a Broker's
+// Whisper names a harbour as well as a good, and the order it promises has
+// to pay at the harbour it named, so the caller that pins the good pins the
+// port too rather than leaving it to the usual pick below. Both overrides
+// are read the way the filter is, as absent for every other caller, so the
+// six ordinary orders and the paths' own errands keep the draw they had.
 // What the market may draw from this round: whatever the room's tier has
 // unlocked by now (see ./pools). Passed in rather than read from module scope
 // so these generators stay pure functions of (rng, pools) and a captain's
@@ -77,11 +84,12 @@ export function genRawOrder(
   pools: MarketPools,
   filter: string | null = null,
   quantityOverride?: number,
+  portOverride?: string,
 ): Omit<OrderCard, "id"> {
   const num = randInt(rng, 1, 3);
   const resources: { type: string; required: number }[] = [];
   const available = [...pools.resources];
-  const port = pick(rng, pools.ports);
+  const port = portOverride ?? pick(rng, pools.ports);
   let total = 0;
   if (pools.resources.includes(filter ?? "")) {
     const req = quantityOverride ?? randInt(rng, 2, 5);
@@ -112,13 +120,14 @@ export function genProductOrder(
   pools: MarketPools,
   filter: string | null = null,
   quantityOverride?: number,
+  portOverride?: string,
 ): Omit<OrderCard, "id"> {
   const product =
     filter && pools.products.includes(filter)
       ? filter
       : pick(rng, pools.products);
   const req = quantityOverride ?? randInt(rng, 1, 3);
-  const port = pick(rng, pools.ports);
+  const port = portOverride ?? pick(rng, pools.ports);
   const basePrice = randInt(
     rng,
     PRODUCT_PRICES[product][0],
@@ -519,7 +528,7 @@ export function startMarket(
   state.phase = "market";
   state.purchaseCount = 0;
   state.purchasedCards = [];
-  state.phase2DemandTags = [];
+  state.marketDemandTags = [];
   // [ONLINE] Deterministic intel pool: this captain's seed, this voyage,
   // this round.
   const intelRng = createRng(
@@ -529,7 +538,7 @@ export function startMarket(
   const allItems = [...marketPools.resources, ...marketPools.products];
   for (let i = 0; i < 5; i++) {
     let t = pick(intelRng, allItems as readonly string[]);
-    if (!state.phase2DemandTags.includes(t)) state.phase2DemandTags.push(t);
+    if (!state.marketDemandTags.includes(t)) state.marketDemandTags.push(t);
   }
   state.revealedIntel = [];
   // Farsight hands over its rumors here rather than at boon selection, since
@@ -538,9 +547,9 @@ export function startMarket(
   // captain's paid Broker's Whisper for the round.
   const freeIntel = state.modifierFlags.free_intel ?? 0;
   for (let i = 0; i < freeIntel; i++) {
-    if (!state.phase2DemandTags.length) break;
-    const idx = Math.floor(Math.random() * state.phase2DemandTags.length);
-    const item = state.phase2DemandTags.splice(idx, 1)[0];
+    if (!state.marketDemandTags.length) break;
+    const idx = Math.floor(Math.random() * state.marketDemandTags.length);
+    const item = state.marketDemandTags.splice(idx, 1)[0];
     const openPorts = unlockedPorts(state.difficulty, state.currentRound);
     const port = openPorts[Math.floor(Math.random() * openPorts.length)];
     state.revealedIntel.push({ item, port });

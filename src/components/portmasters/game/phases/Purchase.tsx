@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Anchor } from "lucide-react";
+import { FoldRow } from "../FoldRow";
 import { RefitBench } from "../RefitBench";
 import { IntelBanner, PanelTitle, type PhasePanelProps } from "./PhaseShared";
 import { MarketPriceReference } from "./PurchasePriceReference";
@@ -35,6 +37,7 @@ export function Purchase({
   onContinue: () => void;
 }) {
   const resolveColor = itemColorResolver(colorFor);
+  const [readingsOpen, setReadingsOpen] = useState(false);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -68,20 +71,32 @@ export function Purchase({
           usual price, which of the six is the best of them, and how many
           cards are carrying each good. */}
       <PurchaseBoard game={game} act={act} colorFor={resolveColor} />
-      {/* The four readings of the board, wrapped into a row rather than
-          stacked: each one is a strip of chips, and four stacked strips of
-          chips read as four screens of small print in front of the cards.
-          They take the width the stage has and share it between as many as
-          fit at a readable width, so a wide window draws the price table
-          beside the deal ranks and a narrow one keeps them one under the
-          other. Each panel keeps the bottom margin the rest of this screen
-          spaces itself with, which is what separates two wrapped rows. */}
-      <div className="flex flex-wrap items-stretch gap-x-3 [&>*]:grow [&>*]:basis-[320px]">
-        <MarketPriceReference game={game} colorFor={resolveColor} />
-        <TradeAdvisor game={game} colorFor={resolveColor} />
-        <MarketPulse game={game} />
-        <MarketDepth game={game} colorFor={resolveColor} />
-      </div>
+      {/* The four readings of the board, folded to one row until asked
+          for. They are the second pass rather than the screen: what this
+          is worth against the usual price, which of the six is the best
+          of them, and how many cards are carrying each good. Open they
+          were four strips of chips in front of the cards, which read as
+          four screens of small print to a captain who came here to buy;
+          a captain pricing a lot opens the row, a captain buying does
+          not. Opened, they wrap into a row rather than stacking: each
+          one is a strip of chips, and they take the width the stage has
+          and share it between as many as fit at a readable width. */}
+      <FoldRow
+        tone="intel"
+        icon="📊"
+        title="Market Readings"
+        gist="What the board is worth: usual prices, the best of the six, and how deep each good runs."
+        open={readingsOpen}
+        onToggle={() => setReadingsOpen((v) => !v)}
+        className="mb-4"
+      >
+        <div className="flex flex-wrap items-stretch gap-x-3 [&>*]:grow [&>*]:basis-[320px]">
+          <MarketPriceReference game={game} colorFor={resolveColor} />
+          <TradeAdvisor game={game} colorFor={resolveColor} />
+          <MarketPulse game={game} />
+          <MarketDepth game={game} colorFor={resolveColor} />
+        </div>
+      </FoldRow>
       <Provisions game={game} act={act} />
       {/* [D4: Loom: the Refit] The bench stands at the foot of the merchant's
           own panels, because a captain reads what the harbor is selling

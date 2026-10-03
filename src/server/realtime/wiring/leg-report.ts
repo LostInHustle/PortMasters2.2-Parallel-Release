@@ -91,6 +91,11 @@ export function wireLegReport(socket: Socket): void {
       // letting it stand beside a missing denominator.
       foodSpend: optional(payload?.foodSpend),
       bargeSpend: optional(payload?.bargeSpend),
+      // [F4: boons at milestone moments] The voyage's crew losses so far,
+      // on the same optional reader as the figures above: a count the
+      // client kept, kept only if it arrived readable, so a loss figure
+      // can never cost a captain the rest of their leg.
+      crewLosses: optional(payload?.crewLosses),
     });
   });
 }

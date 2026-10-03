@@ -85,7 +85,8 @@ export async function balanceDashboardSuite(inputs: {
   // One captain's line, with the fields the marks and the mute live on
   // read as the ordinary case unless a fixture says otherwise: a captain
   // who was still in the harbor when the voyage closed, who was not put
-  // ashore, who was not silenced, and who took nothing in trade.
+  // ashore, who was not silenced, who lost no hand, and who took nothing
+  // in trade.
   const dashLine = (
     userId: string,
     over: Partial<TelemetryRecord["captains"][number]> = {},
@@ -94,6 +95,7 @@ export async function balanceDashboardSuite(inputs: {
     presentAtEnd: true,
     marooned: false,
     muted: false,
+    crewLost: false,
     peerTradeProfit: 0,
     ...over,
   });

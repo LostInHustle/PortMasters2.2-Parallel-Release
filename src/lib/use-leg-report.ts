@@ -47,6 +47,7 @@ import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import { mealsOf } from "@/lib/game/foods";
+import { crewLossRuleOn } from "@/lib/game/crew";
 import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
 import {
@@ -182,6 +183,17 @@ export function useLegReport(
   // that can disagree.
   const foodSpend = bargeOn(game.mode) ? game.foodSpend : undefined;
   const bargeSpend = bargeOn(game.mode) ? game.bargeSpend : undefined;
+  // [F4: boons at milestone moments] The voyage's crew losses so far, read
+  // off the maroon mark's own list and sent only when the switch that gives
+  // them meaning is on: a leg sailed without the loss rule has no losses to
+  // report. It is the voyage's running total rather than the leg's, on E1's
+  // rule above and for the same reason, and the plan's evaluation is why:
+  // retention is compared across a voyage, so a reader takes the last report
+  // each captain filed rather than adding the legs up. A voyage that lost
+  // nobody reports its zero, because zero is a reading of the rule.
+  const crewLosses = crewLossRuleOn(game.mode)
+    ? game.crewLost.length
+    : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -210,6 +222,7 @@ export function useLegReport(
         opportunistBorrows,
         foodSpend,
         bargeSpend,
+        crewLosses,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -237,5 +250,6 @@ export function useLegReport(
     opportunistBorrows,
     foodSpend,
     bargeSpend,
+    crewLosses,
   ]);
 }

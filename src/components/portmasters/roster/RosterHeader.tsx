@@ -13,8 +13,9 @@ import { PanelHeader } from "../PanelHeader";
  * the chat wear too: the three panels a captain folds are folded the same
  * way, in the same place, with the same mark. `collapsed` and `onToggle`
  * travel straight through, because the fold is owned by the room rather
- * than by this file (see usePanelPrefs in GameRoom): folding the roster
- * hands its height to the chat below it.
+ * than by this file (see usePanelPrefs in GameRoom): on the wide layout
+ * folding the roster hands its width to the chat beside it, and below the
+ * breakpoint it collapses to this head.
  */
 export function RosterHeader({
   memberCount,

@@ -2,10 +2,13 @@
 
 // The voyage's public objective, in a Gambit harbor.
 //
-// This is the surface that answers "which game am I playing". It sits full
-// width under the fleet ticker, above every column, from the first phase
-// through the last, because the commission is owed by the whole harbor and
-// a fact the whole harbor shares does not belong in one captain's column.
+// This is the surface that answers what the whole table owes: the
+// commission, from the first phase through the last, because it is owed
+// by the whole harbor and a fact the whole harbor shares does not belong
+// in one captain's column. Which mode the harbor runs is a fact about
+// the room, written on the room's card before entry and worn by the
+// boards themselves; this strip used to say it a third time, beside its
+// own title, and the title is what a captain needs here.
 //
 // It wears gold, and gold specifically. The commission is an imperial
 // one, so it wears the colour the Imperial Mandate already wears on the
@@ -15,13 +18,18 @@
 // not a rung on the ladder, which is why a full width surface can wear it
 // without disturbing the distance between anything else on screen.
 //
+// It carries no standing rule text: the sentence about who pays and when
+// the commission is read sits on the Deliver button, where it is wanted
+// the moment it applies, and in the Guide, where every rule lives. An
+// always visible paragraph of rules on a strip this one was a row of
+// vinyl lettering on a working deck.
+//
 // Nothing here renders in Classic. There is no objective to draw there, so
 // the hook returns null and this returns null with it.
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ICONS } from "@/lib/game/constants/brand";
-import { modeConfig } from "@/lib/game/mode";
 import type { Objective, ObjectiveProgress } from "@/lib/game/objectives";
 import { OBJECTIVE_DELIVERY_PHASE } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
@@ -40,7 +48,6 @@ export function ObjectivePanel({
   onDeliver: () => void;
 }) {
   if (!objective || !progress) return null;
-  const mode = modeConfig(game.mode);
   // What is still owed, and what it is worth. The one number a captain
   // needs before deciding to hand anything over, and it is not derivable
   // from the bar: a bar says how far along the fleet is, not what the rest
@@ -54,11 +61,8 @@ export function ObjectivePanel({
   return (
     <div className="rounded-2xl px-3 py-2 border border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm leading-none" aria-hidden>
-          {mode.icon}
-        </span>
         <span className="text-[10px] font-semibold uppercase tracking-wide text-gold-ink">
-          {mode.badge} · Fleet Commission
+          Fleet Commission
         </span>
         <span className="font-display text-sm font-semibold">
           {objective.name}
@@ -92,16 +96,16 @@ export function ObjectivePanel({
           </span>
         )}
         {open && deliverable > 0 && (
-          <Button size="sm" variant="outline" onClick={onDeliver}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDeliver}
+            title="The Emperor pays for what you hand over, and the commission is read when the voyage ends."
+          >
             Deliver {deliverable}
           </Button>
         )}
       </div>
-
-      <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        The Emperor pays for what you hand over, and the commission is read when
-        the voyage ends.
-      </p>
     </div>
   );
 }

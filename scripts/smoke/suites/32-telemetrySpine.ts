@@ -124,6 +124,7 @@ export async function telemetrySpineSuite(
         presentAtEnd: false,
         marooned: true,
         muted: true,
+        crewLost: true,
         peerTradeProfit: 1234,
       },
     ],

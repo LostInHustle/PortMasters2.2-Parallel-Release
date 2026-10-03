@@ -240,6 +240,19 @@ export interface TelemetryPayloads {
     // the legs, since each leg's copy carries the running total.
     foodSpend?: number;
     bargeSpend?: number;
+    // [F4: boons at milestone moments] The plan's evaluation of this
+    // feature is whether the milestone boons matter: "track boon pick rate
+    // against voyage outcome so it is visible whether boons cluster on
+    // voyages that were already winning". The pick rate is read off the
+    // card tally the draft already writes, and the outcome half is read
+    // off retention: this field is the voyage's crew losses so far, the
+    // one number that sorts each captain into the cohort the report
+    // compares (see npm run report:milestones). It is a voyage running
+    // total rather than a leg figure, on E1's rule above and for the same
+    // reason, and it rides the loss rule's own switch: a leg sailed
+    // without the rule reports nothing rather than reporting a zero that
+    // would sort the captain into the wrong cohort.
+    crewLosses?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally
@@ -430,6 +443,16 @@ export interface TelemetryCaptain {
   // chronicle's own line for them, which is the join this field makes
   // without needing one.
   muted: boolean;
+  // [F4: boons at milestone moments] Whether this captain's voyage lost a
+  // hand at any point. Marked at the same call that keeps the leg report
+  // carrying the loss count, so a line and an event cannot disagree, and
+  // read at the mark rather than joined out of the events for the reason
+  // the two fields above are: a truncated record still says who lost one.
+  // It is the cohort half of the plan's evaluation of this feature: the
+  // retention table (see npm run report:milestones) reads it against
+  // presentAtEnd above, which is the same one pass over these lines the
+  // maroon's retention figure makes, taken once per cohort.
+  crewLost: boolean;
 }
 
 // The record one voyage leaves behind. The header is everything a reader
@@ -504,13 +527,14 @@ export function normalizeRecord(value: unknown): TelemetryRecord | null {
         userId: line.userId,
         presentAtEnd: line.presentAtEnd === true,
         // A line written before these reads existed reads as a captain the
-        // harbor did not put ashore, was not silenced, and who took nothing
-        // in trade, which is the same absence an unreadable save gives. That
-        // is the no backfill rule: an old record is read with defaults
-        // rather than rewritten, and no record carries a null a reader would
-        // have to special case.
+        // harbor did not put ashore, was not silenced, lost no hand, and
+        // who took nothing in trade, which is the same absence an
+        // unreadable save gives. That is the no backfill rule: an old
+        // record is read with defaults rather than rewritten, and no
+        // record carries a null a reader would have to special case.
         marooned: line.marooned === true,
         muted: line.muted === true,
+        crewLost: line.crewLost === true,
         peerTradeProfit: normalizeProfit(line.peerTradeProfit),
       })),
     events: events.filter(

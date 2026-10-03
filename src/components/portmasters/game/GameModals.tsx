@@ -292,10 +292,23 @@ export function RumorBoardModal({
             Spend gold to reveal what Orders will ask for!
           </DialogDescription>
         </DialogHeader>
-        <div className="flex justify-center my-2">
-          <Button className="pm-grad-rumors rounded-xl" onClick={onBuy}>
+        {/* The button greys outside Market because the engine refuses the
+            press there (see purchaseIntel): a rumor bought after the board
+            is dealt could never be honoured, and a dialog left open across
+            the rest of the lap is exactly how that press used to happen. */}
+        <div className="flex flex-col items-center my-2 gap-1.5">
+          <Button
+            className="pm-grad-rumors rounded-xl"
+            onClick={onBuy}
+            disabled={game.phase !== "market"}
+          >
             🔮 Buy Rumor ({intelCost}💰)
           </Button>
+          {game.phase !== "market" && (
+            <p className="text-[11px] text-muted-foreground">
+              The Broker only deals during Market.
+            </p>
+          )}
         </div>
         <div className="rounded-lg border border-rumors/15 bg-rumors/[0.04] p-3.5 min-h-[110px]">
           {game.revealedIntel.length ? (

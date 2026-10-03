@@ -3,6 +3,7 @@
 import { cardText } from "@/lib/game/cards";
 import { lockInBoon, swapBoonChoices } from "@/lib/game/engine";
 import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
+import { OpenBoons } from "../OpenBoons";
 import {
   CancelReadyButton,
   DraftCard,
@@ -18,8 +19,13 @@ export function BoonDraft({
   ctx,
   act,
   phaseSync,
+  boons,
   members,
-}: Pick<PhasePanelProps, "game" | "ctx" | "act" | "phaseSync" | "members">) {
+  me,
+}: Pick<
+  PhasePanelProps,
+  "game" | "ctx" | "act" | "phaseSync" | "boons" | "members" | "me"
+>) {
   const picks = game.boonChoices;
   // This is the screen the user specifically called out for a visible
   // ready indicator: once a captain locks in a boon, swap the picker for
@@ -42,6 +48,17 @@ export function BoonDraft({
         <CancelReadyButton phaseSync={phaseSync}>
           ↩️ Choose a different Boon
         </CancelReadyButton>
+        {/* [F5: public offers] The ledger follows a captain who has
+            locked in, because the wait is exactly when the table's other
+            picks are worth reading: the room is still choosing, and what
+            each seat kept is the news. */}
+        <OpenBoons
+          game={game}
+          me={me}
+          members={members}
+          entries={boons.entries}
+          className="mt-6 text-left"
+        />
       </div>
     );
   }
@@ -85,6 +102,17 @@ export function BoonDraft({
           );
         })}
       </DraftGrid>
+      {/* [F5: public offers] And the ledger under the cards, live as the
+          table locks in: a captain choosing stares at the same board the
+          rest of the room is reading, which is the plan's teach the pool
+          by watching clause. It draws nothing until a first pick lands. */}
+      <OpenBoons
+        game={game}
+        me={me}
+        members={members}
+        entries={boons.entries}
+        className="mt-5 text-left"
+      />
     </div>
   );
 }

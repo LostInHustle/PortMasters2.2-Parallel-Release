@@ -48,10 +48,13 @@ export function MembersPanel({
   onSelectPlayer: (userId: string) => void;
   myRenownLevel?: number;
   // The fold, owned by the room rather than by this panel (see
-  // usePanelPrefs in GameRoom): the roster and the chat split the right
-  // rail's height, so folding one is a fact about the column the other
-  // lives in. Defaulted open, which is the panel's own contract without
-  // the room around it.
+  // usePanelPrefs in GameRoom): the roster and the chat share the right
+  // rail, so folding one is a fact about the rail the other lives in, and
+  // on the wide layout it is the room that hides this panel outright and
+  // stands its strip in the rail. What arrives here is the below
+  // breakpoint half of the same record: the fold to the head that a full
+  // width row has room for. Defaulted open, which is the panel's own
+  // contract without the room around it.
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
@@ -154,11 +157,14 @@ export function MembersPanel({
         onToggle={onToggleCollapse}
       />
 
-      {/* Folded, the panel is its head: the list and the notices under it
-          leave the column, and the height they held goes to the chat,
-          which is what the fold is for. One conditional around the pair
-          rather than one around each, because the notices ride under the
-          list as one unit. */}
+      {/* Folded, the panel is its head below the breakpoint, where the
+          fold is an accordion: the list and the notices under it leave
+          the row, and the height they held goes to whatever follows,
+          which is what the fold is for there. On the wide layout the
+          room hides this panel outright and stands its strip in the rail
+          (see the strips in GameRoom), so nothing here is on screen
+          there. One conditional around the pair rather than one around
+          each, because the notices ride under the list as one unit. */}
       {!collapsed && (
         <>
           <div className="pm-scroll flex-1 min-h-0 overflow-y-auto p-2.5 space-y-1.5">

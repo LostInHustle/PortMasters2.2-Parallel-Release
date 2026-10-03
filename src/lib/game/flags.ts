@@ -9,9 +9,9 @@
 // itself and C2's loss rule. C3's wardrobe made three, C4's split hold
 // made four, D2's path orders made five, D3's escort contracts made six,
 // D4's refit made seven, D5's bazaar rumor made eight, D7's draft makes
-// nine and F3's module trades make ten, and a policy that ten families
-// depend on belongs beside none of them rather than inside the first one
-// that needed it.
+// nine, F3's module trades make ten and F4's milestone boons make eleven,
+// and a policy that eleven families depend on belongs beside none of them
+// rather than inside the first one that needed it.
 //
 // [The mode boundary] Every switch here answers with two readings, and the
 // order they are taken in is the rule: the mode first, the environment
@@ -43,11 +43,12 @@ import { modeConfig } from "./mode";
 /**
  * The one place a survival switch is judged, for every flag in this epic.
  *
- * The policy is written here once because ten switches read it now. Seven
- * are judged in this file, the provisions layer, C4's split hold, D2's path
- * orders, D3's escort contracts, D5's bazaar rumor, D7's draft and F3's
- * module trades, and three read it from their own module, C2's loss rule in
- * ./crew, C3's wardrobe in ./garments and D4's bench in ./engine/refits.
+ * The policy is written here once because eleven switches read it now.
+ * Eight are judged in this file, the provisions layer, C4's split hold,
+ * D2's path orders, D3's escort contracts, D5's bazaar rumor, D7's draft,
+ * F3's module trades and F4's milestone boons, and three read it from
+ * their own module, C2's loss rule in ./crew, C3's wardrobe in ./garments
+ * and D4's bench in ./engine/refits.
  * The cost of ten copies is a set that drifts: one flag accepting a value
  * another refuses is a bug that only shows the evening an operator tries it.
  *
@@ -272,6 +273,42 @@ export function pathDraftOn(mode: unknown): boolean {
  */
 export function moduleTradesOn(mode: unknown): boolean {
   return flagOnFor(mode, process.env.NEXT_PUBLIC_MODULE_TRADES);
+}
+
+/**
+ * Whether a voyage deals boons at milestone moments.
+ *
+ * [F4: boons at milestone moments] F4's own rollback, and the plan's
+ * clause is "boons are additive and rare, so a content revert is clean.
+ * Any boon that grants a durable effect has to be unwound through the
+ * same normalization path the rest of the state uses." The two halves of
+ * that sentence are the two places this switch is read. With the switch
+ * off no moment is armed (see queueMilestoneMoment in
+ * ./engine/milestones), a moment left waiting in a save written while
+ * the switch was on is simply not shown (see milestonePending in
+ * ./milestones), and the boons already held keep their effects for the
+ * voyage, which is the data half of the plan's sentence read the way F3
+ * reads its own off state: nothing is unwritten and nothing is half
+ * applied, and the load path's healing is the unwinding road (see
+ * normalizeHeldBoons, which drops a retired or unknown card the same way
+ * every other saved field heals).
+ *
+ * The trigger sources it leans on are read where the triggers are rather
+ * than here: a moment whose source system is off never becomes due (the
+ * loss rule never writes a loss, the wardrobe's own switch answers no
+ * cold, and the pathbound site asks the lock's reader, which holds D2's
+ * switch at its end), so the layered reading ./garments gives its own
+ * switch arrives here for free rather than as a second list.
+ *
+ * It is judged here rather than in ./milestones for the reason the ten
+ * above it are judged here: it is a switch like them, and a reader
+ * looking for one should not have to know which feature made it a
+ * special case. (D4's bench is the exception that proves the rule, and
+ * its trailing note below says why: it asks another layer's switch
+ * before it answers, which is a cycle this module cannot hold.)
+ */
+export function milestoneBoonsOn(mode: unknown): boolean {
+  return flagOnFor(mode, process.env.NEXT_PUBLIC_MILESTONE_BOONS);
 }
 
 /* D4's own switch is not judged here, and the reason is the cycle rather

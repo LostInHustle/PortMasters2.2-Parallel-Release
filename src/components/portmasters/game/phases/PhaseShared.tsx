@@ -12,6 +12,7 @@ import type { useBazaarRumors } from "@/lib/use-bazaar-rumors";
 import type { useAid } from "@/lib/use-aid";
 import type { useBacking } from "@/lib/use-backing";
 import type { useAudit } from "@/lib/use-audit";
+import type { useBoonLedger } from "@/lib/use-boon-ledger";
 import type { useMaroon } from "@/lib/use-maroon";
 import type { useRoomRoster } from "@/lib/use-room-roster";
 import type { VoyageLog } from "@/lib/use-voyage-log";
@@ -48,6 +49,7 @@ type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
 type Audit = ReturnType<typeof useAudit>;
 type Maroon = ReturnType<typeof useMaroon>;
+type Boons = ReturnType<typeof useBoonLedger>;
 type Roster = ReturnType<typeof useRoomRoster>;
 
 export type PhasePanelProps = {
@@ -92,6 +94,12 @@ export type PhasePanelProps = {
   // inside the one phase that reads it, because the finding outlives the
   // phase it was made in and the room level strip reads the same state.
   audit: Audit;
+  // [F5: public offers] The fleet's ledger, threaded the same way and for
+  // the same reason: the picks are made at Dawn and read at Parley, so
+  // the state cannot belong to either phase's own hook. The panels draw
+  // nothing at all of it in a Classic harbor, and the hook itself is
+  // inert there (see @/lib/use-boon-ledger).
+  boons: Boons;
   // [H7: Maroon and the Harbormaster] The heavier vote, threaded the same
   // way and for the same reason: the vote is called at the Parley table,
   // and the result it leaves behind is read by the room. The roster comes

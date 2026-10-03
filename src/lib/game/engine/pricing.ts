@@ -51,10 +51,15 @@ export type ExpectedPrice = {
   modifiers: string[];
 };
 
-// At most one boon's flags are ever active at a time (selecting a new one
-// replaces state.modifierFlags wholesale, see applyBoon), so finding
-// whichever card owns a given modifier key reliably names the source of a
-// price adjustment for the breakdowns below.
+// One owner per modifier key, which is what makes finding whichever card
+// writes a given key a reliable way to name the source of a price
+// adjustment for the breakdowns below. That used to be true because only
+// one boon's flags were ever active at a time (selecting a new one
+// replaced state.modifierFlags wholesale, see applyBoon); held boons
+// made several flags ride together, and the pool's own validator is what
+// keeps this reader honest through that: no two cards write the same key,
+// so the first match is still the only match (see the one owner per key
+// clause in ../cards).
 //
 // [F2: the card record, and the mode weighting field] The name comes off the
 // card record rather than off a second walk of the boon table, which is what
@@ -177,6 +182,15 @@ export function calcVAT(
     let vat = Math.floor(taxable * VAT_RATE);
     if (state.modifierFlags.vat_discount)
       vat = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
+    // [F4: boons at milestone moments] Harbor Credit, the boon a crossed
+    // rung deals: the dues a quarter lower, taken as the same
+    // multiplication the round's own discount takes and landing after it
+    // rather than beside it, so a captain holding both pays the product
+    // of the two. The order is a declaration rather than a rule, the way
+    // applyBoon's merge is: the two flags multiply and multiplication
+    // commutes.
+    if (state.modifierFlags.harbor_credit)
+      vat = Math.floor(vat * (1 - state.modifierFlags.harbor_credit));
     if (hasModule(state, "tax_evasion")) vat = Math.floor(vat * 0.5);
     return vat;
   }
@@ -216,6 +230,18 @@ export function explainVAT(
     const next = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
     steps.push({
       label: `${boonNameForModifierKey("vat_discount")} (down ${Math.round(state.modifierFlags.vat_discount * 100)}%)`,
+      delta: next - vat,
+    });
+    vat = next;
+  }
+  // [F4: boons at milestone moments] Harbor Credit's own line, beside the
+  // round discount's and in the same order the arithmetic takes the two
+  // (see calcVAT above), so the tooltip and the charge cannot come to
+  // describe one sale two ways.
+  if (state.modifierFlags.harbor_credit) {
+    const next = Math.floor(vat * (1 - state.modifierFlags.harbor_credit));
+    steps.push({
+      label: `${boonNameForModifierKey("harbor_credit")} (down ${Math.round(state.modifierFlags.harbor_credit * 100)}%)`,
       delta: next - vat,
     });
     vat = next;

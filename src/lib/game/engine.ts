@@ -436,6 +436,19 @@ export {
   type ModuleTrafficSubject,
 } from "./engine/modules";
 
+// ========== Milestone boons ==========
+// [F4: boons at milestone moments] The second way a boon reaches a
+// captain, and the part of it that needs a public name is the answer:
+// answerMilestone is the overlay's one call, taking the card the captain
+// pressed off the head of the queue or refusing a card the head no
+// longer deals (see ./engine/milestones for why a refusal is a real
+// answer). The arming side stays inside ./engine/ and is not forwarded:
+// queueMilestoneMoment is called by the two sweeps and the three site
+// moments, and the sweeps are called by the dawn and the settlement
+// beside their own ticks, so a caller outside ./engine/ meets a moment
+// through the voyage rather than through a name.
+export { answerMilestone } from "./engine/milestones";
+
 // ========== The Supply Barge ==========
 // [E1: the Supply Barge] The mode's fallback vendor, and the whole of the
 // feature is one sale: buyFromBarge, at a premium the constants set and

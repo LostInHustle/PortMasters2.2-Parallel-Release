@@ -185,18 +185,29 @@ export function shortOfWarmth(state: GameState): boolean {
 
 /**
  * The warmth score: the sum across worn garments of the rating times the
- * fraction left. The one number the plan's check reads.
+ * fraction left, plus the boon that hardens the crew against the cold.
+ * The one number the plan's check reads.
+ *
+ * [F4: boons at milestone moments] Cold Hardened, the boon a cold leg
+ * deals, counts as one more of warmth for the rest of the voyage, and it
+ * is folded into the sum rather than into the check so that the number
+ * the warning is about, the number the settlement prints and the number
+ * the panel wears all stay the one number this function exists to be.
+ * The field it reads is the round's flag set, which is where a held
+ * boon's effect rides (see heldFlagsOf in ./milestones).
  *
  * Exported because two readers print it as well as compare it, and a panel
  * that did the arithmetic again would be a second opinion about the number
  * the crew freezes against.
  */
-export function warmthScore(state: Pick<GameState, "garments">): number {
+export function warmthScore(
+  state: Pick<GameState, "garments" | "modifierFlags">,
+): number {
   let total = 0;
   for (const garment of state.garments ?? []) {
     total += garmentWarmth(garment);
   }
-  return total;
+  return total + (state.modifierFlags.cold_hardened ?? 0);
 }
 
 /**

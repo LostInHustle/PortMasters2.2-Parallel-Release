@@ -35,8 +35,8 @@ import { hasModule } from "./core";
 // rolled client side, never a room wide checkpoint.
 // The chance this round's raid is actually rolled against, with every
 // modifier folded in: the room's tier, a corrupt broker's leak, Golden
-// Lotus's extra raids, the Deep Sea Escort Pact's reduction, and the Persian
-// Dome Compass.
+// Lotus's extra raids, the Deep Sea Escort Pact's reduction, Fleet Colors'
+// own reduction, and the Persian Dome Compass.
 //
 // Exported so the Settlement panel can print the number the roll uses rather
 // than rebuilding it. It used to rebuild it by hand from the tier and the
@@ -64,6 +64,13 @@ export function pirateChance(state: GameState): number {
   if (state.housePerks.goldenPirateBump) chance = Math.min(1, chance * 1.05);
   if (state.modifierFlags.pirate_risk_discount)
     chance *= 1 - state.modifierFlags.pirate_risk_discount;
+  // [F4: boons at milestone moments] Fleet Colors, the boon the shared
+  // commission deals: raiders think twice, the risk a quarter lower for
+  // the voyage. It takes the same multiplication the round's own
+  // discount takes and lands right after it, ahead of the Compass's flat
+  // thirty, so a captain holding both softens the odds twice.
+  if (state.modifierFlags.fleet_color)
+    chance *= 1 - state.modifierFlags.fleet_color;
   if (hasModule(state, "persian_dome_compass")) chance *= 0.7;
   return chance;
 }

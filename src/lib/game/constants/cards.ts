@@ -65,6 +65,7 @@ import type { GameMode } from "../mode";
 import type { PathId } from "../paths";
 import type { ModifierKey } from "../types";
 import type { Tag, TagList } from "./tags";
+import { MILESTONE_TRIGGERS, type MilestoneTrigger } from "./milestones";
 
 // The three things a captain can hold that are not goods, a position or a
 // crew member. The two with records in the pool today are the two the
@@ -74,23 +75,42 @@ import type { Tag, TagList } from "./tags";
 export type CardKind = "boon" | "module" | "charter";
 export const CARD_KINDS: readonly CardKind[] = ["boon", "module", "charter"];
 
-// Where a card arrives. Today that is the draft that offers it, which is
-// the only moment the tree offers a card at all; F4 widens this list with
-// the milestone moments a boon can be drafted at ("the first pathbound
+// Where a card arrives. The draft that offers it is the only moment the
+// tree offered a card at all until F4, which widens this list with the
+// milestone moments a boon can be drafted at ("the first pathbound
 // order, crossing a Renown threshold, surviving a cold leg with zero
-// frostbite, contributing to a Joint Mandate, and losing a crew member"),
-// and every one of those is a value added here rather than a new field.
-export type CardTrigger = "boon_draft" | "shipyard_draft" | "charter_draft";
+// frostbite, contributing to a Joint Mandate, and losing a crew member",
+// see ./milestones for the five and for the one reading taken in place
+// of the plan's word Renown), as the comment here promised it would: a
+// value added to this union rather than a new field.
+export type CardTrigger =
+  "boon_draft" | "shipyard_draft" | "charter_draft" | MilestoneTrigger;
 
 // Which trigger each kind arrives at. One map rather than a field repeated
 // on every record: a boon offered at the shipyard is a card whose kind and
 // whose trigger disagree, and the clause that reads this map is what makes
 // that a failed build rather than a card nobody can explain.
+//
+// The boon entry is the round draft's trigger, and it is a default rather
+// than the only one a boon may carry, which is exactly what F4 changed:
+// the map answers which trigger a kind arrives at when the kind decides
+// it, and a boon's trigger is the card's own field because a milestone
+// boon arrives at a moment rather than at a draft. The validator reads
+// the two cases apart (see the pair of clauses in ../cards).
 export const CARD_TRIGGER: Record<CardKind, CardTrigger> = {
   boon: "boon_draft",
   module: "shipyard_draft",
   charter: "charter_draft",
 };
+
+// Every trigger a boon may carry: the round draft's, and the five
+// moments. Written out here rather than folded into the map above,
+// because the map answers for a kind and this answers for one kind's
+// cards, and an author adding a sixth moment edits ./milestones alone.
+export const BOON_TRIGGERS: readonly CardTrigger[] = [
+  "boon_draft",
+  ...MILESTONE_TRIGGERS,
+];
 
 // What has to be true of a captain for a card to be worth offering, and
 // how strongly. Every arm carries the weight it answers with, and every

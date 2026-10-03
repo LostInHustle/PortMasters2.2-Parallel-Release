@@ -36,9 +36,11 @@ import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
 import { feedCrew } from "../larder";
+import { heldFlagsOf } from "../milestones";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
+import { noteDawnMilestones } from "./milestones";
 
 // The three cards a leg puts in front of a captain.
 //
@@ -66,9 +68,17 @@ function draftBoons(state: GameState): CardRecord[] {
 // finds a boon) but which the compiler is right to ask about, and a card
 // that somehow arrived here without flags is a card that changes nothing
 // rather than a crash inside a round.
+//
+// [F4: boons at milestone moments] The held flags are folded in under the
+// round's, so a boon taken from a moment rides through this write the same
+// way it rides through the round's rollover (see endRound in ./lifecycle
+// and heldFlagsOf in ../milestones). The two sides cannot collide, and
+// that is the pool validator's doing rather than this spread's (see the
+// one owner per key clause in ../cards), so the order here is a
+// declaration of precedence rather than a rule anything depends on.
 function applyBoon(state: GameState, card: CardRecord, logs: string[]) {
   if (card.effect.kind !== "flags") return;
-  state.modifierFlags = card.effect.flags;
+  state.modifierFlags = { ...card.effect.flags, ...heldFlagsOf(state) };
   if (card.effect.flags.instant_gold) {
     state.money += card.effect.flags.instant_gold;
     logs.push(
@@ -169,6 +179,12 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   // mouths and the roster is who they are, so the rule that takes a hand
   // lives in ../crew and reads the Larder rather than the other way around.
   if (feedCrew(state, logs)) settleHunger(state, logs);
+  // [F4: boons at milestone moments] The dawn sweep: a hand lost to the
+  // meal above or to the hunger behind it is answered here, at the seat
+  // where it happened, which is the moment the plan's evaluation is
+  // about (see noteDawnMilestones in ./milestones). It sits after the
+  // meal rather than before it because the loss is the meal's fact.
+  noteDawnMilestones(state, logs);
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;
@@ -237,6 +253,17 @@ export function selectBoon(
   if (!card || card.kind !== "boon") return false;
   logs.push(`🧭 Boon Locked In: ${cardLead(card.id)}`);
   noteCardPick(state.cardTally, card);
+  // [F5: public offers] The fleet's record of this pick, written from the
+  // draft before it is dropped two lines down: the cleared list is the one
+  // thing that cannot answer for the trio that was on the table. Written
+  // here rather than by any caller, because this is the one pick site the
+  // round's draft has, which is what makes the ledger's claim true however
+  // the pick arrived (a click, a standing order, the dawn fallback).
+  state.boonRecord = {
+    round: state.currentRound,
+    shown: state.boonChoices.map((c) => c.id),
+    kept: card.id,
+  };
   applyBoon(state, card, logs);
   state.boonChoices = [];
   return true;

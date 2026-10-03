@@ -97,8 +97,15 @@ function OrderCard({
   const brokerCommissionPct =
     o.reward > 0 ? Math.round((brokerCommission / o.reward) * 100) : 0;
   netProfit -= brokerCommission;
-  const matchesIntel = game.revealedIntel.some((i) =>
-    o.resources.some((r) => r.type === i.item),
+  // Matched on the whole whisper, its good and its harbour, because that
+  // pair is the promise: the guarantee lands the order on the port the
+  // Broker named (see the intel guarantee in engine/orders), so a card
+  // carrying the good to some other port is not the promised trade, and a
+  // badge on it would be the board claiming a guarantee the engine never
+  // gave.
+  const matchesIntel = game.revealedIntel.some(
+    (i) =>
+      i.port === o.demandPort && o.resources.some((r) => r.type === i.item),
   );
   // [D2] A locked card is asked first, because the lock is the
   // strongest thing a card can say: a card nobody may fill is

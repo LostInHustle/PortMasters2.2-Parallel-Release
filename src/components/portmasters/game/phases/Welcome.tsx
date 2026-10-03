@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { STARTING_STOCK } from "@/lib/game/constants/goods";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
 import { Avatar } from "../../shared";
+import { FoldRow } from "../FoldRow";
 import { RoundFlow } from "../RoundFlow";
 import type { PhasePanelProps } from "./PhaseShared";
 
@@ -136,6 +138,7 @@ export function Welcome({
   // income tax is not yet a DifficultyConfig dial: every charter still
   // uses the founding 10%, which is what calcIncomeTax charges.
   const taxRate = INCOME_TAX_RATE;
+  const [briefingOpen, setBriefingOpen] = useState(false);
   return (
     <div className="max-w-3xl mx-auto text-center py-4">
       <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1">
@@ -191,48 +194,6 @@ export function Welcome({
           New Player Tutorial
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-2xl mx-auto">
-        <InfoCard
-          tone="gain"
-          title="🚀 Starting Resources"
-          rows={[
-            `📦 ${stockLine}`,
-            `💰 ${cfg.startingGold} Gold starting funds`,
-          ]}
-        />
-        <InfoCard
-          tone="warn"
-          title="⏱️ Production Delay"
-          rows={[
-            "Assign task now → item arrives at Resolve",
-            "Workers don't produce instantly!",
-          ]}
-        />
-        <InfoCard
-          tone="sea"
-          title="💸 Round End Costs"
-          rows={[
-            `🔧 ${cfg.maintenance} Gold ship maintenance per round`,
-            "👥 Wages settled at Resolve, not on hire",
-          ]}
-        />
-        <InfoCard
-          tone="alarm"
-          title="🧾 Taxes Explained"
-          rows={[
-            "VAT: 5% of finished goods profit margin",
-            `Income Tax: ${Math.round(taxRate * 100)}% income tax`,
-          ]}
-        />
-        <InfoCard
-          tone="warn"
-          title="🏴‍☠️ Pirates & Borrowing"
-          rows={[
-            `${raidPct}% chance of losing all Gold on hand`,
-            "Hire an escort, or ask the harbor for a loan",
-          ]}
-        />
-      </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
         {/* The count this label used to carry is gone, and its absence is
             the fix rather than an omission. It read "4 Phases per Voyage"
@@ -282,6 +243,67 @@ export function Welcome({
           Hire artisans only when you can sustain at least 2 rounds of wages.
           Always keep funds &gt; Maintenance + All Wages.
         </div>
+      </div>
+      {/* The five founding numbers, folded to a row at the foot of the
+          screen, below the round chart and the mode's own line because
+          those two are what this screen is for and these are what a
+          captain looks up. They used to stand open under the start
+          button: five cards of figures above the one thing the screen
+          exists for (getting the table sailing), read once and never
+          again, on the first screen of the voyage. Folded, the pier
+          opens on the button and the figures wait a press away. */}
+      <div className="max-w-2xl mx-auto mt-3">
+        <FoldRow
+          tone="harbor"
+          icon="📋"
+          title="Harbor Briefing"
+          gist="Starting resources, round costs, taxes and the pirate odds."
+          open={briefingOpen}
+          onToggle={() => setBriefingOpen((v) => !v)}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
+            <InfoCard
+              tone="gain"
+              title="🚀 Starting Resources"
+              rows={[
+                `📦 ${stockLine}`,
+                `💰 ${cfg.startingGold} Gold starting funds`,
+              ]}
+            />
+            <InfoCard
+              tone="warn"
+              title="⏱️ Production Delay"
+              rows={[
+                "Assign task now → item arrives at Resolve",
+                "Workers don't produce instantly!",
+              ]}
+            />
+            <InfoCard
+              tone="sea"
+              title="💸 Round End Costs"
+              rows={[
+                `🔧 ${cfg.maintenance} Gold ship maintenance per round`,
+                "👥 Wages settled at Resolve, not on hire",
+              ]}
+            />
+            <InfoCard
+              tone="alarm"
+              title="🧾 Taxes Explained"
+              rows={[
+                "VAT: 5% of finished goods profit margin",
+                `Income Tax: ${Math.round(taxRate * 100)}% income tax`,
+              ]}
+            />
+            <InfoCard
+              tone="warn"
+              title="🏴‍☠️ Pirates & Borrowing"
+              rows={[
+                `${raidPct}% chance of losing all Gold on hand`,
+                "Hire an escort, or ask the harbor for a loan",
+              ]}
+            />
+          </div>
+        </FoldRow>
       </div>
     </div>
   );

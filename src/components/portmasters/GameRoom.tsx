@@ -31,6 +31,7 @@ import { useVoyageLog } from "@/lib/use-voyage-log";
 import { useObjective } from "@/lib/use-objective";
 import { useLegReport } from "@/lib/use-leg-report";
 import { useAudit } from "@/lib/use-audit";
+import { useBoonLedger } from "@/lib/use-boon-ledger";
 import { useMaroon } from "@/lib/use-maroon";
 import { useNotificationCenter } from "@/lib/use-notifications";
 import { useHarborBoards } from "@/lib/use-harbor-boards";
@@ -41,9 +42,9 @@ import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
 import { PathDraft } from "./game/PathDraft";
 import { PathChip } from "./game/status/PathChip";
+import { HeldBoons } from "./game/status/HeldBoons";
 import { PanelHeader } from "./PanelHeader";
 import { HarborTopBar } from "./game/HarborTopBar";
-import { ShortcutLegend } from "./game/ShortcutLegend";
 import { StandingOrdersModal } from "./game/StandingOrdersModal";
 import { ObjectivePanel } from "./game/ObjectivePanel";
 import { AuditRevealStrip } from "./game/AuditPanel";
@@ -102,12 +103,15 @@ const RAIL_COLS = {
   both: "lg:grid-cols-[52px_minmax(0,1fr)_52px]",
 } as const;
 
-// What either folded rail leaves standing: the narrow column of icons that
-// is the way back. One shell for the two of them, since the difference
+// What a folded surface leaves standing: the narrow column of icons that
+// is the way back. One shell for the three of them, since the difference
 // between the stubs is which panels they lead back to rather than how they
-// stand. Wide layout only, the same reasoning as the chevrons that fold
-// them: below the breakpoint the rails are full width rows and there is no
-// parcel for a stub to hold.
+// stand: the captain's rail folds to a stub in the left column, either
+// right-rail widget folds to a strip of its own at the rail's outer edge,
+// and both folded leave one merged stub holding both icons. Wide layout
+// only, the same reasoning as the chevrons that fold them: below the
+// breakpoint the rails are full width rows and there is no parcel for a
+// stub to hold.
 const RAIL_STUB =
   "pm-glass hidden rounded-2xl p-1.5 flex-col items-center gap-1";
 
@@ -518,6 +522,11 @@ export function GameRoom({
   // and both are room stamped inside the hook. Inert in Classic, where no
   // vote can be called and none is ever sent.
   const audit = useAudit(socket, room.id, state.game, me.id);
+  // [F5: public offers] The fleet's ledger: this captain's own boon picks
+  // reported out, the whole table's reported back. Both directions are
+  // mode gated inside the hook (see its own note), so a Classic harbor
+  // costs no frame either way and the panels draw nothing of it.
+  const boons = useBoonLedger(socket, room.id, state.game);
   // [H7: Maroon and the Harbormaster] The second vote, and the one piece
   // of state in this component a client applies to its own books on
   // somebody else's word, which is why this hook is handed `act`. Inert in
@@ -650,6 +659,16 @@ export function GameRoom({
   // state, and a stored fourth key could hold a rail that is empty and
   // yet still standing, with nothing on screen able to have put it there.
   const rightFolded = panelCollapsed.roster && panelCollapsed.chat;
+  // The rail lays out as a row exactly when one widget is folded and the
+  // other is open: the folded one stands as a full height strip at the
+  // rail's outer edge and the open one takes the rest of the rail's
+  // width. A fold here is horizontal, the shape the captain's rail has
+  // folded to since the rails were drawn: the widget gives up its width
+  // rather than being squashed to its head, and the width it gives up
+  // goes to its sibling, so nothing on the rail ever sits in dead space.
+  // Both open is the stacked split; both folded hands the whole column
+  // to the merged stub.
+  const oneFolded = panelCollapsed.roster !== panelCollapsed.chat;
 
   // Load the room's members on mount. The conversation is deliberately not
   // fetched with them: a session's chat is held in the server's memory and
@@ -997,7 +1016,12 @@ export function GameRoom({
               in the layout on a voyage with nothing to say, and the gap
               between two empty wrappers is a band of nothing above the
               columns. The four are the row's own children, so each one that
-              draws nothing simply is not there. */}
+              draws nothing simply is not there. The basis in the row's own
+              classes is the one fixed number here on purpose: it is not a
+              width any card is held at (each card grows to whatever its row
+              leaves it), it is only the threshold at which the row steps
+              from three columns to two to one, so the cards themselves are
+              always the window's own size. */}
           <div className="flex flex-wrap items-start gap-3 [&>*]:grow [&>*]:basis-[420px] [&>*]:min-w-[280px]">
             {/* The voyage's public objective, owed by the whole harbor
                 rather than by the captain whose column it would otherwise
@@ -1095,6 +1119,12 @@ export function GameRoom({
                 onSwitch={draft.switchPath}
                 onDismissError={draft.clearError}
               />
+              {/* [F4: boons at milestone moments] What the moments have
+                  left in this captain's hands, under the chip because the
+                  two answer the same question in the same words. It
+                  draws nothing when nothing is held, so a rail without a
+                  moment answered opens exactly as it did before. */}
+              <HeldBoons game={state.game} />
               <div className="flex-1 min-h-0">
                 <GameStatusPanel
                   game={state.game}
@@ -1147,15 +1177,13 @@ export function GameRoom({
               The bar is the same component either way; only its place in
               the column changes. */}
           <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-3 lg:min-h-0">
-            {/* The bar and the key hints under it, in one block. The hints
-                belong to the controls the way a legend belongs to a map, so
-                they travel with the bar rather than with the board, and this
-                is also what keeps them legible: inside the stage's scroller
-                they were the one thing under a phase panel that fills the
-                stage, which put them exactly one row below the fold on every
-                screen whose board was short enough to fit. A hint nobody can
-                see is not a hint. */}
-            <div className="shrink-0 lg:order-2 space-y-2">
+            {/* The bar, which is the one thing on screen in every phase.
+                The row of key hints that used to sit under it left with
+                the declutter pass: the list is one press away on the
+                bar's own shortcuts glyph (lg and up, where a keyboard
+                exists), and four caps of chrome between the captain and
+                the board was exactly the clutter the row was. */}
+            <div className="shrink-0 lg:order-2">
               <GameControlPanel
                 game={state.game}
                 saving={state.saving}
@@ -1172,8 +1200,8 @@ export function GameRoom({
                 clock={phaseSync.phaseClock}
                 onStandingOrders={() => setStandingOpen(true)}
                 onCancelReady={phaseSync.cancelReady}
+                onShortcuts={() => setShortcutHelpOpen(true)}
               />
-              <ShortcutLegend onOpen={() => setShortcutHelpOpen(true)} />
             </div>
             {/* The stage, and the one thing on this screen the boards
                 inside it are allowed to measure themselves against. It is a
@@ -1184,60 +1212,75 @@ export function GameRoom({
                 width of a phone's, so every card wrapped every line. The
                 boards ask this instead, and a board in a modal asks the
                 window, which is what a modal is as wide as. */}
-            <div className="@container space-y-3 lg:order-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
-              <GamePhasePanel
-                game={state.game}
-                ctx={ctx}
-                act={act}
-                members={members}
-                phaseSync={phaseSync}
-                barter={barter}
-                aid={aid}
-                backing={backing}
-                escort={escort}
-                refit={refit}
-                modules={modules}
-                bazaar={bazaar}
-                audit={audit}
-                maroon={maroon}
-                voyageLog={voyageLog}
-                privateLog={privateLog}
-                me={me}
-                room={{
-                  id: room.id,
-                  code: room.code,
-                  name: room.name,
-                  hostId,
-                }}
-                voyageResult={voyageResult}
-                reveal={reveal}
-                myLegacy={myLegacy}
-                onRestart={handleRestart}
-                onRumorBoardOpen={() => setRumorOpen(true)}
-                onTutorialOpen={() => setTutOpen(true)}
-                colorFor={colorFor}
-                roster={roster}
-              />
-              {/* The captain's own card. It sits at the foot of the stage
-                  rather than up among the controls, because it is
-                  something a captain reads about their own voyage and not
-                  something they press: the bar under the stage holds the
-                  buttons, and the reading is what scrolls. It draws
-                  nothing at all in a harbor that has not dealt one.
-
-                  The peer ledger is the one thing a card shows that the
-                  server did not send: it is read from the captain's own
-                  voyage, on the captain's own screen, and no drawer holds
-                  it, which is why the card asks for it rather than it
-                  travelling on the private entry. Only a Broker's card
-                  prints it. */}
-              {privateLog.map((entry, index) => (
-                <PrivateCard
-                  key={`${entry.kind}:${index}`}
-                  entry={entry}
-                  peerTradeProfit={state.game.peerTradeProfit}
+            {/* The stage's relative wrapper, which exists for one thing:
+                the notification bubble. Anchored here it can only ever
+                cover the board's own corner, and on a wide window that
+                is the difference between a bubble over the captain's
+                rail and a bubble over the table. It wraps the scroller
+                rather than positioning the column itself, because a
+                relative column would re-anchor every absolutely placed
+                board inside it. */}
+            <div className="lg:relative lg:order-1 lg:flex lg:flex-col lg:flex-1 lg:min-h-0">
+              <div className="@container space-y-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
+                <GamePhasePanel
+                  game={state.game}
+                  ctx={ctx}
+                  act={act}
+                  members={members}
+                  phaseSync={phaseSync}
+                  barter={barter}
+                  aid={aid}
+                  backing={backing}
+                  escort={escort}
+                  refit={refit}
+                  modules={modules}
+                  bazaar={bazaar}
+                  audit={audit}
+                  boons={boons}
+                  maroon={maroon}
+                  voyageLog={voyageLog}
+                  privateLog={privateLog}
+                  me={me}
+                  room={{
+                    id: room.id,
+                    code: room.code,
+                    name: room.name,
+                    hostId,
+                  }}
+                  voyageResult={voyageResult}
+                  reveal={reveal}
+                  myLegacy={myLegacy}
+                  onRestart={handleRestart}
+                  onRumorBoardOpen={() => setRumorOpen(true)}
+                  onTutorialOpen={() => setTutOpen(true)}
+                  colorFor={colorFor}
+                  roster={roster}
                 />
-              ))}
+                {/* The captain's own card. It sits at the foot of the stage
+                    rather than up among the controls, because it is
+                    something a captain reads about their own voyage and not
+                    something they press: the bar under the stage holds the
+                    buttons, and the reading is what scrolls. It draws
+                    nothing at all in a harbor that has not dealt one.
+
+                    The peer ledger is the one thing a card shows that the
+                    server did not send: it is read from the captain's own
+                    voyage, on the captain's own screen, and no drawer holds
+                    it, which is why the card asks for it rather than it
+                    travelling on the private entry. Only a Broker's card
+                    prints it. */}
+                {privateLog.map((entry, index) => (
+                  <PrivateCard
+                    key={`${entry.kind}:${index}`}
+                    entry={entry}
+                    peerTradeProfit={state.game.peerTradeProfit}
+                  />
+                ))}
+              </div>
+              <NotificationCenter
+                current={notifications.current}
+                dismiss={notifications.dismissCurrent}
+              />
             </div>
           </div>
 
@@ -1260,20 +1303,42 @@ export function GameRoom({
               the two together need more room than the column has, the column
               scrolls rather than either panel being cut off at the knee.
 
-              Either panel folds to its own head (see PanelHeader), and the
-              fold is why the split is flex rather than fixed: the roster
-              folded hands its two fifths to the chat, the chat folded hands
-              its three fifths to the roster, and the column is fully used
-              however many panels are open. Folding both folds the rail
-              itself (see rightFolded above): the column gives way to a stub
-              holding the two icons, one press each, so the way in names the
-              panel it leads to. */}
-          <div className="order-3 min-w-0 flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
+              Below the breakpoint the pair stacks, and each panel stands
+              on a height of its own: a share of the viewport, clamped so a
+              short phone still shows a list rather than a sliver and a
+              tall one is not mostly chat. The heights used to be flat, 320
+              and 380, which is comfortable on one window and crowding on
+              the next. The wide layout's two floors under the split are
+              viewport relative for the same reason: they keep a short
+              window from squeezing either panel past reading height, and
+              what counts as reading height scales with the window too.
+
+              Either panel folds to a strip of its own on the wide layout
+              (see oneFolded above): the open one takes the rail's width,
+              the folded one stands beside it at the outer edge, and the
+              rail is fully used however many panels are open. Below the
+              breakpoint the fold is instead a fold to the panel's own
+              head, because a full width row has no width to give up; the
+              chevron on that head is the way back there. Folding both
+              folds the rail itself (see rightFolded above): the column
+              gives way to one stub holding the two icons, one press each,
+              so the way in names the panel it leads to. */}
+          <div
+            className={cn(
+              "order-3 min-w-0 flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1",
+              oneFolded && "lg:flex-row lg:items-start lg:overflow-visible",
+            )}
+          >
             <div
               className={cn(
                 panelCollapsed.roster
                   ? "h-auto"
-                  : "h-[320px] lg:h-auto lg:flex-[2] lg:min-h-[150px]",
+                  : "h-[clamp(240px,40dvh,400px)]",
+                !panelCollapsed.roster &&
+                  (panelCollapsed.chat
+                    ? "lg:h-full lg:min-h-0 lg:flex-1 lg:min-w-0"
+                    : "lg:h-auto lg:flex-[2] lg:min-h-[18dvh]"),
+                panelCollapsed.roster && "lg:hidden",
                 rightFolded && "lg:hidden",
               )}
             >
@@ -1292,9 +1357,12 @@ export function GameRoom({
             <div
               className={cn(
                 "pm-glass rounded-2xl overflow-hidden flex flex-col",
-                panelCollapsed.chat
-                  ? "h-auto"
-                  : "h-[380px] lg:h-auto lg:flex-[3] lg:min-h-[240px]",
+                panelCollapsed.chat ? "h-auto" : "h-[clamp(300px,50dvh,520px)]",
+                !panelCollapsed.chat &&
+                  (panelCollapsed.roster
+                    ? "lg:h-full lg:min-h-0 lg:flex-1 lg:min-w-0"
+                    : "lg:h-auto lg:flex-[3] lg:min-h-[26dvh]"),
+                panelCollapsed.chat && "lg:hidden",
                 rightFolded && "lg:hidden",
               )}
             >
@@ -1379,9 +1447,57 @@ export function GameRoom({
                 </TabsContent>
               </Tabs>
             </div>
-            {/* The stub a folded rail leaves, the way back shaped like
-                what it leads to: one press each, and the press opens the
-                named panel, which is also what reopens the rail. */}
+            {/* The strips a single folded widget leaves, one per widget,
+                standing at the rail's outer edge beside the open sibling.
+                They follow the chat in the DOM rather than their own
+                panel because the row runs left to right: the open widget
+                keeps the stage side and the strip holds the outer edge,
+                which is also the parcel the grid column gives up when the
+                second widget folds, so a strip never has to move. The
+                labels are the merged stub's own, because the press is the
+                same press; only one of the two is ever on screen. */}
+            <div
+              className={cn(
+                RAIL_STUB,
+                "shrink-0 lg:w-12",
+                panelCollapsed.roster && !rightFolded ? "lg:flex" : "lg:hidden",
+              )}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-members"
+                aria-label="Open the Harbor Roster"
+                title="Open the Harbor Roster"
+                onClick={() => setPanelCollapsed("roster", false)}
+              >
+                <Ship className="h-4 w-4" />
+              </Button>
+            </div>
+            <div
+              className={cn(
+                RAIL_STUB,
+                "shrink-0 lg:w-12",
+                panelCollapsed.chat && !rightFolded ? "lg:flex" : "lg:hidden",
+              )}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-chat"
+                aria-label="Open the chat"
+                title="Open the chat"
+                onClick={() => setPanelCollapsed("chat", false)}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+            </div>
+            {/* The one stub both folded widgets leave, the way back shaped
+                like what it leads to: one press each, and the press opens
+                the named panel, which is also what reopens the rail. This
+                merged stub exists for the rail fully folded, where the
+                grid column itself has given way (see rightFolded); a
+                single folded widget leaves its own strip above. */}
             <div
               className={cn(RAIL_STUB, rightFolded ? "lg:flex" : "lg:hidden")}
             >
@@ -1459,10 +1575,6 @@ export function GameRoom({
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
         items={notifications.items}
-      />
-      <NotificationCenter
-        current={notifications.current}
-        dismiss={notifications.dismissCurrent}
       />
       <PlayerDetailModal
         open={selectedPlayerId !== null}

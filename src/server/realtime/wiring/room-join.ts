@@ -10,6 +10,7 @@ import { normalizeMode } from "@/lib/game/mode";
 import { aidList, removeUserAidRequest } from "../aid";
 import { auditRevealFor } from "../audit";
 import { requireAuth } from "../auth";
+import { boonLedgerFor } from "../boon-ledger";
 import { barterPayloadFor, removeUserBarterOffers } from "../barter";
 import { bazaarPayloadFor } from "../bazaar";
 import { directLogFor, emitRoomMembers, harborLog } from "../chat";
@@ -212,6 +213,16 @@ export function wireRoomJoin(
     // hand over: a harbor that has not audited anyone costs no frame.
     const audit = auditRevealFor(roomId);
     if (audit) io.to(socket.id).emit("audit:reveal", audit);
+    // [F5: public offers] The fleet's ledger rides the same hand-out and
+    // is public for the plainer reason: the plan's own sentence, every
+    // offer is public. A captain who reloads into the middle of a draft
+    // has to see what the table has already kept, or the argument the
+    // table is having is missing a side of it on their screen. Sent to
+    // the joining socket only, exactly like the two above, and only when
+    // something has been kept: a harbor where no boon has been answered
+    // yet costs no frame.
+    const ledger = boonLedgerFor(roomId);
+    if (ledger) io.to(socket.id).emit("boon:ledger", ledger);
     // The maroon is handed over on the same reasoning, and it has to be:
     // a joiner who is not told the harbor put a captain ashore would read
     // that captain's empty ship as a bug, and a joiner who is not told

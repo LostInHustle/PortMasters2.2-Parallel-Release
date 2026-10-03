@@ -10,6 +10,7 @@ import { ENTRY_PHASE } from "@/lib/game/phases";
 import { clearAid } from "../aid";
 import { clearAudits } from "../audit";
 import { seated } from "../auth";
+import { clearBoonLedger } from "../boon-ledger";
 import { clearBarter, clearFlexibleAccepted } from "../barter";
 import { clearMutedUsers, clearSessionChat, emitRoomMembers } from "../chat";
 import {
@@ -129,6 +130,13 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // already spent it, and the room's first vote would vanish with no
       // frame to explain why.
       clearAudits(roomId);
+      // [F5: public offers] And the fleet's ledger, which is the same
+      // sentence one step milder than the audit's: it holds no once per
+      // voyage flag and refuses nothing on its own, but it holds the
+      // ended voyage's picks by captain, and a new voyage that kept them
+      // would open with a table already showing cards from a voyage
+      // nobody is sailing.
+      clearBoonLedger(roomId);
       // And the maroon, which is the same flag with a ship behind it: the
       // result is what makes the vote once a voyage and what tells the
       // server who the Harbormaster is, and the shift is the market the

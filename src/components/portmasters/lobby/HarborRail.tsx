@@ -158,8 +158,11 @@ export function HarborRail({
           two the voyage's chat carries: the harbor square, which is
           where a captain speaks to everybody standing in the lobby,
           and the private threads, which is where picking a name above
-          lands. */}
-      <div className="pm-glass pm-panel-flush flex h-[22.5rem] flex-col">
+          lands. Its height is a share of the viewport rather than the
+          flat 22.5rem it used to be, so the same widget sits at a
+          comfortable size on a phone and on a desktop; the voyage's
+          chat sizes itself the same way. */}
+      <div className="pm-glass pm-panel-flush flex h-[clamp(280px,45dvh,420px)] flex-col">
         <Tabs
           value={chatTab}
           onValueChange={(v) => onChatTabChange(v as "lobby" | "dm")}

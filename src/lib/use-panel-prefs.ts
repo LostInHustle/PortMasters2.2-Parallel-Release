@@ -10,13 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 //
 // Three keys, two levels. `left` is rail level: the captain's rail gives
 // way to a stub beside the stage and the stage takes the width. `roster`
-// and `chat` are widget level: inside the right rail the two panels fold
-// to their own heads independently, so a captain can keep the roster and
-// give the chat the column. The right rail itself is not a fourth key:
-// it is folded exactly when both of its panels are, derived at the reader
-// rather than stored, so the record cannot hold a rail that is empty and
-// yet still standing. All three keys are only read on the wide layout
-// where a stub exists to come back from.
+// and `chat` are widget level: on the wide layout either one folds to a
+// strip of its own at the rail's outer edge and the other takes the rail,
+// so a captain can keep the roster and give the chat the width; below the
+// breakpoint the same key folds the panel to its head, the accordion a
+// full width row has room for, and the chevron on that head is the way
+// back. The right rail itself is not a fourth key: it is folded exactly
+// when both of its panels are, derived at the reader rather than stored,
+// so the record cannot hold a rail that is empty and yet still standing.
 const PANELS_KEY = "portmasters_room_panels";
 
 export type RoomPanel = "left" | "roster" | "chat";

@@ -141,9 +141,12 @@ export async function tagVocabularySuite(): Promise<void> {
   const cold = entriesWithTag("cold").map((entry) => entry.id);
   const wardrobe = Object.keys(GARMENTS);
   check(
-    cold.length === wardrobe.length &&
-      wardrobe.every((garment) => cold.includes(garment)),
-    "the cold tag gathers exactly the wardrobe and nothing else, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question",
+    cold.length === wardrobe.length + 1 &&
+      wardrobe.every((garment) => cold.includes(garment)) &&
+      entriesWithTag("cold").some(
+        (entry) => entry.kind === "boon" && entry.id === "cold_hardened",
+      ),
+    "the cold tag gathers exactly the wardrobe and the one card that hardens against a cold leg, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question, and the moment card that answers such a leg is gathered by the same word rather than by a name kept beside it",
   );
   const pantryOf = (tag: Tag) =>
     entriesWithTag(tag)
@@ -166,12 +169,13 @@ export async function tagVocabularySuite(): Promise<void> {
     (entry) => `${entry.kind}:${entry.id}`,
   );
   check(
-    armed.length === 4 &&
+    armed.length === 5 &&
       armed.includes("charter:open_waters") &&
       armed.includes("charter:monsoon") &&
       armed.includes("boon:deep_sea_escort_pact") &&
+      armed.includes("boon:fleet_colors") &&
       armed.includes("module:persian_dome_compass"),
-    "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort and the compass that turns a raid, which is the query shape the single card record is being built to answer",
+    "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort, the colors that make a raider think twice and the compass that turns a raid, which is the query shape the single card record is being built to answer",
   );
   check(
     DIFFICULTIES.monsoon.pirateChance.length === 2 &&
@@ -235,12 +239,14 @@ export async function tagVocabularySuite(): Promise<void> {
     ) === true,
     "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
   );
+  // Every entry that carries the word, stripped by the tag rather than by
+  // name: the Harbor Credit boon borrows on the same word, and a fixture
+  // that knew one debtor's name would stop asking its question the day a
+  // second one signed on.
   check(
     soleFinding({
       ...shipped,
-      entries: shipped.entries.filter(
-        (entry) => !(entry.kind === "boon" && entry.id === "emergency_loan"),
-      ),
+      entries: shipped.entries.filter((entry) => !entry.tags.includes("debt")),
     })?.includes('no entry carries "debt"') === true,
     "a tag of the twelve that no entry carries is caught, since it would otherwise be a word in the vocabulary with nothing a card could be about",
   );

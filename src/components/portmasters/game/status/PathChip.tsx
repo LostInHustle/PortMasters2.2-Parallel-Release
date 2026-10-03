@@ -35,7 +35,10 @@ import { PhaseError } from "../phases/PhaseShared";
  * the same two words the locked order board and the fleet log use. A
  * captain who holds no path reads that instead, which is a real state
  * rather than an empty one: a table can be mid draft, or can have been
- * dealt to before this captain arrived.
+ * dealt to before this captain arrived. Neither state wears a section
+ * label above it: the chip already names itself, the empty state already
+ * opens with "No path yet", and the label over them was the same fact
+ * said twice on a rail that counts its rows.
  *
  * The switch lives behind the chip rather than open on the rail, and the
  * reason is that it is a rare move with consequences: a permanent row of
@@ -76,13 +79,8 @@ export function PathChip({
   if (game.path === null) {
     return (
       <div className="shrink-0">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-voyage">
-          Your path
-        </div>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-          No path yet. The draft deals one to every captain when the voyage
-          leaves the dock, and a captain who joins a voyage under way sails
-          without one.
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          No path yet. A path is dealt when the voyage sails.
         </p>
       </div>
     );
@@ -105,15 +103,12 @@ export function PathChip({
 
   return (
     <div className="shrink-0">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-voyage">
-        Your path
-      </div>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             aria-label={`Your path is ${card.name}. Change your papers.`}
-            className="mt-1 flex w-full items-center gap-2 rounded-lg border border-voyage/20 bg-voyage/[0.04] px-2.5 py-1.5 text-left transition hover:bg-voyage/[0.09]"
+            className="flex w-full items-center gap-2 rounded-lg border border-voyage/20 bg-voyage/[0.04] px-2.5 py-1.5 text-left transition hover:bg-voyage/[0.09]"
           >
             <span className="text-base leading-none">{card.crest}</span>
             <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold">

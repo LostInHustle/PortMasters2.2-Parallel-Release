@@ -80,6 +80,9 @@ import { tagVocabularySuite } from "./suites/44-tagVocabulary";
 import { readyCheckThatStallsSuite } from "./suites/45-theReadyCheckThatStalls";
 import { cardRecordSuite } from "./suites/46-cardRecord";
 import { moduleTradesSuite } from "./suites/47-moduleTrades";
+import { milestoneBoonsSuite } from "./suites/48-milestoneBoons";
+import { publicOffersSuite } from "./suites/49-publicOffers";
+import { brokersWhisperSuite } from "./suites/50-brokersWhisper";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -367,6 +370,11 @@ async function main(): Promise<void> {
     await pathsSuite();
     console.log("\nThe pathbound order board");
     await pathboundOrderBoardSuite();
+    // The whisper's article deals its boards through the same lifecycle
+    // calls the article above uses and reads the same order cards, so it
+    // stands beside it rather than in the group at the foot of the run.
+    console.log("\nThe Broker's Whisper");
+    await brokersWhisperSuite();
     console.log("\nThe escort contract");
     await escortContractSuite(run, { host });
     console.log("\nLoom: the refit");
@@ -403,6 +411,22 @@ async function main(): Promise<void> {
     // table anybody has to be sitting at.
     console.log("\nThe card record");
     await cardRecordSuite();
+    // The milestone boons' article joins the three above that need no
+    // harbor, and it is the card record's neighbour in the run the way it
+    // is in the tree: the pool the record puts a shape under is the pool
+    // the five moment cards are drawn from. Its checks walk the engine's
+    // own state in process, and the one half that touches the database
+    // (the telemetry accumulator the wire feeds) opens no harbor of its
+    // own, so no table has to be sitting for any of it.
+    console.log("\nThe milestone boons");
+    await milestoneBoonsSuite();
+    // [F5] The public offers' article follows the record suite it extends
+    // (the two pick sites its first half walks are the ones the milestone
+    // boons' own article armed), and unlike it the wire half needs a real
+    // harbor with live sockets, which is why it opens one of its own
+    // rather than joining the group above that needs no table.
+    console.log("\nPublic offers");
+    await publicOffersSuite(run, { gambitHost, gambitSecond });
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a
