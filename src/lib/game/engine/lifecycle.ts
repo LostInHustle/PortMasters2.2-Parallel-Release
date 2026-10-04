@@ -300,7 +300,11 @@ export function showWelcome(state: GameState, logs: string[]) {
 // bartering case is the Parley case with a new name, because the exchange it
 // closes is the same exchange.
 export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
-  const from = state.phase;
+  // Read through the same normalizer the load heal uses (see heal-save):
+  // a token this build does not speak moves as the phase it means rather
+  // than falling to the default below, where the seat would advance
+  // nothing while the ready check refuses it.
+  const from = normalizePhase(state.phase);
   switch (from) {
     case "market":
       // Leaving the market settles the port purchase half of the phase. The

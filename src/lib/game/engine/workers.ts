@@ -16,7 +16,12 @@
 // and discounts, was a balance inconsistency that this refactor closes.
 // =====================================================================
 import { ICONS } from "../constants/brand";
-import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
+import {
+  CREW_LOSS_AFTER_HUNGRY_LEGS,
+  WORKER_TYPES,
+  workerType,
+  type WorkerTypeId,
+} from "../constants/crew";
 import { RECIPES } from "../constants/goods";
 import { onShortRations, shortRationsYield } from "../larder";
 import { newCrewIdentity } from "../crew";
@@ -166,7 +171,7 @@ export function assignTask(
   }
   logs.push(
     frozen
-      ? "❌ The only free hands are out of action this leg with frostbite."
+      ? "❌ The only free hands are frozen out this leg: the crew went into the cold short of warm clothes, and they are back next leg. A warmer layer before a cold leg keeps every hand working."
       : "❌ All workers are already assigned tasks!",
   );
 }
@@ -200,11 +205,13 @@ export function processProduction(state: GameState, logs: string[]) {
   // because it is one fact about the captain rather than one per artisan:
   // the ship either went hungry this leg or it did not. The line below is
   // said once for the same reason, so the smaller numbers that follow it
-  // have an explanation above them instead of a note on every row.
+  // have an explanation above them instead of a note on every row, and it
+  // names the stake as well as the state so the empty larder's price is
+  // read before it is paid.
   const short = onShortRations(state);
   if (short)
     logs.push(
-      "⚠️ The crew is on short rations, so every artisan works the leg at a slower pace.",
+      `⚠️ The crew is on short rations, so every artisan works the leg at a slower pace, and ${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard.`,
     );
   for (const { list, name, weaves } of allLists) {
     for (const w of list) {
@@ -216,7 +223,9 @@ export function processProduction(state: GameState, logs: string[]) {
       // after this one.
       if (isFrostbitten(w, state.currentRound)) {
         if (w.task)
-          logs.push(`🥶 ${w.name} is out of action and cannot work this leg.`);
+          logs.push(
+            `🥶 ${w.name} is frozen out this leg: the crew went into the cold short of warm clothes, and the work on ${w.task} waits for next leg.`,
+          );
         continue;
       }
       if (w.task) {

@@ -327,7 +327,17 @@ function armDeparture(io: Server, plan: DeparturePlan): void {
     if (userSockets.get(userId)?.size) return;
     await reapDeparture(io, plan);
   }, DEPARTURE_GRACE_MS);
+  // Like the clock's and the advance watch's, this must never be the
+  // reason a process stays up.
+  t.unref();
   departureTimers.set(key, t);
+}
+
+// Releases every armed grace timer. The shutdown's path: a process going
+// away is not a captain leaving, so no seat is reaped over it.
+export function clearDepartureTimers(): void {
+  for (const timer of departureTimers.values()) clearTimeout(timer);
+  departureTimers.clear();
 }
 
 // Takes an account out of the presence bookkeeping outright: the account

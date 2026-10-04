@@ -1115,6 +1115,7 @@ export function GameRoom({
               />
               <PathChip
                 game={state.game}
+                inDeal={draft.view !== null}
                 error={draft.error}
                 onSwitch={draft.switchPath}
                 onDismissError={draft.clearError}

@@ -95,7 +95,7 @@ const STEPS: Step[] = [
     title: "Put Artisans to Work",
     gradient: "pm-grad-market",
     body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: the goods land at Resolve next round, not this round.",
-    tip: "Hire artisans only when you can sustain at least two rounds of wages. A worker who goes unpaid strikes and sinks your voyage.",
+    tip: "Hire artisans only when you can sustain at least two rounds of wages. A crew that goes unpaid takes a bankruptcy, which ends the voyage in Classic and leaves a mark in Ocean Gambit.",
   },
   {
     icon: TrendingUp,

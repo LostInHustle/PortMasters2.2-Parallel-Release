@@ -35,6 +35,7 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Avatar, Pill, ItemIcon } from "../shared";
+import { workerStatusLine } from "./phases/WorkerList";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
   Sparkles,
@@ -770,9 +771,7 @@ export function PlayerDetailModal({
                                 key={i}
                                 className="text-[11px] text-muted-foreground"
                               >
-                                {w.task
-                                  ? `Working: ${w.task}${w.isSkilled ? " ⭐" : ""}`
-                                  : `Idle${w.isSkilled ? " ⭐" : ""}`}
+                                {workerStatusLine(w, detail.round)}
                               </div>
                             ))}
                           </div>

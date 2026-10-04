@@ -15,6 +15,21 @@ import {
 } from "./PhaseShared";
 
 /**
+ * The line one hand's row carries: what they are doing, or why they are
+ * not doing it. Exported because the peek modal draws the same roster, and
+ * a hand seen from either surface should read the same reason and the same
+ * promise: the cold holds a hand for the leg, not the voyage.
+ */
+export function workerStatusLine(w: Worker, round: number): string {
+  if (isFrostbitten(w, round)) {
+    return "🥶 Frozen out this leg: the crew went into the cold short of warm clothes. Back next leg.";
+  }
+  return w.task
+    ? `Working on: ${w.task}${w.isSkilled ? " (Skilled)" : ""}`
+    : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`;
+}
+
+/**
  * One artisan type aboard: the wash in its craft's hue, its people, and the
  * goods this bench can set them to. Rows carry the person's name and what
  * they are doing; the buttons under them are the tasks they could be doing.
@@ -71,14 +86,13 @@ function WorkerList({
               [C3: garments and the cold] A hand the cold has taken says so
               where their work would have been, because that is the one
               thing that changed about them: they are still aboard, still
-              eating and still on the payroll. */}
+              eating and still on the payroll. The sentence carries the
+              why and the way back as well as the state, because a row
+              that only said "out of action" left the captain with no way
+              to know it was the wardrobe that owed them a coat rather
+              than the sea owing them a funeral. */}
           <span>
-            {w.name}:{" "}
-            {isFrostbitten(w, round)
-              ? "🥶 Out of action this leg"
-              : w.task
-                ? `Working on: ${w.task}${w.isSkilled ? " (Skilled)" : ""}`
-                : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`}
+            {w.name}: {workerStatusLine(w, round)}
           </span>
           {!w.task && (
             // Quiet until you reach for it, but still edged so it reads as a

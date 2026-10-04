@@ -364,8 +364,13 @@ export async function fleetCommissionSuite(
   // exercises the write would be claiming something it never checked.
   //
   // One captain ends holding a trace that met the commission and the
-  // others end holding nothing, which is what makes the two branches of
-  // the met flag both testable in one voyage.
+  // others end holding nothing. The fill is a fact about the fleet, so
+  // the conclusion merges every record of it and writes one answer to
+  // every row; the one record that has the fill is enough for all four,
+  // which is the invariant this voyage holds down. The other branch, a
+  // voyage where NO record exists and every row reads unmet, needs a
+  // voyage of its own and is the sibling article's (see
+  // 54-theFleetsOwnOutcome).
   const fullBoard: Record<string, number> = {};
   for (const r of nextCommission.resources) fullBoard[r.type] = r.required;
   await call<{ ok: boolean }>("/api/game/state", {
@@ -510,10 +515,8 @@ export async function fleetCommissionSuite(
   );
   check(
     hostChronicle?.objectiveMet === true &&
-      chronicles
-        .filter((row) => row.userId !== gambitHost.id)
-        .every((row) => row.objectiveMet === false),
-    "reading the met flag out of that trace, and never inventing one for a captain who kept none",
+      chronicles.every((row) => row.objectiveMet === true),
+    "reading the fleet's outcome once from the merged record, so the trace one client kept fills the commission on every row",
   );
 
   // ---- What the voyage decided about each card ----
@@ -540,16 +543,17 @@ export async function fleetCommissionSuite(
   );
   check(
     verdictOf(gambitSecond.id)?.won === true &&
-      verdictOf(gambitSecond.id)?.objectiveMet === false,
-    "and a Broker who reached the target wins it beside them, on a voyage the fleet did not finish",
+      verdictOf(gambitSecond.id)?.objectiveMet === true,
+    "and a Broker who reached the target wins it beside them, on the same filled voyage the Honest captain reads",
   );
   check(
     verdictOf(gambitThird.id)?.won === false,
     "while a Broker one Gold short of the target wins nothing",
   );
   check(
-    verdictOf(gambitFourth.id)?.won === false,
-    "and a Pirate ends a voyage the fleet fell short of with nothing, from a rating below the floor the card demands",
+    verdictOf(gambitFourth.id)?.won === false &&
+      verdictOf(gambitFourth.id)?.objectiveMet === true,
+    "and a Pirate wins nothing on a voyage the record shows filled, because the card only pays for a failure the fleet's own record does not show",
   );
 
   // The mode is a room property the server reads for itself, so the

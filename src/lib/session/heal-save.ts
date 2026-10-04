@@ -53,6 +53,7 @@ import {
 import { normalizeStandingOrders } from "@/lib/game/standing";
 import { normalizePath } from "@/lib/game/paths";
 import { normalizePathSwitchLeg } from "@/lib/game/draft";
+import { normalizePhase } from "@/lib/game/phases";
 
 // What the room and the account answered at the moment this save was
 // loaded, which is everything the heal cannot read out of the blob itself.
@@ -81,6 +82,16 @@ export function healLoadedVoyage(
   healCommissionAndHold(game);
   healVoyageTallies(game);
   healMarksAndLeans(game);
+  // The phase the save was written under, healed the way the mode below is
+  // and for a sharper reason: a legacy token ("3", "barter") or one no
+  // switch this build has would reach the first screen as a phase nothing
+  // advances and the ready check refuses, wedging the table behind one
+  // captain's old save. normalizePhase answers the token's own phase, or
+  // the entry phase where nothing answers, which are the two states every
+  // reader already handles. A live personal screen passes through
+  // untouched: the faces are phases this build speaks, so a save written
+  // mid yard is not moved by the heal.
+  game.phase = normalizePhase(game.phase);
   // [C1: the Larder and Short Rations] The provisions a save was
   // carrying, healed the way every other saved field is. A voyage
   // saved before this layer existed holds no Larder and no stamp, so
@@ -239,6 +250,13 @@ function healVoyageTallies(game: GameState): void {
   // An old save that heals to null simply reports nothing until the next
   // pick, which is the same screen a fresh voyage shows.
   game.boonRecord = game.boonRecord ?? null;
+  // The gates below are coalesced rather than read strictly, and the
+  // direction is deliberate: each records that a beat already ran (a swap
+  // taken, an escort sailed, the raid answered), so a damaged value that
+  // still reads truthy keeps the gate closed. Reopening one would let a
+  // reload replay a beat the room already settled, while a spurious closed
+  // gate only costs an option the next leg returns anyway. The verdicts
+  // read the opposite way on purpose (see healMarksAndLeans).
   game.boonSwapUsed = game.boonSwapUsed ?? false;
   game.moduleSwapUsed = game.moduleSwapUsed ?? false;
   game.pirateAttackResolved = game.pirateAttackResolved ?? false;
@@ -246,13 +264,14 @@ function healVoyageTallies(game: GameState): void {
   game.brokerTippedPirates = game.brokerTippedPirates ?? false;
   game.debts = game.debts ?? [];
   game.loansGiven = game.loansGiven ?? [];
-  game.defaultedDebt = game.defaultedDebt ?? false;
 }
 
 // The marks a failed voyage leaves and the leans a failed or a bribed
-// harbor puts on the market. All three readers here are strict rather than
-// coalescing, because a damaged value would otherwise be read as a verdict
-// or priced into a market rather than merely looking wrong.
+// harbor puts on the market. The marks read strictly rather than
+// coalescing, because a damaged value would otherwise be read as a
+// verdict; the leans go through the normalizers their own readers use,
+// because a damaged lean would price a market rather than merely look
+// wrong.
 function healMarksAndLeans(game: GameState): void {
   // [H7: Maroon and the Harbormaster] The two marks a failed seat
   // carries, read strictly rather than coalesced: they are booleans
@@ -261,6 +280,13 @@ function healMarksAndLeans(game: GameState): void {
   // power. Anything that is not exactly true is not a failure.
   game.bankrupt = game.bankrupt === true;
   game.marooned = game.marooned === true;
+  // The loan a captain walked away from, read strictly for the same
+  // reason and healed here rather than among the debts it was written
+  // with: the endgame reads it first when the closing rank is dealt
+  // (see endGame), so a damaged value would decide a captain's own
+  // ranking rather than merely looking wrong. Anything that is not
+  // exactly true is not a default.
+  game.defaultedDebt = game.defaultedDebt === true;
   // The port a Harbormaster leaned, read through the same normalizer
   // the server's own call validates against, so a save cannot hand
   // the pricing function a port that is not a port or a direction

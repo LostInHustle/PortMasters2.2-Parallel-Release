@@ -85,6 +85,11 @@ import { publicOffersSuite } from "./suites/49-publicOffers";
 import { brokersWhisperSuite } from "./suites/50-brokersWhisper";
 import { chartersSuite } from "./suites/51-charters";
 import { powerBudgetSuite } from "./suites/52-powerBudget";
+import { theSeatWaitsInsideTheYardSuite } from "./suites/53-theSeatWaitsInsideTheYard";
+import { theFleetsOwnOutcomeSuite } from "./suites/54-theFleetsOwnOutcome";
+import { theLegacyPhaseMovesSuite } from "./suites/55-theLegacyPhaseMoves";
+import { theMarksAndTheGatesSuite } from "./suites/56-theMarksAndTheGates";
+import { theOrderThatSettlesSuite } from "./suites/57-theOrderThatSettles";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -445,6 +450,28 @@ async function main(): Promise<void> {
     // ready check stays last.
     console.log("\nThe power budget");
     await powerBudgetSuite();
+    // The yard's article is the ready check's sibling, and it runs just
+    // ahead of it: both need a live harbor, and this one is done in a few
+    // seconds rather than watched through a grace, which is the only
+    // reason the ready check stays last.
+    console.log("\nThe seat that waits inside the yard");
+    await theSeatWaitsInsideTheYardSuite(run);
+    // The fleet's own outcome's article is the yard's sibling: both drive
+    // a live harbor with raw reports and neither spends a wall clock on a
+    // grace. It sits after the yard because it is the newer article and
+    // the ready check stays last.
+    console.log("\nThe fleet's own outcome");
+    await theFleetsOwnOutcomeSuite(run);
+    // The correctness trio below opens no harbor: each is a pure read of
+    // a state in process (a load heal, a flag contract, a settlement), so
+    // they sit together after the harbor articles and ahead of the ready
+    // check, which stays last for the reason below.
+    console.log("\nThe legacy phase that moves");
+    await theLegacyPhaseMovesSuite();
+    console.log("\nThe marks and the gates");
+    await theMarksAndTheGatesSuite();
+    console.log("\nThe order that settles");
+    await theOrderThatSettlesSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

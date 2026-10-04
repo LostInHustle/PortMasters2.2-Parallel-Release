@@ -308,9 +308,23 @@ function ActivePhase(props: Props) {
         </div>
       );
     case "module_draft":
-      return <ModuleDraft game={game} act={act} />;
+      return (
+        <ModuleDraft
+          game={game}
+          act={act}
+          phaseSync={phaseSync}
+          members={members}
+        />
+      );
     case "module_swap":
-      return <ModuleSwap game={game} act={act} />;
+      return (
+        <ModuleSwap
+          game={game}
+          act={act}
+          phaseSync={phaseSync}
+          members={members}
+        />
+      );
     case "bankruptcy":
       return (
         <Bankruptcy

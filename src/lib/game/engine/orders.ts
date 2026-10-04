@@ -218,7 +218,11 @@ export function completeOrder(
   // beside them.
   const hasWoven = cargoCarriesTag(order.resources, "woven");
   let transport = calcTransportCost(state, order.totalItems, hasWoven);
-  for (const r of order.resources) state.inventory[r.type] -= r.required!;
+  // Read through the same absence the shortfall check above reads: a line
+  // without a count takes nothing, rather than subtracting an undefined
+  // and poisoning every number the hold reports for the rest of the
+  // voyage.
+  for (const r of order.resources) state.inventory[r.type] -= r.required ?? 0;
   let reward = order.reward;
   // [D6: Free Captain: Opportunist] The borrow's penalty lands here, on the
   // face value and before anything else touches the number, so every step
@@ -239,14 +243,15 @@ export function completeOrder(
     logs.push(opportunistLine(state, order.reward, reward));
   }
   let totalVat = 0;
-  if (order.isProductOrder) {
-    const product = order.resources[0].type;
-    const unitVat = calcVAT(
-      state,
-      product,
-      reward / order.resources[0].required!,
-    );
-    totalVat = unitVat * order.resources[0].required!;
+  // The taxed line is read once, and only a line that actually sells
+  // something is taxed: a card with no resource lines, or a line without
+  // a count, pays its reward and no VAT rather than dividing by an
+  // absence and carrying a NaN payout into the ledger.
+  const productRef = order.isProductOrder ? order.resources[0] : undefined;
+  const productUnits = productRef?.required ?? 0;
+  if (productRef && productUnits > 0) {
+    const unitVat = calcVAT(state, productRef.type, reward / productUnits);
+    totalVat = unitVat * productUnits;
     reward -= totalVat;
     state.vatPaid += totalVat;
     logs.push(`🧾 Product Sales VAT: ${totalVat} Gold`);

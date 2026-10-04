@@ -135,11 +135,12 @@ export type PhasePanelProps = {
  * bar that runs down beside it.
  *
  * One widget rather than a countdown of its own, and one place rather than
- * one per screen, because the three screens that show it (a phase's footer,
- * the shipyard, and the port board) all show the same published pair of
- * numbers. A screen that drew its own would be a second answer to "how long
- * is left" the moment the two drifted, and the drift would only be visible
- * to whichever captain happened to be standing there.
+ * one per screen, because the screens that show it (a phase's footer, the
+ * shipyard, the shipyard's two sub screens, and the port board) all show
+ * the same published pair of numbers. A screen that drew its own would be a
+ * second answer to "how long is left" the moment the two drifted, and the
+ * drift would only be visible to whichever captain happened to be standing
+ * there.
  *
  * It draws nothing at all when there is nothing to draw: ReadyBar returns
  * null for a room with no ready state, and a screen with no clock in hand

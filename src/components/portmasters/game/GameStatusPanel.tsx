@@ -56,6 +56,16 @@ export type RosterEntry = WorkerType & {
  * is not, so the page itself never grows. The ledger becomes a peer tab rather
  * than a footnote below the fold.
  *
+ * The pinning holds while the rail has the room for it. On a short window
+ * the head and a usable board cannot both fit, and the first shape this
+ * took crushed the board: the flex row gave every spare pixel to the pinned
+ * head and the tab bodies collapsed to slivers that could not be read,
+ * which is exactly what the field reported as "only the four boxes scroll".
+ * So the panel itself is the scroll container, and the tab box carries a
+ * floor under which it is never compressed: when the window is tall the
+ * head pins and nothing scrolls, as before, and when it is short the whole
+ * rail scrolls as one column so the board stays reachable.
+ *
  * The pinned "Due" figure carries the safe/short tone, because that is the one
  * number that decides whether a captain is about to go bankrupt, and it should
  * be readable without opening anything.
@@ -114,9 +124,12 @@ export function GameStatusPanel({
   const duesAlert = (showObligations && !safe) || game.debts.length > 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Pinned: never scrolls, so the numbers a captain checks constantly
-          are always in the same place. */}
+    <div className="pm-scroll flex h-full min-h-0 flex-col overflow-y-auto">
+      {/* Pinned: never scrolls while the rail has the room, so the numbers
+          a captain checks constantly are always in the same place. On a
+          short window the panel takes the scroll instead (see the doc
+          comment), because a pinned head over a crushed board is a head
+          nobody can use. */}
       <div className="shrink-0">
         <VoyageHeader
           currentRound={game.currentRound}
@@ -140,7 +153,7 @@ export function GameStatusPanel({
 
       <Tabs
         defaultValue="hold"
-        className="mt-2.5 flex min-h-0 flex-1 flex-col gap-2"
+        className="mt-2.5 flex min-h-0 flex-1 flex-col gap-2 lg:min-h-[18rem]"
       >
         <TabsList className="grid w-full shrink-0 grid-cols-4">
           <TabsTrigger value="hold" className="text-[11px]">

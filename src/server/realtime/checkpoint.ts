@@ -40,7 +40,7 @@ import {
   lapSuccessor,
   openingPhase,
 } from "@/lib/game/checkpoint";
-import { normalizePhase, phaseFace } from "@/lib/game/phases";
+import { normalizePhase, phaseFace, seatOf } from "@/lib/game/phases";
 import { modeConfig, normalizeMode } from "@/lib/game/mode";
 import { computeHarborPulse } from "@/lib/game/harborPulse";
 import { bazaarRumorsOn } from "@/lib/game/flags";
@@ -158,15 +158,20 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
 // the vote in maybeAdvance is counted against and the one the bar's
 // denominator is drawn from so the two never disagree.
 //
-// The gap between them was a deadlock rather than a tidiness. The shipyard's
-// draft and swap screens carry no ready bar and send no vote, while the
-// roster above counted a captain inside one as a captain the seat was
-// waiting for: one captain opening the draft at Dusk left the table holding
-// every vote it could collect and able to move none of them, with the one
-// captain who could have cast the missing vote reading a module card on a
-// screen that draws no bar and no clock. The phase registry has said of
-// those screens that none of them is a seat the room waits on since the six
-// phase leg landed; this is the roster agreeing with it.
+// A captain inside the shipyard's draft or swap screens is waited on, and
+// the seat their screen folds to is what says so: the phase registry places
+// those screens inside Dusk (see seatOf in @/lib/game/phases), so the
+// question below is asked of the seat a screen is a screen inside rather
+// than of the screen's own name. Reading the raw name was the field report:
+// it dropped the draft captain from the roster, so the moment every
+// remaining captain had voted the room announced the departure, and the
+// draft captain's own client, which folds its seat the same way in every
+// guard it has, followed the announcement out of a screen they were still
+// using (autoCommit cancels the draft and leaves Dusk). The two screens draw
+// the room's own bar now, so the captain the table is waiting on can see the
+// wait and its countdown, and a captain who never comes back is moved by the
+// clock like any other, whose fire counts the active roster and never this
+// one (see forceAdvance).
 //
 // A member with no status frame yet is waited on rather than skipped, which
 // is the one case not read off a seat: a captain who has just joined has no
@@ -186,12 +191,11 @@ async function waitingRosterSet(roomId: string): Promise<Set<string>> {
   const out = new Set<string>();
   for (const id of memberIds) {
     const ph = statuses?.get(id)?.phase;
-    // A phase the lap does not gate covers the personal screens and both
-    // terminals, which is the same set the two names above exclude today
-    // plus the screens that were the hole, and it is read off the lap
-    // rather than off a list of names that a sixth personal screen would
-    // have to be added to.
-    if (ph === undefined || isGatedPhase(cp.mode, ph)) out.add(id);
+    // Folded to the seat the screen stands inside before the lap is asked,
+    // so the draft and the swap wait like the Dusk seat they are drawn on
+    // top of, and a terminal (which folds to itself) is still excluded by
+    // the same read.
+    if (ph === undefined || isGatedPhase(cp.mode, seatOf(ph))) out.add(id);
   }
   return out;
 }

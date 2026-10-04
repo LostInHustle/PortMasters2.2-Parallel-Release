@@ -224,45 +224,61 @@ export function RefitBench({
       )}
 
       {/* What every captain can do alone, and the price a refit is measured
-          against. One point a leg, once, whatever the path. */}
+          against. One point a leg, once, whatever the path.
+
+          A leg whose mend is spent keeps the whole row on screen rather
+          than swapping it for a sentence: the field read the row vanishing
+          as every button having fired, and no panel that deletes its own
+          record can argue with that. The worked garment's number has moved
+          and the others' have not, which is the receipt, and the disabled
+          press says tomorrow without taking the numbers down. */}
       <div className="rounded-lg border border-black/5 dark:border-white/10 bg-background/40 p-3 mb-3">
         <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
           <span className="text-muted-foreground">Harbor tailors</span>
           {mendedThisLeg ? (
             <span className="text-muted-foreground">
-              have already worked on the crew this leg. They take another
-              garment tomorrow.
+              have already worked on the crew this leg. Another garment waits
+              for tomorrow.
             </span>
           ) : mendable.length === 0 ? (
             <span className="text-muted-foreground">
-              have nothing to put right. The crew's clothes are whole.
+              {(game.garments ?? []).length === 0
+                ? "have nothing to put right. Nobody in the crew is wearing anything."
+                : "have nothing to put right. The crew's clothes are whole."}
             </span>
           ) : (
-            <>
-              <span className="text-muted-foreground">
-                will put {TAILOR_WORK} back for {MEND_GOLD_PER_POINT} Gold, once
-                a leg.
-              </span>
-              {mendable.map((worn) => {
-                const spec = garmentSpec(worn);
-                const left = spec
-                  ? spec.durability - garmentRoom(game, worn)
-                  : 0;
-                return (
-                  <Button
-                    key={worn}
-                    size="sm"
-                    className="h-7 rounded-lg px-2.5 text-[11px]"
-                    onClick={() => act((g, l) => mendGarment(g, worn, l))}
-                  >
-                    🪡 Mend {worn} ({left}
-                    {spec ? ` of ${spec.durability}` : ""},{" "}
-                    {MEND_GOLD_PER_POINT}💰)
-                  </Button>
-                );
-              })}
-            </>
+            <span className="text-muted-foreground">
+              will put {TAILOR_WORK} back for {MEND_GOLD_PER_POINT} Gold, once a
+              leg.
+            </span>
           )}
+          {/* The row of buttons stays a row after the mend: the same
+              buttons, greyed, with the numbers the mend left behind. The
+              spent leg reads the whole wardrobe, because a garment already
+              whole has no room to mend and would otherwise vanish from a
+              row whose whole job is to account for where the points went. */}
+          {(mendedThisLeg
+            ? Array.from(
+                new Set((game.garments ?? []).map((garment) => garment.good)),
+              )
+            : mendable
+          ).map((worn) => {
+            const spec = garmentSpec(worn);
+            const left = spec ? spec.durability - garmentRoom(game, worn) : 0;
+            return (
+              <Button
+                key={worn}
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={mendedThisLeg ? "secondary" : "default"}
+                disabled={mendedThisLeg}
+                onClick={() => act((g, l) => mendGarment(g, worn, l))}
+              >
+                🪡 Mend {worn} ({left}
+                {spec ? ` of ${spec.durability}` : ""}, {MEND_GOLD_PER_POINT}💰)
+              </Button>
+            );
+          })}
         </div>
       </div>
 

@@ -34,11 +34,16 @@ import { PhaseError } from "../phases/PhaseShared";
  * (see @/lib/game/paths), so a captain reading "Quartermaster" here reads
  * the same two words the locked order board and the fleet log use. A
  * captain who holds no path reads that instead, which is a real state
- * rather than an empty one: a table can be mid draft, or can have been
- * dealt to before this captain arrived. Neither state wears a section
- * label above it: the chip already names itself, the empty state already
- * opens with "No path yet", and the label over them was the same fact
- * said twice on a rail that counts its rows.
+ * rather than an empty one, and it is three states rather than one: the
+ * deal is open to them now, the deal is still to come, or the deal ran
+ * before they came aboard and this voyage sails them without one (see
+ * inDeal and the phase below). Each reads its own sentence, because one
+ * sentence covering all three would tell two of them a future that is not
+ * theirs; the switch is offered in none of them, since the engine refuses
+ * a captain holding no path to set aside (see pathSwitchBlocked). Neither
+ * state wears a section label above it: the chip already names itself,
+ * the empty state already opens with "No path yet", and the label over
+ * them was the same fact said twice on a rail that counts its rows.
  *
  * The switch lives behind the chip rather than open on the rail, and the
  * reason is that it is a rare move with consequences: a permanent row of
@@ -60,11 +65,16 @@ import { PhaseError } from "../phases/PhaseShared";
  */
 export function PathChip({
   game,
+  inDeal,
   error,
   onSwitch,
   onDismissError,
 }: {
   game: GameState;
+  /** Whether the path deal is open to this captain right now (a live
+      draft view). Passed in rather than read off the game, because the
+      deal is the room's record rather than the save's. */
+  inDeal: boolean;
   error: string | null;
   onSwitch: (path: PathId) => void;
   onDismissError: () => void;
@@ -80,7 +90,11 @@ export function PathChip({
     return (
       <div className="shrink-0">
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          No path yet. A path is dealt when the voyage sails.
+          {inDeal
+            ? "No path yet. The deal is open: keep one of the cards dealt to you."
+            : game.phase === "harbor"
+              ? "No path yet. A path is dealt when the voyage sails."
+              : "No path yet. The deal ran before you came aboard, so you sail this voyage without one."}
         </p>
       </div>
     );

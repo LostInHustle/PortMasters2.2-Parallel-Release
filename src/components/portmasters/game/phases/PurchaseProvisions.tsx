@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "@/lib/game/constants/crew";
 import {
   FOODS,
   FOODS_DRAW_ORDER,
@@ -206,7 +207,8 @@ export function Provisions({
       {short && (
         <PanelNote tone="alarm">
           ⚠️ The larder is empty and the crew is working hungry: every artisan
-          produces less until this is filled.
+          produces less, and {CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without
+          rations costs the newest hand aboard. Fill it before the next Dawn.
         </PanelNote>
       )}
       <div className="mt-2 space-y-1">
