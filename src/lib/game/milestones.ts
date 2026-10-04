@@ -40,6 +40,7 @@ import {
 import { MERCHANT_RATINGS } from "./constants/reputation";
 import { milestoneBoonsOn } from "./flags";
 import { garmentsLayerOn, legIsCold } from "./garments";
+import { powerBudgetAllows } from "./held-cards";
 import { createRng } from "./rng";
 import { flatWorkerRoster, type GameState } from "./types";
 
@@ -189,10 +190,29 @@ export function milestoneDue(
  * The mark rides in the seed so that a trigger which fires twice deals a
  * second distinct hand where the shrinking pool allows one, which is
  * what the plan's own cadence asks of a repeat.
+ *
+ * [F7: the power budget] The budget filters the table after the draw
+ * rather than before it, and that placement is load bearing: this reader
+ * is re-derived on every render, a peer can settle a trade onto this
+ * captain's hull while a moment is queued, and a filter inside the draw
+ * would hand the same seed a different pool the moment power moved, which
+ * is the reshuffle the paragraph above forbids. Filtering the drawn trio
+ * keeps the draw power-blind, so a power drop can only put a card back on
+ * a table the captain is looking at, never take one away, and a click
+ * already made can never be invalidated. What the filter can leave is an
+ * empty table for a captain whose hull is too heavy, which every caller
+ * already answers: the head of the queue is left inert rather than drawn
+ * as a screen with no exit (see milestonePending), and the arm path tells
+ * its two empties apart so the cap defers a moment rather than spending
+ * it (see queueMilestoneMoment). The ignoreBudget arm is the arm path's
+ * own question ("is the family's pool dry, the budget aside") and is not
+ * a second reading of the table: same seed, same pool, the one filter
+ * lifted.
  */
 export function milestoneChoices(
   state: GameState,
   trigger: MilestoneTrigger,
+  options: { ignoreBudget?: boolean } = {},
 ): CardRecord[] {
   const held = new Set(state.heldBoons);
   const random = createRng(
@@ -214,7 +234,8 @@ export function milestoneChoices(
     .map((card) => [card, cardWeight(card, state)] as [CardRecord, number])
     .filter(([, weight]) => weight > 0);
   picks.push(...drawOffer(pool, CARDS_PER_OFFER - picks.length, random));
-  return picks;
+  if (options.ignoreBudget) return picks;
+  return picks.filter((card) => powerBudgetAllows(state, card));
 }
 
 /**
@@ -238,10 +259,14 @@ export function milestoneChoices(
  * waiting behind another can see its last available card taken by the
  * answer ahead of it. Reading the pool at the head is enough because the
  * five moments share one, so an empty table at the head is an empty
- * table everywhere. The reading is monotone and cannot flicker back:
- * held ids are never released and these five cards' weights do not move
- * with the voyage, so a table that has run dry stays dry, and the moment
- * is left inert on the queue rather than drawn as a screen with no exit.
+ * table everywhere. [F7: the power budget] One exception rides on the
+ * budget and it is the safe direction: a table emptied by the cap can
+ * refill if the captain's power later drops, because a module sold or
+ * swapped down frees weight (see powerBudgetAllows in ./held-cards), so
+ * the reading is no longer strictly monotone. What it keeps is the
+ * property that matters: the moment is left inert on the queue while the
+ * table is empty, never spent and never drawn as a screen with no exit,
+ * and it either revives when the hull lightens or stays quietly queued.
  */
 export function milestonePending(state: GameState): boolean {
   if (!milestoneBoonsOn(state.mode)) return false;

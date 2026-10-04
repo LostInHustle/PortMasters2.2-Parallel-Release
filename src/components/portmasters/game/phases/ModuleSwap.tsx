@@ -2,7 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
+import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
 import { finalizeModuleSwap } from "@/lib/game/engine";
+import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
 import { Term } from "../../Term";
 import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 
@@ -10,6 +12,13 @@ import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
  * The swap: which module aboard the newly drafted one replaces. Every
  * fitted module is offered, and the captain may also step back to the
  * picker without spending the choice.
+ *
+ * [F7: the power budget] Each row reads its own slot's arithmetic: the
+ * new module landing where that one sat, so replacing a heavy module can
+ * be allowed while replacing a light one is not, and the disabled rows
+ * say why before the click (the engine refuses the same picks as the
+ * floor under this). The roll's filter promised the card fits over the
+ * heaviest module on the hull, so at least one row here always fits.
  */
 export function ModuleSwap({
   game,
@@ -17,6 +26,7 @@ export function ModuleSwap({
 }: Pick<PhasePanelProps, "game" | "act">) {
   const newMod = game._newModule;
   const newText = newMod ? cardText(newMod) : null;
+  const held = heldPower(game);
   return (
     <div className="max-w-2xl mx-auto text-center">
       <PhaseHeading layout="mb-1" tone="text-module-swap" brush>
@@ -30,6 +40,8 @@ export function ModuleSwap({
       <div className="rounded-xl border border-module-swap/15 bg-module-swap/[0.03] p-4 my-4 space-y-2 text-left">
         {game.equippedModules.map((card, i) => {
           const text = cardText(card);
+          const blocked =
+            newMod !== undefined && !powerBudgetAllows(game, newMod, card);
           return (
             <div
               key={card.id}
@@ -42,11 +54,19 @@ export function ModuleSwap({
                 <div className="text-[11px] text-muted-foreground">
                   {text.desc}
                 </div>
+                {blocked && newMod && (
+                  <div className="text-[11px] text-alarm mt-1">
+                    Replacing it would put your hull at{" "}
+                    {held - card.power + newMod.power} power, and a hull carries
+                    at most {HELD_POWER_CAP}.
+                  </div>
+                )}
               </div>
               <Button
                 size="sm"
-                variant="destructive"
-                className="rounded-lg"
+                variant={blocked ? "secondary" : "destructive"}
+                className="rounded-lg shrink-0"
+                disabled={blocked}
                 onClick={() => act((g, l) => finalizeModuleSwap(g, i, l))}
               >
                 🗑️ Replace

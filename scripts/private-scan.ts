@@ -22,9 +22,9 @@
  *   2. One reader of the alignment table. Only the module that deals the
  *      cards may read the rows back, so a slice that wants a card has to
  *      ask that module rather than the database.
- *   3. The verdict is a property in three places: the balance reader,
- *      the operator window and the wire type. A fourth is a verdict that
- *      has learned to travel.
+ *   3. The verdict is a property in four places: the balance reader,
+ *      the operator window, the wire type and the combination instrument.
+ *      A fifth is a verdict that has learned to travel.
  *   4. No broadcast payload statement names a secret. This one reads the
  *      text of the emit rather than its meaning, so it catches a payload
  *      that says role or flourish or ally or alignment and passes one
@@ -87,12 +87,17 @@ const isSmoke = (file: string): boolean =>
   file === "scripts/smoke.ts" || file.startsWith("scripts/smoke/");
 
 /* Rule 3. Where the win verdict is a property: the balance reader that
-   counts it, the operator window that reads the count, and the wire type
-   the reveal is shaped by. */
+   counts it, the operator window that reads the count, the wire type
+   the reveal is shaped by, and the combination instrument, whose whole
+   reading is a reduction over rows that carry it (win rate by pair, see
+   src/lib/game/combinations.ts). The fourth was added when the F7
+   instrument landed, and it carries its sentence: the instrument
+   counts verdicts it does not decide, and counting is not travelling. */
 const VERDICT_PROPERTY_FILES = [
   "src/lib/game/balance.ts",
   "src/server/telemetry-window.ts",
   "src/types/realtime/voyage.ts",
+  "src/lib/game/combinations.ts",
 ];
 
 /* Rule 4. The shapes a payload must not take. Each one is a token rather
@@ -213,8 +218,8 @@ for (const file of scannedFiles) {
       file: relativePath,
       line: index + 1,
       message:
-        "writes the win verdict as a property. Three places hold it (see" +
-        " VERDICT_PROPERTY_FILES in this script), and a fourth wants a sentence here.",
+        "writes the win verdict as a property. Four places hold it (see" +
+        " VERDICT_PROPERTY_FILES in this script), and a fifth wants a sentence here.",
     });
   });
 }

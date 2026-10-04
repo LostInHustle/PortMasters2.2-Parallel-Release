@@ -84,6 +84,7 @@ import { milestoneBoonsSuite } from "./suites/48-milestoneBoons";
 import { publicOffersSuite } from "./suites/49-publicOffers";
 import { brokersWhisperSuite } from "./suites/50-brokersWhisper";
 import { chartersSuite } from "./suites/51-charters";
+import { powerBudgetSuite } from "./suites/52-powerBudget";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -436,6 +437,14 @@ async function main(): Promise<void> {
     // it is the newer article and the ready check stays last.
     console.log("\nThe charters");
     await chartersSuite();
+    // [F7] The power budget's article is the charters' sibling in the
+    // tree as well as in the run: both hold one derived table against a
+    // state in process, and the instrument half reads fixture rows
+    // through a pure reduction, so no harbor is opened here either. It
+    // sits after the charters because it is the newer article and the
+    // ready check stays last.
+    console.log("\nThe power budget");
+    await powerBudgetSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

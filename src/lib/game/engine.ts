@@ -272,6 +272,11 @@ export {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
+  // [F7: the power budget] The yard's draft-or-not question, forwarded
+  // for the reason the rest of this block is: the Shipyard panel asks it
+  // before the Draft button, and the answer has to be the roll's own
+  // predicate rather than a second guess written at the button.
+  moduleDraftPossible,
   startBoonDrafting,
   startModuleDrafting,
   swapBoonChoices,

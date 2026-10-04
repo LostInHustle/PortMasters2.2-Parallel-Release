@@ -1,6 +1,7 @@
 // =====================================================================
-// [F4: boons at milestone moments, F6: charters at leg four] The cards a
-// captain holds, and the flags they write.
+// [F4: boons at milestone moments, F6: charters at leg four, F7: the
+// power budget] The cards a captain holds, and the flags they write, and
+// the weight the two of them add up to.
 //
 // The moments that hand boons out live in ./milestones and the voyage's
 // one charter moment lives in ./charters; what a captain takes from any
@@ -29,6 +30,7 @@
 // mutates and no clock is read.
 // =====================================================================
 import { cardById } from "./cards";
+import { HELD_POWER_CAP } from "./constants/cards";
 import type { CardRecord } from "./constants/cards";
 import type { GameState, ModifierKey } from "./types";
 
@@ -149,4 +151,59 @@ export function heldFlagsOf(
     Object.assign(flags, charter.effect.flags);
   }
   return flags;
+}
+
+// ========== The budget ==========
+
+/**
+ * [F7: the power budget] The weight the durable set is carrying: every
+ * held milestone boon, every bolted on module, and the voyage's charter,
+ * summed through the pool.
+ *
+ * The boons are read through normalizeHeldBoons rather than off the raw
+ * list, so the budget reads exactly the durable set the load heals: a
+ * round draft's id, a retired card or a repeat is not power here for the
+ * same reason it is not power after a reload, and there is one
+ * implementation of that reading instead of two that could drift. The
+ * modules are read off the hull the captain carries (a duplicate from the
+ * draft's fallback pool is two bolted on modules and counts twice). A
+ * card the pool cannot answer for is skipped, so a save that never went
+ * through the heal still reads honestly here.
+ */
+export function heldPower(
+  state: Pick<GameState, "heldBoons" | "equippedModules" | "charter">,
+): number {
+  let power = 0;
+  for (const id of normalizeHeldBoons(state.heldBoons)) {
+    power += cardById(id)?.power ?? 0;
+  }
+  for (const mod of state.equippedModules) {
+    power += mod.power;
+  }
+  const charter = heldCharterCard(state);
+  if (charter !== null) power += charter.power;
+  return power;
+}
+
+/**
+ * Whether taking this card keeps the durable set within the cap.
+ *
+ * Two shapes in one reader because the two differ in one term rather than
+ * in the answer. Taking a card on top (a milestone boon, a charter, a
+ * purchase onto an open hull) passes null and the sum has one more card
+ * than the hull. Replacing one (the yard's swap, where the new module
+ * takes a slot an old one gives up) passes the card being displaced, and
+ * that card's own power is freed before the new card's lands, which is
+ * what makes trading a heavy module for a lighter one always allowed
+ * however full the hull is. The bound is inclusive: a set that lands
+ * exactly on the cap is at the cap, not past it.
+ */
+export function powerBudgetAllows(
+  state: Pick<GameState, "heldBoons" | "equippedModules" | "charter">,
+  card: CardRecord,
+  displaced: CardRecord | null = null,
+): boolean {
+  return (
+    heldPower(state) - (displaced?.power ?? 0) + card.power <= HELD_POWER_CAP
+  );
 }

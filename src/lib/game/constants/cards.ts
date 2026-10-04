@@ -167,6 +167,19 @@ export const MODE_POWER_CEILING: Record<GameMode, number> = {
   ocean_gambit: 5,
 };
 
+// [F7: the power budget] The ceiling on one captain's held cards, which is
+// a different question from the one above: that one bounds a single card
+// as the pool admits it, this one bounds the durable set a voyage has
+// handed one captain (the milestone boons, the bolted on modules and the
+// charter; see heldPower in ../held-cards). One number for both modes on
+// purpose: it sits above Classic's whole reachable ladder, whose ceiling
+// three pool already tames it, and below Ocean Gambit's stacked maximum,
+// so the only lines it ever binds are the greediest Gambit ones. The
+// plan's own rollback is this constant ("The budget cap is a validation
+// constant, so raising it is the rollback and it needs no migration"), so
+// every gate reads it live and one edit is the whole unwind.
+export const HELD_POWER_CAP = 26;
+
 // The leaning weights a card carries when it leans nowhere, and the two
 // modes it is offered in when it is offered in both. Shared, typed, and
 // written once, for the reason pools.ts writes its empty list once: a bare

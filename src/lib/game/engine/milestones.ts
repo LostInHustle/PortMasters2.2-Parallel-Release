@@ -72,10 +72,21 @@ export function queueMilestoneMoment(
   if (!milestoneDue(state, trigger)) return;
   const choices = milestoneChoices(state, trigger);
   if (choices.length === 0) {
-    // Every card this family has is held or out of this mode's pool.
-    // There is no decline and no second table, so the moment is spent
-    // rather than left to re-fire at every settlement for the rest of
-    // the voyage: the mark moves and nothing is drawn.
+    // [F7: the power budget] Two empty tables, and the second is new. If
+    // the family's pool itself is dry (every card held or out of this
+    // mode's pool) there is no decline and no second table, so the moment
+    // is spent rather than left to re-fire at every settlement for the
+    // rest of the voyage: the mark moves and nothing is drawn. But a
+    // table the budget emptied is not that: the captain can lighten
+    // their hull at the yard and the same moment is answerable then, so
+    // spending it would eat a moment the cap only meant to defer. The
+    // two are told apart by re-reading the same draw with the one filter
+    // lifted (see the ignoreBudget arm in ../milestones), and the
+    // deferral costs nothing to leave: this function re-runs at every
+    // settlement sweep and re-reads the budget each time.
+    if (milestoneChoices(state, trigger, { ignoreBudget: true }).length > 0) {
+      return;
+    }
     markAnswered(state, trigger);
     return;
   }

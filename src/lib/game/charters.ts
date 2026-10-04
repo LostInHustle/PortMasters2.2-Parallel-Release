@@ -47,6 +47,7 @@ import { drawOffer } from "./cards";
 import type { CardRecord } from "./constants/cards";
 import { CHARTER_LEG, CHARTER_PATH, CHARTERS } from "./constants/charters";
 import { chartersOn } from "./flags";
+import { powerBudgetAllows } from "./held-cards";
 import { createRng } from "./rng";
 import type { GameState } from "./types";
 
@@ -84,6 +85,14 @@ export function charterDue(state: GameState): boolean {
  * than rolled, for the reasons the header gives: the offer must not
  * move under a captain's eyes between becoming due and being answered,
  * and a reload is one of the ways it could have.
+ *
+ * [F7: the power budget] The budget filter rides after the draw for the
+ * reason the milestone table's does (see milestoneChoices in
+ * ./milestones): this reader re-derives on every render, a peer can
+ * settle a sale onto this captain's hull while the overlay is open, and
+ * a filter inside the draw would land the same seed on a different card
+ * the moment power moved. Drawn first and filtered second, the wildcard
+ * never changes identity and a power drop can only put a card back.
  */
 export function charterChoices(state: GameState): CardRecord[] {
   const path = state.path;
@@ -98,7 +107,7 @@ export function charterChoices(state: GameState): CardRecord[] {
       1,
       random,
     ),
-  ];
+  ].filter((card) => powerBudgetAllows(state, card));
 }
 
 /**

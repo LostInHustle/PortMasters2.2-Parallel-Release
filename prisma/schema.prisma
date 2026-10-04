@@ -314,6 +314,15 @@ model VoyageChronicle {
   objectiveId     String   @default("")
   objectiveMet    Boolean  @default(false)
   objectiveTrace  String   @default("")
+  // [F7: the combination instrument] The durable cards this captain ended
+  // the voyage holding, as a JSON array of ids (the milestone boons, the
+  // bolted on modules and the charter). JSON text for the trace's reason:
+  // the pair matrix is read by the report script, never by a query, and
+  // the ids are resolved through the pool at read time so a retired card
+  // falls out of the instrument the same way it falls out of a save. A
+  // forged finish writes empty here, the same reading every other
+  // measurement from an unreadable save gets.
+  heldCards       String   @default("")
   // [H4: the Broker] Whether this captain won their own voyage, decided by
   // evaluateVictory in src/lib/game/victory.ts at the moment the voyage
   // concluded, and the alignment they sailed under, recorded right beside

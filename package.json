@@ -22,6 +22,7 @@
     "report:cards": "tsx scripts/cardConversion.ts",
     "report:modules": "tsx scripts/moduleTrades.ts",
     "report:milestones": "tsx scripts/milestoneBoons.ts",
+    "report:pairs": "tsx scripts/pairs.ts",
     "test:smoke": "tsx scripts/smoke/index.ts",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
