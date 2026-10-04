@@ -385,7 +385,14 @@ export function applyRefitSide(
       // Reachable only if the garment left the wardrobe between the offer
       // being accepted and this call. The board hides the accept when there
       // is no work to do, so this is the sentence for a state that moved
-      // underneath the agreement rather than for an ordinary one.
+      // underneath the agreement rather than for an ordinary one. The fee
+      // stands as it was moved above, and deliberately: the seller's own
+      // machine credits the agreed price on its own side of this same
+      // function, so the two saves cannot unpay what one of them already
+      // banked, which is the same reading the module trade takes when its
+      // card fails to resolve (see the buyer branch in ./modules). The
+      // sentence is what the captain gets for the price, rather than
+      // silence.
       logs.push(`❌ There is no worn ${contract.good} left to work on.`);
     }
   } else {

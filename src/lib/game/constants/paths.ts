@@ -102,12 +102,11 @@ export const CONVOY_RAID_COVERAGE = 0.4;
 export const CONSENT_FEE_MIN = 1;
 export const CONSENT_FEE_MAX = 1000;
 
-// [D7: the draft, and switching] The draft's two numbers and its clock, kept
-// together because they are one feature's arithmetic and a reader who has
-// one of them is looking for the others. The plan's own text sets the first
-// two: "Deal each captain three path cards face down from a deck seeded so
-// at least two Quartermaster cards are in circulation", and the third is the
-// plan's target for the whole draft read as a clock.
+// [D7: the draft, and switching] The draft's numbers, kept together because
+// they are one feature's arithmetic and a reader who has one of them is
+// looking for the others. The plan's own text sets the first two: "Deal each
+// captain three path cards face down from a deck seeded so at least two
+// Quartermaster cards are in circulation".
 //
 // DRAFT_DEAL is the hand every captain is dealt, and it is also the size of
 // the deck: three cards a captain, dealt out entirely, so the deal and the
@@ -124,16 +123,21 @@ export const CONSENT_FEE_MAX = 1000;
 // repeatedly." The floor is deliberately not one of those weights, because a
 // knob that can be tuned to zero is not a guarantee.
 //
-// DRAFT_STEP_SECONDS is the clock on one keep, and three of them are the
-// plan's forty five seconds: "Forty five seconds with a good interface is
-// the target". The server holds the clock and picks for a captain who has
-// not, because a table where one seat walks away is a table that never
-// sails, and the pick it makes is the first card in that captain's hand
-// rather than a card of the server's choosing (see DRAFT_AUTO_PICK in
-// ./draft).
+// DRAFT_WATCH_MS is the one clock the feature has left, and nobody is ever
+// shown it. The room waits at the draft for its captains, not for a timer:
+// the steps close when every seat has answered, and a captain who is still
+// connected holds the table however long they take. What this window is
+// for is the seat that is gone rather than slow. When a seat's last socket
+// drops, the room gives it this long to come back, and then lays the first
+// card of that captain's own hand for them so the table is not held for
+// somebody who is no longer there (see armDraftWatch and DRAFT_AUTO_PICK).
+// The number is the plan's forty five second target divided across the
+// three keeps and rounded, which is the reading the draft's own release
+// notes take: the pacing the plan budgeted per keep, spent as a reconnect
+// window instead of a countdown.
 export const DRAFT_DEAL = 3;
 export const DRAFT_QUARTERMASTER_MIN = 2;
-export const DRAFT_STEP_SECONDS = 15;
+export const DRAFT_WATCH_MS = 15_000;
 
 // [D7: the draft, and switching] The switch's window, its fee and its
 // ceiling, and the plan's own clause for all three: "once per voyage, at a

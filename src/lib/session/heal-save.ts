@@ -16,6 +16,7 @@
 
 import {
   normalizeInventory,
+  normalizeLoans,
   normalizeWorkerRoster,
   type GameState,
 } from "@/lib/game/types";
@@ -28,15 +29,25 @@ import {
   normalizeRefitState,
   normalizeRumorLean,
   noHousePerks,
+  reconcileModulePenalties,
 } from "@/lib/game/engine";
 import { normalizeOrderFills } from "@/lib/game/audit";
-import { normalizeCardTally } from "@/lib/game/cards";
+import { cardById, normalizeCardTally } from "@/lib/game/cards";
+import type { CardRecord } from "@/lib/game/constants/cards";
 import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import {
   normalizeMilestoneOffers,
   normalizeMilestonesAnswered,
 } from "@/lib/game/milestones";
-import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
+import {
+  difficultyConfig,
+  normalizeDifficulty,
+  type Difficulty,
+} from "@/lib/game/difficulty";
+import {
+  MAX_SHIP_LEVEL,
+  SHIP_UPGRADE_LADDER,
+} from "@/lib/game/constants/ships";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { normalizePortShift } from "@/lib/game/maroon";
 import { normalizeLarder, normalizeLarderFedRound } from "@/lib/game/larder";
@@ -129,6 +140,11 @@ export function healLoadedVoyage(
   // vendor is full for rather than one the captain reads as already spent.
   normalizeBargeState(game);
   refreshVoyageFacts(game, facts);
+  // Last, and after the facts above rather than with the collections: the
+  // fixed cost falls back to the tier's own maintenance, and the tier is
+  // only settled once the room has answered (see refreshVoyageFacts), and
+  // the two penalties are read back off the hull the load has healed.
+  healShipLedger(game);
 }
 
 // The collections and the perk set a save may predate entirely: every one
@@ -141,7 +157,17 @@ function healSaveCollections(game: GameState): void {
   game.completedOrders = game.completedOrders ?? [];
   game.resourceCards = game.resourceCards ?? [];
   game.customerCards = game.customerCards ?? [];
-  game.equippedModules = game.equippedModules ?? [];
+  // The hull is the one held-card collection stored as whole records
+  // rather than resolved by id at each read, and the one whose elements
+  // the old bare coalesce never looked at. A save written before the card
+  // record existed carries elements of the old module shape, which has no
+  // strings table: the first yard screen to draw one threw, and the power
+  // budget summed it into NaN. Healed through the pool itself rather than
+  // field by field, because the pool is the shape every other reader
+  // already trusts (see healHull below).
+  game.equippedModules = healHull(
+    (game as unknown as { equippedModules?: unknown }).equippedModules,
+  );
   // Rebuild the artisan roster defensively: fills in any type this
   // save predates, and reads a pre charter save that still carried
   // three separate weavers / masterWeavers / sachetMakers arrays.
@@ -153,7 +179,22 @@ function healSaveCollections(game: GameState): void {
       sachetMakers?: GameState["workers"]["sachet_maker"];
     },
   );
-  game.revealedIntel = game.revealedIntel ?? [];
+  // The container has always been coalesced here; the elements are argued
+  // one by one for the reason every reader indexes them: the intelligence
+  // banner and the market's guarantee match both read .item and .port off
+  // each entry, and a damaged blob holding one null among them reached a
+  // render and threw. The element contract is the engine's own writers'
+  // (the rumor records in ./engine/orders and ./engine/market), so an
+  // entry failing it is damage rather than a whisper and is dropped.
+  game.revealedIntel = (game.revealedIntel ?? []).filter((entry) => {
+    const w = entry as unknown as Record<string, unknown> | null;
+    return (
+      w !== null &&
+      typeof w === "object" &&
+      typeof w.item === "string" &&
+      typeof w.port === "string"
+    );
+  });
   // The round's demand tags carried the market's share of an older lap
   // numbering in their name (phase2DemandTags), so a save written before
   // the rename heals under the name this build reads and the legacy key
@@ -175,6 +216,29 @@ function healSaveCollections(game: GameState): void {
   game.housePerks = game.housePerks ?? noHousePerks();
   game.houseId = game.houseId ?? null;
   game.priceHistory = game.priceHistory ?? {};
+}
+
+// The hull, healed through the pool the way every other reader of a held
+// card already resolves one. Every element is asked of cardById: an id
+// the pool knows lands as this build's own record, so a save carrying an
+// older copy of a card heals to the current one, and anything the pool
+// cannot answer for (the old module shape's unknown id, a bare string, a
+// null) is damage rather than a card and is dropped rather than drawn.
+// Duplicates are kept one entry per copy, which is the shape the sell
+// and swap flows already read: a captain carrying two of the same module
+// keeps both.
+function healHull(raw: unknown): CardRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const hull: CardRecord[] = [];
+  for (const item of raw) {
+    const id =
+      item !== null && typeof item === "object"
+        ? (item as Record<string, unknown>).id
+        : null;
+    const card = typeof id === "string" ? cardById(id) : null;
+    if (card !== null && card.kind === "module") hull.push(card);
+  }
+  return hull;
 }
 
 // The fleet commission, the manifest audit and the hold: the three records
@@ -262,8 +326,13 @@ function healVoyageTallies(game: GameState): void {
   game.pirateAttackResolved = game.pirateAttackResolved ?? false;
   game.escortHired = game.escortHired ?? false;
   game.brokerTippedPirates = game.brokerTippedPirates ?? false;
-  game.debts = game.debts ?? [];
-  game.loansGiven = game.loansGiven ?? [];
+  // The voyage's two loan lists, healed through the pure reader beside the
+  // shape they hold rather than coalesced, for the reason the audit gave
+  // every other saved list in this file: the end of the last round walks
+  // them with arithmetic (see settleOutstandingDebts), so an entry a save
+  // damaged would carry NaN into the purse rather than merely look wrong.
+  game.debts = normalizeLoans(game.debts);
+  game.loansGiven = normalizeLoans(game.loansGiven);
 }
 
 // The marks a failed voyage leaves and the leans a failed or a bribed
@@ -412,6 +481,45 @@ function healConsentBoards(game: GameState): void {
   // undefined and the first sale writes the first entry (see
   // normalizeModuleTradeState).
   normalizeModuleTradeState(game);
+}
+
+// The hull's own ledger: the numbers the shipyard, the settlement and the
+// wage bill read as arithmetic rather than as views.
+//
+// Each of them is written once at creation (createInitialGameState) and
+// read subtractively forever after, so a damaged value here does not look
+// wrong, it prices wrong: the yard's upgrade row adds the penalty to the
+// ladder and lets an upgrade run state.money minus NaN, and the
+// maintenance bill carries a NaN into the purse every Resolve. The two
+// penalties are read back off the hull itself rather than floored,
+// because one shipped build wrote both directions of the mismatch (see
+// reconcileModulePenalties in the engine). The difficulty is read from
+// the settled field, which is why this heal runs after refreshVoyageFacts
+// rather than beside the collections.
+function healShipLedger(game: GameState): void {
+  if (!Number.isFinite(game.fixedCost)) {
+    game.fixedCost = difficultyConfig(game.difficulty).maintenance;
+  }
+  // The ladder is healed index by index against the canonical one: a
+  // missing entry or a non-number lands on the fee this build charges for
+  // that step, and entries past the top a damaged file grew are dropped
+  // rather than read, since the yard never asks for them.
+  game.shipUpgradeCost = SHIP_UPGRADE_LADDER.map((fee, i) => {
+    const held = game.shipUpgradeCost?.[i];
+    return typeof held === "number" && Number.isFinite(held) ? held : fee;
+  });
+  // The level is the count of upgrades the hull took, an integer on a
+  // ladder with exactly MAX_SHIP_LEVEL steps, and every reader treats it
+  // as one: moduleSlotsOpen subtracts the equipped list from it and the
+  // freight discount multiplies by it. A damaged value that stayed in
+  // place would quote slots and discounts for levels the game cannot
+  // sell, so anything off the ladder is read as the level whose effects
+  // are the absence of all of them.
+  const level = game.shipLevel;
+  game.shipLevel = Number.isFinite(level)
+    ? Math.min(MAX_SHIP_LEVEL, Math.max(0, Math.trunc(level)))
+    : 0;
+  reconcileModulePenalties(game);
 }
 
 // The answers that come from outside the save, applied last so that they

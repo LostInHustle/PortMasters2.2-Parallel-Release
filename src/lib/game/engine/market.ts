@@ -497,10 +497,20 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   state.purchasedCards.push(card.id);
   state.purchaseCount++;
   if (card.isProductCard) {
+    // The line names the card's one goods line, and a save carrying a
+    // product card with an empty line is guarded the way the engine's
+    // other taxed line reader guards it: the purchase stands and the
+    // line falls back to the plain receipt rather than throwing a read
+    // off a line that is not there (the bug audit's finding, closed on
+    // every reader of the same shape).
     const r = card.resources[0];
-    logs.push(
-      `🛒 Bought Product at ${card.port}: ${ICONS[r.type]}${r.type}×${r.quantity} (@${r.price} Gold/item, Mat Cost ${r.materialCost} Gold), Total ${cost} Gold`,
-    );
+    if (r) {
+      logs.push(
+        `🛒 Bought Product at ${card.port}: ${ICONS[r.type]}${r.type}×${r.quantity} (@${r.price} Gold/item, Mat Cost ${r.materialCost} Gold), Total ${cost} Gold`,
+      );
+    } else {
+      logs.push(`🛒 Bought Product at ${card.port}, Total ${cost} Gold`);
+    }
     logs.push("   💡 Tip: VAT applies when selling finished products");
   } else {
     const txt = card.resources

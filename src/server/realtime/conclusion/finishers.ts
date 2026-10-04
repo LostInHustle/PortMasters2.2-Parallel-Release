@@ -264,7 +264,7 @@ async function concludeFinisher(
   const newMerits = await awardCaptainMerits(f, ctx.run, outcome);
   const record = readCaptainRecord(f, ctx, outcome, objectiveMet);
   await writeChronicleRow(f, ctx, outcome, record);
-  const revealed = revealRow(f, outcome, record);
+  const revealed = revealRow(f, outcome, record, ctx.run.rounds);
   const standing = standingRow(f, outcome, record, newMerits);
   const rival = rivalRow(f, outcome);
 
@@ -586,6 +586,7 @@ function revealRow(
   f: FinishedCaptain,
   outcome: FinisherOutcome,
   record: CaptainRecord,
+  roundsAllowed: number,
 ): RevealedCaptain {
   // [H8: the reveal and the replay ledger] This captain's row on the
   // ledger, built from the verdict and the marks decided just above. Two
@@ -610,7 +611,13 @@ function revealRow(
     reputation: f.reputation,
     peerTradeProfit: outcome.forged ? 0 : ending.peerTradeProfit,
     delivered: outcome.forged ? {} : ending.delivered,
-    fills: outcome.forged ? [] : normalizeOrderFills(save?.orderFills),
+    // The manifest is read with the voyage's own length as its ceiling:
+    // a line dated past the last leg is a line no round of this voyage
+    // could have run, so it is dropped rather than printed on the room's
+    // ledger (see normalizeOrderFills).
+    fills: outcome.forged
+      ? []
+      : normalizeOrderFills(save?.orderFills, roundsAllowed),
   };
 }
 

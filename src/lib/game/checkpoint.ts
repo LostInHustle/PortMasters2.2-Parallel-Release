@@ -19,14 +19,42 @@
 // design names, and it is the same six names in both modes: what differs
 // between the modes is the order, which is the whole reason the order
 // lives on the mode record. A lapped phase is a phase of the leg plus the
-// pier the lap opens at, and nothing else is a checkpoint. Two of the
-// engine's older checkpoints, bartering and artisan management, are work
-// inside Parley and Market now rather than steps the room waits on.
+// ends a round has rather than stations on it: the pier the lap opens at
+// and, in a dealing Gambit build, the draft's seat after it (see lapOrder
+// below). Two of the engine's older checkpoints, bartering and artisan
+// management, are work inside Parley and Market now rather than steps the
+// room waits on.
 // =====================================================================
 
+import { pathDraftOn } from "./flags";
 import { modeConfig } from "./mode";
 import { normalizePhase, seatOf } from "./phases";
 import type { Phase } from "./types";
+
+// The order a mode's lap actually walks, switch and all.
+//
+// [W2: the path draft] A Gambit lap carries the draft's seat between the
+// pier and Dawn, because a room that deals has a seat it stops at (see
+// ./mode.ts). A build with the draft switched off deals nothing, so it has
+// no such seat: a captain cannot keep a card the server never drew, and a
+// lap that kept the entry anyway would march its room into a step whose
+// only work is to wait for a settle that can never come. The fold is
+// written here rather than into the mode record because the mode record is
+// content and the switch is configuration: what the mode says is that a
+// dealing build stops at the draft, and this is the one reader that
+// applies "unless the deal itself is off" to it.
+//
+// Every reader of the lap below folds first, so the rank, the successor
+// and the round close all agree about the shape of the voyage whichever
+// way the switch is set, and a rank computed in one build never has to be
+// compared against a rank computed in the other: a room reads the switch
+// once, when it created the voyage, and never changes it mid sail.
+function lapOrder(mode: unknown): readonly Phase[] {
+  const order = modeConfig(mode).checkpointPhaseOrder;
+  return pathDraftOn(mode)
+    ? order
+    : order.filter((phase) => phase !== "path_draft");
+}
 
 // Where a phase sits on a mode's lap, and how long that lap is.
 //
@@ -42,7 +70,7 @@ import type { Phase } from "./types";
 // means. Keeping the sentinel visible rather than folding it into a null
 // here is what lets closesRound give a plain yes or no.
 function lapSeat(mode: unknown, phase: Phase) {
-  const order = modeConfig(mode).checkpointPhaseOrder;
+  const order = lapOrder(mode);
   return { order, seat: order.indexOf(phase), count: order.length };
 }
 
@@ -55,16 +83,18 @@ function lapSeat(mode: unknown, phase: Phase) {
 // caller assuming a lap is something you can filter. Exposed here so that
 // stays a fact about this module.
 export function lapPhases(mode: unknown): readonly Phase[] {
-  return modeConfig(mode).checkpointPhaseOrder;
+  return lapOrder(mode);
 }
 
 // The phase a voyage opens on for this mode.
 //
 // Every lap begins at the pier, which is a lobby rather than a step a
 // captain takes, so the first phase after it is where a round actually
-// starts. That is the boon draft, which the six phase leg calls Dawn, in
-// both modes today, and it is read off the lap rather than named so it
-// stays a property of the lap.
+// starts: the path draft in a dealing Gambit build, and Dawn in Classic
+// and in any build with the deal switched off. It is read off the lap
+// rather than named so it stays a property of the lap, and the fold in
+// lapOrder above is what makes the same line answer correctly for a
+// build that deals and one that does not.
 //
 // Read as "the first entry that is leg work" rather than as "the second
 // entry", which is what it used to be: that only ever worked because both

@@ -18,8 +18,8 @@ import {
   getIntelCost,
   lockedBehind,
   moduleSlotsOpen,
+  wageBill,
 } from "@/lib/game/engine";
-import { WORKER_TYPES } from "@/lib/game/constants/crew";
 import { RECIPES } from "@/lib/game/constants/goods";
 import { TONE_WASH } from "./shared";
 
@@ -382,10 +382,15 @@ function analyzeOrders(game: GameState): Suggestion | null {
       // then moves with the captain's own VAT modifiers. This reads the
       // engine mirror Orders already reads rather than a second estimate,
       // because the estimate was the one the captain was never charged.
-      const required = o.resources[0].required ?? 0;
-      if (required > 0) {
+      // The engine's own reading of the taxed line (see completeOrder),
+      // the guard included: a product card with no line, or a line with
+      // no count, is taxed on nothing rather than reading a count off a
+      // line that is not there.
+      const productRef = o.resources[0];
+      const required = productRef?.required ?? 0;
+      if (productRef && required > 0) {
         net -=
-          explainVAT(game, o.resources[0].type, o.reward / required).final *
+          explainVAT(game, productRef.type, o.reward / required).final *
           required;
       }
     }
@@ -440,19 +445,16 @@ function analyzeSettlement(game: GameState): Suggestion | null {
   if (game.pirateAttackResolved) {
     // Already resolved the pirate attack, now it is about bills.
     //
-    // Summed the way payWages charges and the way Settlement and the status
-    // panel already total it, one artisan at a time off getHireCost. This
-    // used to multiply the whole roster by a single artisan's wage, which
-    // was wrong twice over: the trades do not share a wage (8 through 24),
-    // and every wage carries the captain's own modifiers. On a harbor of
-    // Perfumers and Jewelers the estimate came out at less than half the
-    // bill, so the advice below could call a captain solvent on the round
-    // they went bankrupt.
-    const wagesDue = WORKER_TYPES.reduce(
-      (sum, w) =>
-        sum + (game.workers[w.id] ?? []).length * getHireCost(game, w.id),
-      0,
-    );
+    // The engine's own bill (see wageBill), so the advice quotes the figure
+    // payWages is about to charge rather than a second opinion about the
+    // same roster: this sum used to count every hired hand, the wage a Jade
+    // Pavilion pledge waives included, so it could warn a captain who was
+    // about to settle cleanly that they were going bankrupt. An earlier
+    // shape of it multiplied the whole roster by one artisan's wage, wrong
+    // twice over (the trades do not share a wage, and every wage carries
+    // the captain's own modifiers), which once let it call a captain
+    // solvent on the round they went bankrupt.
+    const wagesDue = wageBill(game).reduce((sum, b) => sum + b.due, 0);
     const totalDue = game.fixedCost + game.maintenancePenalty + wagesDue;
 
     if (game.money < totalDue) {

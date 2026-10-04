@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { STARTING_STOCK } from "@/lib/game/constants/goods";
 import { INCOME_TAX_RATE } from "@/lib/game/engine";
+import { openingPhase } from "@/lib/game/checkpoint";
 import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
 import { modeConfig } from "@/lib/game/mode";
+import { phaseFace } from "@/lib/game/phases";
 import { cn } from "@/lib/utils";
 import { Ship, BookOpen } from "lucide-react";
 import type { PublicUser } from "@/lib/api";
@@ -124,6 +126,11 @@ export function Welcome({
   // describe two different voyages.
   const play = modeConfig(game.mode);
   const briefing = play.briefing;
+  // The seat the departure walks the room into, read off the mode's own
+  // lap rather than named here (see openingPhase). For a dealing Gambit
+  // build it is the path draft, and the round pill below names it as the
+  // first thing that will be asked of the captain.
+  const opening = openingPhase(game.mode);
   // The InfoCard numbers derive from the room's difficulty tier rather
   // than the old hardcoded founding trade figures. Fair Winds reads
   // exactly like the original (20% raid, 15 Gold maintenance), while
@@ -216,6 +223,16 @@ export function Welcome({
             A line and a chart are two renderings of one record, not two
             records, which is why this branch is a branch on the data
             rather than a second panel beside the first. */}
+        {/* One pill for the two questions this screen exists to answer,
+            what you are playing and what it costs you to fail (W4): the
+            round and the mode's own line were two tinted boxes saying
+            one thing, and a captain reading their first lobby met three
+            competing pills before they met the start button. The badge
+            line rides under the round chart as a lighter wing of the
+            same box, and the list of what a mode changes is still not
+            printed here: it belongs on the surfaces built for lists, and
+            this panel says where it is rather than carrying another copy
+            of it. */}
         <div className="rounded-lg bg-sea/[0.06] border border-sea/15 px-3.5 py-2.5 text-xs">
           <strong>🔄 How a Round Runs:</strong>{" "}
           {briefing.kind === "line" ? (
@@ -223,25 +240,31 @@ export function Welcome({
           ) : (
             <RoundFlow legs={briefing.legs} closes={briefing.closes} />
           )}
-        </div>
-        {/* The mode's own line, above the tip and below the round, because
-            this is the screen a captain reads once before the first Dawn
-            and the two questions it has to answer are what they are
-            playing and what it costs them to fail. Both come out of the
-            record. The list of what a mode changes is not printed here:
-            it belongs on the surfaces built for lists, and this panel
-            says where it is rather than carrying a fifth copy of it. */}
-        <div className="rounded-lg bg-charter/[0.06] border border-charter/15 px-3.5 py-2.5 text-xs">
-          <strong>🧭 {play.badge}:</strong> {play.tagline} {play.failureRule}
-          {/* It points at the button without a direction, because the
-              button sits above this panel rather than below it. */}
-          {play.differences.length > 0 &&
-            " The New Player Tutorial lists everything this mode changes."}
+          {/* The first seat, named: a captain who has read the chart
+              knows the shape of the lap and not what standing in its
+              first seat asks of them, and for the mode whose lap opens
+              with the deal this is the one sentence that turns the
+              chart's first box into a thing with cards in it. It reads
+              the opening off the mode's own lap rather than naming a
+              phase here, so a mode that opens elsewhere draws no such
+              line and needs no edit. */}
+          {opening === "path_draft" && (
+            <span className="block mt-1">
+              Your first seat is the {phaseFace("path_draft").label}: three
+              cards dealt face down, and the one you keep is the path you sail.
+            </span>
+          )}
+          <span className="block mt-1.5 pt-1.5 border-t border-sea/15">
+            <strong>🧭 {play.badge}:</strong> {play.tagline} {play.failureRule}
+            {/* It points at the button without a direction, because the
+                button sits above this panel rather than below it. */}
+            {play.differences.length > 0 &&
+              " The New Player Tutorial lists everything this mode changes."}
+          </span>
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
-          <strong>💡 New Player Tip:</strong> Rely on raw material orders early.
-          Hire artisans only when you can sustain at least 2 rounds of wages.
-          Always keep funds &gt; Maintenance + All Wages.
+          <strong>💡 New Player Tip:</strong> Keep your purse above maintenance
+          plus all wages, and hire artisans only when you can sustain them.
         </div>
       </div>
       {/* The five founding numbers, folded to a row at the foot of the

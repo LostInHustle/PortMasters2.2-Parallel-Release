@@ -15,6 +15,7 @@ import type { useAudit } from "@/lib/use-audit";
 import type { useBoonLedger } from "@/lib/use-boon-ledger";
 import type { useMaroon } from "@/lib/use-maroon";
 import type { useRoomRoster } from "@/lib/use-room-roster";
+import type { usePathDraft } from "@/lib/use-path-draft";
 import type { VoyageLog } from "@/lib/use-voyage-log";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,13 @@ type Audit = ReturnType<typeof useAudit>;
 type Maroon = ReturnType<typeof useMaroon>;
 type Boons = ReturnType<typeof useBoonLedger>;
 type Roster = ReturnType<typeof useRoomRoster>;
+// [W2: the path draft] The deal's own board, threaded like every market
+// above and for the same reason: the socket lives in the room and no phase
+// panel is handed one. The hand it holds is this captain's own, which is
+// what makes it the one board here that is drawn on exactly one seat: the
+// draft's screen is where the cards are, and every other screen draws
+// nothing of it (see PathDraft in ./PathDraft).
+type Draft = ReturnType<typeof usePathDraft>;
 
 export type PhasePanelProps = {
   game: GameState;
@@ -127,6 +135,13 @@ export type PhasePanelProps = {
   // phases do not need it; Bankruptcy and Endgame use it to show a live
   // standings board of the captains still sailing.
   roster?: Roster;
+  // [W2: the path draft] The room's deal, as this captain meets it. The
+  // one board here that the room does not share: what it holds is this
+  // captain's own hand while the draft runs, the count of the table still
+  // choosing, and the path it settled on. Required, because the seat it is
+  // drawn on is a seat of every dealing Gambit lap rather than a screen
+  // that might be open (see the PathDraft case in ../GamePhasePanel).
+  draft: Draft;
 };
 
 /**

@@ -182,9 +182,14 @@ export function feedCrew(state: GameState, logs: string[]): boolean {
     // The number in the sentence is read off the constant rather than
     // written into the words, the way the unlock line reads its own
     // threshold: a pace that moved would move what the captain is told.
+    // The second clause is what the pace alone did not say: the yield
+    // floors a line's output and lifts any line that would fall below one
+    // back to one item (see shortRationsYield), so a lone hand still
+    // brings home one where a bare percentage promised half of one. The
+    // sentence claims both because the engine applies both.
     const pace = Math.round(SHORT_RATIONS_YIELD * 100);
     logs.push(
-      `⚠️ Short rations! ${crew} aboard and the larder is empty: the crew works this leg at ${pace}% pace, and the fleet can see it.`,
+      `⚠️ Short rations! ${crew} aboard and the larder is empty: the crew works this leg at ${pace}% pace, and every line still brings home at least one item. The fleet can see it.`,
     );
     return true;
   }

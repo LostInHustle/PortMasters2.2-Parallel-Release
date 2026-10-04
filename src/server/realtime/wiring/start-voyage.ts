@@ -10,6 +10,7 @@ import { gambitSystemsOn } from "@/lib/game/mode";
 import { seated } from "../auth";
 import { clearMutedUsers, emitRoomMembers } from "../chat";
 import {
+  announceDraftComplete,
   armPhaseClock,
   broadcastReadyState,
   getCheckpoint,
@@ -113,6 +114,11 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       cp.phase = opening;
       cp.readyUserIds.clear();
       cp.advancing = false;
+      // The departure is the second and last place a seat moves (see
+      // advanceCheckpointFromReport), so the yard hold is cleared here for
+      // the same reason: a new voyage's first seat carries no hold spent
+      // by a harbor that has not sailed yet.
+      cp.yardHeld = false;
       // [B4: the log surfaces] The voyage's log opens with it, and it
       // opens on the leg and the seat the checkpoint was just pinned to
       // rather than on a leg of its own choosing. Placed here, after the
@@ -166,7 +172,21 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // minute later, because membership can change mid voyage and a deck
       // cannot be re dealt around it: a captain who joins a voyage under
       // way sails pathless, which the harbor already has a reading for.
-      await dealPaths(io, roomId, roster, room.mode);
+      const dealt = await dealPaths(io, roomId, roster, room.mode);
+      // [W2: the path draft] A departure whose deal declined to seat
+      // anybody would otherwise be a table standing forever at the draft's
+      // seat: the seat is left by the settle, and a deal that never dealt
+      // has no settle in front of it. It takes an account deleted in the
+      // window between the roster read above and the names read inside the
+      // deal, which is why the guard is here rather than in the deal
+      // itself: the room's own row was already pinned to the seat, and the
+      // repair that fits is the one every settled deal sends. The frame
+      // names the seat being left, so every client runs the ordinary
+      // departure to Dawn and the voyage sails on pathless, the reading
+      // this tree gives every captain the deck could not name.
+      if (opening === "path_draft" && !dealt) {
+        await announceDraftComplete(io, roomId);
+      }
       await broadcastReadyState(io, roomId, cp);
     } finally {
       startingRooms.delete(roomId);

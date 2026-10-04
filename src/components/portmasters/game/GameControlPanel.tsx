@@ -127,20 +127,31 @@ export function GameControlPanel({
       startDisabled = false;
     }
     nextDisabled = true;
+  } else if (game.phase === "path_draft") {
+    // [W2: the path draft] The deal's own seat, handled ahead of the gated
+    // branch below because this phase *is* a gated one: left to that branch
+    // it would offer an enabled Next Phase over a seat canLeavePhase
+    // refuses, which is the ready set no departure could carry out that
+    // leaveRefusal exists to prevent. Like the boon draft above, the seat is
+    // left by the table answering rather than by any button here: each step
+    // turns over when every hand is in, and the settle walks the room on.
+    startText = "Drafting Paths...";
+    startDisabled = true;
+    nextDisabled = true;
   } else if (game.phase === "dawn") {
     startText = "Drafting Boon...";
     startDisabled = true;
     nextDisabled = true;
   } else if (isGatedPhase(game.mode, game.phase)) {
     // Every phase the ready check gates, which is every phase of the leg
-    // except the draft: Dawn is handled by the branch above, so it cannot
-    // reach here, because a boon is locked in by choosing one rather than by
-    // confirming anything (see lockInBoon in the engine's lifecycle). Read
-    // off the room's lap rather than listed, so the button offers exactly
-    // the moves the room will actually wait for: a phase added to a lap is a
-    // Next Phase step the day it lands, and a phase a mode does not run is
-    // not a step at all, which it would be if this asked whether the phase
-    // is leg work instead.
+    // except the drafts: Dawn and the Path Draft are handled by the branches
+    // above, so they cannot reach here, because neither is left by confirming
+    // anything (see lockInBoon and the draft's settle in the engine's
+    // lifecycle). Read off the room's lap rather than listed, so the button
+    // offers exactly the moves the room will actually wait for: a phase added
+    // to a lap is a Next Phase step the day it lands, and a phase a mode does
+    // not run is not a step at all, which it would be if this asked whether
+    // the phase is leg work instead.
     startText = "On Voyage...";
     startDisabled = true;
     nextText = "Next Phase";

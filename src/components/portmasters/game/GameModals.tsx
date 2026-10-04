@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Avatar, Pill, ItemIcon } from "../shared";
 import { workerStatusLine } from "./phases/WorkerList";
+import { FoldRow } from "./FoldRow";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import {
   Sparkles,
@@ -562,8 +563,12 @@ function CargoRow({
  * bankrupt captain's spectator window. There's no separate read only
  * board, watching the rest of the room just means opening their popups.
  *
- * Laid out as a profile: an identity header, a headline stat row, Renown
- * underneath it, then cargo/workers and modules/log side by side.
+ * Laid out as a profile: the standings first (an identity header, the
+ * headline figures, the comparison against your own seat and the legacy
+ * card), and the reference half (cargo, workers, modules and the log)
+ * folded behind them (W4, UX-9 in docs/STUDIO_AUDIT.md). The figures a
+ * captain opens this to compare are readable without a press, and the
+ * lists they might look up are one press away.
  */
 export function PlayerDetailModal({
   open,
@@ -600,6 +605,7 @@ export function PlayerDetailModal({
   myPlayer?: PublicUser | null;
 }) {
   const resolveColor = itemColorResolver(colorFor);
+  const [refOpen, setRefOpen] = useState(false);
   const workerGroups = detail
     ? unlockedWorkerTypes(difficulty, detail.round).map((w) => {
         const list = detail.workers?.[w.id] ?? [];
@@ -713,123 +719,139 @@ export function PlayerDetailModal({
 
             {legacy && <CaptainLegacyCard legacy={legacy} compact />}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-              <div className="space-y-3.5">
-                <div className="rounded-xl border border-profile/15 bg-profile/[0.03] p-3.5">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-                    📦 Cargo
-                  </h4>
-                  <div className="grid grid-cols-2 gap-x-4">
-                    <div>
-                      <div className="text-[10px] font-medium text-muted-foreground mb-1">
-                        Raw Materials
+            {/* The reference half, behind one fold (W4, UX-9 in
+                docs/STUDIO_AUDIT.md): cargo, workers, modules and the log
+                used to run this popup well past a laptop viewport under
+                the figures it exists to show, and the figures are what a
+                captain opens it for. */}
+            <FoldRow
+              tone="profile"
+              icon="🗂️"
+              title="The Ship's Books"
+              gist="Cargo, artisans, equipped modules and the recent log."
+              open={refOpen}
+              onToggle={() => setRefOpen((v) => !v)}
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                <div className="space-y-3.5">
+                  <div className="rounded-xl border border-profile/15 bg-profile/[0.03] p-3.5">
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                      📦 Cargo
+                    </h4>
+                    <div className="grid grid-cols-2 gap-x-4">
+                      <div>
+                        <div className="text-[10px] font-medium text-muted-foreground mb-1">
+                          Raw Materials
+                        </div>
+                        {unlockedResources(difficulty, detail.round).map(
+                          (r) => (
+                            <CargoRow
+                              key={r}
+                              item={r}
+                              count={detail.inventory[r] || 0}
+                              color={resolveColor(r)}
+                            />
+                          ),
+                        )}
                       </div>
-                      {unlockedResources(difficulty, detail.round).map((r) => (
-                        <CargoRow
-                          key={r}
-                          item={r}
-                          count={detail.inventory[r] || 0}
-                          color={resolveColor(r)}
-                        />
-                      ))}
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-medium text-muted-foreground mb-1">
-                        Finished Goods
+                      <div>
+                        <div className="text-[10px] font-medium text-muted-foreground mb-1">
+                          Finished Goods
+                        </div>
+                        {unlockedProducts(difficulty, detail.round).map((r) => (
+                          <CargoRow
+                            key={r}
+                            item={r}
+                            count={detail.inventory[r] || 0}
+                            color={resolveColor(r)}
+                          />
+                        ))}
                       </div>
-                      {unlockedProducts(difficulty, detail.round).map((r) => (
-                        <CargoRow
-                          key={r}
-                          item={r}
-                          count={detail.inventory[r] || 0}
-                          color={resolveColor(r)}
-                        />
-                      ))}
                     </div>
+                  </div>
+
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                      👥 Workers
+                    </h4>
+                    {workerGroups.every((g) => g.list.length === 0) ? (
+                      <p className="text-xs text-muted-foreground">
+                        No artisans hired yet.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {workerGroups
+                          .filter((g) => g.list.length > 0)
+                          .map((g) => (
+                            <div key={g.name}>
+                              <div className="text-[11px] font-semibold mb-1">
+                                {g.icon} {g.name} ({g.list.length})
+                              </div>
+                              {g.list.map((w, i) => (
+                                <div
+                                  key={i}
+                                  className="text-[11px] text-muted-foreground"
+                                >
+                                  {workerStatusLine(w, detail.round)}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-                    👥 Workers
-                  </h4>
-                  {workerGroups.every((g) => g.list.length === 0) ? (
-                    <p className="text-xs text-muted-foreground">
-                      No artisans hired yet.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {workerGroups
-                        .filter((g) => g.list.length > 0)
-                        .map((g) => (
-                          <div key={g.name}>
-                            <div className="text-[11px] font-semibold mb-1">
-                              {g.icon} {g.name} ({g.list.length})
-                            </div>
-                            {g.list.map((w, i) => (
-                              <div
-                                key={i}
-                                className="text-[11px] text-muted-foreground"
-                              >
-                                {workerStatusLine(w, detail.round)}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-3.5">
-                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-                    🔧 Equipped Modules
-                  </h4>
-                  {detail.equippedModules.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No modules installed.
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {detail.equippedModules.map((card) => {
-                        const text = cardText(card);
-                        return (
-                          <div key={card.id} className="text-[12px]">
-                            {card.icon} <strong>{text.name}</strong>:{" "}
-                            {text.desc}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <Eye className="h-3.5 w-3.5" /> Recent Log
-                  </h4>
-                  <ScrollArea className="h-40 pr-2">
-                    {detail.logs.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">
-                        Nothing logged yet.
+                <div className="space-y-3.5">
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+                      🔧 Equipped Modules
+                    </h4>
+                    {detail.equippedModules.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No modules installed.
                       </p>
                     ) : (
-                      <div className="space-y-0.5 font-mono text-[11px] leading-relaxed">
-                        {detail.logs.map((l, i) => (
-                          <div
-                            key={i}
-                            className="whitespace-pre-wrap break-words"
-                          >
-                            {l}
-                          </div>
-                        ))}
+                      <div className="space-y-1">
+                        {detail.equippedModules.map((card) => {
+                          const text = cardText(card);
+                          return (
+                            <div key={card.id} className="text-[12px]">
+                              {card.icon} <strong>{text.name}</strong>:{" "}
+                              {text.desc}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
+
+                  <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Eye className="h-3.5 w-3.5" /> Recent Log
+                    </h4>
+                    <ScrollArea className="h-40 pr-2">
+                      {detail.logs.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">
+                          Nothing logged yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-0.5 font-mono text-[11px] leading-relaxed">
+                          {detail.logs.map((l, i) => (
+                            <div
+                              key={i}
+                              className="whitespace-pre-wrap break-words"
+                            >
+                              {l}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
                 </div>
               </div>
-            </div>
+            </FoldRow>
           </div>
         )}
 

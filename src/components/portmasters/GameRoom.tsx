@@ -40,7 +40,6 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
-import { PathDraft } from "./game/PathDraft";
 import { PathChip } from "./game/status/PathChip";
 import { HeldBoons } from "./game/status/HeldBoons";
 import { PanelHeader } from "./PanelHeader";
@@ -126,6 +125,13 @@ function leaveRefusal(phase: GameState["phase"]): string {
   switch (phase) {
     case "harbor":
       return "A voyage leaves the pier when the host sets sail, not by readying up.";
+    // [W2: the path draft] The deal's own seat. It is left by the table
+    // rather than by any one captain, so the refusal says what actually
+    // turns the step over instead of pointing at a button that never
+    // existed: see canLeavePhase, which refuses this seat, and the panel
+    // in ./game/phases/PathDraft, which draws no ready footer at all.
+    case "path_draft":
+      return "The Path Draft is left by laying your cards down. Each step turns over when every hand is in.";
     case "dawn":
       return "Dawn is left by locking in a Boon. Pick one of the cards and it goes with you.";
     case "bankruptcy":
@@ -980,28 +986,12 @@ export function GameRoom({
             three columns rather than inside one of them. It is capped at a
             share of the window on a wide screen and scrolls inside that cap.
             Uncapped it is what pushed the columns off the fold, because a
-            voyage carrying a draft and three notices stacks half a window of
-            strips before the first column starts. The draft leads the band
-            rather than following the ticker: it is the one entry here with a
-            deadline on it, and reading it should never mean scrolling for
-            it. */}
+            voyage carrying three notices stacks half a window of strips
+            before the first column starts. The draft's own panel used to
+            lead this band and no longer lives here at all: the deal is a
+            seat of the lap now, drawn in the stage like every other seat
+            (see the PathDraft case in ./game/GamePhasePanel). */}
         <div className="shrink-0 space-y-3 lg:max-h-[45vh] lg:overflow-y-auto pm-scroll lg:pr-1">
-          {/* [D7: the draft, and switching] The deal, at the very top of the
-              voyage's own column because of when it happens rather than what
-              it is: it is dealt as the voyage leaves the dock, over the
-              opening leg, so a captain who is reading this panel is also
-              reading their first market behind it. Renders nothing at all
-              outside a live draft (see PathDraft), and the hook holding the
-              hand is fed by the server rather than by anything on this
-              screen. */}
-          {draft.view && (
-            <PathDraft
-              view={draft.view}
-              error={draft.error}
-              onKeep={draft.keep}
-              onDismissError={draft.clearError}
-            />
-          )}
           <FleetTicker
             socket={socket}
             roomId={room.id}
@@ -1256,6 +1246,10 @@ export function GameRoom({
                   onTutorialOpen={() => setTutOpen(true)}
                   colorFor={colorFor}
                   roster={roster}
+                  // [W2: the path draft] The room's deal, for the stage at
+                  // the draft's own seat. The chip in the rail above reads
+                  // the same hook for its in deal state.
+                  draft={draft}
                 />
                 {/* The captain's own card. It sits at the foot of the stage
                     rather than up among the controls, because it is

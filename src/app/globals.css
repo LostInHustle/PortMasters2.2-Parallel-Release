@@ -340,6 +340,9 @@
   .pm-grad-harbor {
     --pm-fill: var(--w-harbor-fill);
   }
+  .pm-grad-path-draft {
+    --pm-fill: var(--w-path-draft-fill);
+  }
   .pm-grad-market {
     --pm-fill: var(--w-market-fill);
   }

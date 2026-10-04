@@ -34,6 +34,19 @@ import type { PublicUser } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { HuePanel, PanelHeading } from "./phases/PhaseShared";
 
+/**
+ * Whether the ledger has a row to draw: any member with a record. The
+ * gate is exported because the Parley fold that holds this board asks
+ * the same question before drawing itself (see Parley.tsx), and one
+ * reader is what keeps an empty fold off the screen.
+ */
+export function hasLedgerRows(
+  members: PublicUser[],
+  entries: Record<string, BoonRecord>,
+): boolean {
+  return members.some((m) => entries[m.id]);
+}
+
 export function OpenBoons({
   game,
   me,
@@ -48,12 +61,12 @@ export function OpenBoons({
   className?: string;
 }) {
   if (!gambitSystemsOn(game.mode)) return null;
+  if (!hasLedgerRows(members, entries)) return null;
   const rows: Array<{ member: PublicUser; record: BoonRecord }> = [];
   for (const member of members) {
     const record = entries[member.id];
     if (record) rows.push({ member, record });
   }
-  if (rows.length === 0) return null;
 
   return (
     <HuePanel tone="dawn" className={cn("px-3.5 py-2.5", className)}>

@@ -38,10 +38,12 @@ import {
   auditSeed,
   drawAudit,
   normalizeOrderFills,
+  pruneStaleVotes,
 } from "@/lib/game/audit";
-import { normalizeLarder } from "@/lib/game/larder";
+import { normalizeLarder, onShortRations } from "@/lib/game/larder";
+import { normalizeWorkerRoster } from "@/lib/game/types";
 import { survivalLayerOn } from "@/lib/game/flags";
-import { auditOpensAt } from "@/lib/game/mode";
+import { auditOpensAt, normalizeMode } from "@/lib/game/mode";
 import { activeRosterSet } from "./checkpoint";
 import { parseSave } from "./save";
 import { noteTelemetry } from "./telemetry";
@@ -148,6 +150,17 @@ async function auditRoomGate(
 // claims, and it is left off entirely when the provisions layer is
 // switched off, since a voyage with the switch off carries a Larder that
 // no rule moves.
+//
+// Two bounds landed with the bug audit, both for the same reason: the
+// room voted for evidence, so a doctored save must not get to decide what
+// evidence it shows. The manifest is read with the room's own leg as its
+// ceiling, so a fill dated past the leg the vote carried in is dropped
+// rather than printed as a thing the captain did. And the row's integrity
+// mark is read alongside its data: a save the Ledger Integrity Pass has
+// already judged impossible yields a reveal with no lines and no Larder,
+// only the flag that says the books could not be reconciled, which is the
+// same treatment the finish ledger gives a forged voyage rather than
+// printing figures the harbor knows are invented.
 async function revealFor(
   roomId: string,
   voyageEpoch: number,
@@ -168,20 +181,47 @@ async function revealFor(
   if (!member) return null;
   const row = await db.gameState.findUnique({
     where: { userId_roomId: { userId: targetUserId, roomId } },
-    select: { data: true },
+    select: { data: true, integritySeverity: true },
   });
   const save = parseSave(row?.data ?? null);
+  const flagged = row?.integritySeverity === "impossible";
+  // The provisions pair, read once for the two fields that need it: the
+  // count the badge prints and the engine's own short rations reading the
+  // sentence prints (an empty Larder aboard a crew with somebody on it,
+  // see onShortRations). The guard is shared because the two fields are
+  // one disclosure: neither appears for a marked save or a voyage with
+  // the layer switched off.
+  const provisionsOn = !flagged && survivalLayerOn(member.room.mode);
+  const larder = provisionsOn
+    ? normalizeLarder(save?.larder, member.room.mode)
+    : undefined;
   return {
     roomId,
     round,
     target: { userId: targetUserId, name: member.user.displayName },
-    fulfillments: drawAudit(
-      auditSeed(roomId, voyageEpoch, round, targetUserId),
-      normalizeOrderFills(save?.orderFills),
-    ),
-    larder: survivalLayerOn(member.room.mode)
-      ? normalizeLarder(save?.larder, member.room.mode)
-      : undefined,
+    fulfillments: flagged
+      ? []
+      : drawAudit(
+          auditSeed(roomId, voyageEpoch, round, targetUserId),
+          normalizeOrderFills(save?.orderFills, round),
+        ),
+    larder,
+    shortRations:
+      provisionsOn && larder !== undefined
+        ? onShortRations({
+            mode: normalizeMode(member.room.mode),
+            larder,
+            // The same roster read the load heals through, so the
+            // headcount behind the rule is the shape every other reader
+            // of a save works from rather than a second walk of the raw
+            // blob.
+            workers: normalizeWorkerRoster(
+              (save as { workers?: unknown } | null)?.workers,
+              {},
+            ),
+          })
+        : undefined,
+    flagged: flagged || undefined,
   };
 }
 
@@ -194,7 +234,10 @@ async function revealFor(
  * the checkpoint rather than off the payload. A nomination that arrives
  * for a captain the room has stopped counting is dropped rather than
  * counted, because the arithmetic below divides by that roster and a vote
- * outside it would move a majority with nobody behind it.
+ * outside it would move a majority with nobody behind it, and the same
+ * roster re-judges the votes already in the book, so a nomination the
+ * room has stopped counting stays out even if it was cast while it still
+ * counted.
  *
  * The tally goes out after every vote including the last one, and the
  * reveal only ever goes out once. Both are broadcast, and neither carries
@@ -216,6 +259,12 @@ export async function recordAuditVote(
   if (state.reveal) return;
   const roster = await activeRosterSet(roomId);
   if (!roster.has(voterId) || !roster.has(targetUserId)) return;
+  // The book is re-derived against the room that exists now, not the room
+  // that existed when each nomination was cast. A vote from a captain who
+  // has since gone bankrupt would otherwise sit under a shrunken roster
+  // and carry a majority with nobody behind it, which is the same flaw the
+  // door check above closes for fresh votes (see pruneStaleVotes).
+  state.votes = pruneStaleVotes(state.votes, roster);
   state.votes.set(voterId, targetUserId);
   // [I1: the telemetry spine] The nomination, recorded where the vote is
   // accepted and before the tally goes out, so a record and the room can

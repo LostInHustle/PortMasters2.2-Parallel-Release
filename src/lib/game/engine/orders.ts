@@ -421,12 +421,19 @@ export function completeOrder(
   state.orderFills.push({
     round: state.currentRound,
     port: order.demandPort,
-    items: order.resources.map((r) => ({ type: r.type, qty: r.required! })),
+    // The engine's own reading of a missing count, the one canFillOrder
+    // and the deduction above both take (`?? 0`): the fill record says
+    // what was actually deducted rather than asserting a count onto a
+    // line that does not carry one. The audit's reader drops a zero
+    // line the same way it drops a non number, so the sample is
+    // unchanged; what changes is that the save never holds a record
+    // disagreeing with the settlement that wrote it.
+    items: order.resources.map((r) => ({ type: r.type, qty: r.required ?? 0 })),
     reward,
   });
   state.orderFills = state.orderFills.slice(-AUDIT_WINDOW);
   const txt = order.resources
-    .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+    .map((r) => `${ICONS[r.type]}${r.type}×${r.required ?? 0}`)
     .join(" + ");
   logs.push(`📦 Completed Order at ${order.demandPort}: ${txt}`);
   logs.push(
@@ -543,10 +550,21 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(`❌ Need ${cost} Gold for a rumor`);
     return;
   }
-  // Ocean Interpreter adds a rumor that is genuinely free: only the paid
-  // reveals below deduct the fee, so the extra one costs nothing.
+  // One press is one purchase, and one fee: what the hull's modules
+  // change is how many whispers the one purchase brings back. The
+  // Brokers' Network brings two and the Ocean Interpreter adds a third
+  // on the house, which is what the module's own card promises: a rumor
+  // at 2 Gold that reveals two.
   const paidCount = hasModule(state, "brokers_network") ? 2 : 1;
   const count = paidCount + (hasModule(state, "ocean_relay") ? 1 : 0);
+  // [bug cycle: one purchase, one fee] The fee is paid once, here, which
+  // is the price the button that led to this press displayed and the
+  // price the guard above checked against. It used to be billed inside
+  // the loop, once per paid reveal, so a hull carrying the Brokers'
+  // Network paid double the price its own button named, and a captain
+  // holding more than one fee but less than two passed a guard that
+  // only ever read one and left the press with a negative purse.
+  state.money -= cost;
   for (let i = 0; i < count; i++) {
     if (!state.marketDemandTags.length) break;
     const item =
@@ -560,7 +578,6 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(
       `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
     );
-    if (i < paidCount) state.money -= cost;
     // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
     // delivered and always true, on every tier: the intel guarantee is never
     // touched. What a corrupt broker does instead is also sell word of this

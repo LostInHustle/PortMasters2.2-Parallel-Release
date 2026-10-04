@@ -90,6 +90,8 @@ import { theFleetsOwnOutcomeSuite } from "./suites/54-theFleetsOwnOutcome";
 import { theLegacyPhaseMovesSuite } from "./suites/55-theLegacyPhaseMoves";
 import { theMarksAndTheGatesSuite } from "./suites/56-theMarksAndTheGates";
 import { theOrderThatSettlesSuite } from "./suites/57-theOrderThatSettles";
+import { theWageTheBillQuotesSuite } from "./suites/58-theWageTheBillQuotes";
+import { theDoorsAndTheLoadSuite } from "./suites/59-theDoorsAndTheLoad";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -462,16 +464,21 @@ async function main(): Promise<void> {
     // the ready check stays last.
     console.log("\nThe fleet's own outcome");
     await theFleetsOwnOutcomeSuite(run);
-    // The correctness trio below opens no harbor: each is a pure read of
-    // a state in process (a load heal, a flag contract, a settlement), so
-    // they sit together after the harbor articles and ahead of the ready
-    // check, which stays last for the reason below.
+    // The correctness articles below open no harbor: each is a pure read
+    // of a state in process (a load heal, a flag contract, a settlement, a
+    // wage bill, a bolt onto a hull and the load that reconciles it), so
+    // they sit together after the harbor articles and ahead
+    // of the ready check, which stays last for the reason below.
     console.log("\nThe legacy phase that moves");
     await theLegacyPhaseMovesSuite();
     console.log("\nThe marks and the gates");
     await theMarksAndTheGatesSuite();
     console.log("\nThe order that settles");
     await theOrderThatSettlesSuite();
+    console.log("\nThe wage the bill quotes");
+    await theWageTheBillQuotesSuite();
+    console.log("\nThe doors and the load");
+    await theDoorsAndTheLoadSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

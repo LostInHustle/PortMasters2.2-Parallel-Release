@@ -460,7 +460,13 @@ export function tickGarments(state: GameState, logs: string[]): void {
   }
   state.garments = kept;
   if (worn.length > 0 && rags === 0) {
-    logs.push(`🧵 Worn clothes lose ${step} of their warmth to the sea.`);
+    // The number is durability points rather than warmth, which are two
+    // units rather than one: warmth is the garment's rating scaled by the
+    // durability it has left (see warmthScore), so two points off a coat
+    // costs a fraction of its warmth. The line used to call the points
+    // warmth, and a captain watching the wardrobe could never reconcile
+    // the sentence with the numbers.
+    logs.push(`🧵 Worn clothes lose ${step} point of wear to the sea.`);
   }
 }
 

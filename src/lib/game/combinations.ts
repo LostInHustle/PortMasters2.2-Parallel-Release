@@ -131,9 +131,9 @@ export type PairRow = {
  * own word for it is "more than"). A pair can trip both, which is why the
  * row carries a list rather than a verdict.
  */
-export type PairFlag = "win_rate" | "share_of_wins";
+type PairFlag = "win_rate" | "share_of_wins";
 
-export type PairReading = {
+type PairReading = {
   /** Rows the reading could speak about: those that carried any cards. */
   voyages: number;
   /** Of those, the ones won, which is the share's denominator. */

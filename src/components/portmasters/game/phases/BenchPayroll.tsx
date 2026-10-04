@@ -76,8 +76,15 @@ export function BenchPayroll({
         let totalProducedValue = 0;
         for (const r of rows) {
           for (const w of r.list) {
-            if (w.producedCount > 0 && w.task) {
-              totalProducedValue += RECIPES[w.task].value * w.producedCount;
+            // The recipe is asked for rather than trusted: task is a
+            // RECIPES key for every hand the engine assigns, and a
+            // damaged save is the one carrier a task naming no recipe
+            // arrives on, which used to index the table and throw out
+            // of this panel (or, for a prototype key, print NaN into a
+            // caption beside real numbers).
+            const recipe = w.task ? RECIPES[w.task] : undefined;
+            if (recipe && w.producedCount > 0) {
+              totalProducedValue += recipe.value * w.producedCount;
             }
           }
         }

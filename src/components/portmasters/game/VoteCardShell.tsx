@@ -1,57 +1,40 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { FoldRow, TONES } from "./FoldRow";
 
-// The two votes share one shape: a card worth showing before its rung (a
-// mode whose headline mechanic nobody has heard of is a mechanic nobody
-// uses), actionable at its rung, and worth a line afterwards. The closed
-// states used to spend a heading, a paragraph and a card's worth of
-// padding each, at the top of the Parley board, which pushed the market
-// itself under the fold. Closed now wears one row of the shared fold (see
-// FoldRow, which owns the tones): the name, the one line that says what
-// it is, and the chevron for the full explanation. Live is always open,
-// because a vote a captain can cast is not a note to file.
+// The two votes share one shape: a heading in the meaning colour of what
+// the vote costs, and the body of whichever state its window is in. The
+// shell used to choose between a full card and a fold of its own, one per
+// vote, stacked at the top of the Parley board; both votes live inside
+// the one Harbor Business fold now (W4, UX-3 in docs/STUDIO_AUDIT.md), so
+// the fold owns the disclosure and the shell owns the heading and the
+// section rhythm. The heading wears the same uppercase label the reveal
+// strips wear, because the card and the strip are the same vote read at
+// two moments.
 export function VoteCardShell({
   tone,
   icon,
   title,
-  gist,
-  live,
   children,
 }: {
   tone: "intel" | "alarm";
   icon: string;
   title: string;
-  gist: string;
-  live: boolean;
   children: ReactNode;
 }) {
-  const [folded, setFolded] = useState(true);
-
-  if (live) {
-    return (
-      <div className={cn("rounded-xl border p-4 mb-4", TONES[tone])}>
-        <h3 className="text-center font-semibold mb-1 text-sm">
-          {icon} {title}
-        </h3>
-        {children}
-      </div>
-    );
-  }
-
   return (
-    <FoldRow
-      tone={tone}
-      icon={icon}
-      title={title}
-      gist={gist}
-      open={!folded}
-      onToggle={() => setFolded((v) => !v)}
-      className="mb-4"
-    >
+    <div className="mb-3 last:mb-0">
+      <h4
+        className={cn(
+          "mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide",
+          tone === "alarm" ? "text-alarm" : "text-intel",
+        )}
+      >
+        <span aria-hidden>{icon}</span>
+        {title}
+      </h4>
       {children}
-    </FoldRow>
+    </div>
   );
 }

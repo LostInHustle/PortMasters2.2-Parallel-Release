@@ -27,6 +27,11 @@
 //     voyage: a pirate who ends solvent and standing wins the failure,
 //     which is the branch no earlier article's fixture could reach because
 //     every one of them filled the commission.
+//   - a voyage whose purse the conclusion's own sweeps pay out after the
+//     verdict was once read. The open venture force failed at the close
+//     refunds its half, the client reports the settled total the way its
+//     own beacon would, and the purse goal the finished total missed by
+//     ten is won on the total the captain actually ends holding.
 
 import { db } from "@/lib/db";
 import {
@@ -36,7 +41,8 @@ import {
   objectiveSeed,
   type Objective,
 } from "@/lib/game/objectives";
-import { flourishDeck } from "@/lib/game/gambit";
+import { flourishById, flourishDeck } from "@/lib/game/gambit";
+import { CONVOY_VENTURE_FAILURE_REFUND_RATE } from "@/lib/game/constants/world";
 import { evaluateVictory, flourishMet, readEnding } from "@/lib/game/victory";
 import type { ObjectiveTraceEntry } from "@/lib/game/types";
 import type { RevealedCaptain, VoyageReveal } from "@/types/realtime/voyage";
@@ -85,6 +91,7 @@ async function chronicleRows(roomId: string, count: number) {
         objectiveMet: true,
         objectiveId: true,
         objectiveTrace: true,
+        finalGold: true,
       },
     });
   let rows = await read();
@@ -589,5 +596,230 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
           ending: honestEnding,
         }),
     "and both verdicts are the rule's own answer on the empty record, read from the commission neither client filled",
+  );
+
+  // ---- The purse the voyage's own sweeps pay ----
+  // The bug cycle's own shape, fixed in the conclusion this article
+  // guards: the win condition was judged on the money a captain held one
+  // beat before the conclusion paid them. The conclusion's own sweeps
+  // return an escrow, a venture's half and a loan's zero, and each of
+  // those lands in the captain's own client and comes back on that
+  // client's next broadcast. This voyage parks an open venture under a
+  // purse goal the finished total misses by ten and the refund clears, so
+  // the verdict below can only be won on the settled money. The captain
+  // side is played the way the app plays it: the payout frame arrives,
+  // the purse takes it, and the new total is reported back on the same
+  // channel the review beacon uses.
+  const settling = await openVoyage(run, "the settled purse's voyage", [
+    "purse",
+    // Nine characters would push smoke_<label>_<suffix> past the server's
+    // twenty character name bound, so the companion reads short.
+    "aside",
+  ]);
+  const settlingDeck = flourishDeck(settling.objective.id);
+  // The regression's goal is planted rather than searched for, because
+  // the draw decides the commission and only half the decks carry a
+  // purse: half the rooms this article could open have no goal the
+  // settled refund could clear. The row the conclusion reads resolves
+  // any flourish this build still prints (see cardsFromRows), and a
+  // purse is about Gold rather than about the commission's goods, so it
+  // reads honestly under any contract. It is the field report's own
+  // goal, the 450 the screenshot read beside the 446.
+  const purseGoal = flourishById("brocade_command_purse");
+  if (!purseGoal) {
+    throw new Error(
+      "the build prints no 450 purse flourish this article judges on, stopping here.",
+    );
+  }
+  // The companion's goal is the drawn table's own, any of its three
+  // answers, since this article only judges the spender's row.
+  const companion = settlingDeck[0];
+  if (!companion) {
+    throw new Error(
+      `the deck for ${settling.objective.id} dealt no companion this article can seat, stopping here.`,
+    );
+  }
+  const spender = settling.crew[0];
+  const bystander = settling.crew[1];
+  const sailed = await db.room.findUnique({
+    where: { id: settling.roomId },
+    select: { voyageEpoch: true },
+  });
+  const stake = 40;
+  const planted = await db.convoyVenture.create({
+    data: {
+      roomId: settling.roomId,
+      voyageEpoch: sailed?.voyageEpoch ?? 0,
+      posterId: spender.captain.id,
+      posterName: spender.captain.username,
+      targetGold: stake * 5,
+      deadlineRound: 1,
+      contributions: JSON.stringify({
+        [spender.captain.id]: {
+          name: spender.captain.username,
+          amount: stake,
+        },
+      }),
+    },
+  });
+  const refund = Math.round(stake * CONVOY_VENTURE_FAILURE_REFUND_RATE);
+  const purseGold = purseGoal.amount - 10;
+  const spenderRep = 400;
+  const bystanderGold = 200;
+  const bystanderRep = 200;
+  const settledGold = purseGold + refund;
+  check(
+    purseGold < purseGoal.amount && settledGold >= purseGoal.amount,
+    "the fixture spans the goal: the finished purse sits ten short of it and the venture's own refund carries it over",
+  );
+
+  const settlingFull: Record<string, number> = {};
+  for (const r of settling.objective.resources) {
+    settlingFull[r.type] = r.required;
+  }
+  const spenderSave = {
+    objectiveDelivered: settlingFull,
+    objectiveTrace: [{ round: 6, at: Date.now(), delivered: settlingFull }],
+  };
+  const bystanderSave = { objectiveDelivered: {}, objectiveTrace: [] };
+  await db.voyageRole.upsert({
+    where: {
+      roomId_userId: { roomId: settling.roomId, userId: spender.captain.id },
+    },
+    create: {
+      roomId: settling.roomId,
+      userId: spender.captain.id,
+      role: "honest",
+      flourish: purseGoal.id,
+    },
+    update: { role: "honest", flourish: purseGoal.id },
+  });
+  await db.voyageRole.upsert({
+    where: {
+      roomId_userId: { roomId: settling.roomId, userId: bystander.captain.id },
+    },
+    create: {
+      roomId: settling.roomId,
+      userId: bystander.captain.id,
+      role: "honest",
+      flourish: companion.id,
+    },
+    update: { role: "honest", flourish: companion.id },
+  });
+  const wroteSpender = await writeSave(
+    spender.captain.cookie,
+    settling.roomId,
+    spenderSave,
+  );
+  const wroteBystander = await writeSave(
+    bystander.captain.cookie,
+    settling.roomId,
+    bystanderSave,
+  );
+  check(
+    wroteSpender.status === 200 && wroteBystander.status === 200,
+    "and both records land in the harbor's saves, one of them carrying the fill",
+  );
+
+  const settledFrames = waitForEvent<{
+    roomId: string;
+    ventureId: string;
+    outcome: string;
+    settlements: { userId: string; amount: number }[];
+  }>(
+    spender.socket,
+    "venture:settled",
+    (p) => p?.ventureId === planted.id,
+    30000,
+  );
+  // The captain's own client behavior, played faithfully: the payout
+  // frame is applied to the purse and the new total is reported on the
+  // same channel a real browser's beacon uses.
+  spender.socket.on(
+    "venture:settled",
+    (p: {
+      ventureId?: string;
+      settlements?: { userId: string; amount: number }[];
+    }) => {
+      if (p?.ventureId !== planted.id) return;
+      const mine = (p.settlements ?? []).find(
+        (entry) => entry.userId === spender.captain.id,
+      );
+      if (!mine) return;
+      finish(spender, settling.roomId, settledGold, spenderRep);
+    },
+  );
+  const purseRevealed = waitForEvent<VoyageReveal>(
+    spender.socket,
+    "voyage:reveal",
+    (p) => p?.roomId === settling.roomId,
+    30000,
+  );
+  finish(spender, settling.roomId, purseGold, spenderRep);
+  await wait(300);
+  finish(bystander, settling.roomId, bystanderGold, bystanderRep);
+  const settleFrame = await settledFrames;
+  const purseFrame = await purseRevealed;
+  check(
+    purseFrame !== null,
+    "the third voyage concludes and its reveal is announced",
+  );
+  check(
+    settleFrame?.outcome === "failed",
+    "the open venture is force failed as the voyage closes, the reading every conclusion owes a board nobody will sail again",
+  );
+  const paidBack =
+    settleFrame?.settlements.find((s) => s.userId === spender.captain.id)
+      ?.amount ?? 0;
+  check(
+    paidBack === refund,
+    "and its half comes back to the captain whose purse the verdict is about",
+  );
+
+  const settlingRows = await chronicleRows(settling.roomId, 2);
+  check(settlingRows.length === 2, "with one chronicle row per captain");
+  const purseRow = settlingRows.find(
+    (row) => row.userId === spender.captain.id,
+  );
+  const purseReveal = (purseFrame?.captains ?? []).find(
+    (c) => c.userId === spender.captain.id,
+  );
+  check(
+    purseReveal?.gold === settledGold,
+    "the reveal prints the purse the voyage settled on rather than the purse read one beat before its own sweep, which is the number the captain's endgame screen is showing",
+  );
+  check(
+    purseRow?.finalGold === settledGold,
+    "and the chronicle row keeps the same settled figure, so the record and the reveal cannot tell two stories",
+  );
+  check(
+    purseRow?.won === true,
+    "and the purse goal is judged on that same settled purse, which is the whole reason the conclusion waits a beat",
+  );
+  check(
+    purseRow?.won ===
+      evaluateVictory({
+        role: "honest",
+        objective: settling.objective,
+        objectiveMet: true,
+        flourish: purseGoal,
+        ending: readEnding(spenderSave, {
+          gold: settledGold,
+          reputation: spenderRep,
+          bankrupt: false,
+        }),
+      }) &&
+      evaluateVictory({
+        role: "honest",
+        objective: settling.objective,
+        objectiveMet: true,
+        flourish: purseGoal,
+        ending: readEnding(spenderSave, {
+          gold: purseGold,
+          reputation: spenderRep,
+          bankrupt: false,
+        }),
+      }) === false,
+    "and the rule's own answer agrees on the settled purse while reading the loss on the finished one, which is the verdict this article exists to keep out of the harbor",
   );
 }

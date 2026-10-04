@@ -50,13 +50,20 @@ export function OrderFulfillmentPlanner({ game }: { game: GameState }) {
       const transport = calcTransportCost(game, o.totalItems, hasWoven);
       let net = o.reward - transport;
       if (o.isProductOrder) {
-        const product = o.resources[0].type;
-        const vat = explainVAT(
-          game,
-          product,
-          o.reward / o.resources[0].required!,
-        );
-        net -= vat.final * o.resources[0].required!;
+        // The engine's own reading of the taxed line (see completeOrder):
+        // a product card with no line, or a line with no count, adds no
+        // VAT to the estimate rather than throwing the plan out with a
+        // non null assertion.
+        const productRef = o.resources[0];
+        const productUnits = productRef?.required ?? 0;
+        if (productRef && productUnits > 0) {
+          const vat = explainVAT(
+            game,
+            productRef.type,
+            o.reward / productUnits,
+          );
+          net -= vat.final * productUnits;
+        }
       }
       if (o.isBrokerFavor) {
         net -= brokersFavorCommission(o.reward);

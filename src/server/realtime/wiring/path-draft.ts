@@ -52,18 +52,30 @@ export function wirePathDraft(io: Server, socket: Socket): void {
 
   // One card laid down. The pick is an index into this captain's own hand
   // and never a path, because a deck with a floor can hand one captain two
-  // cards of the same path (see keepFrom). Everything the step needs is in
-  // the module: the seat's own hand, who has answered, and what the table
-  // is then sent.
-  socket.on("draft:keep", (payload: { roomId?: string; pick?: unknown }) => {
-    const s = seated(socket, payload);
-    if (!s) return;
-    const { roomId } = s;
-    const refused = takeDraftPick(io, roomId, s.userId, payload?.pick);
-    if (refused !== null) {
-      socket.emit("draft:error", { roomId, error: refused });
-    }
-  });
+  // cards of the same path (see keepFrom). The frame names the step it was
+  // read off as well as the card, because an index is only a card against
+  // one hand: an answer that crossed a step's close is refused at this door
+  // rather than counted against the next step's cards (see takeDraftPick).
+  // Everything else the step needs is in the module: the seat's own hand,
+  // who has answered, and what the table is then sent.
+  socket.on(
+    "draft:keep",
+    (payload: { roomId?: string; pick?: unknown; step?: unknown }) => {
+      const s = seated(socket, payload);
+      if (!s) return;
+      const { roomId } = s;
+      const refused = takeDraftPick(
+        io,
+        roomId,
+        s.userId,
+        payload?.pick,
+        payload?.step,
+      );
+      if (refused !== null) {
+        socket.emit("draft:error", { roomId, error: refused });
+      }
+    },
+  );
 
   // One captain's change of papers.
   //

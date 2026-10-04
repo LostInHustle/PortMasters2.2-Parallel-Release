@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { PriceBreakdownTooltip, priceAwareTermContent } from "../PriceTooltips";
+import { PanelNote } from "./PhasePanels";
 import { TradeCard, type PhasePanelProps } from "./PhaseShared";
 
 type MarketCard = GameState["resourceCards"][number];
@@ -53,22 +54,49 @@ function PurchaseCard({
         </>
       }
       footer={
-        <Button
-          className={cn("w-full rounded-lg", canAfford ? "pm-grad-market" : "")}
-          variant={canAfford ? "default" : "secondary"}
-          disabled={!canAfford}
-          onClick={() => act((g, l) => purchaseCard(g, c.id, l))}
-        >
-          {purchased ? "✅ Purchased" : `🛒 Buy (${finalCost}💰)`}
-        </Button>
+        <>
+          <Button
+            className={cn(
+              "w-full rounded-lg",
+              canAfford ? "pm-grad-market" : "",
+            )}
+            variant={canAfford ? "default" : "secondary"}
+            disabled={!canAfford}
+            onClick={() => act((g, l) => purchaseCard(g, c.id, l))}
+          >
+            {purchased ? "✅ Purchased" : `🛒 Buy (${finalCost}💰)`}
+          </Button>
+          {/* Why a greyed Buy is greyed, said beside it. The one reason a
+              card refuses that is not already on the button is the purse,
+              and the shortfall is a number this card can read: the price
+              it already printed and the purse it already checked. A
+              captain should not have to open a tooltip or do subtraction
+              to learn why a button will not take their press. */}
+          {!purchased && game.money < finalCost && (
+            <PanelNote tone="alarm" className="mt-1.5 text-[10px] text-center">
+              Need {finalCost - game.money} more Gold.
+            </PanelNote>
+          )}
+        </>
       }
     >
       {c.resources.map((r, i) => {
         const pulse = game.harborPulse?.[r.type];
         const hasPulse = pulse !== undefined && Math.abs(pulse) > 0.01;
-        // flex-wrap matters here: the good name, the Deal or Pricey
-        // chip and the harbor pulse chip together are wider than a
-        // narrow market card, and the card clips its overflow.
+        // The deal mark and its range. The range is printed under the
+        // price rather than kept in a hover title, because "Deal"
+        // without the range it is a deal against is a word a captain
+        // has to trust rather than a fact they can weigh (UX-11 in
+        // docs/STUDIO_AUDIT.md). The pulse chip keeps its place and
+        // its words: the arrow says the direction and "price" says
+        // what moved, so nothing on this board needs a hover.
+        const range = basePriceRange(r.type);
+        const unitPrice = r.price ?? 0;
+        const isDeal = range !== undefined && unitPrice < range[0];
+        const isPricey = range !== undefined && unitPrice > range[1];
+        // flex-wrap matters here: the good name and the mark chips
+        // together are wider than a narrow market card, and the card
+        // clips its overflow.
         return (
           <div
             key={i}
@@ -81,53 +109,34 @@ function PurchaseCard({
               </span>
             </Term>
             <span className="mx-1.5">×{r.quantity}</span>
-            <span className="ml-auto text-muted-foreground">
-              Unit: {r.price}💰
-            </span>
-            {(() => {
-              const range = basePriceRange(r.type);
-              if (!range) return null;
-              const [min, max] = range;
-              const price = r.price ?? 0;
-              const isDeal = price < min;
-              const isPricey = price > max;
-              if (!isDeal && !isPricey) return null;
-              return (
+            <span className="ml-auto text-right text-muted-foreground">
+              <span className="block">Unit: {r.price}💰</span>
+              {range !== undefined && (isDeal || isPricey) && (
                 <span
                   className={cn(
-                    "ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
-                    isDeal ? "bg-gain/5 text-gain" : "bg-alarm/5 text-alarm",
+                    "block text-[9px]",
+                    isDeal ? "text-gain" : "text-alarm",
                   )}
-                  title={
-                    isDeal
-                      ? `Below the typical range of ${min} to ${max} Gold`
-                      : `Above the typical range of ${min} to ${max} Gold`
-                  }
                 >
-                  {isDeal ? "Deal" : "Pricey"}
+                  {isDeal ? "Deal" : "Pricey"}: {range[0]} to {range[1]} typical
                 </span>
-              );
-            })()}
+              )}
+            </span>
             {hasPulse && (
               <span
                 className={cn(
                   "ml-1.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                   pulse > 0 ? "bg-alarm/5 text-alarm" : "bg-gain/5 text-gain",
                 )}
-                title={
-                  pulse > 0
-                    ? "The harbor leaned into this good last round, so prices are up"
-                    : "The harbor ignored this good last round, so prices softened"
-                }
               >
                 {pulse > 0 ? "▲" : "▼"}
-                {Math.abs(Math.round(pulse * 100))}%
+                {Math.abs(Math.round(pulse * 100))}% price
               </span>
             )}
           </div>
         );
       })}
-      {c.isProductCard && c.resources[0].materialCost ? (
+      {c.isProductCard && c.resources[0]?.materialCost ? (
         <div className="text-[10px] text-muted-foreground pl-6">
           📦 Mat Cost: {c.resources[0].materialCost} Gold (
           {c.resources[0].materialDetails})

@@ -49,6 +49,20 @@ export type Checkpoint = {
   phase: Phase;
   readyUserIds: Set<string>;
   advancing: boolean;
+  // [B2: hard timers, the server as timekeeper] Whether this seat's fire has
+  // already been held once for a captain standing in the yard. A captain in
+  // the module draft is at Dusk (see seatOf), so the clock that times Dusk
+  // would otherwise cancel a pick that is seconds from done, and the hold
+  // below moves the deadline once per seat rather than moving the
+  // checkpoint.
+  //
+  // Cleared where the seat moves, never where the clock is armed, because
+  // the hold's own extension goes through the same arming path as every
+  // other: a reset there would hold the seat forever rather than once. One
+  // bit, not a counter, is the whole contract: the second fire of a seat
+  // advances the room whether or not the yard is still occupied, so no
+  // table can be parked in the yard past one extra budget.
+  yardHeld: boolean;
   // [B2: hard timers, the server as timekeeper] The epoch millisecond this
   // seat's clock runs out, or null when no clock is running: the pier, a
   // harbor that has not set sail, and a server started with the clock off

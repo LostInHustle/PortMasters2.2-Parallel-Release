@@ -34,6 +34,31 @@ import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
 
+/**
+ * The two questions the Parley board asks about this vote, answered once
+ * beside the vote itself so the card and the Harbor Business fold that
+ * holds it cannot disagree about when the harbor is voting (W4, UX-3 in
+ * docs/STUDIO_AUDIT.md; see Parley.tsx).
+ */
+export function auditVoteOpen(game: GameState, audit: Audit): boolean {
+  const opensAt = auditOpensAt(game.mode);
+  return (
+    opensAt !== null && audit.reveal === null && game.currentRound >= opensAt
+  );
+}
+
+export function auditCardShown(game: GameState, audit: Audit): boolean {
+  const opensAt = auditOpensAt(game.mode);
+  if (opensAt === null || game.phase !== "parley") return false;
+  // (a) of UX-3: the open window, or a window this voyage can still
+  // reach. A spent audit is neither, and it leaves the board because the
+  // reveal strip carries the finding from there.
+  return (
+    auditVoteOpen(game, audit) ||
+    (audit.reveal === null && opensAt <= game.maxRounds)
+  );
+}
+
 export function AuditVoteCard({
   game,
   members,
@@ -47,45 +72,34 @@ export function AuditVoteCard({
 }) {
   const [target, setTarget] = useState("");
 
-  // Three states, and the panel is worth showing in all of them: a mode
-  // whose headline mechanic nobody has heard of is a mechanic nobody uses.
-  // Before the rung it explains itself, at the Parley of a rung round it
-  // offers the vote, and after the audit is spent it says so rather than
-  // going quiet.
-  //
-  // The rung is read off the mode's own record rather than compared against
-  // a constant, so this panel and the server's vote ask one question: a
-  // mode whose rung is null has no manifest to open, and that is what
-  // draws nothing here (see auditOpensAt in @/lib/game/mode).
+  // The visibility rule is the reader's ((a) of UX-3 in
+  // docs/STUDIO_AUDIT.md): the open window, or a window still ahead this
+  // voyage. The rung is read off the mode's own record rather than
+  // compared against a constant, so this panel and the server's vote ask
+  // one question: a mode whose rung is null has no manifest to open, and
+  // that is what draws nothing here (see auditOpensAt in @/lib/game/mode).
+  // The body still explains the vote before the rung, because a mode
+  // whose headline mechanic nobody has heard of is a mechanic nobody
+  // uses, and inside the Harbor Business fold that explanation costs the
+  // board nothing (see Parley.tsx).
   const opensAt = auditOpensAt(game.mode);
   if (opensAt === null) return null;
-  if (game.phase !== "parley") return null;
-  const spent = audit.reveal !== null;
-  const open = game.currentRound >= opensAt;
+  if (!auditCardShown(game, audit)) return null;
+  const open = auditVoteOpen(game, audit);
   const rows = tallyRows(audit.votes, members);
   const nameOf = (id: string) =>
     members.find((m) => m.id === id)?.displayName ?? "a captain";
 
   return (
-    <VoteCardShell
-      tone="intel"
-      icon="🔎"
-      title="Manifest Audit"
-      gist={
-        spent
-          ? "This voyage's audit has been called. The harbor gets one."
-          : `From leg ${opensAt}: a majority may open one manifest.`
-      }
-      live={open && !spent}
-    >
-      {open && !spent ? (
+    <VoteCardShell tone="intel" icon="🔎" title="Manifest Audit">
+      {open ? (
         <>
-          <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
             A majority of the captains still sailing can open one manifest. What
             comes back is a sample of what they filed, and the harbor trades no
             more this leg.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -107,18 +121,18 @@ export function AuditVoteCard({
             </Button>
           </div>
           {audit.myVote && (
-            <p className="text-center text-[11px] text-muted-foreground mt-2">
+            <p className="text-[11px] text-muted-foreground mt-2">
               You named {nameOf(audit.myVote)}. Waiting on the rest of the
               harbor.
             </p>
           )}
           <VoteTallyRows rows={rows} />
-          <p className="text-center text-[10px] text-muted-foreground/80 mt-2">
+          <p className="text-[10px] text-muted-foreground/80 mt-2">
             A majority is more than half of the captains still in the voyage.
           </p>
         </>
       ) : (
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-relaxed">
           {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
         </p>
       )}
@@ -156,7 +170,13 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
         </button>
       </div>
 
-      {reveal.fulfillments.length === 0 ? (
+      {/* A flagged reveal prints no lines at all, because there are none to
+          print: the server withholds a marked manifest rather than handing
+          the table evidence it has already judged unsound (see AuditReveal
+          .flagged). The flag is then the strip's whole finding, and it is
+          read off the reveal rather than counted from an empty list so it
+          cannot be confused with a captain who filed nothing. */}
+      {reveal.flagged ? null : reveal.fulfillments.length === 0 ? (
         <p className="mt-1 text-[11px] text-muted-foreground">
           No order fulfillments filed this voyage.
         </p>
@@ -188,7 +208,7 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-              reveal.larder === 0
+              reveal.shortRations
                 ? "border-alarm/30 bg-alarm/5 text-alarm"
                 : "border-intel/25 text-foreground",
             )}
@@ -197,17 +217,19 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
             Larder {reveal.larder}
           </span>
           <span className="ml-1.5 text-[10px] text-muted-foreground/80">
-            {reveal.larder === 0
+            {reveal.shortRations
               ? "an empty larder: this captain's crew is on short rations."
-              : "rations aboard, eaten one a head each leg."}
+              : reveal.larder === 0
+                ? "an empty larder, with no crew aboard to go hungry."
+                : "rations aboard, eaten one a head each leg."}
           </span>
         </div>
       )}
 
       <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        A random sample of this captain&apos;s most recent order fulfillments,
-        opened by a vote of the harbor. Their card, their Gold and the rest of
-        their hold were not opened.
+        {reveal.flagged
+          ? "The harbor's own checks could not reconcile this manifest, so its lines are withheld."
+          : "A random sample of this captain's most recent order fulfillments, opened by a vote of the harbor. Their card, their Gold and the rest of their hold were not opened."}
       </p>
     </div>
   );

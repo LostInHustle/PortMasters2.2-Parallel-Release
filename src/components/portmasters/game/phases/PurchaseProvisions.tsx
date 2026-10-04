@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "@/lib/game/constants/crew";
 import {
@@ -11,7 +12,12 @@ import {
   RATION_PRICE,
   type FoodId,
 } from "@/lib/game/constants/supplies";
-import { crewSize, onShortRations, provisionFood } from "@/lib/game/larder";
+import {
+  cargoCapacity,
+  crewSize,
+  onShortRations,
+  provisionFood,
+} from "@/lib/game/larder";
 import {
   foodRoomMeals,
   mealsOf,
@@ -19,7 +25,6 @@ import {
   preserveFood,
 } from "@/lib/game/foods";
 import {
-  cargoSlots,
   holdCapacityOn,
   storesSlots,
   usedCargoSlots,
@@ -33,9 +38,9 @@ import {
   buyFromBarge,
 } from "@/lib/game/engine";
 import { Utensils } from "lucide-react";
+import { FoldRow } from "../FoldRow";
 import {
   HuePanel,
-  PanelLabel,
   PanelNote,
   PanelStat,
   type PhasePanelProps,
@@ -115,6 +120,7 @@ export function Provisions({
   game,
   act,
 }: Pick<PhasePanelProps, "game" | "act">) {
+  const [bargeFoldOpen, setBargeFoldOpen] = useState(false);
   if (!survivalLayerOn(game.mode)) return null;
   const crew = crewSize(game);
   const legCost = crew * RATION_PRICE;
@@ -150,14 +156,19 @@ export function Provisions({
 
   return (
     <HuePanel tone="larder">
-      <PanelLabel
-        tone="text-larder"
-        note="one ration a head, eaten at each Dawn"
-      >
-        <Utensils className="h-3.5 w-3.5" />
-        Provisions
-      </PanelLabel>
+      {/* The stats live on the header row (W4): the label, the one line
+          that says what the panel is, and the five figures a captain
+          checks before buying were two stacked rows that said one thing,
+          and the panel that leads with its numbers is the shape every
+          other desk on this screen already wears. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-larder">
+          <Utensils className="h-3.5 w-3.5" />
+          Provisions
+          <span className="font-normal text-muted-foreground ml-1">
+            one ration a head, eaten at each Dawn
+          </span>
+        </span>
         <PanelStat
           label="Larder"
           value={game.larder}
@@ -190,7 +201,16 @@ export function Provisions({
               suffix={
                 <span className="text-muted-foreground">
                   {" "}
-                  / {cargoSlots(short)}
+                  {/*
+                    The engine's own capacity reader rather than the raw
+                    slot count: the market's purchase gate reads
+                    cargoCapacity, which folds in the path's cargo
+                    modifier and the hungry crew's quarter (see
+                    cargoRoom in @/lib/game/larder), and the tile used
+                    to print the unmodified number, so a Convoy captain
+                    was told 30 while the market refused at 24.
+                  */}
+                  / {cargoCapacity(game)}
                 </span>
               }
             />
@@ -297,39 +317,55 @@ export function Provisions({
           it: the row names what a ration costs against what the port
           above charges for one. */}
       {bargePort !== null && (
-        <div className="mt-2 rounded-lg border border-larder/15 bg-background/40 p-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[11px]">
-              <span className="mr-1">⛵</span>
-              <span className="font-medium">Supply Barge</span>
-              <span className="text-muted-foreground"> at {bargePort}</span>
-            </span>
-            <Button
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
-              variant={bargeOne > 0 ? "default" : "secondary"}
-              disabled={bargeOne <= 0}
-              onClick={() => act((g, l) => buyFromBarge(g, 1, l))}
-            >
-              🌾 Buy {bargeOne > 0 ? `1 Ration (${bargePrice}💰)` : "Rations"}
-            </Button>
-            <Button
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
-              variant={bargeLot > 1 ? "default" : "secondary"}
-              disabled={bargeLot <= 1}
-              onClick={() => act((g, l) => buyFromBarge(g, bargeLeft, l))}
-            >
-              Take the Lot
-              {bargeLot > 1 ? ` (${bargeLot}, ${bargeLot * bargePrice}💰)` : ""}
-            </Button>
+        <FoldRow
+          tone="larder"
+          icon="⛵"
+          title="Supply Barge"
+          gist={
+            bargeLeft < 1
+              ? "The barge has nothing left for you this leg."
+              : `An unnamed trader on the quay: ${bargePrice} Gold a ration against the port's ${RATION_PRICE}.`
+          }
+          open={bargeFoldOpen}
+          onToggle={() => setBargeFoldOpen((v) => !v)}
+          className="mt-2"
+        >
+          <div className="rounded-lg border border-larder/15 bg-background/40 p-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-[11px]">
+                <span className="mr-1">⛵</span>
+                <span className="font-medium">Supply Barge</span>
+                <span className="text-muted-foreground"> at {bargePort}</span>
+              </span>
+              <Button
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={bargeOne > 0 ? "default" : "secondary"}
+                disabled={bargeOne <= 0}
+                onClick={() => act((g, l) => buyFromBarge(g, 1, l))}
+              >
+                🌾 Buy {bargeOne > 0 ? `1 Ration (${bargePrice}💰)` : "Rations"}
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={bargeLot > 1 ? "default" : "secondary"}
+                disabled={bargeLot <= 1}
+                onClick={() => act((g, l) => buyFromBarge(g, bargeLeft, l))}
+              >
+                Take the Lot
+                {bargeLot > 1
+                  ? ` (${bargeLot}, ${bargeLot * bargePrice}💰)`
+                  : ""}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              {bargeLeft < 1
+                ? "The barge has nothing left for you this leg, and it is a fresh lot tomorrow."
+                : `${bargeLeft} ${bargeLeft === 1 ? "ration is" : "rations are"} left for you this leg.`}
+            </p>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1.5">
-            {bargeLeft < 1
-              ? "The barge has nothing left for you this leg, and it is a fresh lot tomorrow."
-              : `An unnamed trader on the quay, charging ${bargePrice} Gold a ration against the port's ${RATION_PRICE}. ${bargeLeft} ${bargeLeft === 1 ? "ration is" : "rations are"} left for you this leg.`}
-          </p>
-        </div>
+        </FoldRow>
       )}
       {crew === 0 && (
         <PanelNote>

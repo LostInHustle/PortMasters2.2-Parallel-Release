@@ -55,7 +55,14 @@ function bookCeiling(good: string): number {
   return range ? range[1] : 0;
 }
 
-/** One switch, its name, and the sentence that says what it does. */
+/**
+ * One switch and its name, with a hint only where the row's own order
+ * says something its section's hint does not (W4, UX-10 in
+ * docs/STUDIO_AUDIT.md). The panel's prose was the heaviest in the game
+ * because every row repeated the shape of its section's sentence; the
+ * section owns the explanation now, and a row prints one only when it
+ * differs from that.
+ */
 function OrderRow({
   title,
   hint,
@@ -64,7 +71,7 @@ function OrderRow({
   onChange,
 }: {
   title: string;
-  hint: string;
+  hint?: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (next: boolean) => void;
@@ -78,9 +85,11 @@ function OrderRow({
     >
       <div className="min-w-0">
         <p className="text-[12.5px] font-medium">{title}</p>
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-          {hint}
-        </p>
+        {hint && (
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            {hint}
+          </p>
+        )}
       </div>
       <Switch
         checked={checked}
@@ -377,11 +386,10 @@ export function StandingOrdersModal({
 
           <Section
             title="Orders"
-            hint="The trade board, filled the way a captain would fill it: only what the hold can actually cover, in the order the orders are laid out, and left alone when the hold cannot cover it."
+            hint="The trade board, filled the way a captain would fill it: only what the hold can actually cover, in the order the orders are laid out, and left alone when the hold cannot cover it. Nothing is bought to complete an order, so one your hold cannot pay for in goods is skipped rather than chased."
           >
             <OrderRow
               title="Fill every order the hold can cover"
-              hint="Nothing is bought to complete an order, so an order your hold cannot pay for in goods is skipped rather than chased."
               checked={orders.fill === "all"}
               disabled={off}
               onChange={(next) => set({ fill: next ? "all" : "none" })}
@@ -390,11 +398,10 @@ export function StandingOrdersModal({
 
           <Section
             title="Dusk"
-            hint="The shipyard's one standing choice. The purse and the hull's own ceiling are checked by the engine, so an order to upgrade that cannot be paid for simply does nothing."
+            hint="The shipyard's one standing choice: the next ship level, bought the moment the shipyard opens if the purse covers it. The purse and the hull's own ceiling are checked by the engine, so an order to upgrade that cannot be paid for simply does nothing."
           >
             <OrderRow
               title="Upgrade the hull when you can afford it"
-              hint="The next ship level, bought the moment the shipyard opens if the purse covers it."
               checked={orders.shipyard === "upgrade"}
               disabled={off}
               onChange={(next) =>

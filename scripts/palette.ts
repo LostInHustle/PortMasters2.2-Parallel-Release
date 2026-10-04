@@ -216,6 +216,23 @@ const WIDGETS: Widget[] = [
      hue and needs no hue that could collide with the panels it opens
      beside. */
   { name: "harbor", hue: 68, screens: ["phase:harbor"], what: "The pier" },
+  /* [W2: the path draft] The deal a dealing Gambit departure opens at,
+     between the pier and Dawn. It is a phase of the lap rather than one of
+     the leg's six (see PHASE_FACES), so it is listed here with a screen of
+     its own and nothing beside it: what this rung has to clear is the five
+     session surfaces every phase stands among. 207 does, with Members at
+     175 and Chat at 240 the nearest two at 32 and 33 degrees against a
+     floor of twenty, and it sits 170 degrees off the meaning red. Chart
+     at 210.4 and Standing Orders at 208 are nearer than that floor, and
+     both are legal by the dialog rule above: the one is a lobby surface
+     this screen never meets, and the other is a dialog, which dims the
+     board behind it and answers to its own screen. */
+  {
+    name: "path-draft",
+    hue: 207,
+    screens: ["phase:path-draft"],
+    what: "The Path Draft",
+  },
   {
     name: "dawn",
     hue: 325,

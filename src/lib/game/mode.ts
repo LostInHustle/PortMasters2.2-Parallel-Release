@@ -562,8 +562,19 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // orders before parley, where Classic reads parley before orders. The
     // six names are the design's, and the artisan bench, which used to be a
     // checkpoint of its own after the table, is the second half of Market.
+    //
+    // [W2: the path draft] And the seat this mode opens its rounds at: the
+    // hands are dealt as the voyage leaves the dock, so the first thing a
+    // round asks this table is which cards each captain keeps, and Dawn
+    // opens behind it. It is written here rather than folded in by a lap
+    // reader because it is one of this mode's own rules, like the orders
+    // order above it; the reader that honors the draft's own switch folds
+    // the seat back out of the lap when the switch is off (see lapOrder in
+    // ./checkpoint.ts), so the rolled back build walks the same seven
+    // entries it always did and opens at Dawn.
     checkpointPhaseOrder: [
       "harbor",
+      "path_draft",
       "dawn",
       "market",
       "orders",

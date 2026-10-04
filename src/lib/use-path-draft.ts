@@ -62,9 +62,9 @@ const CHANNEL = {
 // follows a reconnect asks again.
 //
 // The rest of the fields are read for the same reason every wire reader in
-// this build reads rather than asserts: the step is one of four, the
-// deadline and the open count are finite numbers, and the path is a path
-// this build has or nothing.
+// this build reads rather than asserts: the step is one of four, the open
+// count is a finite number, the reader's own answer is a boolean, and the
+// path is a path this build has or nothing.
 function readDraftView(data: unknown, roomId: string): DraftView | null {
   if (!data || typeof data !== "object") return null;
   const frame = data as Record<string, unknown>;
@@ -75,9 +75,6 @@ function readDraftView(data: unknown, roomId: string): DraftView | null {
   ) {
     return null;
   }
-  if (typeof frame.deadline !== "number" || !Number.isFinite(frame.deadline)) {
-    return null;
-  }
   if (
     typeof frame.open !== "number" ||
     !Number.isFinite(frame.open) ||
@@ -85,6 +82,7 @@ function readDraftView(data: unknown, roomId: string): DraftView | null {
   ) {
     return null;
   }
+  if (typeof frame.picked !== "boolean") return null;
   if (!Array.isArray(frame.hand) || frame.hand.length === 0) return null;
   const hand: PathId[] = [];
   for (const card of frame.hand) {
@@ -99,9 +97,9 @@ function readDraftView(data: unknown, roomId: string): DraftView | null {
     // Cast from the string the list was just asked about, the way
     // normalizeVoyageLogEntry casts the kind it checked the same way.
     step: frame.step as DraftStep,
-    deadline: Math.floor(frame.deadline),
     hand,
     open: Math.floor(frame.open),
+    picked: frame.picked,
     path,
   };
 }
@@ -177,8 +175,10 @@ export function usePathDraft(
     // The hand lives in the server's process and nowhere else, so a socket
     // that drops mid draft and comes back has to ask again: the reconnect is
     // a new connection that was never sent a view, and a captain left
-    // holding a stale hand with an expired clock would be reading three
-    // cards the table has already passed.
+    // holding a stale hand would be reading cards the table has already
+    // passed. The room held the seat for them while they were gone (see
+    // noteDraftAway on the server), so the view that comes back is the
+    // step the table is actually standing at.
     const request = (): void => {
       socket.emit(CHANNEL.stateRequest, { roomId });
     };
@@ -202,13 +202,30 @@ export function usePathDraft(
   // A card laid down. The index is into the hand the server dealt this
   // captain, which is the hand the view above is holding, and the server
   // refuses anything that is not in it.
+  //
+  // The press carries the step the hand was read off beside the index,
+  // because the index alone means nothing without it: the hands change
+  // when a step turns over, and a press that crossed a close would be
+  // read against cards this captain never saw (see takeDraftPick on the
+  // server, which refuses the stale answer rather than guessing). The
+  // view is where the step comes from, the same frame the cards came
+  // from, so a press is stamped with exactly what the captain was
+  // looking at; a press with no view to stamp is a press with no cards
+  // in front of it and is dropped here rather than sent to be refused.
   const keep = useCallback(
     (pick: number) => {
-      if (!socket || !roomId) return;
+      const answering = view?.roomId === roomId ? view : null;
+      if (!socket || !roomId || !answering || answering.step === "done") {
+        return;
+      }
       setError(null);
-      socket.emit(CHANNEL.keep, { roomId, pick });
+      socket.emit(CHANNEL.keep, {
+        roomId,
+        pick,
+        step: answering.step,
+      });
     },
-    [socket, roomId],
+    [socket, roomId, view],
   );
 
   // The press. It carries the path this captain means to sail on and asks

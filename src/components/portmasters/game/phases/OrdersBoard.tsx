@@ -87,14 +87,24 @@ function OrderCard({
   let totalVat = 0;
   let vatBreakdown: PriceBreakdown | null = null;
   if (o.isProductOrder) {
-    const product = o.resources[0].type;
-    vatBreakdown = explainVAT(
-      game,
-      product,
-      rewardBasis / o.resources[0].required!,
-    );
-    totalVat = vatBreakdown.final * o.resources[0].required!;
-    netProfit -= totalVat;
+    // Read the way completeOrder reads the taxed line (see the engine): a
+    // product card with no line, or a line with no count, is taxed on
+    // nothing rather than dividing by an absence. The non null assertion
+    // this replaces was the bug audit's finding: a save carrying a product
+    // card with an empty line threw out of a render rather than reading
+    // as an untaxed card, and the board would have disagreed with the
+    // engine about the same card.
+    const productRef = o.resources[0];
+    const productUnits = productRef?.required ?? 0;
+    if (productRef && productUnits > 0) {
+      vatBreakdown = explainVAT(
+        game,
+        productRef.type,
+        rewardBasis / productUnits,
+      );
+      totalVat = vatBreakdown.final * productUnits;
+      netProfit -= totalVat;
+    }
   }
   const brokerCommission = o.isBrokerFavor
     ? brokersFavorCommission(o.reward)
@@ -244,7 +254,12 @@ function OrderCard({
       }
     >
       {o.resources.map((r, i) => {
-        const has = (game.inventory[r.type] || 0) >= r.required!;
+        // The engine's own reading of a missing count (canFillOrder takes
+        // `?? 0`): a line with no count is a line needing nothing, so the
+        // tick agrees with the button the engine arms. The non null
+        // assertion this replaces read a doctored line as an impossible
+        // one, greying a card the fill would have accepted.
+        const has = (game.inventory[r.type] || 0) >= (r.required ?? 0);
         return (
           <div key={i} className="flex items-center text-[12px]">
             <span className="mr-1.5">{has ? "✅" : "❌"}</span>
@@ -254,7 +269,7 @@ function OrderCard({
                 {r.type}
               </span>
             </Term>
-            <span className="mx-1.5">×{r.required}</span>
+            <span className="mx-1.5">×{r.required ?? 0}</span>
             <span
               className="ml-auto text-[10px]"
               style={{ color: has ? "var(--gain)" : "var(--alarm)" }}

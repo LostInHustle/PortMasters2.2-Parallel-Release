@@ -396,7 +396,7 @@ export function explainCardPrice(
     const reduction = card.resources.reduce(
       (sum, r) =>
         carriesTag("good", r.type, "bulk")
-          ? sum + r.quantity! * hempReduction
+          ? sum + (r.quantity ?? 0) * hempReduction
           : sum,
       0,
     );

@@ -16,7 +16,8 @@ export function hasModule(state: GameState, id: string): boolean {
 
 // How many module slots this hull has open, which is the one place the
 // slot ladder is worked out: a hull takes one more module for every level
-// it climbs, so three at level three, four at four and five at five.
+// it climbs, and the climb ends at ship level three (see MAX_SHIP_LEVEL
+// in ../constants/ships), so the top of the ladder is three slots.
 //
 // It was three copies of the same comparison before F3 needed a fourth
 // (the shipyard's own slot line, the draft's install-or-swap label and the
@@ -39,8 +40,17 @@ export function moduleSlotsOpen(
 // (see BARTER_ITEMS in ../constants), so anything that reads or writes an
 // amount by item name goes through these two rather than reaching into
 // state.money / state.inventory directly.
+//
+// The Gold branch carries the same fallback its sibling always had: the
+// inventory's values are scrubbed to numbers by the load
+// (normalizeInventory), while the purse itself arrives as whatever the
+// save holds, and one damaged blob with a null purse turned every
+// affordability read into a comparison against NaN, which reads as
+// unaffordable everywhere, and let a trade settle its fee at zero while
+// the seller was still credited the agreed price. An unreadable purse now
+// reads as empty.
 export function getOwnedAmount(state: GameState, item: string): number {
-  return item === "Gold" ? state.money : state.inventory[item] || 0;
+  return item === "Gold" ? state.money || 0 : state.inventory[item] || 0;
 }
 
 // Exported here because the modules split out of engine.ts need it, but

@@ -7,6 +7,7 @@ import type { CardRecord } from "./constants/cards";
 import type { MilestoneTrigger } from "./constants/milestones";
 import { ITEMS, STARTING_STOCK } from "./constants/goods";
 import { LARDER_START, type FoodId } from "./constants/supplies";
+import { SHIP_UPGRADE_LADDER } from "./constants/ships";
 import {
   DEFAULT_DIFFICULTY,
   difficultyConfig,
@@ -42,6 +43,14 @@ export type LegPhase =
 
 export type Phase =
   | "harbor"
+  // [W2: the path draft] The seat a Gambit voyage opens its round at,
+  // between the pier and Dawn: the hands are dealt at departure and the
+  // room stops here while every captain keeps their cards. It is a seat
+  // the room waits on but not one of the leg's six, because the leg's
+  // phases are the work a round is made of and this is the deal that
+  // precedes the first of them; the lap still carries it (see ./mode.ts)
+  // so the rank, the gate and the catch up all read one order.
+  | "path_draft"
   | LegPhase
   // Personal sub states: a captain drafting or swapping a module is
   // standing in Dusk, and the room is not waiting on them.
@@ -276,6 +285,57 @@ type Loan = {
   amount: number;
   roundBorrowed: number;
 };
+
+// The cap a healed loan list is read under. One voyage's table is small
+// and a captain cannot lend more than once a leg to each of its seats, so
+// a list past this is not something this game could have written.
+const LOANS_MAX = 64;
+// The longest counterparty name a saved loan may carry, read the way the
+// crew's own stored names are: a display name on the accounts this build
+// makes is far shorter, so anything longer is damage rather than a name.
+const LOAN_NAME_MAX = 64;
+
+// The two loan lists read back into records every reader can trust.
+//
+// The bug audit's finding, closed at the load line the same way the
+// crew's names and the manifest's fills are: an entry missing its amount
+// would carry NaN through settleOutstandingDebts into the purse at the
+// end of the last round, and an entry with no counterparty could never be
+// repaid to anyone or closed on the server's ledger, so both are dropped
+// rather than repaired. The engine writes every entry with the full shape
+// above, so nothing this game wrote is ever dropped here.
+export function normalizeLoans(raw: unknown): Loan[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Loan[] = [];
+  for (const entry of raw) {
+    if (out.length >= LOANS_MAX) break;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const loan = entry as Record<string, unknown>;
+    if (typeof loan.id !== "string" || !loan.id) continue;
+    if (typeof loan.counterpartyId !== "string" || !loan.counterpartyId)
+      continue;
+    if (
+      typeof loan.counterpartyName !== "string" ||
+      !loan.counterpartyName ||
+      loan.counterpartyName.length > LOAN_NAME_MAX
+    )
+      continue;
+    if (typeof loan.amount !== "number" || !Number.isFinite(loan.amount))
+      continue;
+    out.push({
+      id: loan.id,
+      counterpartyId: loan.counterpartyId,
+      counterpartyName: loan.counterpartyName,
+      amount: Math.max(0, Math.floor(loan.amount)),
+      roundBorrowed:
+        typeof loan.roundBorrowed === "number" &&
+        Number.isFinite(loan.roundBorrowed)
+          ? Math.max(0, Math.floor(loan.roundBorrowed))
+          : 0,
+    });
+  }
+  return out;
+}
 
 // [H2: the fleet commission] One leg's worth of the harbor's objective
 // total, as a captain's own client last watched it. Exported because the
@@ -1065,7 +1125,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     garmentsTickRound: 0,
     fixedCost: cfg.maintenance,
     shipLevel: 0,
-    shipUpgradeCost: [15, 25, 40],
+    shipUpgradeCost: [...SHIP_UPGRADE_LADDER],
     shipUpgradePenalty: 0,
     maintenancePenalty: 0,
     // A voyage is born at the pier, before its first leg. See

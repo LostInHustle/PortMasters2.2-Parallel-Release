@@ -122,8 +122,81 @@ export function unequipModuleAccounting(
   state: GameState,
   mod: CardRecord,
 ): void {
-  if (mod.id === "bulk_hauler") state.shipUpgradePenalty -= 15;
-  if (mod.id === "overdrive_engine") state.maintenancePenalty -= 10;
+  if (mod.id === "bulk_hauler") state.shipUpgradePenalty -= BULK_HAULER_PENALTY;
+  if (mod.id === "overdrive_engine") {
+    state.maintenancePenalty -= OVERDRIVE_PENALTY;
+  }
+}
+
+// What each of the two surcharge modules adds to its bill, named once for
+// the three readers that must agree on it: the live accounting below, the
+// unwind above, and the load's own reconcile. The card records print the
+// same numbers to the captain (see the English descriptions for
+// bulk_hauler and overdrive_engine in ../constants/drafts), so a change
+// here that skips that copy would put the bill and the card's own promise
+// at odds.
+const BULK_HAULER_PENALTY = 15;
+const OVERDRIVE_PENALTY = 10;
+
+// The arrival side of the accounting, and the one place a landed module is
+// written down.
+//
+// The increment used to live inline at the end of equipModule while the
+// decrement above was already its own exported function, and the two
+// drifted the moment a module gained a third way onto a hull: the buyer's
+// side of a Parley module trade (see applyModuleTradeSide in ./modules)
+// bolts the card on without passing through equipModule, because
+// equipModule's slot guard must not stand between an agreed trade and its
+// settle. That branch pushed the card bare, so a traded bulk_hauler or
+// overdrive_engine was never charged its surcharge, and the first unwind
+// of that hull then subtracted one that was never added: the penalty read
+// -15 or -10, and payMaintenance's sum went below the tier fee line and
+// paid the captain Gold every Resolve instead of billing them. Every site
+// that bolts a module on now calls this one function, so "installed" is
+// one event wherever the card lands.
+//
+// The tally rides here for the reason the install site used to carry
+// alone: the draft's swap flow parks a choice in _newModule and a captain
+// can still back out of it, so counting at the park would count cards that
+// were never taken. It runs for the swap branch and the install branch
+// both, which the old inline call in the install branch alone did not: a
+// swapped-in module joins the hull the same as a fresh one, and a module
+// the trade delivered is counted the same way because its branch calls
+// this function too.
+export function installModuleAccounting(
+  state: GameState,
+  mod: CardRecord,
+): void {
+  if (mod.id === "bulk_hauler") state.shipUpgradePenalty += BULK_HAULER_PENALTY;
+  if (mod.id === "overdrive_engine") {
+    state.maintenancePenalty += OVERDRIVE_PENALTY;
+  }
+  noteCardPick(state.cardTally, mod);
+}
+
+// The two surcharges, read back off the hull that owes them.
+//
+// Inside a session the two doors above are exact mirrors, so the stored
+// fields agree with the hull. A save is the one place the two can
+// disagree, and one build wrote both directions of the mismatch: a module
+// that arrived through the trade's buyer branch before the accounting was
+// shared was never charged, so its hull reads 0 where 10 is owed and the
+// captain underpays every Resolve; and once that hull swapped the module
+// away, the unwind subtracted a surcharge that was never added, so the
+// field read -10 and payMaintenance paid the captain instead of billing
+// them. The load reconciles both fields to the count the hull itself
+// carries, which is the value every door above already maintains in the
+// same session, so an old save heals to the bill it should have been
+// paying without any reader changing.
+export function reconcileModulePenalties(state: GameState): void {
+  let upgrade = 0;
+  let maintenance = 0;
+  for (const mod of state.equippedModules) {
+    if (mod.id === "bulk_hauler") upgrade += BULK_HAULER_PENALTY;
+    if (mod.id === "overdrive_engine") maintenance += OVERDRIVE_PENALTY;
+  }
+  state.shipUpgradePenalty = upgrade;
+  state.maintenancePenalty = maintenance;
 }
 
 function equipModule(
@@ -146,19 +219,13 @@ function equipModule(
   } else {
     if (state.equippedModules.length < state.shipLevel) {
       state.equippedModules.push(mod);
-      // The pick is only written down where the card lands, which is the one
-      // place a module actually joins the hull: the swap flow parks a choice
-      // in _newModule and a captain can still back out of it, so counting
-      // there would count cards that were never taken.
-      noteCardPick(state.cardTally, mod);
       logs.push(`✅ Installed ${cardName(mod.id)}!`);
     } else {
       logs.push("❌ No empty slots! Must swap.");
       return;
     }
   }
-  if (mod.id === "bulk_hauler") state.shipUpgradePenalty += 15;
-  if (mod.id === "overdrive_engine") state.maintenancePenalty += 10;
+  installModuleAccounting(state, mod);
   // See note above: brokers_network no longer writes state.intelCost.
 }
 
@@ -454,11 +521,18 @@ export function finalizeModuleSwap(
 // The Shipyard's "Back" button, used to bail out of the module draft
 // (phase "module_draft") or the swap picker (phase "module_swap") without
 // committing to anything. Resets the captain to the Shipyard phase, which the
-// leg calls Dusk, and clears the two transients the draft might have parked:
-// the drafted pool itself (`_draftChoices`) and the half chosen swap target
-// (`_newModule`). Reopening the draft afterwards rolls a fresh pool, since
-// `startModuleDrafting` only skips the roll while `_draftChoices` is
-// non undefined.
+// leg calls Dusk, and clears the one transient the draft might have parked:
+// the half chosen swap target (`_newModule`).
+//
+// [bug cycle: backing out is not a reroll] The round's table is kept, not
+// cleared. The draw is stored rather than re-derived precisely so that
+// reopening the draft screen, including through this Back and then Draft
+// again loop, reshows whatever the round already has on offer (see
+// startModuleDrafting above); clearing it here re-enabled the unlimited
+// free reroll that the once a round swap cap below exists to close, since
+// startModuleDrafting rolls a fresh pool whenever the table is empty. The
+// half chosen swap target still goes, because a captain who left the yard
+// has not chosen anything, and the reopen shows every original option.
 //
 // Note: canceling here does NOT refund a `swapModuleChoices` reroll, on
 // purpose. The reroll was already spent the moment the new pool was rolled
@@ -468,7 +542,6 @@ export function finalizeModuleSwap(
 // is exactly the free reroll exploit the swap cap exists to close.
 export function cancelModuleDraft(state: GameState) {
   state.phase = "dusk";
-  state._draftChoices = undefined;
   state._newModule = undefined;
 }
 

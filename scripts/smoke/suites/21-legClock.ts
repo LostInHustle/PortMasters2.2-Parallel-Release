@@ -19,7 +19,8 @@ import {
   seatOf,
 } from "@/lib/game/phases";
 import type { Phase } from "@/lib/game/types";
-import { CARRIES_A_DASH, check } from "../harness";
+import { pathDraftOn } from "@/lib/game/flags";
+import { CARRIES_A_DASH, check, withEnv } from "../harness";
 
 export async function legClockSuite(): Promise<void> {
   // [B1: the six phase leg, as data] What the release changed, held to
@@ -44,29 +45,31 @@ export async function legClockSuite(): Promise<void> {
       `the ${badge} lap opens at the pier and visits every phase of the leg, once each`,
     );
     check(
-      lap.filter((phase) => !isLegPhase(phase)).length === 1,
-      "and carries nothing on it that is not a phase of the leg",
+      lap.filter((phase) => !isLegPhase(phase)).length ===
+        (pathDraftOn(mode) ? 2 : 1),
+      "and carries nothing on it that is not a phase of the leg, beyond the pier and the draft's own seat where the deal is on",
     );
     // Where a round actually opens, which is not the pier: the lap opens
-    // there so the room has a lobby, and the first leg phase is what the
-    // host's Set Sail opens the round at. Read as "the first entry that is
-    // leg work" rather than as "the second entry", so a lap that listed
-    // its phases in another order would still open correctly.
+    // there so the room has a lobby, and the first entry after it is what
+    // the host's Set Sail opens the round at, which is the path draft in a
+    // dealing Gambit harbor and Dawn everywhere else (see openingPhase,
+    // which reads the lap rather than naming either phase).
     check(
       openingPhase(mode) === lap[1] && isGatedPhase(mode, openingPhase(mode)),
-      `the ${badge} round opens at the first phase of the leg, which is a seat the room waits on`,
+      `the ${badge} round opens at the first seat after the pier, which is a seat the room waits on`,
     );
-    // The room waits where the lap says it waits, which is every phase of
-    // the leg and the pier nowhere in it. Bartering and artisan management
-    // used to be checkpoints of their own; neither names a lap seat now,
-    // so neither is a place the harbor can be made to wait.
+    // The room waits where the lap says it waits, which is every seat of
+    // the lap but the pier. Bartering and artisan management used to be
+    // checkpoints of their own; neither names a lap seat now, so neither
+    // is a place the harbor can be made to wait, and the draft's seat is
+    // one because a room that deals stops there.
     const gated = (Object.keys(PHASE_FACES) as Phase[]).filter((phase) =>
       isGatedPhase(mode, phase),
     );
     check(
-      gated.length === LEG_PHASE_ORDER.length &&
+      gated.length === LEG_PHASE_ORDER.length + (pathDraftOn(mode) ? 1 : 0) &&
         LEG_PHASE_ORDER.every((phase) => gated.includes(phase)),
-      `the ${badge} ready check gates the six phases of the leg and nothing else`,
+      `the ${badge} ready check gates every seat of its own lap but the pier and nothing else`,
     );
     // Where a round closes, which is a property of the lap rather than of
     // a phase name: the last entry settles the books, and a lap that
@@ -81,6 +84,29 @@ export async function legClockSuite(): Promise<void> {
       "and hands the closed round back to the pier it opened from",
     );
   }
+
+  // [W2: the path draft] The draft's seat is configuration rather than
+  // content, so the fold is read here the way a rolled back build reads
+  // it: with the deal switched off a dealing mode's lap is the founding
+  // seven again and the round opens at Dawn, which is the voyage this
+  // tree sailed before the feature existed. Read through withEnv rather
+  // than asserted about the record, because the fold lives in the lap's
+  // one reader and this is the switch that moves it.
+  check(
+    withEnv("NEXT_PUBLIC_PATH_DRAFT", "off", () => {
+      const lap = lapPhases("ocean_gambit");
+      return (
+        lap.length === 7 &&
+        !lap.includes("path_draft") &&
+        openingPhase("ocean_gambit") === "dawn" &&
+        !isGatedPhase("ocean_gambit", "path_draft")
+      );
+    }) &&
+      pathDraftOn("ocean_gambit") &&
+      lapPhases("ocean_gambit").length === 8 &&
+      openingPhase("ocean_gambit") === "path_draft",
+    "the draft's seat rides the lap only while the deal is on: a rolled back build runs the founding seven and opens at Dawn, and a dealing build carries the seat as its eighth entry, which is the step every reader of the lap folds the same way",
+  );
 
   // Every phase value this engine has ever persisted, and where a voyage
   // that is already sailing is placed when it loads one. The six landed

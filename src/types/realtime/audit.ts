@@ -84,4 +84,36 @@ export type AuditReveal = {
    * number and never on a placeholder.
    */
   larder?: number;
+  /**
+   * Whether the engine's own short rations rule reads true for this
+   * captain, carried beside the count because the count alone cannot
+   * answer it: the rule is an empty Larder aboard a crew with somebody on
+   * it (see onShortRations in @/lib/game/larder), so a captain who lost
+   * every hand and carries an empty hold is not on short rations, and a
+   * sentence drawn from the count alone told the room they were. The
+   * sentence and the badge print from this field, so the reveal says what
+   * the rule says rather than what the number suggests.
+   *
+   * Undefined wherever larder is.
+   */
+  shortRations?: boolean;
+  /**
+   * Whether the harbor's own ledger checks had already marked this
+   * captain's books when the vote carried.
+   *
+   * A marked save is one the Ledger Integrity Pass judged impossible (see
+   * @/lib/game/integrity), and every report in it is exactly as
+   * trustworthy as the number that failed the check. So a reveal for a
+   * marked row withholds the manifest and the Larder rather than printing
+   * evidence the harbor already knows is unsound, the same choice the
+   * finish ledger makes for a forged voyage (see revealRow), and the flag
+   * is the one thing such a reveal carries instead. It is a boolean
+   * rather than the finding on purpose: the note behind it names the four
+   * aggregate fields the pass reads, which is the operator's reading and
+   * not the table's.
+   *
+   * Absent on every ordinary reveal, so a frame without it is the shape
+   * this wire has always had, and the smoke suite asserts both shapes.
+   */
+  flagged?: boolean;
 };

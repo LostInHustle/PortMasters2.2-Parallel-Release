@@ -93,11 +93,12 @@ export function ModuleSwap({
         // ModuleDraft "Back to Shipyard" button below: this one keeps the
         // already drafted pool and the picked _newModule, just lands the
         // captain back on the picker so they can reconsider. cancelModuleDraft
-        // would throw both away and bounce all the way to the Shipyard, so
-        // this is the one place we still set the phase directly. There is no
-        // engine helper for "back to draft but keep the choice" because that
-        // state is already valid: phase = "module_draft" with _draftChoices
-        // and _newModule intact is exactly what startModuleDrafting produces.
+        // would drop the half chosen swap and bounce all the way to the
+        // Shipyard, so this is the one place we still set the phase directly.
+        // There is no engine helper for "back to draft but keep the choice"
+        // because that state is already valid: phase = "module_draft" with
+        // _draftChoices and _newModule intact is exactly what
+        // startModuleDrafting produces.
         onClick={() =>
           act((g, _l) => {
             g.phase = "module_draft";

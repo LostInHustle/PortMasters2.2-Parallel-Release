@@ -19,7 +19,7 @@ import type { TallyRow } from "@/lib/voteTally";
 export function VoteTallyRows({ rows }: { rows: TallyRow[] }) {
   if (rows.length === 0) return null;
   return (
-    <div className="mt-3 space-y-0.5 text-center">
+    <div className="mt-3 space-y-0.5">
       {rows.map((row) => (
         <p key={row.targetId} className="text-[11px]">
           <span className="font-medium">{row.name}</span>

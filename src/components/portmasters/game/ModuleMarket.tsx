@@ -110,9 +110,9 @@ export function ModuleMarket({
       <p className="text-center text-[11px] text-muted-foreground mb-3 max-w-xl mx-auto">
         A module bolted to a hull, sold at a price the two of you agree. It
         comes off the seller&apos;s hull and onto the buyer&apos;s the moment
-        the two of you shake hands, so the buyer needs an open slot: three at
-        ship level three, four at four and five at five. The fee is paid when
-        you shake hands.
+        the two of you shake hands, so the buyer needs an open slot, and a
+        hull&apos;s ladder tops out at three slots at ship level three. The fee
+        is paid when you shake hands.
       </p>
 
       {/* The listing form belongs to a captain with something to sell. A

@@ -14,13 +14,19 @@ import {
 import { cn } from "@/lib/utils";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
-import { AuditVoteCard } from "../AuditPanel";
-import { HarbormasterConsole, MaroonVoteCard } from "../MaroonPanel";
+import { AuditVoteCard, auditCardShown, auditVoteOpen } from "../AuditPanel";
+import {
+  HarbormasterConsole,
+  MaroonVoteCard,
+  maroonCardShown,
+  maroonVoteOpen,
+} from "../MaroonPanel";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
 import { ModuleMarket } from "../ModuleMarket";
 import { BazaarRumors } from "../BazaarRumors";
-import { OpenBoons } from "../OpenBoons";
+import { hasLedgerRows, OpenBoons } from "../OpenBoons";
+import { FoldRow } from "../FoldRow";
 import {
   HuePanel,
   PanelHeading,
@@ -50,9 +56,12 @@ import {
 // Harbormaster's console, the two votes and the fleet's ledger draw under
 // the strip on both stations, because a vote a captain cannot see is a
 // vote they cannot cast, and because the ledger is where the table argues
-// about what each seat passed on. The strip itself draws only when a
-// market is switched on, so a Classic harbor opens exactly the exchange
-// it always had, with no second station to visit.
+// about what each seat passed on. Those three are one fold now (W4,
+// UX-3 in docs/STUDIO_AUDIT.md): below the console and above the board,
+// led open while a vote is live and collapsed to one row otherwise. The
+// strip itself draws only when a market is switched on, so a Classic
+// harbor opens exactly the exchange it always had, with no second
+// station to visit and no business fold at all.
 type Station = "exchange" | "markets";
 
 const STATIONS: { id: Station; label: string; icon: string }[] = [
@@ -108,6 +117,13 @@ export function Parley({
   const otherMembers = members.filter((m) => m.id !== me.id);
   const [station, setStation] = useState<Station>("exchange");
 
+  // The harbor's business, behind one fold (W4, UX-3 in
+  // docs/STUDIO_AUDIT.md). The override is a tri-state on purpose: null
+  // means "however the table stands", so the fold leads open the moment a
+  // vote is live and closes itself when the last one is spent, while a
+  // captain who has pressed the row keeps the answer they gave.
+  const [bizOpen, setBizOpen] = useState<boolean | null>(null);
+
   // Whether this harbor has a market to trade with. The strip draws only
   // when it has, so a Classic harbor (where all three markets draw
   // nothing at all) opens on the exchange with no second station to
@@ -116,6 +132,30 @@ export function Parley({
     escortContractsOn(game.mode) ||
     moduleTradesOn(game.mode) ||
     bazaarRumorsOn(game.mode);
+
+  // The three things the fold holds, and whether any of them earns it: a
+  // live vote, a vote this voyage can still open (each card carries its
+  // own explanation), or a pick on the ledger. The visibility readers
+  // live beside each vote (../AuditPanel, ../MaroonPanel, ../OpenBoons),
+  // so this fold and the cards cannot disagree about when the harbor is
+  // voting. A Classic harbor draws none of the three, which is what
+  // keeps the fold off its screen.
+  const auditLive = auditVoteOpen(game, audit);
+  const maroonLive = maroonVoteOpen(game, maroon);
+  const anyLive = auditLive || maroonLive;
+  const ledgerShown = hasLedgerRows(members, boons.entries);
+  const businessShown =
+    auditCardShown(game, audit) || maroonCardShown(game, maroon) || ledgerShown;
+  const businessOpen = bizOpen ?? anyLive;
+  const businessGist = anyLive
+    ? auditLive && maroonLive
+      ? "Two votes are open: the audit and the maroon."
+      : auditLive
+        ? "The audit vote is open."
+        : "The maroon vote is open."
+    : ledgerShown
+      ? "No vote is open. The fleet's picks are on the record."
+      : "No vote is open yet.";
 
   // [H6: the Manifest Audit] The leg this screen is on ends the moment the
   // vote carries, so the captain reads the finding on the strip above and
@@ -175,38 +215,53 @@ export function Parley({
         </div>
       )}
 
-      {/* [H7: Maroon and the Harbormaster] The console sits above the two
-          votes because it belongs to one captain and it is the reason this
+      {/* [H7: Maroon and the Harbormaster] The console sits above the fold
+          because it belongs to one captain and it is the reason this
           screen is open for them: everything under it is the table's
           business, and this is theirs. It renders nothing at all for a
           captain the harbor has not put ashore. */}
       <HarbormasterConsole game={game} maroon={maroon} />
 
-      <AuditVoteCard game={game} members={members} me={me} audit={audit} />
-
-      <MaroonVoteCard
-        game={game}
-        members={members}
-        me={me}
-        maroon={maroon}
-        statuses={roster?.statuses}
-      />
-
-      {/* [F5: public offers] The fleet's ledger, under the two votes and
-          above the two stations: everything above it is a captain's
-          business made public (a vote, a finding), and this is the other
-          half of that sentence, the picks each seat made in the open. It
-          is the plan's evaluation surface, where the table argues about
-          what a captain passed on, so it sits where the argument happens
-          rather than where the picks were made. It draws nothing at all
-          until a first pick lands, and nothing ever in a Classic harbor. */}
-      <OpenBoons
-        game={game}
-        me={me}
-        members={members}
-        entries={boons.entries}
-        className="mb-4"
-      />
+      {/* [H6: the Manifest Audit, H7: Maroon, F5: public offers] The
+          harbor's business, behind one fold: the two votes and the
+          fleet's ledger used to stack up to three panels, two of them
+          folds of their own, between the strip and the board. They are
+          one row now, and the row leads open exactly while a vote is
+          live, because a vote a captain cannot see is a vote they cannot
+          cast. Each vote card leaves the board once its vote is spent
+          (the strips carry the outcome) and each stays inside this fold
+          until its window has passed the voyage by, so a mode's headline
+          mechanic is still explained to the first captain who opens the
+          row. The ledger is the plan's evaluation surface, where the
+          table argues about what each seat passed on, so it sits where
+          the argument happens rather than where the picks were made, and
+          it draws nothing at all until a first pick lands. */}
+      {businessShown && (
+        <FoldRow
+          tone="intel"
+          icon="⚖️"
+          title="Harbor Business"
+          gist={businessGist}
+          open={businessOpen}
+          onToggle={() => setBizOpen(!businessOpen)}
+          className="mb-4"
+        >
+          <AuditVoteCard game={game} members={members} me={me} audit={audit} />
+          <MaroonVoteCard
+            game={game}
+            members={members}
+            me={me}
+            maroon={maroon}
+            statuses={roster?.statuses}
+          />
+          <OpenBoons
+            game={game}
+            me={me}
+            members={members}
+            entries={boons.entries}
+          />
+        </FoldRow>
+      )}
 
       {station === "exchange" ? (
         <>

@@ -56,7 +56,7 @@ export const CHARTER_LEG = 4;
 // What a captain meets when the moment arrives: the glyph and the two
 // lines the overlay prints, the same three fields a milestone moment
 // carries, because the same overlay prints both (see ./milestones).
-export interface CharterMoment {
+interface CharterMoment {
   icon: string;
   title: string;
   line: string;

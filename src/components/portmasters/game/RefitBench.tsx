@@ -30,7 +30,6 @@ import {
 import { garmentRoom, garmentSpec } from "@/lib/game/garments";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { Shirt } from "lucide-react";
 import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
 import type { Refit } from "./phases/PhaseShared";
 
@@ -111,14 +110,11 @@ export function RefitBench({
   ).filter((worn) => garmentRoom(game, worn) > 0);
 
   return (
-    <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-refit mb-1.5">
-        <Shirt className="h-3.5 w-3.5" />
-        {SELLER_PATH.crest} Loom Refit Bench
-        <span className="font-normal text-muted-foreground ml-1">
-          a garment put right in one leg
-        </span>
-      </div>
+    <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5">
+      {/* The bench's own heading line is gone (W4): the fold row above it
+          already names the desk, so the only thing a header here added was
+          a third repetition of the same sentence between the row and the
+          paragraph that explains the trade. */}
       <p className="text-[11px] text-muted-foreground mb-2 max-w-2xl">
         Clothes lose a point of wear every leg and two on a cold one. A{" "}
         {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a

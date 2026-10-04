@@ -256,7 +256,14 @@ export {
 } from "./engine/barterAccess";
 
 // ========== Artisans ==========
-export { assignTask, fireWorker, hireWorker } from "./engine/workers";
+export {
+  assignTask,
+  fireWorker,
+  hireWorker,
+  payMaintenance,
+  payWages,
+  wageBill,
+} from "./engine/workers";
 
 // ========== A seat that failed ==========
 // [H7: Maroon and the Harbormaster] The harbor's two ways of writing a
@@ -277,6 +284,10 @@ export {
   // before the Draft button, and the answer has to be the roll's own
   // predicate rather than a second guess written at the button.
   moduleDraftPossible,
+  // The load's own reconcile for the two surcharge fields, forwarded for
+  // the reason the rest of this block is: the heal has to read the same
+  // accounting the doors write rather than a second copy of the rules.
+  reconcileModulePenalties,
   startBoonDrafting,
   startModuleDrafting,
   swapBoonChoices,

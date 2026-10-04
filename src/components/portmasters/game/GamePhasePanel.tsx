@@ -11,6 +11,7 @@ import { MilestoneDraft } from "./phases/MilestoneDraft";
 import { Market } from "./phases/Market";
 import { Parley } from "./phases/Parley";
 import { Orders } from "./phases/Orders";
+import { PathDraft } from "./phases/PathDraft";
 import { Settlement } from "./phases/Settlement";
 import { Shipyard, ModuleDraft, ModuleSwap } from "./phases/Shipyard";
 import { VoyageLogPanel } from "./VoyageLogPanel";
@@ -173,6 +174,7 @@ function ActivePhase(props: Props) {
     myLegacy,
     onRestart,
     roster,
+    draft,
   } = props;
   const p = game.phase;
 
@@ -188,6 +190,17 @@ function ActivePhase(props: Props) {
           onTutorialOpen={onTutorialOpen}
         />
       );
+    case "path_draft":
+      // [W2: the path draft] The deal's own screen, at the seat a dealing
+      // Gambit departure opens at. It is a whole stage rather than a strip
+      // above the board, which is the change the seat itself made: the
+      // cards used to be dealt over the opening leg and drawn as a band
+      // across the table, and a captain reading them was reading their
+      // first market behind the cards. The panel takes the deal's own
+      // board and nothing else; the wait inside it is the room's count
+      // rather than a button, so there is no ready footer here to draw
+      // (see canLeavePhase, which refuses this seat).
+      return <PathDraft draft={draft} />;
     case "dawn":
       return (
         <BoonDraft

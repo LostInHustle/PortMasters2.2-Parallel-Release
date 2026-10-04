@@ -393,6 +393,24 @@ export function sweepAbsentBorrowerLoans(
   if (sweptAny) broadcastLoans(io, roomId);
 }
 
+// [bug cycle: the settled purse] The beat the conclusion stops for after
+// its own sweeps, before it reads the room back. The sweeps are what pays
+// the last money of a voyage out: an escrow returns to its poster when
+// the trade board clears, an open venture refunds its half, and each of
+// those lands in a captain's own client and comes back on that client's
+// next broadcast. Two cadences are what the number is measured against:
+// the status beacon follows any change to a voyage within 120ms, and the
+// autosave follows one within 700ms, so a beat of a second and a half
+// stands past both with room for a window the browser has throttled into
+// the background. It is paid once per concluded voyage, and a verdict
+// read a beat early is a captain told they lost a goal their own endgame
+// screen says they met.
+const SETTLEMENT_BEAT_MS = 1500;
+
+export function awaitSettlementBeat(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, SETTLEMENT_BEAT_MS));
+}
+
 export function readForgedUsers(
   roomId: string,
   finished: FinishedCaptain[],

@@ -28,16 +28,26 @@ import type { PathId } from "@/lib/game/paths";
 // the feature names, and reads them for a hand that is not the one that
 // seat was dealt.
 //
-// The step is the draft's clock as well as its beat: three steps, fifteen
-// seconds each, which is the plan's forty five second interface read as
-// three decisions rather than one. `deadline` is an epoch stamp rather
-// than a countdown so two clients cannot disagree about how much time is
-// left, and it is the server's clock in both cases.
+// The step is the draft's beat and nothing else. Three steps, three keeps,
+// and each one turns over when every seat has answered rather than when a
+// clock runs out: the room waits for its captains, and there is no
+// countdown on any surface for a client to render or to disagree about.
+// A seat whose connection has gone is laid its first card by the room's
+// own absence watch, which is timing nothing anyone is shown (see the
+// server half in src/server/realtime/draft).
 //
 // `open` is how many captains at the table have still to choose this step,
 // which is a count and never a card, so it is safe to put in front of the
-// table and it is what makes the clock legible: a captain knows whether
+// table and it is what makes the wait legible: a captain knows whether
 // they are waiting on four people or on one.
+//
+// `picked` is whether this reader's own card is down, which the count
+// cannot say and the reader's screen needs: a captain whose tab went dark
+// mid step comes back to a hand the room has already laid a card from (see
+// the absence watch in src/server/realtime/draft), and the view has to be
+// what tells them, because the screen that does not know offers the cards
+// again and then refuses the press. It is the reader's own answer and never
+// a card, so it tells the table nothing `open` does not already.
 //
 // `path` is the whole of the result and is null until the draft is done.
 // A finished view is sent once more to every seat when the last step
@@ -64,9 +74,9 @@ export const DRAFT_STEPS: readonly DraftStep[] = [
 export type DraftView = {
   roomId: string;
   step: DraftStep;
-  deadline: number;
   hand: PathId[];
   open: number;
+  picked: boolean;
   path: PathId | null;
 };
 

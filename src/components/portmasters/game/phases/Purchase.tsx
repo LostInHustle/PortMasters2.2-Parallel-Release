@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Anchor } from "lucide-react";
+import { refitsOn } from "@/lib/game/engine";
 import { FoldRow } from "../FoldRow";
 import { RefitBench } from "../RefitBench";
 import { IntelBanner, PanelTitle, type PhasePanelProps } from "./PhaseShared";
@@ -38,6 +39,7 @@ export function Purchase({
 }) {
   const resolveColor = itemColorResolver(colorFor);
   const [readingsOpen, setReadingsOpen] = useState(false);
+  const [benchOpen, setBenchOpen] = useState(false);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -98,18 +100,31 @@ export function Purchase({
         </div>
       </FoldRow>
       <Provisions game={game} act={act} />
-      {/* [D4: Loom: the Refit] The bench stands at the foot of the merchant's
-          own panels, because a captain reads what the harbor is selling
-          before they read what a neighbour is. It draws itself out of the
-          tree wherever the refit switch is off, so this line costs a build
-          without the bench nothing. */}
-      <RefitBench
-        game={game}
-        act={act}
-        refit={refit}
-        me={me}
-        members={members}
-      />
+      {/* [D4: Loom: the Refit] The bench folds, because it is a desk a
+          captain visits rather than the screen they buy on: the board and
+          the larder lead, and a Loom captain or a captain shopping for a
+          mend opens one row. It draws itself out of the tree wherever the
+          refit switch is off, so this line costs a build without the
+          bench nothing. */}
+      {refitsOn(game.mode) && (
+        <FoldRow
+          tone="refit"
+          icon="🪡"
+          title="Refit Bench"
+          gist="A Loom captain's work: a garment put right in one leg, at a fee the two of you agree."
+          open={benchOpen}
+          onToggle={() => setBenchOpen((v) => !v)}
+          className="mb-3.5"
+        >
+          <RefitBench
+            game={game}
+            act={act}
+            refit={refit}
+            me={me}
+            members={members}
+          />
+        </FoldRow>
+      )}
       <div className="mt-5 text-center">
         <Button className="rounded-xl px-6" onClick={onContinue}>
           ✅ Board Done, to the Artisan Bench

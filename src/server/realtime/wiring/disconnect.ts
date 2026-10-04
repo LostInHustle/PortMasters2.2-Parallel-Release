@@ -5,6 +5,7 @@
 import type { Server, Socket } from "socket.io";
 
 import { emitRoomMembers } from "../chat";
+import { noteDraftAway } from "../draft";
 import {
   broadcastPresence,
   forgetSocket,
@@ -37,7 +38,15 @@ export function wireDisconnect(
           content: `${s.user.displayName} has gone ashore`,
         });
         void emitRoomMembers(io, s.roomId);
-        if (!set || set.size === 0)
+        if (!set || set.size === 0) {
+          // [W2: the path draft] A live draft holds the room at the
+          // draft's seat, so a seat whose last socket just went is a seat
+          // the draft would otherwise wait on forever. The draft's own
+          // absence watch gives it a window to come back and then lays
+          // its first card, which is the module's business and not this
+          // frame's: this call only tells it that the socket is gone (see
+          // noteDraftAway in ../draft).
+          noteDraftAway(io, s.roomId, s.userId);
           scheduleDeparture(
             io,
             s.roomId,
@@ -45,6 +54,7 @@ export function wireDisconnect(
             s.user.displayName,
             departureCleanup,
           );
+        }
       }
       // A disconnect also pulls the captain out of the Quick Start
       // queue, so a closed tab doesn't leave a phantom entry that

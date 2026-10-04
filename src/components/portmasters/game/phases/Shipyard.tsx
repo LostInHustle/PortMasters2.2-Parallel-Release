@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
 import {
@@ -17,6 +18,8 @@ import {
 import { heldPower } from "@/lib/game/held-cards";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
+import { FoldRow } from "../FoldRow";
+import { PanelNote } from "./PhasePanels";
 import {
   PhaseClockBar,
   PhaseHeading,
@@ -39,6 +42,7 @@ export function Shipyard({
   phaseSync,
   members,
 }: Pick<PhasePanelProps, "game" | "ctx" | "act" | "phaseSync" | "members">) {
+  const [rigOpen, setRigOpen] = useState(false);
   const canUpgrade = game.shipLevel < MAX_SHIP_LEVEL;
   const upgCost = canUpgrade
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
@@ -77,8 +81,30 @@ export function Shipyard({
         <div className="text-sm text-dusk mt-1.5">
           ⚡ Hull Power: {heldPower(game)} / {HELD_POWER_CAP}
         </div>
-        {game.equippedModules.length ? (
-          <div className="mt-3 space-y-1">
+        {game.equippedModules.length === 0 && (
+          <PanelNote className="mt-2 text-xs">
+            No modules installed. Upgrade ship to unlock slots!
+          </PanelNote>
+        )}
+      </div>
+      {/* The fit folds (W4): the rows used to print every module's full
+          description inline under the hull's figures, with the synergy
+          analyzer stacked over them after that, which is a wall of small
+          print on a screen whose decision is two buttons. The gist names
+          what is aboard and what it weighs, and the rows and the analyzer
+          wait behind the one chevron, the same fold the market's readings
+          wear (see FoldRow). */}
+      {game.equippedModules.length > 0 && (
+        <FoldRow
+          tone="dusk"
+          icon="🔌"
+          title="Modules Aboard"
+          gist={`${game.equippedModules.length} installed, power ${heldPower(game)} of ${HELD_POWER_CAP}.`}
+          open={rigOpen}
+          onToggle={() => setRigOpen((v) => !v)}
+          className="mb-3.5"
+        >
+          <div className="space-y-1">
             {game.equippedModules.map((card) => {
               const text = cardText(card);
               return (
@@ -92,15 +118,13 @@ export function Shipyard({
               );
             })}
           </div>
-        ) : (
-          <div className="text-xs text-muted-foreground mt-2">
-            No modules installed. Upgrade ship to unlock slots!
-          </div>
-        )}
-      </div>
-      {/* Module Synergy Analyzer */}
-      {game.equippedModules.length >= 2 && (
-        <ModuleSynergyAnalyzer modules={game.equippedModules} />
+          {/* Module Synergy Analyzer */}
+          {game.equippedModules.length >= 2 && (
+            <div className="mt-2">
+              <ModuleSynergyAnalyzer modules={game.equippedModules} />
+            </div>
+          )}
+        </FoldRow>
       )}
       {phaseSync.waiting ? (
         <PhaseWaiting
@@ -145,11 +169,11 @@ export function Shipyard({
               : "🔧 Draft & Install Module"}
           </Button>
           {game.shipLevel > 0 && !draftDealable && (
-            <p className="text-center text-[11px] text-muted-foreground">
+            <PanelNote className="text-center text-[11px]">
               Every module the yard could deal would pass this hull&apos;s{" "}
               {HELD_POWER_CAP} power. Selling one at the Parley table makes
               room.
-            </p>
+            </PanelNote>
           )}
           <Button
             size="lg"

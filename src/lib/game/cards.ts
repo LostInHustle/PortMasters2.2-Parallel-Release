@@ -325,7 +325,7 @@ export type CardTally = Record<string, { offered: number; picked: number }>;
 // the two instruments agree about what counts as evidence.
 export const CARD_CONVERSION_FLOOR = 40;
 
-export type CardReading = {
+type CardReading = {
   id: string;
   name: string;
   kind: CardKind;
