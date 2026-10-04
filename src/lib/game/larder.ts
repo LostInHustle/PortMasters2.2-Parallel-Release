@@ -164,9 +164,20 @@ export function feedCrew(state: GameState, logs: string[]): boolean {
   // hold, so a count ahead of the account still costs the crew the meal
   // the game says they ate, and a pantry the meal empties draws less than
   // the crew asked for and leaves the shortage below to say so.
-  drawMeals(state, crew);
+  //
+  // [F4: boons at milestone moments] Steady Watch, the boon a lost hand
+  // deals, is the one thing in the game that changes what the meal costs:
+  // its flag is the number of rations the leg saves, floored at one so a
+  // crew of one still eats (a meal of nobody would make the boon a
+  // starvation switch rather than a saving). Everything below reads the
+  // need rather than the headcount, so the pantry draw, the count and
+  // the ledger line all speak about the same meal; the short rations
+  // line still reads the headcount, because that line is about the
+  // mouths aboard rather than about what they were served.
+  const need = Math.max(1, crew - (state.modifierFlags.steady_rations ?? 0));
+  drawMeals(state, need);
   const before = state.larder;
-  state.larder = Math.max(0, before - crew);
+  state.larder = Math.max(0, before - need);
   if (state.larder === 0) {
     // The number in the sentence is read off the constant rather than
     // written into the words, the way the unlock line reads its own
@@ -178,7 +189,7 @@ export function feedCrew(state: GameState, logs: string[]): boolean {
     return true;
   }
   logs.push(
-    `🍲 The crew eats ${crew} ${crew === 1 ? "ration" : "rations"}. ${state.larder} left in the larder.`,
+    `🍲 The crew eats ${need} ${need === 1 ? "ration" : "rations"}. ${state.larder} left in the larder.`,
   );
   return true;
 }

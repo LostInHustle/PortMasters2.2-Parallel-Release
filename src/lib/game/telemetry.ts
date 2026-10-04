@@ -240,6 +240,19 @@ export interface TelemetryPayloads {
     // the legs, since each leg's copy carries the running total.
     foodSpend?: number;
     bargeSpend?: number;
+    // [F4: boons at milestone moments] The plan's evaluation of this
+    // feature is whether the milestone boons matter: "track boon pick rate
+    // against voyage outcome so it is visible whether boons cluster on
+    // voyages that were already winning". The pick rate is read off the
+    // card tally the draft already writes, and the outcome half is read
+    // off retention: this field is the voyage's crew losses so far, the
+    // one number that sorts each captain into the cohort the report
+    // compares (see npm run report:milestones). It is a voyage running
+    // total rather than a leg figure, on E1's rule above and for the same
+    // reason, and it rides the loss rule's own switch: a leg sailed
+    // without the rule reports nothing rather than reporting a zero that
+    // would sort the captain into the wrong cohort.
+    crewLosses?: number;
   };
   // [B2: hard timers, the server as timekeeper] A leg's clock ran out and
   // the room was moved on without every captain having readied. The tally
@@ -280,6 +293,32 @@ export interface TelemetryPayloads {
   // this event counted per voyage against the voyages that could have
   // switched one.
   path_switched: { leg: number; actor: string; path: string };
+  // [F6: charters at leg four] The voyage's one charter, written once per
+  // captain per voyage by the server and never by the client. The plan's
+  // two evaluations of this feature both need the path and the alignment
+  // on the same row as the card: the split within a path (whether the two
+  // charters a path offers are taken at even rates) and the cover rate
+  // (whether the salvage charter is taken by honest captains and by
+  // pirates at the same rate, because a charter only traitors take has
+  // stopped being cover). Neither field rides the wire, and that is the
+  // classification rather than a convenience: the client claims the card
+  // id alone, the path is read from the room's own draft book, and the
+  // alignment from the same table the voyage's end already reads, at one
+  // call site inside the room's realtime layer. A take the server cannot
+  // attribute on both is not written, because a guessed field on an
+  // operator measurement is worse than a missing one. The role field
+  // lives operator side by construction: it rides a stored record the
+  // balance dashboard reads and no frame any captain receives, which is
+  // the same side of the line the chronicle's per captain alignment
+  // already stands on. The leg is the accumulator's, like every event
+  // above, so the claim's own leg number never reaches the record.
+  charter_taken: {
+    leg: number;
+    actor: string;
+    charter: string;
+    path: string;
+    role: string;
+  };
   // ---- market ----
   // The barter board's three outcomes. All three count the same side of an
   // offer, the units its poster put up, so the three add up: what was
@@ -340,6 +379,7 @@ export const TELEMETRY_FAMILY: Record<TelemetryName, TelemetryFamily> = {
   leg_timed_out: "loop",
   path_taken: "loop",
   path_switched: "loop",
+  charter_taken: "loop",
   offer_posted: "market",
   offer_filled: "market",
   offer_expired: "market",
@@ -430,6 +470,16 @@ export interface TelemetryCaptain {
   // chronicle's own line for them, which is the join this field makes
   // without needing one.
   muted: boolean;
+  // [F4: boons at milestone moments] Whether this captain's voyage lost a
+  // hand at any point. Marked at the same call that keeps the leg report
+  // carrying the loss count, so a line and an event cannot disagree, and
+  // read at the mark rather than joined out of the events for the reason
+  // the two fields above are: a truncated record still says who lost one.
+  // It is the cohort half of the plan's evaluation of this feature: the
+  // retention table (see npm run report:milestones) reads it against
+  // presentAtEnd above, which is the same one pass over these lines the
+  // maroon's retention figure makes, taken once per cohort.
+  crewLost: boolean;
 }
 
 // The record one voyage leaves behind. The header is everything a reader
@@ -504,13 +554,14 @@ export function normalizeRecord(value: unknown): TelemetryRecord | null {
         userId: line.userId,
         presentAtEnd: line.presentAtEnd === true,
         // A line written before these reads existed reads as a captain the
-        // harbor did not put ashore, was not silenced, and who took nothing
-        // in trade, which is the same absence an unreadable save gives. That
-        // is the no backfill rule: an old record is read with defaults
-        // rather than rewritten, and no record carries a null a reader would
-        // have to special case.
+        // harbor did not put ashore, was not silenced, lost no hand, and
+        // who took nothing in trade, which is the same absence an
+        // unreadable save gives. That is the no backfill rule: an old
+        // record is read with defaults rather than rewritten, and no
+        // record carries a null a reader would have to special case.
         marooned: line.marooned === true,
         muted: line.muted === true,
+        crewLost: line.crewLost === true,
         peerTradeProfit: normalizeProfit(line.peerTradeProfit),
       })),
     events: events.filter(

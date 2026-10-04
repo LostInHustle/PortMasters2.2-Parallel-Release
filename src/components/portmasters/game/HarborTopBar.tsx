@@ -164,15 +164,24 @@ export function HarborTopBar({
               </Pill>
             )}
           </Button>
-          <div className="flex items-center gap-2 pl-2 border-l border-black/5 dark:border-white/10">
+          <div className="flex items-center gap-2 sm:pl-2 sm:border-l border-black/5 dark:border-white/10">
             <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
+            {/* Below the sm width the Leave button is its glyph alone,
+                with the name kept in the title and the aria label: the
+                labelled button and the divider before it were the last
+                two things pushing the bar's controls onto a second row
+                on a phone, and a second row of chrome is a second row
+                of board the captain cannot see. */}
             <Button
               variant="ghost"
               size="sm"
               className="rounded-lg"
+              aria-label="Leave the harbor"
+              title="Leave the harbor"
               onClick={onLeave}
             >
-              <DoorOpen className="h-4 w-4 mr-1.5" /> Leave
+              <DoorOpen className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Leave</span>
             </Button>
           </div>
         </div>

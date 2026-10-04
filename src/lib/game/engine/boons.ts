@@ -32,13 +32,16 @@ import {
   offerPool,
 } from "../cards";
 import type { CardRecord } from "../constants/cards";
+import { HELD_POWER_CAP } from "../constants/cards";
 import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
+import { heldFlagsOf, heldPower, powerBudgetAllows } from "../held-cards";
 import { feedCrew } from "../larder";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
+import { noteDawnMilestones } from "./milestones";
 
 // The three cards a leg puts in front of a captain.
 //
@@ -66,9 +69,17 @@ function draftBoons(state: GameState): CardRecord[] {
 // finds a boon) but which the compiler is right to ask about, and a card
 // that somehow arrived here without flags is a card that changes nothing
 // rather than a crash inside a round.
+//
+// [F4: boons at milestone moments] The held flags are folded in under the
+// round's, so a boon taken from a moment rides through this write the same
+// way it rides through the round's rollover (see endRound in ./lifecycle
+// and heldFlagsOf in ../held-cards). The two sides cannot collide, and
+// that is the pool validator's doing rather than this spread's (see the
+// one owner per key clause in ../cards), so the order here is a
+// declaration of precedence rather than a rule anything depends on.
 function applyBoon(state: GameState, card: CardRecord, logs: string[]) {
   if (card.effect.kind !== "flags") return;
-  state.modifierFlags = card.effect.flags;
+  state.modifierFlags = { ...card.effect.flags, ...heldFlagsOf(state) };
   if (card.effect.flags.instant_gold) {
     state.money += card.effect.flags.instant_gold;
     logs.push(
@@ -169,6 +180,12 @@ export function startBoonDrafting(state: GameState, logs: string[]) {
   // mouths and the roster is who they are, so the rule that takes a hand
   // lives in ../crew and reads the Larder rather than the other way around.
   if (feedCrew(state, logs)) settleHunger(state, logs);
+  // [F4: boons at milestone moments] The dawn sweep: a hand lost to the
+  // meal above or to the hunger behind it is answered here, at the seat
+  // where it happened, which is the moment the plan's evaluation is
+  // about (see noteDawnMilestones in ./milestones). It sits after the
+  // meal rather than before it because the loss is the meal's fact.
+  noteDawnMilestones(state, logs);
   state.boonSwapUsed = false;
   state.moduleSwapUsed = false;
   state._draftChoices = undefined;
@@ -237,6 +254,17 @@ export function selectBoon(
   if (!card || card.kind !== "boon") return false;
   logs.push(`🧭 Boon Locked In: ${cardLead(card.id)}`);
   noteCardPick(state.cardTally, card);
+  // [F5: public offers] The fleet's record of this pick, written from the
+  // draft before it is dropped two lines down: the cleared list is the one
+  // thing that cannot answer for the trio that was on the table. Written
+  // here rather than by any caller, because this is the one pick site the
+  // round's draft has, which is what makes the ledger's claim true however
+  // the pick arrived (a click, a standing order, the dawn fallback).
+  state.boonRecord = {
+    round: state.currentRound,
+    shown: state.boonChoices.map((c) => c.id),
+    kept: card.id,
+  };
   applyBoon(state, card, logs);
   state.boonChoices = [];
   return true;
@@ -249,8 +277,21 @@ export function selectBoon(
 // already equipped most of what is on offer falls back to the whole pool
 // rather than to two cards, because a draft with empty seats is not a
 // tighter draft, it is a broken screen.
+//
+// [F7: the power budget] The pool is filtered through moduleFitsHull
+// before the equipped filter and the fallback, so the fallback stays
+// inside the fitting pool and every seat the draft deals can actually be
+// taken: a card that only the cap refuses is a card this yard does not
+// offer, which is what keeps the screen whole without a blocked row on
+// it. Unlike the two moments' tables, this draw is stored rather than
+// re-derived (see startModuleDrafting), so filtering inside it cannot
+// reshape a trio under a captain's eyes: the hull cannot change between
+// the roll and the pick except by a budget-guarded swap below, which
+// never raises the held power.
 function rollModuleChoices(state: GameState): CardRecord[] {
-  const pool = offerPool("module", state);
+  const pool = offerPool("module", state).filter(([card]) =>
+    moduleFitsHull(state, card),
+  );
   const equipped = new Set(state.equippedModules.map((card) => card.id));
   const available = pool.filter(([card]) => !equipped.has(card.id));
   const picks = drawOffer(
@@ -259,6 +300,62 @@ function rollModuleChoices(state: GameState): CardRecord[] {
   );
   for (const card of picks) noteCardOffer(state.cardTally, card);
   return picks;
+}
+
+// [F7: the power budget] Whether this yard can bolt this card onto this
+// hull without passing the cap, over either path the pick can take. A
+// hull with an open slot installs on top, so the card is weighed against
+// the held power as it stands. A full hull can only swap, and the swap
+// may give up any equipped module, so the card fits if it fits over the
+// heaviest one, which is the most room the hull can make. Everywhere
+// this answer gates an action the panel names the sentence for, and the
+// two install paths below refuse as well: the refusals are the floor,
+// the filter above is the screen.
+function moduleFitsHull(state: GameState, card: CardRecord): boolean {
+  const heaviest = heaviestEquipped(state);
+  if (state.equippedModules.length < state.shipLevel) {
+    return powerBudgetAllows(state, card);
+  }
+  return powerBudgetAllows(state, card, heaviest);
+}
+
+function heaviestEquipped(state: GameState): CardRecord | null {
+  let heaviest: CardRecord | null = null;
+  for (const mod of state.equippedModules) {
+    if (heaviest === null || mod.power > heaviest.power) heaviest = mod;
+  }
+  return heaviest;
+}
+
+// [F7: the power budget] The sentence a refused install reads, written
+// once because both install paths say the same thing: the total the card
+// would push the hull to, the cap it passes, and (for the swap) nothing
+// else, since which card left is the slot's business and the arithmetic
+// is the same either way. The two numbers are on the sentence because a
+// refusal a captain can check is a refusal they can plan around, and the
+// plan's own reading of the cap is a floor rather than a mystery.
+function powerRefusal(
+  state: GameState,
+  card: CardRecord,
+  displaced: CardRecord | null,
+): string {
+  const total = heldPower(state) - (displaced?.power ?? 0) + card.power;
+  return `❌ ${cardName(card.id)} would put your hull at ${total} power, and a hull carries at most ${HELD_POWER_CAP}.`;
+}
+
+/**
+ * Whether the yard's draft has anything to deal this hull right now.
+ *
+ * The Shipyard's Draft button asks this before it opens the draft, so a
+ * hull the cap has fully shut reads a disabled button rather than a
+ * screen with an empty table. It is the roll's own predicate read over
+ * the whole pool instead of a deal of three (see moduleFitsHull above),
+ * which is why it writes nothing: no draw, no tally, no state.
+ */
+export function moduleDraftPossible(state: GameState): boolean {
+  return offerPool("module", state).some(([card]) =>
+    moduleFitsHull(state, card),
+  );
 }
 
 // Only rolls a fresh pool the first time this is called for the round
@@ -297,6 +394,16 @@ export function handleModuleSelect(
 ) {
   const mod = state._draftChoices?.[idx];
   if (!mod) return;
+  // [F7: the power budget] The floor under the roll's filter: a pick that
+  // would pass the cap is refused with a sentence rather than installed,
+  // and the phase is left where it stands so the captain can take
+  // another seat or back out. The panel blocks these picks before the
+  // click, so this is the same defense in depth the no-empty-slots
+  // refusal below has always been.
+  if (!moduleFitsHull(state, mod)) {
+    logs.push(powerRefusal(state, mod, null));
+    return;
+  }
   if (state.equippedModules.length < state.shipLevel) {
     equipModule(state, mod, null, logs);
     // Direct installs resolve immediately, so the pick is final: drop it
@@ -324,6 +431,18 @@ export function finalizeModuleSwap(
 ) {
   const mod = state._newModule;
   if (!mod) return;
+  // [F7: the power budget] The per-slot half of the yard's gate: the roll
+  // only promised this card fits over SOME equipped module, and this is
+  // the slot the captain chose, so the arithmetic runs against what that
+  // slot frees. A refused row leaves the flow where it is (the picker
+  // still holds the choice, Back to Draft still works), and the panel
+  // disables these rows before the click the same way the market's
+  // accept is disabled.
+  const displaced = state.equippedModules[slotIdx] ?? null;
+  if (!powerBudgetAllows(state, mod, displaced)) {
+    logs.push(powerRefusal(state, mod, displaced));
+    return;
+  }
   equipModule(state, mod, slotIdx, logs);
   state._draftChoices = (state._draftChoices ?? []).filter(
     (m) => m.id !== mod.id,

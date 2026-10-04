@@ -100,6 +100,31 @@ export type LegReport = {
   // by the other never has to guess which of the two it is holding.
   foodSpend?: number;
   bargeSpend?: number;
+  // [F4: boons at milestone moments] The voyage's crew losses so far, sent
+  // only when the switch that gives them meaning is on, exactly as the
+  // four blocks above are sent: a leg sailed without the loss rule has no
+  // losses to report. It is the voyage's running total rather than the
+  // leg's, because the plan's evaluation reads retention across a voyage:
+  // the captains who lost a hand are one cohort and the captains who did
+  // not are the other, and what is compared is how many of each finished
+  // the voyage. One number is enough to sort a captain into a cohort, and
+  // the server keeps it as the boolean that sort needs rather than a tally
+  // nobody reads (see the crewLost captain line in
+  // src/lib/game/telemetry.ts).
+  crewLosses?: number;
+  // [F6: charters at leg four] The one claim of this report that is not a
+  // number: the id of the charter this captain holds. It is sent on every
+  // leg once the moment has been answered and only while the switch that
+  // gives the moment meaning is on, because the report is also the frame a
+  // reload files: a captain who answered at leg four, sailed to leg nine
+  // and only then had their screen restored has no other way to be
+  // recorded, and the server writes the take once per voyage whatever the
+  // client sends (see noteCharterTaken). The report keeps no copy of it.
+  // The server validates the id against the pool, attaches the path and
+  // the alignment from its own books rather than trusting a claim about
+  // them, and drops the take it cannot attribute on both, so this field
+  // can only ever name the card the captain actually holds.
+  charter?: string;
 };
 
 /**

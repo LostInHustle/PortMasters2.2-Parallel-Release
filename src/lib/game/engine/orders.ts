@@ -63,6 +63,7 @@ import {
   genRawOrder,
   poolsFor,
 } from "./market";
+import { queueMilestoneMoment } from "./milestones";
 import {
   brokersFavorCommission,
   calcTransportCost,
@@ -234,8 +235,8 @@ export function completeOrder(
   // allowance cannot be spent twice for one fill.
   if (locked) {
     state.opportunistBorrows += 1;
-    reward = opportunistPayout(order.reward);
-    logs.push(opportunistLine(order.reward, reward));
+    reward = opportunistPayout(state, order.reward);
+    logs.push(opportunistLine(state, order.reward, reward));
   }
   let totalVat = 0;
   if (order.isProductOrder) {
@@ -322,6 +323,47 @@ export function completeOrder(
       `${cardLead("exotic_treasures")}: +${Math.round(pct * 100)}% Reward!`,
     );
   }
+  // [F4: boons at milestone moments] Route Mastery, the boon the first
+  // pathbound order deals: a quarter more on the orders that follow the
+  // captain's own path, which is what the card's text promises. The gate
+  // is the lock's own reader rather than the card's raw marker, so the
+  // D2 switch is held at this end too (with path orders off no card is
+  // anyone's path order and no order pays the bonus), and the pathless
+  // captain is asked about before the comparison rather than through it,
+  // since a null path matching a null derivation would pay a bonus for
+  // following no path at all. Read once here because the arm at the
+  // bottom of this function asks the same question about the same card.
+  const followsPath =
+    state.path !== null && pathOrderOf(order, state.mode) === state.path;
+  if (followsPath && state.modifierFlags.route_mastery) {
+    const pct = state.modifierFlags.route_mastery;
+    reward += Math.floor(reward * pct);
+    logs.push(
+      `${cardLead("route_mastery")}: +${Math.round(pct * 100)}% Reward!`,
+    );
+  }
+  // [F6: charters at leg four] The Standing Manifest and the Quality Mark,
+  // the two charters that pay on the reward itself, each taken as the same
+  // `reward + floor(reward * pct)` the cards above them take and landing
+  // last, because a voyage long charter scales the reward the voyage has
+  // actually built rather than the face value a round card already grew.
+  // The Manifest reads every completed order, which is its whole text; the
+  // Mark reads the same woven gate the Woven Monopoly reads above, so the
+  // mark and the cloth cannot come to disagree about what counts as woven.
+  if (state.modifierFlags.manifest_order_bonus) {
+    const pct = state.modifierFlags.manifest_order_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(
+      `${cardLead("standing_manifest")}: +${Math.round(pct * 100)}% Reward!`,
+    );
+  }
+  if (hasWoven && state.modifierFlags.loom_sale_bonus) {
+    const pct = state.modifierFlags.loom_sale_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(
+      `${cardLead("quality_mark")}: +${Math.round(pct * 100)}% Reward!`,
+    );
+  }
   if (hasModule(state, "salvage_crane") && Math.random() < 0.3) {
     state.money += transport;
     logs.push(
@@ -394,6 +436,14 @@ export function completeOrder(
   if (state.totalOrdersCompleted === WORD_ON_THE_DOCKS_THRESHOLD) {
     state._pendingDocksClaim = { total: state.totalOrdersCompleted };
   }
+  // [F4: boons at milestone moments] The pathbound moment: the plan's
+  // "first pathbound order", read as the captain's own order along their
+  // path, which is what the moment's own copy promises ("Your first
+  // order along your path is filled"). The same reading the bonus above
+  // took, so a borrowed fill of another path's card is a fill rather
+  // than a pathbound moment, and the trigger's own latch inside the
+  // queue call keeps it to the once.
+  if (followsPath) queueMilestoneMoment(state, logs, "pathbound_order");
 }
 
 // [MANIFEST 02: Word on the Docks] Applied only on the one client the
@@ -470,7 +520,16 @@ export function callBrokersFavor(
 }
 
 export function purchaseIntel(state: GameState, logs: string[]) {
-  if (!state.phase2DemandTags.length) {
+  // Sold on the Market board and only there, because that is the one screen
+  // whose banner makes the promise this purchase depends on: the whisper is
+  // cashed by startOrders below, so a rumor bought after the board is dealt
+  // could never be honoured. The dialog can outlive the market leg, so the
+  // engine refuses a late press rather than charging for it.
+  if (state.phase !== "market") {
+    logs.push("🔮 The Broker only deals during Market.");
+    return;
+  }
+  if (!state.marketDemandTags.length) {
     logs.push("🔮 The Broker has no more whispers...");
     return;
   }
@@ -484,12 +543,12 @@ export function purchaseIntel(state: GameState, logs: string[]) {
   const paidCount = hasModule(state, "brokers_network") ? 2 : 1;
   const count = paidCount + (hasModule(state, "ocean_relay") ? 1 : 0);
   for (let i = 0; i < count; i++) {
-    if (!state.phase2DemandTags.length) break;
+    if (!state.marketDemandTags.length) break;
     const item =
-      state.phase2DemandTags[
-        Math.floor(Math.random() * state.phase2DemandTags.length)
+      state.marketDemandTags[
+        Math.floor(Math.random() * state.marketDemandTags.length)
       ];
-    state.phase2DemandTags.splice(state.phase2DemandTags.indexOf(item), 1);
+    state.marketDemandTags.splice(state.marketDemandTags.indexOf(item), 1);
     const openPorts = unlockedPorts(state.difficulty, state.currentRound);
     const port = openPorts[Math.floor(Math.random() * openPorts.length)];
     state.revealedIntel.push({ item, port });
@@ -563,6 +622,14 @@ export function startOrders(
   // this at one guarantee per round no matter how many rumors a captain
   // had revealed (Broker's Network reveals two per purchase), so the
   // second rumor's "guaranteed" order silently never appeared.
+  //
+  // Both halves of the rumor are honoured, which is the whole of what the
+  // word guarantee means on the four screens that print it: the good the
+  // whisper names is the good the card asks for (the generators' filter)
+  // and the harbour it names is the harbour the card pays at
+  // (portOverride). The port half used to be left to the draw, which
+  // quietly made a word that reads as a fact ("Word from Tortuga: High
+  // demand for Silk") false on every card that paid somewhere else.
   const guaranteedCount = Math.min(
     state.revealedIntel.length,
     state.customerCards.length,
@@ -571,8 +638,14 @@ export function startOrders(
     const intel = state.revealedIntel[i];
     const localRng: Rng = Math.random;
     const guaranteed = (RESOURCES as readonly string[]).includes(intel.item)
-      ? genRawOrder(localRng, orderPools, intel.item)
-      : genProductOrder(localRng, orderPools, intel.item);
+      ? genRawOrder(localRng, orderPools, intel.item, undefined, intel.port)
+      : genProductOrder(
+          localRng,
+          orderPools,
+          intel.item,
+          undefined,
+          intel.port,
+        );
     state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
   }
   // [DIFFICULTY] Imperial mandate: on the rounds this tier schedules one, the

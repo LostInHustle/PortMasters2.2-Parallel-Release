@@ -128,10 +128,16 @@ export function PathDraft({
           <h2 className="font-display text-sm font-semibold">
             🧭 The Path Draft
           </h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Three cards each, dealt face down. What you hold at the end is the
-            path you sail this voyage.
-          </p>
+          {/* The explainer rides only while the choice is live. A captain
+              whose card is down has read it, and the band holds this row
+              open for the rest of the step while the table finishes, so
+              it is the one reading the wait does not need. */}
+          {!answered && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Three cards each, dealt face down. What you hold at the end is the
+              path you sail this voyage.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="font-semibold uppercase tracking-wide text-voyage">
@@ -151,7 +157,7 @@ export function PathDraft({
         />
       )}
 
-      <p className="mt-2 text-xs text-foreground">{face.line}</p>
+      {!answered && <p className="mt-2 text-xs text-foreground">{face.line}</p>}
 
       {answered ? (
         <p className="mt-3 text-xs text-muted-foreground">

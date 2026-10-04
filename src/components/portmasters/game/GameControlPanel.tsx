@@ -17,6 +17,7 @@ import {
   Loader2,
   Cloud,
   ScrollText,
+  Keyboard,
 } from "lucide-react";
 import { ActionSuggester } from "../ActionSuggester";
 
@@ -36,6 +37,7 @@ export function GameControlPanel({
   clock,
   onStandingOrders,
   onCancelReady,
+  onShortcuts,
 }: {
   game: GameState;
   saving: boolean;
@@ -75,6 +77,14 @@ export function GameControlPanel({
    */
   clock?: PhaseClock | null;
   onCancelReady: () => void;
+  /**
+   * Opens the list of every key this screen answers to. It was the row of
+   * key caps under the bar and is now one glyph on it, on the wide layout
+   * only: the list is a list of keys, a phone has none of them, and four
+   * caps of chrome between the captain and the board was the clutter the
+   * row was (see KeyboardShortcutHelp, which kept its own hotkey all along).
+   */
+  onShortcuts: () => void;
 }) {
   // [B3] The page is the mode's before it is the captain's. A voyage whose
   // mode keeps no standing order has none to write, so the button is not
@@ -86,14 +96,17 @@ export function GameControlPanel({
 
   // Both conditions are the same fact read twice: waiting is only ever set
   // on the recurring Next Phase transition, so the button wears the quiet
-  // variant whenever it is not the one to press.
-  let startText = "🚢 Set Sail";
+  // variant whenever it is not the one to press. The labels carry no
+  // emoji: each button already wears its own glyph from the icon set the
+  // rest of the room speaks in, and the two together were one mark
+  // competing with the other on the same line.
+  let startText = "Set Sail";
   let startDisabled = true;
-  let nextText = "⏭️ Continue";
+  let nextText = "Continue";
   let nextDisabled = true;
 
   if (game.gameOver) {
-    startText = "⚠️ Game Over";
+    startText = "Game Over";
     startDisabled = true;
     nextDisabled = true;
   } else if (game.phase === "harbor") {
@@ -101,7 +114,7 @@ export function GameControlPanel({
     // ready vote, so there's no "waiting" state for this button. It's
     // either disabled (not host, or not enough captains yet) or armed.
     if (!isHost) {
-      startText = "⏳ Waiting for host…";
+      startText = "Waiting for host…";
       startDisabled = true;
     } else if (harborCount < 1) {
       startText = "Need one captain";
@@ -115,7 +128,7 @@ export function GameControlPanel({
     }
     nextDisabled = true;
   } else if (game.phase === "dawn") {
-    startText = "🧭 Drafting Boon...";
+    startText = "Drafting Boon...";
     startDisabled = true;
     nextDisabled = true;
   } else if (isGatedPhase(game.mode, game.phase)) {
@@ -128,12 +141,12 @@ export function GameControlPanel({
     // Next Phase step the day it lands, and a phase a mode does not run is
     // not a step at all, which it would be if this asked whether the phase
     // is leg work instead.
-    startText = "🚢 On Voyage...";
+    startText = "On Voyage...";
     startDisabled = true;
-    nextText = "⏭️ Next Phase";
+    nextText = "Next Phase";
     nextDisabled = false;
   } else {
-    startText = "🚢 On Voyage...";
+    startText = "On Voyage...";
     startDisabled = true;
     nextDisabled = true;
   }
@@ -184,7 +197,11 @@ export function GameControlPanel({
           page on a phone: "Standing orders" alone is wider than a third of
           a phone, and four of them plus their icons and gaps are wider than
           the viewport itself, so the row pushed the whole page 35 pixels
-          wide and every screen in the harbor scrolled sideways with it. */}
+          wide and every screen in the harbor scrolled sideways with it.
+          Below the sm width the four wear their glyphs alone, with the
+          name kept in the title, the aria label and the wider layouts:
+          four labelled buttons wrap to a row of their own on a phone,
+          and a phone's rows are the room the board needed. */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">
           {saving ? (
@@ -209,6 +226,7 @@ export function GameControlPanel({
               "rounded-lg",
               ordersLive && "text-standing hover:text-standing",
             )}
+            aria-label="Standing orders"
             title={
               ordersLive
                 ? "Standing orders are written and on"
@@ -216,30 +234,36 @@ export function GameControlPanel({
             }
             onClick={onStandingOrders}
           >
-            <ScrollText className="h-4 w-4 mr-1.5" /> Standing orders
+            <ScrollText className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Standing orders</span>
           </Button>
         )}
         <Button
           variant="ghost"
           size="sm"
           className="rounded-lg"
+          aria-label="Open the harbor guide"
           onClick={onGuide}
         >
-          <BookOpen className="h-4 w-4 mr-1.5" /> Guide
+          <BookOpen className="h-4 w-4 sm:mr-1.5" />
+          <span className="hidden sm:inline">Guide</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
           className="rounded-lg"
+          aria-label="Save the voyage"
           onClick={onSave}
         >
-          <Save className="h-4 w-4 mr-1.5" /> Save
+          <Save className="h-4 w-4 sm:mr-1.5" />
+          <span className="hidden sm:inline">Save</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
           className="rounded-lg"
           disabled={!isHost}
+          aria-label="Restart the voyage"
           title={
             isHost
               ? "Restart the voyage for everyone in the harbor"
@@ -247,7 +271,18 @@ export function GameControlPanel({
           }
           onClick={onRestart}
         >
-          <RotateCcw className="h-4 w-4 mr-1.5" /> Restart
+          <RotateCcw className="h-4 w-4 sm:mr-1.5" />
+          <span className="hidden sm:inline">Restart</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-lg hidden lg:inline-flex"
+          aria-label="Show all keyboard shortcuts"
+          title="Keyboard shortcuts"
+          onClick={onShortcuts}
+        >
+          <Keyboard className="h-4 w-4" />
         </Button>
       </div>
     </div>

@@ -51,10 +51,15 @@ export type ExpectedPrice = {
   modifiers: string[];
 };
 
-// At most one boon's flags are ever active at a time (selecting a new one
-// replaces state.modifierFlags wholesale, see applyBoon), so finding
-// whichever card owns a given modifier key reliably names the source of a
-// price adjustment for the breakdowns below.
+// One owner per modifier key, which is what makes finding whichever card
+// writes a given key a reliable way to name the source of a price
+// adjustment for the breakdowns below. That used to be true because only
+// one boon's flags were ever active at a time (selecting a new one
+// replaced state.modifierFlags wholesale, see applyBoon); held boons
+// made several flags ride together, and the pool's own validator is what
+// keeps this reader honest through that: no two cards write the same key,
+// so the first match is still the only match (see the one owner per key
+// clause in ../cards).
 //
 // [F2: the card record, and the mode weighting field] The name comes off the
 // card record rather than off a second walk of the boon table, which is what
@@ -82,6 +87,20 @@ export function calcTransportCost(
     cost = Math.max(
       5,
       Math.floor(cost * state.modifierFlags.transport_silk_discount),
+    );
+  // [F6: charters at leg four] The Bulk Charter, the Quartermaster pair's
+  // first rule: gold off per lot rather than off the bill. Read after the
+  // two round flags and before the modules, the order its display mirror
+  // below takes too, and floored at zero rather than at the five the base
+  // charge floors at, the same reading the modules under it take: a
+  // charter that makes a light run's freight free is doing what its text
+  // says, and the fall to zero is a power a card above Classic's ceiling
+  // is allowed to carry.
+  if (state.modifierFlags.transport_per_lot_discount)
+    cost = Math.max(
+      0,
+      cost -
+        Math.floor(totalItems * state.modifierFlags.transport_per_lot_discount),
     );
   if (hasModule(state, "bulk_hauler")) cost = Math.max(0, cost - totalItems);
   if (hasModule(state, "overdrive_engine")) cost = Math.max(0, cost - 5);
@@ -133,6 +152,18 @@ export function explainTransportCost(
     });
     cost = next;
   }
+  // [F6: charters at leg four] The Bulk Charter's own line, in the place
+  // the arithmetic above takes it, so the tooltip and the charge cannot
+  // come to describe one run two ways.
+  if (state.modifierFlags.transport_per_lot_discount) {
+    const perLot = state.modifierFlags.transport_per_lot_discount;
+    const next = Math.max(0, cost - Math.floor(totalItems * perLot));
+    steps.push({
+      label: `${boonNameForModifierKey("transport_per_lot_discount")} (down ${perLot}g per lot)`,
+      delta: next - cost,
+    });
+    cost = next;
+  }
   if (hasModule(state, "bulk_hauler")) {
     const next = Math.max(0, cost - totalItems);
     steps.push({
@@ -177,6 +208,22 @@ export function calcVAT(
     let vat = Math.floor(taxable * VAT_RATE);
     if (state.modifierFlags.vat_discount)
       vat = Math.floor(vat * (1 - state.modifierFlags.vat_discount));
+    // [F4: boons at milestone moments] Harbor Credit, the boon a crossed
+    // rung deals: the dues a quarter lower, taken as the same
+    // multiplication the round's own discount takes and landing after it
+    // rather than beside it, so a captain holding both pays the product
+    // of the two. The order is a declaration rather than a rule, the way
+    // applyBoon's merge is: the two flags multiply and multiplication
+    // commutes.
+    if (state.modifierFlags.harbor_credit)
+      vat = Math.floor(vat * (1 - state.modifierFlags.harbor_credit));
+    // [F6: charters at leg four] The Quiet Account, the other half of the
+    // Aroma pair: the harbor dues halved, taken as the same
+    // multiplication Harbor Credit takes and landing after it rather
+    // than beside it, so a captain holding both pays the product of the
+    // two, floored at each step the way every multiplication above it is.
+    if (state.modifierFlags.voyage_dues_discount)
+      vat = Math.floor(vat * (1 - state.modifierFlags.voyage_dues_discount));
     if (hasModule(state, "tax_evasion")) vat = Math.floor(vat * 0.5);
     return vat;
   }
@@ -220,6 +267,32 @@ export function explainVAT(
     });
     vat = next;
   }
+  // [F4: boons at milestone moments] Harbor Credit's own line, beside the
+  // round discount's and in the same order the arithmetic takes the two
+  // (see calcVAT above), so the tooltip and the charge cannot come to
+  // describe one sale two ways.
+  if (state.modifierFlags.harbor_credit) {
+    const next = Math.floor(vat * (1 - state.modifierFlags.harbor_credit));
+    steps.push({
+      label: `${boonNameForModifierKey("harbor_credit")} (down ${Math.round(state.modifierFlags.harbor_credit * 100)}%)`,
+      delta: next - vat,
+    });
+    vat = next;
+  }
+  // [F6: charters at leg four] The Quiet Account's own line, beside
+  // Harbor Credit's and in the same order the arithmetic takes the two
+  // (see calcVAT above), so the tooltip and the charge cannot come to
+  // describe one sale two ways.
+  if (state.modifierFlags.voyage_dues_discount) {
+    const next = Math.floor(
+      vat * (1 - state.modifierFlags.voyage_dues_discount),
+    );
+    steps.push({
+      label: `${boonNameForModifierKey("voyage_dues_discount")} (down ${Math.round(state.modifierFlags.voyage_dues_discount * 100)}%)`,
+      delta: next - vat,
+    });
+    vat = next;
+  }
   if (hasModule(state, "tax_evasion")) {
     const next = Math.floor(vat * 0.5);
     steps.push({
@@ -231,9 +304,10 @@ export function explainVAT(
   return { base: sellingPrice, steps, final: vat };
 }
 
-// The rate every charter is on until one of them dials it, which no
-// charter does yet. Named because the Welcome screen quotes the same
-// figure to a new captain, and two copies of it had already been written.
+// The rate a voyage pays until something dials it, and the only thing
+// that dials it today is the Tax Shelter boon (see tax_shelter). Named
+// because the Welcome screen quotes the same figure to a new captain,
+// and two copies of it had already been written.
 export const INCOME_TAX_RATE = 0.1;
 
 // The tax on the margin of a finished good sale. Written out four times
@@ -292,6 +366,22 @@ export function explainCardPrice(
     const next = Math.floor(cost * (1 - state.modifierFlags.purchase_discount));
     steps.push({
       label: `${boonNameForModifierKey("purchase_discount")} (down ${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+      delta: next - cost,
+    });
+    cost = next;
+  }
+  // [F6: charters at leg four] The Long Ledger, the Aroma pair's first
+  // money rule: port purchases a tenth cheaper, taken as the same
+  // multiplication the round's own discount takes and landing right
+  // after it rather than beside it, so a captain holding both pays the
+  // product of the two. This is the charge's copy of the rule; the
+  // preview mirror below folds the same read into its range.
+  if (state.modifierFlags.voyage_purchase_discount) {
+    const next = Math.floor(
+      cost * (1 - state.modifierFlags.voyage_purchase_discount),
+    );
+    steps.push({
+      label: `${boonNameForModifierKey("voyage_purchase_discount")} (down ${Math.round(state.modifierFlags.voyage_purchase_discount * 100)}%)`,
       delta: next - cost,
     });
     cost = next;
@@ -426,6 +516,19 @@ export function explainExpectedPrice(
       max = Math.floor(max * factor);
       modifiers.push(
         `${boonNameForModifierKey("purchase_discount")} (down ${Math.round(state.modifierFlags.purchase_discount * 100)}%)`,
+      );
+    }
+    // [F6: charters at leg four] The Long Ledger, folded into the range
+    // exactly the way the round's own discount above is and in the same
+    // order the card charge takes the two (see explainCardPrice), so the
+    // preview and the charge cannot come to describe one purchase two
+    // ways.
+    if (state.modifierFlags.voyage_purchase_discount) {
+      const factor = 1 - state.modifierFlags.voyage_purchase_discount;
+      min = Math.floor(min * factor);
+      max = Math.floor(max * factor);
+      modifiers.push(
+        `${boonNameForModifierKey("voyage_purchase_discount")} (down ${Math.round(state.modifierFlags.voyage_purchase_discount * 100)}%)`,
       );
     }
     if (

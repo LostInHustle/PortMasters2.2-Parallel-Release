@@ -230,13 +230,13 @@ export async function standingOrdersSuite(): Promise<void> {
   check(
     took(orderedDawnLogs, cardText(writtenPick).name) &&
       !took(orderedDawnLogs, cardText(firstOffer).name) &&
-      orderedDawn.modifierFlags ===
-        (writtenPick.effect.kind === "flags"
-          ? writtenPick.effect.flags
-          : null) &&
+      JSON.stringify(orderedDawn.modifierFlags) ===
+        JSON.stringify(
+          writtenPick.effect.kind === "flags" ? writtenPick.effect.flags : null,
+        ) &&
       orderedDawn.boonChoices.length === 0 &&
       orderedDawn.phase !== "dawn",
-    "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue",
+    "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue, and the round reads back exactly what that card carries: the comparison is content rather than object identity because the write folds any held flags in beneath the card's own, and a captain holding nothing yet lands on the card's flags alone",
   );
   const missedDawn = deal("dawn");
   const missedFirst = missedDawn.boonChoices[0];

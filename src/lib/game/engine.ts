@@ -174,10 +174,18 @@ export {
 // normalizeOpportunistBorrows. completeOrder is the only caller that
 // spends one, and it reads the same readers the board does, so what the
 // button promises and what the engine pays cannot come apart.
+//
+// [F6: charters at leg four] The Factor made two of those answers stateful,
+// and the block grew the readers with them: opportunistAllowance is the
+// voyage's count under the charter, and opportunistIsBorrower is the door
+// the path or the charter holds open, which the board's spent line asks
+// rather than comparing a path itself.
 export {
   normalizeOpportunistBorrows,
+  opportunistAllowance,
   opportunistBorrowsLeft,
   opportunistBorrowsTaken,
+  opportunistIsBorrower,
   opportunistLine,
   opportunistMayBorrow,
   opportunistPayout,
@@ -264,6 +272,11 @@ export {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
+  // [F7: the power budget] The yard's draft-or-not question, forwarded
+  // for the reason the rest of this block is: the Shipyard panel asks it
+  // before the Draft button, and the answer has to be the roll's own
+  // predicate rather than a second guess written at the button.
+  moduleDraftPossible,
   startBoonDrafting,
   startModuleDrafting,
   swapBoonChoices,
@@ -435,6 +448,30 @@ export {
   type ModuleTrafficSave,
   type ModuleTrafficSubject,
 } from "./engine/modules";
+
+// ========== Milestone boons ==========
+// [F4: boons at milestone moments] The second way a boon reaches a
+// captain, and the part of it that needs a public name is the answer:
+// answerMilestone is the overlay's one call, taking the card the captain
+// pressed off the head of the queue or refusing a card the head no
+// longer deals (see ./engine/milestones for why a refusal is a real
+// answer). The arming side stays inside ./engine/ and is not forwarded:
+// queueMilestoneMoment is called by the two sweeps and the three site
+// moments, and the sweeps are called by the dawn and the settlement
+// beside their own ticks, so a caller outside ./engine/ meets a moment
+// through the voyage rather than through a name.
+export { answerMilestone } from "./engine/milestones";
+
+// ========== Charters ==========
+// [F6: charters at leg four] The voyage's one charter, and the part of it
+// that needs a public name is the answer: answerCharter is the overlay's
+// one call, taking the card the captain pressed off the trio or refusing
+// a card the trio no longer deals (see ./engine/charters for why a
+// refusal is a real answer). The reading side stays in ../charters and is
+// not forwarded: the overlay imports what is due and what is offered from
+// there, the way the boon draft imports its own pair, so a caller meets
+// the question through the module that asks it.
+export { answerCharter } from "./engine/charters";
 
 // ========== The Supply Barge ==========
 // [E1: the Supply Barge] The mode's fallback vendor, and the whole of the

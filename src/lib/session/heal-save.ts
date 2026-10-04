@@ -31,6 +31,11 @@ import {
 } from "@/lib/game/engine";
 import { normalizeOrderFills } from "@/lib/game/audit";
 import { normalizeCardTally } from "@/lib/game/cards";
+import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
+import {
+  normalizeMilestoneOffers,
+  normalizeMilestonesAnswered,
+} from "@/lib/game/milestones";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
 import { normalizePortShift } from "@/lib/game/maroon";
@@ -138,7 +143,15 @@ function healSaveCollections(game: GameState): void {
     },
   );
   game.revealedIntel = game.revealedIntel ?? [];
-  game.phase2DemandTags = game.phase2DemandTags ?? [];
+  // The round's demand tags carried the market's share of an older lap
+  // numbering in their name (phase2DemandTags), so a save written before
+  // the rename heals under the name this build reads and the legacy key
+  // is dropped rather than ridden along: one field, one name, in a fresh
+  // save either way.
+  const legacyDemand = (game as unknown as { phase2DemandTags?: string[] })
+    .phase2DemandTags;
+  game.marketDemandTags = game.marketDemandTags ?? legacyDemand ?? [];
+  delete (game as unknown as { phase2DemandTags?: string[] }).phase2DemandTags;
   game.modifierFlags = game.modifierFlags ?? {};
   // A voyage saved before Great Houses existed carries no perk set
   // at all, and every wage, market and pirate path now reads one.
@@ -190,6 +203,42 @@ function healVoyageTallies(game: GameState): void {
   // this build does not know is dropped rather than carried, so a stale id
   // from a retired card cannot print as a nameless row.
   game.cardTally = normalizeCardTally(game.cardTally);
+  // [F4: boons at milestone moments] The three fields a moment writes: the
+  // boons held, the moments waiting to be answered and the mark each
+  // trigger is answered to. All three heal through the pure module's own
+  // readers, and that is the plan's rollback clause read as a load rule
+  // ("any boon that grants a durable effect has to be unwound through the
+  // same normalization path the rest of the state uses"): a held id the
+  // pool no longer answers for (a retired card) and a queued moment this
+  // build does not know are dropped rather than carried, and a mark keeps
+  // only the shapes its trigger's units use. The flags the held boons
+  // write are not rebuilt here, because every flag write rebuilds them
+  // (see endRound in @/lib/game/engine/lifecycle and the merge in
+  // applyBoon), so the list and the flags it rides cannot drift for longer
+  // than a leg's own next write.
+  game.heldBoons = normalizeHeldBoons(game.heldBoons);
+  game.milestoneOffers = normalizeMilestoneOffers(game.milestoneOffers);
+  game.milestonesAnswered = normalizeMilestonesAnswered(
+    game.milestonesAnswered,
+  );
+  // [F6: charters at leg four] The voyage's one charter, healed through
+  // the same pure reader the three fields above use, which is the plan's
+  // rollback read as a load rule ("a charter is a modifier set on the
+  // captain for the voyage, so it reverts with the pool"): an id the
+  // pool no longer answers for, or one that is not a charter, drops to
+  // null rather than being carried, and the flags it wrote are rebuilt
+  // at the next write for the reason the boons' are (see endRound in
+  // @/lib/game/engine/lifecycle).
+  game.charter = normalizeCharter(game.charter);
+  // [F5: public offers] The last boon decision, which a save written
+  // before the ledger existed does not carry. Healed as a bare presence
+  // default rather than through a normalizer, because it is the one field
+  // here no rule reads: the claim hook only sends it out, and a record
+  // already in a save is a fact that happened (the pick was made) rather
+  // than a value a rule could be hurt by, so there is nothing to scrub.
+  // An old save that heals to null simply reports nothing until the next
+  // pick, which is the same screen a fresh voyage shows.
+  game.boonRecord = game.boonRecord ?? null;
   game.boonSwapUsed = game.boonSwapUsed ?? false;
   game.moduleSwapUsed = game.moduleSwapUsed ?? false;
   game.pirateAttackResolved = game.pirateAttackResolved ?? false;

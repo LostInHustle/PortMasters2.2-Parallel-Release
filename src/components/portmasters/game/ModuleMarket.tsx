@@ -6,6 +6,7 @@ import { Select } from "@/components/ui/select";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import { cardById, cardName, cardText } from "@/lib/game/cards";
+import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   canSellModule,
@@ -14,6 +15,7 @@ import {
   type ModuleTrade,
 } from "@/lib/game/engine";
 import { moduleTradesOn } from "@/lib/game/flags";
+import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
@@ -196,6 +198,7 @@ export function ModuleMarket({
             <ModuleRow
               key={trade.id}
               trade={trade}
+              game={game}
               me={me}
               modules={modules}
               round={game.currentRound}
@@ -219,12 +222,14 @@ export function ModuleMarket({
  */
 function ModuleRow({
   trade,
+  game,
   me,
   modules,
   round,
   roomOpen,
 }: {
   trade: ModuleTrade;
+  game: GameState;
   me: PublicUser;
   modules: ModuleTrades;
   round: number;
@@ -232,18 +237,27 @@ function ModuleRow({
 }) {
   const mine = trade.sellerUserId === me.id;
   const isBuyer = trade.buyerUserId === me.id;
-  const icon = cardById(trade.module)?.icon ?? UNKNOWN_MODULE_ICON;
+  const card = cardById(trade.module);
+  const icon = card?.icon ?? UNKNOWN_MODULE_ICON;
   const stale = trade.round !== round;
   // The server's own refusals, shown before the click rather than after it,
-  // plus the one this panel adds: a buyer with no open slot cannot bolt the
+  // plus the two this panel adds: a buyer with no open slot cannot bolt the
   // module on, and the board would settle it onto a full hull anyway rather
   // than lose it (see applyModuleTradeSide), so the honest path is told here
-  // and the corner stays unreachable from this screen.
+  // and the corner stays unreachable from this screen; and a buyer whose
+  // hull the module would push past the cap cannot take it, which is the
+  // budget's one reachable guard on a purchase, since the server has never
+  // read a save and the settle has to complete either way (both readings
+  // are applyModuleTradeSide's own notes). A trade the pool cannot resolve
+  // blocks nothing: it is the unreachable corner the crest above stands in
+  // for.
   const blocked = stale
     ? "That offer belongs to an earlier leg."
     : roomOpen < 1
       ? "Every slot on your hull is full. Make room at the yard first."
-      : null;
+      : card !== null && !powerBudgetAllows(game, card)
+        ? `Taking it would put your hull at ${heldPower(game) + card.power} power, and a hull carries at most ${HELD_POWER_CAP}.`
+        : null;
 
   return (
     <PathDeskRow mine={mine}>

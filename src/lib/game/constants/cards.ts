@@ -65,32 +65,51 @@ import type { GameMode } from "../mode";
 import type { PathId } from "../paths";
 import type { ModifierKey } from "../types";
 import type { Tag, TagList } from "./tags";
+import { MILESTONE_TRIGGERS, type MilestoneTrigger } from "./milestones";
 
 // The three things a captain can hold that are not goods, a position or a
-// crew member. The two with records in the pool today are the two the
-// engine drafts; a charter is a card a voyage offers once at leg four (F6)
-// and is named here because the shape is the deliverable rather than the
-// first wave of content that happens to fill it.
+// crew member. The two the engine drafts are the boons and the modules; a
+// charter is a card a voyage offers once at leg four, ten of them since
+// F6, two for each of the five paths.
 export type CardKind = "boon" | "module" | "charter";
 export const CARD_KINDS: readonly CardKind[] = ["boon", "module", "charter"];
 
-// Where a card arrives. Today that is the draft that offers it, which is
-// the only moment the tree offers a card at all; F4 widens this list with
-// the milestone moments a boon can be drafted at ("the first pathbound
+// Where a card arrives. The draft that offers it is the only moment the
+// tree offered a card at all until F4, which widens this list with the
+// milestone moments a boon can be drafted at ("the first pathbound
 // order, crossing a Renown threshold, surviving a cold leg with zero
-// frostbite, contributing to a Joint Mandate, and losing a crew member"),
-// and every one of those is a value added here rather than a new field.
-export type CardTrigger = "boon_draft" | "shipyard_draft" | "charter_draft";
+// frostbite, contributing to a Joint Mandate, and losing a crew member",
+// see ./milestones for the five and for the one reading taken in place
+// of the plan's word Renown), as the comment here promised it would: a
+// value added to this union rather than a new field.
+export type CardTrigger =
+  "boon_draft" | "shipyard_draft" | "charter_draft" | MilestoneTrigger;
 
 // Which trigger each kind arrives at. One map rather than a field repeated
 // on every record: a boon offered at the shipyard is a card whose kind and
 // whose trigger disagree, and the clause that reads this map is what makes
 // that a failed build rather than a card nobody can explain.
+//
+// The boon entry is the round draft's trigger, and it is a default rather
+// than the only one a boon may carry, which is exactly what F4 changed:
+// the map answers which trigger a kind arrives at when the kind decides
+// it, and a boon's trigger is the card's own field because a milestone
+// boon arrives at a moment rather than at a draft. The validator reads
+// the two cases apart (see the pair of clauses in ../cards).
 export const CARD_TRIGGER: Record<CardKind, CardTrigger> = {
   boon: "boon_draft",
   module: "shipyard_draft",
   charter: "charter_draft",
 };
+
+// Every trigger a boon may carry: the round draft's, and the five
+// moments. Written out here rather than folded into the map above,
+// because the map answers for a kind and this answers for one kind's
+// cards, and an author adding a sixth moment edits ./milestones alone.
+export const BOON_TRIGGERS: readonly CardTrigger[] = [
+  "boon_draft",
+  ...MILESTONE_TRIGGERS,
+];
 
 // What has to be true of a captain for a card to be worth offering, and
 // how strongly. Every arm carries the weight it answers with, and every
@@ -148,6 +167,19 @@ export const MODE_POWER_CEILING: Record<GameMode, number> = {
   ocean_gambit: 5,
 };
 
+// [F7: the power budget] The ceiling on one captain's held cards, which is
+// a different question from the one above: that one bounds a single card
+// as the pool admits it, this one bounds the durable set a voyage has
+// handed one captain (the milestone boons, the bolted on modules and the
+// charter; see heldPower in ../held-cards). One number for both modes on
+// purpose: it sits above Classic's whole reachable ladder, whose ceiling
+// three pool already tames it, and below Ocean Gambit's stacked maximum,
+// so the only lines it ever binds are the greediest Gambit ones. The
+// plan's own rollback is this constant ("The budget cap is a validation
+// constant, so raising it is the rollback and it needs no migration"), so
+// every gate reads it live and one edit is the whole unwind.
+export const HELD_POWER_CAP = 26;
+
 // The leaning weights a card carries when it leans nowhere, and the two
 // modes it is offered in when it is offered in both. Shared, typed, and
 // written once, for the reason pools.ts writes its empty list once: a bare
@@ -155,6 +187,13 @@ export const MODE_POWER_CEILING: Record<GameMode, number> = {
 // and the empty lean is a value rather than an absence.
 export const NO_LEAN: Partial<Record<PathId, number>> = {};
 export const BOTH_MODES: ModeWeights = { classic: 1, ocean_gambit: 1 };
+
+// The weighting a card carries when only Ocean Gambit runs it. Named
+// rather than inlined because a reader should be able to tell which pool
+// a card is in by reading the name rather than by comparing two numbers,
+// and shared from here since it acquired its second family: the pool's
+// own cards above Classic's ceiling, and F6's ten charters.
+export const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
 
 // The card's two faces, per language. The name is what a captain reads on
 // the card and in the ledger line it writes, and the description is the

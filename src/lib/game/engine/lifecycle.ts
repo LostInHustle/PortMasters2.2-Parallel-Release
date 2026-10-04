@@ -26,6 +26,7 @@ import { merchantRatingForScore } from "../constants/reputation";
 import { closesRound, isGatedPhase, lapSuccessor } from "../checkpoint";
 import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
+import { heldFlagsOf } from "../held-cards";
 import { modeConfig } from "../mode";
 import { isLegPhase, normalizePhase, phaseFace } from "../phases";
 import { normalizeStandingOrders } from "../standing";
@@ -40,6 +41,7 @@ import { settleOutstandingDebts } from "./aid";
 import { completeParley } from "./barter";
 import { cancelModuleDraft, selectBoon, startBoonDrafting } from "./boons";
 import { completeMarket, startMarket } from "./market";
+import { noteSettlementMilestones } from "./milestones";
 import { startOrders } from "./orders";
 import { resolvePirateAttack } from "./pirates";
 import { calcIncomeTax, INCOME_TAX_RATE } from "./pricing";
@@ -85,8 +87,14 @@ function endRound(state: GameState, logs: string[]) {
   if (state.vatPaid > 0)
     logs.push(`🧾 VAT Paid this round: ${state.vatPaid} Gold`);
 
-  state.modifierFlags = {};
-  state.phase2DemandTags = [];
+  // [F4: boons at milestone moments] The round's flags are rebuilt from
+  // the held boons rather than emptied, because a boon taken from a
+  // moment is permanent for the voyage: the round draft's flags expire
+  // with the round they were drafted in, and the held effects are the
+  // ones this write carries into the next one (see heldFlagsOf in
+  // ../held-cards and the merge in applyBoon for the other end).
+  state.modifierFlags = heldFlagsOf(state);
+  state.marketDemandTags = [];
   state.revealedIntel = [];
   state.roundRevenue = 0;
   state.roundCosts = 0;
@@ -180,6 +188,12 @@ function finishSettlement(state: GameState, logs: string[]) {
   // ended and the rot is about what was carried through it, which is the
   // same kind of fact a line later.
   tickSpoilage(state, logs);
+  // [F4: boons at milestone moments] The settlement sweep: the cold leg
+  // and the crossed rung are both facts this settlement just produced,
+  // so the moments they deal are noticed here, beside the ticks above
+  // who wrote their evidence, and never at a screen (see
+  // noteSettlementMilestones in ./milestones).
+  noteSettlementMilestones(state, logs);
   logs.push("\n💰=== Paying Worker Wages ===");
   const wageResult = payWages(state, logs);
   if (wageResult === "bankruptcy") return failSeat(state, logs);

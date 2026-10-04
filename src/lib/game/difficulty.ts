@@ -285,9 +285,11 @@ export function marketCountsFor(
   };
 }
 
-// Which content tier's charter opens on exactly this round, if any, so the
-// caller can announce what actually arrived rather than a generic banner.
-function charterTierOpeningOn(
+// Which content tier's Silk Road Charter opens on exactly this round, if
+// any, so the caller can announce what actually arrived rather than a
+// generic banner. (Named for the Silk Road Charter, the schedule's own
+// event, so it cannot be read as the leg four charter cards' switch.)
+function silkRoadCharterTierOpeningOn(
   value: unknown,
   roundNo: number,
 ): number | undefined {
@@ -299,8 +301,11 @@ function charterTierOpeningOn(
   return undefined;
 }
 
-export function charterOpensOn(value: unknown, roundNo: number): boolean {
-  return charterTierOpeningOn(value, roundNo) !== undefined;
+export function silkRoadCharterOpensOn(
+  value: unknown,
+  roundNo: number,
+): boolean {
+  return silkRoadCharterTierOpeningOn(value, roundNo) !== undefined;
 }
 
 // Raid probability for this round: the flat toll, or the second half tier once

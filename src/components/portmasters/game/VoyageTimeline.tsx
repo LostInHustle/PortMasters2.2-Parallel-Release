@@ -8,8 +8,8 @@ import type { GameMode } from "@/lib/game/mode";
 import type { LegPhase, Phase } from "@/lib/game/types";
 
 /**
- * Voyage Progress Timeline. A compact horizontal strip showing the
- * phases of a round and which one is active right now.
+ * The phase strip of the rail: the steps of the leg, with the one the
+ * room is standing on lit.
  *
  * The phases cycle, and where they cycle TO is not written here. The
  * order is the room's mode (see src/lib/game/mode.ts), the same lap the
@@ -20,6 +20,12 @@ import type { LegPhase, Phase } from "@/lib/game/types";
  * seen the rail point at the phase they had already finished, and
  * nothing in the engine would have been wrong. Only the picture of it
  * would have been.
+ *
+ * A "Voyage Progress" bar rode above the strip with the round written
+ * twice under it. Both left with the declutter pass: how far the voyage
+ * has run is written once, on the pinned VoyageHeader above this strip,
+ * as a ring and a number, and a second bar two rows below the first was
+ * two readings of one fact on one rail.
  *
  * The names and glyphs come from the phase's own face for the same
  * reason ([B1]: this file used to hold a label table, the dispatcher
@@ -51,14 +57,10 @@ function railStep(phase: Phase): LegPhase | null {
 }
 
 export function VoyageTimeline({
-  currentRound,
-  maxRounds,
   phase,
   mode,
   className,
 }: {
-  currentRound: number;
-  maxRounds: number;
   phase: Phase;
   mode: GameMode;
   className?: string;
@@ -79,28 +81,9 @@ export function VoyageTimeline({
   // The closing banner wears the terminal phase's own face, drawn above
   // rather than on a step, since a terminal phase has no step to sit on.
   const terminalFace = phaseFace(phase);
-  const voyageProgress = Math.min(100, (currentRound / maxRounds) * 100);
 
   return (
     <div className={cn("space-y-2", className)}>
-      {/* Voyage progress bar */}
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>Voyage Progress</span>
-          <span>
-            Round {currentRound} of {maxRounds}
-          </span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-celadon via-jade to-gold"
-            initial={{ width: 0 }}
-            animate={{ width: `${voyageProgress}%` }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          />
-        </div>
-      </div>
-
       {/* Phase timeline */}
       {!isTerminal && (
         <div className="flex items-stretch gap-1">

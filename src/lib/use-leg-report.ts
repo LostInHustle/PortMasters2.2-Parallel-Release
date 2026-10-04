@@ -47,9 +47,11 @@ import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import { mealsOf } from "@/lib/game/foods";
+import { crewLossRuleOn } from "@/lib/game/crew";
 import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
 import {
+  chartersOn,
   escortContractsOn,
   moduleTradesOn,
   pathOrdersOn,
@@ -182,6 +184,29 @@ export function useLegReport(
   // that can disagree.
   const foodSpend = bargeOn(game.mode) ? game.foodSpend : undefined;
   const bargeSpend = bargeOn(game.mode) ? game.bargeSpend : undefined;
+  // [F4: boons at milestone moments] The voyage's crew losses so far, read
+  // off the maroon mark's own list and sent only when the switch that gives
+  // them meaning is on: a leg sailed without the loss rule has no losses to
+  // report. It is the voyage's running total rather than the leg's, on E1's
+  // rule above and for the same reason, and the plan's evaluation is why:
+  // retention is compared across a voyage, so a reader takes the last report
+  // each captain filed rather than adding the legs up. A voyage that lost
+  // nobody reports its zero, because zero is a reading of the rule.
+  const crewLosses = crewLossRuleOn(game.mode)
+    ? game.crewLost.length
+    : undefined;
+  // [F6: charters at leg four] The voyage's one charter, sent on every leg
+  // once it has been answered and only when the switch that gives the
+  // moment meaning is on: a leg sailed without the moment has no charter
+  // to name. It rides every leg rather than the leg it was taken on
+  // because this report is also the reconnect frame, and the server writes
+  // the take once per voyage whatever is sent (see noteCharterTaken): the
+  // client's only job is to keep saying what it holds until the voyage
+  // ends. Null reads as an absence rather than as an empty claim, which is
+  // the same shape the whole report takes for a question not asked yet.
+  const charter = chartersOn(game.mode)
+    ? (game.charter ?? undefined)
+    : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -210,6 +235,8 @@ export function useLegReport(
         opportunistBorrows,
         foodSpend,
         bargeSpend,
+        crewLosses,
+        charter,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -237,5 +264,7 @@ export function useLegReport(
     opportunistBorrows,
     foodSpend,
     bargeSpend,
+    crewLosses,
+    charter,
   ]);
 }

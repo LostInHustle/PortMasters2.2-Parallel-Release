@@ -34,6 +34,18 @@ export function CargoHold({
   // bottom, which had the pair being asked for four times per render.
   const cargoResources = unlockedResources(game.difficulty, game.currentRound);
   const cargoProducts = unlockedProducts(game.difficulty, game.currentRound);
+  // Only what is aboard is drawn. The two lists used to print every good
+  // the tier has unlocked, zeroes included, which is a column of nothing
+  // said eleven times on a rail that counts its rows: a good a captain
+  // does not hold is a row their eye re-reads to learn nothing. The Hold
+  // Value estimator and the composition bar below already draw nothing
+  // at zero, and this is the same reading applied to the rows.
+  const heldResources = cargoResources.filter(
+    (r) => (game.inventory[r] || 0) > 0,
+  );
+  const heldProducts = cargoProducts.filter(
+    (p) => (game.inventory[p] || 0) > 0,
+  );
 
   return (
     <>
@@ -70,32 +82,45 @@ export function CargoHold({
           </div>
         );
       })()}
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-0.5">
-        ━━ Raw Materials ━━
-      </div>
-      {cargoResources.map((r) => (
-        <InvItem
-          key={r}
-          icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
-          name={r}
-          color={resolveColor(r)}
-          count={game.inventory[r] || 0}
-          priceContent={priceAwareTermContent(game, r)}
-        />
-      ))}
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">
-        ━━ Finished Goods ━━
-      </div>
-      {cargoProducts.map((r) => (
-        <InvItem
-          key={r}
-          icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
-          name={r}
-          color={resolveColor(r)}
-          count={game.inventory[r] || 0}
-          priceContent={priceAwareTermContent(game, r)}
-        />
-      ))}
+      {heldResources.length > 0 && (
+        <>
+          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-0.5">
+            ━━ Raw Materials ━━
+          </div>
+          {heldResources.map((r) => (
+            <InvItem
+              key={r}
+              icon={<ItemIcon item={r} className="h-3.5 w-3.5" />}
+              name={r}
+              color={resolveColor(r)}
+              count={game.inventory[r] || 0}
+              priceContent={priceAwareTermContent(game, r)}
+            />
+          ))}
+        </>
+      )}
+      {heldProducts.length > 0 && (
+        <>
+          <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">
+            ━━ Finished Goods ━━
+          </div>
+          {heldProducts.map((p) => (
+            <InvItem
+              key={p}
+              icon={<ItemIcon item={p} className="h-3.5 w-3.5" />}
+              name={p}
+              color={resolveColor(p)}
+              count={game.inventory[p] || 0}
+              priceContent={priceAwareTermContent(game, p)}
+            />
+          ))}
+        </>
+      )}
+      {heldResources.length === 0 && heldProducts.length === 0 && (
+        <p className="text-[10px] text-muted-foreground">
+          Nothing in the hold yet.
+        </p>
+      )}
       {workerCount > 0 ? (
         <>
           <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mt-2 mb-0.5">

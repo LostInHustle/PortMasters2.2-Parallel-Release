@@ -4,6 +4,7 @@
 import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
 import type { CardTally } from "./cards";
 import type { CardRecord } from "./constants/cards";
+import type { MilestoneTrigger } from "./constants/milestones";
 import { ITEMS, STARTING_STOCK } from "./constants/goods";
 import { LARDER_START, type FoodId } from "./constants/supplies";
 import {
@@ -115,22 +116,56 @@ type Product = string;
 // contract: a card's effect is written in these keys (see CardEffect in
 // ./constants/cards), so the record needs to name the universe the field
 // here pins.
-export type ModifierKey =
-  | "transport_flat_discount"
-  | "transport_silk_discount"
-  | "purchase_discount"
-  | "worker_bonus_production"
-  | "instant_gold"
-  | "income_tax_override"
-  | "hemp_price_reduction"
-  | "hire_discount"
-  | "free_intel"
-  | "charter_order_bonus"
-  | "vat_discount"
-  | "extra_order"
-  | "escort_discount"
-  | "pirate_risk_discount"
-  | "exotic_order_bonus";
+//
+// [F4: boons at milestone moments] The list is a real array now rather
+// than only a type, and the type is derived from it, for the reason
+// ./paths derives PathId from its record: the content check asks the
+// pool a question about every key (that exactly one card writes each,
+// see the clause in ./cards), and a question about every key needs the
+// keys at run time. Deriving the union from the array keeps the one
+// place a key is added, which was the whole point of pinning them here.
+// The keys from steady_rations on are the held cards' own: the five
+// milestone boons' moments, then F6's eleven charter keys, which write
+// for the rest of a voyage rather than for a round. Both groups are
+// deliberately keys no round drafted card writes: a held card and a
+// round card can then never be in force on the same key at the same
+// time, which is what keeps cardByFlag's answer, and therefore the
+// pricing breakdown's source line, true without a second rule.
+export const MODIFIER_KEYS = [
+  "transport_flat_discount",
+  "transport_silk_discount",
+  "purchase_discount",
+  "worker_bonus_production",
+  "instant_gold",
+  "income_tax_override",
+  "hemp_price_reduction",
+  "hire_discount",
+  "free_intel",
+  "charter_order_bonus",
+  "vat_discount",
+  "extra_order",
+  "escort_discount",
+  "pirate_risk_discount",
+  "exotic_order_bonus",
+  "steady_rations",
+  "cold_hardened",
+  "route_mastery",
+  "harbor_credit",
+  "fleet_color",
+  "transport_per_lot_discount",
+  "manifest_order_bonus",
+  "guns_risk_discount",
+  "standing_escort_discount",
+  "loom_extra_produce",
+  "loom_sale_bonus",
+  "voyage_purchase_discount",
+  "voyage_dues_discount",
+  "factor_borrows",
+  "factor_penalty",
+  "marque_salvage",
+] as const;
+
+export type ModifierKey = (typeof MODIFIER_KEYS)[number];
 
 export type Worker = {
   task: Product | null;
@@ -287,6 +322,26 @@ export type EscortCover = {
 export type EscortClaim = {
   contractId: string;
   raidGold: number;
+};
+
+// [F5: public offers] What one captain kept, and what they were shown when
+// they kept it: the last boon decision this captain made, written by the
+// decision itself (see selectBoon in ./engine/boons and answerMilestone in
+// ./engine/milestones) and read back out to the whole fleet by the ledger's
+// claim hook. It is a record of a choice rather than a rule: no engine
+// branch reads it, and losing it costs the table the last thing it saw
+// rather than a mechanic. `round` is the leg the choice was made in,
+// `shown` the cards that were on the table at that moment (the trio of a
+// compass draw, or the cards a milestone offered), `kept` the one taken,
+// and `moment` names the milestone the answer belonged to, absent for a
+// compass draw. Every id here is a boon the public catalogue knows, which
+// is what lets the server bound a report against the same catalogue the
+// room reads (see readBoonReport in src/server/realtime/wiring/boons).
+export type BoonRecord = {
+  round: number;
+  shown: string[];
+  kept: string;
+  moment?: MilestoneTrigger;
 };
 
 export type GameState = {
@@ -468,7 +523,11 @@ export type GameState = {
   bankrupt: boolean;
   marooned: boolean;
   modifierFlags: Partial<Record<ModifierKey, number>>;
-  phase2DemandTags: string[];
+  // The round's demand tags: drawn at Market from this harbor's own
+  // pools, spent one per Broker's Whisper, and the good half of what a
+  // whisper promises. The name says when they exist and where they are
+  // read rather than the seat number an older lap gave the market.
+  marketDemandTags: string[];
   revealedIntel: IntelItem[];
   // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
   // round's Market, keyed by resource name (Hemp, Silk, Tea), derived room
@@ -607,6 +666,40 @@ export type GameState = {
   // offers a dozen cards, a season of voyages offers thousands, and the
   // event stream has a ceiling of its own (see TELEMETRY_EVENT_CAP).
   cardTally: CardTally;
+  // [F4: boons at milestone moments] The voyage's held boons, the moments
+  // waiting for an answer, and the marks of what has been answered, all
+  // three personal to this captain and none of them crossing a wire. The
+  // held list is the cards themselves, by id, so a reload re-reads their
+  // flags off the pool rather than trusting a saved map (see
+  // heldFlagsOf in ./held-cards), which is exactly the rollback path the
+  // plan asks for: a card the pool no longer knows drops out at load and
+  // its effect unwinds at the next rollover through endRound's rebuild.
+  //
+  // The queue is a list of triggers rather than of drawn cards, because
+  // the draw is a pure function of the state (see milestoneChoices), so
+  // storing it would be a second thing to heal that cannot disagree with
+  // the first. The marks are one number per trigger, each in that
+  // trigger's own units, documented where they are written (./engine
+  // holds the writer, ./milestones the due rule that reads them).
+  heldBoons: string[];
+  milestoneOffers: MilestoneTrigger[];
+  milestonesAnswered: Partial<Record<MilestoneTrigger, number>>;
+  // [F6: charters at leg four] The one charter this voyage chose, or null
+  // before the moment is answered. An id rather than a record, for the
+  // reason heldBoons is a list of ids: a reload re-reads its flags off
+  // the pool rather than trusting a saved map (see heldCharterCard in
+  // ./held-cards), so the content revert the plan names for the rollback
+  // ("a charter is a modifier set on the captain for the voyage, so it
+  // reverts with the pool") is a pool edit and a load, with nothing
+  // durable left behind to unwind.
+  charter: string | null;
+  // [F5: public offers] The last boon decision this captain made, or null
+  // before the voyage's first pick. Written by the two pick sites only
+  // (selectBoon and answerMilestone, per the shape's note above), and not
+  // cleared by a new leg: the record is what the table most recently saw,
+  // so a captain who has not yet picked this leg still shows the last card
+  // they kept rather than a blank, which is the truth of the table.
+  boonRecord: BoonRecord | null;
   // Reset every round in startBoonDrafting, same as boonSwapUsed/
   // moduleSwapUsed above. Resolved once per round, in Resolve, before the
   // wages and maintenance settlement: either a 20% chance of losing every
@@ -1000,7 +1093,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     bankrupt: false,
     marooned: false,
     modifierFlags: {},
-    phase2DemandTags: [],
+    marketDemandTags: [],
     revealedIntel: [],
     harborPulse: {},
     portShift: null,
@@ -1016,6 +1109,19 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     equippedModules: [],
     boonChoices: [],
     cardTally: {},
+    // [F4: boons at milestone moments] A fresh voyage holds no boons,
+    // waits on no moments and has answered none: every mark starts
+    // absent, which the due rules read as zero in the trigger's own
+    // units (see ../milestones).
+    heldBoons: [],
+    milestoneOffers: [],
+    milestonesAnswered: {},
+    // [F6: charters at leg four] No charter yet: the moment at leg four
+    // is where one is first offered, and null is the honest reading of
+    // "the question has not been asked" (see charterPending in
+    // ./charters).
+    charter: null,
+    boonRecord: null,
     boonSwapUsed: false,
     moduleSwapUsed: false,
     pirateAttackResolved: false,

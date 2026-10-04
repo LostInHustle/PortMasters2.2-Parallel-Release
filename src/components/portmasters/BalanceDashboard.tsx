@@ -132,13 +132,22 @@ export function BalanceDashboard() {
   return (
     <div className="pm-canvas min-h-screen">
       {/* The column, and the number every width decision below reads. The
-          cap and the padding live here rather than on the two children, so
-          the container measures the width the panels actually have.
-          Every breakpoint under it used to read the window instead, which
-          is how this page came to change shape at 1280 while the column it
-          draws in stayed at 1024: the four front page tiles jumped from two
-          across to four across without the room for them changing at all. */}
-      <div className="@container mx-auto max-w-5xl px-4 sm:px-6">
+          gutters live here rather than on the children, so the container
+          measures the width the panels actually have. Every breakpoint
+          under it used to read the window instead, which is how this page
+          came to change shape at 1280 while the column it draws in stayed
+          at 1024: the four front page tiles jumped from two across to four
+          across without the room for them changing at all.
+
+          There is no cap. This page is a stack of panels, and a panel is a
+          table with room to breathe: a window wider than the widest table
+          wants is width the tables themselves can use. The layout steps
+          below are read off this container, so the page takes a new shape
+          when the panels have the room rather than when the window crosses
+          a number, and the gutters grow with the window in one fluid step
+          so the page keeps its margins without spending a fixed number of
+          pixels on them. */}
+      <div className="@container w-full px-[clamp(0.75rem,2.5vw,3rem)]">
         <header className="pb-2 pt-3">
           <div className="pm-glass pm-panel-bar">
             <div className="flex items-center gap-3">
@@ -149,7 +158,7 @@ export function BalanceDashboard() {
                 <h1 className="font-display text-sm leading-tight font-bold tracking-tight">
                   Balance Dashboard
                 </h1>
-                <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
+                <p className="line-clamp-2 text-[11px] leading-tight text-muted-foreground">
                   {subtitle}
                 </p>
               </div>
@@ -159,7 +168,7 @@ export function BalanceDashboard() {
                 title="The operator console"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Console</span>
+                <span className="hidden @md:inline">Console</span>
               </a>
               <button
                 onClick={() => {
@@ -175,17 +184,17 @@ export function BalanceDashboard() {
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden @md:inline">Refresh</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main className="space-y-3 pt-3 pb-10">
+        <main className="flex flex-col gap-3 pt-3 pb-10">
           {error && <Notice message={error} onDismiss={() => setError(null)} />}
 
           {reading === null && !error && (
-            <div className="pm-glass pm-tile flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <div className="pm-glass flex items-center justify-center gap-2 rounded-2xl py-12 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Reading the window...
             </div>
@@ -201,11 +210,13 @@ export function BalanceDashboard() {
                 questions. A tile carries the state and the one sentence the
                 panel below can say today, so the strip alone is the minute
                 the evaluation asks for.
-                Four across where the column can carry four, two where it
-                can carry two, one on a phone. The two steps are read off
-                the column, so a tile keeps the width it was designed at
-                whatever window the column happens to be sitting in. */}
-              <div className="grid gap-3 @xl:grid-cols-2 @4xl:grid-cols-4">
+                Four across only where each tile clears its own name: four
+                tiles need four times the ~17rem a tile reads at plus the
+                gaps between them, which is 72rem of container, and below
+                that the grid falls to two and then one. The steps read the
+                column like every other width on this page, so the count
+                changes when the tiles run out of room and not before. */}
+              <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @6xl:grid-cols-4">
                 <FrontNumber line={reading.frontPage} />
                 {reading.panels
                   .filter((panel) => panel.question !== null)
@@ -219,9 +230,19 @@ export function BalanceDashboard() {
                   ))}
               </div>
 
-              {reading.panels.map((panel) => (
-                <Panel key={panel.id} panel={panel} />
-              ))}
+              {/* The panels, in as many columns as the column can carry.
+                A panel is a card around a four column table, and that table
+                needs about 46rem of panel before it would rather be the
+                stacked rows a narrow panel falls back to, so two panels
+                need 93rem of container and three need 140. A wall display
+                lays the whole dashboard out in three columns; a laptop
+                reads them one at a time at full width, which is how they
+                were designed to be read. */}
+              <div className="grid grid-cols-1 gap-3 @min-[93rem]:grid-cols-2 @min-[140rem]:grid-cols-3">
+                {reading.panels.map((panel) => (
+                  <Panel key={panel.id} panel={panel} />
+                ))}
+              </div>
             </>
           )}
         </main>
@@ -306,20 +327,44 @@ function GapList({ gaps }: { gaps: string[] }) {
 // sets no band on the share of food spending, so the chip reads measured
 // rather than good or bad, and a window with no report in it still reads as
 // nothing to read rather than as a zero.
+//
+// Only a judged reading gets the display size. A verdict that is not a
+// judgement has no number to show, only a sentence about what is missing,
+// and a sentence at display size is the page shouting an absence: those
+// read at body size, in the quieter ink the rest of the page's prose uses.
+// The size itself grows with the window rather than sitting at one value,
+// because this is the one number the page is opened to find and a wall
+// display has the room to say so.
 function FrontNumber({ line }: { line: DashboardReadingLine }) {
   const chip = VERDICT[line.verdict];
+  const judged =
+    line.verdict === "in" ||
+    line.verdict === "under" ||
+    line.verdict === "over";
   return (
-    <div className="pm-glass pm-tile space-y-2">
+    <div className="pm-glass pm-tile flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-xs leading-snug font-semibold">{line.label}</h2>
-        <Pill tone={chip.tone}>{chip.word}</Pill>
+        {/* The chip keeps its width and the label wraps around it: a chip
+            squeezed by a long question would rather break its own word. */}
+        <Pill tone={chip.tone} className="shrink-0">
+          {chip.word}
+        </Pill>
       </div>
-      <p className="font-display text-lg leading-none font-bold tracking-tight">
-        {line.value}
-      </p>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {line.target}. The seat&apos;s early warning, and the number this page
-        is named for.
+      {judged ? (
+        <p className="font-display text-[clamp(1.25rem,1vw,1.75rem)] leading-none font-bold tracking-tight">
+          {line.value}
+        </p>
+      ) : (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {line.value}
+        </p>
+      )}
+      {/* The target rests on the tile's floor rather than under the value,
+          so four tiles of different heights still put the one line every
+          reader compares on one line. */}
+      <p className="mt-auto text-[11px] leading-relaxed text-muted-foreground">
+        {line.target}
       </p>
     </div>
   );
@@ -339,12 +384,14 @@ function FrontTile({
   answer: string;
 }) {
   return (
-    <div className="pm-glass pm-tile space-y-2">
+    <div className="pm-glass pm-tile flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-xs leading-snug font-semibold">{title}</h2>
-        <Pill tone={state.tone}>{state.word}</Pill>
+        <Pill tone={state.tone} className="shrink-0">
+          {state.word}
+        </Pill>
       </div>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
+      <p className="mt-auto text-[11px] leading-relaxed text-muted-foreground">
         {answer}
       </p>
     </div>
@@ -358,7 +405,7 @@ function FrontTile({
 // without a verdict would be a table.
 function Panel({ panel }: { panel: DashboardPanel }) {
   return (
-    <section className="pm-glass overflow-hidden rounded-2xl">
+    <section className="@container pm-glass overflow-hidden rounded-2xl">
       <div className="flex flex-wrap items-center gap-2 border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
         <h2 className="font-display text-sm font-bold tracking-tight">
           {panel.title}
@@ -371,62 +418,57 @@ function Panel({ panel }: { panel: DashboardPanel }) {
 
       {/* A reading is four facts: what was measured, what it read, the gate
           it is judged against, and the verdict. A table carries all four in
-          a line where the column is wide enough, and a row per reading
-          carries the same four stacked where it is not. The stacked form is
-          not a smaller table: it keeps every fact, and it is the reason a
-          reader on a phone no longer has to drag the panel 308 pixels
-          sideways to find out whether a number passed. */}
-      <div className="hidden @3xl:block pm-scroll overflow-x-auto">
+          a line where the panel is wide enough for one, and a row per
+          reading carries the same four stacked where it is not. The
+          threshold is the panel's own width rather than the page's,
+          because the panel is now its own container: a panel narrower than
+          46rem would rather stack than squeeze four columns, whatever the
+          window around it is doing. The stacked form is not a smaller
+          table: it keeps every fact, and it is the reason a reader on a
+          phone no longer has to drag the panel 308 pixels sideways to find
+          out whether a number passed. */}
+      <div className="hidden @min-[46rem]:block pm-scroll overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
             {/* The four columns hold their proportions from panel to panel.
                 Left to itself a table sizes its columns from whatever it
-                happens to be carrying, and these four panels carry
-                different things: measured across the four, the Gate column
-                came out 291 pixels wide on one panel and 135 on the next,
-                so a gate wrapped on one table and sat on one line on the
-                table below it.
-                Each share is what its longest string needs on one line,
-                measured at the page's own cap of 974 pixels: Reading 321,
-                Gate 261, Verdict 105. Window would need 445 and cannot have
-                it, because all four together come to 1132 in a column of
-                974. Window is the one that gives: its values are lists of
-                readings by table size rather than numbers, so it is the
-                column that can take a second line and the only one that
-                does. The three that fit are the three a reader scans. */}
+                happens to be carrying, and these panels carry different
+                things: measured across them, the Gate column came out 291
+                pixels wide on one panel and 135 on the next, and the
+                Reading column starved to 237 on the panel with the longest
+                Window lists while its neighbour ran 295, wrapping labels
+                that fit on two lines next door onto four. The label is the
+                one thing a reader scans first, so it gets a floor rather
+                than whatever is left over.
+                The shares are proportions of the panel's own width rather
+                than fixed sizes: the same four numbers read at 736 pixels
+                and at 1368, which is what keeps the columns in the same
+                visual order at every width the panel is ever drawn at. A
+                reading only has to hold four facts, and the shares are
+                what its longest strings need to say them: Reading 32%,
+                Window 28%, Gate 28%, Verdict 12%. */}
             <tr className="border-b border-black/[0.06] text-left dark:border-white/[0.08]">
-              <Th className="w-[35%]">Reading</Th>
-              <Th className="w-[27%] text-right">Window</Th>
-              <Th className="w-[27%]">Gate</Th>
-              <Th className="w-[11%] text-right">Verdict</Th>
+              <Th className="w-[32%]">Reading</Th>
+              <Th className="w-[28%] text-right">Window</Th>
+              <Th className="w-[28%]">Gate</Th>
+              <Th className="w-[12%] whitespace-nowrap text-right">Verdict</Th>
             </tr>
           </thead>
           <tbody>
             {panel.readings.map((line) => (
               <tr
                 key={line.label}
-                className="border-b border-black/[0.04] last:border-0 dark:border-white/[0.06]"
+                className="border-b border-black/[0.04] transition-colors last:border-0 hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]"
               >
-                <td className="px-4 py-2 text-xs">{line.label}</td>
-                <td className="px-4 py-2 text-right text-xs tabular-nums">
+                <td className="px-4 py-2.5 text-xs">{line.label}</td>
+                <td className="px-4 py-2.5 text-right text-xs tabular-nums">
                   {line.value}
                 </td>
-                <td className="px-4 py-2 text-xs text-muted-foreground">
+                <td className="px-4 py-2.5 text-xs text-muted-foreground">
                   {line.target}
                 </td>
-                <td className="px-4 py-2 text-right">
-                  {/* Held on one line. A pill is a chip with a rounded
-                      background, and text that breaks inside one turns it
-                      into a two line lozenge that is taller than the row
-                      it stands in: "no source" was doing exactly that in
-                      this column, and the four rows carrying it came out
-                      eight pixels taller than the rows around them. */}
-                  <Pill
-                    tone={VERDICT[line.verdict].tone}
-                    className="whitespace-nowrap"
-                  >
-                    {VERDICT[line.verdict].word}
-                  </Pill>
+                <td className="px-4 py-2.5 text-right">
+                  <VerdictWord verdict={line.verdict} />
                 </td>
               </tr>
             ))}
@@ -444,7 +486,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
           median" in: three lines, and the one reading whose name most
           needs reading was the one that was hardest to read. Given its own
           line it says the same words in two. */}
-      <ul className="@3xl:hidden">
+      <ul className="@min-[46rem]:hidden">
         {panel.readings.map((line) => (
           <li
             key={line.label}
@@ -452,9 +494,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
           >
             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
               <p className="min-w-0 flex-1 text-xs">{line.label}</p>
-              <Pill tone={VERDICT[line.verdict].tone} className="shrink-0">
-                {VERDICT[line.verdict].word}
-              </Pill>
+              <VerdictWord verdict={line.verdict} />
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               <span className="tabular-nums text-foreground">{line.value}</span>{" "}
@@ -466,6 +506,35 @@ function Panel({ panel }: { panel: DashboardPanel }) {
 
       <GapList gaps={panel.gaps} />
     </section>
+  );
+}
+
+// A verdict at row scale: a dot and the word, no chip. Forty chips down
+// four tables turn the verdict column into a stripe of coloured lozenges,
+// and a stripe is not a column anyone scans; the dot keeps the colour and
+// lets the word sit on the row's own baseline. The full pill is kept for
+// the three places a verdict is a headline rather than a detail: the
+// launch strip, a panel's header and a front tile. The word and its tone
+// still come from one map, so the dot, the word and the panel's chip can
+// never come to different conclusions about the same reading.
+function VerdictWord({ verdict }: { verdict: ReadingVerdict }) {
+  const { tone, word } = VERDICT[verdict];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium ${
+        tone === "gain"
+          ? "text-gain"
+          : tone === "warn"
+            ? "text-warn"
+            : "text-muted-foreground"
+      }`}
+    >
+      <span
+        aria-hidden
+        className="h-1.5 w-1.5 shrink-0 rounded-full bg-current"
+      />
+      {word}
+    </span>
   );
 }
 

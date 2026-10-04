@@ -24,6 +24,7 @@
 // good are its first customers rather than this goal's leftovers: they
 // are listed in the plan as the work of F2.
 
+import { CHARTERS } from "@/lib/game/constants/charters";
 import { BOONS, MODULES } from "@/lib/game/constants/drafts";
 import { GARMENTS } from "@/lib/game/constants/garments";
 import { GOOD_TAGS, ITEMS } from "@/lib/game/constants/goods";
@@ -85,13 +86,14 @@ export async function tagVocabularySuite(): Promise<void> {
   const entries = taggedEntries();
   const of = (kind: string) => entries.filter((e) => e.kind === kind).length;
   check(
-    TAGGED_KINDS.length === 5 &&
+    TAGGED_KINDS.length === 6 &&
       of("good") === ITEMS.length &&
       of("food") === Object.keys(FOODS).length &&
       of("module") === MODULES.length &&
       of("boon") === BOONS.length &&
-      of("charter") === Object.keys(DIFFICULTIES).length,
-    "the walk covers every item of all five catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
+      of("charter") === CHARTERS.length &&
+      of("difficulty") === Object.keys(DIFFICULTIES).length,
+    "the walk covers every item of all six catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
   );
   check(
     entries.length ===
@@ -99,6 +101,7 @@ export async function tagVocabularySuite(): Promise<void> {
         Object.keys(FOODS).length +
         MODULES.length +
         BOONS.length +
+        CHARTERS.length +
         Object.keys(DIFFICULTIES).length &&
       TAGGED_KINDS.every((kind) => of(kind) > 0),
     "with nothing walked twice and no catalogue empty, which is the same count read the other way round",
@@ -141,9 +144,12 @@ export async function tagVocabularySuite(): Promise<void> {
   const cold = entriesWithTag("cold").map((entry) => entry.id);
   const wardrobe = Object.keys(GARMENTS);
   check(
-    cold.length === wardrobe.length &&
-      wardrobe.every((garment) => cold.includes(garment)),
-    "the cold tag gathers exactly the wardrobe and nothing else, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question",
+    cold.length === wardrobe.length + 1 &&
+      wardrobe.every((garment) => cold.includes(garment)) &&
+      entriesWithTag("cold").some(
+        (entry) => entry.kind === "boon" && entry.id === "cold_hardened",
+      ),
+    "the cold tag gathers exactly the wardrobe and the one card that hardens against a cold leg, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question, and the moment card that answers such a leg is gathered by the same word rather than by a name kept beside it",
   );
   const pantryOf = (tag: Tag) =>
     entriesWithTag(tag)
@@ -166,20 +172,21 @@ export async function tagVocabularySuite(): Promise<void> {
     (entry) => `${entry.kind}:${entry.id}`,
   );
   check(
-    armed.length === 4 &&
-      armed.includes("charter:open_waters") &&
-      armed.includes("charter:monsoon") &&
+    armed.length === 5 &&
+      armed.includes("difficulty:open_waters") &&
+      armed.includes("difficulty:monsoon") &&
       armed.includes("boon:deep_sea_escort_pact") &&
+      armed.includes("boon:fleet_colors") &&
       armed.includes("module:persian_dome_compass"),
-    "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort and the compass that turns a raid, which is the query shape the single card record is being built to answer",
+    "while one tag reaches across catalogues: armed gathers the two difficulties that gain teeth, the pact that pays for an escort, the colors that make a raider think twice and the compass that turns a raid, which is the query shape the single card record is being built to answer",
   );
   check(
     DIFFICULTIES.monsoon.pirateChance.length === 2 &&
-      tagsOf("charter", "monsoon")?.includes("armed") === true &&
+      tagsOf("difficulty", "monsoon")?.includes("armed") === true &&
       DIFFICULTIES.monsoon.brokerCorruption &&
-      tagsOf("charter", "monsoon")?.includes("contraband") === true &&
+      tagsOf("difficulty", "monsoon")?.includes("contraband") === true &&
       DIFFICULTIES.fair_winds.pirateChance.length === 1 &&
-      tagsOf("charter", "fair_winds")?.includes("armed") === false,
+      tagsOf("difficulty", "fair_winds")?.includes("armed") === false,
     "and the hardest water carries both of its own tags, read off the two numbers in its record rather than out of the prose: what gains teeth partway through the voyage says so, and what sails a corrupt broker says that too",
   );
   const named = new Set<string>([
@@ -235,12 +242,14 @@ export async function tagVocabularySuite(): Promise<void> {
     ) === true,
     "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
   );
+  // Every entry that carries the word, stripped by the tag rather than by
+  // name: the Harbor Credit boon borrows on the same word, and a fixture
+  // that knew one debtor's name would stop asking its question the day a
+  // second one signed on.
   check(
     soleFinding({
       ...shipped,
-      entries: shipped.entries.filter(
-        (entry) => !(entry.kind === "boon" && entry.id === "emergency_loan"),
-      ),
+      entries: shipped.entries.filter((entry) => !entry.tags.includes("debt")),
     })?.includes('no entry carries "debt"') === true,
     "a tag of the twelve that no entry carries is caught, since it would otherwise be a word in the vocabulary with nothing a card could be about",
   );
@@ -282,18 +291,18 @@ export async function tagVocabularySuite(): Promise<void> {
   );
   check(
     soleFinding(
-      withRow("charter", "fair_winds", ["public", "armed"]),
+      withRow("difficulty", "fair_winds", ["public", "armed"]),
     )?.includes("never steps up") === true,
-    "a charter that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
+    "a difficulty that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
   );
   check(
-    soleFinding(withRow("charter", "open_waters", ["public"]))?.includes(
+    soleFinding(withRow("difficulty", "open_waters", ["public"]))?.includes(
       "gains teeth partway through the voyage and does not carry armed",
     ) === true,
-    "and one that gains teeth without saying so is caught in the other direction, because a charter that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
+    "and one that gains teeth without saying so is caught in the other direction, because a difficulty that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
   );
   check(
-    soleFinding(withRow("charter", "monsoon", ["armed"]))?.includes(
+    soleFinding(withRow("difficulty", "monsoon", ["armed"]))?.includes(
       "sails a corrupt broker and does not carry contraband",
     ) === true,
     "as is the water that sails a corrupt broker without carrying contraband, read off the same record's own flag rather than off a list kept in the checker",

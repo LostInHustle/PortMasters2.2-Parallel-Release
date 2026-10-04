@@ -56,6 +56,7 @@ import {
   type CardTally,
 } from "@/lib/game/cards";
 import {
+  BOON_TRIGGERS,
   CARD_KINDS,
   CARD_TRIGGER,
   LANGUAGES,
@@ -65,6 +66,7 @@ import {
   type CardRecord,
   type CardTrigger,
 } from "@/lib/game/constants/cards";
+import { CHARTERS } from "@/lib/game/constants/charters";
 import { BOONS, CARDS_PER_OFFER, MODULES } from "@/lib/game/constants/drafts";
 import type { TagList } from "@/lib/game/constants/tags";
 import {
@@ -129,21 +131,23 @@ export async function cardRecordSuite(): Promise<void> {
     "every card carries the plan's ten fields, plus the glyph the record added as its eleventh: the icon is language neutral, so it sits beside the two strings rather than inside either, and a card without one is a card a draft cannot draw",
   );
   check(
-    CARDS.length === BOONS.length + MODULES.length &&
-      CARDS.length === 28 &&
+    CARDS.length === BOONS.length + MODULES.length + CHARTERS.length &&
+      CARDS.length === 43 &&
       new Set(CARDS.map((card) => card.id)).size === CARDS.length,
-    "the registry is the two ladders stacked and nothing else, twenty eight records with twenty eight identifiers, so a card cannot be drafted without being in the walk. Two cards sharing an id would be a rename nobody could detect, since the id is what every save, standing order and wire frame stores",
+    "the registry is the three catalogues stacked and nothing else, forty three records with forty three identifiers, so a card cannot be drafted without being in the walk. Two cards sharing an id would be a rename nobody could detect, since the id is what every save, standing order and wire frame stores",
   );
   check(
     CARDS.every(
       (card) =>
         CARD_KINDS.includes(card.kind) &&
-        card.trigger === CARD_TRIGGER[card.kind],
+        (card.kind === "boon"
+          ? BOON_TRIGGERS.includes(card.trigger)
+          : card.trigger === CARD_TRIGGER[card.kind]),
     ) &&
       cardsOfKind("boon").length === BOONS.length &&
       cardsOfKind("module").length === MODULES.length &&
-      cardsOfKind("charter").length === 0,
-    "each card's kind is one of the plan's three and each card arrives at the draft its kind promises, read through the one map rather than off a field repeated per record, so a boon offered at the shipyard is a failed build rather than a card nobody can explain. The charter count is zero and says so: F6 drafts the first one, and what this pins is that the shape and the reader are already there for it",
+      cardsOfKind("charter").length === CHARTERS.length,
+    "each card's kind is one of the plan's three and each card arrives at the draft its kind promises, read through the one map rather than off a field repeated per record, so a boon offered at the shipyard is a failed build rather than a card nobody can explain. A boon is the one kind whose arrival is a set rather than a point: the round draft or one of the five moments, read off the same table the moments are armed from, which is what lets a moment card ride the pool the round draft deals from without answering to a draft it never arrives at. The charter count reads off the catalogue F6 filled rather than off a number typed here, which is the shape and the reader the pool was built to take",
   );
   check(
     CARDS.every((card) =>
@@ -240,7 +244,18 @@ export async function cardRecordSuite(): Promise<void> {
   const gambitModules = idsOf(offerPool("module", wide));
   const classicBoons = idsOf(offerPool("boon", narrow));
   const classicModules = idsOf(offerPool("module", narrow));
-  const WITHHELD = aboveClassic.map((card) => card.id);
+  // Above Classic's ceiling now sit the drafted ladders' own tall cards
+  // and F6's ten charters. A charter is withheld from the base mode
+  // wholesale and arrives through its own moment rather than through
+  // either drafted pool, so the read below holds the two ladders' own
+  // withheld cards against the pools and names the charters' separate
+  // route beside them.
+  const WITHHELD = aboveClassic
+    .filter((card) => card.kind !== "charter")
+    .map((card) => card.id);
+  const withheldCharters = aboveClassic.filter(
+    (card) => card.kind === "charter",
+  );
   check(
     WITHHELD.length === 3 &&
       WITHHELD.every(
@@ -250,8 +265,10 @@ export async function cardRecordSuite(): Promise<void> {
         (id) => !classicBoons.includes(id) && !classicModules.includes(id),
       ) &&
       gambitBoons.length + gambitModules.length ===
-        classicBoons.length + classicModules.length + WITHHELD.length,
-    "three cards are withheld from the base mode and they are exactly the ones above its ceiling, watched at the pool a captain is drafted from rather than in the arithmetic alone: each is offered in Ocean Gambit and absent from the base mode on the same state, so the field is read by the draw instead of merely stored beside it",
+        classicBoons.length + classicModules.length + WITHHELD.length &&
+      withheldCharters.length === CHARTERS.length &&
+      withheldCharters.every((card) => card.modes.classic === 0),
+    "three drafted cards are withheld from the base mode and they are exactly the ones above its ceiling, watched at the pool a captain is drafted from rather than in the arithmetic alone: each is offered in Ocean Gambit and absent from the base mode on the same state, so the field is read by the draw instead of merely stored beside it. The ten charters sit above the same ceiling wholesale, every one of them zeroed out of the base mode, because a charter is offered at its own moment rather than dealt by either drafted pool",
   );
   const early = voyageState({ difficulty: "open_waters" });
   const earlyBoons = idsOf(offerPool("boon", early));
@@ -456,8 +473,8 @@ export async function cardRecordSuite(): Promise<void> {
       refused.boonChoices.length === 0 &&
       refused.cardTally[first.id]?.picked === 1 &&
       firstFlags !== null &&
-      refused.modifierFlags === firstFlags,
-    "a real boon takes: the flags the record carries land on the round in one write, the table clears, and the card's pick is counted, so the tally holds one offer and one pick for a card that was dealt and taken",
+      JSON.stringify(refused.modifierFlags) === JSON.stringify(firstFlags),
+    "a real boon takes: the flags the record carries land on the round in one write, the table clears, and the card's pick is counted, so the tally holds one offer and one pick for a card that was dealt and taken. The comparison is content rather than object identity because the write folds any held flags in beneath the card's own, and this captain holds nothing yet",
   );
   const loaned = voyageState();
   const purse = loaned.money;
@@ -632,6 +649,15 @@ export async function cardRecordSuite(): Promise<void> {
       card.id === "silk_monopoly" ? { ...card, ...patch } : card,
     ),
   });
+  // A subject with the key ledger switched off, for the fixtures whose
+  // clause is about the record's own shape: a card broken below stops
+  // counting as its flag's writer, and the ledger's finding about the key
+  // it leaves unwritten is asked of its own fixtures further down rather
+  // than riding along with every other clause's answer.
+  const withoutLedger = (subject: CardSubject): CardSubject => ({
+    ...subject,
+    modifierKeys: undefined,
+  });
   // A clause is asked for its finding and for nothing else, since a rule
   // that fired alongside three others could be firing for the wrong reason.
   const sole = (subject: CardSubject): string | null => {
@@ -660,7 +686,7 @@ export async function cardRecordSuite(): Promise<void> {
   check(
     (() => {
       const notAKind = validateCards(
-        broken({ kind: "relic" as CardRecord["kind"] }),
+        withoutLedger(broken({ kind: "relic" as CardRecord["kind"] })),
       );
       return (
         notAKind.length === 2 &&
@@ -737,16 +763,83 @@ export async function cardRecordSuite(): Promise<void> {
     "a condition asking for a trade the roster cannot hold is caught, because the engine would answer it false for every captain alive and the card would be offered to nobody: the reader is defensive, so this is a content failure rather than a crash, and a content failure has to be caught here instead",
   );
   check(
-    sole(broken({ effect: { kind: "hull" } }))?.includes(
+    sole(withoutLedger(broken({ effect: { kind: "hull" } })))?.includes(
       "a boon writes the round's flags",
     ) === true,
     "a boon whose effect is not the flags is caught, since the draft applies a boon by writing what its record carries and a boon carrying a hull would be a card that changes nothing at all",
   );
   check(
-    sole(broken({ effect: { kind: "flags", flags: {} } }))?.includes(
-      "writes no flag",
-    ) === true,
+    sole(
+      withoutLedger(broken({ effect: { kind: "flags", flags: {} } })),
+    )?.includes("writes no flag") === true,
     "and a boon that writes no flags is caught even when its shape is right: an empty flag set is a card a captain can pick, and pay for, and receive nothing from",
+  );
+  check(
+    sole({
+      ...shipped,
+      cards: shipped.cards.map((card) =>
+        card.id === "merchant_charm"
+          ? {
+              ...card,
+              effect: {
+                kind: "flags",
+                flags: {
+                  purchase_discount: 0.15,
+                  transport_silk_discount: 0.5,
+                },
+              },
+            }
+          : card,
+      ),
+    })?.includes(
+      "writes transport_silk_discount, which silk_wind already writes",
+    ) === true,
+    "and a key two cards write is caught and names both, because the ledger reads a modifier's source by finding the card that writes its key and that reader takes the first match: two writers would make the source a function of table order, and the day they disagreed the breakdown would quietly print the wrong card's name",
+  );
+  check(
+    sole({
+      ...shipped,
+      cards: shipped.cards.filter((card) => card.id !== "silk_wind"),
+    })?.includes("no card writes transport_silk_discount") === true,
+    "while a key no card writes is caught in the other direction, because every key the vocabulary names has a read site in the engine: a renamed key on one side of that pair is a read site waiting on a flag that never arrives, and this clause is what fails the build the day the two sides part",
+  );
+  // ---- F6's pairing clause ----
+  // The clause reads the charter id to path map rather than the records,
+  // so its fixtures patch the map and the findings are read in pairs:
+  // what the map itself got wrong, then the count that same mistake
+  // leaves a path with. The pairing is the clause's shape rather than
+  // two clauses, because a map edited wrongly is never wrong about one
+  // thing.
+  const pairing = (charterPaths: Record<string, string>): string[] =>
+    validateCards({ ...shipped, charterPaths });
+  const orphaned = pairing({
+    ...(shipped.charterPaths ?? {}),
+    ghost_charter: "loom",
+  });
+  check(
+    orphaned.length === 2 &&
+      orphaned[0].includes("no card carries this id") &&
+      orphaned[1].includes("carries 3 charters"),
+    "an entry pairing a charter the pool does not have is caught, and the path it was filed under is caught carrying one too many: an orphan entry is never a mistake about one thing, since the count it inflates is the same edit read again",
+  );
+  const unpaired = { ...(shipped.charterPaths ?? {}) };
+  delete unpaired.bulk_charter;
+  const missing = pairing(unpaired);
+  check(
+    missing.length === 2 &&
+      missing[0].includes("a charter with no path") &&
+      missing[1].includes("carries 1 charters"),
+    "a charter the map forgets is caught in the other direction, and its path is caught short by the same edit: a charter no trio can pair is a card in the pool that no captain can ever be offered, which is the failure the two per path count exists to make loud",
+  );
+  const misrouted = pairing({
+    ...(shipped.charterPaths ?? {}),
+    bulk_charter: "galleon",
+  });
+  check(
+    misrouted.length === 2 &&
+      misrouted[0].includes("which is not a path") &&
+      misrouted[1].includes("carries 1 charters"),
+    "and a charter filed under something that is not a path is caught, its old path caught short with it: the map is what the trio's first two slots read, so a path name the game does not have is a slot that silently deals nothing",
   );
   check(
     sole(
@@ -807,6 +900,7 @@ export async function cardRecordSuite(): Promise<void> {
     [
       "src/lib/game/constants/cards.ts",
       "src/lib/game/cards.ts",
+      "src/lib/game/constants/charters.ts",
       "src/lib/game/constants/drafts.ts",
       "src/lib/game/engine/boons.ts",
       "src/lib/game/engine/pricing.ts",

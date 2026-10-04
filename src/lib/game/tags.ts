@@ -8,8 +8,8 @@
 // time rather than by review, because a rule that depends on people
 // remembering it is not a rule. This module is that validation. The walk
 // below reads the content the tree actually ships rather than a copy of
-// it, so a good, a card or a charter added tomorrow is checked the moment
-// it exists and nothing has to be remembered at the call site. The build
+// it, so a good, a card or a difficulty added tomorrow is checked the
+// moment it exists and nothing has to be remembered at the call site. The build
 // runs it before it compiles a page (see scripts/tags.ts).
 //
 // Nine things have to hold, and each has a way of going wrong that
@@ -42,8 +42,8 @@
 //   8. The pantry's two tags are held to its keepings: every food is
 //      preserved or perishable and never both, and a preserved food keeps
 //      at least as long as a perishable one.
-//   9. The charters carry armed exactly when the raid chance steps up, and
-//      contraband exactly when a corrupt broker sails. Both are
+//   9. The difficulties carry armed exactly when the raid chance steps
+//      up, and contraband exactly when a corrupt broker sails. Both are
 //      biconditionals rather than one way implications, because the
 //      vocabulary's job is to describe the content rather than to allow
 //      it: a tier that gains teeth and does not say so is the drift this
@@ -59,6 +59,7 @@
 // content is static data, so the whole of this module is a function of
 // what is imported.
 // =====================================================================
+import { CHARTERS } from "./constants/charters";
 import { BOONS, MODULES } from "./constants/drafts";
 import { GARMENTS } from "./constants/garments";
 import { GOOD_TAGS, ITEMS } from "./constants/goods";
@@ -66,8 +67,9 @@ import { FOODS, FOOD_TAGS, type FoodId } from "./constants/supplies";
 import { MAX_TAGS_PER_ENTRY, TAGS, type Tag } from "./constants/tags";
 import { DIFFICULTIES, type Difficulty } from "./difficulty";
 
-/** The five catalogues an entry can belong to, in the order they are walked. */
-export type TaggedKind = "good" | "food" | "module" | "boon" | "charter";
+/** The six catalogues an entry can belong to, in the order they are walked. */
+export type TaggedKind =
+  "good" | "food" | "module" | "boon" | "charter" | "difficulty";
 
 /** Every kind, in one array, so a reader can name the whole of the walk. */
 export const TAGGED_KINDS: readonly TaggedKind[] = [
@@ -76,6 +78,7 @@ export const TAGGED_KINDS: readonly TaggedKind[] = [
   "module",
   "boon",
   "charter",
+  "difficulty",
 ];
 
 /** One tagged entry: what it is, which one it is, and what it carries. */
@@ -97,18 +100,19 @@ export type TaggingSubject = {
   garments: readonly string[];
   /** How many legs each pantry food stays food for, null meaning never. */
   keepings: Record<string, number | null>;
-  /** Each charter's raid step-up and its corrupt broker, off its own record. */
-  charters: Record<string, { stepsUp: boolean; corrupt: boolean }>;
+  /** Each difficulty's raid step-up and its corrupt broker, off its record. */
+  difficulties: Record<string, { stepsUp: boolean; corrupt: boolean }>;
 };
 
 /**
  * The subject this tree ships, walked from the content itself.
  *
  * The order is the plan's own with the pantry beside the goods it is
- * carried with: goods, foods, modules, boons, charters. Cards are walked
- * module first and boon second because that is the order the plan lists
- * them in, and the order is kept for the reason the vocabulary keeps the
- * plan's: two lists a reader compares should not need a second alphabet.
+ * carried with: goods, foods, modules, boons, charters, difficulties.
+ * Cards are walked module first, boon second and charter third because
+ * that is the order the plan lists them in, and the order is kept for the
+ * reason the vocabulary keeps the plan's: two lists a reader compares
+ * should not need a second alphabet.
  *
  * Every catalogue item is walked, so an item added tomorrow is read by the
  * rule the moment it exists and nothing here has to be remembered. Each
@@ -131,15 +135,19 @@ export function shippedTagging(): TaggingSubject {
   for (const boon of BOONS) {
     entries.push({ kind: "boon", id: boon.id, tags: boon.tags });
   }
+  for (const charter of CHARTERS) {
+    entries.push({ kind: "charter", id: charter.id, tags: charter.tags });
+  }
   for (const id of Object.keys(DIFFICULTIES) as Difficulty[]) {
-    entries.push({ kind: "charter", id, tags: DIFFICULTIES[id].tags });
+    entries.push({ kind: "difficulty", id, tags: DIFFICULTIES[id].tags });
   }
   const keepings: Record<string, number | null> = {};
   for (const id of Object.keys(FOODS) as FoodId[])
     keepings[id] = FOODS[id].keeps;
-  const charters: Record<string, { stepsUp: boolean; corrupt: boolean }> = {};
+  const difficulties: Record<string, { stepsUp: boolean; corrupt: boolean }> =
+    {};
   for (const id of Object.keys(DIFFICULTIES) as Difficulty[]) {
-    charters[id] = {
+    difficulties[id] = {
       stepsUp: DIFFICULTIES[id].pirateChance.length > 1,
       corrupt: DIFFICULTIES[id].brokerCorruption,
     };
@@ -148,7 +156,7 @@ export function shippedTagging(): TaggingSubject {
     entries,
     garments: Object.keys(GARMENTS),
     keepings,
-    charters,
+    difficulties,
   };
 }
 
@@ -186,7 +194,7 @@ export function entriesWithTag(tag: Tag): TaggedEntry[] {
 export function validateTagging(
   subject: TaggingSubject = shippedTagging(),
 ): string[] {
-  const { entries, garments, keepings, charters } = subject;
+  const { entries, garments, keepings, difficulties } = subject;
   const findings: string[] = [];
   const known = new Set<string>(TAGS);
   const used = new Set<Tag>();
@@ -277,23 +285,23 @@ export function validateTagging(
     }
   }
 
-  // 9: the two tags a charter's own numbers decide.
-  for (const [id, config] of Object.entries(charters)) {
+  // 9: the two tags a difficulty's own numbers decide.
+  for (const [id, config] of Object.entries(difficulties)) {
     const armed = entries.some(
-      (e) => e.kind === "charter" && e.id === id && e.tags.includes("armed"),
+      (e) => e.kind === "difficulty" && e.id === id && e.tags.includes("armed"),
     );
     const contraband = entries.some(
       (e) =>
-        e.kind === "charter" && e.id === id && e.tags.includes("contraband"),
+        e.kind === "difficulty" && e.id === id && e.tags.includes("contraband"),
     );
     if (armed !== config.stepsUp) {
       findings.push(
-        `charter "${id}" ${armed ? "carries armed and its raid chance never steps up" : "gains teeth partway through the voyage and does not carry armed"}.`,
+        `difficulty "${id}" ${armed ? "carries armed and its raid chance never steps up" : "gains teeth partway through the voyage and does not carry armed"}.`,
       );
     }
     if (contraband !== config.corrupt) {
       findings.push(
-        `charter "${id}" ${contraband ? "carries contraband and sails no corrupt broker" : "sails a corrupt broker and does not carry contraband"}.`,
+        `difficulty "${id}" ${contraband ? "carries contraband and sails no corrupt broker" : "sails a corrupt broker and does not carry contraband"}.`,
       );
     }
   }

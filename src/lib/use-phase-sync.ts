@@ -15,8 +15,8 @@ import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import type { PortShift } from "@/lib/game/maroon";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
-import { checkpointRank } from "@/lib/game/checkpoint";
-import { normalizePhase } from "@/lib/game/phases";
+import { checkpointRank, isGatedPhase } from "@/lib/game/checkpoint";
+import { normalizePhase, seatOf } from "@/lib/game/phases";
 import {
   phaseClockLabel,
   secondsRemaining,
@@ -229,6 +229,16 @@ export function usePhaseSync({
           act(fn);
           return;
         }
+        // Only a seat the room waits at is a seat the room can have run
+        // out, and the pier is the one seat on the lap nobody readies out
+        // of (see isGatedPhase). The frame that carries a captain off the
+        // pier is room:started, which lays the opening seat out itself,
+        // and that deal lands by an act rather than by this render: a room
+        // that departs while this snapshot still reads the pier would
+        // otherwise read as a room that moved past this captain, and the
+        // fallback below would commit the cards the deal just laid out
+        // before they ever render. One room move, applied once.
+        if (!isGatedPhase(roomMode, seatOf(g.phase))) return;
         // [B2: hard timers, the server as timekeeper] Nobody here was
         // waiting on anything to happen: this captain was idle when the
         // room's clock ran the seat out, and the advance that carried the
@@ -342,6 +352,11 @@ export function usePhaseSync({
         });
         return;
       }
+      // The same reading the catch up above makes, for the same reason: the
+      // seat has to be one the room waits at before its fallback can be
+      // this captain's to run. The held transition above is untouched: a
+      // captain only holds one by having pressed at the seat they stand in.
+      if (!isGatedPhase(g.mode, seatOf(g.phase))) return;
       // [B2: hard timers, the server as timekeeper] And when there is no
       // pending transition, this is the room's clock having run the seat out
       // while this captain was idle. Nobody chose anything here, so the seat

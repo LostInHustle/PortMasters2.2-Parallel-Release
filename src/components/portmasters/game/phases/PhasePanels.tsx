@@ -110,6 +110,10 @@ const HUE_TONES = {
   planner: "border-planner/15 bg-planner/[0.03]",
   wardrobe: "border-wardrobe/15 bg-wardrobe/[0.03]",
   modules: "border-modules/15 bg-modules/[0.02]",
+  // [F5: public offers] The compass's own hue, for the fleet ledger the
+  // two boon screens draw (see OpenBoons). Same border and fill strength
+  // as every tone above it; the only thing new is the name.
+  dawn: "border-dawn/15 bg-dawn/[0.03]",
 } as const;
 
 /**

@@ -36,18 +36,7 @@
 //     carries both, and a card that arrives later cannot arrive with one
 //     string and pass review: the content check fails the build.
 // =====================================================================
-import {
-  BOTH_MODES,
-  NO_LEAN,
-  type CardRecord,
-  type ModeWeights,
-} from "./cards";
-
-// The two mode weightings that are not the shared one. Named rather than
-// inlined because the pair is the whole point of the field: a card is in
-// both pools or it is in Ocean Gambit's alone, and a reader should be able
-// to tell which by reading the name rather than by comparing two numbers.
-const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
+import { BOTH_MODES, GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
 
 export const BOONS_TIER0: CardRecord[] = [
   {
@@ -369,10 +358,149 @@ export const BOONS_TIER2: CardRecord[] = [
   },
 ];
 
+// [F4: boons at milestone moments] The launch pool: one boon per moment,
+// five cards, exactly the small set the plan's iteration note asks for
+// ("The pool should stay small at launch, and the first widening should
+// target the paths with the lowest pick rate"), which is why each card
+// carries a path lean from the first wave rather than none.
+//
+// The list stands outside the three tier ladders on purpose, and that
+// placement is the round draft's whole protection: unlockedBoons walks
+// the ladders (see ./pools), so a card here can never appear in a
+// round's three, and it appears in the milestone draw alone. It rides
+// ./cards' CARDS for everything else, the door, the tally, the validator
+// and the flag lookup, so a milestone boon is a card like any other the
+// moment it is on a table.
+//
+// Every condition is the always arm, because the moment is the
+// conditioning: the crew loss card is worth the same to a rich captain
+// and a broke one, and what decides which of these a captain sees is
+// which moment arrived and which of the five they already hold.
+//
+// Each card writes a key of its own. The five keys are new here (see
+// MODIFIER_KEYS in ../types), and no round drafted card writes any of
+// them, so a held boon and a round boon are never in force on the same
+// key: the pool's one owner per key clause (see the validator in
+// ../cards) holds the line, and the pricing breakdown's source line
+// stays true without a second rule.
+export const MILESTONE_BOONS: CardRecord[] = [
+  {
+    id: "steady_watch",
+    kind: "boon",
+    power: 2,
+    icon: "🍲",
+    tags: ["crewed"],
+    pathWeight: { quartermaster: 2 },
+    trigger: "crew_loss",
+    condition: { kind: "always", weight: 1 },
+    effect: { kind: "flags", flags: { steady_rations: 1 } },
+    modes: BOTH_MODES,
+    strings: {
+      en: {
+        name: "Steady Watch",
+        desc: "The crew eats one fewer than their number each leg, for the voyage.",
+      },
+      zh: {
+        name: "守望",
+        desc: "本航程余下期间，船员每段航程少消耗一份口粮。",
+      },
+    },
+  },
+  {
+    id: "cold_hardened",
+    kind: "boon",
+    power: 3,
+    icon: "🧣",
+    tags: ["cold"],
+    pathWeight: { convoy: 2 },
+    trigger: "cold_leg",
+    condition: { kind: "always", weight: 1 },
+    effect: { kind: "flags", flags: { cold_hardened: 1 } },
+    modes: BOTH_MODES,
+    strings: {
+      en: {
+        name: "Cold Hardened",
+        desc: "The warmth the crew wears counts one higher, for the voyage.",
+      },
+      zh: {
+        name: "耐寒",
+        desc: "本航程余下期间，船员所穿御寒值提高 1。",
+      },
+    },
+  },
+  {
+    id: "route_mastery",
+    kind: "boon",
+    power: 3,
+    icon: "🗺️",
+    tags: ["public"],
+    pathWeight: { quartermaster: 1.5, aroma: 1.5 },
+    trigger: "pathbound_order",
+    condition: { kind: "always", weight: 1 },
+    effect: { kind: "flags", flags: { route_mastery: 0.25 } },
+    modes: BOTH_MODES,
+    strings: {
+      en: {
+        name: "Route Mastery",
+        desc: "Orders that follow your path pay a quarter more, for the voyage.",
+      },
+      zh: {
+        name: "路线精通",
+        desc: "本航程余下期间，沿你路径的订单报酬增加四分之一。",
+      },
+    },
+  },
+  {
+    id: "harbor_credit",
+    kind: "boon",
+    power: 3,
+    icon: "🏅",
+    tags: ["debt"],
+    pathWeight: { loom: 2 },
+    trigger: "renown_rung",
+    condition: { kind: "always", weight: 1 },
+    effect: { kind: "flags", flags: { harbor_credit: 0.25 } },
+    modes: BOTH_MODES,
+    strings: {
+      en: {
+        name: "Harbor Credit",
+        desc: "Product sales dues are a quarter lower, for the voyage.",
+      },
+      zh: {
+        name: "港口信用",
+        desc: "本航程余下期间，商品销售税降低四分之一。",
+      },
+    },
+  },
+  {
+    id: "fleet_colors",
+    kind: "boon",
+    power: 2,
+    icon: "🚩",
+    tags: ["armed"],
+    pathWeight: { free_captain: 2 },
+    trigger: "mandate",
+    condition: { kind: "always", weight: 1 },
+    effect: { kind: "flags", flags: { fleet_color: 0.25 } },
+    modes: BOTH_MODES,
+    strings: {
+      en: {
+        name: "Fleet Colors",
+        desc: "Raiders think twice: pirate risk is a quarter lower, for the voyage.",
+      },
+      zh: {
+        name: "舰队旗帜",
+        desc: "本航程余下期间，海盗来袭的风险降低四分之一。",
+      },
+    },
+  },
+];
+
 export const BOONS: CardRecord[] = [
   ...BOONS_TIER0,
   ...BOONS_TIER1,
   ...BOONS_TIER2,
+  ...MILESTONE_BOONS,
 ];
 
 // What a boon reroll costs, once per round. The module side has no

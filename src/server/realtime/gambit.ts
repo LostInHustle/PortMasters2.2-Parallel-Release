@@ -248,15 +248,34 @@ type HeldCard = {
 };
 
 /**
- * Every card at the table, for the one reader outside the table that has
- * any business knowing them: the voyage's end, which records whether each
- * captain won the game their card set them.
+ * Every card at the table, for the two readers outside the table that
+ * have any business knowing them.
  *
- * The room is read once rather than per captain, because the conclusion
- * walks every finisher anyway and this is one indexed read of a table with
- * one row per seat. It is called after the last captain has finished, so
- * nothing here is in flight during play, and what it answers is written to
- * a row only the captain it belongs to can read.
+ * The voyage's end is the first: it records whether each captain won the
+ * game their card set them. The room is read once rather than per
+ * captain, because the conclusion walks every finisher anyway and this is
+ * one indexed read of a table with one row per seat. It is called after
+ * the last captain has finished, so nothing of that read is in flight
+ * during play, and what it answers is written to a row only the captain
+ * it belongs to can read.
+ *
+ * [F6: charters at leg four] The charter take is the second. The leg
+ * report's one non-figure claim is a card a captain holds, and the
+ * alignment that take is recorded with has to come off this table rather
+ * than off the wire (see charter_taken in @/lib/game/telemetry), so an
+ * operator measurement says what the voyage dealt a captain and never
+ * what a captain said about themselves. It is called during play, once
+ * per leg a claim arrives on, which the once per voyage dedup in
+ * noteCharterTaken bounds to what a client's repetition costs, and a
+ * captain this table cannot name is left unattributed by the caller
+ * rather than filled in.
+ *
+ * The two readers are what keeps the classification thin, and it is
+ * worth restating at the second one: every read of this table is inside
+ * this file, and both callers are server side. No alignment reaches a
+ * captain except through the private entry's own role, which is the line
+ * the frame sweeps hold and check:private watches. Nothing here is a
+ * frame.
  *
  * The flourish is resolved here rather than handed back as an id, for the
  * same reason cardsFromRows resolves it for the wire: an id from a deck

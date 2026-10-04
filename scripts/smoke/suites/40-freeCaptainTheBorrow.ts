@@ -14,11 +14,14 @@ import {
   lockedBehind,
   nextPhase,
   normalizeOpportunistBorrows,
+  opportunistAllowance,
   opportunistBorrowsLeft,
   opportunistBorrowsTaken,
+  opportunistIsBorrower,
   opportunistLine,
   opportunistMayBorrow,
   opportunistPayout,
+  opportunistUsesLine,
   restartGame,
   snapToCheckpoint,
 } from "@/lib/game/engine";
@@ -36,13 +39,16 @@ import {
 export async function freeCaptainTheBorrowSuite(): Promise<void> {
   // ---- the allowance ----
   // The two numbers the plan sets, and the payout they make. The penalty
-  // is read off the constant rather than typed here, so F6's retune moves
-  // this check with it.
+  // is read off the constant rather than typed here, and the empty flag
+  // set is the captain before any charter: [F6] retunes the pair through
+  // the Factor, and the retune is read in its own checks below rather
+  // than folded into this one, so the base reading stays the base one.
   check(
     OPPORTUNIST_USES === 1 &&
       OPPORTUNIST_PENALTY === 0.4 &&
-      opportunistPayout(100) === 60 &&
-      opportunistPayout(100) === 100 - Math.round(100 * OPPORTUNIST_PENALTY),
+      opportunistPayout({ modifierFlags: {} }, 100) === 60 &&
+      opportunistPayout({ modifierFlags: {} }, 100) ===
+        100 - Math.round(100 * OPPORTUNIST_PENALTY),
     "a hundred Gold order pays sixty on the borrow, which is the plan's forty percent penalty read off the constant rather than typed into the rule",
   );
   // The property, over every face value a card can carry rather than over
@@ -52,17 +58,20 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
   // instead of rounding would leave a two Gold order paying two and the
   // penalty would stop being real exactly where the plan says the reach
   // has to cost something.
+  const bareBorrow = { modifierFlags: {} };
   check(
     Array.from({ length: 200 }, (_, i) => i + 1).every(
       (face, i, all) =>
-        opportunistPayout(face) <= face &&
-        opportunistPayout(face) >= 0 &&
-        (i === 0 || opportunistPayout(face) >= opportunistPayout(all[i - 1])),
+        opportunistPayout(bareBorrow, face) <= face &&
+        opportunistPayout(bareBorrow, face) >= 0 &&
+        (i === 0 ||
+          opportunistPayout(bareBorrow, face) >=
+            opportunistPayout(bareBorrow, all[i - 1])),
     ) &&
-      opportunistPayout(2) === 1 &&
-      opportunistPayout(1) === 1 &&
-      opportunistPayout(0) === 0 &&
-      opportunistPayout(-5) === 0,
+      opportunistPayout(bareBorrow, 2) === 1 &&
+      opportunistPayout(bareBorrow, 1) === 1 &&
+      opportunistPayout(bareBorrow, 0) === 0 &&
+      opportunistPayout(bareBorrow, -5) === 0,
     "and the payout is bounded by the face value at every size, so the penalty is charged on a one Gold errand as surely as on a hundred: the deduction is the number rounded and the smallest orders still pay it",
   );
   // One path works the borrow and no other does, and the switch is read
@@ -73,38 +82,115 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     PATH_IDS.every(
       (id) =>
         opportunistMayBorrow(
-          { path: id, opportunistBorrows: 0, mode: GAMBIT },
+          { path: id, opportunistBorrows: 0, mode: GAMBIT, modifierFlags: {} },
           "convoy",
         ) ===
         (id === OPPORTUNIST_PATH),
     ) &&
       !opportunistMayBorrow(
-        { path: null, opportunistBorrows: 0, mode: GAMBIT },
+        { path: null, opportunistBorrows: 0, mode: GAMBIT, modifierFlags: {} },
         "convoy",
       ) &&
       !withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
         opportunistMayBorrow(
-          { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+          {
+            path: OPPORTUNIST_PATH,
+            opportunistBorrows: 0,
+            mode: GAMBIT,
+            modifierFlags: {},
+          },
           "convoy",
         ),
       ) &&
       !opportunistMayBorrow(
-        { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+        {
+          path: OPPORTUNIST_PATH,
+          opportunistBorrows: 0,
+          mode: GAMBIT,
+          modifierFlags: {},
+        },
         null,
       ),
-    "one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
+    "with no charter in hand one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
   );
   // The counter itself: a bound read off the constant, a spent allowance
   // that reads as none left, and a save carrying more spent than this
   // build allows reading as none left rather than as a debt.
   check(
-    opportunistBorrowsLeft({ opportunistBorrows: 0 }) === OPPORTUNIST_USES &&
-      opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES }) === 0 &&
-      opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES + 5 }) ===
-        0 &&
+    opportunistBorrowsLeft({ opportunistBorrows: 0, modifierFlags: {} }) ===
+      OPPORTUNIST_USES &&
+      opportunistBorrowsLeft({
+        opportunistBorrows: OPPORTUNIST_USES,
+        modifierFlags: {},
+      }) === 0 &&
+      opportunistBorrowsLeft({
+        opportunistBorrows: OPPORTUNIST_USES + 5,
+        modifierFlags: {},
+      }) === 0 &&
       opportunistBorrowsTaken({ opportunistBorrows: 2.7 }) === 2 &&
       opportunistBorrowsTaken({ opportunistBorrows: -4 }) === 0,
     "the allowance is a count rather than a flag, bounded by the constant F6 retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
+  );
+  // ---- the Factor, and the borrow's second door ----
+  // [F6: charters at leg four] The charter whose text sells the borrow
+  // itself to whoever holds it: three open doors where the path has one,
+  // sixty percent where the path pays forty, and a holder who never held
+  // the path. The numbers read here are the card's own shipped pair, the
+  // same reading the first check takes of the base two, and every reader
+  // is asked with them in place so the text and the arithmetic are one
+  // reading rather than two.
+  const factor = { modifierFlags: { factor_borrows: 3, factor_penalty: 0.6 } };
+  check(
+    opportunistAllowance({ modifierFlags: {} }) === OPPORTUNIST_USES &&
+      opportunistAllowance(factor) === 3 &&
+      opportunistBorrowsLeft({ ...factor, opportunistBorrows: 2 }) === 1 &&
+      opportunistUsesLine({ ...factor, opportunistBorrows: 0 }).endsWith(
+        "3 of 3.",
+      ),
+    "the charter's holder counts from three where the path counts from one, a spent counter comes off the charter's three the same way it comes off the base one, and the card's own sentence prints the retuned total, so the number a captain reads before the press is the number the guard spends against",
+  );
+  check(
+    opportunistPayout(factor, 100) === 40 &&
+      opportunistPayout(factor, 2) === 1 &&
+      opportunistPayout(factor, 1) === 0 &&
+      opportunistPayout({ modifierFlags: { factor_penalty: 0 } }, 100) === 60,
+    "the heavier rate lands where the base one does, on the face value with the deduction rounded: a hundred pays forty, a two Gold errand still pays a coin, the smallest errand pays nothing at all, and a flag carrying no rate falls back to the constant rather than waiving the penalty",
+  );
+  check(
+    opportunistIsBorrower({ path: OPPORTUNIST_PATH, modifierFlags: {} }) &&
+      !opportunistIsBorrower({ path: "quartermaster", modifierFlags: {} }) &&
+      opportunistIsBorrower({
+        path: "quartermaster",
+        modifierFlags: { factor_borrows: 3 },
+      }) &&
+      opportunistMayBorrow(
+        {
+          path: "quartermaster",
+          opportunistBorrows: 0,
+          mode: GAMBIT,
+          modifierFlags: { factor_borrows: 3 },
+        },
+        "convoy",
+      ) &&
+      !opportunistMayBorrow(
+        {
+          path: "quartermaster",
+          opportunistBorrows: 0,
+          mode: GAMBIT,
+          modifierFlags: {},
+        },
+        "convoy",
+      ) &&
+      !opportunistMayBorrow(
+        {
+          path: "quartermaster",
+          opportunistBorrows: 3,
+          mode: GAMBIT,
+          modifierFlags: { factor_borrows: 3 },
+        },
+        "convoy",
+      ),
+    "the Factor opens the borrow to a captain holding no path of the borrow's own, refuses the same captain with no charter in hand, and bounds the charter's holder by the charter's own three: a card the four other paths could draw as their wildcard and gain nothing from would be a trap inside a trio, so the door the text sells is the door the guard opens",
   );
   // The heal, and the old save it exists for: a voyage written before
   // this feature carries no counter at all, and the load site reads it
@@ -212,7 +298,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       card.totalItems,
       cargoCarriesTag(card.resources, "woven"),
     );
-    const paid = opportunistPayout(card.reward);
+    const paid = opportunistPayout(filled, card.reward);
     const lines: string[] = [];
     completeOrder(filled, card.id, lines, true);
     check(
@@ -223,7 +309,8 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       "a borrowed order fills through the same settlement as any other, pays the reduced reward down to the coin, spends the allowance, and leaves the captain holding the path they already held: the order is filled without joining its own",
     );
     check(
-      lines.includes(opportunistLine(card.reward, paid)) && paid < card.reward,
+      lines.includes(opportunistLine(filled, card.reward, paid)) &&
+        paid < card.reward,
       "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the plan says has to cost something real",
     );
 

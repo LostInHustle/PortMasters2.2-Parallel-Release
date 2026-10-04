@@ -110,8 +110,14 @@ import {
   REWEAVE_GOOD,
   REWEAVE_RAGS,
 } from "@/lib/game/constants/garments";
-import { BOONS, CARDS_PER_OFFER, MODULES } from "@/lib/game/constants/drafts";
 import {
+  BOONS,
+  CARDS_PER_OFFER,
+  MILESTONE_BOONS,
+  MODULES,
+} from "@/lib/game/constants/drafts";
+import {
+  BOON_TRIGGERS,
   CARD_KINDS,
   CARD_TRIGGER,
   LANGUAGES,
@@ -121,6 +127,7 @@ import {
   type CardRecord,
   type CardTrigger,
 } from "@/lib/game/constants/cards";
+import { CHARTERS } from "@/lib/game/constants/charters";
 import {
   CARD_CONVERSION_FLOOR,
   CARDS,
@@ -196,6 +203,7 @@ import {
   widestObjectivePayout,
 } from "@/lib/game/objectives";
 import {
+  TELEMETRY_EVENT_CAP,
   TELEMETRY_FAMILY,
   TELEMETRY_VERSION,
   normalizeRecord,
@@ -276,12 +284,14 @@ import {
   type CaptainEnding,
 } from "@/lib/game/victory";
 import {
+  MODIFIER_KEYS,
   createInitialGameState,
   flatWorkerRoster,
   type EscortClaim,
   type EscortCover,
   type GameContext,
   type GameState,
+  type ModifierKey,
   type OrderCard,
   type OrderFill,
   type Phase,
@@ -356,11 +366,52 @@ import {
 import {
   bazaarRumorsOn,
   escortContractsOn,
+  milestoneBoonsOn,
   moduleTradesOn,
   pathDraftOn,
   pathOrdersOn,
   splitHoldOn,
 } from "@/lib/game/flags";
+// [F4: boons at milestone moments] The moments' own surfaces, named
+// together so the feature's imports read as one: the records and their
+// trigger words, the pure readers the save and the screens share, the
+// engine's arming walks and the answer, the barrel read as a namespace for
+// the surface check, the two pricers the held flags bend, and the one
+// telemetry figure the leg report carries for a crew lost.
+import {
+  MILESTONE_MOMENTS,
+  MILESTONE_TRIGGERS,
+  normalizeMilestoneTrigger,
+  type MilestoneTrigger,
+} from "@/lib/game/constants/milestones";
+import {
+  heldBoonCards,
+  heldFlagsOf,
+  normalizeHeldBoons,
+} from "@/lib/game/held-cards";
+import {
+  milestoneChoices,
+  milestoneDue,
+  milestonePending,
+  normalizeMilestoneOffers,
+  normalizeMilestonesAnswered,
+  rungsOf,
+} from "@/lib/game/milestones";
+import {
+  answerMilestone,
+  noteSettlementMilestones,
+  queueMilestoneMoment,
+} from "@/lib/game/engine/milestones";
+import * as engineBarrel from "@/lib/game/engine";
+import { calcVAT, explainVAT } from "@/lib/game/engine/pricing";
+import { pirateChance } from "@/lib/game/engine/pirates";
+import { MERCHANT_RATINGS } from "@/lib/game/constants/reputation";
+import {
+  closeVoyageTelemetry,
+  noteLegReport,
+  noteTelemetry,
+  openVoyageTelemetry,
+} from "@/server/realtime/telemetry";
 import { cargoCapacity, cargoRoom, provisionFood } from "@/lib/game/larder";
 import {
   acceptBarterOffer,
@@ -379,6 +430,7 @@ import {
   consentOfferStanding,
   consentPartyBusy,
   coverFromBoard,
+  deliverToObjective,
   escortCoverage,
   escortCoverOf,
   expireConsent,
@@ -395,6 +447,7 @@ import {
   pathOrderOf,
   postBarterOffer,
   purchaseCard,
+  purchaseIntel,
   refundBarterOffer,
   resetConsentLedger,
   resetEscortLeg,
@@ -418,11 +471,14 @@ import {
 // the guards ask about.
 import {
   normalizeOpportunistBorrows,
+  opportunistAllowance,
   opportunistBorrowsLeft,
   opportunistBorrowsTaken,
+  opportunistIsBorrower,
   opportunistLine,
   opportunistMayBorrow,
   opportunistPayout,
+  opportunistUsesLine,
   OPPORTUNIST_PATH,
 } from "@/lib/game/engine";
 // [D7: the draft, and switching] The deal's own arithmetic and the two
@@ -541,6 +597,35 @@ import {
   standingOrdersLive,
   type StandingOrders,
 } from "@/lib/game/standing";
+// [F6: charters at leg four] The charters' own block, imported beside the
+// milestone boons' for the reason every feature's block is imported here:
+// what the vocabulary means and what the engine does with it are one
+// subject, and the checks below are about the second. The readers the
+// screens call are imported from their own module rather than through the
+// barrel, and the two telemetry writers are the ones the leg report's
+// handler itself calls.
+import {
+  CHARTER_LEG,
+  CHARTER_MOMENT,
+  CHARTER_PATH,
+  COVER_CHARTERS,
+} from "@/lib/game/constants/charters";
+import {
+  charterChoices,
+  charterDue,
+  charterPending,
+} from "@/lib/game/charters";
+import { chartersOn } from "@/lib/game/flags";
+import { heldCharterCard } from "@/lib/game/held-cards";
+import { NO_LEAN } from "@/lib/game/constants/cards";
+import { difficultyConfig } from "@/lib/game/difficulty";
+import { answerCharter } from "@/lib/game/engine/charters";
+import { startMarket } from "@/lib/game/engine/market";
+import { getCardFinalCost } from "@/lib/game/engine/pricing";
+import { escortCost } from "@/lib/game/engine/pirates";
+import { processProduction } from "@/lib/game/engine/workers";
+import { noteCharterTaken, noteLegAdvanced } from "@/server/realtime/telemetry";
+import { heldPathOf } from "@/server/realtime/draft";
 import {
   VOYAGE_LOG_CAP,
   VOYAGE_LOG_KINDS,
@@ -5655,13 +5740,15 @@ async function main(): Promise<void> {
     check(
       took(orderedDawnLogs, cardText(writtenPick).name) &&
         !took(orderedDawnLogs, cardText(firstOffer).name) &&
-        orderedDawn.modifierFlags ===
-          (writtenPick.effect.kind === "flags"
-            ? writtenPick.effect.flags
-            : null) &&
+        JSON.stringify(orderedDawn.modifierFlags) ===
+          JSON.stringify(
+            writtenPick.effect.kind === "flags"
+              ? writtenPick.effect.flags
+              : null,
+          ) &&
         orderedDawn.boonChoices.length === 0 &&
         orderedDawn.phase !== "dawn",
-      "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue",
+      "an absent captain's Dawn takes the boon they wrote, off the board they were dealt rather than out of the catalogue, and the round reads back exactly what that card carries: the comparison is content rather than object identity because the write folds any held flags in beneath the card's own, and a captain holding nothing yet lands on the card's flags alone",
     );
     const missedDawn = deal("dawn");
     const missedFirst = missedDawn.boonChoices[0];
@@ -10032,6 +10119,7 @@ async function main(): Promise<void> {
           presentAtEnd: false,
           marooned: true,
           muted: true,
+          crewLost: true,
           peerTradeProfit: 1234,
         },
       ],
@@ -10968,7 +11056,8 @@ async function main(): Promise<void> {
     // One captain's line, with the fields the marks and the mute live on
     // read as the ordinary case unless a fixture says otherwise: a captain
     // who was still in the harbor when the voyage closed, who was not put
-    // ashore, who was not silenced, and who took nothing in trade.
+    // ashore, who was not silenced, who lost no hand, and who took nothing
+    // in trade.
     const dashLine = (
       userId: string,
       over: Partial<TelemetryRecord["captains"][number]> = {},
@@ -10977,6 +11066,7 @@ async function main(): Promise<void> {
       presentAtEnd: true,
       marooned: false,
       muted: false,
+      crewLost: false,
       peerTradeProfit: 0,
       ...over,
     });
@@ -11469,7 +11559,7 @@ async function main(): Promise<void> {
     );
     check(
       emptyVerdict.tally ===
-        "0 of 16 gates inside their bands, 0 out of band, 9 with no source, 7 with no voyage to read.",
+        "0 of 16 gates inside their bands, 0 out of band, 8 with no source, 8 with no voyage to read.",
       "and the tally counts the gates by where they stand, keeping the zeroes rather than dropping them, so a quiet line and a good line cannot read the same",
     );
 
@@ -11583,12 +11673,14 @@ async function main(): Promise<void> {
       "and the floor the dashboard built holds the mode alongside the three role rates the same chronicle rows read, naming the gates rather than printing a chip a reader has to interpret",
     );
 
-    // Gates waiting on a voyage, over a window whose other fourteen are
+    // Gates waiting on a voyage, over a window whose other thirteen are
     // read: the sentence has to say how many rather than sixteen, because a
     // reader on balance duty should not have to work out which it is
-    // talking about. Two wait here, and each for its own reason: retention,
-    // since the voyage in the window had nobody put ashore, and utilization,
-    // since no captain of it filed a leg report from a split hold.
+    // talking about. Three wait here, each for its own reason: retention,
+    // since the voyage in the window had nobody put ashore; utilization,
+    // since no captain of it filed a leg report from a split hold; and the
+    // charter split, since no captain of it took a charter at the fourth
+    // leg.
     const oneUnplayed = readLaunchVerdict(
       readDashboard({
         records: [dashRecord("dash-lone")],
@@ -11597,11 +11689,11 @@ async function main(): Promise<void> {
       }),
     );
     check(
-      oneUnplayed.unplayed.length === 2 &&
+      oneUnplayed.unplayed.length === 3 &&
         oneUnplayed.gaps.some((gap) =>
-          gap.includes("2 of the 16 gates have no voyage to read"),
+          gap.includes("3 of the 16 gates have no voyage to read"),
         ),
-      "and gates waiting on a voyage are described by their count, since two gates and sixteen are not the same finding",
+      "and gates waiting on a voyage are described by their count, since three gates and sixteen are not the same finding",
     );
 
     // A gate whose row stopped carrying it. It cannot happen while the page
@@ -13985,6 +14077,56 @@ async function main(): Promise<void> {
         lockCarriers.length === 1 &&
         lockCarriers[0].endsWith(join("game", "paths.ts")),
       "the lock sentence a card prints appears in one file in the whole tree, the path record, so a retuned path cannot desynchronize from the words the board explains it with",
+    );
+
+    // [The Broker's Whisper] The rumor's promise, held end to end. The
+    // boards below are dealt through the real lifecycle rather than written
+    // out by hand: snapToCheckpoint runs the engine's own startMarket and
+    // startOrders, and the rumor is bought between them the way a captain
+    // buys it, on the Market screen and before the board is dealt.
+    console.log("\nThe Broker's Whisper");
+
+    const whisperState = (suffix: string) => {
+      const state = voyageState();
+      const ctx = { seedBase: `smoke:whisper:${suffix}`, harborId: "harbor-a" };
+      snapToCheckpoint(state, ctx, 1, "market", []);
+      return { state, ctx };
+    };
+
+    const early = whisperState("early");
+    const moneyBefore = early.state.money;
+    const buyLogs: string[] = [];
+    purchaseIntel(early.state, buyLogs);
+    const rumors = early.state.revealedIntel.map((i) => ({ ...i }));
+    check(
+      rumors.length > 0 &&
+        early.state.money < moneyBefore &&
+        buyLogs.some((line) => line.includes("Broker's Whisper")),
+      `a rumor bought on the Market screen is billed and revealed (${rumors.length} rumor${rumors.length === 1 ? "" : "s"} for ${moneyBefore - early.state.money} Gold)`,
+    );
+    snapToCheckpoint(early.state, early.ctx, 1, "orders", []);
+    check(
+      rumors.every((i) =>
+        early.state.customerCards.some(
+          (c) =>
+            c.demandPort === i.port &&
+            c.resources.some((r) => r.type === i.item),
+        ),
+      ),
+      "every whisper a captain paid for is dealt as an order at the harbour it named for the good it named, so the Broker's word is always good about both halves of what it sold",
+    );
+
+    const afterBoard = whisperState("late");
+    snapToCheckpoint(afterBoard.state, afterBoard.ctx, 1, "orders", []);
+    const afterMoney = afterBoard.state.money;
+    const afterIntel = afterBoard.state.revealedIntel.length;
+    const afterLogs: string[] = [];
+    purchaseIntel(afterBoard.state, afterLogs);
+    check(
+      afterBoard.state.money === afterMoney &&
+        afterBoard.state.revealedIntel.length === afterIntel &&
+        afterLogs.some((line) => line.includes("only deals during Market")),
+      "a press that arrives after the board is dealt is refused rather than billed, because an order it promised could never appear once the board is down",
     );
 
     console.log("\nThe escort contract");
@@ -17646,13 +17788,16 @@ async function main(): Promise<void> {
 
     // ---- the allowance ----
     // The two numbers the plan sets, and the payout they make. The penalty
-    // is read off the constant rather than typed here, so F6's retune moves
-    // this check with it.
+    // is read off the constant rather than typed here, and the empty flag
+    // set is the captain before any charter: [F6] retunes the pair through
+    // the Factor, and the retune is read in its own checks below rather
+    // than folded into this one, so the base reading stays the base one.
     check(
       OPPORTUNIST_USES === 1 &&
         OPPORTUNIST_PENALTY === 0.4 &&
-        opportunistPayout(100) === 60 &&
-        opportunistPayout(100) === 100 - Math.round(100 * OPPORTUNIST_PENALTY),
+        opportunistPayout({ modifierFlags: {} }, 100) === 60 &&
+        opportunistPayout({ modifierFlags: {} }, 100) ===
+          100 - Math.round(100 * OPPORTUNIST_PENALTY),
       "a hundred Gold order pays sixty on the borrow, which is the plan's forty percent penalty read off the constant rather than typed into the rule",
     );
     // The property, over every face value a card can carry rather than over
@@ -17662,17 +17807,20 @@ async function main(): Promise<void> {
     // instead of rounding would leave a two Gold order paying two and the
     // penalty would stop being real exactly where the plan says the reach
     // has to cost something.
+    const bareBorrow = { modifierFlags: {} };
     check(
       Array.from({ length: 200 }, (_, i) => i + 1).every(
         (face, i, all) =>
-          opportunistPayout(face) <= face &&
-          opportunistPayout(face) >= 0 &&
-          (i === 0 || opportunistPayout(face) >= opportunistPayout(all[i - 1])),
+          opportunistPayout(bareBorrow, face) <= face &&
+          opportunistPayout(bareBorrow, face) >= 0 &&
+          (i === 0 ||
+            opportunistPayout(bareBorrow, face) >=
+              opportunistPayout(bareBorrow, all[i - 1])),
       ) &&
-        opportunistPayout(2) === 1 &&
-        opportunistPayout(1) === 1 &&
-        opportunistPayout(0) === 0 &&
-        opportunistPayout(-5) === 0,
+        opportunistPayout(bareBorrow, 2) === 1 &&
+        opportunistPayout(bareBorrow, 1) === 1 &&
+        opportunistPayout(bareBorrow, 0) === 0 &&
+        opportunistPayout(bareBorrow, -5) === 0,
       "and the payout is bounded by the face value at every size, so the penalty is charged on a one Gold errand as surely as on a hundred: the deduction is the number rounded and the smallest orders still pay it",
     );
     // One path works the borrow and no other does, and the switch is read
@@ -17683,39 +17831,127 @@ async function main(): Promise<void> {
       PATH_IDS.every(
         (id) =>
           opportunistMayBorrow(
-            { path: id, opportunistBorrows: 0, mode: GAMBIT },
+            {
+              path: id,
+              opportunistBorrows: 0,
+              mode: GAMBIT,
+              modifierFlags: {},
+            },
             "convoy",
           ) ===
           (id === OPPORTUNIST_PATH),
       ) &&
         !opportunistMayBorrow(
-          { path: null, opportunistBorrows: 0, mode: GAMBIT },
+          {
+            path: null,
+            opportunistBorrows: 0,
+            mode: GAMBIT,
+            modifierFlags: {},
+          },
           "convoy",
         ) &&
         !withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
           opportunistMayBorrow(
-            { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+            {
+              path: OPPORTUNIST_PATH,
+              opportunistBorrows: 0,
+              mode: GAMBIT,
+              modifierFlags: {},
+            },
             "convoy",
           ),
         ) &&
         !opportunistMayBorrow(
-          { path: OPPORTUNIST_PATH, opportunistBorrows: 0, mode: GAMBIT },
+          {
+            path: OPPORTUNIST_PATH,
+            opportunistBorrows: 0,
+            mode: GAMBIT,
+            modifierFlags: {},
+          },
           null,
         ),
-      "one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
+      "with no charter in hand one path works the borrow and no other does, a card that is not locked to the captain is not this captain's to borrow, and the path orders switch is read first and separately: with the locks rolled back there is nothing to reach through and the ability is refused with them",
     );
     // The counter itself: a bound read off the constant, a spent allowance
     // that reads as none left, and a save carrying more spent than this
     // build allows reading as none left rather than as a debt.
     check(
-      opportunistBorrowsLeft({ opportunistBorrows: 0 }) === OPPORTUNIST_USES &&
-        opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES }) ===
-          0 &&
-        opportunistBorrowsLeft({ opportunistBorrows: OPPORTUNIST_USES + 5 }) ===
-          0 &&
+      opportunistBorrowsLeft({ opportunistBorrows: 0, modifierFlags: {} }) ===
+        OPPORTUNIST_USES &&
+        opportunistBorrowsLeft({
+          opportunistBorrows: OPPORTUNIST_USES,
+          modifierFlags: {},
+        }) === 0 &&
+        opportunistBorrowsLeft({
+          opportunistBorrows: OPPORTUNIST_USES + 5,
+          modifierFlags: {},
+        }) === 0 &&
         opportunistBorrowsTaken({ opportunistBorrows: 2.7 }) === 2 &&
         opportunistBorrowsTaken({ opportunistBorrows: -4 }) === 0,
       "the allowance is a count rather than a flag, bounded by the constant F6 retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
+    );
+    // ---- the Factor, and the borrow's second door ----
+    // [F6: charters at leg four] The charter whose text sells the borrow
+    // itself to whoever holds it: three open doors where the path has one,
+    // sixty percent where the path pays forty, and a holder who never held
+    // the path. The numbers read here are the card's own shipped pair, the
+    // same reading the first check takes of the base two, and every reader
+    // is asked with them in place so the text and the arithmetic are one
+    // reading rather than two.
+    const factor = {
+      modifierFlags: { factor_borrows: 3, factor_penalty: 0.6 },
+    };
+    check(
+      opportunistAllowance({ modifierFlags: {} }) === OPPORTUNIST_USES &&
+        opportunistAllowance(factor) === 3 &&
+        opportunistBorrowsLeft({ ...factor, opportunistBorrows: 2 }) === 1 &&
+        opportunistUsesLine({ ...factor, opportunistBorrows: 0 }).endsWith(
+          "3 of 3.",
+        ),
+      "the charter's holder counts from three where the path counts from one, a spent counter comes off the charter's three the same way it comes off the base one, and the card's own sentence prints the retuned total, so the number a captain reads before the press is the number the guard spends against",
+    );
+    check(
+      opportunistPayout(factor, 100) === 40 &&
+        opportunistPayout(factor, 2) === 1 &&
+        opportunistPayout(factor, 1) === 0 &&
+        opportunistPayout({ modifierFlags: { factor_penalty: 0 } }, 100) === 60,
+      "the heavier rate lands where the base one does, on the face value with the deduction rounded: a hundred pays forty, a two Gold errand still pays a coin, the smallest errand pays nothing at all, and a flag carrying no rate falls back to the constant rather than waiving the penalty",
+    );
+    check(
+      opportunistIsBorrower({ path: OPPORTUNIST_PATH, modifierFlags: {} }) &&
+        !opportunistIsBorrower({ path: "quartermaster", modifierFlags: {} }) &&
+        opportunistIsBorrower({
+          path: "quartermaster",
+          modifierFlags: { factor_borrows: 3 },
+        }) &&
+        opportunistMayBorrow(
+          {
+            path: "quartermaster",
+            opportunistBorrows: 0,
+            mode: GAMBIT,
+            modifierFlags: { factor_borrows: 3 },
+          },
+          "convoy",
+        ) &&
+        !opportunistMayBorrow(
+          {
+            path: "quartermaster",
+            opportunistBorrows: 0,
+            mode: GAMBIT,
+            modifierFlags: {},
+          },
+          "convoy",
+        ) &&
+        !opportunistMayBorrow(
+          {
+            path: "quartermaster",
+            opportunistBorrows: 3,
+            mode: GAMBIT,
+            modifierFlags: { factor_borrows: 3 },
+          },
+          "convoy",
+        ),
+      "the Factor opens the borrow to a captain holding no path of the borrow's own, refuses the same captain with no charter in hand, and bounds the charter's holder by the charter's own three: a card the four other paths could draw as their wildcard and gain nothing from would be a trap inside a trio, so the door the text sells is the door the guard opens",
     );
     // The heal, and the old save it exists for: a voyage written before
     // this feature carries no counter at all, and the load site reads it
@@ -17825,7 +18061,7 @@ async function main(): Promise<void> {
         card.totalItems,
         cargoCarriesTag(card.resources, "woven"),
       );
-      const paid = opportunistPayout(card.reward);
+      const paid = opportunistPayout(filled, card.reward);
       const lines: string[] = [];
       completeOrder(filled, card.id, lines, true);
       check(
@@ -17836,7 +18072,7 @@ async function main(): Promise<void> {
         "a borrowed order fills through the same settlement as any other, pays the reduced reward down to the coin, spends the allowance, and leaves the captain holding the path they already held: the order is filled without joining its own",
       );
       check(
-        lines.includes(opportunistLine(card.reward, paid)) &&
+        lines.includes(opportunistLine(filled, card.reward, paid)) &&
           paid < card.reward,
         "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the plan says has to cost something real",
       );
@@ -19486,13 +19722,14 @@ async function main(): Promise<void> {
     const entriesOfKind = (kind: string) =>
       tagEntries.filter((entry) => entry.kind === kind).length;
     check(
-      TAGGED_KINDS.length === 5 &&
+      TAGGED_KINDS.length === 6 &&
         entriesOfKind("good") === ITEMS.length &&
         entriesOfKind("food") === Object.keys(FOODS).length &&
         entriesOfKind("module") === MODULES.length &&
         entriesOfKind("boon") === BOONS.length &&
-        entriesOfKind("charter") === Object.keys(DIFFICULTIES).length,
-      "the walk covers every item of all five catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
+        entriesOfKind("charter") === CHARTERS.length &&
+        entriesOfKind("difficulty") === Object.keys(DIFFICULTIES).length,
+      "the walk covers every item of all six catalogues, counted against the catalogues themselves rather than against a number typed here, so an entry added tomorrow is read by the rule the moment it exists",
     );
     check(
       tagEntries.length ===
@@ -19500,6 +19737,7 @@ async function main(): Promise<void> {
           Object.keys(FOODS).length +
           MODULES.length +
           BOONS.length +
+          CHARTERS.length +
           Object.keys(DIFFICULTIES).length &&
         TAGGED_KINDS.every((kind) => entriesOfKind(kind) > 0),
       "with nothing walked twice and no catalogue empty, which is the same count read the other way round",
@@ -19542,9 +19780,12 @@ async function main(): Promise<void> {
     const coldGoods = entriesWithTag("cold").map((entry) => entry.id);
     const wardrobe = Object.keys(GARMENTS);
     check(
-      coldGoods.length === wardrobe.length &&
-        wardrobe.every((garment) => coldGoods.includes(garment)),
-      "the cold tag gathers exactly the wardrobe and nothing else, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question",
+      coldGoods.length === wardrobe.length + 1 &&
+        wardrobe.every((garment) => coldGoods.includes(garment)) &&
+        entriesWithTag("cold").some(
+          (entry) => entry.kind === "boon" && entry.id === "cold_hardened",
+        ),
+      "the cold tag gathers exactly the wardrobe and the one card that hardens against a cold leg, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question, and the moment card that answers such a leg is gathered by the same word rather than by a name kept beside it",
     );
     const pantryOf = (tag: Tag) =>
       entriesWithTag(tag)
@@ -19567,20 +19808,21 @@ async function main(): Promise<void> {
       (entry) => `${entry.kind}:${entry.id}`,
     );
     check(
-      armedEntries.length === 4 &&
-        armedEntries.includes("charter:open_waters") &&
-        armedEntries.includes("charter:monsoon") &&
+      armedEntries.length === 5 &&
+        armedEntries.includes("difficulty:open_waters") &&
+        armedEntries.includes("difficulty:monsoon") &&
         armedEntries.includes("boon:deep_sea_escort_pact") &&
+        armedEntries.includes("boon:fleet_colors") &&
         armedEntries.includes("module:persian_dome_compass"),
-      "while one tag reaches across catalogues: armed gathers the two charters that gain teeth, the pact that pays for an escort and the compass that turns a raid, which is the query shape the single card record is being built to answer",
+      "while one tag reaches across catalogues: armed gathers the two difficulties that gain teeth, the pact that pays for an escort, the colors that make a raider think twice and the compass that turns a raid, which is the query shape the single card record is being built to answer",
     );
     check(
       DIFFICULTIES.monsoon.pirateChance.length === 2 &&
-        tagsOf("charter", "monsoon")?.includes("armed") === true &&
+        tagsOf("difficulty", "monsoon")?.includes("armed") === true &&
         DIFFICULTIES.monsoon.brokerCorruption &&
-        tagsOf("charter", "monsoon")?.includes("contraband") === true &&
+        tagsOf("difficulty", "monsoon")?.includes("contraband") === true &&
         DIFFICULTIES.fair_winds.pirateChance.length === 1 &&
-        tagsOf("charter", "fair_winds")?.includes("armed") === false,
+        tagsOf("difficulty", "fair_winds")?.includes("armed") === false,
       "and the hardest water carries both of its own tags, read off the two numbers in its record rather than out of the prose: what gains teeth partway through the voyage says so, and what sails a corrupt broker says that too",
     );
     const namedThings = new Set<string>([
@@ -19640,11 +19882,15 @@ async function main(): Promise<void> {
       ) === true,
       "a tag written down twice is caught rather than counted once, because a ceiling of two that a three entry set could pass is not a ceiling",
     );
+    // Every entry that carries the word, stripped by the tag rather than by
+    // name: the Harbor Credit boon borrows on the same word, and a fixture
+    // that knew one debtor's name would stop asking its question the day a
+    // second one signed on.
     check(
       soleFinding({
         ...tagSubject,
         entries: tagSubject.entries.filter(
-          (entry) => !(entry.kind === "boon" && entry.id === "emergency_loan"),
+          (entry) => !entry.tags.includes("debt"),
         ),
       })?.includes('no entry carries "debt"') === true,
       "a tag of the twelve that no entry carries is caught, since it would otherwise be a word in the vocabulary with nothing a card could be about",
@@ -19687,18 +19933,20 @@ async function main(): Promise<void> {
     );
     check(
       soleFinding(
-        withTagRow("charter", "fair_winds", ["public", "armed"]),
+        withTagRow("difficulty", "fair_winds", ["public", "armed"]),
       )?.includes("never steps up") === true,
-      "a charter that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
+      "a difficulty that carries armed without gaining teeth is caught, so the tag cannot claim a threat its own raid curve does not deliver",
     );
     check(
-      soleFinding(withTagRow("charter", "open_waters", ["public"]))?.includes(
+      soleFinding(
+        withTagRow("difficulty", "open_waters", ["public"]),
+      )?.includes(
         "gains teeth partway through the voyage and does not carry armed",
       ) === true,
-      "and one that gains teeth without saying so is caught in the other direction, because a charter that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
+      "and one that gains teeth without saying so is caught in the other direction, because a difficulty that turns harder past the midpoint and does not advertise it is the drift a vocabulary exists to prevent",
     );
     check(
-      soleFinding(withTagRow("charter", "monsoon", ["armed"]))?.includes(
+      soleFinding(withTagRow("difficulty", "monsoon", ["armed"]))?.includes(
         "sails a corrupt broker and does not carry contraband",
       ) === true,
       "as is the water that sails a corrupt broker without carrying contraband, read off the same record's own flag rather than off a list kept in the checker",
@@ -19779,21 +20027,23 @@ async function main(): Promise<void> {
         "every card carries the plan's ten fields, plus the glyph the record added as its eleventh: the icon is language neutral, so it sits beside the two strings rather than inside either, and a card without one is a card a draft cannot draw",
       );
       check(
-        CARDS.length === BOONS.length + MODULES.length &&
-          CARDS.length === 28 &&
+        CARDS.length === BOONS.length + MODULES.length + CHARTERS.length &&
+          CARDS.length === 43 &&
           new Set(CARDS.map((card) => card.id)).size === CARDS.length,
-        "the registry is the two ladders stacked and nothing else, twenty eight records with twenty eight identifiers, so a card cannot be drafted without being in the walk. Two cards sharing an id would be a rename nobody could detect, since the id is what every save, standing order and wire frame stores",
+        "the registry is the three catalogues stacked and nothing else, forty three records with forty three identifiers, so a card cannot be drafted without being in the walk. Two cards sharing an id would be a rename nobody could detect, since the id is what every save, standing order and wire frame stores",
       );
       check(
         CARDS.every(
           (card) =>
             CARD_KINDS.includes(card.kind) &&
-            card.trigger === CARD_TRIGGER[card.kind],
+            (card.kind === "boon"
+              ? BOON_TRIGGERS.includes(card.trigger)
+              : card.trigger === CARD_TRIGGER[card.kind]),
         ) &&
           cardsOfKind("boon").length === BOONS.length &&
           cardsOfKind("module").length === MODULES.length &&
-          cardsOfKind("charter").length === 0,
-        "each card's kind is one of the plan's three and each card arrives at the draft its kind promises, read through the one map rather than off a field repeated per record, so a boon offered at the shipyard is a failed build rather than a card nobody can explain. The charter count is zero and says so: F6 drafts the first one, and what this pins is that the shape and the reader are already there for it",
+          cardsOfKind("charter").length === CHARTERS.length,
+        "each card's kind is one of the plan's three and each card arrives at the draft its kind promises, read through the one map rather than off a field repeated per record, so a boon offered at the shipyard is a failed build rather than a card nobody can explain. A boon is the one kind whose arrival is a set rather than a point: the round draft or one of the five moments, read off the same table the moments are armed from, which is what lets a moment card ride the pool the round draft deals from without answering to a draft it never arrives at. The charter count reads off the catalogue F6 filled rather than off a number typed here, which is the shape and the reader the pool was built to take",
       );
       check(
         CARDS.every((card) =>
@@ -19900,7 +20150,18 @@ async function main(): Promise<void> {
       const gambitModules = idsOf(offerPool("module", wide));
       const classicBoons = idsOf(offerPool("boon", narrow));
       const classicModules = idsOf(offerPool("module", narrow));
-      const WITHHELD = aboveClassic.map((card) => card.id);
+      // Above Classic's ceiling now sit the drafted ladders' own tall cards
+      // and F6's ten charters. A charter is withheld from the base mode
+      // wholesale and arrives through its own moment rather than through
+      // either drafted pool, so the read below holds the two ladders' own
+      // withheld cards against the pools and names the charters' separate
+      // route beside them.
+      const WITHHELD = aboveClassic
+        .filter((card) => card.kind !== "charter")
+        .map((card) => card.id);
+      const withheldCharters = aboveClassic.filter(
+        (card) => card.kind === "charter",
+      );
       check(
         WITHHELD.length === 3 &&
           WITHHELD.every(
@@ -19910,8 +20171,10 @@ async function main(): Promise<void> {
             (id) => !classicBoons.includes(id) && !classicModules.includes(id),
           ) &&
           gambitBoons.length + gambitModules.length ===
-            classicBoons.length + classicModules.length + WITHHELD.length,
-        "three cards are withheld from the base mode and they are exactly the ones above its ceiling, watched at the pool a captain is drafted from rather than in the arithmetic alone: each is offered in Ocean Gambit and absent from the base mode on the same state, so the field is read by the draw instead of merely stored beside it",
+            classicBoons.length + classicModules.length + WITHHELD.length &&
+          withheldCharters.length === CHARTERS.length &&
+          withheldCharters.every((card) => card.modes.classic === 0),
+        "three drafted cards are withheld from the base mode and they are exactly the ones above its ceiling, watched at the pool a captain is drafted from rather than in the arithmetic alone: each is offered in Ocean Gambit and absent from the base mode on the same state, so the field is read by the draw instead of merely stored beside it. The ten charters sit above the same ceiling wholesale, every one of them zeroed out of the base mode, because a charter is offered at its own moment rather than dealt by either drafted pool",
       );
       const early = voyageState({ difficulty: "open_waters" });
       const earlyBoons = idsOf(offerPool("boon", early));
@@ -20119,8 +20382,8 @@ async function main(): Promise<void> {
           refused.boonChoices.length === 0 &&
           refused.cardTally[first.id]?.picked === 1 &&
           firstFlags !== null &&
-          refused.modifierFlags === firstFlags,
-        "a real boon takes: the flags the record carries land on the round in one write, the table clears, and the card's pick is counted, so the tally holds one offer and one pick for a card that was dealt and taken",
+          JSON.stringify(refused.modifierFlags) === JSON.stringify(firstFlags),
+        "a real boon takes: the flags the record carries land on the round in one write, the table clears, and the card's pick is counted, so the tally holds one offer and one pick for a card that was dealt and taken. The comparison is content rather than object identity because the write folds any held flags in beneath the card's own, and this captain holds nothing yet",
       );
       const loaned = voyageState();
       const purse = loaned.money;
@@ -20299,6 +20562,15 @@ async function main(): Promise<void> {
           card.id === "silk_monopoly" ? { ...card, ...patch } : card,
         ),
       });
+      // A subject with the key ledger switched off, for the fixtures whose
+      // clause is about the record's own shape: a card broken below stops
+      // counting as its flag's writer, and the ledger's finding about the key
+      // it leaves unwritten is asked of its own fixtures further down rather
+      // than riding along with every other clause's answer.
+      const withoutLedger = (subject: CardSubject): CardSubject => ({
+        ...subject,
+        modifierKeys: undefined,
+      });
       // A clause is asked for its finding and for nothing else, since a rule
       // that fired alongside three others could be firing for the wrong reason.
       const sole = (subject: CardSubject): string | null => {
@@ -20327,7 +20599,7 @@ async function main(): Promise<void> {
       check(
         (() => {
           const notAKind = validateCards(
-            broken({ kind: "relic" as CardRecord["kind"] }),
+            withoutLedger(broken({ kind: "relic" as CardRecord["kind"] })),
           );
           return (
             notAKind.length === 2 &&
@@ -20405,16 +20677,83 @@ async function main(): Promise<void> {
         "a condition asking for a trade the roster cannot hold is caught, because the engine would answer it false for every captain alive and the card would be offered to nobody: the reader is defensive, so this is a content failure rather than a crash, and a content failure has to be caught here instead",
       );
       check(
-        sole(broken({ effect: { kind: "hull" } }))?.includes(
+        sole(withoutLedger(broken({ effect: { kind: "hull" } })))?.includes(
           "a boon writes the round's flags",
         ) === true,
         "a boon whose effect is not the flags is caught, since the draft applies a boon by writing what its record carries and a boon carrying a hull would be a card that changes nothing at all",
       );
       check(
-        sole(broken({ effect: { kind: "flags", flags: {} } }))?.includes(
-          "writes no flag",
-        ) === true,
+        sole(
+          withoutLedger(broken({ effect: { kind: "flags", flags: {} } })),
+        )?.includes("writes no flag") === true,
         "and a boon that writes no flags is caught even when its shape is right: an empty flag set is a card a captain can pick, and pay for, and receive nothing from",
+      );
+      check(
+        sole({
+          ...shipped,
+          cards: shipped.cards.map((card) =>
+            card.id === "merchant_charm"
+              ? {
+                  ...card,
+                  effect: {
+                    kind: "flags",
+                    flags: {
+                      purchase_discount: 0.15,
+                      transport_silk_discount: 0.5,
+                    },
+                  },
+                }
+              : card,
+          ),
+        })?.includes(
+          "writes transport_silk_discount, which silk_wind already writes",
+        ) === true,
+        "and a key two cards write is caught and names both, because the ledger reads a modifier's source by finding the card that writes its key and that reader takes the first match: two writers would make the source a function of table order, and the day they disagreed the breakdown would quietly print the wrong card's name",
+      );
+      check(
+        sole({
+          ...shipped,
+          cards: shipped.cards.filter((card) => card.id !== "silk_wind"),
+        })?.includes("no card writes transport_silk_discount") === true,
+        "while a key no card writes is caught in the other direction, because every key the vocabulary names has a read site in the engine: a renamed key on one side of that pair is a read site waiting on a flag that never arrives, and this clause is what fails the build the day the two sides part",
+      );
+      // ---- F6's pairing clause ----
+      // The clause reads the charter id to path map rather than the records,
+      // so its fixtures patch the map and the findings are read in pairs:
+      // what the map itself got wrong, then the count that same mistake
+      // leaves a path with. The pairing is the clause's shape rather than
+      // two clauses, because a map edited wrongly is never wrong about one
+      // thing.
+      const pairing = (charterPaths: Record<string, string>): string[] =>
+        validateCards({ ...shipped, charterPaths });
+      const orphaned = pairing({
+        ...(shipped.charterPaths ?? {}),
+        ghost_charter: "loom",
+      });
+      check(
+        orphaned.length === 2 &&
+          orphaned[0].includes("no card carries this id") &&
+          orphaned[1].includes("carries 3 charters"),
+        "an entry pairing a charter the pool does not have is caught, and the path it was filed under is caught carrying one too many: an orphan entry is never a mistake about one thing, since the count it inflates is the same edit read again",
+      );
+      const unpaired = { ...(shipped.charterPaths ?? {}) };
+      delete unpaired.bulk_charter;
+      const missing = pairing(unpaired);
+      check(
+        missing.length === 2 &&
+          missing[0].includes("a charter with no path") &&
+          missing[1].includes("carries 1 charters"),
+        "a charter the map forgets is caught in the other direction, and its path is caught short by the same edit: a charter no trio can pair is a card in the pool that no captain can ever be offered, which is the failure the two per path count exists to make loud",
+      );
+      const misrouted = pairing({
+        ...(shipped.charterPaths ?? {}),
+        bulk_charter: "galleon",
+      });
+      check(
+        misrouted.length === 2 &&
+          misrouted[0].includes("which is not a path") &&
+          misrouted[1].includes("carries 1 charters"),
+        "and a charter filed under something that is not a path is caught, its old path caught short with it: the map is what the trio's first two slots read, so a path name the game does not have is a slot that silently deals nothing",
       );
       check(
         sole(
@@ -20480,6 +20819,7 @@ async function main(): Promise<void> {
         [
           "src/lib/game/constants/cards.ts",
           "src/lib/game/cards.ts",
+          "src/lib/game/constants/charters.ts",
           "src/lib/game/constants/drafts.ts",
           "src/lib/game/engine/boons.ts",
           "src/lib/game/engine/pricing.ts",
@@ -20502,6 +20842,1987 @@ async function main(): Promise<void> {
           }),
         ),
         "which the card text itself keeps, read straight off the records in both languages: every string on the face is a captain's words, so the house rule is held there by the same expression the source files are held by, and a dash the validator never looks for is a dash that ships",
+      );
+    }
+
+    // ---- The milestone boons ----
+    // [F4] The plan's sentence for this goal is that a boon can arrive
+    // at a moment rather than only at the round draft: a hand is lost
+    // overboard, an order follows the captain's path, a rung of renown
+    // is reached, a cold leg is sailed, and a mandate is carried home,
+    // and the captain is offered a boon for each. What is checked here
+    // is the five moments end to end: the records and their triggers,
+    // the arm and the answer, the empty table spent rather than queued,
+    // the flags each card writes read at their five live sites, the save
+    // healed back with the choices in it, the one optional figure the
+    // leg report carries for a crew lost, and the barrel's surface,
+    // which hands the answer out and keeps the arming walks to the
+    // engine.
+    //
+    // It sits here, beside the card record's block and the tag walk's,
+    // for their reason: the moments are pure functions of a state, and
+    // the one half that touches the database opens no harbor of its own.
+    // The whole block is scoped, the way the ready check's is, so its
+    // local names are its own rather than names the rest of this run
+    // has to avoid.
+    {
+      // A voyage that has lost a hand, which is the one moment every block
+      // below can arm without a second system standing behind it.
+      const fallen = () => {
+        const state = voyageState();
+        state.crewLost = [{ name: "Old Salt", round: 1 }];
+        return state;
+      };
+
+      // A cold leg and a mild one, found by asking the weather rule rather
+      // than written down as numbers that were cold once. 4242 is the epoch
+      // the launch gates' own weather checks sail under, so the two suites
+      // read the same calendar.
+      const calendar = voyageState();
+      calendar.voyageEpoch = 4242;
+      const findRound = (cold: boolean) => {
+        for (let round = 1; round <= 60; round++) {
+          calendar.currentRound = round;
+          if (legIsCold(calendar) === cold) return round;
+        }
+        return -1;
+      };
+      const coldRound = findRound(true);
+      const mildRound = findRound(false);
+
+      // A cold leg that has just been settled: the round stamped by the tick
+      // and nothing else written yet, which is exactly the evidence the cold
+      // moment's arm reads.
+      const coldAt = (round: number) => {
+        const state = voyageState();
+        state.voyageEpoch = 4242;
+        state.currentRound = round;
+        state.garmentsTickRound = round;
+        return state;
+      };
+
+      // One order board dealt from one seed and one round, so every run
+      // below stands on identical cards and the only difference between
+      // two runs is the one thing a check is about. The round is a
+      // parameter because which round deals the shape a check needs is
+      // the board's business rather than something a check may assume:
+      // the round one board misses a pathbound order about one deal in
+      // eight, so a scan that wants one walks the twelve rather than
+      // betting on the first.
+      const dealBoard = (round: number) => {
+        const state = voyageState();
+        snapToCheckpoint(
+          state,
+          { seedBase: `smoke:milestones:${suffix}`, harborId: "harbor-a" },
+          round,
+          "orders",
+          [],
+        );
+        return state;
+      };
+      const stockHold = (state: GameState, order: OrderCard) => {
+        for (const r of order.resources) {
+          state.inventory[r.type] =
+            (state.inventory[r.type] ?? 0) + (r.required ?? 0);
+        }
+      };
+
+      // ========== A. The vocabulary ==========
+
+      check(
+        MILESTONE_TRIGGERS.join() ===
+          "crew_loss,pathbound_order,renown_rung,cold_leg,mandate",
+        "the five triggers are the plan's five in the plan's order, so the vocabulary can be held against the plan text line by line",
+      );
+
+      check(
+        MILESTONE_TRIGGERS.every(
+          (trigger) =>
+            normalizeMilestoneTrigger(trigger) === trigger &&
+            MILESTONE_MOMENTS[trigger].icon.length > 0 &&
+            MILESTONE_MOMENTS[trigger].title.length > 0 &&
+            MILESTONE_MOMENTS[trigger].line.length > 0,
+        ) &&
+          normalizeMilestoneTrigger("losing_a_hand") === null &&
+          normalizeMilestoneTrigger(7) === null &&
+          MILESTONE_BOONS.length === MILESTONE_TRIGGERS.length &&
+          MILESTONE_BOONS.every(
+            (card) =>
+              card.trigger !== "boon_draft" &&
+              normalizeMilestoneTrigger(card.trigger) !== null,
+          ) &&
+          MILESTONE_TRIGGERS.every((trigger) =>
+            MILESTONE_BOONS.some((card) => card.trigger === trigger),
+          ),
+        "every trigger round trips through its normalizer and every trigger is the trigger of exactly one moment card, so the vocabulary the save carries and the family the pool deals are the same five",
+      );
+
+      // The switch's own policy, read through the function every switch in
+      // this tree is read through: on unless the operator says otherwise,
+      // and answered inside one mode and no other.
+      check(
+        [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+          withEnv(
+            "NEXT_PUBLIC_MILESTONE_BOONS",
+            value,
+            switchFor(GAMBIT, milestoneBoonsOn),
+          ),
+        ) &&
+          ["off", "0", "OFF", " off ", "Off"].every(
+            (value) =>
+              !withEnv(
+                "NEXT_PUBLIC_MILESTONE_BOONS",
+                value,
+                switchFor(GAMBIT, milestoneBoonsOn),
+              ),
+          ),
+        "the milestone boons are on for every value except the word off and the digit zero, which is the policy every switch in this tree is read through",
+      );
+
+      check(
+        withEnv(
+          "NEXT_PUBLIC_MILESTONE_BOONS",
+          "1",
+          () =>
+            milestoneBoonsOn(GAMBIT) &&
+            !milestoneBoonsOn(CLASSIC) &&
+            !milestoneBoonsOn("some_future_mode"),
+        ),
+        "and the eleventh switch is a gambit system like its ten siblings: a rollback turned all the way on still leaves the founding mode without a single moment",
+      );
+
+      check(
+        MILESTONE_TRIGGERS.every(
+          (trigger) =>
+            !CARRIES_A_DASH.test(MILESTONE_MOMENTS[trigger].title) &&
+            !CARRIES_A_DASH.test(MILESTONE_MOMENTS[trigger].line),
+        ) &&
+          MILESTONE_BOONS.every((card) =>
+            Object.values(card.strings).every(
+              (strings) =>
+                !CARRIES_A_DASH.test(strings.name) &&
+                !CARRIES_A_DASH.test(strings.desc),
+            ),
+          ),
+        "every captain facing string a moment prints is dash free in both languages, by the house rule the card pool already answers to",
+      );
+
+      check(
+        [
+          "src/lib/game/milestones.ts",
+          "src/lib/game/constants/milestones.ts",
+          "src/lib/game/engine/milestones.ts",
+          "src/components/portmasters/game/phases/MilestoneDraft.tsx",
+          "src/components/portmasters/game/status/HeldBoons.tsx",
+        ].every((relative) => !carriesADash(relative)),
+        "and the five files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
+      );
+
+      // ========== B. The five cards ==========
+
+      // The flag each card writes, and the value, read off the design rather
+      // than off the card, so a retuned effect fails here rather than
+      // agreeing with itself.
+      const expectedFlags: Record<string, [string, number]> = {
+        steady_watch: ["steady_rations", 1],
+        cold_hardened: ["cold_hardened", 1],
+        route_mastery: ["route_mastery", 0.25],
+        harbor_credit: ["harbor_credit", 0.25],
+        fleet_colors: ["fleet_color", 0.25],
+      };
+
+      check(
+        MILESTONE_BOONS.every((card) => {
+          const expected = expectedFlags[card.id];
+          if (expected === undefined) return false;
+          const [key, value] = expected;
+          return (
+            card.kind === "boon" &&
+            card.trigger !== "boon_draft" &&
+            card.effect.kind === "flags" &&
+            Object.keys(card.effect.flags).length === 1 &&
+            card.effect.flags[key as ModifierKey] === value
+          );
+        }),
+        "each moment card writes exactly one flag and the flag is the one its boon is named for: rations saved, warmth hardened, a quarter on the path's orders, a quarter off the dues, and a quarter off the raiders' odds",
+      );
+
+      check(
+        [
+          "steady_rations",
+          "cold_hardened",
+          "route_mastery",
+          "harbor_credit",
+          "fleet_color",
+        ].every((key) => (MODIFIER_KEYS as readonly string[]).includes(key)),
+        "and the five keys the cards write are five members of the closed flag vocabulary, so the effect a moment leaves on the voyage is a key the save, the healer and every reader already know",
+      );
+
+      check(
+        MILESTONE_BOONS.every((card) => cardById(card.id) === card) &&
+          MILESTONE_BOONS.every((card) => BOONS.includes(card)) &&
+          new Set(MILESTONE_BOONS.map((card) => card.id)).size ===
+            MILESTONE_BOONS.length,
+        "the five join the round boon pool by the same records rather than by copies, so a retuned moment card is the card the round draft would deal and the card a held list resolves to, and no id is carried twice",
+      );
+
+      check(
+        validateCards(shippedCards()).length === 0,
+        "and the pool's own validator passes over the shipped record with the five in it, which is where the one owner per key clause and every other shape rule over the cards is answered",
+      );
+
+      check(
+        MILESTONE_BOONS.every(
+          (card) =>
+            cardWeight(card, voyageState()) > 0 &&
+            cardWeight(card, voyageState({ mode: CLASSIC })) > 0,
+        ),
+        "every moment card weighs in for both modes, because the five are content the pool carries for every voyage rather than a system only the experimental mode runs",
+      );
+
+      check(
+        MILESTONE_BOONS.every((card) =>
+          Object.values(card.strings).every(
+            (strings) => strings.name.length > 0 && strings.desc.length > 0,
+          ),
+        ) &&
+          new Set(MILESTONE_BOONS.map((card) => card.strings.en.name)).size ===
+            MILESTONE_BOONS.length,
+        "every moment card is written in both languages with a name and a description, and the five English names are five distinct names rather than one word dealt five times",
+      );
+
+      check(
+        heldBoonCards({ heldBoons: ["steady_watch", "cold_hardened"] })
+          .map((card) => card.id)
+          .join() === "steady_watch,cold_hardened" &&
+          heldBoonCards({ heldBoons: ["not_a_card"] }).length === 0 &&
+          heldFlagsOf({
+            heldBoons: ["steady_watch", "cold_hardened"],
+            charter: null,
+          }).steady_rations === 1 &&
+          heldFlagsOf({
+            heldBoons: ["steady_watch", "cold_hardened"],
+            charter: null,
+          }).cold_hardened === 1 &&
+          Object.keys(heldFlagsOf({ heldBoons: [], charter: null })).length ===
+            0,
+        "the held list resolves through the pool in the order the cards were taken and merges its flags into one set, and an id the pool no longer knows draws nothing rather than a placeholder",
+      );
+
+      // ========== C. The pure reads ==========
+
+      const topRung = MERCHANT_RATINGS[0].minScore;
+      check(
+        rungsOf(0) === 0 &&
+          rungsOf(49) === 0 &&
+          rungsOf(50) === 1 &&
+          rungsOf(99) === 1 &&
+          rungsOf(100) === 2 &&
+          rungsOf(topRung - 1) === 3 &&
+          rungsOf(topRung) ===
+            MERCHANT_RATINGS.filter((rating) => rating.minScore > 0).length,
+        "the rungs a score has crossed are read off the printed merchant ladder, its own floor entry excluded, because a threshold of zero is the catch all rung rather than a rung anybody crosses",
+      );
+
+      check(
+        !milestoneDue(voyageState(), "crew_loss") &&
+          milestoneDue(fallen(), "crew_loss") &&
+          !milestoneDue(
+            Object.assign(fallen(), { milestonesAnswered: { crew_loss: 1 } }),
+            "crew_loss",
+          ) &&
+          milestoneDue(
+            Object.assign(voyageState(), {
+              crewLost: [
+                { name: "Old Salt", round: 1 },
+                { name: "Cabin Hand", round: 3 },
+              ],
+              milestonesAnswered: { crew_loss: 1 },
+            }),
+            "crew_loss",
+          ),
+        "the lost hand's moment is a count rather than a latch: one loss is a moment, the same loss answered is not a second one, and a second hand gone is",
+      );
+
+      check(
+        milestoneDue(voyageState(), "pathbound_order") &&
+          milestoneDue(voyageState(), "mandate") &&
+          !milestoneDue(
+            Object.assign(voyageState(), {
+              milestonesAnswered: { pathbound_order: 1 },
+            }),
+            "pathbound_order",
+          ) &&
+          !milestoneDue(
+            Object.assign(voyageState(), {
+              milestonesAnswered: { mandate: 1 },
+            }),
+            "mandate",
+          ),
+        "the pathbound order and the commission are latches: the site only asks when its event happens, and the mark then holds the answer for the voyage",
+      );
+
+      check(
+        milestoneDue(
+          Object.assign(voyageState(), { score: 60 }),
+          "renown_rung",
+        ) &&
+          !milestoneDue(
+            Object.assign(voyageState(), {
+              score: 60,
+              milestonesAnswered: { renown_rung: 1 },
+            }),
+            "renown_rung",
+          ) &&
+          milestoneDue(
+            Object.assign(voyageState(), {
+              score: 130,
+              milestonesAnswered: { renown_rung: 1 },
+            }),
+            "renown_rung",
+          ) &&
+          !milestoneDue(
+            Object.assign(voyageState(), {
+              score: 130,
+              milestonesAnswered: { renown_rung: 2 },
+            }),
+            "renown_rung",
+          ) &&
+          !milestoneDue(voyageState(), "renown_rung"),
+        "a crossed rung is a moment and the mark counts the rungs already answered, so the same rung is answered once and the next crossing is a new moment",
+      );
+
+      withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
+        const ticked = coldAt(coldRound);
+        const unTicked = coldAt(coldRound);
+        unTicked.garmentsTickRound = 0;
+        const answered = coldAt(coldRound);
+        answered.milestonesAnswered.cold_leg = coldRound;
+        const bitten = coldAt(coldRound);
+        bitten.money = 1000;
+        hireWorker(bitten, "weaver", []);
+        bitten.workers.weaver[0].frostbittenRound = coldRound + 1;
+        const mild = coldAt(mildRound);
+        check(
+          coldRound > 0 &&
+            mildRound > 0 &&
+            milestoneDue(ticked, "cold_leg") &&
+            !milestoneDue(unTicked, "cold_leg") &&
+            !milestoneDue(answered, "cold_leg") &&
+            !milestoneDue(bitten, "cold_leg") &&
+            !milestoneDue(mild, "cold_leg"),
+          "a cold leg survived with zero frostbite is a moment, and every other way to read the same facts is not: no settlement tick, a hand already bitten by that leg, the same leg answered, and a mild one that was never cold at all",
+        );
+      });
+
+      const fallenHand = fallen();
+      fallenHand.voyageEpoch = 777;
+      const hand = milestoneChoices(fallenHand, "crew_loss").map(
+        (card) => card.id,
+      );
+      const again = milestoneChoices(fallenHand, "crew_loss").map(
+        (card) => card.id,
+      );
+      check(
+        hand.length === CARDS_PER_OFFER &&
+          hand[0] === "steady_watch" &&
+          hand.every((id) => MILESTONE_BOONS.some((card) => card.id === id)) &&
+          hand.join() === again.join(),
+        "a moment's table is the anchor card its own trigger is named for first and two more drawn off the family pool, and the seed leaves the round out, so a room advance, a checkpoint or a reload deals the same three cards",
+      );
+
+      const holding = fallen();
+      holding.voyageEpoch = 777;
+      holding.heldBoons = ["steady_watch"];
+      const afterPick = milestoneChoices(holding, "crew_loss").map(
+        (card) => card.id,
+      );
+      check(
+        afterPick.length === CARDS_PER_OFFER &&
+          !afterPick.includes("steady_watch"),
+        "a card already taken from a moment is out of the pool for every moment after it, so no two moments can deal one captain the same boon twice",
+      );
+
+      const spent = fallen();
+      spent.voyageEpoch = 777;
+      spent.heldBoons = MILESTONE_BOONS.map((card) => card.id);
+      const classicFallen = voyageState({ mode: CLASSIC });
+      classicFallen.crewLost = [{ name: "Old Salt", round: 1 }];
+      check(
+        milestoneChoices(spent, "crew_loss").length === 0 &&
+          milestoneChoices(classicFallen, "crew_loss").length ===
+            CARDS_PER_OFFER,
+        "and a family whose every card is held deals nothing rather than a short table, while the founding mode's captain, who can never be offered one, would still be dealt the full three by the same reader",
+      );
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const idle = voyageState();
+        const waiting = fallen();
+        waiting.milestoneOffers = ["crew_loss"];
+        const drained = fallen();
+        drained.heldBoons = MILESTONE_BOONS.map((card) => card.id);
+        drained.milestoneOffers = ["crew_loss"];
+        check(
+          !milestonePending(idle) &&
+            milestonePending(waiting) &&
+            !milestonePending(drained),
+          "a moment is drawn only when the queue holds one and its table still has a card on it, so a queue whose pool ran dry behind another moment is left inert rather than drawn as a screen with no exit",
+        );
+        withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "0", () => {
+          check(
+            !milestonePending(waiting),
+            "and with the switch off a moment already queued is simply not drawn, which is the plan's rollback: the data stays and the moment does not arrive",
+          );
+        });
+      });
+
+      const roundBoon = BOONS.find((card) => card.trigger === "boon_draft");
+      check(
+        roundBoon !== undefined &&
+          normalizeHeldBoons([
+            "steady_watch",
+            "steady_watch",
+            "not_a_card",
+            roundBoon.id,
+            "route_mastery",
+          ]).join() === "steady_watch,route_mastery" &&
+          normalizeHeldBoons("junk").length === 0 &&
+          normalizeMilestoneOffers(["mandate", "nope", "mandate", 7]).join() ===
+            "mandate",
+        "a save's held list keeps only ids the pool still answers as moment boons, dropping the unknown, the repeated and the round draft's own (whose flag is meant to last a round rather than the voyage), and a save's queue keeps only real triggers read once each",
+      );
+
+      const marks = normalizeMilestonesAnswered({
+        crew_loss: 2,
+        cold_leg: 0,
+        renown_rung: -1,
+        mandate: 1.5,
+        rogue: 3,
+        pathbound_order: 1,
+      });
+      check(
+        marks.crew_loss === 2 &&
+          marks.pathbound_order === 1 &&
+          marks.cold_leg === undefined &&
+          marks.renown_rung === undefined &&
+          !("mandate" in marks) &&
+          !("rogue" in marks) &&
+          Object.keys(normalizeMilestonesAnswered(null)).length === 0,
+        "and a save's marks keep only whole numbers of at least one in units the vocabulary knows, so a zero, a negative, a fraction and a stranger all read as absent rather than as a mark",
+      );
+
+      // ========== D. The writes ==========
+
+      const switchedOff = fallen();
+      const offLogs: string[] = [];
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "0", () => {
+        queueMilestoneMoment(switchedOff, offLogs, "crew_loss");
+      });
+      const foundingFallen = voyageState({ mode: CLASSIC });
+      foundingFallen.crewLost = [{ name: "Old Salt", round: 1 }];
+      const foundingLogs: string[] = [];
+      queueMilestoneMoment(foundingFallen, foundingLogs, "crew_loss");
+      check(
+        switchedOff.milestoneOffers.length === 0 &&
+          Object.keys(switchedOff.cardTally).length === 0 &&
+          offLogs.length === 0 &&
+          foundingFallen.milestoneOffers.length === 0 &&
+          foundingLogs.length === 0,
+        "with the switch off a due moment is refused before anything is counted or written, and the founding mode's captain is refused the same way with the switch on, because nothing on the arming path outruns the switch",
+      );
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const armed = fallen();
+        const logs: string[] = [];
+        queueMilestoneMoment(armed, logs, "crew_loss");
+        const dealt = milestoneChoices(armed, "crew_loss").map(
+          (card) => card.id,
+        );
+        check(
+          armed.milestoneOffers.join() === "crew_loss" &&
+            logs.some((line) =>
+              line.includes(MILESTONE_MOMENTS.crew_loss.title),
+            ) &&
+            logs.some((line) =>
+              line.includes(MILESTONE_MOMENTS.crew_loss.line),
+            ) &&
+            dealt.length === CARDS_PER_OFFER &&
+            dealt.every(
+              (id) =>
+                armed.cardTally[id]?.offered === 1 &&
+                armed.cardTally[id]?.picked === 0,
+            ),
+          "arming a moment queues it, writes the two ledger lines the captain meets and counts the three cards as offered before any screen sees them, because a re render must not count one deal as two",
+        );
+        queueMilestoneMoment(armed, logs, "crew_loss");
+        check(
+          armed.milestoneOffers.length === 1 &&
+            logs.filter((line) =>
+              line.includes(MILESTONE_MOMENTS.crew_loss.title),
+            ).length === 1 &&
+            dealt.every((id) => armed.cardTally[id]?.offered === 1),
+          "and the guard keeps a moment already waiting from being armed a second time, which is what makes every re entered sweep idempotent",
+        );
+
+        const drained = fallen();
+        const drainedLogs: string[] = [];
+        drained.heldBoons = MILESTONE_BOONS.map((card) => card.id);
+        queueMilestoneMoment(drained, drainedLogs, "crew_loss");
+        check(
+          drained.milestoneOffers.length === 0 &&
+            drained.milestonesAnswered.crew_loss === 1 &&
+            drainedLogs.length === 0 &&
+            Object.keys(drained.cardTally).length === 0 &&
+            !milestonePending(drained),
+          "a moment whose table has run dry is spent rather than queued: the mark moves so it cannot re fire at every settlement for the rest of the voyage, nothing is drawn and nothing is logged",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const answering = fallen();
+        const logs: string[] = [];
+        queueMilestoneMoment(answering, logs, "crew_loss");
+        const card = milestoneChoices(answering, "crew_loss")[0];
+        const took = answerMilestone(answering, card.id, logs);
+        check(
+          took &&
+            card.id === "steady_watch" &&
+            answering.heldBoons.join() === "steady_watch" &&
+            answering.milestoneOffers.length === 0 &&
+            answering.modifierFlags.steady_rations === 1 &&
+            answering.cardTally[card.id]?.picked === 1 &&
+            answering.milestonesAnswered.crew_loss === 1 &&
+            logs.some((line) => line.includes(cardLead(card.id))) &&
+            !milestonePending(answering),
+          "answering takes exactly the card the screen drew: the anchor card is dealt first and a press on it holds it, folds its flag into the round's flags, counts the pick, moves the mark and drops the moment off the queue",
+        );
+
+        const refusing = fallen();
+        const refuseLogs: string[] = [];
+        queueMilestoneMoment(refusing, refuseLogs, "crew_loss");
+        const refusedWrong = answerMilestone(
+          refusing,
+          "cold_hardened",
+          refuseLogs,
+        );
+        const quiet =
+          refusing.milestoneOffers.length === 1 &&
+          refusing.heldBoons.length === 0 &&
+          Object.keys(refusing.modifierFlags).length === 0;
+        check(
+          !refusedWrong &&
+            quiet &&
+            !answerMilestone(voyageState(), "steady_watch", []) &&
+            answerMilestone(
+              refusing,
+              milestoneChoices(refusing, "crew_loss")[0].id,
+              refuseLogs,
+            ) &&
+            !answerMilestone(refusing, "cold_hardened", refuseLogs),
+          "a press is validated against the same derived table the screen drew, so a stale click on a card this moment does not deal is refused with the moment left standing, and an answer with no moment waiting is refused as well",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const dawn = fallen();
+        const dawnLogs: string[] = [];
+        startBoonDrafting(dawn, dawnLogs);
+        const armed = dawn.milestoneOffers.join() === "crew_loss";
+        startBoonDrafting(dawn, dawnLogs);
+        check(
+          armed &&
+            dawn.milestoneOffers.length === 1 &&
+            dawnLogs.filter((line) =>
+              line.includes(MILESTONE_MOMENTS.crew_loss.title),
+            ).length === 1 &&
+            milestoneChoices(dawn, "crew_loss").every(
+              (card) => dawn.cardTally[card.id]?.offered === 1,
+            ),
+          "the dawn sweep arms the lost hand's moment from inside the boon draft's opener, and the catch up entry that runs the same dawn again deals nothing twice",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
+          const settled = coldAt(coldRound);
+          settled.score = 60;
+          const settleLogs: string[] = [];
+          noteSettlementMilestones(settled, settleLogs);
+          const ordered =
+            settled.milestoneOffers.join() === "cold_leg,renown_rung";
+          // The two tables can overlap on a card (a moment deals from the
+          // family, not from a private shelf), so the count that proves the
+          // re-entry is quiet is the whole tally held still rather than any
+          // one card's number.
+          const talliedOnce = JSON.stringify(settled.cardTally);
+          noteSettlementMilestones(settled, settleLogs);
+          check(
+            ordered &&
+              settled.milestoneOffers.length === 2 &&
+              settleLogs.filter((line) =>
+                line.includes(MILESTONE_MOMENTS.cold_leg.title),
+              ).length === 1 &&
+              settleLogs.filter((line) =>
+                line.includes(MILESTONE_MOMENTS.renown_rung.title),
+              ).length === 1 &&
+              JSON.stringify(settled.cardTally) === talliedOnce &&
+              Object.keys(settled.cardTally).length > 0,
+            "the settled books deal the cold leg first, because its evidence is the freshest thing in the ledger, and the crossed rung second, and a second entry into the same settlement leaves both alone",
+          );
+        });
+      });
+
+      withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+        withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+          const findPathbound = () => {
+            for (let round = 1; round <= 12; round++) {
+              const board = dealBoard(round);
+              const order = board.customerCards.find(
+                (card) =>
+                  pathOrderOf(card, board.mode) !== null &&
+                  !card.isProductOrder &&
+                  !card.isBrokerFavor,
+              );
+              if (order !== undefined) return { board, order };
+            }
+            return null;
+          };
+          const found = findPathbound();
+          if (found !== null) {
+            const board = found.board;
+            const pathCard = found.order;
+            board.path = pathOrderOf(pathCard, board.mode);
+            stockHold(board, pathCard);
+            board.money = 1000;
+            const boardLogs: string[] = [];
+            completeOrder(board, pathCard.id, boardLogs);
+            check(
+              board.milestoneOffers.join() === "pathbound_order" &&
+                boardLogs.some((line) =>
+                  line.includes(MILESTONE_MOMENTS.pathbound_order.title),
+                ) &&
+                boardLogs.some((line) =>
+                  line.includes(MILESTONE_MOMENTS.pathbound_order.line),
+                ),
+              "the first order filled along the captain's own path arms its moment at the fill itself, after the ledger has already said what the order paid",
+            );
+          } else {
+            check(false, "the board deals a pathbound order to fill");
+          }
+        });
+      });
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const delivering = voyageState();
+        delivering.phase = "orders";
+        const objective = OBJECTIVE_DECK[0];
+        const first = objective.resources[0];
+        delivering.inventory[first.type] =
+          (delivering.inventory[first.type] ?? 0) + first.required;
+        const deliveryLogs: string[] = [];
+        deliverToObjective(delivering, objective, deliveryLogs);
+        const ledgerFirst =
+          deliveryLogs.findIndex((line) => line.includes("Fleet Commission")) <
+          deliveryLogs.findIndex((line) =>
+            line.includes(MILESTONE_MOMENTS.mandate.title),
+          );
+        answerMilestone(
+          delivering,
+          milestoneChoices(delivering, "mandate")[0].id,
+          deliveryLogs,
+        );
+        const second = objective.resources[1];
+        delivering.inventory[second.type] =
+          (delivering.inventory[second.type] ?? 0) + second.required;
+        deliverToObjective(delivering, objective, deliveryLogs);
+        check(
+          delivering.milestonesAnswered.mandate === 1 &&
+            delivering.heldBoons.length === 1 &&
+            delivering.milestoneOffers.length === 0 &&
+            ledgerFirst &&
+            deliveryLogs.filter((line) =>
+              line.includes(MILESTONE_MOMENTS.mandate.title),
+            ).length === 1,
+          "the first delivery to the fleet's commission arms its moment after the commission's own ledger line, and every delivery after the answered first one is quiet",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
+        const rolling = voyageState();
+        rolling.money = 5000;
+        rolling.currentRound = 4;
+        rolling.phase = "resolve";
+        rolling.pirateAttackResolved = true;
+        rolling.heldBoons = ["steady_watch"];
+        rolling.modifierFlags = { steady_rations: 1, vat_discount: 0.5 };
+        const rollLogs: string[] = [];
+        const ctx = {
+          seedBase: `smoke:milestones:${suffix}`,
+          harborId: "harbor-a",
+        };
+        for (let press = 0; press < 6 && rolling.currentRound === 4; press++) {
+          nextPhase(rolling, ctx, rollLogs);
+        }
+        const landedOn = rolling.phase as Phase;
+        check(
+          rolling.currentRound === 5 &&
+            rolling.modifierFlags.steady_rations === 1 &&
+            rolling.modifierFlags.vat_discount === undefined &&
+            rolling.heldBoons.join() === "steady_watch" &&
+            landedOn === "dawn",
+          "a round's rollover rebuilds the flag set from the held boons, so a held moment boon rides through every reset while the round draft's own flags come and go above it",
+        );
+      });
+
+      // ========== E. The five read sites ==========
+
+      withEnv("NEXT_PUBLIC_SURVIVAL", "1", () => {
+        const makeCrew = (heads: number, larder: number, rations?: number) => {
+          const state = voyageState();
+          state.money = 1000;
+          for (let head = 0; head < heads; head++)
+            hireWorker(state, "weaver", []);
+          state.currentRound = 3;
+          state.larder = larder;
+          if (rations !== undefined)
+            state.modifierFlags.steady_rations = rations;
+          return state;
+        };
+        const plain = makeCrew(3, 5);
+        const plainLogs: string[] = [];
+        const fedPlain = feedCrew(plain, plainLogs);
+        const saved = makeCrew(3, 5, 1);
+        const savedLogs: string[] = [];
+        const fedSaved = feedCrew(saved, savedLogs);
+        const floored = makeCrew(1, 2, 5);
+        const floorLogs: string[] = [];
+        const fedFloor = feedCrew(floored, floorLogs);
+        check(
+          fedPlain &&
+            fedSaved &&
+            fedFloor &&
+            plain.larder === 2 &&
+            saved.larder === 3 &&
+            floored.larder === 1 &&
+            plainLogs.some((line) => line.includes("eats 3 rations")) &&
+            savedLogs.some((line) => line.includes("eats 2 rations")) &&
+            floorLogs.some((line) => line.includes("eats 1 ration")),
+          "Steady Watch is read at the pantry: three hands cost three rations with nothing held and two with the boon, the saving floors at one so a lone hand still eats rather than starving on a boon, and the ledger line says what was saved",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
+        const bare = coldAt(coldRound);
+        const once = coldAt(coldRound);
+        once.modifierFlags.cold_hardened = 1;
+        const twice = coldAt(coldRound);
+        twice.modifierFlags.cold_hardened = 2;
+        check(
+          warmthScore(bare) === 0 &&
+            warmthScore(twice) === 2 &&
+            shortOfWarmth(bare) &&
+            shortOfWarmth(once) &&
+            !shortOfWarmth(twice) &&
+            COLD_LEG_WARMTH === 2,
+          "Cold Hardened is read where the cold is judged: the score the crew freezes against counts it as warmth beside the garments, and the leg still bites through one of it and not through two because the leg asks for the two the constant states",
+        );
+      });
+
+      withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
+        // Both shapes on one board, found by walking the twelve rather
+        // than betting the whole check on the round one deal, and every
+        // run below dealing that same round so the runs still stand on
+        // identical cards.
+        const findPair = () => {
+          for (let round = 1; round <= 12; round++) {
+            const control = dealBoard(round);
+            const pathCard = control.customerCards.find(
+              (order) =>
+                pathOrderOf(order, control.mode) !== null &&
+                !order.isProductOrder &&
+                !order.isBrokerFavor,
+            );
+            const plainCard = control.customerCards.find(
+              (order) =>
+                pathOrderOf(order, control.mode) === null &&
+                !order.isProductOrder &&
+                !order.isBrokerFavor &&
+                order.reward > 0,
+            );
+            if (pathCard !== undefined && plainCard !== undefined) {
+              return { round, control, pathCard, plainCard };
+            }
+          }
+          return null;
+        };
+        const found = findPair();
+        if (found !== null) {
+          const { round, control, pathCard, plainCard } = found;
+          const chosenPath = pathOrderOf(pathCard, control.mode);
+          const run = (card: OrderCard, flag: boolean, path: PathId | null) => {
+            const state = dealBoard(round);
+            state.path = path;
+            if (flag) state.modifierFlags.route_mastery = 0.25;
+            stockHold(state, card);
+            state.money = 1000;
+            const before = state.money;
+            completeOrder(state, card.id, []);
+            return state.money - before;
+          };
+          const plainDelta = run(pathCard, false, chosenPath);
+          const masteredDelta = run(pathCard, true, chosenPath);
+          const pathlessDelta = run(plainCard, true, null);
+          const plainFlaggedDelta = run(plainCard, true, chosenPath);
+          check(
+            masteredDelta - plainDelta === Math.floor(pathCard.reward * 0.25) &&
+              masteredDelta - plainDelta > 0 &&
+              pathlessDelta === plainFlaggedDelta,
+            "Route Mastery is read at the order's payout: a quarter of the face reward more on the orders that follow the captain's own path, and nothing at all on an order that belongs to no path, whether the captain sails one or none",
+          );
+        } else {
+          check(
+            false,
+            "the board deals a pathbound order and a plain one to fill",
+          );
+        }
+      });
+
+      const product = Object.keys(PRODUCT_PRICES)[1];
+      const vatPlain = calcVAT(voyageState(), product, 500);
+      const credited = voyageState();
+      credited.modifierFlags.harbor_credit = 0.25;
+      const vatCredit = calcVAT(credited, product, 500);
+      const breakdown = explainVAT(credited, product, 500);
+      const creditCard = cardById("harbor_credit");
+      const creditStep = breakdown.steps.find(
+        (step) =>
+          creditCard !== null && step.label.includes(cardText(creditCard).name),
+      );
+      check(
+        vatPlain > 0 &&
+          vatCredit === Math.floor(vatPlain * 0.75) &&
+          breakdown.final === vatCredit &&
+          creditStep !== undefined &&
+          creditStep.delta === vatCredit - vatPlain,
+        "Harbor Credit is read in the dues arithmetic and again in the tooltip that mirrors it: the tax a quarter lower, named on its own step of the breakdown, and the printed total is the charged one to the coin",
+      );
+
+      const calmSea = voyageState();
+      calmSea.currentRound = 6;
+      const flyingColors = voyageState();
+      flyingColors.currentRound = 6;
+      flyingColors.modifierFlags.fleet_color = 0.25;
+      const baseChance = pirateChance(calmSea);
+      check(
+        baseChance > 0 &&
+          Math.abs(pirateChance(flyingColors) - baseChance * 0.75) < 1e-9,
+        "Fleet Colors is read at the raiders' table: the risk a quarter lower for the voyage, taken as the same multiplication the round's own discount takes and landing right after it, ahead of the compass's flat thirty",
+      );
+
+      const drafting = voyageState();
+      drafting.heldBoons = ["steady_watch"];
+      const draftLogs: string[] = [];
+      startBoonDrafting(drafting, draftLogs);
+      const pick = drafting.boonChoices[0];
+      selectBoon(drafting, pick.id, draftLogs);
+      check(
+        drafting.modifierFlags.steady_rations === 1 &&
+          pick.effect.kind === "flags" &&
+          Object.entries(pick.effect.flags).every(
+            ([key, value]) =>
+              drafting.modifierFlags[key as ModifierKey] === value,
+          ),
+        "a round boon answered beside a held one lands both flag sets in the same set, so the round's effect and the voyage's own are read from one place rather than racing for it",
+      );
+
+      // ========== F. The save ==========
+
+      const saved = voyageState();
+      saved.heldBoons = [
+        "steady_watch",
+        "steady_watch",
+        "not_a_card",
+        roundBoon?.id ?? "missing",
+        "route_mastery",
+      ];
+      saved.milestoneOffers = [
+        "mandate",
+        "nope",
+        "mandate",
+      ] as unknown as MilestoneTrigger[];
+      saved.milestonesAnswered = {
+        crew_loss: 2,
+        cold_leg: 0,
+        renown_rung: 1.5,
+        mandate: 1,
+      };
+      healLoadedVoyage(saved, { legacyRenownLevel: null });
+      check(
+        saved.heldBoons.join() === "steady_watch,route_mastery" &&
+          saved.milestoneOffers.join() === "mandate" &&
+          saved.milestonesAnswered.crew_loss === 2 &&
+          saved.milestonesAnswered.mandate === 1 &&
+          saved.milestonesAnswered.cold_leg === undefined &&
+          saved.milestonesAnswered.renown_rung === undefined,
+        "the load path heals all three fields through the same readers the rest of the save uses: the unknown, the repeated and the round draft's own leave the held list, the queue reads once per trigger, and the marks keep only the answers that mean something",
+      );
+
+      const legacy = voyageState();
+      legacy.heldBoons = undefined as unknown as string[];
+      legacy.milestoneOffers = undefined as unknown as MilestoneTrigger[];
+      legacy.milestonesAnswered = undefined as unknown as Partial<
+        Record<MilestoneTrigger, number>
+      >;
+      healLoadedVoyage(legacy, { legacyRenownLevel: null });
+      check(
+        legacy.heldBoons.length === 0 &&
+          legacy.milestoneOffers.length === 0 &&
+          Object.keys(legacy.milestonesAnswered).length === 0,
+        "and a save written before the moments existed loads as a voyage that has met none of them rather than as one carrying a hole",
+      );
+
+      // ========== G. The leg report's losses ==========
+
+      // The wire itself cannot be driven from in process (the socket handler
+      // reaches its captain through a listener map this suite cannot see), so
+      // the accumulator is driven here the way the handler drives it, against
+      // the real database, and everything it writes is deleted again.
+      const roomPrefix = `smoke48-${suffix}-`;
+      const roomFacts = (id: string) => {
+        const sample = voyageState();
+        return {
+          id,
+          mode: sample.mode,
+          difficulty: sample.difficulty,
+          voyageEpoch: 7,
+          createdAt: new Date(),
+        };
+      };
+      try {
+        const roomA = `${roomPrefix}a`;
+        openVoyageTelemetry(roomFacts(roomA), []);
+        noteLegReport(roomA, "u-a", 1, {
+          ordersDealt: 3,
+          ordersFilled: 2,
+          distinctGoods: 2,
+          crewLosses: 2,
+        });
+        await closeVoyageTelemetry(roomA, "concluded", []);
+        const rowsA = await db.voyageTelemetry.findMany({
+          where: { roomId: roomA },
+        });
+        const storedA =
+          rowsA.length === 1 ? readStoredRecord(rowsA[0].record) : null;
+        const reportA = storedA?.events.find(
+          (event) => event.name === "leg_report",
+        );
+        const lossesA =
+          reportA?.name === "leg_report" ? reportA.crewLosses : null;
+        const captainA = storedA?.captains.find(
+          (line) => line.userId === "u-a",
+        );
+        check(
+          storedA !== null && lossesA === 2 && captainA?.crewLost === true,
+          "a leg that lost two hands carries the count on its own wire line and marks the captain who suffered it, so a reader can count the losses and the captains they belonged to out of the same record",
+        );
+
+        const roomB = `${roomPrefix}b`;
+        openVoyageTelemetry(roomFacts(roomB), []);
+        noteLegReport(roomB, "u-b", 1, {
+          ordersDealt: 1,
+          ordersFilled: 1,
+          distinctGoods: 1,
+          crewLosses: 0,
+        });
+        await closeVoyageTelemetry(roomB, "concluded", []);
+        const rowsB = await db.voyageTelemetry.findMany({
+          where: { roomId: roomB },
+        });
+        const storedB =
+          rowsB.length === 1 ? readStoredRecord(rowsB[0].record) : null;
+        const reportB = storedB?.events.find(
+          (event) => event.name === "leg_report",
+        );
+        const lossesB =
+          reportB?.name === "leg_report" ? reportB.crewLosses : null;
+        const captainB = storedB?.captains.find(
+          (line) => line.userId === "u-b",
+        );
+        check(
+          lossesB === 0 && captainB?.crewLost === false,
+          "a leg that reports zero losses keeps the honest zero on the wire and leaves the captain unmarked, because the mark is for a captain the voyage actually saw lose a hand rather than for one who sent the field",
+        );
+
+        const roomC = `${roomPrefix}c`;
+        openVoyageTelemetry(roomFacts(roomC), []);
+        noteLegReport(roomC, "u-c", 1, {
+          ordersDealt: 1,
+          ordersFilled: 1,
+          distinctGoods: 1,
+        });
+        await closeVoyageTelemetry(roomC, "concluded", []);
+        const rowsC = await db.voyageTelemetry.findMany({
+          where: { roomId: roomC },
+        });
+        const storedC =
+          rowsC.length === 1 ? readStoredRecord(rowsC[0].record) : null;
+        const reportC = storedC?.events.find(
+          (event) => event.name === "leg_report",
+        );
+        const wroteKey =
+          reportC !== undefined &&
+          Object.prototype.hasOwnProperty.call(reportC, "crewLosses");
+        const captainC = storedC?.captains.find(
+          (line) => line.userId === "u-c",
+        );
+        check(
+          !wroteKey && captainC?.crewLost === false,
+          "a voyage whose crew loss rule was off sends no field at all rather than a zero, so an absent reading stays absent through the record the way the hold's own figures do",
+        );
+
+        const roomD = `${roomPrefix}d`;
+        openVoyageTelemetry(roomFacts(roomD), []);
+        for (let i = 0; i < TELEMETRY_EVENT_CAP; i++) {
+          noteTelemetry(roomD, "message_sent", { actor: "u-d" });
+        }
+        noteLegReport(roomD, "u-d", 1, {
+          ordersDealt: 1,
+          ordersFilled: 1,
+          distinctGoods: 1,
+          crewLosses: 1,
+        });
+        await closeVoyageTelemetry(roomD, "concluded", []);
+        const rowsD = await db.voyageTelemetry.findMany({
+          where: { roomId: roomD },
+        });
+        const storedD =
+          rowsD.length === 1 ? readStoredRecord(rowsD[0].record) : null;
+        const captainD = storedD?.captains.find(
+          (line) => line.userId === "u-d",
+        );
+        check(
+          storedD !== null &&
+            storedD.truncated &&
+            storedD.events.length === TELEMETRY_EVENT_CAP &&
+            storedD.events.every((event) => event.name !== "leg_report") &&
+            captainD?.crewLost === true,
+          "a voyage whose events have filled to the cap drops the leg's own line and keeps the captain's loss mark, so the one captain a full record would otherwise have forgotten is still named on it",
+        );
+      } finally {
+        await db.voyageTelemetry.deleteMany({
+          where: { roomId: { startsWith: roomPrefix } },
+        });
+      }
+      const leftovers = await db.voyageTelemetry.count({
+        where: { roomId: { startsWith: roomPrefix } },
+      });
+      check(
+        leftovers === 0,
+        "and the synthetic rooms this suite sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
+      );
+
+      // The oracle is one file at the scripts root rather than a suite under
+      // scripts/smoke/suites, so the walk up to the repository is one step
+      // here where the suite's copy takes three.
+      const repoRoot = join(import.meta.dirname, "..");
+      const wiring = readFileSync(
+        join(repoRoot, "src", "server", "realtime", "wiring", "leg-report.ts"),
+        "utf8",
+      );
+      const hook = readFileSync(
+        join(repoRoot, "src", "lib", "use-leg-report.ts"),
+        "utf8",
+      );
+      check(
+        wiring.includes("crewLosses: optional(payload?.crewLosses)") &&
+          hook.includes("crewLosses") &&
+          hook.includes("crewLossRuleOn"),
+        "the two ends of the wire the accumulator sits between both name the losses in their own source, held here rather than by a fake because the socket seam between them is module private and a fake would prove nothing about it",
+      );
+
+      // ========== H. The barrel ==========
+
+      check(
+        "answerMilestone" in engineBarrel &&
+          !("queueMilestoneMoment" in engineBarrel) &&
+          !("noteSettlementMilestones" in engineBarrel) &&
+          !("milestoneChoices" in engineBarrel) &&
+          !("heldFlagsOf" in engineBarrel),
+        "only the answer crosses the engine's barrel: the arming walks stay inside the engine so no screen can arm a moment of its own, and the pure readers stay in the vocabulary's own module where the record and the screens both find them",
+      );
+    }
+
+    // ---- The charters ----
+    // [F6] The plan's second feature of the cycle: a voyage offers one
+    // charter at the fourth leg, a trio of the captain's two path charters
+    // and one wildcard, and the one they take carries for the rest of the
+    // voyage. What is checked here is the feature end to end: the
+    // vocabulary and the ten cards, the three pure reads that derive the
+    // moment, the answer and its refusals, every flag the ten write read
+    // at its live site, the save healed back, the take the wire files
+    // once per voyage, and the barrel's one public name.
+    //
+    // It sits here, beside the milestone boons' block, for their reason:
+    // the moment is a pure function of a state, and the one half that
+    // touches the database opens no harbor of its own. The voyage
+    // schedule's chartered waves share the noun, which is why every
+    // captain facing string below says charter in the possessive the
+    // screen uses. The whole block is scoped, the way the ready check's
+    // is, so its local names are its own.
+    {
+      // A captain standing at the charter's leg. The path is dealt by the
+      // draft in a real room; here it is seated directly, because the
+      // path's own deal has its own block and this one is about what a
+      // path does when the offer reads it.
+      const pathlessAt = (round: number) => {
+        const state = voyageState();
+        state.currentRound = round;
+        return state;
+      };
+      const pathAt = (path: PathId, round: number) => {
+        const state = pathlessAt(round);
+        state.path = path;
+        return state;
+      };
+      const loomAt = (round: number) => pathAt("loom", round);
+
+      // The eight a Loom captain's wildcard is drawn from, read off the
+      // pairing map rather than typed here, so a sixth path tomorrow
+      // moves this list with the map instead of leaving a stale copy
+      // behind.
+      const otherEight = (path: PathId) =>
+        CHARTERS.filter((card) => CHARTER_PATH[card.id] !== path).map(
+          (card) => card.id,
+        );
+
+      // ========== A. The vocabulary ==========
+
+      check(
+        CHARTER_LEG === 4 && CHARTERS.length === 10,
+        "the moment lands on the fourth leg of the twelve and the pool holds the plan's ten, counted off the catalogue rather than typed here",
+      );
+
+      check(
+        CHARTER_MOMENT.icon.length > 0 &&
+          CHARTER_MOMENT.title.length > 0 &&
+          CHARTER_MOMENT.line.length > 0,
+        "and the moment carries the glyph and the two lines the overlay prints, the same three fields a milestone moment carries because the same overlay prints both",
+      );
+
+      // The pairing, held against the pump: every charter is paired,
+      // every path is paired exactly twice, and the map names no path the
+      // game does not have. A charter the map forgets is a card no trio
+      // can ever offer, which is the failure the two per path count
+      // exists to make loud.
+      const pathIds = Object.keys(PATHS) as PathId[];
+      check(
+        pathIds.length > 0 &&
+          CHARTERS.every((card) => pathIds.includes(CHARTER_PATH[card.id])) &&
+          pathIds.every(
+            (path) =>
+              CHARTERS.filter((card) => CHARTER_PATH[card.id] === path)
+                .length === 2,
+          ),
+        "every charter is paired to a real path and every path is paired exactly twice, so no path's moment offers a hole and no card sits in the pool unofferable",
+      );
+
+      check(
+        COVER_CHARTERS.length > 0 &&
+          COVER_CHARTERS.includes("letter_of_marque") &&
+          COVER_CHARTERS.every((id) =>
+            CHARTERS.some((card) => card.id === id && card.kind === "charter"),
+          ),
+        "the cover row's list names the salvage writer and only ids the pool still ships as charters, because the row counts takes and a retired id would read as cover nobody could ever deal",
+      );
+
+      // The switch's own policy, read through the function every switch
+      // in this tree is read through: on unless the operator says
+      // otherwise, and answered inside one mode and no other.
+      check(
+        [undefined, "", "1", "on", "true", "live", "ON "].every((value) =>
+          withEnv("NEXT_PUBLIC_CHARTERS", value, () => chartersOn(GAMBIT)),
+        ) &&
+          ["off", "0", "OFF", " off ", "Off"].every(
+            (value) =>
+              !withEnv("NEXT_PUBLIC_CHARTERS", value, () => chartersOn(GAMBIT)),
+          ),
+        "the charters are on for every value except the word off and the digit zero, which is the policy every switch in this tree is read through",
+      );
+
+      check(
+        withEnv(
+          "NEXT_PUBLIC_CHARTERS",
+          "1",
+          () =>
+            chartersOn(GAMBIT) &&
+            !chartersOn(CLASSIC) &&
+            !chartersOn("some_future_mode"),
+        ),
+        "and the twelfth switch is a gambit system like its eleven siblings: a rollback turned all the way on still leaves the founding mode without a single charter",
+      );
+
+      check(
+        !CARRIES_A_DASH.test(CHARTER_MOMENT.title) &&
+          !CARRIES_A_DASH.test(CHARTER_MOMENT.line) &&
+          CHARTERS.every((card) =>
+            Object.values(card.strings).every(
+              (strings) =>
+                !CARRIES_A_DASH.test(strings.name) &&
+                !CARRIES_A_DASH.test(strings.desc),
+            ),
+          ),
+        "every captain facing string a charter prints is dash free in both languages, by the house rule the card pool already answers to",
+      );
+
+      check(
+        [
+          "src/lib/game/charters.ts",
+          "src/lib/game/constants/charters.ts",
+          "src/lib/game/engine/charters.ts",
+          "src/components/portmasters/game/phases/CharterDraft.tsx",
+        ].every((relative) => !carriesADash(relative)),
+        "and the four files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
+      );
+
+      // ========== B. The ten cards ==========
+
+      // The flags each card writes, read off the design rather than off
+      // the cards, so a retuned effect fails here rather than agreeing
+      // with itself. The Factor is the one that writes two keys: the
+      // count of borrows the voyage opens and the penalty each one
+      // carries.
+      const expectedFlags: Record<string, Record<string, number>> = {
+        bulk_charter: { transport_per_lot_discount: 1 },
+        standing_manifest: { manifest_order_bonus: 0.15 },
+        gun_charter: { guns_risk_discount: 0.3 },
+        standing_escort: { standing_escort_discount: 0.5 },
+        weavers_charter: { loom_extra_produce: 1 },
+        quality_mark: { loom_sale_bonus: 0.1 },
+        long_ledger: { voyage_purchase_discount: 0.1 },
+        quiet_account: { voyage_dues_discount: 0.5 },
+        the_factor: { factor_borrows: 3, factor_penalty: 0.6 },
+        letter_of_marque: { marque_salvage: 0.25 },
+      };
+
+      check(
+        Object.keys(expectedFlags).length === CHARTERS.length &&
+          CHARTERS.every((card) => {
+            const expected = expectedFlags[card.id];
+            if (expected === undefined) return false;
+            const effect = card.effect;
+            return (
+              card.kind === "charter" &&
+              card.trigger === "charter_draft" &&
+              card.pathWeight === NO_LEAN &&
+              card.condition.kind === "always" &&
+              card.condition.weight === 1 &&
+              effect.kind === "flags" &&
+              Object.keys(effect.flags).length ===
+                Object.keys(expected).length &&
+              Object.entries(expected).every(
+                ([key, value]) => effect.flags[key as ModifierKey] === value,
+              )
+            );
+          }),
+        "each charter writes exactly the keys its design names and no lean of its own, because the trio is composed by the reader rather than by the weighted draw and a weight written beside the pair would be the same fact in a second place",
+      );
+
+      check(
+        [
+          "transport_per_lot_discount",
+          "manifest_order_bonus",
+          "guns_risk_discount",
+          "standing_escort_discount",
+          "loom_extra_produce",
+          "loom_sale_bonus",
+          "voyage_purchase_discount",
+          "voyage_dues_discount",
+          "factor_borrows",
+          "factor_penalty",
+          "marque_salvage",
+        ].every((key) => (MODIFIER_KEYS as readonly string[]).includes(key)),
+        "and the eleven keys the ten write are members of the closed flag vocabulary, so the effect a charter leaves on the voyage is a key the save, the healer and every reader already know",
+      );
+
+      check(
+        CHARTERS.every(
+          (card) =>
+            cardWeight(card, voyageState({ mode: CLASSIC })) === 0 &&
+            cardWeight(card, voyageState()) > 0,
+        ),
+        "every charter weighs in for the experimental mode and nothing at all in the founding one, which is the pool's own reader holding the mode clause rather than a list of ids kept here",
+      );
+
+      check(
+        CHARTERS.every((card) => cardById(card.id) === card) &&
+          CHARTERS.every((card) => shippedCards().cards.includes(card)) &&
+          new Set(CHARTERS.map((card) => card.id)).size === CHARTERS.length,
+        "the ten join the shipped record by the same objects rather than by copies, so a retuned charter is the card a held id resolves to and a dealt trio holds, and no id is carried twice",
+      );
+
+      check(
+        validateCards(shippedCards()).length === 0,
+        "and the pool's own validator passes over the shipped record with the ten in it, which is where the one owner per key clause and the two per path clause are answered",
+      );
+
+      check(
+        CHARTERS.every((card) =>
+          Object.values(card.strings).every(
+            (strings) => strings.name.length > 0 && strings.desc.length > 0,
+          ),
+        ) &&
+          new Set(CHARTERS.map((card) => card.strings.en.name)).size ===
+            CHARTERS.length,
+        "every charter is written in both languages with a name and a description, and the ten English names are ten distinct names rather than one word dealt ten times",
+      );
+
+      check(
+        heldCharterCard({ charter: "weavers_charter" })?.id ===
+          "weavers_charter" &&
+          heldCharterCard({ charter: "old_relic" }) === null &&
+          heldCharterCard({ charter: null }) === null,
+        "the held charter resolves through the pool rather than a copy, so a retuned card is the card the captain holds on the next read, and an id the pool no longer answers draws nothing rather than a placeholder",
+      );
+
+      // ========== C. The pure reads ==========
+
+      // The moment reads off the voyage alone: the fourth leg reached
+      // with no answer given, whether or not the deal handed the captain
+      // a path. The path gates the offer rather than the question, which
+      // is the split charterChoices and charterPending make below.
+      check(
+        !charterDue(pathAt("loom", 3)) &&
+          charterDue(pathAt("loom", 4)) &&
+          charterDue(pathAt("loom", 12)) &&
+          charterDue(pathlessAt(4)) &&
+          !charterDue(
+            Object.assign(pathAt("loom", 6), {
+              charter: "weavers_charter",
+            }),
+          ),
+        "the moment is due at the fourth leg and past it rather than only at it, a pathless captain's question still reads due because the offer is what their path gates, and an answered voyage is a finished question rather than one asked again",
+      );
+
+      // The trio, for every path at once: the pair first, in the
+      // catalogue's own order, then one wildcard from the other eight
+      // and never a second of the captain's own. Derived rather than
+      // stored, and seeded rather than rolled: the same read deals the
+      // same three.
+      check(
+        (Object.keys(PATHS) as PathId[]).every((path) => {
+          const trio = charterChoices(pathAt(path, 5)).map((card) => card.id);
+          const own = CHARTERS.filter(
+            (card) => CHARTER_PATH[card.id] === path,
+          ).map((card) => card.id);
+          return (
+            trio.length === 3 &&
+            trio.slice(0, 2).join() === own.join() &&
+            otherEight(path).includes(trio[2]) &&
+            !own.includes(trio[2])
+          );
+        }),
+        "every path's table is the path's two charters in the catalogue's own order and one wildcard from the other eight, so the trio's first two slots are the map's answer rather than a shuffle",
+      );
+
+      const loomTrio = charterChoices(loomAt(4)).map((card) => card.id);
+      const loomAgain = charterChoices(loomAt(4)).map((card) => card.id);
+      const loomLater = charterChoices(loomAt(9)).map((card) => card.id);
+      check(
+        loomTrio.length === 3 &&
+          loomTrio[0] === "weavers_charter" &&
+          loomTrio[1] === "quality_mark" &&
+          loomTrio.join() === loomAgain.join() &&
+          loomTrio.join() === loomLater.join(),
+        "and the seed leaves the round out: the same captain is dealt the same three on a re read and again at a later leg, so a room advance, a checkpoint or a reload cannot reshuffle the cards under their eyes",
+      );
+
+      check(
+        charterChoices(voyageState()).length === 0,
+        "a captain holding no path has an empty table rather than a smaller one, because a charter forks a path and a captain without one has nothing to fork",
+      );
+
+      withEnv("NEXT_PUBLIC_CHARTERS", "1", () => {
+        check(
+          !charterPending(pathlessAt(4)) &&
+            !charterPending(loomAt(3)) &&
+            charterPending(loomAt(4)) &&
+            !charterPending(
+              Object.assign(loomAt(6), { charter: "weavers_charter" }),
+            ),
+          "the moment is drawn only when the switch is on, the leg is reached, a path is held and no answer stands, which is the whole of what a screen has to ask before it draws the overlay",
+        );
+        withEnv("NEXT_PUBLIC_CHARTERS", "0", () => {
+          check(
+            !charterPending(loomAt(4)) && charterDue(loomAt(4)),
+            "and with the switch off a due moment is not drawn while the question itself still reads due, which is the split the rollback rests on: the reading is about the voyage and only the pending read is about the deployment",
+          );
+        });
+        const classicLoom = pathAt("loom", 4);
+        classicLoom.mode = CLASSIC;
+        check(
+          !charterPending(classicLoom) &&
+            charterChoices(classicLoom).length === 3,
+          "the founding mode's captain, who can never be offered one, would still be dealt the full three by the same reader, and the pending read is what keeps the moment off their screen",
+        );
+      });
+
+      // The wildcard is drawn flat, which is what lets the dashboard's
+      // cover row read the pool rather than read who happened to be dealt
+      // what. A leaning draw would still deal every card eventually; it
+      // would not deal them in the bands a flat one answers for, and
+      // those are what this holds.
+      {
+        const counts = new Map<string, number>();
+        for (let epoch = 1; epoch <= 400; epoch++) {
+          const state = loomAt(4);
+          state.voyageEpoch = epoch;
+          const wild = charterChoices(state)[2]?.id ?? "";
+          counts.set(wild, (counts.get(wild) ?? 0) + 1);
+        }
+        const others = otherEight("loom");
+        check(
+          counts.size === others.length &&
+            others.every((id) => {
+              const drawn = counts.get(id) ?? 0;
+              return drawn >= 20 && drawn <= 90;
+            }),
+          "and over four hundred voyages every one of the other eight is drawn, in bands only a flat draw answers for, so the third slot leans toward no card and the cover row's denominator stays the pool rather than a luckier pair of cards",
+        );
+      }
+
+      // ========== D. The writes ==========
+
+      withEnv("NEXT_PUBLIC_CHARTERS", "1", () => {
+        const answering = loomAt(4);
+        answering.modifierFlags = { vat_discount: 0.5 };
+        const logs: string[] = [];
+        const trio = charterChoices(answering);
+        const took = answerCharter(answering, trio[0].id, logs);
+        check(
+          took &&
+            trio[0].id === "weavers_charter" &&
+            answering.charter === "weavers_charter" &&
+            answering.modifierFlags.loom_extra_produce === 1 &&
+            answering.modifierFlags.vat_discount === 0.5 &&
+            trio.every((card) => answering.cardTally[card.id]?.offered === 1) &&
+            trio.every(
+              (card) =>
+                answering.cardTally[card.id]?.picked ===
+                (card.id === "weavers_charter" ? 1 : 0),
+            ) &&
+            logs.some(
+              (line) =>
+                line.includes(CHARTER_MOMENT.icon) &&
+                line.includes(cardLead("weavers_charter")),
+            ) &&
+            !charterPending(answering),
+          "answering takes the card the moment dealt: the id is stored, the flag folds in beneath whatever the voyage already carried, the three offers and the one pick are counted off the same table the guard validated, and the ledger line speaks in the moment's own glyph",
+        );
+        check(
+          !answerCharter(answering, "weavers_charter", logs) &&
+            answering.charter === "weavers_charter",
+          "and a second answer meets a question already answered, so the idempotence falls out of the pending guard rather than being written beside it",
+        );
+
+        const refusing = loomAt(4);
+        const refuseLogs: string[] = [];
+        const refusedWrong = answerCharter(refusing, "gun_charter", refuseLogs);
+        const quiet =
+          refusing.charter === null &&
+          Object.keys(refusing.cardTally).length === 0;
+        check(
+          !refusedWrong &&
+            quiet &&
+            !answerCharter(voyageState(), "weavers_charter", []) &&
+            answerCharter(
+              refusing,
+              charterChoices(refusing)[0].id,
+              refuseLogs,
+            ) &&
+            !answerCharter(refusing, "gun_charter", refuseLogs),
+          "a press is validated against the same derived table the screen drew, so a stale click on a card this moment does not deal is refused with the trio left standing, and an answer with no moment waiting is refused as well",
+        );
+
+        const together = loomAt(4);
+        together.heldBoons = ["steady_watch"];
+        answerCharter(together, "weavers_charter", []);
+        check(
+          together.modifierFlags.steady_rations === 1 &&
+            together.modifierFlags.loom_extra_produce === 1,
+          "a held boon beside the charter reaches the books through one spread, so the voyage's two long lived effects are read from one set rather than racing for it",
+        );
+      });
+
+      // The rollback, read the way its own sentence reads: with the
+      // switch off the moment is not shown, and a charter already held
+      // keeps its flags for the voyage. The second half is why this check
+      // drives a rollover rather than only a read: the held merge is
+      // deliberately not gated, and the round's own flags are what the
+      // rollover replaces.
+      withEnv("NEXT_PUBLIC_CHARTERS", "0", () => {
+        const rolling = loomAt(4);
+        rolling.charter = "weavers_charter";
+        rolling.money = 5000;
+        rolling.phase = "resolve";
+        rolling.pirateAttackResolved = true;
+        rolling.modifierFlags = { loom_extra_produce: 1, vat_discount: 0.5 };
+        const rollLogs: string[] = [];
+        const ctx = {
+          seedBase: `smoke:charters:${suffix}`,
+          harborId: "harbor-a",
+        };
+        for (let press = 0; press < 6 && rolling.currentRound === 4; press++) {
+          nextPhase(rolling, ctx, rollLogs);
+        }
+        check(
+          rolling.currentRound === 5 &&
+            rolling.modifierFlags.loom_extra_produce === 1 &&
+            rolling.modifierFlags.vat_discount === undefined &&
+            rolling.charter === "weavers_charter" &&
+            heldFlagsOf({ heldBoons: [], charter: "weavers_charter" })
+              .loom_extra_produce === 1,
+          "a round's rollover rebuilds the flag set from the held cards, so the charter's key rides through every reset while the round's own vat discount comes and goes above it, and the merge reads the same with the switch off because it answers about a card already taken rather than about the offer",
+        );
+      });
+
+      // ========== E. The eleven read sites ==========
+
+      // The Factor's two keys (the borrow count and its penalty) are
+      // already read at their three live sites by the borrow block's own
+      // checks, so they are counted in the map above rather than driven
+      // again here: eleven keys from ten cards, and the one key this
+      // block does not drive is the one another block drives three ways.
+
+      {
+        const laden = voyageState();
+        laden.modifierFlags = { transport_per_lot_discount: 1 };
+        const plainHeavy = calcTransportCost(voyageState(), 10);
+        const charteredHeavy = calcTransportCost(laden, 10);
+        const plainLight = calcTransportCost(voyageState(), 5);
+        const charteredLight = calcTransportCost(laden, 5);
+        check(
+          plainHeavy > 0 &&
+            charteredHeavy === Math.max(0, plainHeavy - 10) &&
+            charteredLight === Math.max(0, plainLight - 5) &&
+            charteredHeavy < plainHeavy,
+          "The Bulk Charter is read in the freight arithmetic: a Gold off per lot, after the round's own discounts and before the modules, floored at zero so a charter that empties a light run's freight is doing what its text says",
+        );
+      }
+
+      // One order board dealt from one seed per round, so the runs of a
+      // check stand on identical cards and the only difference between
+      // two of them is the flag under test. The scan is for a fillable
+      // card of the shape the check needs, because which order a board
+      // deals is the board's business rather than something a check may
+      // assume.
+      const boardAt = (round: number) => {
+        const state = voyageState();
+        snapToCheckpoint(
+          state,
+          { seedBase: `smoke:charters:${suffix}`, harborId: "harbor-a" },
+          round,
+          "orders",
+          [],
+        );
+        return state;
+      };
+      const fillable = (order: OrderCard, board: GameState) =>
+        !order.isProductOrder &&
+        !order.isBrokerFavor &&
+        order.reward > 0 &&
+        pathOrderOf(order, board.mode) === null;
+      const findOrder = (
+        chooser: (order: OrderCard, board: GameState) => boolean,
+      ) => {
+        for (let round = 1; round <= 12; round++) {
+          const board = boardAt(round);
+          const order = board.customerCards.find(
+            (card) => fillable(card, board) && chooser(card, board),
+          );
+          if (order !== undefined) return { round, order };
+        }
+        return null;
+      };
+      const deltaOf = (
+        round: number,
+        order: OrderCard,
+        flags: Partial<Record<ModifierKey, number>>,
+      ) => {
+        const state = boardAt(round);
+        state.modifierFlags = { ...state.modifierFlags, ...flags };
+        for (const r of order.resources) {
+          state.inventory[r.type] =
+            (state.inventory[r.type] ?? 0) + (r.required ?? 0);
+        }
+        state.money = 1000;
+        const before = state.money;
+        completeOrder(state, order.id, []);
+        return state.money - before;
+      };
+
+      {
+        const found = findOrder((order) =>
+          order.resources.every((r) => !carriesTag("good", r.type, "woven")),
+        );
+        if (found !== null) {
+          const plain = deltaOf(found.round, found.order, {});
+          const manif = deltaOf(found.round, found.order, {
+            manifest_order_bonus: 0.15,
+          });
+          check(
+            plain > 0 &&
+              manif - plain === Math.floor(found.order.reward * 0.15) &&
+              manif - plain > 0,
+            "The Standing Manifest is read at the order's payout: fifteen percent of the face reward more, on every completed order for the rest of the voyage, taken as the same addition the cards above it take rather than as a multiplication that would lose a coin to floating point",
+          );
+        } else {
+          check(false, "the board deals a plain order to fill");
+        }
+      }
+
+      {
+        const found = findOrder((order) =>
+          order.resources.some((r) => carriesTag("good", r.type, "woven")),
+        );
+        if (found !== null) {
+          const plain = deltaOf(found.round, found.order, {});
+          const marked = deltaOf(found.round, found.order, {
+            loom_sale_bonus: 0.1,
+          });
+          check(
+            plain > 0 &&
+              marked - plain === Math.floor(found.order.reward * 0.1) &&
+              marked - plain > 0,
+            "The Quality Mark is read at the woven sale: a tenth of the reward more on the orders that carry cloth, and the cloth it reads is the same woven tag the Woven Monopoly reads, so the mark and the monopoly cannot come to disagree about what counts as woven",
+          );
+        } else {
+          check(false, "the board deals a woven order to fill");
+        }
+      }
+
+      {
+        const calm = voyageState();
+        calm.currentRound = 6;
+        const armed = voyageState();
+        armed.currentRound = 6;
+        armed.modifierFlags = { guns_risk_discount: 0.3 };
+        check(
+          pirateChance(calm) > 0 &&
+            Math.abs(pirateChance(armed) - pirateChance(calm) * 0.7) < 1e-9,
+          "The Gun Charter is read at the raiders' table: the risk thirty percent lower for the voyage, taken as the same multiplication Fleet Colors takes and landing right after it, ahead of the compass's flat thirty",
+        );
+      }
+
+      {
+        const rate = difficultyConfig(voyageState().difficulty).escortCostRate;
+        const plainEscort = voyageState();
+        plainEscort.money = 1000;
+        const escorted = voyageState();
+        escorted.money = 1000;
+        escorted.modifierFlags = { standing_escort_discount: 0.5 };
+        const both = voyageState();
+        both.money = 1000;
+        both.modifierFlags = {
+          escort_discount: 0.5,
+          standing_escort_discount: 0.5,
+        };
+        check(
+          escortCost(plainEscort) === Math.floor(1000 * rate) &&
+            escortCost(escorted) === Math.floor(1000 * rate * 0.5) &&
+            escortCost(both) === Math.floor(1000 * rate * 0.25) &&
+            escortCost(escorted) < escortCost(plainEscort),
+          "The Standing Escort is read where the fee is charged: the hire costs half, taken as the same multiplication the Escort Pact takes and landing after it, so a captain holding both pays the product of the two",
+        );
+      }
+
+      {
+        const wovenGood = Object.keys(PRODUCT_PRICES).find((good) =>
+          carriesTag("good", good, "woven"),
+        );
+        const plainGood = Object.keys(PRODUCT_PRICES).find(
+          (good) => good !== wovenGood,
+        );
+        if (wovenGood !== undefined && plainGood !== undefined) {
+          const bench = (charter: boolean) => {
+            const state = voyageState();
+            state.money = 1000;
+            state.larder = 10;
+            hireWorker(state, "weaver", []);
+            hireWorker(state, "coppersmith", []);
+            state.workers.weaver[0].task = wovenGood;
+            state.workers.coppersmith[0].task = plainGood;
+            if (charter) state.modifierFlags = { loom_extra_produce: 1 };
+            processProduction(state, []);
+            return state;
+          };
+          const plainBench = bench(false);
+          const charteredBench = bench(true);
+          check(
+            plainBench.inventory[wovenGood] === 1 &&
+              charteredBench.inventory[wovenGood] === 2 &&
+              plainBench.inventory[plainGood] === 1 &&
+              charteredBench.inventory[plainGood] === 1,
+            "The Weavers' Charter is read once at the loom: each weaving hand makes one more item and the smith's output is untouched, because the card's sentence says each weaver and the gate reads the trade's own id rather than its label",
+          );
+        } else {
+          check(
+            false,
+            "the recipe table carries a woven product and a plain one to weave",
+          );
+        }
+      }
+
+      {
+        const product = Object.keys(PRODUCT_PRICES)[1];
+        const plainVat = calcVAT(voyageState(), product, 500);
+        const quiet = voyageState();
+        quiet.modifierFlags = { voyage_dues_discount: 0.5 };
+        check(
+          plainVat > 0 &&
+            calcVAT(quiet, product, 500) === Math.floor(plainVat * 0.5),
+          "The Quiet Account is read in the dues arithmetic: the harbor dues halved, taken as the same multiplication Harbor Credit takes and landing after it rather than beside it",
+        );
+      }
+
+      {
+        const market = voyageState();
+        startMarket(
+          market,
+          { seedBase: `smoke:charters:${suffix}`, harborId: "harbor-a" },
+          [],
+        );
+        const priced = market.resourceCards.find((card) => card.totalCost > 0);
+        if (priced !== undefined) {
+          const ledger = voyageState();
+          ledger.modifierFlags = { voyage_purchase_discount: 0.1 };
+          const plainCost = getCardFinalCost(voyageState(), priced);
+          const ledgerCost = getCardFinalCost(ledger, priced);
+          check(
+            plainCost === priced.totalCost &&
+              ledgerCost === Math.floor(plainCost * 0.9) &&
+              ledgerCost < plainCost,
+            "The Long Ledger is read at the port purchase's own arithmetic: a tenth off the card, taken as the same multiplication the round's own discount takes and landing right after it, and the preview the captain hovers reads the same rule through the one price there is rather than a second opinion of one",
+          );
+        } else {
+          check(false, "the market deals a card with a price to read");
+        }
+      }
+
+      {
+        // The one random in the tree this feature reads: the raid roll.
+        // The stub is the roll's own floor (zero is below every chance
+        // the mode can deal), restored in the finally so no check after
+        // this one runs against a coin that always lands the same way.
+        const realRandom = Math.random;
+        Math.random = () => 0;
+        try {
+          const raided = voyageState();
+          raided.currentRound = 6;
+          raided.money = 400;
+          raided.modifierFlags = { marque_salvage: 0.25 };
+          const raidLogs: string[] = [];
+          resolvePirateAttack(raided, raidLogs);
+          const bare = voyageState();
+          bare.currentRound = 6;
+          bare.money = 400;
+          const bareLogs: string[] = [];
+          resolvePirateAttack(bare, bareLogs);
+          const empty = voyageState();
+          empty.currentRound = 6;
+          empty.money = 0;
+          empty.modifierFlags = { marque_salvage: 0.25 };
+          const emptyLogs: string[] = [];
+          resolvePirateAttack(empty, emptyLogs);
+          check(
+            raided.money === 100 &&
+              raidLogs.some((line) => line.includes("recovered 100")) &&
+              bare.money === 0 &&
+              empty.money === 0 &&
+              !emptyLogs.some((line) => line.includes("recovered")),
+            "The Letter of Marque is read at the one site a raid takes gold: a quarter of the raid comes back and the ledger line says how much, a bare hold loses everything, and a hold with nothing in it salvages nothing rather than putting a recovery line over a zero",
+          );
+        } finally {
+          Math.random = realRandom;
+        }
+      }
+
+      // ========== F. The save ==========
+
+      const kept = voyageState();
+      kept.charter = "weavers_charter";
+      const retired = voyageState();
+      retired.charter = "old_relic";
+      const stranger = voyageState();
+      stranger.charter = 42 as unknown as string;
+      const legacySave = voyageState();
+      legacySave.charter = undefined as unknown as string;
+      for (const state of [kept, retired, stranger, legacySave]) {
+        healLoadedVoyage(state, { legacyRenownLevel: null });
+      }
+      check(
+        kept.charter === "weavers_charter" &&
+          retired.charter === null &&
+          stranger.charter === null &&
+          legacySave.charter === null,
+        "the load path heals the field through the pool's own reader: a charter this build still ships stays, and a retired id, a write that is not a card and a save from before the field existed all read as a voyage that has not answered yet, which the plan's rollback clause says word for word",
+      );
+
+      // ========== G. The take on the wire ==========
+
+      // The socket handler reaches its captain through a listener map
+      // this file cannot see, so the accumulator is driven here the way
+      // the handler drives it, against the real database, and everything
+      // it writes is deleted again.
+      const roomPrefix = `smoke51-${suffix}-`;
+      const roomFacts = (id: string) => {
+        const sample = voyageState();
+        return {
+          id,
+          mode: sample.mode,
+          difficulty: sample.difficulty,
+          voyageEpoch: 7,
+          createdAt: new Date(),
+        };
+      };
+      try {
+        const roomA = `${roomPrefix}a`;
+        openVoyageTelemetry(roomFacts(roomA), []);
+        noteLegAdvanced(roomA, 4);
+        noteCharterTaken(roomA, "u-a", "weavers_charter", "loom", "honest");
+        noteCharterTaken(roomA, "u-a", "gun_charter", "convoy", "pirate");
+        await closeVoyageTelemetry(roomA, "concluded", []);
+        const rowsA = await db.voyageTelemetry.findMany({
+          where: { roomId: roomA },
+        });
+        const storedA =
+          rowsA.length === 1 ? readStoredRecord(rowsA[0].record) : null;
+        const takesA =
+          storedA?.events.filter((event) => event.name === "charter_taken") ??
+          [];
+        const fieldsA = takesA[0]?.name === "charter_taken" ? takesA[0] : null;
+        const captainA = storedA?.captains.find(
+          (line) => line.userId === "u-a",
+        );
+        check(
+          takesA.length === 1 &&
+            fieldsA !== null &&
+            fieldsA.leg === 4 &&
+            fieldsA.charter === "weavers_charter" &&
+            fieldsA.path === "loom" &&
+            fieldsA.role === "honest" &&
+            captainA !== undefined,
+          "a captain's take is written once per voyage whatever the client repeats: the first claim stands rather than the last, the leg is the accumulator's rather than a number the claim chose, and the path and the alignment are the fields the caller attached rather than anything the wire said",
+        );
+
+        const roomB = `${roomPrefix}b`;
+        openVoyageTelemetry(roomFacts(roomB), []);
+        noteCharterTaken(roomB, "u-b", "gun_charter", "convoy", "pirate");
+        noteCharterTaken(
+          roomB,
+          "u-c",
+          "letter_of_marque",
+          "free_captain",
+          "broker",
+        );
+        await closeVoyageTelemetry(roomB, "concluded", []);
+        const rowsB = await db.voyageTelemetry.findMany({
+          where: { roomId: roomB },
+        });
+        const storedB =
+          rowsB.length === 1 ? readStoredRecord(rowsB[0].record) : null;
+        const takesB =
+          storedB?.events.filter((event) => event.name === "charter_taken") ??
+          [];
+        const firstB = takesB[0]?.name === "charter_taken" ? takesB[0] : null;
+        const secondB = takesB[1]?.name === "charter_taken" ? takesB[1] : null;
+        check(
+          takesB.length === 2 &&
+            firstB?.actor === "u-b" &&
+            firstB.charter === "gun_charter" &&
+            secondB?.actor === "u-c" &&
+            secondB.charter === "letter_of_marque",
+          "and the once per voyage rule is per captain rather than per table: two captains take two lines, in the order the takes arrived, so one captain's silence cannot swallow another's charter",
+        );
+
+        const roomC = `${roomPrefix}c`;
+        noteCharterTaken(roomC, "u-d", "weavers_charter", "loom", "honest");
+        const rowsC = await db.voyageTelemetry.count({
+          where: { roomId: roomC },
+        });
+        check(
+          rowsC === 0,
+          "a take noted against a room the accumulator never opened is dropped by the writer rather than opening a record for it, so a stray claim cannot mint a voyage in the operator's table",
+        );
+
+        const roomD = `${roomPrefix}d`;
+        openVoyageTelemetry(roomFacts(roomD), []);
+        for (let i = 0; i < TELEMETRY_EVENT_CAP; i++) {
+          noteTelemetry(roomD, "message_sent", { actor: "u-e" });
+        }
+        noteCharterTaken(roomD, "u-e", "weavers_charter", "loom", "honest");
+        await closeVoyageTelemetry(roomD, "concluded", []);
+        const rowsD = await db.voyageTelemetry.findMany({
+          where: { roomId: roomD },
+        });
+        const storedD =
+          rowsD.length === 1 ? readStoredRecord(rowsD[0].record) : null;
+        check(
+          storedD !== null &&
+            storedD.truncated &&
+            storedD.events.length === TELEMETRY_EVENT_CAP &&
+            storedD.events.every((event) => event.name !== "charter_taken"),
+          "a voyage whose events have filled to the cap drops the take rather than stretching the record, so a full ledger stops at its cap instead of growing one line past it",
+        );
+      } finally {
+        await db.voyageTelemetry.deleteMany({
+          where: { roomId: { startsWith: roomPrefix } },
+        });
+      }
+      const charterLeftovers = await db.voyageTelemetry.count({
+        where: { roomId: { startsWith: roomPrefix } },
+      });
+      check(
+        charterLeftovers === 0,
+        "and the synthetic rooms this block sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
+      );
+
+      // The oracle is one file at the scripts root rather than a suite
+      // under scripts/smoke/suites, so the walk up to the repository is
+      // one step here where the suite's copy takes three.
+      const repoRoot = join(import.meta.dirname, "..");
+      const charterWiring = readFileSync(
+        join(repoRoot, "src", "server", "realtime", "wiring", "leg-report.ts"),
+        "utf8",
+      );
+      const charterHook = readFileSync(
+        join(repoRoot, "src", "lib", "use-leg-report.ts"),
+        "utf8",
+      );
+      check(
+        charterWiring.includes('card?.kind === "charter"') &&
+          charterWiring.includes("path === null") &&
+          charterWiring.includes("role === undefined") &&
+          charterWiring.includes("heldPathOf(roomId") &&
+          charterWiring.includes("noteCharterTaken(roomId") &&
+          charterHook.includes("chartersOn(game.mode)") &&
+          charterHook.includes("game.charter ?? undefined"),
+        "the two ends of the wire the take sits between: the client claims the charter only while the switch is on, and the server vouches it through the pool before attributing the path off the room's own book and the alignment off the table, dropping a take it cannot place on either rather than filling in a guess",
+      );
+
+      check(
+        heldPathOf("smoke51-never-drafted", "u-a") === null,
+        "and the book the server attributes paths from answers null for a room it has never seen, which is the one reader of that book and the shape every unattributable take takes on its way to the drop",
+      );
+
+      // ========== H. The barrel ==========
+
+      check(
+        "answerCharter" in engineBarrel &&
+          !("charterChoices" in engineBarrel) &&
+          !("charterDue" in engineBarrel) &&
+          !("charterPending" in engineBarrel) &&
+          !("heldFlagsOf" in engineBarrel),
+        "only the answer crosses the engine's barrel: the reads stay in the vocabulary's own module where the overlay and the server both find them, and the merge stays with the held cards, so a caller meets the question through the module that asks it",
       );
     }
 

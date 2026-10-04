@@ -223,7 +223,7 @@ export async function launchGatesSuite(
   );
   check(
     emptyVerdict.tally ===
-      "0 of 16 gates inside their bands, 0 out of band, 9 with no source, 7 with no voyage to read.",
+      "0 of 16 gates inside their bands, 0 out of band, 8 with no source, 8 with no voyage to read.",
     "and the tally counts the gates by where they stand, keeping the zeroes rather than dropping them, so a quiet line and a good line cannot read the same",
   );
 
@@ -334,12 +334,14 @@ export async function launchGatesSuite(
     "and the floor the dashboard built holds the mode alongside the three role rates the same chronicle rows read, naming the gates rather than printing a chip a reader has to interpret",
   );
 
-  // Gates waiting on a voyage, over a window whose other fourteen are
+  // Gates waiting on a voyage, over a window whose other thirteen are
   // read: the sentence has to say how many rather than sixteen, because a
   // reader on balance duty should not have to work out which it is
-  // talking about. Two wait here, and each for its own reason: retention,
-  // since the voyage in the window had nobody put ashore, and utilization,
-  // since no captain of it filed a leg report from a split hold.
+  // talking about. Three wait here, each for its own reason: retention,
+  // since the voyage in the window had nobody put ashore; utilization,
+  // since no captain of it filed a leg report from a split hold; and the
+  // charter split, since no captain of it took a charter at the fourth
+  // leg.
   const oneUnplayed = readLaunchVerdict(
     readDashboard({
       records: [dashRecord("dash-lone")],
@@ -348,11 +350,11 @@ export async function launchGatesSuite(
     }),
   );
   check(
-    oneUnplayed.unplayed.length === 2 &&
+    oneUnplayed.unplayed.length === 3 &&
       oneUnplayed.gaps.some((gap) =>
-        gap.includes("2 of the 16 gates have no voyage to read"),
+        gap.includes("3 of the 16 gates have no voyage to read"),
       ),
-    "and gates waiting on a voyage are described by their count, since two gates and sixteen are not the same finding",
+    "and gates waiting on a voyage are described by their count, since three gates and sixteen are not the same finding",
   );
 
   // A gate whose row stopped carrying it. It cannot happen while the page

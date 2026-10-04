@@ -33,6 +33,9 @@ import {
 } from "@/lib/game/victory";
 import type { ObjectiveTraceEntry } from "@/lib/game/types";
 import { buildChronicle } from "@/lib/game/engine/chronicle";
+import { cardById } from "@/lib/game/cards";
+import { MAX_HELD_CARDS } from "@/lib/game/combinations";
+import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import { unlockLineFor } from "@/lib/unlock";
 import { maroonResultFor } from "../maroon";
 import type { RivalStanding } from "../rival";
@@ -102,8 +105,8 @@ type FinisherRows = {
 // extras out of it, and every verdict decided on it. The win verdict is
 // held as `verdict` rather than as `won` for a reason that has nothing to
 // do with the reading: `won` is a name the private scan reserves for the
-// three places allowed to hold it as a property, and this is a local
-// reader rather than a fourth one. Every row either of the two writers
+// four places allowed to hold it as a property, and this is a local
+// reader rather than a fifth one. Every row either of the two writers
 // below emits still carries it as `won`.
 type CaptainRecord = {
   save: Record<string, unknown> | null;
@@ -132,6 +135,7 @@ function extractChronicleExtras(
   lendCount: number;
   borrowCount: number;
   objectiveTrace: ObjectiveTraceEntry[];
+  heldCards: string[];
 } {
   if (forged || !data) {
     return {
@@ -143,6 +147,11 @@ function extractChronicleExtras(
       // Gold it reported, which is to say not at all, so it is dropped the
       // same way the peak reputation is.
       objectiveTrace: [],
+      // [F7: the combination instrument] And the held set is dropped for
+      // the same reason, one step sharper: the instrument exists to find
+      // which combinations win, and a finish the integrity pass would not
+      // read is a claim about winning over a claim about holding.
+      heldCards: [],
     };
   }
   return {
@@ -154,6 +163,7 @@ function extractChronicleExtras(
     lendCount: Array.isArray(data.loansGiven) ? data.loansGiven.length : 0,
     borrowCount: Array.isArray(data.debts) ? data.debts.length : 0,
     objectiveTrace: readObjectiveTrace(data.objectiveTrace),
+    heldCards: readHeldCards(data),
   };
 }
 
@@ -197,6 +207,42 @@ function readObjectiveTrace(raw: unknown): ObjectiveTraceEntry[] {
     entries.push({ round: entry.round, at: entry.at, delivered });
   }
   return entries;
+}
+
+// [F7: the combination instrument] Reads the durable cards out of a save
+// for the instrument's column. Shape first and pool second, the trace's
+// discipline with one addition: every id is resolved through the pool the
+// same way the save's own heal resolves it, so the reading is the durable
+// set as this build understands it (a retired card, a kind that does not
+// belong in the field and a round draft's id all read the way a reload
+// would read them) rather than whatever strings a client typed. The boons
+// and the charter go through the save's own healing readers for exactly
+// that reason; the modules are records rather than ids on the save, so
+// their ids are pulled here and held to the module kind.
+//
+// A repeat among the boons is dropped by that same heal (it is one held
+// card); a repeated module id is kept, because two of the same module
+// bolted on is two modules, which is the reading the hull itself takes.
+//
+// The list is bounded by the instrument's own MAX_HELD_CARDS, which has
+// one home there rather than here because both ends of the column need
+// it: this writer, and the reader that has to imitate it for a row that
+// was written by hand.
+function readHeldCards(data: Record<string, unknown>): string[] {
+  const ids: string[] = [...normalizeHeldBoons(data.heldBoons)];
+  const modules = Array.isArray(data.equippedModules)
+    ? data.equippedModules
+    : [];
+  for (const item of modules) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const id = (item as Record<string, unknown>).id;
+    if (typeof id !== "string") continue;
+    if (cardById(id)?.kind !== "module") continue;
+    ids.push(id);
+  }
+  const charter = normalizeCharter(data.charter);
+  if (charter !== null) ids.push(charter);
+  return ids.slice(0, MAX_HELD_CARDS);
 }
 
 // One captain's whole finish, in the order it has always happened in.
@@ -530,6 +576,9 @@ async function writeChronicleRow(
         objectiveId: ctx.run.objective?.id ?? "",
         objectiveMet,
         objectiveTrace: JSON.stringify(extras.objectiveTrace),
+        // [F7: the combination instrument] The held set rides beside the
+        // trace, written from the same read of the same save.
+        heldCards: JSON.stringify(extras.heldCards),
         alignment: card?.role ?? "",
         won,
       },

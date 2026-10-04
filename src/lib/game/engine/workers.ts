@@ -173,6 +173,12 @@ export function assignTask(
 
 export function processProduction(state: GameState, logs: string[]) {
   const bonus = state.modifierFlags.worker_bonus_production || 0;
+  // [F6: charters at leg four] The Weavers' Charter, read once here for the
+  // reason the boon above is: one fact about the captain, not one per
+  // artisan. It is a fact about weaving hands alone, which is what its text
+  // names, so the map below carries which trades weave and only those take
+  // the extra item.
+  const weavingCharter = state.modifierFlags.loom_extra_produce || 0;
   // Every artisan type, whether or not this tier has unlocked it: a captain
   // can only ever have hired an unlocked one, and an empty list costs nothing.
   // The singular label, not a plural with its trailing s trimmed off.
@@ -183,6 +189,12 @@ export function processProduction(state: GameState, logs: string[]) {
   const allLists = WORKER_TYPES.map((w) => ({
     list: state.workers[w.id] ?? [],
     name: w.label,
+    // [F6: charters at leg four] A Master Weaver is a weaver, and the
+    // charter's sentence says each weaver, so both weaving trades take
+    // the charter's item while the smiths and the makers do not. Read off
+    // the type's own id rather than its label, because the label is the
+    // string the ledger prints and a copy change must not move a rule.
+    weaves: w.id === "weaver" || w.id === "master",
   }));
   // [C1: the Larder and Short Rations] Read once, outside both loops,
   // because it is one fact about the captain rather than one per artisan:
@@ -194,7 +206,7 @@ export function processProduction(state: GameState, logs: string[]) {
     logs.push(
       "⚠️ The crew is on short rations, so every artisan works the leg at a slower pace.",
     );
-  for (const { list, name } of allLists) {
+  for (const { list, name, weaves } of allLists) {
     for (const w of list) {
       // [C3: garments and the cold] The bench will not hand work to a hand
       // out of action, but a save is not the bench and can carry a task
@@ -211,12 +223,22 @@ export function processProduction(state: GameState, logs: string[]) {
         let base = w.isSkilled ? 2 : 1;
         let amt = base + bonus;
         if (hasModule(state, "artisans_workshop")) amt += 1;
+        // [F6: charters at leg four] The charter's item lands before the
+        // ration reduction, like every addition above it: the extra work
+        // is done on the round it is done, and a hungry leg then shrinks
+        // the whole of it rather than a part.
+        if (weaves && weavingCharter) amt += weavingCharter;
         if (short) amt = shortRationsYield(amt);
         state.inventory[w.task] = (state.inventory[w.task] || 0) + amt;
         w.producedCount = (w.producedCount || 0) + amt;
+        // The tail used to read "(Boon Bonus)", which was already loose
+        // (the workshop module is not a boon) and became a plain
+        // misattribution the afternoon a charter could raise this number:
+        // three sources can now land on one line, so the line names what
+        // they have in common rather than one of the three.
         if (amt > base)
           logs.push(
-            `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Boon Bonus)`,
+            `✅ Skilled ${name} finished ${amt}× ${ICONS[w.task]}${w.task}! (Bonus)`,
           );
         // Reads its own amount rather than the 2 this branch used to spell
         // out. That was true for as long as a skilled artisan's output could

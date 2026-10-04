@@ -23,15 +23,17 @@ now, with what closed them written where they were raised.
 Three surfaces, taken from the plan:
 
 1. **Every site that builds a broadcast payload.** Anything a whole harbor
-   receives. There are 59 `io.to(...)` and `io.emit(...)` statements across
-   28 files under `src/server/realtime`, and the question asked of each is
-   whether anything private can be inside the payload it sends. The two
-   passes read the 50 statements across the 16 files that existed when they
-   ran; four files joined the surface after them, and the extraction that
-   moved the connection handlers one to a file moved statements between
-   files without adding one, so the count above is the surface as it stands
-   rather than the pages that were turned. The last section records what the
-   repeat rule makes of both.
+   receives. There are 62 `io.to(...)` and `io.emit(...)` statements across
+   29 files under `src/server/realtime`, and a thirtieth file, the chat
+   module, carries the phrase inside a comment and no statement. The
+   question asked of each is whether anything private can be inside the
+   payload it sends. The two passes read the 50 statements across the 16
+   files that existed when they ran; four files joined the surface after
+   them, the extraction that moved the connection handlers one to a file
+   moved statements between files without adding one, and the count has
+   grown and moved again since, all of it recounted in the last section, so
+   the count above is the surface as it stands rather than the pages that
+   were turned. The last section records what the repeat rule makes of both.
 2. **Every site that writes to the log array.** The session conversation,
    which lives in process memory for the length of a room's life and is
    deliberately never written to the database.
@@ -62,8 +64,9 @@ run as `npm run check:private`, holds seven rules:
    it. A fifth file is a second path nobody reviewed.
 2. One reader of the alignment table. Only the module that deals the cards
    may read the rows back.
-3. The win verdict is a property in three places: the balance reader, the
-   operator window and the wire type.
+3. The win verdict is a property in four places: the balance reader, the
+   operator window, the wire type and the combination instrument, whose
+   whole reading is a count over rows that carry it.
 4. No broadcast payload statement names a secret.
 5. The tutorial's one `dangerouslySetInnerHTML` site, which renders authored
    copy with constants in it and nothing else.
@@ -120,13 +123,16 @@ that changes inside a single beat is a card that reached the wrong socket.
 
 ### 1. Broadcast payloads
 
-59 statements, 28 files. The two passes read the 50 statements across the 16
-files that existed when they ran, and every one of those was read for what it
-carries; the four files added since are named in the last section, and the
-extraction that moved the connection handlers one to a file took 29
-statements out of the composition root and into nine leaves, which is one
-file off the surface and nine on with the total unchanged, so the count here
-is the surface as it stands rather than the pages that were turned. The findings that matter are in the next section; what the inventory
+62 statements, 29 files, with a thirtieth file, the chat module, carrying
+the phrase in a comment and no statement. The two passes read the 50
+statements across the 16 files that existed when they ran, and every one of
+those was read for what it carries; the four files added since are named in
+the last section, the extraction that moved the connection handlers one to a
+file took 29 statements out of the composition root and into nine leaves,
+which is one file off the surface and nine on with the total unchanged, and
+the growth and the conclusion's split since the extraction are recounted
+there too, so the count here is the surface as it stands rather than the
+pages that were turned. The findings that matter are in the next section; what the inventory
 establishes is the shape of the surface: the broadcasts carry room rosters,
 chat lines, a voyage checkpoint, objective totals, barter and aid offers,
 telemetry statuses, the audit reveal, and the end of voyage reveal. The two
@@ -372,10 +378,15 @@ construction rather than by review.
 The plan's evaluation for this review is that no alignment field can reach
 the wrong client, at severity one. The verdict is that none does, and that
 none did before the fixes either: the alignment table has three production
-readers, all inside `src/server/realtime/gambit.ts` (lines 154, 213, 270),
+readers, all inside `src/server/realtime/gambit.ts` (lines 154, 213, 289),
 and the only wire field that can carry an alignment is `role`, inside a
 `PrivateEntry` that `emitPrivate` addresses to one captain's own sockets
-(`src/server/realtime/presence.ts:63`).
+(`src/server/realtime/presence.ts:63`). The set stayed three when the
+charters landed at leg four: the take reads the table through the same
+module's own accessor, where the voyage's end was already the first caller
+(`cardsInRoom`, called from `src/server/realtime/conclusion/voyage.ts:327`
+and, for the take, `src/server/realtime/wiring/leg-report.ts:130`), which
+is a second caller rather than a fourth reader.
 
 That verdict is now mechanical rather than remembered. Two sweeps in the
 smoke suite read every frame every socket receives at two Gambit tables,
@@ -485,6 +496,29 @@ file. What it does change is the count that clause is read against, and that
 count is already recorded above as an owed repeat. The repeat stays owed, it
 is now owed over 28 files rather than 20, and no reading has been taken over
 the newer ones, which is stated here rather than implied by the numbers.
+
+**The surface then grew again, by measurement, and the scan's third rule
+grew with it.** The extraction's note left the count at 59 statements
+across 28 files, a count that included the chat module's comment line.
+Since then the checkpoint carries one statement more and the room join two,
+and the F5 public offers ledger added one in a file of its own,
+`boon-ledger.ts`, while the conclusion split into `conclusion/finishers.ts`
+and `conclusion/voyage.ts` and moved three statements between two files
+without adding one. The surface stands at 62 executable statements across
+29 files, the chat module's comment beside them. Nothing in the additions
+carries a private payload: the ledger's broadcast carries the public record
+the plan makes public by design, the checkpoint's carries a deadline, and
+the room join's carry membership. The trigger stays met on the broadcast
+payload clause as a count rather than a reading, and the repeat stays owed,
+now over 29 files, with no reading taken over the newer ones. The cycle
+this note is written in, F7, adds no broadcast statement at all: its diff
+grows the count zero, and what it does grow is rule 3's file list, where
+`src/lib/game/combinations.ts` joins the balance reader, the operator
+window and the wire type as a place the win verdict is a property. The
+rule's own sentence is that a fifth is a verdict that has learned to
+travel, and the list's comment records why the fourth does not: the
+instrument counts verdicts it does not decide, and counting is not
+travelling.
 
 What holds the newer paths in the meantime is `npm run check:private`, whose
 fourth rule reads the text of every broadcast payload statement for a secret

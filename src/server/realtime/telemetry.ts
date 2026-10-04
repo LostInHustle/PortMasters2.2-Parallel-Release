@@ -86,6 +86,16 @@ interface VoyageAccumulator {
   // closes with. The set is never emptied by an unmute, because the mark
   // means "was muted", and the two events beside it say when.
   muted: Set<string>;
+  // [F4: boons at milestone moments] The captains whose voyage has lost a
+  // hand, held as a mark for the maroon's own two reasons: a voyage whose
+  // record was truncated still says who lost one, and the line and the
+  // leg_report that carries the count are written from the same call, so
+  // neither can say something the other does not. It is a set of its own
+  // rather than a reading joined out of the leg reports at the reading
+  // end, because the plan's question is a cohort comparison (the report
+  // script's retention table) and re-deriving a voyage long fact from a
+  // capped event list is exactly the shape the cap can cut.
+  crewLost: Set<string>;
   events: TelemetryEvent[];
   truncated: boolean;
 }
@@ -159,6 +169,7 @@ export function openVoyageTelemetry(
     left: new Set(),
     marooned: new Set(),
     muted: new Set(),
+    crewLost: new Set(),
     events: [],
     truncated: false,
   });
@@ -267,6 +278,7 @@ export function noteLegReport(
     opportunistBorrows?: number;
     foodSpend?: number;
     bargeSpend?: number;
+    crewLosses?: number;
   },
 ): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -334,6 +346,15 @@ export function noteLegReport(
     foodSpend === undefined || bargeSpend === undefined
       ? {}
       : { foodSpend, bargeSpend };
+  // [F4: boons at milestone moments] The voyage's crew losses, read with
+  // `held` for the reason every count above is: a loss count cannot be
+  // negative. The mark is written here, at the same call that keeps the
+  // report, so a captain's line and the count on the wire cannot
+  // disagree, and it is written before the replacement walk below rather
+  // than after it, because the report that first carries a loss is
+  // routinely the later copy of a leg already on the record.
+  const crewLosses = held(figures.crewLosses);
+  if (crewLosses !== undefined && crewLosses > 0) voyage.crewLost.add(actor);
   const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
     leg,
     actor,
@@ -355,6 +376,7 @@ export function noteLegReport(
     ...(moduleFeesEarned === undefined ? {} : { moduleFeesEarned }),
     ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
     ...bargeFigures,
+    ...(crewLosses === undefined ? {} : { crewLosses }),
   });
   // Walking backwards because the report being replaced is almost always
   // the one this captain filed a moment ago, and replacing in place rather
@@ -376,6 +398,62 @@ export function noteLegReport(
   if (!admitsMore(voyage)) return;
   voyage.captains.add(actor);
   voyage.events.push(event);
+}
+
+/**
+ * [F6: charters at leg four] The voyage's one charter, written when the
+ * server can attribute it and never twice.
+ *
+ * It is not noteTelemetry, and the difference is the dedup. The client
+ * sends its claim on every leg report once the moment is answered,
+ * because that report is also the frame a reload files, so the once per
+ * voyage rule has to live in the one writer rather than in the caller.
+ * The scan below is that rule: a captain who already has a charter_taken
+ * line in this voyage's events is answered with silence, which makes the
+ * whole note idempotent and lets a captain keep saying what they hold
+ * without the record growing a line per leg.
+ *
+ * The path and the alignment are the caller's to attach and are read
+ * before this is called, off the room's own books, never off the wire:
+ * this writer records what it is handed, for the reason every note above
+ * takes the accumulator's own numbers. It follows that there is no
+ * reader here of the alignment table, and check:private's rule about how
+ * thin that reader set stays is untouched by this function.
+ *
+ * The leg is the accumulator's, like every event, so the claim's own leg
+ * number cannot place it anywhere, and the append counts the captain for
+ * the same reason a kept report does: the voyage saw them take a card.
+ */
+export function noteCharterTaken(
+  roomId: string,
+  actor: string,
+  charter: string,
+  path: string,
+  role: string,
+): void {
+  const voyage = voyageTelemetry.get(roomId);
+  if (!voyage) return;
+  // The dedup walks the voyage's own events rather than keeping a mark
+  // beside them, and the walk is the honest shape for it: a second book
+  // of what happened is a second thing that can disagree with the record,
+  // and this list is capped, in memory, and read once per leg by at most
+  // one captain. The one writer owning the scan is also what keeps the
+  // rule true from every caller rather than from the one that remembers
+  // it.
+  for (const seen of voyage.events) {
+    if (seen.name === "charter_taken" && seen.actor === actor) return;
+  }
+  if (!admitsMore(voyage)) return;
+  voyage.captains.add(actor);
+  voyage.events.push(
+    telemetryEvent("charter_taken", voyage.voyageId, Date.now(), {
+      leg: voyage.leg,
+      actor,
+      charter,
+      path,
+      role,
+    }),
+  );
 }
 
 /**
@@ -520,6 +598,15 @@ export async function closeVoyageTelemetry(
   for (const userId of voyage.muted) {
     voyage.captains.add(userId);
   }
+  // [F4: boons at milestone moments] The crew loss mark gets the same
+  // fold, for the one edge where a report can carry a loss and still
+  // leave no line of its own: a voyage whose events have filled to the
+  // cap keeps the mark and drops the append. Everywhere else the mark's
+  // captain already has a line, because the report that wrote the mark
+  // is the same call that counted them.
+  for (const userId of voyage.crewLost) {
+    voyage.captains.add(userId);
+  }
   const captains: TelemetryCaptain[] = Array.from(
     voyage.captains,
     (userId) => ({
@@ -527,6 +614,7 @@ export async function closeVoyageTelemetry(
       presentAtEnd: stillThere.has(userId),
       marooned: voyage.marooned.has(userId),
       muted: voyage.muted.has(userId),
+      crewLost: voyage.crewLost.has(userId),
       peerTradeProfit: peerTradeProfits.get(userId) ?? 0,
     }),
   );
