@@ -56,7 +56,10 @@ export const WIN_RATE_TARGETS: Record<
 
 // The three roles in the order the deck deals them, which is the order a
 // report reads them in: the fleet, then the two who are playing against it.
-const ROLE_ORDER: readonly GambitRole[] = ["honest", "broker", "pirate"];
+// Exported since the balance dashboard's cover row reads the same three
+// rates in the same order (see ./dashboard), and a second order would be
+// one of the two places a reader could find the roles listed differently.
+export const ROLE_ORDER: readonly GambitRole[] = ["honest", "broker", "pirate"];
 
 // One cell of the grid: how a role did at one table size.
 type BandReading = {

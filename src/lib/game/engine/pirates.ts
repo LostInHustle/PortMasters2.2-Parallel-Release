@@ -23,6 +23,7 @@
 // contract runs on (see ./contracts). The claim carries the Gold the raid
 // would have taken, because the seller is the one who prices what they eat.
 // =====================================================================
+import { cardLead } from "../cards";
 import { difficultyConfig, pirateChanceFor } from "../difficulty";
 import type { GameState } from "../types";
 import { escortClaimFrom, escortCoverOf } from "./contracts";
@@ -36,7 +37,8 @@ import { hasModule } from "./core";
 // The chance this round's raid is actually rolled against, with every
 // modifier folded in: the room's tier, a corrupt broker's leak, Golden
 // Lotus's extra raids, the Deep Sea Escort Pact's reduction, Fleet Colors'
-// own reduction, and the Persian Dome Compass.
+// own reduction, the Gun Charter's own reduction, and the Persian Dome
+// Compass.
 //
 // Exported so the Settlement panel can print the number the roll uses rather
 // than rebuilding it. It used to rebuild it by hand from the tier and the
@@ -71,6 +73,13 @@ export function pirateChance(state: GameState): number {
   // thirty, so a captain holding both softens the odds twice.
   if (state.modifierFlags.fleet_color)
     chance *= 1 - state.modifierFlags.fleet_color;
+  // [F6: charters at leg four] The Gun Charter, the Convoy pair's first
+  // rule: sailed armed, and raiders think harder about closing. The same
+  // multiplication Fleet Colors takes and the next landing after it,
+  // ahead of the Compass's flat thirty, so a captain holding every
+  // reduction softens the odds at every step the tree has built.
+  if (state.modifierFlags.guns_risk_discount)
+    chance *= 1 - state.modifierFlags.guns_risk_discount;
   if (hasModule(state, "persian_dome_compass")) chance *= 0.7;
   return chance;
 }
@@ -83,6 +92,12 @@ export function escortCost(state: GameState): number {
   let rate = difficultyConfig(state.difficulty).escortCostRate;
   if (state.modifierFlags.escort_discount)
     rate *= 1 - state.modifierFlags.escort_discount;
+  // [F6: charters at leg four] The Standing Escort, the Convoy pair's
+  // second rule: a cutter keeps station, so the hire below costs half.
+  // The same multiplication the Escort Pact takes, landing after it, so
+  // a captain holding both pays the product of the two.
+  if (state.modifierFlags.standing_escort_discount)
+    rate *= 1 - state.modifierFlags.standing_escort_discount;
   return Math.floor(state.money * rate);
 }
 
@@ -117,8 +132,24 @@ export function resolvePirateAttack(state: GameState, logs: string[]) {
       return;
     }
     const lost = state.money;
-    state.money = 0;
-    logs.push(`🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold.`);
+    // [F6: charters at leg four] The Letter of Marque, the plan's own
+    // design case: a warrant that pays whoever holds it, honest captain
+    // and raider alike, so taking it never reads as an accusation, and
+    // the card's text promises exactly this read. The quarter comes back
+    // here because this is the one site a raid takes gold, so "anything
+    // raiders take from you" is measured against the raid itself rather
+    // than against a table of losses nobody keeps. A hold with nothing
+    // in it salvages nothing and reads as every captain's empty hold
+    // reads, which is the honest floor of a percentage rule.
+    const salvaged = Math.floor(
+      lost * (state.modifierFlags.marque_salvage || 0),
+    );
+    state.money = salvaged;
+    if (salvaged > 0)
+      logs.push(
+        `🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold, and ${cardLead("letter_of_marque")} recovered ${salvaged} of it.`,
+      );
+    else logs.push(`🏴‍☠️ Pirates raided your hold! Lost all ${lost} Gold.`);
   } else {
     logs.push("🌊 Clear seas. No pirates sighted this round.");
   }

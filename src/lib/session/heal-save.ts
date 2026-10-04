@@ -31,8 +31,8 @@ import {
 } from "@/lib/game/engine";
 import { normalizeOrderFills } from "@/lib/game/audit";
 import { normalizeCardTally } from "@/lib/game/cards";
+import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import {
-  normalizeHeldBoons,
   normalizeMilestoneOffers,
   normalizeMilestonesAnswered,
 } from "@/lib/game/milestones";
@@ -221,6 +221,15 @@ function healVoyageTallies(game: GameState): void {
   game.milestonesAnswered = normalizeMilestonesAnswered(
     game.milestonesAnswered,
   );
+  // [F6: charters at leg four] The voyage's one charter, healed through
+  // the same pure reader the three fields above use, which is the plan's
+  // rollback read as a load rule ("a charter is a modifier set on the
+  // captain for the voyage, so it reverts with the pool"): an id the
+  // pool no longer answers for, or one that is not a charter, drops to
+  // null rather than being carried, and the flags it wrote are rebuilt
+  // at the next write for the reason the boons' are (see endRound in
+  // @/lib/game/engine/lifecycle).
+  game.charter = normalizeCharter(game.charter);
   // [F5: public offers] The last boon decision, which a save written
   // before the ledger existed does not carry. Healed as a bare presence
   // default rather than through a normalizer, because it is the one field

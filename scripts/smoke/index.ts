@@ -83,6 +83,7 @@ import { moduleTradesSuite } from "./suites/47-moduleTrades";
 import { milestoneBoonsSuite } from "./suites/48-milestoneBoons";
 import { publicOffersSuite } from "./suites/49-publicOffers";
 import { brokersWhisperSuite } from "./suites/50-brokersWhisper";
+import { chartersSuite } from "./suites/51-charters";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -427,6 +428,14 @@ async function main(): Promise<void> {
     // rather than joining the group above that needs no table.
     console.log("\nPublic offers");
     await publicOffersSuite(run, { gambitHost, gambitSecond });
+    // [F6] The charters' article joins the group above that needs no
+    // harbor, and it is the milestone boons' sibling in the tree as well
+    // as in the run: both walk one moment off a state in process, and the
+    // one half that touches the database (the take the leg report files)
+    // opens no harbor of its own. It sits after the public offers because
+    // it is the newer article and the ready check stays last.
+    console.log("\nThe charters");
+    await chartersSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

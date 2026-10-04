@@ -124,9 +124,11 @@ type Product = string;
 // see the clause in ./cards), and a question about every key needs the
 // keys at run time. Deriving the union from the array keeps the one
 // place a key is added, which was the whole point of pinning them here.
-// The last five are the milestone boons' own keys, and they are
-// deliberately keys no round drafted card writes: a held boon and a
-// round boon can then never be in force on the same key at the same
+// The keys from steady_rations on are the held cards' own: the five
+// milestone boons' moments, then F6's eleven charter keys, which write
+// for the rest of a voyage rather than for a round. Both groups are
+// deliberately keys no round drafted card writes: a held card and a
+// round card can then never be in force on the same key at the same
 // time, which is what keeps cardByFlag's answer, and therefore the
 // pricing breakdown's source line, true without a second rule.
 export const MODIFIER_KEYS = [
@@ -150,6 +152,17 @@ export const MODIFIER_KEYS = [
   "route_mastery",
   "harbor_credit",
   "fleet_color",
+  "transport_per_lot_discount",
+  "manifest_order_bonus",
+  "guns_risk_discount",
+  "standing_escort_discount",
+  "loom_extra_produce",
+  "loom_sale_bonus",
+  "voyage_purchase_discount",
+  "voyage_dues_discount",
+  "factor_borrows",
+  "factor_penalty",
+  "marque_salvage",
 ] as const;
 
 export type ModifierKey = (typeof MODIFIER_KEYS)[number];
@@ -658,7 +671,7 @@ export type GameState = {
   // three personal to this captain and none of them crossing a wire. The
   // held list is the cards themselves, by id, so a reload re-reads their
   // flags off the pool rather than trusting a saved map (see
-  // heldFlagsOf in ../milestones), which is exactly the rollback path the
+  // heldFlagsOf in ./held-cards), which is exactly the rollback path the
   // plan asks for: a card the pool no longer knows drops out at load and
   // its effect unwinds at the next rollover through endRound's rebuild.
   //
@@ -666,11 +679,20 @@ export type GameState = {
   // the draw is a pure function of the state (see milestoneChoices), so
   // storing it would be a second thing to heal that cannot disagree with
   // the first. The marks are one number per trigger, each in that
-  // trigger's own units, documented where they are written (../engine
-  // holds the writer, ../milestones the due rule that reads them).
+  // trigger's own units, documented where they are written (./engine
+  // holds the writer, ./milestones the due rule that reads them).
   heldBoons: string[];
   milestoneOffers: MilestoneTrigger[];
   milestonesAnswered: Partial<Record<MilestoneTrigger, number>>;
+  // [F6: charters at leg four] The one charter this voyage chose, or null
+  // before the moment is answered. An id rather than a record, for the
+  // reason heldBoons is a list of ids: a reload re-reads its flags off
+  // the pool rather than trusting a saved map (see heldCharterCard in
+  // ./held-cards), so the content revert the plan names for the rollback
+  // ("a charter is a modifier set on the captain for the voyage, so it
+  // reverts with the pool") is a pool edit and a load, with nothing
+  // durable left behind to unwind.
+  charter: string | null;
   // [F5: public offers] The last boon decision this captain made, or null
   // before the voyage's first pick. Written by the two pick sites only
   // (selectBoon and answerMilestone, per the shape's note above), and not
@@ -1094,6 +1116,11 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     heldBoons: [],
     milestoneOffers: [],
     milestonesAnswered: {},
+    // [F6: charters at leg four] No charter yet: the moment at leg four
+    // is where one is first offered, and null is the honest reading of
+    // "the question has not been asked" (see charterPending in
+    // ./charters).
+    charter: null,
     boonRecord: null,
     boonSwapUsed: false,
     moduleSwapUsed: false,

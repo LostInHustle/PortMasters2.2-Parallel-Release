@@ -372,10 +372,15 @@ construction rather than by review.
 The plan's evaluation for this review is that no alignment field can reach
 the wrong client, at severity one. The verdict is that none does, and that
 none did before the fixes either: the alignment table has three production
-readers, all inside `src/server/realtime/gambit.ts` (lines 154, 213, 270),
+readers, all inside `src/server/realtime/gambit.ts` (lines 154, 213, 289),
 and the only wire field that can carry an alignment is `role`, inside a
 `PrivateEntry` that `emitPrivate` addresses to one captain's own sockets
-(`src/server/realtime/presence.ts:63`).
+(`src/server/realtime/presence.ts:63`). The set stayed three when the
+charters landed at leg four: the take reads the table through the same
+module's own accessor, where the voyage's end was already the first caller
+(`cardsInRoom`, called from `src/server/realtime/conclusion/voyage.ts:327`
+and, for the take, `src/server/realtime/wiring/leg-report.ts:130`), which
+is a second caller rather than a fourth reader.
 
 That verdict is now mechanical rather than remembered. Two sweeps in the
 smoke suite read every frame every socket receives at two Gambit tables,

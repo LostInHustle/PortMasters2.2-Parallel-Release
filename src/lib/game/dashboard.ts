@@ -25,15 +25,16 @@
 //
 // The second is what the page owes a reader when a gate has no source.
 // Sixteen numbers are launch gates (goal I4) and most of them belong to
-// epics this tree has not built: the card and charter gates are F and the
+// epics this tree has not read yet: the card gates are F and the
 // market gates are G. Every one of those appears below as a reading with no
 // source and the epic it waits on beside it, never as a zero, because a
 // dashboard that prints 0.0% for something nobody has measured is the
 // instrument the plan warns about. What the record can already answer, it
 // answers: the win rate bands and the swing across them, session length,
 // the lobby fill time by table size, where voyages stopped, hold
-// utilization, maroon retention, bankruptcy, and the Barge's own two
-// numbers, which is where this module's reading of Epic E lands.
+// utilization, maroon retention, bankruptcy, the charter split and its
+// cover row [F6], and the Barge's own two numbers, which is where this
+// module's reading of Epic E lands.
 //
 // A reading is judged by one of five verdicts. A gate a window could
 // compare reads `in`, `under` or `over`; a gate whose band saw no voyage
@@ -51,6 +52,7 @@
 // =====================================================================
 
 import {
+  ROLE_ORDER,
   WIN_RATE_TARGETS,
   bandVerdict,
   ratePercent,
@@ -59,7 +61,17 @@ import {
   type BandVerdict,
   type VoyageOutcome,
 } from "./balance";
-import { roleCard, type GambitRole } from "./gambit";
+import { normalizeRole, roleCard, type GambitRole } from "./gambit";
+// [F6: charters at leg four] The two charter rows read three tables that
+// already exist rather than minting any of their own: which two charters
+// belong to each path (CHARTER_PATH), which charters answer a raid
+// (COVER_CHARTERS), and the floor a path's takes must reach before its
+// split is judged. The floor is the card reader's own (see ./cards) rather
+// than a number written again here, because the plan sets one sample floor
+// for a card statistic and a second would have this page judging a sample
+// the page next door still calls thin.
+import { CARD_CONVERSION_FLOOR } from "./cards";
+import { CHARTER_PATH, COVER_CHARTERS } from "./constants/charters";
 // [C4: three foods, spoilage and the split hold] The utilization row's
 // denominator, read from the two capacities the split hold declares rather
 // than repeated as a number here: a hold whose size was retuned in
@@ -71,6 +83,11 @@ import { CARGO_SLOTS, STORES_SLOTS } from "./constants/supplies";
 // band the draw knows and the dashboard does not would be a table size
 // nobody measured.
 import { SEAT_BANDS, seatBand } from "./objectives";
+// The path display names for the split row's value, read from the deck's
+// own table rather than written here: a value that named a path the
+// catalogue does not would be the page inventing a place the voyage was
+// not sailed from.
+import { PATHS, type PathId } from "./paths";
 import type { TelemetryPayloads, TelemetryRecord } from "./telemetry";
 
 // A finished voyage as this module reads one: the three columns the win
@@ -422,22 +439,85 @@ function seatPanel(barge: BargeReadings): DashboardPanel {
 }
 
 // Whether anything is becoming the obvious pick. The plan gates this on
-// cards and goods, both of which belong to epics this tree has not built,
-// so the gates are slots. What the window can read is the nearest thing
-// the spine holds: how many distinct goods a hold closes a leg carrying,
-// which is a staple signal at the count level, and the board's own
-// volumes, which say whether there is a board to staple on.
+// cards, charters and goods: the card and goods gates belong to epics this
+// tree has not read yet, so those rows are slots, and the charter gate is
+// read here [F6] off the takes the record files, with the plan's cover
+// watch beside it. What else the window can read is the nearest thing the
+// spine holds: how many distinct goods a hold closes a leg carrying, which
+// is a staple signal at the count level, and the board's own volumes, which
+// say whether there is a board to staple on.
 function staplesPanel(records: readonly TelemetryRecord[]): DashboardPanel {
   const legReports: TelemetryPayloads["leg_report"][] = [];
   const offers = { posted: 0, filled: 0, expired: 0 };
+  // The charter takes, bucketed once for the two charter rows below. The
+  // split is bucketed by the charter's own path rather than by the path
+  // the report claimed, because the question is which of a path's two
+  // charters captains reach for, and CHARTER_PATH is the one place that
+  // says which two those are. The cover row is bucketed by the alignment
+  // the server attached to the take; a stored role that is not one of the
+  // three is left out of both the numerator and the denominator rather
+  // than folded into Honest, because guessing a role on a measurement is
+  // the failure the take itself was written to avoid (normalizeRole's
+  // fallback reads a card, where the safe direction is the fleet; a row
+  // is not a card).
+  const splitByPath = new Map<PathId, Map<string, number>>();
+  const coverByRole: Record<GambitRole, { takes: number; cover: number }> = {
+    honest: { takes: 0, cover: 0 },
+    broker: { takes: 0, cover: 0 },
+    pirate: { takes: 0, cover: 0 },
+  };
   for (const record of records) {
     for (const event of record.events) {
       if (event.name === "leg_report") legReports.push(event);
       else if (event.name === "offer_posted") offers.posted += event.goods;
       else if (event.name === "offer_filled") offers.filled += event.goods;
       else if (event.name === "offer_expired") offers.expired += event.goods;
+      else if (event.name === "charter_taken") {
+        const path = CHARTER_PATH[event.charter];
+        if (path !== undefined) {
+          const counts = splitByPath.get(path) ?? new Map<string, number>();
+          counts.set(event.charter, (counts.get(event.charter) ?? 0) + 1);
+          splitByPath.set(path, counts);
+        }
+        const named = normalizeRole(event.role);
+        if (named === event.role) {
+          coverByRole[named].takes += 1;
+          if (COVER_CHARTERS.includes(event.charter)) {
+            coverByRole[named].cover += 1;
+          }
+        }
+      }
     }
   }
+
+  // The split, read off those buckets. A path is judged once it holds the
+  // floor the card reader reads its own statistics over; below it the
+  // sample is not evidence and the split is not read. The deviation is the
+  // larger charter's share of the path's takes in whole points off an even
+  // fifty, rounded before it is compared so the boundary is decided the
+  // way the win rate bands decide theirs (see bandVerdict). Only the
+  // widest judged path is printed, so the number and the verdict are
+  // always about the same path.
+  let splitTakes = 0;
+  let widest: { path: PathId; points: number; takes: number } | null = null;
+  for (const [path, counts] of splitByPath) {
+    let total = 0;
+    let larger = 0;
+    for (const count of counts.values()) {
+      total += count;
+      if (count > larger) larger = count;
+    }
+    splitTakes += total;
+    if (total < CARD_CONVERSION_FLOOR) continue;
+    const points = Math.round((larger / total) * 100) - 50;
+    if (widest === null || points > widest.points) {
+      widest = { path, points, takes: total };
+    }
+  }
+  const coverTakes = ROLE_ORDER.reduce(
+    (total, role) => total + coverByRole[role].takes,
+    0,
+  );
 
   const goodsCounts = legReports.map((report) => report.distinctGoods);
   const medianGoods = median(goodsCounts);
@@ -460,9 +540,21 @@ function staplesPanel(records: readonly TelemetryRecord[]): DashboardPanel {
     },
     {
       label: "Charter split deviation",
-      value: NO_SOURCE,
+      value:
+        splitTakes === 0
+          ? "no charter taken in the window"
+          : widest === null
+            ? `${splitTakes} ${splitTakes === 1 ? "take" : "takes"}, none past the ${CARD_CONVERSION_FLOOR} a path is read over`
+            : `${PATHS[widest.path].name}, ${widest.points} points off even over ${widest.takes} takes`,
       target: "no deviation above 20%",
-      verdict: "unmeasured",
+      // The plan judges one direction: an even split is the target and a
+      // wide one is the failure, so a narrow split reads in band rather
+      // than under it. The 20 stands beside the target string's own 20 the
+      // way the Barge's 70 stands beside its target, and the comparison is
+      // made in whole points so the boundary is decided the way the win
+      // rate bands decide theirs.
+      verdict:
+        widest === null ? "unplayed" : widest.points > 20 ? "over" : "in",
       gate: "charter_split",
     },
     {
@@ -478,6 +570,28 @@ function staplesPanel(records: readonly TelemetryRecord[]): DashboardPanel {
       target: "above 60%",
       verdict: "unmeasured",
       gate: "bourse_fills",
+    },
+    // The plan's watch beside the gate: whether the cover charters are
+    // taken at the same rate by honest players as by traitors, because a
+    // charter that only traitors take has stopped being cover. It is a
+    // reading rather than a gate, because the plan sets no threshold on
+    // it: the rate is printed for each alignment the window can name and
+    // the row is left unjudged. A rate is read only where the alignment
+    // has a take to divide by, since a rate over zero takes is the zero
+    // the whole page refuses to print.
+    {
+      label: "Cover charter take rate, by alignment",
+      value:
+        coverTakes === 0
+          ? "no charter taken in the window"
+          : ROLE_ORDER.filter((role) => coverByRole[role].takes > 0)
+              .map((role) => {
+                const { takes, cover } = coverByRole[role];
+                return `${roleCard(role).title} ${sharePercent(cover, takes)} of ${takes}`;
+              })
+              .join(", "),
+      target: "no threshold in the plan",
+      verdict: coverTakes === 0 ? "unplayed" : "ungated",
     },
     // The nearest readings the window has. They are labelled for what
     // they are rather than dressed as the gates above them: a hold
@@ -519,12 +633,17 @@ function staplesPanel(records: readonly TelemetryRecord[]): DashboardPanel {
     state: stateOf(readings),
     answer: summarize(
       readings,
-      "No gate yet: the card gates are Epic F's and the goods gates Epic G's, and no voyage in the window has a leg report to read either.",
+      "No gate yet: the card gates are Epic F's and the goods and Bourse gates are Epic G's, so four slots stand, and the charter gate has no path past its floor yet.",
     ),
     readings,
     gaps: [
-      "The card and charter gates are Epic F's and the goods and Bourse gates are Epic G's, so the five gates above are slots until those epics ship.",
+      "The card gates are Epic F's and the goods and Bourse gates are Epic G's, so the four gates above are slots until those epics ship.",
       "The record keeps the count of goods a leg dealt and a hold closed with, never their names, so the share of goods traded the plan asks for has no source until an event carries the identity rather than the count.",
+      // [F6] How the two charter rows were read, for whoever is on balance
+      // duty when one of them moves: what the split is grouped by and why
+      // a path has to earn its floor, and what the cover row is watching
+      // for now that the plan's threshold is nothing at all.
+      "The two charter rows are the window's own takes, filed once per captain per voyage when the moment is answered at leg four. The split is read inside each path, because the plan's question is which of a path's two charters captains reach for, and a path is only judged once it holds the floor the card reader reads its own card statistics over; the value names the widest judged path, so the deviation it prints and the verdict over it are about the same path. The cover row is the plan's watch rather than a gate: a charter that only traitors take has stopped being cover, so the row reads how often the salvage charters were taken by each alignment, and it is left unjudged because the plan set no threshold on it.",
     ],
   };
 }

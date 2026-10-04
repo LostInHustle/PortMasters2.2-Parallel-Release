@@ -51,6 +51,7 @@ import { crewLossRuleOn } from "@/lib/game/crew";
 import { garmentsLayerOn, legIsCold } from "@/lib/game/garments";
 import { holdCapacityOn, usedHoldSlots } from "@/lib/game/hold";
 import {
+  chartersOn,
   escortContractsOn,
   moduleTradesOn,
   pathOrdersOn,
@@ -194,6 +195,18 @@ export function useLegReport(
   const crewLosses = crewLossRuleOn(game.mode)
     ? game.crewLost.length
     : undefined;
+  // [F6: charters at leg four] The voyage's one charter, sent on every leg
+  // once it has been answered and only when the switch that gives the
+  // moment meaning is on: a leg sailed without the moment has no charter
+  // to name. It rides every leg rather than the leg it was taken on
+  // because this report is also the reconnect frame, and the server writes
+  // the take once per voyage whatever is sent (see noteCharterTaken): the
+  // client's only job is to keep saying what it holds until the voyage
+  // ends. Null reads as an absence rather than as an empty claim, which is
+  // the same shape the whole report takes for a question not asked yet.
+  const charter = chartersOn(game.mode)
+    ? (game.charter ?? undefined)
+    : undefined;
 
   // The figures are the dependency list, which is the point: the effect
   // fires when a count moves, not when the captain clicks.
@@ -223,6 +236,7 @@ export function useLegReport(
         foodSpend,
         bargeSpend,
         crewLosses,
+        charter,
       };
       socket.emit("telemetry:leg", payload);
     }, REPORT_DEBOUNCE_MS);
@@ -251,5 +265,6 @@ export function useLegReport(
     foodSpend,
     bargeSpend,
     crewLosses,
+    charter,
   ]);
 }

@@ -38,7 +38,7 @@ const pairs = entries.filter((e) => e.tags.length === 2).length;
 
 if (findings.length === 0) {
   console.log(
-    `The tags hold. ${entries.length} entries across five catalogues, at most two tags each, ${pairs} of them carrying a pair.`,
+    `The tags hold. ${entries.length} entries across six catalogues, at most two tags each, ${pairs} of them carrying a pair.`,
   );
   console.log(`Every tag is carried: ${distribution}.`);
   process.exit(0);

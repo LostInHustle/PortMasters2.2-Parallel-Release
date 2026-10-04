@@ -6,6 +6,7 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { phaseFace } from "@/lib/game/phases";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
+import { CharterDraft } from "./phases/CharterDraft";
 import { MilestoneDraft } from "./phases/MilestoneDraft";
 import { Market } from "./phases/Market";
 import { Parley } from "./phases/Parley";
@@ -86,6 +87,17 @@ export function GamePhasePanel(props: Props) {
         layoutId="phaseAccent"
         transition={{ duration: 0.3, ease: "easeOut" }}
       />
+      {/* [F6: charters at leg four] The charter overlay, drawn on the
+          same slot as the milestone draft and for the same reasons: it
+          sits outside the AnimatePresence so the answer does not cross
+          fade with a board swap, and it draws nothing at all unless the
+          moment is pending (see charterPending). It is mounted before
+          the milestone draft rather than after it so that when the two
+          stand at once the milestone paints above: the milestone is the
+          rarer event and it is answered under the terms it was armed
+          with, while the charter's window never closes and can wait for
+          the next frame. */}
+      <CharterDraft game={game} act={props.act} />
       {/* [F4: boons at milestone moments] The milestone overlay, drawn
           ahead of whichever board the phase is showing. It sits outside
           the AnimatePresence below on purpose: the board beneath it still

@@ -235,8 +235,8 @@ export function completeOrder(
   // allowance cannot be spent twice for one fill.
   if (locked) {
     state.opportunistBorrows += 1;
-    reward = opportunistPayout(order.reward);
-    logs.push(opportunistLine(order.reward, reward));
+    reward = opportunistPayout(state, order.reward);
+    logs.push(opportunistLine(state, order.reward, reward));
   }
   let totalVat = 0;
   if (order.isProductOrder) {
@@ -340,6 +340,28 @@ export function completeOrder(
     reward += Math.floor(reward * pct);
     logs.push(
       `${cardLead("route_mastery")}: +${Math.round(pct * 100)}% Reward!`,
+    );
+  }
+  // [F6: charters at leg four] The Standing Manifest and the Quality Mark,
+  // the two charters that pay on the reward itself, each taken as the same
+  // `reward + floor(reward * pct)` the cards above them take and landing
+  // last, because a voyage long charter scales the reward the voyage has
+  // actually built rather than the face value a round card already grew.
+  // The Manifest reads every completed order, which is its whole text; the
+  // Mark reads the same woven gate the Woven Monopoly reads above, so the
+  // mark and the cloth cannot come to disagree about what counts as woven.
+  if (state.modifierFlags.manifest_order_bonus) {
+    const pct = state.modifierFlags.manifest_order_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(
+      `${cardLead("standing_manifest")}: +${Math.round(pct * 100)}% Reward!`,
+    );
+  }
+  if (hasWoven && state.modifierFlags.loom_sale_bonus) {
+    const pct = state.modifierFlags.loom_sale_bonus;
+    reward += Math.floor(reward * pct);
+    logs.push(
+      `${cardLead("quality_mark")}: +${Math.round(pct * 100)}% Reward!`,
     );
   }
   if (hasModule(state, "salvage_crane") && Math.random() < 0.3) {

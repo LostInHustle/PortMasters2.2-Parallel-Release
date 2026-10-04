@@ -5,17 +5,7 @@
 // ./constants/milestones holds the vocabulary: the five triggers and the
 // words a captain meets when one arrives. This module is the walk, the
 // same split F1 took with the tags and F2 with the card shape. What it
-// walks is three fields on the state (see the field notes in ./types):
-//
-//   - heldBoons carries the ids of the boons a captain has taken from a
-//     moment. Permanent, which is the plan's word read as the one reading
-//     that gives the moment meaning: nothing a captain does later can
-//     reach back and un-earn the moment, so the boon lasts to the books.
-//     The flags those cards write are rebuilt from this list wherever
-//     the round's flags are written (see heldFlagsOf below and its call
-//     sites in ./engine/boons and ./engine/lifecycle), which is what
-//     makes a held boon ride through every reset without a second copy
-//     of it anywhere and without erasing the round draft's own flags.
+// walks is two fields on the state (see the field notes in ./types):
 //
 //   - milestoneOffers is the queue of moments waiting to be answered.
 //     A queue rather than a phase, because the five moments land at
@@ -32,11 +22,15 @@
 //     order and the mandate are latches, the rung counts rungs, and the
 //     cold leg carries the round it was answered in.
 //
+// The cards those moments hand out are held cards, and their half of the
+// story (the ids a captain carries and the flags they write) lives in
+// ./held-cards, beside the heal that keeps a stale save honest.
+//
 // Everything below is a pure read of those fields and the rest of the
 // state. Nothing here mutates and no clock is read; the one environment
 // read is the switch, which lives in ./flags with the rest of its family.
 // =====================================================================
-import { cardById, cardWeight, drawOffer } from "./cards";
+import { cardWeight, drawOffer } from "./cards";
 import type { CardRecord } from "./constants/cards";
 import { CARDS_PER_OFFER, MILESTONE_BOONS } from "./constants/drafts";
 import {
@@ -47,38 +41,9 @@ import { MERCHANT_RATINGS } from "./constants/reputation";
 import { milestoneBoonsOn } from "./flags";
 import { garmentsLayerOn, legIsCold } from "./garments";
 import { createRng } from "./rng";
-import { flatWorkerRoster, type GameState, type ModifierKey } from "./types";
+import { flatWorkerRoster, type GameState } from "./types";
 
 // ========== The save ==========
-
-/**
- * Whatever a save says about held boons, read back as a list of ids the
- * pool can still answer for.
- *
- * Three kinds of entry are dropped rather than kept. An id the pool does
- * not know is a retired card, which is the plan's own rollback read as a
- * load rule ("any boon that grants a durable effect has to be unwound
- * through the same normalization path the rest of the state uses"). An id
- * that is not a boon at all is a write that never came from the answer
- * path. And an id whose card arrives at the round draft is the quiet one:
- * held boons are what make a flag last the voyage, a round boon's flag is
- * meant to last a round, and a round id riding in this list would be
- * durable by accident, which is the one way this field can lie about the
- * record it was written from. A repeat is dropped the same way, because
- * the merge below would read it twice for nothing.
- */
-export function normalizeHeldBoons(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  const held: string[] = [];
-  for (const id of raw) {
-    if (typeof id !== "string" || held.includes(id)) continue;
-    const card = cardById(id);
-    if (card === null || card.kind !== "boon") continue;
-    if (card.trigger === "boon_draft") continue;
-    held.push(id);
-  }
-  return held;
-}
 
 /**
  * Whatever a save says about queued moments, read back as trigger ids.
@@ -125,51 +90,6 @@ export function normalizeMilestonesAnswered(
     marks[trigger] = value;
   }
   return marks;
-}
-
-// ========== The held boons ==========
-
-/**
- * The cards a captain is holding, in the order they were taken.
- *
- * Resolved through the pool rather than stored as records, so a retuned
- * card is the card a captain holds on the next read rather than the one
- * they took (the same reason a standing order stores an id). An id with
- * no card is skipped here too: the healing above drops those on load,
- * and this reader answers honestly for a state that never went through
- * it.
- */
-export function heldBoonCards(
-  state: Pick<GameState, "heldBoons">,
-): CardRecord[] {
-  const cards: CardRecord[] = [];
-  for (const id of state.heldBoons) {
-    const card = cardById(id);
-    if (card?.kind === "boon") cards.push(card);
-  }
-  return cards;
-}
-
-/**
- * The flags every held boon writes, merged into one set.
- *
- * This is the durable half of a boon: the engine writes it wherever the
- * round's flags are written (a round opening, a round draft answered, a
- * moment answered), so a held effect rides through every reset while the
- * round's own flags come and go above it. The keys cannot collide with a
- * round boon's, and that is held by the pool's own validator rather than
- * by the merge order here (see the one owner per key clause in ./cards),
- * so the spread that uses this can put either side first and be right.
- */
-export function heldFlagsOf(
-  state: Pick<GameState, "heldBoons">,
-): Partial<Record<ModifierKey, number>> {
-  const flags: Partial<Record<ModifierKey, number>> = {};
-  for (const card of heldBoonCards(state)) {
-    if (card.effect.kind !== "flags") continue;
-    Object.assign(flags, card.effect.flags);
-  }
-  return flags;
 }
 
 // ========== What is due ==========
@@ -309,7 +229,7 @@ export function milestoneChoices(
  * the boons already held keep their effects for the voyage, which is
  * F3's reading of an off switch rather than a new one: the data stays,
  * the moment does not arrive. The save's own healing is the unwinding
- * path either way (see normalizeHeldBoons above).
+ * path either way (see normalizeHeldBoons in ./held-cards).
  *
  * And the head of the queue has to still have a card on its table. The
  * arm path spends a moment whose pool has run dry rather than queueing

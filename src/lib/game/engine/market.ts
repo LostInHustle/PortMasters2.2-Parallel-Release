@@ -25,7 +25,7 @@ import {
   RESOURCES,
   RESOURCE_WEIGHTS,
 } from "../constants/goods";
-import { charterOpensOn, marketCountsFor } from "../difficulty";
+import { silkRoadCharterOpensOn, marketCountsFor } from "../difficulty";
 import { bazaarRumorsOn } from "../flags";
 import { lockingPathFor } from "../paths";
 // The hold's room, read from ./larder rather than from ./hold because the
@@ -576,7 +576,7 @@ export function startMarket(
   // Winds schedules none, so this never fires on the entry tier. Based on
   // the tier's own count, not the Tidewatch bonus below, so the charter
   // banner never takes credit for a card the room itself earned.
-  if (charterOpensOn(state.difficulty, state.currentRound)) {
+  if (silkRoadCharterOpensOn(state.difficulty, state.currentRound)) {
     logs.push(
       `🗺️ The Silk Road Charter opens! The harbor grows busier: ${tierPurchaseCount} cargo lots and as many buyers from this voyage on.`,
     );

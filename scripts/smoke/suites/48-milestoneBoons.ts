@@ -25,10 +25,12 @@ import {
 import {
   heldBoonCards,
   heldFlagsOf,
+  normalizeHeldBoons,
+} from "@/lib/game/held-cards";
+import {
   milestoneChoices,
   milestoneDue,
   milestonePending,
-  normalizeHeldBoons,
   normalizeMilestoneOffers,
   normalizeMilestonesAnswered,
   rungsOf,
@@ -122,15 +124,19 @@ export async function milestoneBoonsSuite(): Promise<void> {
     return state;
   };
 
-  // One order board dealt from one seed, so every run below stands on
-  // identical cards and the only difference between two runs is the one
-  // thing a check is about.
-  const dealBoard = () => {
+  // One order board dealt from one seed and one round, so every run below
+  // stands on identical cards and the only difference between two runs is
+  // the one thing a check is about. The round is a parameter because
+  // which round deals the shape a check needs is the board's business
+  // rather than something a check may assume: the round one board misses
+  // a pathbound order about one deal in eight, so a scan that wants one
+  // walks the twelve rather than betting on the first.
+  const dealBoard = (round: number) => {
     const state = voyageState();
     snapToCheckpoint(
       state,
       { seedBase: `smoke:milestones:${suffix}`, harborId: "harbor-a" },
-      1,
+      round,
       "orders",
       [],
     );
@@ -312,11 +318,15 @@ export async function milestoneBoonsSuite(): Promise<void> {
       .map((card) => card.id)
       .join() === "steady_watch,cold_hardened" &&
       heldBoonCards({ heldBoons: ["not_a_card"] }).length === 0 &&
-      heldFlagsOf({ heldBoons: ["steady_watch", "cold_hardened"] })
-        .steady_rations === 1 &&
-      heldFlagsOf({ heldBoons: ["steady_watch", "cold_hardened"] })
-        .cold_hardened === 1 &&
-      Object.keys(heldFlagsOf({ heldBoons: [] })).length === 0,
+      heldFlagsOf({
+        heldBoons: ["steady_watch", "cold_hardened"],
+        charter: null,
+      }).steady_rations === 1 &&
+      heldFlagsOf({
+        heldBoons: ["steady_watch", "cold_hardened"],
+        charter: null,
+      }).cold_hardened === 1 &&
+      Object.keys(heldFlagsOf({ heldBoons: [], charter: null })).length === 0,
     "the held list resolves through the pool in the order the cards were taken and merges its flags into one set, and an id the pool no longer knows draws nothing rather than a placeholder",
   );
 
@@ -664,14 +674,23 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
     withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
-      const board = dealBoard();
-      const pathCard = board.customerCards.find(
-        (order) =>
-          pathOrderOf(order, board.mode) !== null &&
-          !order.isProductOrder &&
-          !order.isBrokerFavor,
-      );
-      if (pathCard !== undefined) {
+      const findPathbound = () => {
+        for (let round = 1; round <= 12; round++) {
+          const board = dealBoard(round);
+          const order = board.customerCards.find(
+            (card) =>
+              pathOrderOf(card, board.mode) !== null &&
+              !card.isProductOrder &&
+              !card.isBrokerFavor,
+          );
+          if (order !== undefined) return { board, order };
+        }
+        return null;
+      };
+      const found = findPathbound();
+      if (found !== null) {
+        const board = found.board;
+        const pathCard = found.order;
         board.path = pathOrderOf(pathCard, board.mode);
         stockHold(board, pathCard);
         board.money = 1000;
@@ -808,24 +827,37 @@ export async function milestoneBoonsSuite(): Promise<void> {
   });
 
   withEnv("NEXT_PUBLIC_PATH_ORDERS", "1", () => {
-    const control = dealBoard();
-    const pathCard = control.customerCards.find(
-      (order) =>
-        pathOrderOf(order, control.mode) !== null &&
-        !order.isProductOrder &&
-        !order.isBrokerFavor,
-    );
-    const plainCard = control.customerCards.find(
-      (order) =>
-        pathOrderOf(order, control.mode) === null &&
-        !order.isProductOrder &&
-        !order.isBrokerFavor &&
-        order.reward > 0,
-    );
-    if (pathCard !== undefined && plainCard !== undefined) {
+    // Both shapes on one board, found by walking the twelve rather than
+    // betting the whole check on the round one deal, and every run below
+    // dealing that same round so the runs still stand on identical cards.
+    const findPair = () => {
+      for (let round = 1; round <= 12; round++) {
+        const control = dealBoard(round);
+        const pathCard = control.customerCards.find(
+          (order) =>
+            pathOrderOf(order, control.mode) !== null &&
+            !order.isProductOrder &&
+            !order.isBrokerFavor,
+        );
+        const plainCard = control.customerCards.find(
+          (order) =>
+            pathOrderOf(order, control.mode) === null &&
+            !order.isProductOrder &&
+            !order.isBrokerFavor &&
+            order.reward > 0,
+        );
+        if (pathCard !== undefined && plainCard !== undefined) {
+          return { round, control, pathCard, plainCard };
+        }
+      }
+      return null;
+    };
+    const found = findPair();
+    if (found !== null) {
+      const { round, control, pathCard, plainCard } = found;
       const chosenPath = pathOrderOf(pathCard, control.mode);
       const run = (card: OrderCard, flag: boolean, path: PathId | null) => {
-        const state = dealBoard();
+        const state = dealBoard(round);
         state.path = path;
         if (flag) state.modifierFlags.route_mastery = 0.25;
         stockHold(state, card);

@@ -35,8 +35,8 @@ import type { CardRecord } from "../constants/cards";
 import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
+import { heldFlagsOf } from "../held-cards";
 import { feedCrew } from "../larder";
-import { heldFlagsOf } from "../milestones";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
@@ -72,7 +72,7 @@ function draftBoons(state: GameState): CardRecord[] {
 // [F4: boons at milestone moments] The held flags are folded in under the
 // round's, so a boon taken from a moment rides through this write the same
 // way it rides through the round's rollover (see endRound in ./lifecycle
-// and heldFlagsOf in ../milestones). The two sides cannot collide, and
+// and heldFlagsOf in ../held-cards). The two sides cannot collide, and
 // that is the pool validator's doing rather than this spread's (see the
 // one owner per key clause in ../cards), so the order here is a
 // declaration of precedence rather than a rule anything depends on.

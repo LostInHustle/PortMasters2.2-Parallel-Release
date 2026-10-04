@@ -112,6 +112,19 @@ export type LegReport = {
   // nobody reads (see the crewLost captain line in
   // src/lib/game/telemetry.ts).
   crewLosses?: number;
+  // [F6: charters at leg four] The one claim of this report that is not a
+  // number: the id of the charter this captain holds. It is sent on every
+  // leg once the moment has been answered and only while the switch that
+  // gives the moment meaning is on, because the report is also the frame a
+  // reload files: a captain who answered at leg four, sailed to leg nine
+  // and only then had their screen restored has no other way to be
+  // recorded, and the server writes the take once per voyage whatever the
+  // client sends (see noteCharterTaken). The report keeps no copy of it.
+  // The server validates the id against the pool, attaches the path and
+  // the alignment from its own books rather than trusting a claim about
+  // them, and drops the take it cannot attribute on both, so this field
+  // can only ever name the card the captain actually holds.
+  charter?: string;
 };
 
 /**

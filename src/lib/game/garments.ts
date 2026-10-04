@@ -194,7 +194,7 @@ export function shortOfWarmth(state: GameState): boolean {
  * the warning is about, the number the settlement prints and the number
  * the panel wears all stay the one number this function exists to be.
  * The field it reads is the round's flag set, which is where a held
- * boon's effect rides (see heldFlagsOf in ./milestones).
+ * boon's effect rides (see heldFlagsOf in ./held-cards).
  *
  * Exported because two readers print it as well as compare it, and a panel
  * that did the arithmetic again would be a second opinion about the number

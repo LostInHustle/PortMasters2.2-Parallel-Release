@@ -1,13 +1,23 @@
 // =====================================================================
 // The leg report: the one telemetry event a client sends, recorded as a
 // claim about a screen the server never sees.
+//
+// [F6: charters at leg four] The handler also reads the report's one
+// field that is not a figure, the charter a captain holds, and that one
+// is answered rather than kept: the path and the alignment a take has to
+// carry are read off the server's own books before anything is recorded,
+// which is the only place in this file where the server corrects a claim
+// instead of filing it.
 // =====================================================================
 
 import { type LegReport } from "@/types/realtime/objectives";
 import type { Socket } from "socket.io";
 
+import { cardById } from "@/lib/game/cards";
 import { seated } from "../auth";
-import { noteLegReport } from "../telemetry";
+import { heldPathOf } from "../draft";
+import { cardsInRoom } from "../gambit";
+import { noteCharterTaken, noteLegReport } from "../telemetry";
 
 export function wireLegReport(socket: Socket): void {
   // [I1: the telemetry spine] The one telemetry event a client sends,
@@ -97,5 +107,32 @@ export function wireLegReport(socket: Socket): void {
       // can never cost a captain the rest of their leg.
       crewLosses: optional(payload?.crewLosses),
     });
+    // [F6: charters at leg four] The one claim of this report that is not
+    // a figure: the charter the captain holds. It is judged here rather
+    // than kept, because the two fields that make a take readable are the
+    // server's to answer and not the captain's to claim: the path comes
+    // from the room's own book (see heldPathOf) and the alignment from
+    // the table the voyage's end already reads (see cardsInRoom). A take
+    // the server cannot attribute on both is not written at all, because
+    // a guessed field on an operator measurement is worse than a missing
+    // one. The reads are deferred rather than the handler made async, so
+    // the report above is kept first and a slow read can never hold up a
+    // leg, and the voucher sent is the pool's own id rather than the
+    // frame's string, so only a card this build deals can be recorded.
+    const claimed = payload?.charter;
+    if (typeof claimed === "string") {
+      const card = cardById(claimed);
+      if (card?.kind === "charter") {
+        const charterId = card.id;
+        void (async () => {
+          const path = heldPathOf(roomId, s.userId);
+          if (path === null) return;
+          const seats = await cardsInRoom(roomId);
+          const role = seats[s.userId]?.role;
+          if (role === undefined) return;
+          noteCharterTaken(roomId, s.userId, charterId, path, role);
+        })();
+      }
+    }
   });
 }

@@ -56,19 +56,22 @@ import {
   MODE_POWER_CEILING,
   SHIPPED_LANGUAGE,
 } from "./constants/cards";
+import { CHARTERS, CHARTER_PATH } from "./constants/charters";
 import { WORKER_TYPE_IDS } from "./constants/crew";
 import { BOONS, MODULES } from "./constants/drafts";
 import { type GameMode } from "./mode";
 import { PATH_IDS, type PathId, pathConfig } from "./paths";
 import { unlockedBoons, unlockedModules } from "./pools";
 import { MAX_TAGS_PER_ENTRY, TAGS } from "./constants/tags";
-import { entriesWithTag, taggedEntries, tagsOf } from "./tags";
+import { entriesWithTag, taggedEntries, tagsOf, type TaggedKind } from "./tags";
 import { MODIFIER_KEYS, type GameState } from "./types";
 
-// Every card the build ships, in one list. Read by the content check and by
-// the two readers below; nothing else walks it, because everything else
-// wants a kind or an id rather than the whole pool.
-export const CARDS: readonly CardRecord[] = [...BOONS, ...MODULES];
+// Every card the build ships, in one list: the two drafted ladders and
+// F6's charters, stacked in the order the catalogues are named. Read by
+// the content check and by the two readers below; nothing else walks it,
+// because everything else wants a kind or an id rather than the whole
+// pool.
+export const CARDS: readonly CardRecord[] = [...BOONS, ...MODULES, ...CHARTERS];
 
 // ========== The door ==========
 
@@ -145,11 +148,7 @@ export function cardByFlag(key: string): CardRecord | null {
  * Whether an entry of any tagged catalogue carries a tag. A thin read of
  * F1's tagsOf, which answers null for an id no catalogue holds.
  */
-export function carriesTag(
-  kind: "good" | "food" | "module" | "boon" | "charter",
-  id: string,
-  tag: string,
-): boolean {
+export function carriesTag(kind: TaggedKind, id: string, tag: string): boolean {
   return tagsOf(kind, id)?.includes(tag as never) ?? false;
 }
 
@@ -261,7 +260,10 @@ export function cardWeight(card: CardRecord, state: GameState): number {
  *
  * The card's own kind is what decides its reader rather than a table here,
  * because the two unlocked readers each hold one kind's ladder and the pool
- * a mode runs is the same for both.
+ * a mode runs is the same for both. A charter is the third kind and is
+ * absent from this walk on purpose: its trio is composed at the moment it
+ * is offered (see ../charters), and the empty arm below is that absence
+ * stated rather than a kind nobody remembered to wire.
  */
 export function offerPool(
   kind: CardKind,
@@ -434,6 +436,13 @@ export interface CardSubject {
   // has no opinion about the union; the shipped subject fills it, which
   // is where the clause has to hold anyway.
   modifierKeys?: readonly string[];
+  // [F6: charters at leg four] The charter id to path pairing (see
+  // ./constants/charters), so the two per path clause below can hold the
+  // trio's first two slots against the records. Optional for the same
+  // reason modifierKeys is: a hand built pool in a check carries its own
+  // cards and no opinion about the pairing, and the shipped subject
+  // fills it.
+  charterPaths?: Record<string, string>;
 }
 
 export function shippedCards(): CardSubject {
@@ -449,6 +458,7 @@ export function shippedCards(): CardSubject {
       .filter((entry) => entry.kind === "good" || entry.kind === "food")
       .map((entry) => entry.id),
     modifierKeys: MODIFIER_KEYS,
+    charterPaths: CHARTER_PATH,
   };
 }
 
@@ -579,22 +589,30 @@ export function validateCards(subject: CardSubject): string[] {
       findings.push(`${at}: asks for a crew role the roster cannot hold`);
     }
 
-    // The effect the kind promises. A boon bends a round by writing flags
-    // and a module works by being installed, and a record that says one and
-    // is the other is a card the engine will read wrongly rather than not
-    // at all.
+    // The effect the kind promises. A boon and a charter bend the game by
+    // writing flags, a module works by being installed, and a record that
+    // says one and is the other is a card the engine will read wrongly
+    // rather than not at all. The two flag writing kinds share the flag
+    // half of the clause because they share the mechanism; what differs
+    // between them is where the flags are read, a round for the boon and
+    // the rest of the voyage for the charter, and that difference lives
+    // at the read sites rather than in the shape.
+    const writesFlags = card.kind === "boon" || card.kind === "charter";
     if (card.kind === "boon" && card.effect.kind !== "flags") {
       findings.push(
         `${at}: a boon writes the round's flags, and this one does not`,
       );
     }
-    if (card.kind === "boon" && card.effect.kind === "flags") {
+    if (card.kind === "charter" && card.effect.kind !== "flags") {
+      findings.push(`${at}: a charter writes flags, and this one does not`);
+    }
+    if (writesFlags && card.effect.kind === "flags") {
       if (Object.keys(card.effect.flags).length === 0) {
         findings.push(`${at}: writes no flag, so choosing it changes nothing`);
       }
       // The key ledger, written beside the clause that reads the flags
-      // rather than in a walk of its own, so a card that stops being a
-      // boon stops being counted as an owner in the same edit.
+      // rather than in a walk of its own, so a card that stops writing
+      // flags stops being counted as an owner in the same edit.
       for (const key of Object.keys(card.effect.flags)) {
         const owner = keyOwner.get(key);
         if (owner !== undefined) {
@@ -652,6 +670,44 @@ export function validateCards(subject: CardSubject): string[] {
   for (const key of subject.modifierKeys ?? []) {
     if (!keyOwner.has(key)) {
       findings.push(`no card writes ${key}`);
+    }
+  }
+
+  // [F6: charters at leg four] The pairing clause, read through the map
+  // the subject hands over rather than out of the records, because the
+  // map is what the trio's composition reads (see ./constants/charters).
+  // Both directions are held: a charter with no path is a card no trio
+  // can pair, an entry naming a card the pool does not have would pair
+  // nothing, and a path whose count is not two has a trio whose first
+  // two slots do not exist or exist twice.
+  if (subject.charterPaths) {
+    const charters = subject.cards.filter((card) => card.kind === "charter");
+    const perPath = new Map<string, number>();
+    for (const [id, path] of Object.entries(subject.charterPaths)) {
+      if (!subject.paths.includes(path as PathId)) {
+        findings.push(
+          `charter ${id}: paired with ${path}, which is not a path`,
+        );
+      }
+      if (!charters.some((card) => card.id === id)) {
+        findings.push(`charter ${id}: paired, but no card carries this id`);
+      }
+      perPath.set(path, (perPath.get(path) ?? 0) + 1);
+    }
+    for (const card of charters) {
+      if (!(card.id in subject.charterPaths)) {
+        findings.push(
+          `card ${card.id}: a charter with no path, so no trio can pair it`,
+        );
+      }
+    }
+    for (const path of subject.paths) {
+      const count = perPath.get(path) ?? 0;
+      if (count !== 2) {
+        findings.push(
+          `path ${path}: carries ${count} charters, and the trio's first two slots are two`,
+        );
+      }
     }
   }
 

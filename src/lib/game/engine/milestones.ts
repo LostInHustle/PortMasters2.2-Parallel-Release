@@ -3,8 +3,9 @@
 // moments need: arming one, answering one, and the two sweeps that
 // notice the moments the voyage itself produces.
 //
-// The pure half is ../milestones (what is due, what is held, what a
-// moment offers). This half is the writes, and there are exactly three:
+// The pure half is ../milestones (what is due, what a moment offers) and
+// ../held-cards (what is held). This half is the writes, and there are
+// exactly three:
 //
 //   - queueMilestoneMoment arms one moment. The switch, the queue guard,
 //     the due gate, the tally and the ledger line all live here so the
@@ -42,7 +43,8 @@ import {
   type MilestoneTrigger,
 } from "../constants/milestones";
 import { milestoneBoonsOn } from "../flags";
-import { heldFlagsOf, milestoneChoices, milestoneDue } from "../milestones";
+import { heldFlagsOf } from "../held-cards";
+import { milestoneChoices, milestoneDue } from "../milestones";
 import type { GameState } from "../types";
 
 /**

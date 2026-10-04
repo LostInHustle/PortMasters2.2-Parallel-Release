@@ -11,12 +11,12 @@ import {
   explainVAT,
   lockedBehind,
   opportunistBorrowsLeft,
+  opportunistIsBorrower,
   opportunistLine,
   opportunistMayBorrow,
   opportunistPayout,
   opportunistUsesLine,
   pathOrderOf,
-  OPPORTUNIST_PATH,
   OPPORTUNIST_SPENT_LINE,
   type PriceBreakdown,
 } from "@/lib/game/engine";
@@ -61,8 +61,9 @@ function OrderCard({
   const completed = game.completedOrders.includes(o.id);
   // [D6: Free Captain: Opportunist] The one card on this board whose
   // price this captain can move. `mayBorrow` is the ability question,
-  // asked of the engine rather than answered here (the path holds it
-  // and a borrow is left), and everything the card quotes is priced
+  // asked of the engine rather than answered here (the path holds it, or
+  // F6's Factor does, and a borrow is left), and everything the card
+  // quotes is priced
   // off the payout the borrow would actually pay. completeOrder runs
   // the same arithmetic on the same reduced number, so the net figure
   // on the card and the Gold that lands in the purse are one number;
@@ -70,11 +71,15 @@ function OrderCard({
   // engine never hands over. A captain with nothing to spend reads
   // the card exactly as everyone else at the table does.
   const mayBorrow = locked !== null && opportunistMayBorrow(game, locked);
-  const borrowPayout = opportunistPayout(o.reward);
+  const borrowPayout = opportunistPayout(game, o.reward);
   const rewardBasis = mayBorrow ? borrowPayout : o.reward;
   const canBorrow = canFillOrder(game, o, true);
+  // [F6: charters at leg four] The spent line is asked of the door reader
+  // rather than of a path, so a Quartermaster whose Factor is spent reads
+  // the same sentence a spent Free Captain reads. One reader for the
+  // board and the guard, the D6 reading kept through the second door.
   const borrowSpent =
-    game.path === OPPORTUNIST_PATH && opportunistBorrowsLeft(game) < 1;
+    opportunistIsBorrower(game) && opportunistBorrowsLeft(game) < 1;
   const hasWoven = cargoCarriesTag(o.resources, "woven");
   const transport = calcTransportCost(game, o.totalItems, hasWoven);
   const transportBreakdown = explainTransportCost(game, o.totalItems, hasWoven);
@@ -200,7 +205,7 @@ function OrderCard({
               // discovers they had used is a rule taught by surprise.
               <>
                 <div className="text-[11px] text-orders leading-snug">
-                  {opportunistLine(o.reward, borrowPayout)}
+                  {opportunistLine(game, o.reward, borrowPayout)}
                 </div>
                 <Button
                   className={cn(

@@ -41,6 +41,16 @@
 // is kept where the frames are written. It is a Map rather than a table
 // for the plan's own reason: "draft state is transient per voyage, so
 // nothing durable is at risk."
+//
+// [F6: charters at leg four] The module keeps a second book beside the
+// switches: who is sailing on what. The draft's own seats carry each
+// captain's path while the draft runs, but the seats are dropped the
+// moment it settles, and the charter take filed at leg four needs the path
+// long after that, so the settled paths move into a map of their own (see
+// pathsByRoom and heldPathOf). A switch moves that map with it, and both
+// endings drop it, which is the switches' own lifetime above and the same
+// reason: the captain's save is the durable copy of their papers, and the
+// room's copy of either fact lasts exactly one voyage.
 // =====================================================================
 import { DraftStep, DraftView, PathSwitched } from "@/types/realtime/draft";
 import { randomUUID } from "node:crypto";
@@ -112,6 +122,20 @@ const drafts = new Map<string, Draft>();
 // book here and its one reader below, the save's in applyPathSwitch
 // across the wire.
 const switchesByRoom = new Map<string, Set<string>>();
+
+// [F6: charters at leg four] The room's book of paths: who is sailing on
+// what this voyage.
+//
+// The draft's seats hold the same fact while the draft runs, and this
+// book is where it lives after the seats go: settleDraft deletes them the
+// moment every seat holds a path, and the charter take filed at leg four
+// is attributed long after that. The book is written at the settle, moved
+// by a switch, and dropped by both endings, which is the switches' own
+// lifetime above. A late arrival is not in it and reads null, which the
+// take's reader treats as an unattributable take rather than a guess: the
+// deal skipped them (see dealPaths), so a path for them would be a path
+// the table never dealt.
+const pathsByRoom = new Map<string, Map<string, PathId>>();
 
 function clearDraftTimer(draft: Draft): void {
   if (draft.timer !== null) {
@@ -365,11 +389,18 @@ function settleDraft(
   finals: readonly (PathId | undefined)[],
 ): void {
   const seconds = Math.max(0, Math.round((Date.now() - draft.openedAt) / 1000));
+  // [F6: charters at leg four] The settled paths move into the room's own
+  // book as they are written onto the seats, because this is the last
+  // moment the seats holding them exist (see pathsByRoom). The book is
+  // opened before the walk and stored after it, so a seat with nothing to
+  // settle simply contributes no entry.
+  const paths = pathsByRoom.get(draft.roomId) ?? new Map<string, PathId>();
   for (let seat = 0; seat < draft.seats.length; seat += 1) {
     const held = draft.seats[seat];
     const path = finals[seat] ?? held.kept[0];
     if (!path) continue;
     held.path = path;
+    paths.set(held.userId, path);
     emitToUser(io, held.userId, "draft:update", draftView(draft, seat));
     noteVoyageLog(io, draft.roomId, {
       kind: "path_taken",
@@ -388,6 +419,7 @@ function settleDraft(
       seconds,
     });
   }
+  pathsByRoom.set(draft.roomId, paths);
   clearDraftTimer(draft);
   drafts.delete(draft.roomId);
 }
@@ -420,6 +452,15 @@ export function recordPathSwitch(
   if (book.has(row.userId)) return false;
   book.add(row.userId);
   switchesByRoom.set(roomId, book);
+  // [F6: charters at leg four] The paths book moves with the switch, so a
+  // charter take read later in the voyage attributes the papers the
+  // captain is sailing on as they stand then rather than as they were
+  // dealt. It is written here rather than beside the frame below because
+  // the book is the room's record of the change and the frame, the log
+  // line and the measurement are publications of it.
+  const paths = pathsByRoom.get(roomId) ?? new Map<string, PathId>();
+  paths.set(row.userId, row.path);
+  pathsByRoom.set(roomId, paths);
 
   const published: PathSwitched = {
     roomId,
@@ -438,6 +479,24 @@ export function recordPathSwitch(
     path: row.path,
   });
   return true;
+}
+
+/**
+ * [F6: charters at leg four] The path one captain is sailing under, as
+ * the room's own book has it.
+ *
+ * The one reader of the paths book above, and it exists because the
+ * charter take filed at leg four has to attribute a path the draft's own
+ * seats no longer hold (see settleDraft). Null is three answers that are
+ * one answer to its caller: no book is open for this room (a voyage
+ * before its departure and after either ending), the captain is not in it
+ * (a late arrival the deal skipped), or the seat settled holding nothing.
+ * All three are takes the caller cannot attribute, and it drops them
+ * rather than filling in a path, because a guessed field on an operator
+ * measurement is worse than a missing one.
+ */
+export function heldPathOf(roomId: string, userId: string): PathId | null {
+  return pathsByRoom.get(roomId)?.get(userId) ?? null;
 }
 
 // One captain's view of the draft they are standing in.
@@ -494,6 +553,10 @@ export function clearPathVoyage(io: Server, roomId: string): void {
     }
   }
   switchesByRoom.delete(roomId);
+  // [F6: charters at leg four] The paths book goes with the switches, on
+  // the same reading and for the same reason: both are the room's copies
+  // of papers the captain's own save still holds.
+  pathsByRoom.delete(roomId);
 }
 
 // The same clear for a room that is being torn down, where there is nobody
@@ -503,4 +566,5 @@ export function clearPathVoyageSilent(roomId: string): void {
   if (draft) clearDraftTimer(draft);
   drafts.delete(roomId);
   switchesByRoom.delete(roomId);
+  pathsByRoom.delete(roomId);
 }

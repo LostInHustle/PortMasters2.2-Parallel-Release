@@ -401,6 +401,62 @@ export function noteLegReport(
 }
 
 /**
+ * [F6: charters at leg four] The voyage's one charter, written when the
+ * server can attribute it and never twice.
+ *
+ * It is not noteTelemetry, and the difference is the dedup. The client
+ * sends its claim on every leg report once the moment is answered,
+ * because that report is also the frame a reload files, so the once per
+ * voyage rule has to live in the one writer rather than in the caller.
+ * The scan below is that rule: a captain who already has a charter_taken
+ * line in this voyage's events is answered with silence, which makes the
+ * whole note idempotent and lets a captain keep saying what they hold
+ * without the record growing a line per leg.
+ *
+ * The path and the alignment are the caller's to attach and are read
+ * before this is called, off the room's own books, never off the wire:
+ * this writer records what it is handed, for the reason every note above
+ * takes the accumulator's own numbers. It follows that there is no
+ * reader here of the alignment table, and check:private's rule about how
+ * thin that reader set stays is untouched by this function.
+ *
+ * The leg is the accumulator's, like every event, so the claim's own leg
+ * number cannot place it anywhere, and the append counts the captain for
+ * the same reason a kept report does: the voyage saw them take a card.
+ */
+export function noteCharterTaken(
+  roomId: string,
+  actor: string,
+  charter: string,
+  path: string,
+  role: string,
+): void {
+  const voyage = voyageTelemetry.get(roomId);
+  if (!voyage) return;
+  // The dedup walks the voyage's own events rather than keeping a mark
+  // beside them, and the walk is the honest shape for it: a second book
+  // of what happened is a second thing that can disagree with the record,
+  // and this list is capped, in memory, and read once per leg by at most
+  // one captain. The one writer owning the scan is also what keeps the
+  // rule true from every caller rather than from the one that remembers
+  // it.
+  for (const seen of voyage.events) {
+    if (seen.name === "charter_taken" && seen.actor === actor) return;
+  }
+  if (!admitsMore(voyage)) return;
+  voyage.captains.add(actor);
+  voyage.events.push(
+    telemetryEvent("charter_taken", voyage.voyageId, Date.now(), {
+      leg: voyage.leg,
+      actor,
+      charter,
+      path,
+      role,
+    }),
+  );
+}
+
+/**
  * A captain gave up their seat while the voyage was under way.
  *
  * The leg stamped on it is where the plan counts the abandonment, and the

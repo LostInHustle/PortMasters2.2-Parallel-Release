@@ -36,18 +36,7 @@
 //     carries both, and a card that arrives later cannot arrive with one
 //     string and pass review: the content check fails the build.
 // =====================================================================
-import {
-  BOTH_MODES,
-  NO_LEAN,
-  type CardRecord,
-  type ModeWeights,
-} from "./cards";
-
-// The two mode weightings that are not the shared one. Named rather than
-// inlined because the pair is the whole point of the field: a card is in
-// both pools or it is in Ocean Gambit's alone, and a reader should be able
-// to tell which by reading the name rather than by comparing two numbers.
-const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
+import { BOTH_MODES, GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
 
 export const BOONS_TIER0: CardRecord[] = [
   {

@@ -68,10 +68,9 @@ import type { Tag, TagList } from "./tags";
 import { MILESTONE_TRIGGERS, type MilestoneTrigger } from "./milestones";
 
 // The three things a captain can hold that are not goods, a position or a
-// crew member. The two with records in the pool today are the two the
-// engine drafts; a charter is a card a voyage offers once at leg four (F6)
-// and is named here because the shape is the deliverable rather than the
-// first wave of content that happens to fill it.
+// crew member. The two the engine drafts are the boons and the modules; a
+// charter is a card a voyage offers once at leg four, ten of them since
+// F6, two for each of the five paths.
 export type CardKind = "boon" | "module" | "charter";
 export const CARD_KINDS: readonly CardKind[] = ["boon", "module", "charter"];
 
@@ -175,6 +174,13 @@ export const MODE_POWER_CEILING: Record<GameMode, number> = {
 // and the empty lean is a value rather than an absence.
 export const NO_LEAN: Partial<Record<PathId, number>> = {};
 export const BOTH_MODES: ModeWeights = { classic: 1, ocean_gambit: 1 };
+
+// The weighting a card carries when only Ocean Gambit runs it. Named
+// rather than inlined because a reader should be able to tell which pool
+// a card is in by reading the name rather than by comparing two numbers,
+// and shared from here since it acquired its second family: the pool's
+// own cards above Classic's ceiling, and F6's ten charters.
+export const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
 
 // The card's two faces, per language. The name is what a captain reads on
 // the card and in the ledger line it writes, and the description is the

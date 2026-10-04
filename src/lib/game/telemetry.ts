@@ -293,6 +293,32 @@ export interface TelemetryPayloads {
   // this event counted per voyage against the voyages that could have
   // switched one.
   path_switched: { leg: number; actor: string; path: string };
+  // [F6: charters at leg four] The voyage's one charter, written once per
+  // captain per voyage by the server and never by the client. The plan's
+  // two evaluations of this feature both need the path and the alignment
+  // on the same row as the card: the split within a path (whether the two
+  // charters a path offers are taken at even rates) and the cover rate
+  // (whether the salvage charter is taken by honest captains and by
+  // pirates at the same rate, because a charter only traitors take has
+  // stopped being cover). Neither field rides the wire, and that is the
+  // classification rather than a convenience: the client claims the card
+  // id alone, the path is read from the room's own draft book, and the
+  // alignment from the same table the voyage's end already reads, at one
+  // call site inside the room's realtime layer. A take the server cannot
+  // attribute on both is not written, because a guessed field on an
+  // operator measurement is worse than a missing one. The role field
+  // lives operator side by construction: it rides a stored record the
+  // balance dashboard reads and no frame any captain receives, which is
+  // the same side of the line the chronicle's per captain alignment
+  // already stands on. The leg is the accumulator's, like every event
+  // above, so the claim's own leg number never reaches the record.
+  charter_taken: {
+    leg: number;
+    actor: string;
+    charter: string;
+    path: string;
+    role: string;
+  };
   // ---- market ----
   // The barter board's three outcomes. All three count the same side of an
   // offer, the units its poster put up, so the three add up: what was
@@ -353,6 +379,7 @@ export const TELEMETRY_FAMILY: Record<TelemetryName, TelemetryFamily> = {
   leg_timed_out: "loop",
   path_taken: "loop",
   path_switched: "loop",
+  charter_taken: "loop",
   offer_posted: "market",
   offer_filled: "market",
   offer_expired: "market",

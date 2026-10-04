@@ -26,7 +26,7 @@ import { merchantRatingForScore } from "../constants/reputation";
 import { closesRound, isGatedPhase, lapSuccessor } from "../checkpoint";
 import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
-import { heldFlagsOf } from "../milestones";
+import { heldFlagsOf } from "../held-cards";
 import { modeConfig } from "../mode";
 import { isLegPhase, normalizePhase, phaseFace } from "../phases";
 import { normalizeStandingOrders } from "../standing";
@@ -92,7 +92,7 @@ function endRound(state: GameState, logs: string[]) {
   // moment is permanent for the voyage: the round draft's flags expire
   // with the round they were drafted in, and the held effects are the
   // ones this write carries into the next one (see heldFlagsOf in
-  // ../milestones and the merge in applyBoon for the other end).
+  // ../held-cards and the merge in applyBoon for the other end).
   state.modifierFlags = heldFlagsOf(state);
   state.marketDemandTags = [];
   state.revealedIntel = [];
