@@ -36,6 +36,14 @@ import {
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "./world";
+import { PRODUCTS_TIER0, RESOURCES_TIER0 } from "./goods";
+import { CREW_LOSS_AFTER_HUNGRY_LEGS, WORKER_TYPES } from "./crew";
+import {
+  basePriceRange,
+  INCOME_TAX_RATE,
+  INTEL_COST,
+  VAT_RATE,
+} from "../engine/pricing";
 
 // =====================================================================
 // Player facing copy. The wording is preserved from the original game; the
@@ -44,6 +52,26 @@ import {
 // (voyage length, raid odds, escort fee, mandate rounds) is derived from the
 // tier's config, so the guide can never quote a number the engine doesn't use.
 // =====================================================================
+
+// The short rations report, stated once for the three surfaces that carry
+// one: the fleet ticker's badge tooltip, the roster row's badge tooltip,
+// and the provisions panel's note. The rule sentence stands on its own
+// because the panel that refills the larder ends differently than the two
+// badges pointing at the Market do, which is also why its wording stays
+// with each surface and only the rule is shared. The count is the
+// engine's own (see CREW_LOSS_AFTER_HUNGRY_LEGS), since the same number
+// decides the hand the crew loses.
+export const HUNGRY_CREW_RULE = `${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard.`;
+export const HUNGRY_CREW_TOOLTIP = `Going hungry: the crew is on short rations, working at a slower pace, and ${HUNGRY_CREW_RULE} Fill the larder at the next Market.`;
+
+// Three sentences two channels share. The server sends each of these as
+// wire text and a panel or a toast renders it, so the server's wording is
+// the one every surface quotes: a second copy of a string that answers a
+// press is a second answer to what the press did.
+export const HOST_ONLY_RESTART = "Only the host can restart the voyage.";
+export const STALE_OFFER = "That offer belongs to an earlier leg.";
+export const RENOWN_BONUS_LINE =
+  "Each Renown level grants a small Gold bonus at the start of your next fresh voyage";
 
 // "a 20% chance", or "a 22% chance that rises to 30% past the midpoint" on a
 // tier whose raid odds step up at the halfway mark.
@@ -203,7 +231,7 @@ ${roundStepHtml(mode)}
       content: `<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the shipping fee. Your take is whatever is left after fees and tax.</p>
 <p>You can fill as many orders as your cargo allows while Orders is open.</p>
 <div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
-  📌 <strong>Finished goods</strong> (Linen Clothes, Cotton Clothes, Brocade, Sachet) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.
+  📌 <strong>Finished goods</strong> (${PRODUCTS_TIER0.join(", ")}) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.
 </div>
 ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions a <strong>mandate</strong>: one large order at a fixed reward, and the only order exempt from VAT. It often asks for more than a single hold carries, so plan to barter or borrow to fill it.</p>` : ""}`,
     },
@@ -213,7 +241,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${m
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this voyage.<br>Wages come due at Resolve either way.
 </div>
-<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (8g), Master Weavers (12g), and Sachet Makers (20g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
+<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (${wageOf("weaver")}g), Master Weavers (${wageOf("master")}g), and Sachet Makers (${wageOf("sachet_maker")}g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Resolve",
@@ -248,7 +276,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
 <ul style="padding-left:18px;line-height:2.1;font-size:14px">
   <li>Start with raw material orders. Fast money, no complications.</li>
   <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>
-  <li>Hire artisans only when you can cover <strong>two full voyages of wages</strong>.</li>
+  <li>Hire artisans only when you can cover <strong>two full rounds of wages</strong>.</li>
   <li>Dusk ship upgrades compound quickly. Do not skip them.</li>
   <li>Caught short by pirates or a bad round? Ask the harbor for a loan before you assume the voyage is over.</li>
   <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>
@@ -260,6 +288,26 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
     },
   ];
 }
+
+// The tutorial and the guide draw their goods, wage and tax figures the
+// same way every other surface does, off the tables the market and the
+// engine read rather than typed into the sentences. A retune that moved a
+// base price, a wage or a rate would otherwise leave these two surfaces
+// quoting last fortnight's numbers, and the guide can never quote a figure
+// the engine does not use.
+const wageOf = (id: string): number =>
+  WORKER_TYPES.find((w) => w.id === id)?.wage ?? 0;
+const workerLine = (id: string, makes: string): string => {
+  const w = WORKER_TYPES.find((x) => x.id === id);
+  return `• ${w?.label ?? id} (${w?.wage ?? 0} Gold/Round): Makes ${makes}`;
+};
+const priceRangeLine = (items: readonly string[]): string =>
+  items
+    .map((item) => {
+      const range = basePriceRange(item);
+      return range ? `${item}(${range[0]} to ${range[1]}💰)` : item;
+    })
+    .join(", ");
 
 export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
@@ -288,21 +336,21 @@ Sail one voyage of ${rounds} rounds, and finish it with the most wealth and repu
 ${play.failureRule}
 
 📦 Goods System:
-Raw Materials: Hemp(3 to 6💰), Silk(6 to 10💰), Tea(10 to 14💰)
-Finished Goods: Linen Clothes(30 to 42💰), Cotton Clothes(50 to 65💰), Brocade(70 to 90💰), Sachet(95 to 120💰)
+Raw Materials: ${priceRangeLine(RESOURCES_TIER0)}
+Finished Goods: ${priceRangeLine(PRODUCTS_TIER0)}
 
 👥 Worker System:
-• Weaver (8 Gold/Round): Makes Linen or Cotton Clothes
-• Master (12 Gold/Round): Makes Linen, Cotton or Brocade
-• Sachet Maker (20 Gold/Round): Makes Sachets
+${workerLine("weaver", "Linen or Cotton Clothes")}
+${workerLine("master", "Linen, Cotton or Brocade")}
+${workerLine("sachet_maker", "Sachets")}
 
 🧾 Tax System:
-• VAT: 5% on finished product profit margin
-• Income Tax: 10% on voyage net profit
+• VAT: ${Math.round(VAT_RATE * 100)}% on finished product profit margin
+• Income Tax: ${Math.round(INCOME_TAX_RATE * 100)}% on voyage net profit
 
 🔮 Broker's Whisper:
 • Market: Click "Broker's Rumor Board" to open the window
-• Spend 5 Gold to buy a "rumor" about Orders demand
+• Spend ${INTEL_COST} Gold to buy a "rumor" about Orders demand
 • Revealed intel guarantees matching orders will appear
 • A rumor is always true and always delivered, on every tier${cfg.brokerCorruption ? `\n• Here a broker may still be corrupt: you get the true rumor, but your position leaks and this round's raid risk rises, and the log tells you when` : ""}
 
@@ -360,7 +408,7 @@ Finished Goods: Linen Clothes(30 to 42💰), Cotton Clothes(50 to 65💰), Broca
 Captain's Legacy:
 • Every voyage's final Reputation becomes Renown XP on your account the moment the voyage ends, win or lose
 • Renown is permanent: it survives a restart and carries into every future voyage, in any harbor, unlike Gold, cargo, and ship level
-• Each Renown level grants a small Gold bonus at the start of your next fresh voyage
+• ${RENOWN_BONUS_LINE}
 • Whoever ends a voyage with the highest Reputation among everyone who reached the endgame screen is crowned Sea Master
 • Check your current Renown level, title, and Sea Master crowns any time from the Lobby
 

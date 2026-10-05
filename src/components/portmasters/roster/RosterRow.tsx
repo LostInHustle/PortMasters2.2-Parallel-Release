@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import type { Socket } from "socket.io-client";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
 import { canSeeDetail } from "@/lib/game/engine";
-import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "@/lib/game/constants/crew";
+import { HUNGRY_CREW_TOOLTIP } from "@/lib/game/constants/copy";
 import { seatMarks } from "@/lib/seatMarks";
 import { cn } from "@/lib/utils";
 import { Avatar, OnlineDot, Pill } from "../shared";
@@ -178,9 +178,7 @@ export function RosterRow({
             rode writtenOff would quietly take them out of the
             running for a vote they are still entitled to. */}
         {status?.shortRations && (
-          <span
-            title={`Going hungry: the crew is on short rations, working at a slower pace, and ${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard. Fill the larder at the next Market.`}
-          >
+          <span title={HUNGRY_CREW_TOOLTIP}>
             <Pill tone="alarm">
               <Utensils className="h-3 w-3" /> Short Rations
             </Pill>

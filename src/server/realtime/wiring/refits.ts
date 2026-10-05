@@ -3,6 +3,7 @@
 // a port, ordered over ../refits' own board.
 // =====================================================================
 
+import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import type { Server, Socket } from "socket.io";
 
@@ -202,7 +203,7 @@ export function wireRefits(io: Server, socket: Socket): void {
         return;
       }
       if (opening.round !== cp.round) {
-        fail("That offer belongs to an earlier leg.");
+        fail(STALE_OFFER);
         return;
       }
       if (cp.phase !== "market") {

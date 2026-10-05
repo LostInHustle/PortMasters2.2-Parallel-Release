@@ -56,7 +56,7 @@ import {
 } from "./constants/supplies";
 import { survivalLayerOn } from "./flags";
 import { holdCapacityOn, storeRoomMeals } from "./hold";
-import type { GameState, LarderLot } from "./types";
+import { wholeStamp, type GameState, type LarderLot } from "./types";
 
 // The most lots a voyage can legitimately be carrying. Purchases merge
 // into the lot of the same food bought in the same leg, so a twelve leg
@@ -421,6 +421,5 @@ export function normalizeLarderLots(
  * been sailing this build all along.
  */
 export function normalizeLarderSpoilRound(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }

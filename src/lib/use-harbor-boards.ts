@@ -3,8 +3,7 @@
 // =====================================================================
 // The harbor's boards, as this captain's client holds them.
 //
-// Nine boards and the ten relays that close them, and what makes them
-// one module is what they have in common: none of them lives in a save
+// What makes them one module is what they have in common: none of them lives in a save
 // file. Each is real room wide state that no single client's
 // deterministic engine can compute on its own, so each arrives over the
 // socket and is written into this captain's own voyage here, on the side
@@ -300,8 +299,8 @@ export function useHarborBoards({
     onVentureSettled,
   );
 
-  // [D3: Convoy: the Escort Contract] The tenth relay, and the last of the
-  // ones that only ever touch this captain's own purse: a contract this
+  // [D3: Convoy: the Escort Contract] The last of the relays that only
+  // ever touch this captain's own purse: a contract this
   // captain is a side of has moved, and the engine works out what that
   // means for them (see applyEscortSide). Both sides of a contract run this
   // same callback against their own state, which is what keeps the fee and

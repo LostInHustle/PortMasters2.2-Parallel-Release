@@ -42,6 +42,15 @@ export const MAROON_SHARE = 0.5;
 // work in (see the Harbor Pulse's own per good nudge).
 export const PORT_SHIFT_FRACTION = 0.1;
 
+// The share of the roster a maroon vote carries, in the words the vote
+// card and the Harbormaster's hand state it in. It lives here, beside the
+// comparison in maroonCarried, because that comparison is the arithmetic
+// these words render: it is written in whole numbers (count * 3 >= roster
+// * 2) rather than against a floating share, so a retune that moved the
+// vote would have to move this string in the same breath, and the panels
+// quote it rather than restating it.
+export const MAROON_VOTE_SHARE = "Two thirds";
+
 // One port, and which way the Harbormaster leaned it. The durable shape
 // of the power: it is what a client stamps onto its own state when the
 // market opens, and what every price at that port is read against until

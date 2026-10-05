@@ -88,6 +88,7 @@ export {
   calcTransportCost,
   explainCardPrice,
   INCOME_TAX_RATE,
+  INTEL_COST,
   VAT_RATE,
   explainExpectedPrice,
   explainTransportCost,
@@ -102,7 +103,6 @@ export {
 // ========== Market: the port board ==========
 export {
   applyBazaarLean,
-  applyHarborPulse,
   applyMarketLeans,
   applyPortShift,
   applyTidewatchSurge,
@@ -198,7 +198,8 @@ export {
 // [D7: the draft, and switching] The two writes a path leaves in a
 // captain's save, and the one refusal that guards the second. The rule
 // they read (the deck, the pass, the window and the fee) lives outside
-// the engine, in ./draft, for the reason ./contracts and ./bazaar state
+// the engine, in ./draft, for the reason ./engine/contracts and
+// ./engine/bazaar state
 // about their own arithmetic: it holds no state, so the suite can hold it
 // without a server, and only the two apply functions here touch a save.
 //
@@ -455,9 +456,7 @@ export {
   readModuleTraffic,
   shippedModuleTraffic,
   type ModuleTrade,
-  type ModuleTrafficRow,
   type ModuleTrafficSave,
-  type ModuleTrafficSubject,
 } from "./engine/modules";
 
 // ========== Milestone boons ==========
@@ -478,7 +477,7 @@ export { answerMilestone } from "./engine/milestones";
 // that needs a public name is the answer: answerCharter is the overlay's
 // one call, taking the card the captain pressed off the trio or refusing
 // a card the trio no longer deals (see ./engine/charters for why a
-// refusal is a real answer). The reading side stays in ../charters and is
+// refusal is a real answer). The reading side stays in ./charters and is
 // not forwarded: the overlay imports what is due and what is offered from
 // there, the way the boon draft imports its own pair, so a caller meets
 // the question through the module that asks it.
@@ -489,7 +488,9 @@ export { answerCharter } from "./engine/charters";
 // feature is one sale: buyFromBarge, at a premium the constants set and
 // out of a lot drawn from the port and the leg. bargePortAtLeg,
 // bargeLotAtPort, bargeRationPrice and bargeLeftAtPort are the four
-// questions the provisions panel asks before it draws the row; bargeOn is
+// questions the provisions panel asks before it draws the row, and
+// bargeRoomMeals and bargePurseRations are the two ceilings the sale and
+// the panel are both held to, read from one place; bargeOn is
 // the layer the vendor stands on, which is the provisions layer itself
 // rather than a switch of its own, because the plan's rollback for this
 // goal is reverting the mode (see barge); and normalizeBargeState is the
@@ -505,7 +506,9 @@ export {
   bargeLotAtPort,
   bargeOn,
   bargePortAtLeg,
+  bargePurseRations,
   bargeRationPrice,
+  bargeRoomMeals,
   buyFromBarge,
   normalizeBargeState,
 } from "./engine/barge";

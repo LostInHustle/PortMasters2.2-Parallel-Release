@@ -39,21 +39,24 @@ export function MessageList({
   searchQuery: string;
   emptyText: string;
 }) {
+  // One notice, two reasons to draw it: an empty channel and a search that
+  // matched nothing are the same empty box with a different sentence in
+  // it, so the sentence is chosen here and the box is drawn once below.
+  const notice = !hasContent ? (
+    emptyText
+  ) : stream.length === 0 ? (
+    <>No messages match &ldquo;{searchQuery}&rdquo;.</>
+  ) : null;
+
   return (
     <div
       ref={scrollRef}
       className="pm-scroll flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5"
     >
-      {!hasContent ? (
+      {notice !== null ? (
         <div className="h-full flex items-center justify-center text-center px-6">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            {emptyText}
-          </p>
-        </div>
-      ) : stream.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-center px-6">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            No messages match &ldquo;{searchQuery}&rdquo;.
+            {notice}
           </p>
         </div>
       ) : (

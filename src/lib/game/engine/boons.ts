@@ -208,12 +208,6 @@ function equipModule(
   if (swapIdx !== null) {
     const old = state.equippedModules[swapIdx];
     unequipModuleAccounting(state, old);
-    // [REFACTOR] brokers_network used to set state.intelCost = 5 here on
-    // unequip (and = 2 on equip below). With intelCost now derived from
-    // hasModule(state, "brokers_network") in ./pricing.ts#getIntelCost,
-    // these writes are dead and the field is gone from GameState; the
-    // discount is read live off the equipped set, so equip and unequip no
-    // longer need to keep a parallel field in sync.
     state.equippedModules[swapIdx] = mod;
     logs.push(`🔄 Swapped ${cardName(old.id)} for ${cardName(mod.id)}!`);
   } else {

@@ -13,14 +13,16 @@
 // Parley checkpoint, and only for a captain the room still counts. It may
 // not do it twice, and it may not do it to a bankrupt captain, who has
 // nothing left to hide and is already out of the room's calculations
-// (see activeRosterSet, which is the same roster every advance waits on).
+// (see activeRosterSet, the roster the maroon vote is also counted
+// against; the advance's own ready check waits on the narrower roster in
+// that same module, and the two are deliberately distinct).
 //
 // It is also the second thing in the mode whose reveal is transient state
 // the clients cannot rebuild, and it heals the same way the commission
 // does: the reveal lives on this map for the voyage, and a captain who
 // joins or reloads into a harbor that has already audited somebody is
-// handed it directly (see the room:join hand-out in ./index), exactly as
-// a joiner is handed the commission's board.
+// handed it directly (see the room:join hand-out in ./wiring/room-join),
+// exactly as a joiner is handed the commission's board.
 //
 // Nothing about the phase belongs in here. The audit consumes the leg's
 // Parley phase, but it does that by telling the room what it found, and

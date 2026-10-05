@@ -16,12 +16,12 @@ Every defect below has since been repaired. The audit is kept in the tense it wa
 | The Phase 1 price reference misses two module discounts      | The reference applies the same module discounts the counter applies.                                                                                                  |
 | A load timeout and a load error both drop the Renown bonus   | A failed load leaves the captain's Renown level where it was.                                                                                                         |
 | Six numbers the interface states that the game does not      | All six corrected.                                                                                                                                                    |
-| Three things that are written and read by nothing            | The House perks and the Age effects are wired in and live. The Harbor activity feed is not.                                                                           |
+| Three things that are written and read by nothing            | The House perks and the Age effects are wired in and live. The Harbor activity feed was removed rather than wired, button and panel and palette rung together.        |
 | The pledge that strands                                      | The conclusion sweep treats a bankrupt borrower as absent, so their loan is swept and the pledge riding on it resolves.                                               |
 | Dead payload and a dead computation                          | The three unread standings fields, the crown total that was summed and never sent, and the unused ship count are gone.                                                |
 | Two comments naming different boards for one surge           | Both name the Purchase board now, which is where the surge is added.                                                                                                  |
 
-Two entries in the last section are deliberately left as they were found. `CaptainMerit.earnedAt` is still stored and still never printed, and it stays: a timestamp on an achievement is a record of when it was earned rather than a field pretending to be one. The Harbor activity feed still opens onto a panel with nothing behind it, and it will keep doing so until the endpoint it would read from exists.
+One entry in the last section is deliberately left as it was found. `CaptainMerit.earnedAt` is still stored and still never printed, and it stays: a timestamp on an achievement is a record of when it was earned rather than a field pretending to be one. The Harbor activity feed was the other one, and it is gone: the shelf button, its always empty panel and the hue that dressed them were removed on 2026-10-04 rather than left standing over an endpoint that was never built.
 
 ## How the audit was run
 
@@ -95,7 +95,9 @@ The two boons do nothing for the two most valuable goods in the game.
 
 ### Settlement shows a pirate risk higher than the one that is rolled
 
-`src/components/portmasters/game/phases/Settlement.tsx:39` computes the displayed risk:
+`src/components/portmasters/game/phases/PirateAttack.tsx:38` computes the displayed risk as `Math.round(pirateChance(game) * 100)`, straight off the engine's reader.
+
+It used to compute the figure by hand, from the base chance and the leak:
 
 ```typescript
 const raidPct = Math.round(
@@ -106,19 +108,21 @@ const raidPct = Math.round(
 );
 ```
 
-The comment above it reads that this is "so what the captain reads is the real chance". It is not. The actual roll at `src/lib/game/engine/pirates.ts:23` applies three further modifiers after the base chance: `brokerCorruptionRisk`, `pirate_risk_discount`, and the Persian Dome Compass module at a factor of 0.7.
+under a comment reading that this is "so what the captain reads is the real chance". It was not: the actual roll applied three further modifiers after the base chance, `brokerCorruptionRisk`, `pirate_risk_discount`, and the Persian Dome Compass module at a factor of 0.7. A captain who took the Deep Sea Escort Pact boon, which promises that "pirate risk [is] halved this round", was shown the undiscounted chance, and the escort was priced and recommended off that same wrong figure.
 
-A captain who takes the Deep Sea Escort Pact boon, which promises that "pirate risk [is] halved this round", is shown the undiscounted chance. The escort is priced and recommended off that same wrong figure at `Settlement.tsx:110`.
+The panel and the roll read one function now: `pirateChance` at `src/lib/game/engine/pirates.ts:48` folds the tier, the leak, both reductions and the Compass, so what a captain reads is the number the roll uses.
 
 ### Settlement shows an escort price higher than the one charged
 
-`src/components/portmasters/game/phases/Settlement.tsx:32`:
+`src/components/portmasters/game/phases/PirateAttack.tsx:37` reads the quote off the engine:
 
 ```typescript
-const escortCost = Math.floor(game.money * escortRateFor(game.difficulty));
+const escortFee = escortCost(game);
 ```
 
-`hireEscort` at `src/lib/game/engine/pirates.ts:55` applies `escort_discount` before charging. The same boon that halves the escort cost is halved in the charge and not in the quote, so the panel quotes double what the button takes.
+It used to compute it by hand as `Math.floor(game.money * escortRateFor(game.difficulty))`, while the charge applied `escort_discount` before taking money. The same boon that halves the escort cost was halved in the charge and not in the quote, so the panel quoted double what the button took.
+
+The quote and the charge are one function now: `escortCost` at `src/lib/game/engine/pirates.ts:91` applies the Escort Pact and the Standing Escort before returning, and the button takes exactly what the panel shows.
 
 ### Harbor Pulse is calibrated to three goods and the harbor trades more
 
@@ -134,15 +138,15 @@ The lean is the gap between a good's share of harbor buying and the baseline, so
 
 ### The Phase 1 price reference misses two module discounts
 
-The tooltip on each shelf row in `src/components/portmasters/game/phases/Purchase.tsx:63` calls `explainExpectedPrice`, which applies `purchase_discount`, `hemp_price_reduction` and `smugglers_hold`. It does not apply the Kiln Cellar or the Foreign Quarter Pass, both of which `getCardFinalCost` does apply at the counter.
+The tooltip on each shelf row, at `src/components/portmasters/game/phases/PurchasePriceReference.tsx:42`, calls `explainExpectedPrice`. It used to apply `purchase_discount`, `hemp_price_reduction` and `smugglers_hold` but not the Kiln Cellar or the Foreign Quarter Pass, both of which `getCardFinalCost` does apply at the counter, so a captain holding either module was quoted high on that panel and charged low at the till. The error was in the captain's favor, but the reference number the panel exists to provide was wrong.
 
-A captain holding either module is quoted high on that panel and charged low at the counter. The error is in the captain's favor at the till, but the reference number the panel exists to provide is wrong.
+The reader applies both module lines now (`explainExpectedPrice`, `src/lib/game/engine/pricing.ts:504`, the Kiln Cellar at `:550` and the Foreign Quarter Pass at `:560`), so the quote and the counter agree.
 
 ### A load timeout and a load error both drop the Renown bonus
 
-`src/lib/use-game-session.ts:153` and `:259` build a fallback state when a saved voyage cannot be fetched. Both paths reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 falls from 160 Gold to 100, and the Broker's Favor unlock relocks for the rest of that voyage.
+The two fallback loads, for a saved voyage that cannot be fetched, are `applyTimedOutLoad` and `applyFailedLoad` in `src/lib/session/use-voyage-load.ts` (`:154` and `:252`). Both used to reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 fell from 160 Gold to 100, and the Broker's Favor unlock relocked for the rest of that voyage.
 
-A network timeout should not demote a captain.
+A network timeout should not demote a captain, and it no longer does: both paths read the level remembered across loads (`env.renownRef.current`), so a failed fetch leaves the captain exactly where they were.
 
 ### Six numbers the interface states that the game does not
 
@@ -167,7 +171,9 @@ Two entries above have since been corrected. The Purchase panel now reads Harbor
 
 **The Age effects.** The `modifier` field on each Age has no reader outside `ages.ts`. The banner announces the Age and the effect it is meant to have, in the present tense, and no part of the voyage acts on it. Again, the release notes already say so.
 
-**The Harbor activity feed.** It opens onto a panel that reports no recent activity, and will keep reporting that until the endpoint it would read from is built.
+**The Harbor activity feed.** It opened onto a panel that reported no recent activity, and it would have kept reporting that until the endpoint it would read from was built. The endpoint was never built. On 2026-10-04 the feed was removed outright, the shelf button, the panel and the hue that dressed them, so the harbor shelf now carries only controls that answer when pressed.
+
+None of the three stands as it was found: the first two are wired in and live, and the third is gone.
 
 ### The pledge that strands
 
@@ -178,29 +184,30 @@ For a pledge to be stranded, one captain backs a second captain's loan, and then
 1. `src/lib/game/engine/lifecycle.ts:111` sets `state.gameOver = true` when the Settlement bills cannot be covered.
 2. `src/components/portmasters/game/GameControlPanel.tsx:51` disables Next Phase when `game.gameOver`, so a bankrupt captain cannot advance a phase again.
 3. The pledge is settled by the borrower's own client reporting a repayment. A captain who can no longer advance a phase never sends that report.
-4. The conclusion sweep at `src/server/realtime/conclusion.ts:163` deliberately skips any loan whose borrower still has a live socket:
+4. The conclusion sweep at `src/server/realtime/conclusion/voyage.ts:387` deliberately skips any loan whose borrower still has a live socket and is not bankrupt:
 
    ```typescript
-   if ((userSockets.get(loan.borrowerId)?.size ?? 0) > 0) continue;
+   const stillPresent =
+     !bankrupt.has(loan.borrowerId) &&
+     (userSockets.get(loan.borrowerId)?.size ?? 0) > 0;
+   if (stillPresent) continue;
    ```
 
-   The comment above it explains the intent: a connected borrower is one whose report may simply not have arrived yet, and sweeping that loan would race their genuine settlement.
+   The intent is unchanged: a connected borrower is one whose report may simply not have arrived yet, and sweeping that loan would race their genuine settlement.
 
-A bankrupt captain stays connected. The Bankruptcy screen is a spectator view of a harbor they are still in. So the sweep reads them as a captain who is about to report, and their loan is never swept while it is also never repaid.
+A bankrupt captain stays connected: the Bankruptcy screen is a spectator view of a harbor they are still in. The sweep therefore used to read them as a captain who was about to report, and their loan was never swept while it was also never repaid. The backer's escrowed Gold sat out the rest of the voyage, neither refunded nor called on, and on the next server start `clearLoans` dropped the loan from memory without settling it, so the backer lost the escrow and never received the Reputation that a pledge with nothing called on it would have granted.
 
-The backer's escrowed Gold sits out the rest of the voyage, neither refunded nor called on, and on the next server start `clearLoans` drops the loan from memory without settling it. The backer loses the escrow and never receives the Reputation that a pledge with nothing called on it would have granted.
+The repair is the one this finding proposed, read off the concluding roster rather than off `gameOver`: the sweep now builds the set of bankrupt captains from the finished roster and treats them as absent, so a captain who cannot advance a phase is never mistaken for one about to report.
 
-The narrow fix is to treat a borrower whose state is `gameOver` as absent for the purposes of the sweep, since a captain who cannot advance a phase is not about to report anything.
-
-This finding is reasoned from the code path. It was not reproduced in a live voyage.
+This finding was reasoned from the code path rather than reproduced in a live voyage.
 
 ### Dead payload and a dead computation
 
-Neither of these changes what a captain can do. Both are worth clearing before the next person reads the code and assumes the field matters.
+None of these changed what a captain could do, and all of them are cleared now except the one deliberate keep.
 
-The standings rows written at `src/server/realtime/conclusion.ts:384` carry `gold`, `renownLevel` and `renownTitle`, and nothing reads any of the three. `totalCrowns` at `src/app/api/leaderboard/route.ts:46` is computed and never sent. `CaptainMerit.earnedAt` is stored and never shown. The conclusion sweep computes `totalShips` into a variable that is never used.
+The standings rows built by `standingRow` in `src/server/realtime/conclusion/finishers.ts` used to carry `gold`, `renownLevel` and `renownTitle` as well, and nothing read any of the three: the Endgame panel draws final funds from the captain's own game state and the level and title from the legacy record it fetches alongside the payload. The three fields are gone, and the comment above the builder records the reasoning. `totalCrowns` at `src/app/api/leaderboard/route.ts` used to be summed from `parseStatsByDifficulty` and then left out of the entry, so the route paid for a parse whose result nothing ever sent; it is gone too, recorded in the comment above the entries. The conclusion sweep's dead `totalShips` variable is cleared. `CaptainMerit.earnedAt` is the one that stays: stored and never shown, kept on purpose as audit data (see the note above).
 
-`src/lib/game/engine/partialSight.ts:12` carries a comment asserting a Backing trust gate at Renown level 5 that does not exist in the code. `docs/PROPOSAL.md:43` repeats it. Both should go, since the feature they describe works and does not need the gate.
+`src/lib/game/engine/partialSight.ts` used to assert a Backing trust gate at Renown level 5 that did not exist in the code, and `docs/PROPOSAL.md` repeated it. Both now describe the two real thresholds instead: the viewer at Renown Level 5, and the captain being looked at at Level 3.
 
 `src/lib/game/integrity.ts:49` attributes the surge sizing to the order board while `src/lib/game/engine/market.ts:381` adds it to the purchase board. One of the two comments is wrong.
 

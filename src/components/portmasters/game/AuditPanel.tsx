@@ -22,7 +22,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
-import { fulfillmentLine } from "@/lib/game/audit";
+import {
+  AUDIT_REVEAL_WORDS,
+  AUDIT_VOTE_RULE,
+  fulfillmentLine,
+} from "@/lib/game/audit";
 import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
@@ -128,12 +132,12 @@ export function AuditVoteCard({
           )}
           <VoteTallyRows rows={rows} />
           <p className="text-[10px] text-muted-foreground/80 mt-2">
-            A majority is more than half of the captains still in the voyage.
+            {AUDIT_VOTE_RULE}
           </p>
         </>
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: a random pair of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
+          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: ${AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
         </p>
       )}
     </VoteCardShell>

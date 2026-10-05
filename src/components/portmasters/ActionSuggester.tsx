@@ -5,7 +5,12 @@ import { Sparkles, X, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { cardText, cargoCarriesTag } from "@/lib/game/cards";
-import { flatWorkerRoster, type GameState } from "@/lib/game/types";
+import {
+  flatWorkerRoster,
+  type GameState,
+  type ModifierKey,
+} from "@/lib/game/types";
+import type { CardRecord } from "@/lib/game/constants/cards";
 import {
   basePriceRange,
   priceRatio,
@@ -16,11 +21,13 @@ import {
   getCardFinalCost,
   getHireCost,
   getIntelCost,
+  INCOME_TAX_RATE,
   lockedBehind,
   moduleSlotsOpen,
   wageBill,
 } from "@/lib/game/engine";
 import { RECIPES } from "@/lib/game/constants/goods";
+import { SHIP_DISCOUNT_PER_LEVEL } from "@/lib/game/constants/ships";
 import { TONE_WASH } from "./shared";
 
 /**
@@ -29,10 +36,12 @@ import { TONE_WASH } from "./shared";
  * recommendation is advisory, not prescriptive: a captain who
  * disagrees can close the panel and play their own move.
  *
- * The suggester is intentionally conservative. It never recommends
- * spending the last Gold on hand before Resolve, never recommends
- * hiring a worker without at least two rounds of wages in reserve,
- * and always flags the pirate escort decision with the math.
+ * The suggester is intentionally conservative: it only recommends a
+ * purchase the captain can afford, and only suggests hiring when at least
+ * two rounds of wages would remain in hand. It deliberately says nothing
+ * about the pirate escort decision, because the Settlement panel already
+ * offers that choice with its comparison spelled out (see
+ * analyzeSettlement).
  */
 
 type Suggestion = {
@@ -165,6 +174,16 @@ function analyzePhase(game: GameState): Suggestion | null {
   }
 }
 
+// The flags a card record writes, or an empty record for a card that
+// writes none. Every sentence below that quotes a figure quotes the card
+// it names, reading the number here rather than retyping it: a retune
+// moves the record and the suggestion together, and a card that stopped
+// writing the flag stops producing that sentence rather than printing a
+// number the card no longer promises.
+function cardFlags(card: CardRecord): Partial<Record<ModifierKey, number>> {
+  return card.effect.kind === "flags" ? card.effect.flags : {};
+}
+
 function analyzeBoonDraft(game: GameState): Suggestion | null {
   const choices = game.boonChoices ?? [];
   if (choices.length === 0) return null;
@@ -175,34 +194,59 @@ function analyzeBoonDraft(game: GameState): Suggestion | null {
 
   // If money is low, recommend Emergency Loan
   const emergency = choices.find((b) => b.id === "emergency_loan");
-  if (emergency && game.money < 30) {
+  const emergencyGold = emergency
+    ? cardFlags(emergency).instant_gold
+    : undefined;
+  if (emergency && emergencyGold && game.money < 30) {
     return {
       icon: emergency.icon,
       title: `Take the ${cardText(emergency).name}`,
-      body: `You have ${game.money} Gold. The ${cardText(emergency).name} gives 40 Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Resolve.`,
+      body: `You have ${game.money} Gold. The ${cardText(emergency).name} gives ${emergencyGold} Gold immediately, which should cover wages and maintenance this round. Without it, you risk bankruptcy at Resolve.`,
       tone: "alarm",
     };
   }
 
-  // If no workers hired, recommend Master's Apprentice
+  // If no workers hired, recommend Master's Apprentice. The pair of
+  // prices in the sentence is a projection rather than a retyping: the
+  // Weaver's price as the state stands, then the same price with the
+  // card's own discount flag written over a copy, so both numbers come
+  // out of getHireCost, the one function a hire is charged through. A
+  // hand written pair sat here before, and both numbers were wrong for a
+  // captain holding an Artisan's Workshop or a House wage perk.
   const apprentice = choices.find((b) => b.id === "master_apprentice");
+  const hireDiscount = apprentice
+    ? cardFlags(apprentice).hire_discount
+    : undefined;
   const hasWorkers = flatWorkerRoster(game).length > 0;
-  if (apprentice && !hasWorkers && round <= maxRounds - 3) {
+  if (apprentice && hireDiscount && !hasWorkers && round <= maxRounds - 3) {
+    const weaverNow = getHireCost(game, "weaver");
+    const weaverThen = getHireCost(
+      {
+        ...game,
+        modifierFlags: { ...game.modifierFlags, hire_discount: hireDiscount },
+      },
+      "weaver",
+    );
     return {
       icon: apprentice.icon,
       title: `Pick ${cardText(apprentice).name}`,
-      body: `You have no artisans yet. ${cardText(apprentice).name} halves hiring costs this round, letting you get a Weaver for 4 Gold instead of 8. Good for establishing production early.`,
+      body: `You have no artisans yet. ${cardText(apprentice).name} cuts hiring costs by ${Math.round(hireDiscount * 100)}% this round, letting you get a Weaver for ${weaverThen} Gold instead of ${weaverNow}. Good for establishing production early.`,
       tone: "gain",
     };
   }
 
-  // If income is expected to be high, recommend Tax Shelter
+  // If income is expected to be high, recommend Tax Shelter. The two
+  // rates are the engine's own: the base rate a voyage pays and the
+  // override this card writes (see calcIncomeTax in engine/pricing).
   const taxShelter = choices.find((card) => card.id === "tax_shelter");
-  if (taxShelter && score > 50) {
+  const shelterRate = taxShelter
+    ? cardFlags(taxShelter).income_tax_override
+    : undefined;
+  if (taxShelter && shelterRate && score > 50) {
     return {
       icon: taxShelter.icon,
       title: `Grab the ${cardText(taxShelter).name}`,
-      body: `You have ${score} Reputation. With high earnings expected, the ${cardText(taxShelter).name} cuts income tax from 10% to 5%, saving Gold at round end.`,
+      body: `You have ${score} Reputation. With high earnings expected, the ${cardText(taxShelter).name} cuts income tax from ${Math.round(INCOME_TAX_RATE * 100)}% to ${Math.round(shelterRate * 100)}%, saving Gold at round end.`,
       tone: "warn",
     };
   }
@@ -491,7 +535,7 @@ function analyzeShipyard(game: GameState): Suggestion | null {
       return {
         icon: "⚓",
         title: "Upgrade to Ship Level 1",
-        body: `Upgrading costs ${cost} Gold and gives +1 module slot and +5 Gold transport discount. With ${roundsLeft} rounds left, the transport savings alone will pay for the upgrade.`,
+        body: `Upgrading costs ${cost} Gold and gives +1 module slot and +${SHIP_DISCOUNT_PER_LEVEL} Gold transport discount. With ${roundsLeft} rounds left, the transport savings alone will pay for the upgrade.`,
         tone: "gain",
       };
     }

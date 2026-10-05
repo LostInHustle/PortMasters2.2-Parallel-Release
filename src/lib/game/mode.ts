@@ -534,8 +534,10 @@ export const MODES: Record<GameMode, ModeConfig> = {
     //
     // Every sentence here is written for a captain rather than for the
     // engine, so a round is a round here and not a leg. The engine's own
-    // word for one lap of the voyage is a leg (see GameState.maxRounds,
-    // the leg reports in ./telemetry, and the rail), and the two words
+    // fields count rounds (GameState.currentRound and maxRounds), and
+    // the guide defines the word the same way; the leg register that
+    // some of the newer systems write in is recorded where it ships (see
+    // the leg reports in ./telemetry and the voyage log). The two words
     // name one thing: a voyage is the whole run, and it is measured in
     // rounds. The tutorial used to call each lap a voyage, which is what
     // left a captain who read the guide and then looked at the rail

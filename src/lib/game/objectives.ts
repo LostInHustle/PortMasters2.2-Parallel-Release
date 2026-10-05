@@ -149,7 +149,7 @@ type SeatBand = {
 
 // The bands, smallest first, which is also the order a report reads them
 // in. Exported because the two readers outside this module (the win rate
-// reader in ../balance and the smoke suite) have to walk the same bands
+// reader in ./balance and the smoke suite) have to walk the same bands
 // this table holds rather than list them again.
 export const SEAT_BANDS: readonly SeatBand[] = [
   { min: 0, factor: 1, label: "4 or fewer" },
@@ -219,7 +219,9 @@ export function drawObjective(seed: string, seats = 0): Objective {
   };
 }
 
-// How many items the commission is for, across every good.
+// How many items the commission is for, across every good. No production
+// site sums a commission, so the smoke oracle and its suites are this
+// export's readers: they hold the draw and the due to this one total.
 export function objectiveTotalItems(objective: Objective): number {
   return objective.resources.reduce((sum, r) => sum + r.required, 0);
 }

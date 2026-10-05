@@ -315,7 +315,10 @@ function OrderCard({
       </div>
       {o.isBrokerFavor && (
         <div className="text-[10px] text-favor">
-          🤝 Broker&apos;s cut ({brokerCommissionPct}%): {brokerCommission} Gold
+          <Term term="Commission">
+            🤝 Broker&apos;s cut ({brokerCommissionPct}%): {brokerCommission}{" "}
+            Gold
+          </Term>
         </div>
       )}
       {o.isProductOrder && vatBreakdown && (

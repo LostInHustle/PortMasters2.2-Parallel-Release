@@ -21,13 +21,14 @@ import type { ObjectiveTraceEntry, OrderFill } from "@/lib/game/types";
 export type VoyageResult = {
   roomId: string;
   winnerId: string | null;
-  standings: StandingsEntry[];
+  standings: StandingRow[];
 };
 
-// One row in the voyage conclusion standings. Every field is what the
-// server emits on room:voyage_complete, kept here so the Endgame panel
-// and the Lobby's chronicle viewer can share the same shape.
-type StandingsEntry = {
+// One row of the voyage conclusion standings, as the server emits it on
+// room:voyage_complete and hands it to the reveal. Declared here so the
+// Endgame panel, the Lobby's chronicle viewer and the conclusion itself
+// all read one shape rather than a shape each.
+export type StandingRow = {
   userId: string;
   displayName: string;
   avatarHue: number;

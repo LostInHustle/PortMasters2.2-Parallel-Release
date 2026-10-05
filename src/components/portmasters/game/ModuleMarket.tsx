@@ -7,6 +7,7 @@ import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import { cardById, cardName, cardText } from "@/lib/game/cards";
 import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
+import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   canSellModule,
@@ -17,8 +18,13 @@ import {
 import { moduleTradesOn } from "@/lib/game/flags";
 import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
-import { cn } from "@/lib/utils";
-import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
+import {
+  MarketBlock,
+  MarketEmpty,
+  MarketError,
+  MarketPanel,
+  OfferRow,
+} from "./OfferBoard";
 import type { ModuleTrades } from "./phases/PhaseShared";
 
 // The fallback crest for a row whose module the pool cannot resolve, which
@@ -103,23 +109,23 @@ export function ModuleMarket({
     : (sellable[0]?.id ?? "");
 
   return (
-    <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
-      <h3 className="text-center font-semibold mb-1 text-sm">
-        {UNKNOWN_MODULE_ICON} Module Market
-      </h3>
-      <p className="text-center text-[11px] text-muted-foreground mb-3 max-w-xl mx-auto">
-        A module bolted to a hull, sold at a price the two of you agree. It
-        comes off the seller&apos;s hull and onto the buyer&apos;s the moment
-        the two of you shake hands, so the buyer needs an open slot, and a
-        hull&apos;s ladder tops out at three slots at ship level three. The fee
-        is paid when you shake hands.
-      </p>
-
+    <MarketPanel
+      title={`${UNKNOWN_MODULE_ICON} Module Market`}
+      intro={
+        <>
+          A module bolted to a hull, sold at a price the two of you agree. It
+          comes off the seller&apos;s hull and onto the buyer&apos;s the moment
+          the two of you shake hands, so the buyer needs an open slot, and a
+          hull&apos;s ladder tops out at three slots at ship level three. The
+          fee is paid when you shake hands.
+        </>
+      }
+    >
       {/* The listing form belongs to a captain with something to sell. A
           captain with an empty hull reads the board below it and nothing
           else, which is what makes this a market rather than a screen. */}
       {canSell && (
-        <div className="rounded-lg border border-parley/15 bg-background/40 p-3 mb-3">
+        <MarketBlock>
           {sellable.length === 0 ? (
             <p className="text-center text-[11px] text-muted-foreground">
               Every module on your hull is already on the board this leg. The
@@ -170,28 +176,17 @@ export function ModuleMarket({
               </p>
             </>
           )}
-        </div>
+        </MarketBlock>
       )}
 
-      {modules.error && (
-        <p className="text-center text-[11px] text-alarm mb-2">
-          {modules.error}{" "}
-          <button
-            type="button"
-            onClick={modules.clearError}
-            className="underline"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
+      <MarketError error={modules.error} onDismiss={modules.clearError} />
 
       {modules.moduleTrades.length === 0 ? (
-        <p className="text-center text-xs text-muted-foreground py-3">
+        <MarketEmpty>
           {canSell
             ? "Nothing on the market yet. Your listing is the first."
             : "No modules on offer this Parley."}
-        </p>
+        </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
           {modules.moduleTrades.map((trade) => (
@@ -207,7 +202,7 @@ export function ModuleMarket({
           ))}
         </div>
       )}
-    </div>
+    </MarketPanel>
   );
 }
 
@@ -252,7 +247,7 @@ function ModuleRow({
   // blocks nothing: it is the unreachable corner the crest above stands in
   // for.
   const blocked = stale
-    ? "That offer belongs to an earlier leg."
+    ? STALE_OFFER
     : roomOpen < 1
       ? "Every slot on your hull is full. Make room at the yard first."
       : card !== null && !powerBudgetAllows(game, card)
@@ -260,48 +255,20 @@ function ModuleRow({
         : null;
 
   return (
-    <PathDeskRow mine={mine}>
-      <span className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-medium">
-          {icon} {moduleLine(trade, me)}
-        </span>
-        {trade.status === "offered" && trade.buyerUserId && (
-          <JustForChip forMe={isBuyer} name={trade.buyerName} />
-        )}
-      </span>
-
-      {trade.status === "offered" &&
-        (mine ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-7 px-2.5 text-[10px] rounded shrink-0"
-            onClick={() => modules.cancel(trade.id)}
-          >
-            Cancel
-          </Button>
-        ) : (
-          <span className="flex flex-col items-end gap-0.5 shrink-0">
-            <Button
-              size="sm"
-              className={cn(
-                "h-7 px-2.5 text-[10px] rounded",
-                !blocked && "pm-grad-parley",
-              )}
-              variant={blocked ? "secondary" : "default"}
-              disabled={blocked !== null}
-              onClick={() => modules.accept(trade.id)}
-            >
-              {icon} Take It
-            </Button>
-            {blocked && (
-              <span className="text-[9px] text-muted-foreground">
-                {blocked}
-              </span>
-            )}
-          </span>
-        ))}
-    </PathDeskRow>
+    <OfferRow
+      mine={mine}
+      line={`${icon} ${moduleLine(trade, me)}`}
+      chip={
+        trade.status === "offered" && trade.buyerUserId
+          ? { forMe: isBuyer, name: trade.buyerName }
+          : null
+      }
+      acceptLabel={`${icon} Take It`}
+      acceptClassName="pm-grad-parley"
+      blocked={blocked}
+      onCancel={() => modules.cancel(trade.id)}
+      onAccept={() => modules.accept(trade.id)}
+    />
   );
 }
 

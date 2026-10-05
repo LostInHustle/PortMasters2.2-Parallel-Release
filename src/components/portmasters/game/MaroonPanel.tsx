@@ -25,7 +25,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
-import { portShiftLine } from "@/lib/game/maroon";
+import {
+  MAROON_VOTE_SHARE,
+  PORT_SHIFT_FRACTION,
+  portShiftLine,
+} from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
@@ -139,12 +143,12 @@ export function MaroonVoteCard({
           )}
           <VoteTallyRows rows={rows} />
           <p className="text-[10px] text-muted-foreground/80 mt-2">
-            Two thirds of the captains still in the voyage carries it.
+            {MAROON_VOTE_SHARE} of the captains still in the voyage carries it.
           </p>
         </>
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${rung}, two thirds of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
+          {`From leg ${rung}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
         </p>
       )}
     </VoteCardShell>
@@ -266,7 +270,8 @@ export function HarbormasterConsole({
       </h3>
       <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
         The harbor put you ashore and left you its own lever: once a leg, name a
-        port and lean every price at it by a tenth, up or down. The call is
+        port and lean every price at it by{" "}
+        {Math.round(PORT_SHIFT_FRACTION * 100)} percent, up or down. The call is
         public, and the market that opens next leg is the one that answers it.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">

@@ -1,7 +1,7 @@
 // POST /api/quick-start: the signed in check in front of the Quick Start
 // queue.
 //
-// This route deliberately does not enqueue anybody. The queue is a Set in
+// This route deliberately does not enqueue anybody. The queue is a Map in
 // the realtime layer's memory, and a route handler runs in the Next.js
 // bundle, so it would be looking at a different copy of that module with a
 // different and permanently empty queue. The browser does the real work

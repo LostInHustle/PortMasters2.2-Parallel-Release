@@ -23,6 +23,7 @@ import { CargoHold } from "./status/CargoHold";
 import { ShipTab } from "./status/ShipTab";
 import { DuesTab } from "./status/DuesTab";
 import { ConvoyVentures } from "./status/ConvoyVentures";
+import { Term } from "../Term";
 
 // One crew type of the unlocked roster, with the hands of that type aboard
 // and what they are owed at the round end. Built here, where the difficulty
@@ -162,13 +163,17 @@ export function GameStatusPanel({
       <Tabs defaultValue="hold" className="mt-2.5 flex flex-col gap-2">
         <TabsList className="grid w-full shrink-0 grid-cols-4">
           <TabsTrigger value="hold" className="text-[11px]">
-            Hold
+            <Term term="Hold" focusable={false}>
+              Hold
+            </Term>
           </TabsTrigger>
           <TabsTrigger value="ship" className="text-[11px]">
             Ship
           </TabsTrigger>
           <TabsTrigger value="dues" className="text-[11px]">
-            Dues
+            <Term term="Dues" focusable={false}>
+              Dues
+            </Term>
             {duesAlert && (
               <span
                 className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-alarm"

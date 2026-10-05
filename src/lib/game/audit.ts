@@ -36,7 +36,7 @@
 // written into this file before C1: the plan named a number this tree did
 // not have, and a save carried no food, so a reveal that printed one would
 // have put a figure on screen that no rule ever moved. The reading itself
-// belongs to ./server/realtime/audit, which is the side that holds the
+// belongs to src/server/realtime/audit.ts, which is the side that holds the
 // save the Larder is written into, and this module stays what it was: the
 // sample, its seed, and the shape a manifest line may take. Nothing here
 // reads a Larder, and it should not start.
@@ -66,6 +66,19 @@ export const AUDIT_WINDOW = 5;
 // verdict and away from a signal, which is the property the epic's
 // evaluation watches.
 export const AUDIT_REVEAL_COUNT = 2;
+
+// The count above, in the words the vote card states it in: the reveal
+// opens this many order fulfillments, and the sentence below promises the
+// same number to the room, so a retune moves both or the card would say
+// "a pair" over a reveal that opened three.
+export const AUDIT_REVEAL_WORDS = "a random pair";
+
+// The rule a carried audit is decided by, stated here rather than in the
+// panel that renders it: the comparison below is what a majority means in
+// this vote (strictly more than half of the roster), and the tally line a
+// captain reads is a rendering of that comparison, not a second rule.
+export const AUDIT_VOTE_RULE =
+  "A majority is more than half of the captains still in the voyage.";
 
 /**
  * The seed one audit's sample is drawn from.

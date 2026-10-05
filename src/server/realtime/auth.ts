@@ -15,6 +15,10 @@ import {
   getUserFromToken,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
+// The one picker of a row's four public fields, shared with the REST
+// routes. This layer used to carry a private copy of it; a second picker
+// is a second answer to what a wire user is.
+import { publicUser } from "@/lib/db";
 import type { SocketState } from "./types";
 import {
   sockets,
@@ -24,20 +28,6 @@ import {
 } from "./presence";
 import { forgetStatusIfLastSocket } from "./status";
 import { emitRoomMembers } from "./chat";
-
-function publicUser(u: {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-}): PublicUser {
-  return {
-    id: u.id,
-    username: u.username,
-    displayName: u.displayName,
-    avatarHue: u.avatarHue,
-  };
-}
 
 // Parse the pm_session cookie from a raw cookie header. The cookie is
 // sent automatically on same origin connections; cross origin

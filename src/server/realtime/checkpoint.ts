@@ -10,7 +10,7 @@
 // phase without this server needing to know what that phase is.
 //
 // checkpointRank and openingPhase are the shared helpers from
-// ./game/checkpoint, forwarded so this module stays the single place
+// @/lib/game/checkpoint, forwarded so this module stays the single place
 // server code reads anything about a checkpoint from, and lapSuccessor
 // is read here directly to find the step that opens the port market.
 // All three are a boundary, not a copy: the lap they read lives with the
@@ -131,10 +131,10 @@ export async function parleyCheckpoint(
 // has a live socket connected. A member who is just slow to load still
 // correctly counts as someone the room needs to wait for.
 //
-// Exported for the one caller that is not an advance: the Manifest
-// Audit's majority (see ./audit) is counted against this same roster, so
-// the room the audit is put to and the room a phase waits for are the
-// same set of captains. A second roster read that meant "who counts"
+// Exported because two callers outside this module read it: the Manifest
+// Audit's majority (see ./audit) and the maroon vote (see ./maroon) are
+// both counted against this roster, so a vote is only ever put to captains
+// the room still counts. A second roster read that meant "who counts"
 // would be a second answer to that question.
 export async function activeRosterSet(roomId: string): Promise<Set<string>> {
   const statuses = roomStatuses.get(roomId);
@@ -184,7 +184,8 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
 // Not exported: the two readers are the two places a seat's vote is counted,
 // both of them here, and a third reader outside this module would be a
 // second answer to who a seat waits on. activeRosterSet above is exported
-// because the audit genuinely reads it; this one has no such reader.
+// because the audit and the maroon vote genuinely read it; this one has no
+// such reader.
 async function waitingRosterSet(roomId: string): Promise<Set<string>> {
   const statuses = roomStatuses.get(roomId);
   const memberIds = await roomMemberIds(roomId);

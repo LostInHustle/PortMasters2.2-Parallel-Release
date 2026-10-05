@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * The overlay every dialog in the game sits in: a dimmed, blurred backdrop
@@ -48,6 +49,16 @@ export function ModalOverlay({
   );
 }
 
+// The rise and settle every dialog in the game wears. Written once because
+// six dialogs wear it: the two behind the card below, and the four column
+// dialogs the sheet serves.
+const CARD_MOTION = {
+  initial: { opacity: 0, scale: 0.95, y: 20 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.95, y: 20 },
+  transition: { duration: 0.25, ease: "easeOut" },
+} as const;
+
 /**
  * The panel a dialog's content sits on: the card that rises and settles as
  * the dialog opens, wearing the game's glass treatment with the seigaiha
@@ -66,14 +77,47 @@ export function ModalOverlay({
 export function ModalCard({ children }: { children: ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      {...CARD_MOTION}
       className="pm-glass-strong pm-crackle relative z-10 w-full max-w-md overflow-hidden rounded-3xl p-6"
     >
       <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
       <div className="relative">{children}</div>
+    </motion.div>
+  );
+}
+
+/**
+ * The column a dialog with regions sits on: the same glass, the same rise
+ * and the same rounded frame as the card, laid out as a vertical stack
+ * whose header and body the caller hands in as children.
+ *
+ * The guide, the settings, the captain's profile and the leaderboard are
+ * the four dialogs this serves, and before it existed each of them wrote
+ * out the same motion props and the same eleven glass classes, agreeing
+ * on everything but the two numbers this takes: how wide the panel may be
+ * and how tall. The card above keeps its own shape because its content is
+ * one centred column and the four are scrolled regions under fixed
+ * headers; the paper here is one width, one height and the stack.
+ */
+export function ModalSheet({
+  maxW = "max-w-md",
+  maxH = "max-h-[90vh]",
+  children,
+}: {
+  maxW?: string;
+  maxH?: string;
+  children: ReactNode;
+}) {
+  return (
+    <motion.div
+      {...CARD_MOTION}
+      className={cn(
+        "pm-glass-strong pm-crackle relative z-10 flex w-full flex-col overflow-hidden rounded-3xl",
+        maxH,
+        maxW,
+      )}
+    >
+      {children}
     </motion.div>
   );
 }

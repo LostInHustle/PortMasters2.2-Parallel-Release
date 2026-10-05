@@ -7,7 +7,7 @@ import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon, Anchor, Utensils } from "lucide-react";
 import { seatMarks } from "@/lib/seatMarks";
-import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "@/lib/game/constants/crew";
+import { HUNGRY_CREW_TOOLTIP } from "@/lib/game/constants/copy";
 
 /**
  * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
@@ -84,7 +84,7 @@ export function FleetTicker({
               {st?.shortRations && (
                 <span
                   className="flex items-center text-alarm"
-                  title={`Going hungry: the crew is on short rations, working at a slower pace, and ${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard. Fill the larder at the next Market.`}
+                  title={HUNGRY_CREW_TOOLTIP}
                 >
                   <Utensils className="h-3 w-3" />
                 </span>

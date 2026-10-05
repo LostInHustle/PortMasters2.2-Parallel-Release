@@ -182,15 +182,7 @@ Solo practice is built in as well. A captain can set sail alone, which is the ea
 
 This is PortMasters 2.2 Parallel Release, a build of its own rather than a patched copy of the one before it. That earlier build is [PortMasters 2 Parallel Release](https://github.com/LostInHustle/PortMasters2-Parallel-Release), which is where the multiplayer game as it exists today was designed. If you have sailed that one, nothing you learned there is wrong here.
 
-Every system of the earlier build is still here and still working the same way, and six more are built on top of it.
-
-|                        | The earlier build | PortMasters 2.2 Parallel Release |
-| ---------------------- | ----------------- | -------------------------------- |
-| Harbor systems shipped | 10 of 18          | 16 of 18                         |
-| Realtime layer         | one long file     | 57 modules                       |
-| Interface components   | 29                | 79                               |
-| Database models        | 10                | 15                               |
-| The port it answers on | 2232              | 8080                             |
+Every system of the earlier build is still here and still working the same way, and six more are built on top of it. The release notes open with the side by side table of the two builds, from the shipped harbor systems to the measured module counts, and state the rule those counts are re-measured under whenever a pass adds or removes a file.
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
 

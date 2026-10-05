@@ -27,10 +27,9 @@ export function BoonDraft({
   "game" | "ctx" | "act" | "phaseSync" | "boons" | "members" | "me"
 >) {
   const picks = game.boonChoices;
-  // This is the screen the user specifically called out for a visible
-  // ready indicator: once a captain locks in a boon, swap the picker for
-  // the same "x/y ready" readout everyone else gets, rather than leaving
-  // a now meaningless set of cards on screen.
+  // Once a captain locks in a boon, swap the picker for the same "x/y
+  // ready" readout everyone else gets, rather than leaving a now
+  // meaningless set of cards on screen.
   if (phaseSync.waiting) {
     return (
       <div className="max-w-md mx-auto text-center py-10">

@@ -42,7 +42,7 @@ import { cardByFlag, cardText } from "../cards";
 import { OPPORTUNIST_PENALTY, OPPORTUNIST_USES } from "../constants/paths";
 import { pathOrdersOn } from "../flags";
 import type { PathId } from "../paths";
-import type { GameState } from "../types";
+import { wholeStamp, type GameState } from "../types";
 
 /**
  * The path whose ability is the borrow, as a reading of the record rather
@@ -282,7 +282,5 @@ export const OPPORTUNIST_SPENT_LINE =
  * healing lets through cannot do arithmetic it should not.
  */
 export function normalizeOpportunistBorrows(raw: unknown): number {
-  return typeof raw === "number" && Number.isFinite(raw)
-    ? Math.max(0, Math.floor(raw))
-    : 0;
+  return wholeStamp(raw);
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { cn } from "@/lib/utils";
+import { Term } from "../../Term";
 import { type PhasePanelProps } from "./PhaseShared";
 
 /**
@@ -76,9 +77,9 @@ export function LoanBacking({
         })}
       </div>
       <p className="text-[11px] text-muted-foreground mt-2">
-        Pledged Gold is escrowed now, only spent if the loan actually defaults,
-        up to what you pledged. Never called on? It all comes back, plus a small
-        Reputation bonus.
+        Pledged Gold is <Term term="Escrow">escrowed</Term> now, only spent if
+        the loan actually defaults, up to what you pledged. Never called on? It
+        all comes back, plus a small Reputation bonus.
       </p>
     </div>
   );

@@ -539,7 +539,7 @@ export type GameState = {
   // [H4: the Broker] Coin this captain has taken from other captains in
   // trade, net of coin paid to them, across the whole voyage. The one
   // number a Broker's card is measured on (see evaluateVictory in
-  // ../victory), accumulated at the two barter settlement paths and never
+  // ./victory), accumulated at the two barter settlement paths and never
   // by a port sale, which is the distinction the role is made of. Durable
   // rather than per round because the design has to track it from leg one
   // and cannot reconstruct it later.
@@ -934,6 +934,23 @@ function initialInventory(): Record<string, number> {
   return inv;
 }
 
+// Repairs a round stamp read back from a save: the whole number of laps the
+// field counts, floored, with anything unreadable healing to zero. Zero is
+// deliberately a round no voyage has (the first round is one), which is the
+// direction every stamp heals in: a save written before a field existed
+// lands on "this has not happened yet" rather than on a lap that reads as
+// already spent.
+//
+// Every save-healing reader that turns a stored stamp into a round uses this
+// one function: the Larder's fed and spoil rounds, the crew's hungry legs,
+// the wardrobe's tick round, the refit leg stamp (itself written once for
+// two fields), and the opportunist's borrow count. Each reader keeps its own
+// paragraph about its own field; the arithmetic lives here once.
+export function wholeStamp(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.floor(raw));
+}
+
 // Repairs a hold read back from a save. Guarantees a key for every catalogued
 // good, and coerces anything non numeric to zero: a hold damaged before the
 // catalogue existed stored NaN, which JSON writes as null and which would
@@ -1172,7 +1189,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     // [F4: boons at milestone moments] A fresh voyage holds no boons,
     // waits on no moments and has answered none: every mark starts
     // absent, which the due rules read as zero in the trigger's own
-    // units (see ../milestones).
+    // units (see ./milestones).
     heldBoons: [],
     milestoneOffers: [],
     milestonesAnswered: {},

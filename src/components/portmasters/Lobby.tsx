@@ -33,7 +33,6 @@ import { AgeBanner } from "./AgeBanner";
 import { HowToPlayModal } from "./HowToPlayModal";
 import { SettingsModal } from "./SettingsModal";
 import { DifficultyAdvisor } from "./DifficultyAdvisor";
-import { HarborActivityFeed } from "./HarborActivityFeed";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { HarborBoard } from "./lobby/HarborBoard";
 import {
@@ -635,7 +634,6 @@ export function Lobby({
               >
                 <Trophy className="h-3.5 w-3.5" />
               </button>
-              <HarborActivityFeed />
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="pm-tool pm-tool-icon pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"

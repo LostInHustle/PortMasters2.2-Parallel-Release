@@ -7,6 +7,7 @@ import { phaseLabel } from "@/lib/game/engine";
 import { isGatedPhase } from "@/lib/game/checkpoint";
 import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
+import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
@@ -278,7 +279,7 @@ export function GameControlPanel({
           title={
             isHost
               ? "Restart the voyage for everyone in the harbor"
-              : "Only the host can restart the voyage"
+              : HOST_ONLY_RESTART
           }
           onClick={onRestart}
         >

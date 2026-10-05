@@ -10,7 +10,7 @@
 // The server is still the one authority that owns *when* this runs, and
 // it takes two hands: every captain's per round purchase report is
 // tallied as it arrives in src/server/realtime/index.ts (through
-// addPulseReport in ./pulse), and the pulse is then computed exactly once
+// addPulseReport in src/server/realtime/pulse.ts), and the pulse is then computed exactly once
 // by maybeAdvance in src/server/realtime/checkpoint.ts, at the moment the
 // room advances into the next round's Market. This module only owns the
 // formula itself.

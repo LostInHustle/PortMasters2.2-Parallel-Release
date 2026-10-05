@@ -65,6 +65,7 @@ import { flagOnFor, survivalLayerOn } from "./flags";
 import { createRng } from "./rng";
 import {
   flatWorkerRoster,
+  wholeStamp,
   type GameState,
   type Worker,
   type WornGarment,
@@ -556,6 +557,5 @@ export function normalizeGarments(raw: unknown): WornGarment[] {
  * been sailing this build all along.
  */
 export function normalizeGarmentsTickRound(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }

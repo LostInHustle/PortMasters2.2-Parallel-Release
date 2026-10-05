@@ -9,7 +9,7 @@
 // (a forged finish, and a crown), and the two frames the room is told the
 // result with.
 // =====================================================================
-import { RevealedCaptain } from "@/types/realtime/voyage";
+import { RevealedCaptain, type StandingRow } from "@/types/realtime/voyage";
 import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
@@ -69,25 +69,6 @@ export type FinishedCaptain = {
   // like everyone else. Null on a status that never carried the field,
   // which is a status from a client older than this feature.
   bankrupt: boolean;
-};
-
-// One row of the voyage conclusion standings, as it is emitted on
-// room:voyage_complete and handed to the reveal.
-export type StandingRow = {
-  userId: string;
-  displayName: string;
-  avatarHue: number;
-  reputation: number;
-  crowned: boolean;
-  bankrupt: boolean;
-  // [H7: Maroon and the Harbormaster] Beside bankrupt rather than folded
-  // into it: both are marks a failed voyage leaves, and a seat can carry
-  // either, both or neither.
-  marooned: boolean;
-  xpGained: number;
-  leveledUp: boolean;
-  brokersFavorUnlocked: boolean;
-  newMerits: string[];
 };
 
 // Every captain still seated when the voyage ended, or null when the group

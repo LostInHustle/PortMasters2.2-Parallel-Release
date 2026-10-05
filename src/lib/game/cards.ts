@@ -262,7 +262,7 @@ export function cardWeight(card: CardRecord, state: GameState): number {
  * because the two unlocked readers each hold one kind's ladder and the pool
  * a mode runs is the same for both. A charter is the third kind and is
  * absent from this walk on purpose: its trio is composed at the moment it
- * is offered (see ../charters), and the empty arm below is that absence
+ * is offered (see ./charters), and the empty arm below is that absence
  * stated rather than a kind nobody remembered to wire.
  */
 export function offerPool(

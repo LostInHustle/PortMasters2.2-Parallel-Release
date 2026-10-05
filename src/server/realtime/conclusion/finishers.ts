@@ -39,7 +39,10 @@ import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import { unlockLineFor } from "@/lib/unlock";
 import { maroonResultFor } from "../maroon";
 import type { RivalStanding } from "../rival";
-import type { FinishedCaptain, StandingRow, VoyageRun } from "./voyage";
+import type { FinishedCaptain, VoyageRun } from "./voyage";
+// The standings row is declared with the wire shape it travels in; the
+// builder here is its sole producer (see the type's own comment).
+import type { StandingRow } from "@/types/realtime/voyage";
 
 // What the harbor decided about one captain before anything else is read
 // about them.

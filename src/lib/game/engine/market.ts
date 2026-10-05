@@ -356,13 +356,10 @@ export function tallyCardPurchases(
 // [MANIFEST 01: The Harbor Pulse] Stamps the room wide pulse the server
 // computed for this round onto local state, so genResourceCard picks it up
 // the moment startMarket runs below. A plain setter kept as its own function,
-// the same convention purchaseIntel/receiveLoan/etc already follow, so the
-// client's phase advance handler can call it through the same act() dispatch
-// as every other socket driven state change.
-export function applyHarborPulse(
-  state: GameState,
-  pulse: Record<string, number>,
-) {
+// the same convention purchaseIntel/receiveLoan/etc already follow, called
+// by applyMarketLeans below in the same act() dispatch as every other socket
+// driven state change.
+function applyHarborPulse(state: GameState, pulse: Record<string, number>) {
   state.harborPulse = pulse;
 }
 
@@ -437,7 +434,7 @@ export type MarketLeans = {
 export function applyMarketLeans(state: GameState, leans: MarketLeans): void {
   if (leans.harborPulse) applyHarborPulse(state, leans.harborPulse);
   if (leans.portShift !== undefined) {
-    applyPortShift(state, leans.portShift ?? null);
+    applyPortShift(state, leans.portShift);
   }
   if (leans.bazaarLean) applyBazaarLean(state, leans.bazaarLean);
 }

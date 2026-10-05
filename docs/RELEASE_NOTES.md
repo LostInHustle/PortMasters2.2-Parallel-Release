@@ -15,13 +15,15 @@ The 2.2 build branches from it rather than patching it. Every game system that b
 |                                 | The earlier build      | PortMasters 2.2 Parallel Release |
 | ------------------------------- | ---------------------- | -------------------------------- |
 | Harbor Manifest systems shipped | 10 of 18               | 16 of 18                         |
-| Realtime layer                  | one file, 3,097 lines  | 59 modules, 10,901 lines         |
-| Engine modules                  | 12, across 2,493 lines | 29, across 7,469 lines           |
+| Realtime layer                  | one file, 3,097 lines  | 61 modules, 11,752 lines         |
+| Engine modules                  | 12, across 2,493 lines | 31, across 8,500 lines           |
 | API routes                      | 16, plus a stub        | 26                               |
-| Interface components            | 29                     | 146                              |
+| Interface components            | 29                     | 151                              |
 | Database models                 | 10                     | 15                               |
 | The port the game answers on    | 2232                   | 8080                             |
 | The bind address                | not configurable       | `HOST`, defaulting to `0.0.0.0`  |
+
+The tree figures in that table are measured rather than rounded, and the rule is worth writing down because no check reads the docs: the realtime layer counts the `.ts` files under `src/server/realtime` with the `conclusion` subdirectory left out, the engine counts the `.ts` files under `src/lib/game/engine`, and the interface counts the `.tsx` files under `src/components`, the house-colours lookup aside because it is a table rather than a component. Re-measure them the same way after any pass that adds or removes a file.
 
 ## The six systems 2.2 adds
 
@@ -348,6 +350,8 @@ The cycle also caught a flake in the battery itself. Suite 51's board scan is se
 
 **Four lines a captain reads now say what the engine does, and one disclosure gained the half it was missing.** The wardrobe's wear line names the durability points the sea actually takes rather than the warmth rating those points scale, so the sentence and the numbers the panel prints can be reconciled by the captain reading both. The short rations line claims both halves of the yield rule, the halving and the floor that lifts every line back to one item, rather than the bare percentage the floor never fully took. The cargo tile in the provisioning market prints the capacity the engine's own reader answers rather than a second count that disagreed with what the counter would actually sell. And the audit's reveal of the Larder learned to say whether anybody was aboard to go hungry, because the count alone printed short rations over a ship the engine itself never hungered, and beside it the panel now tells an empty larder with a crew apart from an empty larder without one. Two smaller repairs ride along: the payroll's wage efficiency stops reading a recipe no task named, and the module market's fee line teaches the ladder's real top rather than a slot count the yard never allowed. The regression article is `scripts/smoke/suites/59-theDoorsAndTheLoad.ts`: the trade door charged and unwound, both directions of the load's reconciliation, the two collections' heals, the pantry's own keys, the purse's floor and the repaired lines, each pinned to the reading a captain gets and, where the old behavior was a lie a captain could read, to its absence as well.
 
+**The four trading desks now draw from one board, and the dialogs and profile blocks that had grown the same shell four ways now share one each.** The escort market, the module market, the refit bench and the bazaar desk are four markets standing at one table, and each had written out its own copy of the same frame, the same posting block, the same error line, the same empty state and the same offer row: eighteen shared markup lines pairwise between three of them alone, which is four places for one desk's accept button or blocked note to drift from the next. The shared furniture is one file now, the four markets keep the parts that are actually theirs, their sentences and their goods and their refusals, and a retouch to any one desk moves all four together. The same cut ran through the dialogs and the profile: the guide, the settings, the captain's own page and the leaderboard had each written out the same rising glass panel and now share one shell; the profile's four blocks share one heading; the captain's two standing numbers are one tile taken twice; and the chat's empty box is drawn once for its two sentences rather than twice. Two numbers that were written down twice are one reading each: the emergency loan is stated once and both the card a captain is dealt and the manual quote it, and the module interaction lines quote the module records themselves rather than restating the numbers beside them. Nothing a captain sees changed, which is what the battery and the oracle were run to hold, and the copy the fleet reads is held free of dashes from its code points as always.
+
 ## What is still to come
 
 Two of the eighteen Manifest systems are not in the game.
@@ -355,10 +359,6 @@ Two of the eighteen Manifest systems are not in the game.
 **House Rally** (Manifest 09) was designed and not built. It would have given a harbor where most of the captains share a pledge a flavour banner and a bonus House standing at voyage end. It is the last system on the roadmap.
 
 **Bilingual Harbor** (Manifest 15) was built in full and then removed at the owner's request. It does not come back without a fresh owner decision.
-
-One smaller item is written and visible without yet doing anything, and this document would rather name it than let a table imply otherwise.
-
-The Harbor activity feed opens onto a panel that says there has been no recent activity, and it will keep saying that until the endpoint it would read from exists. It is a small piece of work rather than a rewrite, and it is not broken: it is simply not switched on. The three House perks and the three Age effects used to sit on this list beside it. Both are wired in now, so they have left it.
 
 ## Where the two repositories differ outside the game
 

@@ -69,7 +69,7 @@ import {
 import { survivalLayerOn } from "./flags";
 import { addLot, drawMeals, foodRoomMeals, reconcileLarder } from "./foods";
 import { pathCargoModifier } from "./paths";
-import { flatWorkerRoster, type GameState } from "./types";
+import { flatWorkerRoster, wholeStamp, type GameState } from "./types";
 
 /**
  * The crew: the artisan roster, counted through the one helper that
@@ -244,6 +244,43 @@ export function cargoRoom(state: GameState): number {
 }
 
 /**
+ * What one leg of rations costs the whole crew.
+ *
+ * The product is the sale's own (a leg is one ration a head, see
+ * provisionFood below), and it is named here because three surfaces read
+ * it: the sale itself, the refusal line it logs, and the buttons whose
+ * labels print what a press would cost.
+ */
+export function legRationCost(state: GameState): number {
+  return crewSize(state) * RATION_PRICE;
+}
+
+/**
+ * How many legs of one food the stores still have room for.
+ *
+ * One of the two ceilings provisionFood is held to, exported so that the
+ * panel offering the press is held to the same one. The provisions panel
+ * used to compute this itself (the room in meals over the crew, floored),
+ * which is the same arithmetic in a second place, and the two would have
+ * had to be retuned together forever. Floored at zero legs: a pantry with
+ * no room has none rather than a negative amount of it.
+ */
+export function provisionRoom(state: GameState, food: FoodId): number {
+  const crew = crewSize(state);
+  return crew === 0 ? 0 : Math.floor(foodRoomMeals(state, food) / crew);
+}
+
+/**
+ * How many legs of rations the purse can cover, the other ceiling
+ * provisionFood is held to. Zero for a crew of none, because nobody
+ * aboard is nothing to feed rather than a division by nothing.
+ */
+export function provisionAffordable(state: GameState): number {
+  const leg = legRationCost(state);
+  return leg === 0 ? 0 : Math.floor(state.money / leg);
+}
+
+/**
  * Buys food for the crew, as many legs' worth as the stores have room for
  * and the purse can cover.
  *
@@ -289,15 +326,15 @@ export function provisionFood(
     return 0;
   }
   reconcileLarder(state);
-  const room = Math.floor(foodRoomMeals(state, food) / crew);
+  const room = provisionRoom(state, food);
   if (room <= 0) {
     logs.push("🧺 The larder is full.");
     return 0;
   }
-  const affordable = Math.floor(state.money / (crew * RATION_PRICE));
+  const affordable = provisionAffordable(state);
   const wanted = Math.min(Math.floor(legs), room, affordable);
   if (wanted <= 0) {
-    const cost = crew * RATION_PRICE;
+    const cost = legRationCost(state);
     logs.push(
       `❌ Not enough Gold to provision the crew: a leg of rations is ${cost} Gold.`,
     );
@@ -360,6 +397,5 @@ export function normalizeLarder(raw: unknown, mode: unknown): number {
  * sailing this build all along.
  */
 export function normalizeLarderFedRound(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }

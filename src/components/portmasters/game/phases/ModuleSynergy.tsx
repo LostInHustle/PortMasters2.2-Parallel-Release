@@ -49,7 +49,7 @@ const MODULE_SYNERGY_RULES: {
   },
   {
     ids: ["brokers_network", "ocean_relay"],
-    label: `Intel Network: ${cardName("brokers_network")} drops a rumor to 2 Gold and reveals two, and ${cardName("ocean_relay")} adds a third free. Maximum market intelligence.`,
+    label: `Intel Network: ${cardName("brokers_network")} discounts every whisper, and ${cardName("ocean_relay")} adds one more at no cost. Maximum market intelligence.`,
     tone: "intel",
   },
   {
@@ -59,12 +59,12 @@ const MODULE_SYNERGY_RULES: {
   },
   {
     ids: ["kiln_cellar", "bureau_token"],
-    label: `Charter Combo: ${cardName("kiln_cellar")} discounts every bulk good, and ${cardName("bureau_token")} adds 10% to the rewards on orders for the charter's own goods. Buy cheap, sell high.`,
+    label: `Charter Combo: ${cardName("kiln_cellar")} discounts every bulk good, and ${cardName("bureau_token")} pays more on orders for the charter's own goods. Buy cheap, sell high.`,
     tone: "gain",
   },
   {
     ids: ["foreign_quarter_pass", "fleet_of_treasures"],
-    label: `Exotic Trade: ${cardName("foreign_quarter_pass")} discounts every luxury good, and ${cardName("fleet_of_treasures")} takes three Gold a unit off freight on the same trade. Tier 2 goods at tier 0 prices.`,
+    label: `Exotic Trade: ${cardName("foreign_quarter_pass")} discounts every luxury good, and ${cardName("fleet_of_treasures")} takes Gold off freight on the same trade. Tier 2 goods at tier 0 prices.`,
     tone: "gain",
   },
 ];

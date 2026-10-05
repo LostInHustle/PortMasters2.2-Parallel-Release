@@ -46,7 +46,7 @@ import {
 import { cargoRoom } from "../larder";
 import type { PathId } from "../paths";
 import { createRng } from "../rng";
-import type { GameState } from "../types";
+import { wholeStamp, type GameState } from "../types";
 import {
   consentPartyBusy,
   floorTallies,
@@ -440,13 +440,11 @@ export function normalizeRefitState(state: GameState): void {
  * Zero is a leg no voyage has, which is the direction both stamps heal in:
  * a save that predates this feature lands on "the harbor has not worked on
  * the crew yet" rather than on a leg that reads as already spent. Written
- * once for the two stamps because the second copy of it would be the one
- * that kept a fraction.
+ * once for the two stamps, on the one arithmetic every stamp in the game
+ * shares (see wholeStamp in ../types).
  */
 function legStamp(raw: unknown): number {
-  return typeof raw === "number" && Number.isFinite(raw)
-    ? Math.max(0, Math.floor(raw))
-    : 0;
+  return wholeStamp(raw);
 }
 
 // =====================================================================

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import { SectionHeading } from "./SectionHeading";
 
 const TIERS = [
   { id: "fair_winds", name: "Fair Winds", icon: "🌤️" },
@@ -15,9 +16,7 @@ export function DifficultyBreakdown({
 }) {
   return (
     <div>
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        By Difficulty
-      </h3>
+      <SectionHeading>By Difficulty</SectionHeading>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {TIERS.map((t) => {
           const s = (

@@ -65,6 +65,7 @@ import { crewSize, onShortRations } from "./larder";
 import { flagOnFor } from "./flags";
 import {
   flatWorkerRoster,
+  wholeStamp,
   type CrewLoss,
   type GameState,
   type Worker,
@@ -339,12 +340,10 @@ export function healCrewIdentity(state: GameState): void {
  * are. A save written before this field existed carries none, and it lands
  * on zero, which is a crew that has not gone hungry yet: the first hungry
  * leg after loading therefore counts as the first, exactly as it would
- * have had the captain been sailing this build all along. A fraction is
- * floored, because legs are counted.
+ * have had the captain been sailing this build all along.
  */
 export function normalizeHungryLegs(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }
 
 /**

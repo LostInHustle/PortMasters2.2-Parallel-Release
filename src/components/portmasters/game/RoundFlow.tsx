@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { phaseFace } from "@/lib/game/phases";
 import type { RoundLeg } from "@/lib/game/mode";
+import { Term } from "../Term";
 
 /**
  * One mode's round, drawn as the flow it is.
@@ -100,8 +101,17 @@ export function RoundFlow({
                   )}
                 </span>
                 <span className="min-w-0 py-1.5">
+                  {/* The phase's name is a term wherever the rail draws it:
+                      the four leg names a captain meets before any briefing
+                      (Dawn, Parley, Resolve, Dusk) carry their own entries
+                      now, and a name without one falls back to plain text,
+                      so the wrap is the rail saying these words are the
+                      game's vocabulary rather than a second label. */}
                   <span className="font-semibold">
-                    {face.icon} {face.label}
+                    {face.icon}{" "}
+                    <Term term={face.label} focusable={false}>
+                      {face.label}
+                    </Term>
                   </span>
                   <span className="block text-xs leading-snug text-muted-foreground">
                     {leg.body}

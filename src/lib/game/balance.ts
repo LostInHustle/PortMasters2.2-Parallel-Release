@@ -2,9 +2,9 @@
 // PortMasters 2.2 Parallel Release: reading the mode's win rates.
 //
 // [H5: the quota rung] The epic's gate is a claim about numbers: an honest
-// captain wins something between 52 and 58 voyages in a hundred, a Broker
-// between 35 and 45, a Pirate between 20 and 26, and none of those rates
-// moves when the table grows from four seats to five to six. Before H4
+// captain wins the share of voyages WIN_RATE_TARGETS records below, with a
+// Broker's and a Pirate's bands beside it, and none of those rates moves
+// when the table grows from four seats to five to six. Before H4
 // nothing could check that, because a voyage concluded without recording
 // who was dealt what. Now every finished voyage leaves its alignment and
 // its verdict on a Chronicle row, so the claim is a query, and this module

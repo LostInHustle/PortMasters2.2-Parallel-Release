@@ -28,7 +28,7 @@ import type { OrderFill } from "@/lib/game/types";
 /** One captain's nomination, sent to the server. */
 export type AuditVote = {
   roomId: string;
-  /** The leg the vote belongs to, checked against the room's checkpoint. */
+  /** The round the vote belongs to, checked against the room's checkpoint. */
   round: number;
   targetUserId: string;
 };

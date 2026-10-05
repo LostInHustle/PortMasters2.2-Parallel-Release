@@ -25,13 +25,13 @@
 /** One captain's nomination, sent to the server. */
 export type MaroonVote = {
   roomId: string;
-  /** The leg the vote belongs to, checked against the room's checkpoint. */
+  /** The round the vote belongs to, checked against the room's checkpoint. */
   round: number;
   targetUserId: string;
 };
 
 /**
- * The nominations so far this leg, broadcast after every vote including
+ * The nominations so far this round, broadcast after every vote including
  * the one that carries. The same frame the audit's tally uses, and for
  * the same reason: the count is arithmetic the client can do and the
  * names are the part it cannot reconstruct.

@@ -14,6 +14,7 @@ import {
   REWEAVE_RAGS,
 } from "@/lib/game/constants/garments";
 import { RAGS } from "@/lib/game/constants/goods";
+import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
@@ -30,7 +31,7 @@ import {
 import { garmentRoom, garmentSpec } from "@/lib/game/garments";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
+import { MarketBlock, MarketEmpty, MarketError, OfferRow } from "./OfferBoard";
 import type { Refit } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than on
@@ -126,7 +127,7 @@ export function RefitBench({
           who holds no path reads the board below it and the tailors' row,
           which is what makes this a market rather than a screen. */}
       {canSell && (
-        <div className="rounded-lg border border-refit/15 bg-background/40 p-3 mb-3">
+        <MarketBlock tone="refit">
           {takenOn ? (
             <p className="text-center text-[11px] text-muted-foreground">
               You have already taken on a refit this leg, and one pair of hands
@@ -174,14 +175,14 @@ export function RefitBench({
               </p>
             </>
           )}
-        </div>
+        </MarketBlock>
       )}
 
       {/* The harbor's pile. A Loom captain's supply is the scrap the fleet
           brought ashore, which is why this row is drawn for that path alone
           and why it reads the same weather the crew freezes in. */}
       {canSell && (
-        <div className="rounded-lg border border-refit/15 bg-background/40 p-3 mb-3">
+        <MarketBlock tone="refit">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
             <span className="text-muted-foreground">Harbor pile</span>
             <span className="font-bold text-refit">{pile}</span>
@@ -216,7 +217,7 @@ export function RefitBench({
               ? "No rags came ashore this leg. The pile only fills after a cold one."
               : `The pile is what the fleet's scrap comes to after a cold leg, and it is drawn from the voyage's own weather. ${REWEAVE_RAGS} rags go back on the loom as one ${REWEAVE_GOOD}.`}
           </p>
-        </div>
+        </MarketBlock>
       )}
 
       {/* What every captain can do alone, and the price a refit is measured
@@ -228,7 +229,7 @@ export function RefitBench({
           record can argue with that. The worked garment's number has moved
           and the others' have not, which is the receipt, and the disabled
           press says tomorrow without taking the numbers down. */}
-      <div className="rounded-lg border border-black/5 dark:border-white/10 bg-background/40 p-3 mb-3">
+      <MarketBlock tone="plain">
         <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
           <span className="text-muted-foreground">Harbor tailors</span>
           {mendedThisLeg ? (
@@ -276,27 +277,16 @@ export function RefitBench({
             );
           })}
         </div>
-      </div>
+      </MarketBlock>
 
-      {refit.error && (
-        <p className="text-center text-[11px] text-alarm mb-2">
-          {refit.error}{" "}
-          <button
-            type="button"
-            onClick={refit.clearError}
-            className="underline"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
+      <MarketError error={refit.error} onDismiss={refit.clearError} />
 
       {refit.refits.length === 0 ? (
-        <p className="text-center text-xs text-muted-foreground py-2">
+        <MarketEmpty className="py-2">
           {canSell
             ? "Nothing on the bench yet. Your offer is the first."
             : "No refit work on offer this leg."}
-        </p>
+        </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
           {refit.refits.map((row) => (
@@ -345,7 +335,7 @@ function RefitRow({
   // this market bounds (see refitSellerBusy): a customer may buy a refit for
   // every garment they own, and a Loom has two hands and one leg.
   const blocked = stale
-    ? "That offer belongs to an earlier leg."
+    ? STALE_OFFER
     : points < 1
       ? `Nothing left to put right on your ${row.good}.`
       : refitSellerBusy(refit.refits, row.sellerUserId, game.currentRound)
@@ -353,43 +343,19 @@ function RefitRow({
         : null;
 
   return (
-    <PathDeskRow mine={mine}>
-      <span className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-medium">{refitLine(row, me)}</span>
-        {row.status === "offered" && row.buyerUserId && (
-          <JustForChip forMe={isBuyer} name={row.buyerName} />
-        )}
-      </span>
-
-      {row.status === "offered" &&
-        (mine ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-7 px-2.5 text-[10px] rounded shrink-0"
-            onClick={() => refit.cancel(row.id)}
-          >
-            Cancel
-          </Button>
-        ) : (
-          <span className="flex flex-col items-end gap-0.5 shrink-0">
-            <Button
-              size="sm"
-              className="h-7 px-2.5 text-[10px] rounded"
-              variant={blocked ? "secondary" : "default"}
-              disabled={blocked !== null}
-              onClick={() => refit.accept(row.id)}
-            >
-              {crest} Take It
-            </Button>
-            {blocked && (
-              <span className="text-[9px] text-muted-foreground">
-                {blocked}
-              </span>
-            )}
-          </span>
-        ))}
-    </PathDeskRow>
+    <OfferRow
+      mine={mine}
+      line={refitLine(row, me)}
+      chip={
+        row.status === "offered" && row.buyerUserId
+          ? { forMe: isBuyer, name: row.buyerName }
+          : null
+      }
+      acceptLabel={`${crest} Take It`}
+      blocked={blocked}
+      onCancel={() => refit.cancel(row.id)}
+      onAccept={() => refit.accept(row.id)}
+    />
   );
 }
 

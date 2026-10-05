@@ -6,7 +6,11 @@ import { motion } from "framer-motion";
 import { Trophy, Crown, Star, Ship, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar, Pill, RANK_MEDALS } from "./shared";
-import { ModalClose, ModalOverlay } from "@/components/ui/modal-overlay";
+import {
+  ModalClose,
+  ModalOverlay,
+  ModalSheet,
+} from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 
 type SortKey =
@@ -99,12 +103,7 @@ export function LeaderboardModal({
 
   return (
     <ModalOverlay onClose={() => onOpenChange(false)}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="pm-glass-strong pm-crackle relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl"
-      >
+      <ModalSheet maxW="max-w-lg" maxH="max-h-[85vh]">
         {/* Header */}
         <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">
           <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
@@ -241,7 +240,7 @@ export function LeaderboardModal({
             </div>
           )}
         </div>
-      </motion.div>
+      </ModalSheet>
     </ModalOverlay>
   );
 }

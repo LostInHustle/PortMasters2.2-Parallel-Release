@@ -7,6 +7,7 @@ import {
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants/world";
+import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -280,10 +281,11 @@ export function GameRoom({
     escort.claim(pending.contractId, pending.raidGold);
   }, [state.game.pendingEscortClaim, socket, act, escort.claim]);
 
-  // The six effects: join the room channel on every reconnect, watch for
+  // The seven effects: join the room channel on every reconnect, watch for
   // voyage conclusion, relay the engine's pending debt settlements, relay
-  // the Word on the Docks claim, watch for the docks race resolution, and
-  // watch for the Tidewatch surge flip.
+  // the Word on the Docks claim, watch for the docks race resolution,
+  // watch for the Tidewatch surge flip, and hand a captain back to the
+  // Lobby when the room closes.
 
   useEffect(() => {
     if (!socket || !authed) return;
@@ -452,14 +454,14 @@ export function GameRoom({
       act((g, l) => applyTidewatchSurge(g, l));
       toast("🌊 Tidewatch Alert", {
         description:
-          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board for the rest of this voyage.",
+          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board, every round, for the rest of this voyage.",
       });
       notifications.push({
         icon: "🌊",
         title: "Tidewatch Alert",
         lines: [
           `The harbor crossed ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation.`,
-          "One extra cargo lot joins every Port Purchase board.",
+          "One extra cargo lot joins every Port Purchase board, every round.",
         ],
         category: "tidewatch",
       });
@@ -709,7 +711,7 @@ export function GameRoom({
     });
   }, [state.newLines, state.loaded, notifications.push]);
 
-  const openDmRef = useCallback(
+  const openDm = useCallback(
     async (user: PublicUser) => {
       if (user.id === me.id) return;
       setDmTarget(user);
@@ -730,10 +732,6 @@ export function GameRoom({
     },
     [me.id, memberIds],
   );
-  // Reference the openDm declared above so the chat notification effect
-  // keeps the stable identity; this alias keeps the existing call sites
-  // (DM tab onPick, etc.) readable without reorganising the JSX.
-  const openDm = openDmRef;
 
   // Every room/DM message pops up as its own notification too, regardless
   // of which chat tab is currently open. Clicking it jumps to the
@@ -831,7 +829,7 @@ export function GameRoom({
 
   const handleRestart = useCallback(() => {
     if (!isHost) {
-      toast.error("Only the host can restart the voyage");
+      toast.error(HOST_ONLY_RESTART);
       return;
     }
     setRestartConfirmOpen(true);
@@ -1150,7 +1148,7 @@ export function GameRoom({
               </Button>
               <span
                 className="pb-1 text-[11px] font-semibold tabular-nums text-muted-foreground"
-                title={`Leg ${state.game.currentRound}`}
+                title={`Round ${state.game.currentRound}`}
               >
                 {state.game.currentRound > 0
                   ? `R${state.game.currentRound}`

@@ -21,9 +21,10 @@
 // else. Both logs below are keyed by room and die with the room they
 // belong to, so nothing a captain says during a session outlives the
 // session. That is the whole point of them. The Message table remains,
-// but it now only ever holds a direct message sent between two captains
-// who are both in the lobby, where there is no room to belong to and the
-// thread is expected to still be there tomorrow.
+// but it now only ever holds the two things said outside a voyage: the
+// public harbor square and direct messages between captains in the lobby,
+// where there is no room to belong to and the thread is expected to still
+// be there tomorrow.
 //
 // The entry bound is a memory guard rather than a retention policy. A
 // voyage that outgrows it loses its oldest lines, which is the same

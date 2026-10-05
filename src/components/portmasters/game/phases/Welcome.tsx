@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { STARTING_STOCK } from "@/lib/game/constants/goods";
-import { INCOME_TAX_RATE } from "@/lib/game/engine";
+import { INCOME_TAX_RATE, VAT_RATE } from "@/lib/game/engine";
 import { openingPhase } from "@/lib/game/checkpoint";
 import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
 import { modeConfig } from "@/lib/game/mode";
@@ -313,7 +313,7 @@ export function Welcome({
               tone="alarm"
               title="🧾 Taxes Explained"
               rows={[
-                "VAT: 5% of finished goods profit margin",
+                `VAT: ${Math.round(VAT_RATE * 100)}% of finished goods profit margin`,
                 `Income Tax: ${Math.round(taxRate * 100)}% income tax`,
               ]}
             />

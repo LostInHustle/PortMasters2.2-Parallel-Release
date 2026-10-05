@@ -177,6 +177,9 @@ model VoyageRole {
   // column existed. A nullable addition rather than a table of its own,
   // because a flourish has no life apart from the card it was dealt with.
   flourish String?
+  // Write only, on purpose: the moment a role was dealt is a record of
+  // when it happened, kept the same way CaptainMerit.earnedAt is, and no
+  // reader has needed it yet. Docs: BUFF_AUDIT.md, the deliberate keeps.
   drawnAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -229,6 +232,8 @@ model ConvoyVenture {
   contributions    String @default("{}")
   status           String @default("open")
   createdAt        DateTime  @default(now())
+  // Write only, on purpose: when a venture resolved is a record of when
+  // it happened, kept rather than dropped, and no reader has needed it.
   resolvedAt       DateTime?
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -275,7 +280,9 @@ model Loan {
 }
 
 // =====================================================================
-// New tables for the seven un built manifest systems.
+// Tables the manifest systems shipped with: the voyage chronicle, the
+// captain rivalry record, the telemetry spine and the operator report.
+// House Rally is the one manifest system that did not ship a table here.
 // =====================================================================
 
 model VoyageChronicle {
@@ -359,6 +366,8 @@ model CaptainRival {
   userBId   String
   roomId    String
   voyageEpoch Int
+  // Write only, on purpose: the standings each captain held when the
+  // rivalry was sealed, kept as a record beside the outcome flags below.
   aScore    Int
   bScore    Int
   aWon      Boolean @default(false)
