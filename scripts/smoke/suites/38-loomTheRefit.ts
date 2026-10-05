@@ -1,9 +1,14 @@
 // PortMasters 2.2 Parallel Release, smoke run: Loom: the refit.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { RefitBoard } from "@/types/realtime/boards";
 import { db } from "@/lib/db";
 import {
+  COLD_LEG_WARMTH,
+  GARMENTS,
   MEND_GOLD_PER_POINT,
+  MEND_POINTS,
   RAGS_AT_PORT_COLD,
   RAG_SCRAP_VALUE,
   REFIT_POINTS,
@@ -18,6 +23,8 @@ import {
   applyRefitSide,
   buyRag,
   canSellRefit,
+  consentPartyBusy,
+  consentSettled,
   expireConsent,
   mendGarment,
   normalizeRefitState,
@@ -28,11 +35,19 @@ import {
   refitsOn,
   reweaveRags,
 } from "@/lib/game/engine";
-import { garmentSpec, legIsCold } from "@/lib/game/garments";
+import {
+  garmentSpec,
+  garmentWarmth,
+  legIsCold,
+  shortOfWarmth,
+  tickGarments,
+  warmthScore,
+  warmthText,
+} from "@/lib/game/garments";
 import { cargoCapacity, cargoRoom } from "@/lib/game/larder";
 import { PATH_IDS } from "@/lib/game/paths";
 import { phaseFace } from "@/lib/game/phases";
-import type { GameState, Phase } from "@/lib/game/types";
+import type { GameState, Phase, WornGarment } from "@/lib/game/types";
 import type { VoyageLogEntry } from "@/lib/game/voyage-log";
 import { voyageLogLine } from "@/lib/game/voyage-log";
 import {
@@ -47,7 +62,9 @@ import {
   switchFor,
   voyageState,
   waitForEvent,
+  walkSrc,
   withEnv,
+  withoutComments,
 } from "../harness";
 import type { Captain, WireHistory } from "../wire";
 import type { Socket } from "socket.io-client";
@@ -360,6 +377,227 @@ export async function loomTheRefitSuite(
         "and a purse that cannot cover the mend is refused with the garment left exactly as it was, so nothing is ever half paid for",
       );
 
+      // What a mend is worth in the number the wardrobe prints, and the
+      // defect this block holds.
+      //
+      // The defect as reported: after a mend the Wardrobe's own Warmth
+      // figure did not move to meet the crew the sea reads. The number, its
+      // text and the verdict are the garments module's own (see warmthScore,
+      // warmthText and shortOfWarmth), which is the only place the
+      // arithmetic lives: a bench that worked the warmth out again for
+      // itself would be the second opinion the module warns about, and the
+      // one a captain reads as the wardrobe disagreeing with the settlement.
+      const perPoint = worn.warmth / worn.durability;
+      const under = wearing(worn.durability - 2, 500);
+      const underBefore = warmthScore(under);
+      const underTry = attempt((logs) =>
+        mendGarment(under, REWEAVE_GOOD, logs),
+      );
+      check(
+        underTry.ok &&
+          under.garments[0]?.durability === worn.durability - 1 &&
+          Math.abs(warmthScore(under) - underBefore - perPoint) < 1e-9 &&
+          warmthScore(under) > underBefore,
+        "a mend raises the warmth the wardrobe reads by exactly the point it put back, which is the garment's own rating over its maximum rather than a number the bench worked out, so the figure a captain reads before the five Gold and the figure after it differ by the work that was bought",
+      );
+
+      // The ceiling of the mend, read the way the row's own button reads it
+      // (see garmentRoom): a point back and not more, and never past the
+      // rating the catalogue promises.
+      const capacities = (list: WornGarment[]): number =>
+        list.reduce(
+          (total, garment) => total + (garmentSpec(garment.good)?.warmth ?? 0),
+          0,
+        );
+      const nearlyWhole = wearing(worn.durability - 1, 500);
+      const cappedTry = attempt((logs) =>
+        mendGarment(nearlyWhole, REWEAVE_GOOD, logs),
+      );
+      check(
+        cappedTry.ok &&
+          nearlyWhole.garments[0]?.durability === worn.durability &&
+          warmthScore(nearlyWhole) === worn.warmth &&
+          warmthScore(nearlyWhole) <=
+            capacities(nearlyWhole.garments ?? []) + 1e-9,
+        "and the point the tailors put back stops at the garment's own maximum: a coat a point from whole comes back whole and worth exactly the rating the catalogue promises, so no mend can hand a crew more warmth than the clothes on its back are able to give",
+      );
+
+      // The wardrobe's ceiling walked over the whole catalogue at every point
+      // of every garment's life rather than over one fixture: a part of the
+      // sum is its rating times a share of itself, so a row the panel prints
+      // can never read past the garment it stands for.
+      const everyPoint: WornGarment[] = Object.entries(GARMENTS).flatMap(
+        ([good, spec]) =>
+          Array.from({ length: spec.durability }, (_, index) => ({
+            good,
+            durability: index + 1,
+          })),
+      );
+      check(
+        everyPoint.length ===
+          Object.values(GARMENTS).reduce(
+            (total, spec) => total + spec.durability,
+            0,
+          ) &&
+          everyPoint.every((garment) => {
+            const spec = garmentSpec(garment.good);
+            const worth = garmentWarmth(garment);
+            return spec !== null && worth >= 0 && worth <= spec.warmth + 1e-9;
+          }) &&
+          warmthScore({ garments: everyPoint, modifierFlags: {} }) <=
+            capacities(everyPoint) + 1e-9,
+        "no garment is ever worth more than its own rating and no wardrobe is ever worth more than the ratings it is wearing, walked over every point of every garment the catalogue carries, because the multiplier is a share of a garment rather than a bonus on top of one",
+      );
+
+      // The same claim through the tailors rather than through the module,
+      // at every point of every garment the catalogue carries rather than at
+      // the one fixture above: a successful mend always moves the figure
+      // the wardrobe prints. The tenth is read down (see warmthText), so
+      // this is the claim that a point of wear put back is never less than
+      // something a captain can read, which is the whole of what the five
+      // Gold buys and what the field report found missing.
+      const mendablePoints = everyPoint.filter(
+        (garment) =>
+          garment.durability < (garmentSpec(garment.good)?.durability ?? 0),
+      );
+      const mendPrints = mendablePoints.map((garment) => {
+        const state = benchState({
+          currentRound: coldRound,
+          money: MEND_GOLD_PER_POINT,
+          garments: [garment],
+        });
+        const before = warmthText(warmthScore(state));
+        const worked = attempt((logs) =>
+          mendGarment(state, garment.good, logs),
+        );
+        return worked.ok && warmthText(warmthScore(state)) !== before;
+      });
+      check(
+        mendPrints.length ===
+          Object.values(GARMENTS).reduce(
+            (total, spec) => total + spec.durability - 1,
+            0,
+          ) && mendPrints.every(Boolean),
+        "every mend the catalogue can pay for moves the figure the wardrobe prints, walked through the harbor tailors over every garment at every point below its own maximum rather than over the one fixture above, so the tenth a captain reads after the five Gold is never the tenth they read before it",
+      );
+
+      // The seam the defect was reported on, as the wardrobe rather than as
+      // the single number: the sea had taken a point off the cloth, the
+      // captain paid the five Gold, and the wardrobe answered with the ask
+      // met beside a crew the cold still called short.
+      const cloth = garmentSpec("Cotton Clothes");
+      const reported = benchState({
+        currentRound: coldRound,
+        money: MEND_GOLD_PER_POINT,
+        garments: [
+          { good: REWEAVE_GOOD, durability: 1 },
+          { good: "Cotton Clothes", durability: 5 },
+          { good: "Brocade", durability: 1 },
+        ],
+      });
+      const reportedBefore = warmthText(warmthScore(reported));
+      const reportedTry = attempt((logs) =>
+        mendGarment(reported, "Cotton Clothes", logs),
+      );
+      const reportedAfter = warmthText(warmthScore(reported));
+      check(
+        reportedTry.ok &&
+          cloth !== null &&
+          reported.garments[1]?.durability === 5 + MEND_POINTS &&
+          reported.money === 0 &&
+          shortOfWarmth(reported) &&
+          Number(reportedAfter) < COLD_LEG_WARMTH &&
+          reportedAfter !== reportedBefore,
+        "the figure the wardrobe prints after the mend is the figure the sea reads: a crew the work left a hair short is short in the panel's own number as well, and that number moves when the mend lands, so the panel and the settlement cannot read one wardrobe two ways",
+      );
+
+      // The same figure one screen over, at the settlement, which is the
+      // other place this wardrobe is read aloud: the sentence that says the
+      // crew fell short names the crew's own warmth, and a sentence that
+      // said 2 of warmth had fallen short of the 2 it asks is the same
+      // defect wearing a log line.
+      const settledNumber = warmthText(warmthScore(reported));
+      const settled = JSON.parse(JSON.stringify(reported)) as GameState;
+      const settledLogs: string[] = [];
+      tickGarments(settled, settledLogs);
+      const shortLine = settledLogs.find((line) =>
+        line.includes("falls short"),
+      );
+      check(
+        shortLine !== undefined &&
+          shortLine.includes(settledNumber) &&
+          Number(settledNumber) < COLD_LEG_WARMTH,
+        "the settlement names a warmth below the ask in the sentence that says the ask was missed, so the log line and the panel read the same wardrobe the same way",
+      );
+
+      // And the number the panel prints is a function of the save the mend
+      // wrote rather than of anything this machine worked out on the way, so
+      // a reload mid leg reads the wardrobe the mend left rather than the
+      // one it found.
+      const carriedOn = JSON.parse(JSON.stringify(reported)) as GameState;
+      check(
+        warmthText(warmthScore(carriedOn)) === settledNumber &&
+          shortOfWarmth(carriedOn) === shortOfWarmth(reported),
+        "the printed warmth and the verdict survive a save round trip unchanged, because both read the wardrobe and the boon the save carries and nothing else about the machine that wrote it",
+      );
+
+      // The same claim walked rather than fixtured, over every wardrobe the
+      // catalogue can dress rather than over the one that was reported: the
+      // tenth the panel prints meets the leg's ask exactly when the score
+      // does, which is what keeps the panel and the sea from reading one
+      // wardrobe two ways whatever the table's numbers become.
+      const coldCrew = benchState({ currentRound: coldRound });
+      const dressed = (garments: WornGarment[], boon: number): GameState => ({
+        ...coldCrew,
+        garments,
+        modifierFlags: { cold_hardened: boon },
+      });
+      const everyCrew = everyPoint.flatMap((one) =>
+        [0, 1].flatMap((boon) => [
+          dressed([one], boon),
+          ...everyPoint.flatMap((two) => [
+            dressed([one, two], boon),
+            ...everyPoint.map((three) => dressed([one, two, three], boon)),
+          ]),
+        ]),
+      );
+      check(
+        everyCrew.length ===
+          (everyPoint.length +
+            everyPoint.length ** 2 +
+            everyPoint.length ** 3) *
+            2 &&
+          everyCrew.every(
+            (crew) =>
+              Number(warmthText(warmthScore(crew))) >= COLD_LEG_WARMTH ===
+              !shortOfWarmth(crew),
+          ),
+        "and the printed warmth meets the ask exactly when the verdict does, walked over every wardrobe of up to three garments the catalogue can dress with the cold hardening boon on or off, so no captain can read a wardrobe that meets the ask while the sea counts them short",
+      );
+
+      // The rows that sum is printed under, read the way a captain reads
+      // them: each worn garment's own row is the tenth the wardrobe prints
+      // for that garment alone (see garmentWarmth), so a captain who adds
+      // the rows up can never arrive above the figure printed under them,
+      // because a sum of floors is never above the floor of the sum. That
+      // is what reading the number down buys the panel, and it is walked
+      // over the same table the check above walks. The comparison swallows
+      // the billionth the module's own print swallows, since a chain of
+      // tenths is carried in binary; anything a floor could actually hide
+      // is a tenth wide, eight orders of magnitude above that.
+      check(
+        everyCrew.every(
+          (crew) =>
+            (crew.garments ?? []).reduce(
+              (total, garment) =>
+                total + Number(warmthText(garmentWarmth(garment))),
+              0,
+            ) <=
+            Number(warmthText(warmthScore(crew))) + 1e-9,
+        ),
+        "and the rows a captain can add up never come to more than the figure printed under them, walked over the same every wardrobe table as the check above, because each row is the wardrobe's own sum asked one garment at a time rather than a rounding of its own",
+      );
+
       check(
         refitRoomFor(wearing(worn.durability - 1), REWEAVE_GOOD) === 1 &&
           refitRoomFor(wearing(1), REWEAVE_GOOD) === REFIT_POINTS &&
@@ -397,6 +635,60 @@ export async function loomTheRefitSuite(
           !refitSellerBusy([refitOn({ status: "agreed" })], "loom", 4) &&
           !refitSellerBusy([refitOn({ status: "agreed" })], "customer", 3),
         "the bench bounds the seller rather than the customer: a refit that was actually taken makes the Loom busy for that leg, an offer nobody took does not, the next leg frees the hands again, and the customer who bought the work is not the party this market runs out of hands",
+      );
+
+      // Which states settle, which is the one question three readers ask of a
+      // status: the bench's busy rule above, the escort's cover mirror, and
+      // the client relay that reports a settled row to the two captains it
+      // names. The verdicts are written out here rather than derived from
+      // the predicate, so the table is a claim about the four states the
+      // kinds produce instead of the reading restated in the check's own
+      // shape.
+      const settles: [string, boolean][] = [
+        ["offered", false],
+        ["agreed", true],
+        ["claimed", true],
+        ["declined", false],
+      ];
+      check(
+        settles.every(
+          ([status, settled]) => consentSettled(status) === settled,
+        ),
+        "a row settles in exactly the two states that commit a movement, an agreement and the escort's spent cover, and in no other state, so an offer still waiting on a press and one its addressee turned down are both read as rows that settled nothing, which is what makes the declined row safe to keep on the board for the leg it was made in",
+      );
+
+      // One reading rather than two. A status the busy rule calls a
+      // commitment and the predicate calls nothing would be a captain
+      // counted as covered for a leg the market had already refused them,
+      // and it is the shape of the defect the decline was added to fix.
+      const partyRow = (status: string) => ({
+        id: "p1",
+        sellerUserId: "loom",
+        sellerName: "Smoke Loom",
+        buyerUserId: "customer",
+        buyerName: "Smoke Customer",
+        fee: 30,
+        round: 3,
+        phase: "market" as Phase,
+        status,
+        good: REWEAVE_GOOD,
+      });
+      check(
+        settles.every(([status, settled]) =>
+          (["seller", "buyer"] as const).every(
+            (side) =>
+              consentPartyBusy(
+                [partyRow(status)],
+                side,
+                side === "seller" ? "loom" : "customer",
+                3,
+              ) === settled,
+          ),
+        ) &&
+          !consentPartyBusy([partyRow("declined")], "seller", "loom", 3) &&
+          !consentPartyBusy([partyRow("declined")], "buyer", "customer", 3) &&
+          !consentPartyBusy([partyRow("agreed")], "seller", "loom", 4),
+        "and the board's own busy rule is that same reading rather than a second copy of it: over the four states, the party a settled row names is busy for the round it settled in, the next leg frees them, and a captain who was turned down is covered by nothing",
       );
       check(
         expireConsent([refitOn({})], { phase: "orders", round: 3 }).length ===
@@ -441,6 +733,28 @@ export async function loomTheRefitSuite(
           customer.money === 470 &&
           seller.money === 530,
         "and applying the same side twice moves nothing the second time, because the ledger is what keeps a reload between the agreement and the broadcast that carries it from charging the same fee twice",
+      );
+
+      // The warmth seam read from the customer's own side: the points a
+      // refit puts back are read by the wardrobe the moment that machine
+      // applies them, and the number moves by the work that was bought. The
+      // second half of this is the check above it rather than a promise: the
+      // frame the row arrived on is the whole of what the customer's machine
+      // was told, and a second one leaves the number where it stands.
+      const seamCustomer = benchState({
+        currentRound: 3,
+        garments: [{ good: REWEAVE_GOOD, durability: 2 }],
+      });
+      const seamBefore = warmthScore(seamCustomer);
+      applyRefitSide(seamCustomer, agreedRefit, "customer", []);
+      const seamAfter = warmthScore(seamCustomer);
+      check(
+        seamCustomer.garments[0]?.durability === 2 + REFIT_POINTS &&
+          Math.abs(seamAfter - seamBefore - perPoint * REFIT_POINTS) < 1e-9 &&
+          seamAfter > seamBefore &&
+          !applyRefitSide(seamCustomer, agreedRefit, "customer", []) &&
+          warmthScore(seamCustomer) === seamAfter,
+        "a refit moves the warmth the wardrobe reads by the points it put back, on the customer's own machine and off the row alone, which is the seam the mend's own check holds one screen over: the number the panel prints moves when the work lands, and no frame arriving afterwards moves it a second time",
       );
       const bystander = benchState({ currentRound: 3 });
       check(
@@ -969,6 +1283,165 @@ export async function loomTheRefitSuite(
     "and the bench opens again on the new leg, which is what makes the one refit a leg a bound the voyage reads a leg at a time rather than a ceiling on the trade",
   );
 
+  // ===== The frames two captains can press into each other's screens =====
+  //
+  // Everything below is settled by the server's own ordering rather than by
+  // a client being polite: the accept handler reads the bench after its one
+  // await and holds it to the write, so two frames in one tick are two
+  // handlers in one tick and the second one reads what the first one wrote.
+  // Which of the two captains wins is not this suite's to decide, so the
+  // checks read the pair rather than naming a winner: one agreement, one
+  // refusal, and the refusing frame names what it found.
+  const loomLosingFrame = (captain: Captain) =>
+    waitForEvent<{ roomId: string; error: string }>(
+      loomSocketOf(captain),
+      "refit:error",
+      (payload) => payload?.roomId === loomRoomId && Boolean(payload.error),
+      1500,
+    );
+
+  // Two customers taking the same open offer in the same tick, which is the
+  // ordinary shape of a busy leg rather than an exotic one: the bench's open
+  // rows are the whole table's to take.
+  const loomRaceTaken = loomSettles(loomSeller, (board) =>
+    board.some(
+      (row) => row.id === loomReopenedRow?.id && row.status === "agreed",
+    ),
+  );
+  const loomBuyerFrame = loomLosingFrame(loomBuyer);
+  const loomForeignFrame = loomLosingFrame(loomForeigner);
+  loomSocketOf(loomBuyer).emit("refit:accept", {
+    roomId: loomRoomId,
+    contractId: loomReopenedRow?.id ?? "",
+  });
+  loomSocketOf(loomForeigner).emit("refit:accept", {
+    roomId: loomRoomId,
+    contractId: loomReopenedRow?.id ?? "",
+  });
+  const loomRaceRow = ((await loomRaceTaken)?.refits ?? []).find(
+    (row) => row.id === loomReopenedRow?.id,
+  );
+  const [loomBuyerLost, loomForeignLost] = await Promise.all([
+    loomBuyerFrame,
+    loomForeignFrame,
+  ]);
+  const loomRaceWinner =
+    loomBuyerLost === null && loomForeignLost !== null
+      ? loomBuyer
+      : loomBuyerLost !== null && loomForeignLost === null
+        ? loomForeigner
+        : null;
+  check(
+    loomRaceRow !== undefined &&
+      loomRaceRow.status === "agreed" &&
+      loomRaceWinner !== null &&
+      loomRaceRow.buyerUserId === loomRaceWinner.id &&
+      [loomBuyerLost, loomForeignLost].filter((lost) => lost !== null)
+        .length === 1 &&
+      [loomBuyerLost, loomForeignLost].some((lost) =>
+        lost?.error.includes("already gone"),
+      ),
+    "two customers pressing Take It on the same open offer in the same tick leave one agreement behind: the handler that reads the row first takes it, the other reads the sentence that the offer has gone, and the row names the captain who actually took it rather than whichever screen pressed first",
+  );
+
+  // The customer who took it pressing Take It again, which is the same
+  // frame arriving on a row that has moved rather than one that is gone.
+  const loomPressedTwice = loomRaceWinner
+    ? await loomRefused(loomRaceWinner, "refit:accept", {
+        contractId: loomReopenedRow?.id ?? "",
+      })
+    : null;
+  await loomSettle();
+  check(
+    loomPressedTwice !== null &&
+      loomPressedTwice.includes("already gone") &&
+      loomBoardOf(loomSeller).filter((row) => row.status === "agreed")
+        .length === 1 &&
+      loomRaceWinner !== null &&
+      loomBoardOf(loomRaceWinner).some(
+        (row) => row.id === loomReopenedRow?.id && row.status === "agreed",
+      ),
+    "and the customer who took the work pressing it a second time is refused in the same sentence with the bench still carrying one agreement, so a double press settles once and reads as a double press rather than as a second sale",
+  );
+
+  // The next leg, where the seller's hands are free again and the sweep has
+  // taken that agreement off every screen. The move is waited on as a frame
+  // rather than as a pause, because the rows leaving are the evidence that
+  // the checkpoint actually moved.
+  const loomThirdClear = waitForEvent<RefitBoard>(
+    loomSocketOf(loomSeller),
+    "refit:update",
+    (payload) =>
+      payload?.roomId === loomRoomId && (payload.refits ?? []).length === 0,
+  );
+  loomSeat(loomSeller, 3, "market");
+  await loomThirdClear;
+  const loomThirdPosted = loomSettles(loomForeigner, (board) =>
+    board.some(
+      (row) => row.sellerUserId === loomSeller.id && row.status === "offered",
+    ),
+  );
+  loomSocketOf(loomSeller).emit("refit:post", {
+    roomId: loomRoomId,
+    fee: 18,
+    good: REWEAVE_GOOD,
+  });
+  const loomThirdRow = ((await loomThirdPosted)?.refits ?? []).find(
+    (row) => row.sellerUserId === loomSeller.id && row.status === "offered",
+  );
+
+  // The seller taking an offer back while a customer is taking it. The
+  // cancel is synchronous and the accept reads the bench after its one
+  // await, so whichever handler runs second reads what the first one wrote,
+  // and the pair cannot leave a row that is both taken and taken back.
+  const loomThirdAcceptLost = loomLosingFrame(loomBuyer);
+  const loomThirdCancelLost = loomLosingFrame(loomSeller);
+  loomSocketOf(loomSeller).emit("refit:cancel", {
+    roomId: loomRoomId,
+    contractId: loomThirdRow?.id ?? "",
+  });
+  loomSocketOf(loomBuyer).emit("refit:accept", {
+    roomId: loomRoomId,
+    contractId: loomThirdRow?.id ?? "",
+  });
+  const [loomAcceptFrame, loomCancelFrame] = await Promise.all([
+    loomThirdAcceptLost,
+    loomThirdCancelLost,
+  ]);
+  await loomSettle();
+  const loomThirdEnd = loomBoardOf(loomSeller).find(
+    (row) => row.id === loomThirdRow?.id,
+  );
+  check(
+    loomThirdRow !== undefined &&
+      (loomThirdEnd === undefined) !== (loomThirdEnd?.status === "agreed") &&
+      (loomThirdEnd === undefined
+        ? loomAcceptFrame?.error.includes("already gone") === true &&
+          loomCancelFrame === null
+        : loomCancelFrame?.error.includes("withdrawn") === true &&
+          loomAcceptFrame === null),
+    "a seller withdrawing an offer in the same tick as a customer taking it leaves the bench in exactly one of the two states, and the frame that lost reads the sentence for what it found: either the row is gone and the customer is told the offer has gone, or the row is agreed and the seller is told an agreement cannot be withdrawn",
+  );
+
+  // And the row the pair left behind cannot be taken afterwards, whichever
+  // of the two it is: the accept asks the bench for an offer and answers for
+  // the state it found instead, so a press arriving late on a withdrawn row
+  // and one arriving late on a taken row are refused in the same words.
+  const loomThirdLate = await loomRefused(loomForeigner, "refit:accept", {
+    contractId: loomThirdRow?.id ?? "",
+  });
+  await loomSettle();
+  const loomThirdStill = loomBoardOf(loomSeller).find(
+    (row) => row.id === loomThirdRow?.id,
+  );
+  check(
+    loomThirdLate !== null &&
+      loomThirdLate.includes("already gone") &&
+      (loomThirdStill === undefined) === (loomThirdEnd === undefined) &&
+      loomThirdStill?.status === loomThirdEnd?.status,
+    "so an accept arriving on a row that settled or left the bench is answered with the sentence every row that is not an offer reads and changes nothing, because a row a customer no longer has a Take It for is a row the server no longer has an offer to settle",
+  );
+
   // The house rule, over the copy this feature added: the sentences a
   // captain reads at the bench are the bench's own, and the files that
   // carry them are held whole, comments included.
@@ -981,6 +1454,83 @@ export async function loomTheRefitSuite(
       !carriesADash("src/server/realtime/refits.ts") &&
       !carriesADash("src/server/realtime/consent.ts"),
     "every file the refit's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+  );
+
+  // ===== The two seams the checks above cannot reach from a socket =====
+  //
+  // Held in source for the reason suite 48's leg seam is: the relay is a
+  // React effect with a socket inside it, the smoke run has no browser to
+  // mount it in, and a board assembled here would prove nothing about the
+  // file a captain's browser actually runs. What these hold is the two
+  // decisions the checks above depend on rather than test.
+  const repoRoot = join(import.meta.dirname, "..", "..", "..");
+  const relayCode = withoutComments(
+    readFileSync(join(repoRoot, "src", "lib", "use-consent-board.ts"), "utf8"),
+  );
+  const primitiveCode = withoutComments(
+    readFileSync(
+      join(repoRoot, "src", "lib", "game", "engine", "consent.ts"),
+      "utf8",
+    ),
+  );
+  check(
+    relayCode.includes("consentSettled(row.status)") &&
+      primitiveCode.includes('status === "agreed" || status === "claimed"') &&
+      !relayCode.includes('"offered"') &&
+      !relayCode.includes('"declined"'),
+    "the relay every consent market reports through asks the primitive whether a row settled rather than testing the states itself, and the primitive is the one place the two committing states are named, so a row that came back is recorded on a captain's board and never fired at their machine as a movement to apply",
+  );
+
+  // The other end of the warmth seam, which is what makes the mend's own
+  // arithmetic final rather than first: what the room's sockets know about
+  // a garment is its name, checked against the wardrobe table at the moment
+  // an offer is posted, and nothing else. The tailors' point is a call on
+  // the mender's machine and a refit's points are put back by the customer's
+  // machine off the row, so there is no frame anywhere that carries a
+  // durability or a warmth and therefore nothing that could apply either of
+  // them a second time behind the panel that already read the number move.
+  const wireCode = walkSrc(join(repoRoot, "src", "server", "realtime"))
+    .map((file) => withoutComments(readFileSync(file, "utf8")))
+    .join("\n");
+  check(
+    !wireCode.includes("mendGarment") &&
+      !wireCode.includes("mendRound") &&
+      !wireCode.includes("restoreGarment") &&
+      !wireCode.includes("warmthScore") &&
+      !wireCode.includes("durability"),
+    "no module the room's sockets run through names the mend, the repair, a durability or a warmth, so the work is applied exactly once, on the machine that owns the garment, and no frame can arrive behind the panel to apply it again",
+  );
+
+  // And the panel that prints the number, which is the screen the field
+  // report was about. The arithmetic lives in the garments module alone
+  // (see warmthScore, warmthText and garmentWarmth there), so the panel
+  // must read it rather than work any of it out again: the second opinion
+  // is what the module warns about, and it is the wardrobe disagreeing
+  // with the settlement in the one place a captain is looking. Held in
+  // source for the reason the relay above is: this run has no browser to
+  // mount a React panel in, and what this holds is how the panel is
+  // written rather than what it prints today.
+  const wardrobeCode = withoutComments(
+    readFileSync(
+      join(
+        repoRoot,
+        "src",
+        "components",
+        "portmasters",
+        "game",
+        "phases",
+        "WardrobePanel.tsx",
+      ),
+      "utf8",
+    ),
+  );
+  check(
+    wardrobeCode.includes("warmthScore(game)") &&
+      wardrobeCode.includes("warmthText(") &&
+      wardrobeCode.includes("garmentWarmth(") &&
+      !wardrobeCode.includes("Math.round") &&
+      !wardrobeCode.includes("*"),
+    "the Wardrobe panel prints the module's own figure rather than one it worked out for itself: it reads the score, the print and the part through the three exported readers, and the file carries neither a rounding nor a multiplication of any kind, so the number the panel shows and the number the sea reads are one function of the wardrobe",
   );
 
   // =====================================================================

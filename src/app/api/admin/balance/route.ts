@@ -15,19 +15,18 @@
 // dashboard, and this is the lock.
 import { NextResponse } from "next/server";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
+import { NOT_AN_ADMINISTRATOR } from "@/lib/game/constants/copy";
 import { readDashboard } from "@/lib/game/dashboard";
 import { readOperatorWindow } from "@/server/telemetry-window";
 
 export async function GET() {
   const me = await getCurrentUser();
   if (!me) return unauthorizedResponse();
-  // The same sentence the realtime layer refuses a captain with, so the
-  // two surfaces cannot describe one refusal two ways.
+  // The same sentence the realtime layer refuses a captain with, read from
+  // the shared constant rather than typed again, so the two surfaces cannot
+  // describe one refusal two ways.
   if (me.role !== "admin") {
-    return NextResponse.json(
-      { error: "This account is not an administrator." },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: NOT_AN_ADMINISTRATOR }, { status: 403 });
   }
 
   const input = await readOperatorWindow();

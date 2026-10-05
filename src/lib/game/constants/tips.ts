@@ -2,6 +2,19 @@ import { type Difficulty } from "../difficulty";
 import { modeConfig, voyageRoundsFor, type GameMode } from "../mode";
 import { WAGES } from "./crew";
 
+// The line the advice page and the dialog that opens it lead with, written
+// for the mode the captain is actually sailing: every strategy below is
+// written for a captain whose books can end the voyage, and on a mode that
+// keeps a failed seat sailing the first thing to say is so. One string in
+// one place, because the dialog's own description and the page's first
+// line are one sentence about the same mode.
+export function tipsHeading(mode: GameMode): string {
+  const play = modeConfig(mode);
+  return play.bankruptcyIsFinal
+    ? "⚓ Avoiding Bankruptcy Strategies:"
+    : `⚓ Staying Afloat in ${play.badge}:`;
+}
+
 // The advice below is difficulty blind except for the one line about a
 // loan running out: it names the round the harbor settles a debt on its
 // own, and that round is the voyage's last one, which is the voyage's
@@ -9,19 +22,15 @@ import { WAGES } from "./crew";
 export function tipsText(mode: GameMode, difficulty: Difficulty): string {
   const rounds = voyageRoundsFor(mode, difficulty);
   const play = modeConfig(mode);
-  // The heading and the note above the advice, both written for the mode
-  // the captain is actually sailing: every strategy below is written for a
-  // captain whose books can end the voyage, and on a mode that keeps a
-  // failed seat sailing the first thing to say is so. The note is the
-  // record's own sentence rather than a second one written here, so the
-  // tutorial, the guide and this page cannot tell a captain three
-  // different things about the same rule.
-  const heading = play.bankruptcyIsFinal
-    ? "⚓ Avoiding Bankruptcy Strategies:"
-    : `⚓ Staying Afloat in ${play.badge}:`;
-  // A block of its own between the heading and the advice, with a blank
-  // line on either side of it. The founding mode prints nothing where it
-  // would be, which is what leaves its page byte for byte what it was.
+  // The page's first line comes from the reader above, so this page and
+  // the dialog that opens it cannot say two different things.
+  const heading = tipsHeading(mode);
+  // The note between the heading and the advice is the record's own
+  // sentence rather than a second one written here, so the tutorial, the
+  // guide and this page cannot tell a captain three different things
+  // about the same rule. A block of its own, with a blank line on either
+  // side of it: the founding mode prints nothing where it would be, which
+  // is what leaves its page byte for byte what it was.
   const keptSeat = play.bankruptcyIsFinal
     ? ""
     : `\n🛟 If the Bills Beat You:\n${play.failureRule}\n`;

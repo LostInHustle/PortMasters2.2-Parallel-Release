@@ -229,20 +229,43 @@ export function normalizeOrderFills(
 }
 
 /**
- * Whether the nominations carry, and for whom.
+ * Whether a book of nominations carries, for whom, and at what count.
  *
- * A simple majority of the active roster: strictly more than half, so a
- * table of four needs three votes and a table of five also needs three,
- * which is the plan's "simple majority" read the only way it can be read
- * without inventing a tie rule for a vote that cannot tie. Two captains
- * cannot both hold a strict majority of one roster, so the walk below
- * cannot be order dependent, and the roster rather than the votes is the
- * denominator: a captain who went bankrupt is not a vote the room is
- * waiting on, the same rule every ready check already follows.
+ * One walk for both of the mode's votes, because the two are the same
+ * count read at different thresholds rather than two counts: the audit
+ * carries on a strict majority of the roster and the maroon on two
+ * thirds, and the thresholds themselves are the separate names below
+ * (auditNamesNeeded and maroonNamesNeeded) that the cards quote and the
+ * smoke suite holds in step. The counting lives here once so the two
+ * votes cannot drift in how they count what they count, which is the
+ * same reason pruneStaleVotes further down is read by both.
+ *
+ * The roster is the guard rather than the denominator, and it is why
+ * both numbers are arguments: a roster of nobody carries nothing,
+ * however full the book is. Each vote made that reading for itself
+ * before this walk was shared, and it is kept because it is the one
+ * branch no threshold can express: a count of zero carries on any
+ * threshold of zero.
+ *
+ * The two thresholds differ because the two votes are meant to be
+ * different sizes of majority (evidence opens at half the room, a
+ * captain's ship costs two thirds), and each is named in its own module
+ * rather than derived from the other, so a retune of one cannot move the
+ * other by accident. Nothing else about the count differs: both books are
+ * pruned against the same roster before they reach here (see
+ * pruneStaleVotes below, and activeRosterSet in the realtime layer), and
+ * which captains a vote may name is each door's own rule rather than this
+ * walk's (see recordMaroonVote, which refuses a written off target, and
+ * recordAuditVote, which does not).
+ *
+ * Two captains cannot both reach a threshold above half of one roster,
+ * so the walk cannot be order dependent: whichever target the map is
+ * walked to first is the only one that can be over the line.
  */
-export function auditCarried(
+export function carriedTarget(
   votes: ReadonlyMap<string, string>,
   roster: number,
+  namesNeeded: number,
 ): string | null {
   if (roster <= 0) return null;
   const counts = new Map<string, number>();
@@ -250,9 +273,50 @@ export function auditCarried(
     counts.set(target, (counts.get(target) ?? 0) + 1);
   }
   for (const [target, count] of counts) {
-    if (count * 2 > roster) return target;
+    if (count >= namesNeeded) return target;
   }
   return null;
+}
+
+/**
+ * Whether the nominations carry, and for whom.
+ *
+ * A simple majority of the active roster: strictly more than half, so a
+ * table of four needs three votes and a table of five also needs three,
+ * which is the plan's "simple majority" read the only way it can be read
+ * without inventing a tie rule for a vote that cannot tie. The count the
+ * vote carries on is auditNamesNeeded's below, so the number a card
+ * prints and the number the server decides on are one rule, and the walk
+ * that applies it is the shared one above (see carriedTarget, which the
+ * maroon's own threshold also rides).
+ *
+ * The roster rather than the votes is the denominator: a captain who
+ * went bankrupt is not a vote the room is waiting on, the same rule
+ * every ready check already follows.
+ */
+export function auditCarried(
+  votes: ReadonlyMap<string, string>,
+  roster: number,
+): string | null {
+  return carriedTarget(votes, roster, auditNamesNeeded(roster));
+}
+
+/**
+ * How many names carry the audit, for a roster of any size.
+ *
+ * The smallest whole count that is more than half, and the threshold
+ * auditCarried carries on: one name fewer never carries and this many
+ * always does. It is written as arithmetic rather than as a sentence so
+ * a card that tells the room how many names it needs and the server that
+ * decides when it has them answer out of one rule, and the smoke suite
+ * checks the two against each other at every roster this game deals
+ * rather than trusting them to stay in step.
+ *
+ * A roster of nobody needs nobody: an empty room has no vote to carry.
+ */
+export function auditNamesNeeded(roster: number): number {
+  if (roster <= 0) return 0;
+  return Math.floor(roster / 2) + 1;
 }
 
 /**
@@ -270,6 +334,12 @@ export function auditCarried(
  * rather than frozen, and the room is free to nominate again in the same
  * leg, which is what a table that watched a captain walk out would do
  * anyway.
+ *
+ * It lives here and is read by both votes rather than copied into the
+ * heavier one (see src/server/realtime/maroon.ts, which imports it): the
+ * two books are divided by the same roster, so a nomination the room has
+ * stopped counting is the same fact in either book, and a second copy of
+ * this rule would be a second place for it to drift.
  */
 export function pruneStaleVotes(
   votes: ReadonlyMap<string, string>,

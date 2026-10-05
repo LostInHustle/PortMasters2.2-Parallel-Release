@@ -79,7 +79,7 @@ export interface RoundLeg {
 // as an order. A sentence leaves a captain to reconstruct the shape from
 // the words, and it has no room for the two legs a line folds away or
 // for what each leg decides for the legs after it.
-export type ModeBriefing =
+type ModeBriefing =
   | { kind: "line"; text: string }
   | { kind: "flow"; legs: readonly RoundLeg[]; closes: string };
 
@@ -547,6 +547,7 @@ export const MODES: Record<GameMode, ModeConfig> = {
     differences: [
       "The manifest closes before the table opens: Orders runs ahead of Parley, so you commit to your sheet first and nothing on it can be revised once the fleet starts talking.",
       `Every voyage here runs ${GAMBIT_LEGS} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.`,
+      "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
       `From round ${AUDIT_FROM_ROUND}, a simple majority of the fleet can open one captain's manifest at a Parley. The room is shown ${AUDIT_REVEAL_COUNT} of that captain's last ${AUDIT_WINDOW} fills, and calling the vote spends the rest of that Parley's trading.`,
       `From round ${GAMBIT_MAROON_FROM}, two thirds of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${Math.round(PORT_SHIFT_FRACTION * 100)} percent either way.`,
     ],

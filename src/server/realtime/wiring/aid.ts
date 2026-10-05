@@ -12,6 +12,7 @@ import {
   setAidRequest,
 } from "../aid";
 import { requireAuth, seated } from "../auth";
+import { rowId } from "../ids";
 import {
   broadcastLoans,
   loanList,
@@ -40,7 +41,7 @@ export function wireAid(io: Server, socket: Socket): void {
       return;
     }
     const request = {
-      id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      id: rowId(roomId, s.userId),
       fromUserId: s.userId,
       fromName: s.user.displayName,
       amount: amount as number,

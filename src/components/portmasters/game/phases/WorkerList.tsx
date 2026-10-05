@@ -5,6 +5,11 @@ import { ICONS } from "@/lib/game/constants/brand";
 import { RECIPES } from "@/lib/game/constants/goods";
 import { assignTask, fireWorker } from "@/lib/game/engine";
 import { isFrostbitten } from "@/lib/game/garments";
+import {
+  SKILLED_LEGEND,
+  frozenBenchLine,
+  idleBenchLine,
+} from "@/lib/game/status-copy";
 import type { GameState, Worker } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import {
@@ -19,14 +24,19 @@ import {
  * not doing it. Exported because the peek modal draws the same roster, and
  * a hand seen from either surface should read the same reason and the same
  * promise: the cold holds a hand for the leg, not the voyage.
+ *
+ * [W3: the status convention] The two troubled lines are composed in
+ * @/lib/game/status-copy rather than here, where the frozen family's
+ * remedy and the idle family's wage note are authored once for every
+ * surface that carries them. This row is the surface that had lost the
+ * frozen remedy its engine lines kept, which is the drift the convention
+ * exists to stop.
  */
 export function workerStatusLine(w: Worker, round: number): string {
-  if (isFrostbitten(w, round)) {
-    return "🥶 Frozen out this leg: the crew went into the cold short of warm clothes. Back next leg.";
-  }
+  if (isFrostbitten(w, round)) return frozenBenchLine();
   return w.task
     ? `Working on: ${w.task}${w.isSkilled ? " (Skilled)" : ""}`
-    : `Idle${w.isSkilled ? " ⭐ Skilled" : ""}`;
+    : idleBenchLine(w.isSkilled);
 }
 
 /**
@@ -50,8 +60,8 @@ function WorkerList({
   name: string;
   tasks: string[];
   /** The wage Resolve charges for this artisan, discounts already applied.
-      Passed in rather than looked up here, because the display used to read
-      the raw WAGES table while fireWorker charged getHireCost. */
+      Passed in rather than looked up here, so the number displayed and the
+      one fireWorker charges cannot come from different tables. */
   cost: number;
   /** [C3: garments and the cold] The leg in progress, read here so the row
       can say which hand the cold has taken. Passed in rather than pulled off
@@ -75,13 +85,11 @@ function WorkerList({
           key={i}
           className="flex items-center justify-between bg-background/70 rounded-md px-3 py-1.5 my-1 text-xs border border-black/5 dark:border-white/10"
         >
-          {/* The row leads with the person rather than with their trade.
-              It used to read "Weaver 3:", which is a count wearing a
-              name's clothes: the heading above already says the trade,
-              and the number said nothing a captain could hold on to.
-              C2's whole point is that a name going off this list says
-              something a number cannot, which it can only do if the name
-              was on it.
+          {/* The row leads with the person rather than with their trade:
+              the heading above already says the trade, and a bare count is
+              a number said in a name's place. A name going off this list
+              says something a number cannot, which it can only do if the
+              name was on it.
 
               [C3: garments and the cold] A hand the cold has taken says so
               where their work would have been, because that is the one
@@ -90,15 +98,17 @@ function WorkerList({
               why and the way back as well as the state, because a row
               that only said "out of action" left the captain with no way
               to know it was the wardrobe that owed them a coat rather
-              than the sea owing them a funeral. */}
+              than the sea owing them a funeral. [W3: the status
+              convention] The sentence is composed in the status module,
+              so this row and the voyage log give one account of the
+              cold rather than two that can drift. */}
           <span>
             {w.name}: {workerStatusLine(w, round)}
           </span>
           {!w.task && (
             // Quiet until you reach for it, but still edged so it reads as a
-            // button. Every artisan row used to end in a solid red block,
-            // which made dismissal the loudest thing on a screen that is
-            // otherwise about hiring and assigning.
+            // button: a solid red block would make dismissal the loudest
+            // thing on a screen that is otherwise about hiring and assigning.
             <Button
               size="sm"
               variant="ghost"
@@ -157,6 +167,16 @@ export function WorkerStatus({
   return (
     <HuePanel tone="market" className="p-4 mb-4">
       <PanelHeading>👥 Worker Status & Tasks</PanelHeading>
+      {/* [W3: the status convention] The star the idle rows carry is
+          explained once above them rather than in each row, and only
+          while a star is on the board: the legend is a definition of a
+          mark, so it belongs beside the marks rather than on every
+          screen a captain opens before meeting one. */}
+      {rows.some((r) => r.list.some((w) => w.isSkilled)) && (
+        <p className="mb-1 px-1 text-[11px] text-muted-foreground">
+          {SKILLED_LEGEND}
+        </p>
+      )}
       {rows.map((r) => (
         <WorkerList
           key={r.id}

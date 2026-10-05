@@ -163,6 +163,30 @@ export function consentOfferStanding<T extends ConsentTerms>(
 }
 
 /**
+ * Whether a row in this state has settled, which is the question every
+ * reader of a status past the offer stage is really asking.
+ *
+ * Two names, and they are the two this tree's kinds produce: an agreement
+ * for all of them, and the escort's spent cover, which is that agreement
+ * one moment later. Written as the two states that commit rather than as
+ * everything past the offer stage, which is how this read used to be
+ * written and what it got wrong the moment a kind grew a third state: a row
+ * its addressee turned down is every bit as far past the offer stage as an
+ * agreement, and it commits nobody. A kind that grows a fourth state adds
+ * it here rather than being read in by accident.
+ *
+ * The three places a status is judged rather than carried read it here: the
+ * busy rule below, the escort's cover mirror (see coverFromBoard in
+ * ./contracts), and the client relay that reports a settled row to the two
+ * captains it names (see useConsentBoard, which fires on this answer rather
+ * than on the status having changed at all, so a row that came back is
+ * never handed to a machine as a movement to apply).
+ */
+export function consentSettled(status: string): boolean {
+  return status === "agreed" || status === "claimed";
+}
+
+/**
  * Whether one side of the table is already committed for the round.
  *
  * Both kinds need this bound and they need it on different sides, which is
@@ -175,7 +199,10 @@ export function consentOfferStanding<T extends ConsentTerms>(
  * contracts wears several claims, which is the risk that path is priced on,
  * and a buyer who may take several refits is simply a customer.
  *
- * An offer is not a commitment, so only rows past the offer stage count.
+ * An offer is not a commitment, so only a row that settled counts, which is
+ * the predicate above rather than the "not an offer" test this used to
+ * read: a reader that asked whether a row had stopped being an offer would
+ * answer that a captain who said no was covered for the leg.
  */
 export function consentPartyBusy<T extends ConsentTerms>(
   rows: T[],
@@ -185,7 +212,7 @@ export function consentPartyBusy<T extends ConsentTerms>(
 ): boolean {
   return rows.some(
     (c) =>
-      c.status !== "offered" &&
+      consentSettled(c.status) &&
       c.round === round &&
       (side === "seller" ? c.sellerUserId : c.buyerUserId) === userId,
   );

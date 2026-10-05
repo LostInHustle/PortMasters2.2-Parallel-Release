@@ -23,7 +23,7 @@ now, with what closed them written where they were raised.
 Three surfaces, taken from the plan:
 
 1. **Every site that builds a broadcast payload.** Anything a whole harbor
-   receives. There are 62 `io.to(...)` and `io.emit(...)` statements across
+   receives. There are 64 `io.to(...)` and `io.emit(...)` statements across
    29 files under `src/server/realtime`, and a thirtieth file, the chat
    module, carries the phrase inside a comment and no statement. The
    question asked of each is whether anything private can be inside the
@@ -123,7 +123,7 @@ that changes inside a single beat is a card that reached the wrong socket.
 
 ### 1. Broadcast payloads
 
-62 statements, 29 files, with a thirtieth file, the chat module, carrying
+64 statements, 29 files, with a thirtieth file, the chat module, carrying
 the phrase in a comment and no statement. The two passes read the 50
 statements across the 16 files that existed when they ran, and every one of
 those was read for what it carries; the four files added since are named in
@@ -373,6 +373,41 @@ realtime layer reads a captain's identity out of the frame it was sent,
 which is what makes "the sender is who they say they are" true by
 construction rather than by review.
 
+**The price, not the payment, is what the consent boards settle on.**
+The escort, module and refit desks move money on the two captains' own
+machines rather than through the server (`applyEscortSide`,
+`applyModuleTradeSide`), and each side applies its own reading: the buyer
+pays what the purse actually holds (`paid = max(0, min(fee, Gold))`), the
+seller credits the price that was agreed, and each desk guards the press
+beforehand (`canPayFee`, one reader in the engine's core) so only a purse that
+moved between the press and the settle can meet the clamp. A buyer holding
+5 Gold who takes a 100 Gold listing therefore pays 5 while the seller
+banks 100, and the difference is created rather than transferred. That is
+accepted for the reason every cross captain movement here is: the two
+machines cannot see each other, each side must settle what its own save
+can honestly hold, and the price is the agreement. The published fee
+bounds (`CONSENT_FEE_MIN`, `CONSENT_FEE_MAX`) wall the per trade amount,
+and the module suite pins the clamp deliberately rather than by accident.
+
+**An escort claim is a report about a leg, so a frame that crosses the
+leg's close is refused rather than settled against the new one.** The
+claim handler rides the leg rather than the phase
+(`src/server/realtime/wiring/escort-contracts.ts`), a claim arriving
+after the room has carried the leg on meets "That contract was for an
+earlier leg.", and a claim reporting a raid that took nothing is dropped
+silently, because there is no captain doing anything wrong. The loss a
+frame takes by arriving late is accepted: settling cover against the
+wrong leg's raid would be the worse reading, and no other captain can be
+moved by it.
+
+**The bazaar does not check who may speak, and that line is deliberate.**
+Being the Aroma lives in a save this server has never read, so the desk
+checks everything about a rumor row that can be checked without one (its
+shape, its bounds, the voyage leg it names) and nothing about the
+captain's path; the module's own header states the boundary at the code
+(`src/server/realtime/wiring/bazaar.ts:25-31`) rather than leaving it to
+a reader to find.
+
 ## The severity one bar
 
 The plan's evaluation for this review is that no alignment field can reach
@@ -527,3 +562,25 @@ that rule cannot do is the part this review exists for: it reads the words of
 an emit rather than its meaning, so it catches a payload that says role or
 flourish or ally or alignment and passes one that smuggles the same value
 under a name nobody taught it.
+
+**The surface has grown again, by two statements, since that note.** The same
+reading, run at the close of the latest cycle, counts 64 across the same 29
+files, the chat module's comment line still beside them. No finding is
+claimed over the two: a count moving inside the cycles since is exactly the
+trigger, so the repeat stays owed, now over 64 statements and 29 files, and
+no reading has been taken over the newer ones, stated here rather than
+implied by the numbers. What guards them in the meantime is the mechanical
+half: `npm run check:private` ran green over the whole tree, 484 files under
+seven rules, at the close of the same cycle.
+
+**The commission's handover is a new private frame, recorded here as
+such.** The fleet's commission gained two wires in the cycle that
+followed: a handover a captain sends, and a grant the server addresses to
+the sender alone (`objective:granted`), carrying the fleet's running total
+for that captain's own goal and nothing about any other seat. It repeats
+no secret this review hides: the payload is the sender's own standing, the
+same figure the public progress frame already carries as a total,
+delivered to one socket because the step from the fleet's total to one
+captain's share is that captain's own arithmetic. The wires add no
+broadcast statement, so the count above stands at 64 across the same 29
+files, and the repeat stays owed as stated.

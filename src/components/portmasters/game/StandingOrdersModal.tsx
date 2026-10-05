@@ -57,11 +57,9 @@ function bookCeiling(good: string): number {
 
 /**
  * One switch and its name, with a hint only where the row's own order
- * says something its section's hint does not (W4, UX-10 in
- * docs/STUDIO_AUDIT.md). The panel's prose was the heaviest in the game
- * because every row repeated the shape of its section's sentence; the
- * section owns the explanation now, and a row prints one only when it
- * differs from that.
+ * says something its section's hint does not. The section owns the
+ * explanation, so a row prints a hint only when it differs from the
+ * section's own sentence, and the panel stays light.
  */
 function OrderRow({
   title,

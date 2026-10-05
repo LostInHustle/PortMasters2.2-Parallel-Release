@@ -94,18 +94,21 @@ const STEPS: Step[] = [
     tip: "The harbor remembers what everyone bought. A good the room leans into gets pricier next round, while one nobody touches softens.",
   },
   {
+    icon: Wrench,
+    title: "Put Artisans to Work",
+    gradient: "pm-grad-market",
+    // Artisan management is the port stop's second half (see the legacy
+    // phase table in @/lib/game/phases, where the worker bench folds into
+    // Market), which is why this page follows Buy at Port.
+    body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: a task assigned now delivers at this round's Resolve, after Orders has already closed.",
+    tip: "Hire artisans only when you can sustain at least two rounds of wages. A crew that goes unpaid takes a bankruptcy, which ends the voyage in Classic and leaves a mark in Ocean Gambit.",
+  },
+  {
     icon: Handshake,
     title: "Barter with Captains",
     gradient: "pm-grad-parley",
     body: "At the Parley you can trade goods and Gold directly with the other captains, whether your voyage runs it before the orders or after them. Post an offer of what you have and what you want, or accept an offer someone else posted. Offered goods are escrowed the moment you post.",
-    tip: "You can target a specific captain with a Direct Barter Offer if you want to trade with only them.",
-  },
-  {
-    icon: Wrench,
-    title: "Put Artisans to Work",
-    gradient: "pm-grad-market",
-    body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: the goods land at Resolve next round, not this round.",
-    tip: "Hire artisans only when you can sustain at least two rounds of wages. A crew that goes unpaid takes a bankruptcy, which ends the voyage in Classic and leaves a mark in Ocean Gambit.",
+    tip: "You can target a specific captain with a Direct Barter Offer if you want to trade with only them. The Markets station of the Parley holds the escort market, the module market and the bazaar window.",
   },
   {
     icon: TrendingUp,
@@ -118,11 +121,9 @@ const STEPS: Step[] = [
     icon: Skull,
     title: "Survive Settlement",
     gradient: "pm-grad-resolve",
-    // The last sentence this page used to end on stated the founding
-    // mode's rule for a failed seat as if it were the game's, so a Gambit
-    // captain was told here that failing the bills ends the voyage. What
-    // happens instead is the mode's own rule, and it is stated on the
-    // mode's page rather than repeated on this one.
+    // What a failed seat means is the mode's own rule, stated on the
+    // mode's page rather than repeated here: the founding mode's ending
+    // would be wrong for a Gambit captain, whose voyage carries on.
     body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Round End Obligations panel before you spend anything.",
     tip: "Ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
@@ -284,8 +285,8 @@ export function HowToPlayModal({
                 </div>
                 {/* The manual's appendix, under the advice rather than
                     inside it: the tip is one voice and the world's own
-                    prose is another, and the two used to be told apart by
-                    their colour here too. */}
+                    prose is another, and the charter tint is what tells
+                    the two apart. */}
                 {current.aside && (
                   <div className="rounded-xl bg-charter/[0.07] p-3">
                     <p className="text-xs leading-relaxed text-charter">

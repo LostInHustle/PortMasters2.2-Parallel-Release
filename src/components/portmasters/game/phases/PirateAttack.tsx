@@ -21,11 +21,9 @@ import { PhaseHeading, StatTile, SummaryHeading } from "./PhaseShared";
  * shows what each would cost against what a raid would take.
  *
  * Both figures come straight from the engine, off the same two functions
- * the charge itself goes through (see hireEscort and resolvePirateAttack).
- * The panel used to rebuild each one by hand and had drifted away from
- * them: the odds left out the Escort Pact and the Persian Dome Compass,
- * and the fee left out the Pact, so a captain was quoted a risk and a
- * price that were not the ones on offer.
+ * the charge itself goes through (see hireEscort and resolvePirateAttack),
+ * so the risk and the price quoted here are the ones on offer rather than
+ * a hand rebuilt copy that can leave a discount out.
  */
 export function PirateAttack({
   game,

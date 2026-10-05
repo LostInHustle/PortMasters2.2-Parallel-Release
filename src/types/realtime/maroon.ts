@@ -32,15 +32,38 @@ export type MaroonVote = {
 
 /**
  * The nominations so far this round, broadcast after every vote including
- * the one that carries. The same frame the audit's tally uses, and for
- * the same reason: the count is arithmetic the client can do and the
- * names are the part it cannot reconstruct.
+ * the one that carries, and answered to the captain whose card asks (see
+ * maroon:state:request in src/server/realtime/wiring/maroon.ts). The same
+ * frame the audit's tally carries, fields and all, and for the same
+ * reason: the count is arithmetic the client can do and the names are the
+ * part it cannot reconstruct, while the roster the vote is divided by is
+ * the server's own reading and travels with them (see AuditTally for why
+ * a card cannot work it out from the members it can see).
  */
 export type MaroonTally = {
   roomId: string;
   round: number;
   /** voter id -> the captain they nominated. */
   votes: Record<string, string>;
+  /** How many captains the vote is divided by: the roster still sailing. */
+  roster: number;
+  /** How many names one captain needs to carry it (see maroonNamesNeeded). */
+  needed: number;
+  /**
+   * The captains the count is divided by who have not named anyone yet
+   * this leg, which is who the room is waiting on. Ids, so the reader
+   * names them from the roster it already has.
+   */
+  awaiting: string[];
+  /**
+   * The captain the vote named once it has carried, or null while the
+   * vote is live. The nominations die with the vote that carried, so
+   * without this the empty book reads exactly like a fresh leg and a
+   * captain whose ask lands after the carry would be offered a press
+   * that is already spent. It is the server's own record of the vote,
+   * which is what a state request is asking about.
+   */
+  carried: { userId: string; name: string } | null;
 };
 
 /**

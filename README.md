@@ -2,7 +2,7 @@
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
-Captains gather in a shared harbor. Once at least two of them are seated, the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft, then buying at port, then trading with the other captains, then putting artisans to work, then filling trade orders, then settling wages and pirate raids, then refitting at the shipyard. Nobody moves to the next step until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, upkeep and pirate raids come due, then refitting at the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next gate until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
 Everything runs as a single npm project on a single port.
 
@@ -74,17 +74,16 @@ The telemetry checks inside it read the records a voyage leaves behind, so a ser
 
 ### The shape of a round
 
-Every round runs the same seven steps, and every captain in the harbor goes through them together.
+Every round walks the same six gates, opening at the harbor, and every captain in the harbor goes through them together. The one thing the voyage you sail changes is where the Parley sits against the Orders board: Classic trades at the table before the manifest is filled, Ocean Gambit fills the manifest first, and the rail across the top of the board always shows the order.
 
-| Step                | What happens                                                             |
-| ------------------- | ------------------------------------------------------------------------ |
-| Boon draft          | Draw from a fresh pool of boons that bend the rules for the coming round |
-| Phase 1: Purchase   | Buy raw materials from the port market                                   |
-| Barter              | Trade goods and Gold with the other captains, once Renown allows         |
-| Artisan management  | Hire artisans and assign what each of them crafts                        |
-| Phase 2: Orders     | Fill trade orders for Gold and Reputation                                |
-| Phase 3: Settlement | Production lands, wages and maintenance come due, pirates may find you   |
-| Phase 4: Shipyard   | Upgrade the ship, draft and rig modules                                  |
+| Gate    | What happens                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Dawn    | Draw from a fresh pool of boons that bend the rules for the coming round                                                       |
+| Market  | Buy raw materials from the port market, and hire artisans and set what each of them crafts                                     |
+| Parley  | Trade goods and Gold with the other captains on the Captain's Exchange, which is open to every captain from their first voyage |
+| Orders  | Fill trade orders for Gold and Reputation                                                                                      |
+| Resolve | Production lands, pirates may find you, then wages and maintenance come due                                                    |
+| Dusk    | Upgrade the ship, draft and rig modules                                                                                        |
 
 ### Difficulty tiers
 
@@ -130,7 +129,7 @@ Because a trade can land at any point in a round, and every phase reads the hold
 
 Reputation decides the voyage. Gold buys you the means, but Reputation is the score.
 
-A captain goes bankrupt when the bills at Settlement cannot be covered. That ends the voyage for them but not for the harbor, and the rest of the crew sails on. The final Reputation then becomes Renown XP, multiplied by the difficulty tier, which levels the account up over many voyages.
+A captain goes bankrupt when the round's bills cannot be covered. On a Classic voyage that ends the voyage for them while the rest of the harbor sails on; on an Ocean Gambit voyage no seat ever leaves the table, so the harbor marks it against the captain and they sail on with their card, their vote and their say. The final Reputation then becomes Renown XP, multiplied by the difficulty tier, which levels the account up over many voyages.
 
 ### Sealed voyages
 
@@ -154,11 +153,11 @@ It is a room setting rather than an account one, and that is the design rather t
 
 **Convoy ventures.** A captain posts a target and a deadline; the harbor contributes toward it; everyone who took part is paid out when it lands.
 
-**Artisans.** Weavers, potters, coppersmiths and more, each assigned to craft a product. Production takes a round to arrive, and an unpaid artisan strikes.
+**Artisans.** Weavers, potters, coppersmiths and more, each assigned to craft a product that lands at Resolve. Wages come due every round whether they worked or not, and a crew that goes unpaid takes a bankruptcy.
 
 **Trade orders and mandates.** Raw material orders for steady money, finished product orders for real Reputation, and an Emperor's Mandate that every captain in the harbor is chasing at once.
 
-**Pirates and escorts.** The settlement step can cost you every coin on hand. An escort costs a share of the cargo but sails you safely past.
+**Pirates and escorts.** The settlement step can cost you every coin on hand. An escort is hired for a cut of your current Gold and guarantees safe passage.
 
 **The shipyard.** Ship levels that open module slots and cut transport costs, plus modules such as the Smuggler's Hold, the Broker's Network and the Salvage Crane.
 
@@ -166,7 +165,7 @@ It is a room setting rather than an account one, and that is the design rather t
 
 **Live harbor life.** Presence, room chat, direct messages, a fleet ticker, tidewatch surge alerts, and Word on the Docks.
 
-**A guide while you play.** The How to Play screen walks through all nine steps of a voyage, and glossary terms throughout the interface can be hovered for a plain explanation.
+**A guide while you play.** The How to Play screen walks a new captain through the whole voyage, and glossary terms throughout the interface can be hovered for a plain explanation.
 
 Solo practice is built in as well. A captain can set sail alone, which is the easiest way to learn a tier before playing it against other people.
 
@@ -209,7 +208,7 @@ The server reads six environment variables. Five of them configure the process a
 
 An environment variable that is already set always wins over the file, which is the order a hosting platform expects. Point `ENV_FILE` at a different file to read from that one instead, which is how two servers run side by side from a single checkout without editing anything back and forth.
 
-Nine further variables are documented in `.env.example` under their own heading, and none of them is a setting of the server the way the six above are. Each is the rollback for one system of Ocean Gambit, the experimental voyage this branch is building toward, and each is read as two questions in a fixed order: whether the room is a Gambit room, and then what the file says. The mode is asked first, so a switch can only ever take a system away from the mode it belongs to and never hand it to Classic, which is the shipped release kept exactly as it was. That boundary is also why they are not in the table above: they are not knobs on the game, they are the way one mode of it is taken apart, and a Classic harbor plays the game this branch forked from whatever any of them says.
+Twelve further variables are documented in `.env.example` under their own heading, and none of them is a setting of the server the way the six above are. Each is the rollback for one system of Ocean Gambit, the experimental voyage this branch is building toward, and each is read as two questions in a fixed order: whether the room is a Gambit room, and then what the file says. The mode is asked first, so a switch can only ever take a system away from the mode it belongs to and never hand it to Classic, which is the shipped release kept exactly as it was. That boundary is also why they are not in the table above: they are not knobs on the game, they are the way one mode of it is taken apart, and a Classic harbor plays the game this branch forked from whatever any of them says.
 
 `next.config.ts` reads two more, and only while the development server is running, because they decide which hostnames may load development resources: the compiled chunks under `/_next`, the hot reload channel, and the internal endpoints. Next.js allows `localhost` on its own. `ALLOWED_DEV_ORIGINS` adds any other hostname as a comma separated list, and `RAILWAY_PUBLIC_DOMAIN` is read as well, which the host injects with the hostname the running service answers on. A production build reads neither.
 

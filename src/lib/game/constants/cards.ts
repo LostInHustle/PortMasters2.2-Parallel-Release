@@ -147,7 +147,7 @@ export type CardCondition =
 // than an unfinished field: a hull card's mechanism is its identifier, and
 // what the arm buys is that a record claiming to be a module says so in
 // the same place a boon says what it writes.
-export type CardEffect =
+type CardEffect =
   | { kind: "flags"; flags: Partial<Record<ModifierKey, number>> }
   | { kind: "hull" };
 

@@ -32,14 +32,11 @@
 // The register is drawn twice, from one set of rows: a table where the
 // column is wide enough for one, and a card per account where it is not.
 // The width that decides is the column's own rather than the window's,
-// which is the whole reason for the split. The eight column table this
-// screen used to draw needed 1034 pixels while the column it stood in was
-// capped at 976, so at every desktop size the operator had to drag the
-// roster sixty pixels sideways to reach the buttons, and on a phone the
-// drag was 485 pixels: an operator acting on an account could not see the
-// name of the account they were acting on. A table is the right shape for
-// a register this dense, and a card is the right shape for a hand, so the
-// screen keeps both rather than picking one and dragging it everywhere.
+// which is the whole reason for the split. A table is the right shape
+// for a register this dense and a card is the right shape for a hand,
+// and a table dragged sideways to reach its own row buttons hides the
+// name of the account being acted on, so the screen keeps both shapes
+// rather than picking one and dragging it everywhere.
 //
 // Three things shape the screen as it stands now.
 //
@@ -76,6 +73,7 @@ import {
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PublicUser } from "@/lib/api";
+import { NO_LONGER_AN_ADMINISTRATOR } from "@/lib/game/constants/copy";
 import { useRealtime } from "@/lib/use-realtime";
 import { useAdmin } from "@/lib/use-admin";
 import { Avatar, Notice, OnlineDot, Th } from "@/components/portmasters/shared";
@@ -192,7 +190,7 @@ export function AdminConsole({
     useAdmin(
       socket,
       authed,
-      () => onLeave("This account is no longer an administrator."),
+      () => onLeave(NO_LONGER_AN_ADMINISTRATOR),
       announceBulk,
     );
   // The account the deletion dialog is about, and what the operator has
@@ -1079,9 +1077,8 @@ function RosterRow({
 //
 // Everything on the card hangs off one column, the identity's own: the
 // name, the handle, the counts and the actions all start at the same left
-// edge, so the eye reads down a single line. An earlier version indented
-// the facts to clear the avatar, which was 64 pixels of alignment that the
-// first narrow card had to spend on nothing.
+// edge, so the eye reads down a single line. Indenting the facts to clear
+// the avatar would be 64 pixels of alignment a narrow card cannot afford.
 function AccountCard({
   account,
   isSelf,

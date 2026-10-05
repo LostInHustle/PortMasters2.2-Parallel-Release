@@ -57,11 +57,11 @@ export type Tag = (typeof TAGS)[number];
 export type TagList = readonly [Tag] | readonly [Tag, Tag];
 
 // One sentence each, and every one of them phrased as the thing an effect
-// would test rather than as a flavour. Six of the twelve are also read
+// would test rather than as a flavour. Five of the twelve are also read
 // against a number the tree already keeps, which is what the rule module
 // checks: cold against the wardrobe's own table, perishable and preserved
 // against the pantry's keepings, and armed and contraband against a
-// charter's raid chance and its corrupt broker. The pantry clause is
+// difficulty's raid chance and its corrupt broker. The pantry clause is
 // scoped to the pantry, since a good may carry perishable as a reading
 // about its worth and only food has a keeping to measure.
 export const TAG_MEANINGS: Record<Tag, string> = {

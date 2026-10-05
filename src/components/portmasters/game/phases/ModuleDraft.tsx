@@ -6,8 +6,10 @@ import {
   cancelModuleDraft,
   handleModuleSelect,
   moduleSlotsOpen,
+  moduleSwapPossible,
   swapModuleChoices,
 } from "@/lib/game/engine";
+import { PanelNote } from "./PhasePanels";
 import {
   DraftCard,
   DraftGrid,
@@ -37,7 +39,14 @@ export function ModuleDraft({
   members,
 }: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
   const picks = game._draftChoices ?? [];
-  const canSwap = !game.moduleSwapUsed;
+  // [field report: the batch that would not change] The swap's button
+  // reads the swap's own predicate, the way the shipyard's door reads the
+  // draft's (see moduleSwapPossible): a hull the round has shown every
+  // card it could be dealt gets a disabled button and the line below it
+  // saying why, rather than a press that redraws the table it is already
+  // looking at and charges the round's one use for the privilege.
+  const swapDealable = moduleSwapPossible(game);
+  const canSwap = !game.moduleSwapUsed && swapDealable;
   return (
     <div className="max-w-4xl mx-auto text-center">
       <PhaseHeading layout="mb-1" tone="text-module-draft" brush>
@@ -62,6 +71,13 @@ export function ModuleDraft({
               ? "✅ Choices Swapped This Round"
               : "🎲 Swap Choices (1 use/round)"}
           </DraftSwapButton>
+          {!game.moduleSwapUsed && !swapDealable && (
+            <PanelNote className="text-center text-[11px] mb-3">
+              Nothing new to deal: every module the yard could offer this hull
+              is either on this table already or aboard. Take one of these, or
+              come back next leg.
+            </PanelNote>
+          )}
           <DraftGrid>
             {picks.map((card, i) => {
               const text = cardText(card);

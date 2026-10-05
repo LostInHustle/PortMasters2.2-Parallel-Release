@@ -86,10 +86,10 @@ function PurchaseCard({
         // The deal mark and its range. The range is printed under the
         // price rather than kept in a hover title, because "Deal"
         // without the range it is a deal against is a word a captain
-        // has to trust rather than a fact they can weigh (UX-11 in
-        // docs/STUDIO_AUDIT.md). The pulse chip keeps its place and
-        // its words: the arrow says the direction and "price" says
-        // what moved, so nothing on this board needs a hover.
+        // has to trust rather than a fact they can weigh. The pulse
+        // chip keeps its place and its words: the arrow says the
+        // direction and "price" says what moved, so nothing on this
+        // board needs a hover.
         const range = basePriceRange(r.type);
         const unitPrice = r.price ?? 0;
         const isDeal = range !== undefined && unitPrice < range[0];

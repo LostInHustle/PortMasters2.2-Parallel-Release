@@ -6,12 +6,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * One header for the three panels that fold: the captain's rail, the
- * harbor roster and the chat. They used to have three different heads (a
- * heading with a count pill, a bare uppercase line, and no head at all),
- * which is three answers to one question: what is this panel, and is it
- * open. The anatomy is shared here: an icon, an uppercase name, an
- * optional note about the panel's own state, and the chevron that folds
- * it.
+ * harbor roster and the chat. They answer one question between them,
+ * what is this panel and is it open, so the anatomy is shared here: an
+ * icon, an uppercase name, an optional note about the panel's own state,
+ * and the chevron that folds it.
  *
  * `collapsed` is the panel's own state rather than this header's, because
  * the fold lives in one record (see usePanelPrefs) that two surfaces

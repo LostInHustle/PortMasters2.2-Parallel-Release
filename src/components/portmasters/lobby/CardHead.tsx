@@ -5,16 +5,14 @@
 // that card on the right. The icon takes its colour from the call site,
 // because colour is how a card says which part of the harbor it is.
 //
-// It exists because each of the lobby's headings used to be grown by
-// hand, and no two of them agreed. One card led with its icon at five and
-// the next at four, and a heading nudged to fit its own card drifted out
-// of line the moment the text beside it changed length. A heading written
-// once cannot drift away from itself. The figures that sit under those
-// headings are the same argument, and live in ./HarborGauge.
+// It exists so every heading in the lobby is written once: a heading grown
+// by hand nudges to fit its own card and drifts out of line the moment the
+// text beside it changes length, and a heading written once cannot drift
+// away from itself. The figures that sit under those headings are the same
+// argument, and live in ./HarborGauge.
 //
-// It had a second line of explanation under the title for as long as two
-// cards wanted one. Both of those cards are gone, so the prop went with
-// them rather than sit here unread.
+// No second line of explanation sits under the title, and no prop sits
+// here unread for one: no card wants a subtitle, so there is none.
 // =====================================================================
 
 import type { ReactNode } from "react";
@@ -25,9 +23,8 @@ import { cn } from "@/lib/utils";
 // card on the right. The icon takes its colour from the call site, because
 // colour is how a card says which part of the harbor it is.
 //
-// It had a second line of explanation under the title for as long as two
-// cards wanted one. Both of those cards are gone, so the prop went with
-// them rather than sit here unread.
+// No second line of explanation sits under the title, and no prop sits
+// here unread for one: no card wants a subtitle, so there is none.
 export function CardHead({
   icon: Icon,
   tone,

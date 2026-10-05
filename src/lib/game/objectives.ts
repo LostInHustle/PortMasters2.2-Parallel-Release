@@ -272,6 +272,37 @@ export function clampObjectiveTally(
 }
 
 /**
+ * Two readings of one commission, merged good by good into the higher.
+ *
+ * A max rather than a sum, because the two readings overlap: the board a
+ * room broadcasts already contains the captain hearing it, so adding the
+ * two would count that captain's own handover twice the moment one frame
+ * landed. A max also cannot be walked backwards by a frame that arrives
+ * late, which is the same reason the room's own tally merges this way (see
+ * the merge in src/server/realtime/objective.ts).
+ *
+ * One definition rather than one per reader, because two readers need the
+ * same answer and either could get it wrong alone: the screen draws the
+ * bar, the count on the button and the goods a press would take from it,
+ * and the engine holds the press itself to it. What the higher of the two
+ * is, in one sentence, is the fullest reading of the commission anyone
+ * holds, so a handover is visible the instant it happens, an in flight
+ * broadcast can never take one away, and the goods about to be given are
+ * measured against what the commission has actually taken rather than
+ * against one captain's share of it.
+ */
+export function higherObjectiveTally(
+  board: Record<string, number>,
+  own: Record<string, number>,
+): Record<string, number> {
+  const merged: Record<string, number> = { ...board };
+  for (const [good, count] of Object.entries(own)) {
+    merged[good] = Math.max(merged[good] ?? 0, count);
+  }
+  return merged;
+}
+
+/**
  * The fleet's commission leg by leg, merged out of every captain's own
  * record of it.
  *
@@ -317,19 +348,27 @@ export function fleetTrace(
  * What one captain would hand over if they delivered right now: the goods
  * and counts the commission would take from them, and what it would pay.
  *
- * This is the single definition of "how much of this is still owed by this
- * captain", and both callers need it. The engine moves the goods, and the
- * interface has to say what its button will do before it is pressed, and a
- * second copy of this arithmetic in the button is exactly how the promise
- * and the payment drift apart.
+ * This is the single definition of "how much of this is still owed", and
+ * both callers need it. The engine moves the goods, and the interface has
+ * to say what its button will do before it is pressed, and a second copy
+ * of this arithmetic in the button is exactly how the promise and the
+ * payment drift apart.
  *
- * The cap is the captain's own remaining and never the harbor's: what the
- * rest of the fleet has handed over is not knowable here. That does mean
- * two captains can each hand over the whole commission and overshoot it,
- * since neither can see the other's delivery, which is why the board the
- * fleet reads is clamped at its source rather than summed and trusted
- * (see objectiveTotalFor in src/server/realtime/objective.ts). An
- * over-delivery reads as met, and the extra goods are gone either way.
+ * The tally passed in is what the commission has already taken, good by
+ * good, as the caller reads it: the board the room last reported merged
+ * with the captain's own record (see higherObjectiveTally), which is the
+ * read a screen has. A caller driving one captain with no room around them
+ * passes that captain's own record alone, which is the whole of what a
+ * lone captain's board could say.
+ *
+ * What comes back is capped at what the commission still asks for and
+ * never past it, and this is where "take only what remains" is decided:
+ * a captain offering three when one is still owed is handed back a row of
+ * one, and a commission with nothing outstanding has no rows at all. That
+ * is the same rule the Supply Barge reaches an ask by (see buyFromBarge)
+ * and the same rule the room's own acceptance applies to a report (see
+ * src/server/realtime/objective.ts), so a handover the engine would take
+ * whole is a handover the harbor agrees it took.
  */
 export function objectiveTaking(
   objective: Objective,

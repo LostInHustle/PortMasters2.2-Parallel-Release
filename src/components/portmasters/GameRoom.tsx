@@ -151,11 +151,9 @@ export function GameRoom({
 }: {
   me: PublicUser;
   // The room's own record, which is what the page already holds by the time
-  // this renders. It used to be declared here as a union with a hand written
-  // copy of the same shape that listed every field except difficulty, which
-  // meant the lap deciding field was the one a second copy was free to forget.
-  // Nothing ever passed that branch. Typing it as the real thing is what lets
-  // the session below be told which mode this harbor is playing.
+  // this renders. Typed as the page's real RoomDetail rather than a local
+  // shape, so the one record carries every field the session below needs and
+  // the mode this harbor is playing cannot be left off a second copy.
   room: RoomDetail;
   // The optional message is why the captain is leaving, for the times the
   // harbor was taken away rather than walked out of. The page owns the
@@ -802,7 +800,7 @@ export function GameRoom({
       });
     } catch {
       toast.error("Save failed", {
-        description: "Could not reach the harbour master.",
+        description: "Could not reach the Harbormaster.",
       });
     }
   }, [room.id, state.game]);
@@ -814,12 +812,12 @@ export function GameRoom({
     //
     // The departure is leavePhase, which is the seat's own work and then the
     // lap's step off it, and it is the same one the room's clock runs for a
-    // captain who is not there. It used to be a bare nextPhase, which moves a
-    // captain out of most seats but names no work for the ones that need it:
-    // at Dawn it does nothing at all, so a captain who pressed this readied
-    // the room into an advance nobody could carry out. The press is refused
-    // instead (markReady returns false), and the captain is told why rather
-    // than left pressing a button that looks like it worked.
+    // captain who is not there. A bare nextPhase would move a captain out of
+    // most seats but names no work for the ones that need it: at Dawn it does
+    // nothing at all, so the press would ready the room into an advance nobody
+    // could carry out. The press is refused instead (markReady returns false),
+    // and the captain is told why rather than left pressing a button that
+    // looks like it worked.
     if (!phaseSync.markReady((g, l) => leavePhase(g, ctx, l))) {
       toast.error("This seat is not left by pressing Next Phase", {
         description: leaveRefusal(state.game.phase),
@@ -835,7 +833,7 @@ export function GameRoom({
     setRestartConfirmOpen(true);
   }, [isHost]);
 
-  // Keyboard shortcuts (preserved from original).
+  // Keyboard shortcuts.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (
@@ -985,10 +983,9 @@ export function GameRoom({
             share of the window on a wide screen and scrolls inside that cap.
             Uncapped it is what pushed the columns off the fold, because a
             voyage carrying three notices stacks half a window of strips
-            before the first column starts. The draft's own panel used to
-            lead this band and no longer lives here at all: the deal is a
-            seat of the lap now, drawn in the stage like every other seat
-            (see the PathDraft case in ./game/GamePhasePanel). */}
+            before the first column starts. The deal is a seat of the lap,
+            drawn in the stage like every other seat rather than leading
+            this band (see the PathDraft case in ./game/GamePhasePanel). */}
         <div className="shrink-0 space-y-3 lg:max-h-[45vh] lg:overflow-y-auto pm-scroll lg:pr-1">
           <FleetTicker
             socket={socket}
@@ -1083,10 +1080,10 @@ export function GameRoom({
               captain sails as is the first line of the readings, below the
               head and above the voyage header, because an identity is not
               a panel a captain scrolls to: it dresses everything below it,
-              and the stage it used to sit in is the table's board rather
-              than the captain's own. The chip draws nothing at all in a
-              harbor with the draft switched off, so the rail still opens
-              on the voyage header. */}
+              and its stage is the table's board rather than the captain's
+              own rail. The chip draws nothing at all in a harbor with the
+              draft switched off, so the rail still opens on the voyage
+              header. */}
           <div className="order-2 lg:order-1 lg:min-h-0">
             <div
               className={cn(
@@ -1167,11 +1164,10 @@ export function GameRoom({
               the column changes. */}
           <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-3 lg:min-h-0">
             {/* The bar, which is the one thing on screen in every phase.
-                The row of key hints that used to sit under it left with
-                the declutter pass: the list is one press away on the
-                bar's own shortcuts glyph (lg and up, where a keyboard
-                exists), and four caps of chrome between the captain and
-                the board was exactly the clutter the row was. */}
+                The key hint list is one press away on the bar's own
+                shortcuts glyph (lg and up, where a keyboard exists),
+                rather than a row of caps standing between the captain
+                and the board. */}
             <div className="shrink-0 lg:order-2">
               <GameControlPanel
                 game={state.game}
@@ -1196,11 +1192,11 @@ export function GameRoom({
                 inside it are allowed to measure themselves against. It is a
                 container rather than a plain scroller because a phase board
                 laid out against the window is a board laid out for a width
-                it does not have: the market board used to read the window's
-                own breakpoint and deal three columns into a column half the
-                width of a phone's, so every card wrapped every line. The
-                boards ask this instead, and a board in a modal asks the
-                window, which is what a modal is as wide as. */}
+                it does not have: a market board reading the window's own
+                breakpoint would deal three columns into a column half the
+                width of a phone's and wrap every line. The boards ask this
+                instead, and a board in a modal asks the window, which is
+                what a modal is as wide as. */}
             {/* The stage's relative wrapper, which exists for one thing:
                 the notification bubble. Anchored here it can only ever
                 cover the board's own corner, and on a wide window that
@@ -1278,33 +1274,33 @@ export function GameRoom({
           </div>
 
           {/* Right: roster + chat, last of the three columns at every width.
-              The chat used to sit at the very bottom of the page, under the
-              phase panel and the roster, which put it three screens down on
-              a narrow window and left captains reading it as missing. The
-              FleetTicker above already carries the roster at these widths,
-              so the pair can follow the stage rather than opening with it.
+              The chat belongs beside the roster rather than at the foot of
+              the page, where it would sit three screens down on a narrow
+              window and read as missing. The FleetTicker above already
+              carries the roster at these widths, so the pair can follow the
+              stage rather than opening with it.
 
               On a wide window this is the column a captain scrolls least and
               reads most, so it holds still: the roster and the chat split
               the column's height two to three, and the split is a ratio
-              rather than a pair of sizes, so it holds at every window. It
-              used to be a share of the column for the roster, capped at
-              320px, which is not a share: the cap pulled the pair to 34/66
-              at one window and 32/68 at another, and two panels closely
-              related enough to be balanced should be balanced the same way
-              at every height. Each panel still scrolls inside itself, and if
+              rather than a pair of sizes, so it holds at every window. A
+              fixed cap on the roster's share is not a share: a 320px cap
+              would pull the pair to 34/66 at one window and 32/68 at
+              another, and two panels closely related enough to be balanced
+              should be balanced the same way at every height. Each panel
+              still scrolls inside itself, and if
               the two together need more room than the column has, the column
               scrolls rather than either panel being cut off at the knee.
 
               Below the breakpoint the pair stacks, and each panel stands
               on a height of its own: a share of the viewport, clamped so a
               short phone still shows a list rather than a sliver and a
-              tall one is not mostly chat. The heights used to be flat, 320
-              and 380, which is comfortable on one window and crowding on
-              the next. The wide layout's two floors under the split are
-              viewport relative for the same reason: they keep a short
-              window from squeezing either panel past reading height, and
-              what counts as reading height scales with the window too.
+              tall one is not mostly chat. Flat heights would be
+              comfortable on one window and crowding on the next, which is
+              why the wide layout's two floors under the split are viewport
+              relative for the same reason: they keep a short window from
+              squeezing either panel past reading height, and what counts
+              as reading height scales with the window too.
 
               Either panel folds to a strip of its own on the wide layout
               (see oneFolded above): the open one takes the rail's width,

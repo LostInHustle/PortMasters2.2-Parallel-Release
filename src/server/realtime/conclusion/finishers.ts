@@ -24,6 +24,7 @@ import { merchantRatingForScore } from "@/lib/game/constants/reputation";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { normalizeOrderFills } from "@/lib/game/audit";
+import { bankruptMark } from "@/lib/seatMarks";
 import { modeConfig } from "@/lib/game/mode";
 import { fleetTrace, objectiveProgress } from "@/lib/game/objectives";
 import {
@@ -256,7 +257,11 @@ async function concludeFinisher(
 ): Promise<FinisherRows> {
   const forged = ctx.forgedUsers.has(f.userId);
   const crowned = f.userId === ctx.winnerId;
-  const bankrupt = f.bankrupt || f.phase === "bankruptcy";
+  // By either signal, read through the one reader that owns the rule: in
+  // Classic the bankruptcy phase is what says it, and in Ocean Gambit the
+  // seat sails on to the endgame screen and the flag is all that is left
+  // of it (see bankruptMark in @/lib/seatMarks).
+  const bankrupt = bankruptMark(f);
   const xpGained = forged
     ? 0
     : Math.round(Math.max(0, f.reputation) * ctx.run.renownMultiplier);

@@ -1,6 +1,11 @@
 // PortMasters 2.2 Parallel Release, smoke run: Maroon, and the Harbormaster's hand.
 
-import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
+import {
+  MaroonResult,
+  MaroonTally,
+  PortShiftNotice,
+} from "@/types/realtime/maroon";
+import type { PublicUser } from "@/lib/api";
 import { db } from "@/lib/db";
 import { MODULES } from "@/lib/game/constants/drafts";
 import { PORTS_TIER2 } from "@/lib/game/constants/world";
@@ -17,6 +22,7 @@ import {
   PORT_SHIFT_FRACTION,
   maroonCarried,
   maroonKeptGold,
+  maroonNamesNeeded,
   normalizePortShift,
   portShiftLine,
   portShiftMultiplier,
@@ -25,6 +31,7 @@ import { modeConfig } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
 import type { GameState, Phase } from "@/lib/game/types";
 import { createInitialGameState } from "@/lib/game/types";
+import { leaderShortfall, tallyRows } from "@/lib/voteTally";
 import {
   CARRIES_A_DASH,
   LEDGER_PHRASE,
@@ -151,6 +158,67 @@ export async function maroonAndTheHarbormasterSuite(
       maroonCarried(new Map(), 6) === null &&
       maroonCarried(nominations(["a"]), 0) === null,
     "a room split down the middle puts nobody ashore, and neither does a room with no votes in it or no seats at all",
+  );
+
+  // The count a card prints, held against the comparison that carries the
+  // vote rather than against a second statement of the same rule, which is
+  // the pair that has to stay one rule: a card that told the table three
+  // names of six were enough would have the room believing a vote had
+  // carried when it had not, and the two were written in different files.
+  const neededCarries = (roster: number) => {
+    const needed = maroonNamesNeeded(roster);
+    return (
+      maroonCarried(
+        nominations(Array.from({ length: needed }, () => "a")),
+        roster,
+      ) === "a" &&
+      (needed === 0 ||
+        maroonCarried(
+          nominations(Array.from({ length: needed - 1 }, () => "a")),
+          roster,
+        ) === null)
+    );
+  };
+  check(
+    Array.from({ length: 12 }, (_, i) => i + 1).every(neededCarries) &&
+      maroonNamesNeeded(0) === 0,
+    "the count a card prints is the count the vote carries on: at every roster from one to twelve, one name fewer carries nothing and the count carries",
+  );
+  check(
+    maroonNamesNeeded(3) === 2 &&
+      maroonNamesNeeded(5) === 4 &&
+      maroonNamesNeeded(6) === 4,
+    "which is two thirds read as whole names, rounded up so half a captain is never asked to raise a hand: two of three, four of five and four of six",
+  );
+
+  // The shortfall line the shared count draws, read at this vote's own
+  // threshold rather than at the audit's: the two cards render one line
+  // against two different counts of names (see leaderShortfall in
+  // @/lib/voteTally), and a line quoting the majority here would tell the
+  // table three names were enough for a vote that needs four.
+  const shortfallSeat: PublicUser[] = [
+    {
+      id: "captain-a",
+      username: "captain-a",
+      displayName: "AaronZ",
+      avatarHue: 10,
+    },
+  ];
+  const shortfallRows = (names: number) =>
+    tallyRows(
+      Object.fromEntries(
+        Array.from({ length: names }, (_, i) => [`voter-${i}`, "captain-a"]),
+      ),
+      shortfallSeat,
+    );
+  const threeIn = leaderShortfall(shortfallRows(3), maroonNamesNeeded(6));
+  const fourIn = leaderShortfall(shortfallRows(4), maroonNamesNeeded(6));
+  check(
+    maroonNamesNeeded(6) === 4 &&
+      threeIn?.name === "AaronZ" &&
+      threeIn?.short === 1 &&
+      fourIn?.short === 0,
+    "the shared count draws this vote's shortfall at its own threshold: three names of the six seats in leaves AaronZ one name short of the four that carry, and the fourth name closes the line",
   );
 
   // ---- The port the hand leans ----
@@ -432,27 +500,51 @@ export async function maroonAndTheHarbormasterSuite(
   const maroonTargetId = gambitFifth.id;
   const maroonMarkedId = gambitSixth.id;
 
+  // The tally is read for its whole frame rather than for the map alone:
+  // the roster the vote is divided by, the count that carries it and the
+  // captains still to name someone ride with the names, which is what a
+  // card needs to say how far along the vote is without working out a
+  // threshold of its own (see MaroonTally).
   const maroonTallies: Array<{
     round: number;
     votes: Record<string, string>;
+    roster: number;
+    needed: number;
+    awaiting: string[];
   }> = [];
   const maroonResults: MaroonResult[] = [];
   const maroonCalls: PortShiftNotice[] = [];
+  // Every refusal any of these captains is handed, in one list: a refusal
+  // goes to the captain whose press it was and to nobody else, so this is
+  // the room's whole record of them and the checks below read its length.
+  const maroonRefusals: string[] = [];
+  // The lever's own refusals, kept with the socket each one came back on
+  // rather than as one list: which surface a refusal reaches is the
+  // property the checks below read, and a single list would lose it.
+  const maroonShiftRefusals: Array<{ socket: number; error: string }> = [];
   const maroonReadyStates: Array<{
     round: number;
     phase: string;
     requiredUserIds: string[];
   }> = [];
-  maroonSockets.forEach((socket) => {
-    socket.on(
-      "maroon:tally",
-      (payload: { round?: number; votes?: Record<string, string> }) => {
-        maroonTallies.push({
-          round: payload?.round ?? 0,
-          votes: payload?.votes ?? {},
-        });
-      },
-    );
+  maroonSockets.forEach((socket, index) => {
+    socket.on("maroon:tally", (payload: MaroonTally) => {
+      maroonTallies.push({
+        round: payload?.round ?? 0,
+        votes: payload?.votes ?? {},
+        roster: payload?.roster ?? 0,
+        needed: payload?.needed ?? 0,
+        awaiting: payload?.awaiting ?? [],
+      });
+    });
+    socket.on("maroon:error", (payload: { error?: string }) => {
+      if (typeof payload?.error === "string")
+        maroonRefusals.push(payload.error);
+    });
+    socket.on("maroon:shift:error", (payload: { error?: string }) => {
+      if (typeof payload?.error === "string")
+        maroonShiftRefusals.push({ socket: index, error: payload.error });
+    });
     socket.on("maroon:result", (payload: MaroonResult) =>
       maroonResults.push(payload),
     );
@@ -547,6 +639,32 @@ export async function maroonAndTheHarbormasterSuite(
     maroonTallies.length === 0,
     "a nomination for a leg before the mode's rung is refused, so the vote belongs to the back half of a voyage",
   );
+  check(
+    maroonRefusals.length === 1 &&
+      !CARRIES_A_DASH.test(maroonRefusals[0] ?? ""),
+    "and the captain who called it too early is told the leg the vote opens from rather than being met with silence",
+  );
+
+  // The lever answers in the same shape, and this is the leg its own rung
+  // refusal is read on: the hand is not dealt before the vote that deals
+  // it, and a captain pressing it anyway is told which leg it comes from.
+  // The port named below is a real one, so the sentence that comes back is
+  // the leg's rather than the port's.
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 8,
+    port: "Quanzhou Port",
+    direction: 1,
+  });
+  await maroonSettle();
+  check(
+    maroonShiftRefusals.length === 1 &&
+      maroonShiftRefusals[0].socket === 4 &&
+      maroonShiftRefusals[0].error ===
+        `The Harbormaster's hand is not dealt before leg ${modeConfig("ocean_gambit").maroonFrom}.` &&
+      !CARRIES_A_DASH.test(maroonShiftRefusals[0].error),
+    "and a call before the hand is dealt is answered on the socket that sent it with the leg it opens from, in the same plain sentence the vote's own refusal is",
+  );
 
   const atTheRung = await parkMaroonCheckpoint(9, "parley", "Parley");
   check(
@@ -571,6 +689,7 @@ export async function maroonAndTheHarbormasterSuite(
     bankrupt: true,
   });
   await maroonSettle();
+  const refusalsAtTheTable = maroonRefusals.length;
 
   maroonSockets[1].emit("maroon:vote", {
     roomId: maroonRoomId,
@@ -582,6 +701,10 @@ export async function maroonAndTheHarbormasterSuite(
     maroonTallies.length === 0,
     "a captain who is not in this harbor cannot be nominated into one",
   );
+  check(
+    maroonRefusals.length === refusalsAtTheTable + 1,
+    "and the captain who sent it is answered with a sentence rather than left reading a count that never moved",
+  );
 
   maroonSockets[1].emit("maroon:vote", {
     roomId: maroonRoomId,
@@ -592,6 +715,10 @@ export async function maroonAndTheHarbormasterSuite(
   check(
     maroonTallies.length === 0,
     "and a captain the harbor has already written off cannot be put ashore, since the vote would be arming a captain whose race is already run",
+  );
+  check(
+    maroonRefusals.length === refusalsAtTheTable + 2,
+    "which is also refused in the open: a press the room cannot see land is a press the captain is told about",
   );
 
   // The count, at the table. Four of six is what carries it, and the
@@ -610,6 +737,52 @@ export async function maroonAndTheHarbormasterSuite(
       ) &&
       maroonResults.length === 0,
     "a nomination reaches every captain in the harbor, and one of six opens nothing",
+  );
+  // The count the card reads, on the frame: six captains the vote is
+  // divided by, four names to carry it, and the five who have not named
+  // anyone yet. The written off captain is one of the five on purpose:
+  // their mark keeps them off the list a vote may be aimed at, and they
+  // are still a captain this count is divided by until they stop sailing.
+  const firstMaroonTally = maroonTallies[0];
+  const firstAwaiting = firstMaroonTally?.awaiting ?? [];
+  check(
+    firstMaroonTally?.roster === maroonSockets.length &&
+      firstMaroonTally?.needed === maroonNamesNeeded(maroonSockets.length) &&
+      firstMaroonTally?.needed === 4 &&
+      firstAwaiting.length === maroonSockets.length - 1 &&
+      !firstAwaiting.includes(gambitSecond.id) &&
+      firstAwaiting.includes(maroonMarkedId),
+    "and the count travels with the names: six still sailing, four names to carry, and the five captains the room is still waiting on",
+  );
+
+  // A captain names one captain a leg here too, and the refusal is the
+  // same shape as the audit's: the second press, whether it repeats the
+  // first name or asks for another, is refused at the door so the count
+  // the table is reading cannot move under it.
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: gambitHost.id,
+  });
+  await maroonSettle();
+  check(
+    maroonRefusals.length === refusalsAtTheTable + 4 &&
+      maroonRefusals.slice(-2).every((line) => !CARRIES_A_DASH.test(line)),
+    "a captain votes once: a second press, for the same name or for another, is refused with a sentence a captain can read",
+  );
+  check(
+    maroonTallies.length === maroonSockets.length &&
+      maroonTallies.every(
+        (tally) =>
+          Object.keys(tally.votes).length === 1 &&
+          tally.votes[gambitSecond.id] === maroonTargetId,
+      ),
+    "and the count does not move: the book still holds the one name the table was shown, whatever the refused presses asked for",
   );
 
   maroonSockets[2].emit("maroon:vote", {
@@ -668,6 +841,11 @@ export async function maroonAndTheHarbormasterSuite(
       maroonResults.length === maroonSockets.length,
     "and the vote is spent: a harbor cannot put a second captain ashore in one voyage",
   );
+  check(
+    maroonRefusals.length === refusalsAtTheTable + 5 &&
+      !CARRIES_A_DASH.test(maroonRefusals[maroonRefusals.length - 1] ?? ""),
+    "and the captain who called it again is told the harbor has already voted one of its own ashore rather than watching a vote that can no longer carry",
+  );
 
   // ---- The call, and the ports it may name ----
   // The charter's edge is derived rather than typed out, so the refusal
@@ -694,6 +872,14 @@ export async function maroonAndTheHarbormasterSuite(
     maroonCalls.length === 0,
     "a captain the harbor did not maroon has no hand on the market, whatever they send",
   );
+  check(
+    maroonShiftRefusals.length === 2 &&
+      maroonShiftRefusals[1].socket === 0 &&
+      maroonShiftRefusals[1].error ===
+        "The Harbormaster's hand belongs to the captain the harbor put ashore." &&
+      !CARRIES_A_DASH.test(maroonShiftRefusals[1].error),
+    "and the captain who has no hand is told whose it is, on their own socket and nowhere else, rather than left with a press that did nothing",
+  );
 
   maroonSockets[4].emit("maroon:shift", {
     roomId: maroonRoomId,
@@ -713,10 +899,41 @@ export async function maroonAndTheHarbormasterSuite(
     port: "Nowhere Port",
     direction: 1,
   });
+  // The shape the frame is in is the last way a call can be wrong, and it
+  // is the one the wiring used to drop on the floor before this cycle: a
+  // port that is not a port is a refused call like the rest now rather
+  // than a press that vanished between the two layers.
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: 17,
+    direction: 1,
+  });
   await maroonSettle();
   check(
     maroonCalls.length === 0,
     "and the captain who was marooned may lean a port by a tenth up or down and nothing else: not zero, not a port the charter has not opened, and not a port that does not exist",
+  );
+  const handRefusals = maroonShiftRefusals.slice(2);
+  check(
+    maroonShiftRefusals.length === 6 &&
+      handRefusals.length === 4 &&
+      handRefusals.every(
+        (row) => row.socket === 4 && !CARRIES_A_DASH.test(row.error),
+      ) &&
+      handRefusals.filter(
+        (row) =>
+          row.error ===
+          "A call leans a market up or down, and that frame named neither direction.",
+      ).length === 1 &&
+      handRefusals.filter(
+        (row) =>
+          row.error ===
+          "The market this call lands on has not unlocked that port.",
+      ).length === 2 &&
+      handRefusals.filter((row) => row.error === "A call has to name a port.")
+        .length === 1,
+    "and all four are answered on the socket that sent them, each in a plain sentence of its own: a direction that leans neither way, the two ports the coming market cannot trade, and the frame that named no port at all",
   );
 
   maroonSockets[4].emit("maroon:shift", {
@@ -887,6 +1104,14 @@ export async function maroonAndTheHarbormasterSuite(
     maroonCalls.length === maroonSockets.length * 3,
     "where the hand is refused as well, since a market that never opens is not a market to lean",
   );
+  check(
+    maroonShiftRefusals.length === 7 &&
+      maroonShiftRefusals[6].socket === 4 &&
+      maroonShiftRefusals[6].error ===
+        "A call in the closing leg would lean a market this voyage never opens." &&
+      !CARRIES_A_DASH.test(maroonShiftRefusals[6].error),
+    "and the captain still holding the hand is told exactly that, on their own socket, rather than watching a lever that has gone quiet",
+  );
 
   // A restarted voyage has marooned nobody, which is the load bearing half
   // of the once per voyage rule: the result is what spends the vote, so a
@@ -929,6 +1154,207 @@ export async function maroonAndTheHarbormasterSuite(
       (frame) => frame === null,
     ),
     "and a harbor that has just reopened hands nobody the last voyage's maroon, so its own vote is still there to call",
+  );
+
+  // [bug audit] The reopened voyage is the one the walk below sails, and it
+  // is the walk that puts the two halves of the count together. The first
+  // is the stale ballot: a nomination the book still holds from a captain
+  // the room has stopped counting must not be counted under the roster
+  // that shrank, or the room puts a captain ashore on a name nobody is
+  // behind. The second is the count itself: the roster behind it, the
+  // threshold it carries at and the captains it is waiting on all have to
+  // come out of the room the vote is actually being held in.
+  //
+  // Six captains, as the voyage before it: the first votes and then stops
+  // being counted, and the four of the five left carry it. Without the
+  // prune the stale name would be the fourth in the book and the vote
+  // would carry one captain early, which is the check below that reads the
+  // count after the third.
+  const maroonVoyageTwo = maroonSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === maroonRoomId,
+    ),
+  );
+  maroonSockets[0].emit("room:start", { roomId: maroonRoomId });
+  await Promise.all(maroonVoyageTwo);
+  const secondRung = await parkMaroonCheckpoint(9, "parley", "Parley");
+  check(
+    secondRung?.currentRound === 9 && secondRung?.currentPhase === "parley",
+    "and a fresh voyage can be walked back to the rung the vote is called from, with its own vote still to call",
+  );
+
+  // The count before anyone has voted, which is the one count no broadcast
+  // carries: a leg's book is built by the captains in it, so the empty one
+  // is never sent, and a card that opens first has to ask (see
+  // maroon:state:request in src/server/realtime/wiring/maroon.ts). The
+  // answer is the tally frame itself, so the numbers a card reads before
+  // the first vote are the numbers it reads after it.
+  const askedTally = waitForEvent<MaroonTally>(
+    maroonSockets[0],
+    "maroon:tally",
+    (payload) => payload?.roomId === maroonRoomId,
+  );
+  maroonSockets[0].emit("maroon:state:request", {
+    roomId: maroonRoomId,
+    round: 9,
+  });
+  const maroonBoard = await askedTally;
+  check(
+    maroonBoard?.round === 9 &&
+      Object.keys(maroonBoard?.votes ?? {}).length === 0 &&
+      maroonBoard?.roster === maroonSockets.length &&
+      maroonBoard?.needed === 4 &&
+      maroonBoard?.awaiting.length === maroonSockets.length,
+    "a card that has just opened reads the count before anyone has voted: six still sailing, four names to carry it, and the whole harbor still to name someone",
+  );
+
+  const resultsBase = maroonResults.length;
+  const talliesBase = maroonTallies.length;
+
+  // The written off captain votes first. They may: the mark keeps them off
+  // the list a vote can be aimed at, and they are a captain this count is
+  // divided by for as long as they are still sailing.
+  maroonSockets[5].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonTallies.length === talliesBase + maroonSockets.length &&
+      maroonTallies[talliesBase]?.votes[gambitSixth.id] === maroonTargetId &&
+      maroonTallies[talliesBase]?.roster === maroonSockets.length &&
+      maroonTallies[talliesBase]?.awaiting.length === maroonSockets.length - 1,
+    "the first ballot of the new voyage is the written off captain's, and the count takes it: six still sailing, five still to name someone",
+  );
+
+  // Then they stop sailing, which the room reads off the phase the status
+  // carries rather than off the mark. Nothing about the ballot they cast
+  // changes yet: the book is re-read when the next nomination lands, which
+  // is the same moment the audit's book is.
+  maroonSockets[5].emit("game:status", {
+    roomId: maroonRoomId,
+    round: 9,
+    phase: "bankruptcy",
+    phaseLabel: "Bankrupt",
+    gold: 0,
+    reputation: 0,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  await maroonSettle();
+  maroonSockets[1].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  const prunedMaroon = maroonTallies[maroonTallies.length - 1];
+  check(
+    maroonTallies.length === talliesBase + maroonSockets.length * 2 &&
+      Object.keys(prunedMaroon?.votes ?? {}).length === 1 &&
+      !(gambitSixth.id in (prunedMaroon?.votes ?? {})) &&
+      prunedMaroon?.votes[gambitSecond.id] === maroonTargetId,
+    "a ballot from a captain the room has stopped counting leaves the book when the next one lands, so the count holds one name and not two",
+  );
+  const prunedAwaiting = prunedMaroon?.awaiting ?? [];
+  check(
+    prunedMaroon?.roster === maroonSockets.length - 1 &&
+      prunedMaroon?.needed === 4 &&
+      prunedAwaiting.length === maroonSockets.length - 2 &&
+      !prunedAwaiting.includes(gambitSixth.id) &&
+      [gambitHost.id, gambitThird.id, gambitFourth.id, maroonTargetId].every(
+        (id) => prunedAwaiting.includes(id),
+      ),
+    "and the count behind the book is the five still sailing rather than the six on the seat list: four names still to carry it, and the four captains the room is waiting on",
+  );
+
+  // The door reads the marks through the one predicate the maroon list on a
+  // card is drawn with, and the phase counts there as well as the flags
+  // (see writtenOff in @/lib/seatMarks). The captain above is the case that
+  // tells the two readings apart: their bankruptcy is the phase alone, a
+  // status from a client older than the flags, and they are refused as a
+  // name for what they are rather than for the roster arithmetic that also
+  // excludes them.
+  const refusalsBeforeTheMark = maroonRefusals.length;
+  const talliesBeforeTheMark = maroonTallies.length;
+  maroonSockets[4].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: gambitSixth.id,
+  });
+  await maroonSettle();
+  check(
+    maroonRefusals.length === refusalsBeforeTheMark + 1 &&
+      maroonRefusals[maroonRefusals.length - 1] ===
+        "The harbor has already written that captain off." &&
+      maroonTallies.length === talliesBeforeTheMark,
+    "a seat that stopped sailing is refused as a name off the mark it wears rather than off the roster that also excludes it, so the sentence a captain reads names what the captain is",
+  );
+
+  // Three of the five left is not two thirds of five, and that is the
+  // whole reason the prune is here: with the stale name still counted this
+  // would be the fourth name in the book and the vote would carry, one
+  // captain early, on a captain who stopped sailing.
+  maroonSockets[2].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  maroonSockets[3].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonResults.length === resultsBase &&
+      Object.keys(maroonTallies[maroonTallies.length - 1]?.votes ?? {})
+        .length === 3,
+    "three of the five still sailing does not carry, so the name the book dropped is the name that would have carried it",
+  );
+
+  maroonSockets[4].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
+  await maroonSettle();
+  check(
+    maroonResults.length === resultsBase + maroonSockets.length &&
+      maroonResults[maroonResults.length - 1]?.target.userId ===
+        maroonTargetId &&
+      Object.keys(maroonTallies[maroonTallies.length - 1]?.votes ?? {})
+        .length === 4,
+    "and the fourth is two thirds of the five the vote is counted over, so the harbor carries it without the captain who left the voyage",
+  );
+
+  // The answer a state request gets after the vote has carried, which is
+  // the one frame a card opened late ever reads: the nominations die with
+  // the vote that carried, so without the carried record this answer
+  // would read exactly like a fresh leg, an empty book with a full
+  // waiting list, and the card would offer a press the harbor has already
+  // spent (see carried in @/types/realtime/maroon).
+  const carriedAnswer = waitForEvent<MaroonTally>(
+    maroonSockets[0],
+    "maroon:tally",
+    (payload) => payload?.roomId === maroonRoomId && payload?.round === 9,
+  );
+  maroonSockets[0].emit("maroon:state:request", {
+    roomId: maroonRoomId,
+    round: 9,
+  });
+  const afterTheCarry = await carriedAnswer;
+  check(
+    afterTheCarry !== null &&
+      Object.keys(afterTheCarry.votes).length === 0 &&
+      afterTheCarry.carried?.userId === maroonTargetId &&
+      afterTheCarry.carried?.name === "Smoke gamb_e",
+    "a card that asks for the count after the voyage's vote has carried is told what the voyage already did: the book is empty and the carried record names the captain the harbor put ashore, by id and by the name the table knows them by, rather than reading like a fresh leg",
   );
 
   return { maroonRoomId, maroonTargetId };

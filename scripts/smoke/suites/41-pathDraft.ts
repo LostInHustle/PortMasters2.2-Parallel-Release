@@ -690,6 +690,37 @@ export async function pathDraftSuite(
       Date.now() - awayAt >= DRAFT_WATCH_MS - 2000,
     "a step a gone seat never answered stays open through the room's whole absence window and then closes on that window alone, so what turns a step over is the table answering rather than any clock face, and the two cards the gone seat was passed travel without them having chosen anything",
   );
+  // And the same captain answering a step the table has left, which is the
+  // other direction from the probe above: a delayed duplicate of their own
+  // first keep, arriving after the turnover. The index would be read
+  // against the second step's hand if the stamp were trusted, so the room
+  // owes the refusal, and what proves the refusal cost the seat nothing is
+  // the seat still being open for that captain's real answer below.
+  const pastStep = waitForEvent<{ roomId?: string; error?: string }>(
+    draftSeats[0]!.socket,
+    "draft:error",
+    (payload) => payload?.roomId === draftRoomId,
+  );
+  draftSeats[0]!.socket.emit("draft:keep", {
+    roomId: draftRoomId,
+    pick: hostFirstPick,
+    step: openingViews[0]!.step,
+  });
+  check(
+    (await pastStep)?.error === "The table has moved past that step.",
+    "a keep stamped with the step the table has left is refused for the step it names rather than read against the hand it would find now, so a duplicate of an earlier answer can never settle a captain on the cards of a later step",
+  );
+  const laidNothing = waitForEvent<DraftView>(
+    draftSeats[0]!.socket,
+    "draft:update",
+    (payload) => payload?.roomId === draftRoomId && payload?.step === "second",
+  );
+  draftSeats[0]!.socket.emit("draft:state:request", { roomId: draftRoomId });
+  const openNow = await laidNothing;
+  check(
+    openNow !== null && openNow.picked === false && openNow.hand.length === 2,
+    "and the refused answer left nothing down: the seat reads back open in the step the table is standing in, which is what lets that captain's own answer for the step be the one the table counts",
+  );
   // The mate walks back in, inside the thirty second departure grace the
   // room keeps for a returning seat (see scheduleDeparture): a fresh socket
   // for the same captain, whose join is answered with the step the room is
@@ -749,7 +780,13 @@ export async function pathDraftSuite(
   // the mate's last keep is their real answer, the settle takes it, and
   // the path that captain sails on is the paper they chose. The keeps
   // below each name the step they were read off, which is what makes
-  // that the whole of the story rather than a race.
+  // that the whole of the story rather than a race. Because the second
+  // keep is refused, the second paper the room records for that seat is
+  // the one the watch laid, and the expectation below reads the room's
+  // record rather than the refused attempt: reading the attempt there
+  // passed only on the deals where the attempt and the auto pick landed
+  // on the same index, which the dealt odds put at about thirteen runs
+  // in fifteen.
   const hostLast = waitForEvent<DraftView>(
     draftSeats[0]!.socket,
     "draft:update",
@@ -790,7 +827,7 @@ export async function pathDraftSuite(
   ];
   const matePapers = [
     openingHands[1]![DRAFT_AUTO_PICK]!,
-    mateAtSecond.hand[mateSecondPick]!,
+    mateAtSecond.hand[DRAFT_AUTO_PICK]!,
   ];
   check(
     hostAtLast !== null &&
@@ -927,6 +964,60 @@ export async function pathDraftSuite(
       repairedView.hand.join() === matePath &&
       repairedView.open === 0,
     "a captain whose socket was dark through the settle is handed the result when they walk back into the harbor: the path the fleet was told rides the same settled view a live seat heard, so the deal cannot be lost to a tab that was closed while the last card was laid",
+  );
+  // The other end of the same race, both ways. A captain's last press can
+  // be in flight while the settle runs, and the request a reloading tab
+  // sends can arrive after it: the press is answered with the sentence for
+  // a draft that is not running rather than read against a book that has
+  // already been written, and the request is answered from that book with
+  // the view the seat was sent, the same answer every time it is asked.
+  // The fleet's own count is read before either question, because a
+  // re-settle would show up as a second pair of log lines before it showed
+  // up anywhere else.
+  const linesHeard = takenLines.length;
+  const settledKeep = waitForEvent<{ roomId?: string; error?: string }>(
+    walkedBack,
+    "draft:error",
+    (payload) => payload?.roomId === draftRoomId,
+  );
+  walkedBack.emit("draft:keep", {
+    roomId: draftRoomId,
+    pick: mateLastPick,
+    step: "last",
+  });
+  check(
+    (await settledKeep)?.error === "The draft is not running.",
+    "a keep that crossed the settle is refused for the draft that is not running rather than read against the step it stamped, so a last press in flight can neither settle a captain twice nor write a line the fleet has already been told",
+  );
+  const readSettled = async (): Promise<DraftView | null> => {
+    const answered = waitForEvent<DraftView>(
+      walkedBack,
+      "draft:update",
+      (payload) => payload?.roomId === draftRoomId && payload?.step === "done",
+    );
+    walkedBack.emit("draft:state:request", { roomId: draftRoomId });
+    return answered;
+  };
+  const askedAgain = await readSettled();
+  const askedTwice = await readSettled();
+  check(
+    askedAgain !== null &&
+      askedTwice !== null &&
+      askedAgain.step === "done" &&
+      askedAgain.path === matePath &&
+      askedAgain.hand.join() === matePath &&
+      askedAgain.open === 0 &&
+      askedAgain.picked === true &&
+      askedTwice.step === askedAgain.step &&
+      askedTwice.path === askedAgain.path &&
+      askedTwice.hand.join() === askedAgain.hand.join() &&
+      askedTwice.open === askedAgain.open &&
+      askedTwice.picked === askedAgain.picked,
+    "and the done frame is idempotent: the settled view is the same answer on every read, the seat speaks as one whose card is already down rather than one holding an open hand, and a tab that reloads after the settle reads its own result as many times as it likes",
+  );
+  check(
+    takenLines.length === linesHeard,
+    "with the fleet's log exactly as long as it was before either question, so the result is read back rather than dealt again",
   );
 
   // ---- the switch, published to the fleet ----
@@ -1082,6 +1173,108 @@ export async function pathDraftSuite(
       (await closed)?.error ===
         `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.`,
     "and past the last leg of the window the room closes it with the leg it closes after, which is the same sentence the panel would have greyed the button out with",
+  );
+
+  // ---- one departure for one press, however it arrives ----
+  // The departure handler's claim is taken before its first await, and
+  // this is that sentence read off the wire: two room:start frames in one
+  // tick must move the harbor exactly as one did. Before the claim moved,
+  // both frames passed a map checked after the reads (the room read, the
+  // roster read), both ran the whole departure, and both dealt the table,
+  // which is the shape the field report's crash wore: one voyage
+  // announced twice and two alignment deals colliding on the table's own
+  // key. A double tap, a retried frame and a second tab all arrive as
+  // these two frames, so the room below is the regression that keeps the
+  // claim where it is.
+  const racer = await signUp("race");
+  run.extraAccounts.push(racer);
+  const raceRoom = await call<{ room: { id: string } }>("/api/rooms", {
+    method: "POST",
+    cookie: racer.cookie,
+    body: JSON.stringify({
+      name: `Smoke draft race harbor ${suffix}`,
+      isPublic: false,
+      mode: "ocean_gambit",
+      unlock: LEDGER_PHRASE,
+    }),
+  });
+  if (raceRoom.status !== 200) {
+    throw new Error("No race harbor to start, stopping here.");
+  }
+  const raceRoomId = raceRoom.body.room.id;
+  run.lapRoomIds.push(raceRoomId);
+  const raceSocket = await openAuthedSocket(racer);
+  run.sockets.push(raceSocket);
+  let raceStarts = 0;
+  let raceErrors = 0;
+  let raceClosed = 0;
+  const raceViews: DraftView[] = [];
+  raceSocket.on("room:started", (payload: { roomId?: string }) => {
+    if (payload?.roomId === raceRoomId) raceStarts += 1;
+  });
+  raceSocket.on("room:error", () => {
+    raceErrors += 1;
+  });
+  raceSocket.on("draft:update", (payload: DraftView | null) => {
+    // The null frame carries no room, so it is counted as itself: it is
+    // the sentence a harbor tells a captain with no draft in front of
+    // them, on the way in and again the moment a wipe takes one away.
+    if (payload === null) {
+      raceClosed += 1;
+      return;
+    }
+    if (payload.roomId === raceRoomId) raceViews.push(payload);
+  });
+  const raceSeated = waitForEvent<WireHistory>(
+    raceSocket,
+    "chat:history",
+    (payload) => payload?.roomId === raceRoomId,
+  );
+  raceSocket.emit("room:join", { roomId: raceRoomId });
+  await raceSeated;
+  const raceDeal = waitForEvent<DraftView>(
+    raceSocket,
+    "draft:update",
+    (payload) => payload?.roomId === raceRoomId && payload?.step === "first",
+  );
+  raceSocket.emit("room:start", { roomId: raceRoomId });
+  raceSocket.emit("room:start", { roomId: raceRoomId });
+  const raceCards = await raceDeal;
+  const raceClosedAtDeal = raceClosed;
+  // Long enough for a second departure to have announced itself and sent
+  // a second hand if the claim had missed it: a departure's whole body
+  // runs in well under this once its reads are warm.
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  check(
+    raceCards?.hand.length === DRAFT_DEAL &&
+      raceStarts === 1 &&
+      raceErrors === 0 &&
+      raceViews.filter((view) => view.step === "first" && view.picked === false)
+        .length === 1,
+    "a departure pressed twice in one tick is one departure: the harbor announces one start, the second press is answered by the claim rather than by a refusal, and the table is dealt one hand rather than two",
+  );
+  const refusedAgain = waitForEvent<{ roomId?: string; error?: string }>(
+    raceSocket,
+    "room:error",
+    (payload) => payload?.roomId === raceRoomId,
+  );
+  raceSocket.emit("room:start", { roomId: raceRoomId });
+  check(
+    (await refusedAgain)?.error === "This voyage has already set sail.",
+    "while an honest second press after the departure is still refused with the room's own sentence, which is the refusal the claim is not allowed to swallow",
+  );
+  // The room the doubled press sailed goes home cleanly: the draft that
+  // did stand ends with its voyage rather than outliving it, told away
+  // with the same null frame the solo wipe above is read against.
+  const raceWiped = waitForEvent<{ roomId?: string }>(
+    raceSocket,
+    "room:restarted",
+    (payload) => payload?.roomId === raceRoomId,
+  );
+  raceSocket.emit("room:restart", { roomId: raceRoomId });
+  check(
+    (await raceWiped) !== null && raceClosed === raceClosedAtDeal + 1,
+    "and the harbor sailed by the doubled press wipes clean, the one draft it dealt told away with the wipe's own null frame, so the one voyage it ran is one its host can end",
   );
 
   // ---- the wipe that takes a draft with it ----

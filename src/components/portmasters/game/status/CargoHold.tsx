@@ -35,12 +35,11 @@ export function CargoHold({
   // bottom, which had the pair being asked for four times per render.
   const cargoResources = unlockedResources(game.difficulty, game.currentRound);
   const cargoProducts = unlockedProducts(game.difficulty, game.currentRound);
-  // Only what is aboard is drawn. The two lists used to print every good
-  // the tier has unlocked, zeroes included, which is a column of nothing
-  // said eleven times on a rail that counts its rows: a good a captain
-  // does not hold is a row their eye re-reads to learn nothing. The Hold
-  // Value estimator and the composition bar below already draw nothing
-  // at zero, and this is the same reading applied to the rows.
+  // Only what is aboard is drawn. A good a captain does not hold is a row
+  // their eye re-reads to learn nothing, and printing every unlocked good
+  // at zero would be a column of nothing said eleven times on a rail that
+  // counts its rows. The Hold Value estimator and the composition bar below
+  // draw nothing at zero too, which is the same reading applied to the rows.
   const heldResources = cargoResources.filter(
     (r) => (game.inventory[r] || 0) > 0,
   );

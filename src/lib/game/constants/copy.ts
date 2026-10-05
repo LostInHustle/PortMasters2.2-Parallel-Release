@@ -37,7 +37,7 @@ import {
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "./world";
 import { PRODUCTS_TIER0, RESOURCES_TIER0 } from "./goods";
-import { CREW_LOSS_AFTER_HUNGRY_LEGS, WORKER_TYPES } from "./crew";
+import { WORKER_TYPES } from "./crew";
 import {
   basePriceRange,
   INCOME_TAX_RATE,
@@ -53,18 +53,7 @@ import {
 // tier's config, so the guide can never quote a number the engine doesn't use.
 // =====================================================================
 
-// The short rations report, stated once for the three surfaces that carry
-// one: the fleet ticker's badge tooltip, the roster row's badge tooltip,
-// and the provisions panel's note. The rule sentence stands on its own
-// because the panel that refills the larder ends differently than the two
-// badges pointing at the Market do, which is also why its wording stays
-// with each surface and only the rule is shared. The count is the
-// engine's own (see CREW_LOSS_AFTER_HUNGRY_LEGS), since the same number
-// decides the hand the crew loses.
-export const HUNGRY_CREW_RULE = `${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard.`;
-export const HUNGRY_CREW_TOOLTIP = `Going hungry: the crew is on short rations, working at a slower pace, and ${HUNGRY_CREW_RULE} Fill the larder at the next Market.`;
-
-// Three sentences two channels share. The server sends each of these as
+// The sentences two channels share. The server sends each of these as
 // wire text and a panel or a toast renders it, so the server's wording is
 // the one every surface quotes: a second copy of a string that answers a
 // press is a second answer to what the press did.
@@ -72,6 +61,23 @@ export const HOST_ONLY_RESTART = "Only the host can restart the voyage.";
 export const STALE_OFFER = "That offer belongs to an earlier leg.";
 export const RENOWN_BONUS_LINE =
   "Each Renown level grants a small Gold bonus at the start of your next fresh voyage";
+// The refusal a wire answers when the captain it was aimed at is not
+// visible to the room. The two chat handlers and the four trading wires
+// all say this one sentence, spelled the long way on purpose: the smoke
+// run asserts it word for word, so the shorter form the wires drifted
+// into is the one that left.
+export const TARGET_NOT_IN_HARBOR = "That captain is not in this harbor.";
+// The audit and the maroon vote read the same roster, and a captain
+// refused at either door is owed the same sentence whichever door they
+// stood at.
+export const SEAT_NOT_COUNTED = "The harbor is no longer counting your seat.";
+export const TARGET_NOT_COUNTED =
+  "That captain is not one the harbor is still counting.";
+// The two admin refusals, shared by the socket layer, the balance route
+// and the two console screens that draw them.
+export const NOT_AN_ADMINISTRATOR = "This account is not an administrator.";
+export const NO_LONGER_AN_ADMINISTRATOR =
+  "This account is no longer an administrator.";
 
 // "a 20% chance", or "a 22% chance that rises to 30% past the midpoint" on a
 // tier whose raid odds step up at the halfway mark.
@@ -211,16 +217,16 @@ ${roundStepHtml(mode)}
     ...differenceSteps(mode),
     {
       title: "🏪 Market: Buying",
-      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every voyage. Buy now, then barter at Parley and sell at Orders. That is the core loop.</p>
+      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and the rail across the top of the board always shows the order. That is the core loop.</p>
 <p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
-  💡 For the first two or three voyages, stick to raw materials. They sell the same voyage you buy them. No waiting and no risk.
+  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.
 </div>`,
     },
     {
       title: "🤝 Parley: Bartering",
       content: `<p>The Parley is a short window where captains trade directly with each other instead of through the market. Post an offer, like Hemp you don't need for Silk you do, and any other captain in the harbor can take it with one click.</p>
-<p>Where it falls in the round depends on the voyage: some run it right after Market, some right after Orders, and the rail across the top of the board always shows which. Either way, it is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
+<p>Where it falls in the round is set by the voyage you are sailing rather than changing from round to round: ${MODES.classic.badge} runs it right after Market, and ${MODES.ocean_gambit.badge} runs it right after Orders, and the rail across the top of the board always shows which. Either way, it is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   A few ground rules: you can't offer an item for itself, both amounts have to be whole numbers of at least one, and you can never offer more than you currently have. The moment you post an offer, that amount is set aside until someone takes it or you cancel it.
 </div>
@@ -233,19 +239,19 @@ ${roundStepHtml(mode)}
 <div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   📌 <strong>Finished goods</strong> (${PRODUCTS_TIER0.join(", ")}) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.
 </div>
-${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions a <strong>mandate</strong>: one large order at a fixed reward, and the only order exempt from VAT. It often asks for more than a single hold carries, so plan to barter or borrow to fill it.</p>` : ""}`,
+${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On round${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions a <strong>mandate</strong>: one large order at a fixed reward, and the only order exempt from VAT. It often asks for more than a single hold carries, so plan to barter or borrow to fill it.</p>` : ""}`,
     },
     {
       title: "⚠️ The artisan trap",
       content: `<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new players is this:</p>
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
-  Assign a task this voyage.<br>Wages come due at Resolve either way.
+  Assign a task this round.<br>Wages come due at Resolve either way.
 </div>
 <p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers (${wageOf("weaver")}g), Master Weavers (${wageOf("master")}g), and Sachet Makers (${wageOf("sachet_maker")}g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>`,
     },
     {
       title: "🏴‍☠️ Pirates at Resolve",
-      content: `<p>Before the bills below come due each voyage, ${raidCopy(cfg).toLowerCase()} Pirates find your ship and take every coin you're carrying.</p>
+      content: `<p>Before the bills below come due each round, ${raidCopy(cfg).toLowerCase()} Pirates find your ship and take every coin you're carrying.</p>
 <p>You get one choice before that roll happens: hire an escort for ${escortPct(cfg)} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>
 ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.</p>` : ""}
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
@@ -264,7 +270,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">
     <div style="font-size:22px;margin-bottom:4px">👥</div>
     <strong>Artisan Wages</strong><br>
-    <span style="font-size:12px;color:var(--muted-foreground)">8 to 20 Gold per person per voyage</span>
+    <span style="font-size:12px;color:var(--muted-foreground)">${ARTISAN_WAGE_MIN} to ${ARTISAN_WAGE_MAX} Gold per person per round</span>
   </div>
 </div>
 <p style="font-size:13px;color:var(--muted-foreground)">The <strong>Round End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
@@ -297,6 +303,12 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
 // the engine does not use.
 const wageOf = (id: string): number =>
   WORKER_TYPES.find((w) => w.id === id)?.wage ?? 0;
+// The wage range the settlement card prints, read off the same table the
+// engine pays from: the cheapest hand and the dearest one are the two ends
+// of the bill a captain can be handed, so a retuned wage moves the card
+// with it rather than leaving a last fortnight's figure in a sentence.
+const ARTISAN_WAGE_MIN = Math.min(...WORKER_TYPES.map((w) => w.wage));
+const ARTISAN_WAGE_MAX = Math.max(...WORKER_TYPES.map((w) => w.wage));
 const workerLine = (id: string, makes: string): string => {
   const w = WORKER_TYPES.find((x) => x.id === id);
   return `• ${w?.label ?? id} (${w?.wage ?? 0} Gold/Round): Makes ${makes}`;
@@ -346,7 +358,7 @@ ${workerLine("sachet_maker", "Sachets")}
 
 🧾 Tax System:
 • VAT: ${Math.round(VAT_RATE * 100)}% on finished product profit margin
-• Income Tax: ${Math.round(INCOME_TAX_RATE * 100)}% on voyage net profit
+• Income Tax: ${Math.round(INCOME_TAX_RATE * 100)}% on your net profit for the round, charged at Resolve after everything else is paid
 
 🔮 Broker's Whisper:
 • Market: Click "Broker's Rumor Board" to open the window
@@ -369,7 +381,7 @@ ${workerLine("sachet_maker", "Sachets")}
 🏴‍☠️ Pirates and Escorts:
 • Resolve: ${raidCopy(cfg)} Pirates take every Gold coin you carry.
 • Hire an escort for ${escortPct(cfg)} of current Gold to sail safe
-• Decide before the pirate roll happens that round${mandates.length ? `\n\n📜 Imperial Mandates:\n• On voyage${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions one large order at a fixed reward\n• A mandate is the only order exempt from VAT\n• Every captain in the harbor is dealt the same mandate, so it is a race` : ""}
+• Decide before the pirate roll happens that round${mandates.length ? `\n\n📜 Imperial Mandates:\n• On round${mandates.length === 1 ? "" : "s"} ${mandates.join(", ")} the Emperor commissions one large order at a fixed reward\n• A mandate is the only order exempt from VAT\n• Every captain in the harbor is dealt the same mandate, so it is a race` : ""}
 
 📣 Word on the Docks:
 • Whichever captain is first in the harbor to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders total this voyage wins ${WORD_ON_THE_DOCKS_REWARD} Gold on the spot

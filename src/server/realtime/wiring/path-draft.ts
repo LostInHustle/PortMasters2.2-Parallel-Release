@@ -12,6 +12,9 @@ import { seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
 import { draftViewFor, recordPathSwitch, takeDraftPick } from "../draft";
 
+// The refusal the draft answers with when the switch is off.
+const DRAFT_OFF = "The path draft is not running in this harbor.";
+
 export function wirePathDraft(io: Server, socket: Socket): void {
   //
   // [D7: the draft, and switching] The two surfaces the plan's clause
@@ -100,7 +103,7 @@ export function wirePathDraft(io: Server, socket: Socket): void {
         socket.emit("path:error", { roomId, error });
       };
       if (!pathDraftOn(s.mode)) {
-        fail("The path draft is not running in this harbor.");
+        fail(DRAFT_OFF);
         return;
       }
       // The destination is read off the wire and answered as a path this

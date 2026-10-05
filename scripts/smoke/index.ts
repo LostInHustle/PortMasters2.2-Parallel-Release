@@ -93,6 +93,8 @@ import { theOrderThatSettlesSuite } from "./suites/57-theOrderThatSettles";
 import { theWageTheBillQuotesSuite } from "./suites/58-theWageTheBillQuotes";
 import { theDoorsAndTheLoadSuite } from "./suites/59-theDoorsAndTheLoad";
 import { theMirrorAndTheChargeSuite } from "./suites/60-theMirrorAndTheCharge";
+import { theStatusConventionSuite } from "./suites/61-theStatusConvention";
+import { theMutesAndTheKeysSuite } from "./suites/62-theMutesAndTheKeys";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -480,6 +482,20 @@ async function main(): Promise<void> {
     await theDoorsAndTheLoadSuite();
     console.log("\nThe mirror and the charge");
     await theMirrorAndTheChargeSuite();
+    // [W3] The status convention's article joins the pure cluster above:
+    // the registry is static data and its validator is a pure function,
+    // so nothing here needs a harbor. It sits after the correctness
+    // articles because it is the newer article and the ready check stays
+    // last.
+    console.log("\nThe status convention");
+    await theStatusConventionSuite();
+    // [W3] The mutes and the keys' article is the convention's sibling:
+    // it reads the preference functions through a storage stub and walks
+    // src for the three key literals, so it opens no harbor either. It
+    // sits last of the pure cluster because the ready check stays last
+    // of the run.
+    console.log("\nThe mutes and the keys");
+    await theMutesAndTheKeysSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

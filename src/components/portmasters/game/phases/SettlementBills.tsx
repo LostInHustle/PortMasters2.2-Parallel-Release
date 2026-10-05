@@ -55,15 +55,15 @@ export function SettlementBills({
 >) {
   const myUserId = me.id;
   // The bill comes off the engine's own reader rather than off a walk this
-  // screen makes alone (see wageBill). The sheet used to total every hired
-  // hand and knew nothing of the Jade Pavilion pledge, which waives a
-  // sponsored artisan's first wage: a pledged captain saw exactly one wage
-  // too many, the settle button warned of a bankruptcy the run would never
-  // deliver, and the harbor aid request below was seeded with a shortfall
-  // that did not exist (it gates on canAfford). The earlier shape of this
-  // walk had its own scar: it totalled only the three founding types, so a
-  // charter's Coppersmith or Potter was billed here for less than the
-  // engine charged a breath later.
+  // screen makes alone (see wageBill). A walk kept here drifts: a sheet
+  // that totals every hired hand knows nothing of the Jade Pavilion
+  // pledge, which waives a sponsored artisan's first wage, so a pledged
+  // captain sees one wage too many, the settle button warns of a
+  // bankruptcy the run would never deliver, and the harbor aid request
+  // below is seeded with a shortfall that does not exist (it gates on
+  // canAfford). A walk that totalled only the founding types would bill a
+  // charter's Coppersmith or Potter for less than the engine charges a
+  // breath later.
   const bill = wageBill(game);
   const wagesDue = bill.reduce((sum, b) => sum + b.due, 0);
   const nWorkers = bill.reduce((sum, b) => sum + b.count + b.sponsored, 0);

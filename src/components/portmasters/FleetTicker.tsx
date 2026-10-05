@@ -7,7 +7,7 @@ import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon, Anchor, Utensils } from "lucide-react";
 import { seatMarks } from "@/lib/seatMarks";
-import { HUNGRY_CREW_TOOLTIP } from "@/lib/game/constants/copy";
+import { hungryPillLine, hungryTooltip } from "@/lib/game/status-copy";
 
 /**
  * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
@@ -79,14 +79,19 @@ export function FleetTicker({
               {/* [C1: the Larder and Short Rations] The hungry crew, in the
                   same red the roster uses and for the same reason: a
                   shortage is a status, and a status draws from the meaning
-                  half of the palette. An icon alone, because this strip is
-                  read at a glance and the title carries the sentence. */}
+                  half of the palette. [W3: the status convention] The mark
+                  used to be an icon whose sentence lived only in a title,
+                  which a touch screen never shows: it now carries the
+                  roster pill's own two clauses visibly, the state and the
+                  way back, with the full sentence in the title beside
+                  them. */}
               {st?.shortRations && (
                 <span
-                  className="flex items-center text-alarm"
-                  title={HUNGRY_CREW_TOOLTIP}
+                  className="flex items-center gap-1 text-[10px] text-alarm"
+                  title={hungryTooltip()}
                 >
                   <Utensils className="h-3 w-3" />
+                  {hungryPillLine()}
                 </span>
               )}
               {isBankrupt ? (

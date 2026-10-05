@@ -7,20 +7,25 @@ import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import type { Server, Socket } from "socket.io";
 
-import { db } from "@/lib/db";
 import {
   agreeConsent,
   consentFeeFor,
-  consentOfferStanding,
   isModuleId,
   moduleListedThisLeg,
   type ModuleTrade,
 } from "@/lib/game/engine";
 import { moduleTradesOn } from "@/lib/game/flags";
+import { auditSpentLeg, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
+import { rowId } from "../ids";
 import { moduleTrades } from "../module-trades";
 import { noteVoyageLog } from "../voyage-log";
+import { offerStandingRefusal, resolveNamedBuyer } from "./consent-shared";
+
+// The refusal every gate in this market answers with when the switch is
+// off, said once so its three handlers cannot drift apart.
+const MARKET_OFF = "The module market is not running in this harbor.";
 
 export function wireModuleTrades(io: Server, socket: Socket): void {
   //
@@ -77,7 +82,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         socket.emit("module:error", { roomId, error });
       };
       if (!moduleTradesOn(s.mode)) {
-        fail("The module market is not running in this harbor.");
+        fail(MARKET_OFF);
         return;
       }
       // The fee is read through the same reader the panel reads it
@@ -108,26 +113,23 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         fail("A module is listed in the Parley phase.");
         return;
       }
-      let buyerUserId: string | null = null;
-      let buyerName: string | null = null;
-      if (payload?.targetUserId) {
-        if (payload.targetUserId === s.userId) {
-          fail("You can't sell a module to yourself.");
-          return;
-        }
-        const targetMember = await db.roomMember.findUnique({
-          where: {
-            userId_roomId: { userId: payload.targetUserId, roomId },
-          },
-          select: { user: { select: { displayName: true } } },
-        });
-        if (!targetMember) {
-          fail("That captain isn't in this harbor.");
-          return;
-        }
-        buyerUserId = payload.targetUserId;
-        buyerName = targetMember.user.displayName;
+      // The audit's spend closes this board on the tick it lands rather
+      // than on the advance that follows it (see auditSpentLeg).
+      if (auditSpentLeg(roomId, cp.round)) {
+        fail(auditSpentReason("Modules are listed"));
+        return;
       }
+      const named = await resolveNamedBuyer(
+        roomId,
+        s.userId,
+        payload?.targetUserId,
+        "You can't sell a module to yourself.",
+      );
+      if (!named.ok) {
+        fail(named.reason);
+        return;
+      }
+      const { buyerUserId, buyerName } = named;
       const list = moduleTrades.list(roomId);
       // The kind's own bound, refused where the seller is the one who can
       // act on it: one module is one thing, so once a row names it the
@@ -140,16 +142,18 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         fail("You have already listed that module this leg.");
         return;
       }
-      if (consentOfferStanding(list, s.userId, buyerUserId)) {
-        fail(
-          buyerUserId === null
-            ? "You already have an offer standing for anyone at this table."
-            : `You already have an offer standing for ${buyerName}.`,
-        );
+      const standing = offerStandingRefusal(
+        list,
+        s.userId,
+        buyerUserId,
+        buyerName,
+      );
+      if (standing !== null) {
+        fail(standing);
         return;
       }
       const trade: ModuleTrade = {
-        id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        id: rowId(roomId, s.userId),
         sellerUserId: s.userId,
         sellerName: s.user.displayName,
         buyerUserId,
@@ -191,7 +195,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         socket.emit("module:error", { roomId, error });
       };
       if (!moduleTradesOn(s.mode)) {
-        fail("The module market is not running in this harbor.");
+        fail(MARKET_OFF);
         return;
       }
       const cp = await getCheckpoint(roomId);
@@ -218,6 +222,12 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
       }
       if (cp.phase !== "parley") {
         fail("A module trade is agreed in the Parley phase.");
+        return;
+      }
+      // A trade agreed after the spend is trading the leg the harbor
+      // just closed (see auditSpentLeg).
+      if (auditSpentLeg(roomId, cp.round)) {
+        fail(auditSpentReason("Module trades are agreed"));
         return;
       }
       // No party busy check here, and the absence is the design rather
@@ -255,7 +265,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         socket.emit("module:error", { roomId, error });
       };
       if (!moduleTradesOn(s.mode)) {
-        fail("The module market is not running in this harbor.");
+        fail(MARKET_OFF);
         return;
       }
       const board = moduleTrades.list(roomId);

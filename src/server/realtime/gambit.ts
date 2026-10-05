@@ -42,6 +42,7 @@ import {
   type GambitRole,
 } from "@/lib/game/gambit";
 import { roomMemberIds } from "@/lib/rooms";
+import { isUniqueViolation } from "./chat";
 import { objectiveForRoom } from "./objective";
 import { emitPrivate } from "./presence";
 
@@ -169,14 +170,32 @@ export async function dealAlignments(
 
   const roster = await roomMemberIds(roomId);
   const cards = dealCards(roster, randomUUID(), objective.id);
-  await db.voyageRole.createMany({
-    data: roster.map((userId) => ({
-      roomId,
-      userId,
-      role: cards[userId].role,
-      flourish: cards[userId].flourishId,
-    })),
-  });
+  try {
+    await db.voyageRole.createMany({
+      data: roster.map((userId) => ({
+        roomId,
+        userId,
+        role: cards[userId].role,
+        flourish: cards[userId].flourishId,
+      })),
+    });
+  } catch (error) {
+    // The held read above is a check and this write is its act, and the
+    // two are three awaits apart (the objective, the roster, the draw),
+    // which is all the room a second departure needs to arrive between
+    // them with a hand of its own. The table refuses the second row set
+    // on its own key, room and captain, and that refusal is the promise
+    // in the header above read at the one moment it can fail: the rows
+    // that won are the hand the voyage is playing, so both callers are
+    // sent those rather than either caller's own draw.
+    if (!isUniqueViolation(error)) throw error;
+    const rows = await db.voyageRole.findMany({
+      where: { roomId },
+      select: CARD_COLUMNS,
+    });
+    await sendCards(io, roomId, cardsFromRows(rows));
+    return;
+  }
   await sendCards(io, roomId, cards);
 }
 

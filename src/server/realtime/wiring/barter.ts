@@ -5,11 +5,13 @@
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
+import { TARGET_NOT_IN_HARBOR } from "@/lib/game/constants/copy";
 import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
+import { auditSpentLeg, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";
 import {
   authoritativeRenownLevel,
@@ -30,6 +32,7 @@ import { getCheckpoint } from "../checkpoint";
 import { emitToUser } from "../presence";
 import { noteTelemetry } from "../telemetry";
 import { noteVoyageLog } from "../voyage-log";
+import { rowId } from "../ids";
 
 export function wireBarter(io: Server, socket: Socket): void {
   socket.on("barter:state:request", (payload: { roomId?: string }) => {
@@ -91,7 +94,7 @@ export function wireBarter(io: Server, socket: Socket): void {
         if (!targetMember) {
           socket.emit("barter:error", {
             roomId,
-            error: "That captain isn't in this harbor.",
+            error: TARGET_NOT_IN_HARBOR,
           });
           return;
         }
@@ -112,12 +115,28 @@ export function wireBarter(io: Server, socket: Socket): void {
       // and during the phase there is nothing to gain by claiming it,
       // since the exchange is open to everyone anyway.
       const flexible = payload?.flexible === true;
-      if (!flexible && (await getCheckpoint(roomId)).phase !== "parley") {
-        socket.emit("barter:error", {
-          roomId,
-          error: "The Captain's Exchange is only open during the Parley phase.",
-        });
-        return;
+      if (!flexible) {
+        const cp = await getCheckpoint(roomId);
+        if (cp.phase !== "parley") {
+          socket.emit("barter:error", {
+            roomId,
+            error:
+              "The Captain's Exchange is only open during the Parley phase.",
+          });
+          return;
+        }
+        // The audit's price is the rest of that leg's Parley, so the
+        // spend closes this board on the tick it lands rather than on
+        // the advance that follows it (see auditSpentLeg). Flexible
+        // offers are not gated on the phase and are not gated here: they
+        // travel the chat road, and no parley clock ever priced them.
+        if (auditSpentLeg(roomId, cp.round)) {
+          socket.emit("barter:error", {
+            roomId,
+            error: auditSpentReason("The exchange opens"),
+          });
+          return;
+        }
       }
 
       // The flexible gate, checked here rather than trusted from the
@@ -181,7 +200,7 @@ export function wireBarter(io: Server, socket: Socket): void {
         }
       }
       const offer = {
-        id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        id: rowId(roomId, s.userId),
         fromUserId: s.userId,
         fromName: s.user.displayName,
         offerItem,
@@ -256,18 +275,31 @@ export function wireBarter(io: Server, socket: Socket): void {
         return;
       }
 
+      // The audit's spend closes the leg's trading the moment the count
+      // carries (see auditSpentLeg), and a standing exchange offer is
+      // trading the same as a fresh one: without this gate an offer
+      // posted before the carry could settle into the very leg the room
+      // voted to close. Flexible offers are not gated here or at the
+      // post, for the reason the post handler gives: they travel the
+      // chat road, and no parley clock ever priced them.
+      if (!opening.offer.flexible) {
+        const cp = await getCheckpoint(roomId);
+        if (auditSpentLeg(roomId, cp.round)) {
+          fail(auditSpentReason("The exchange opens"));
+          return;
+        }
+      }
+
       // Only a flexible offer has anything left to check, and only a
-      // flexible offer needs the database at all. An exchange offer
-      // from the Captain's Exchange is open to every captain at every
-      // Renown level, so it is accepted here without a level being read
-      // for either side.
+      // flexible offer needs the Renown reads at all: an exchange offer
+      // is open to every captain at every level.
       //
-      // The reads below are the one thing in this handler that waits on
-      // the database, and a different captain can claim the same offer
-      // while they are in flight. So the offer is inspected again
-      // afterwards rather than carried across the gap: everything from
-      // that second inspection down to the broadcast is synchronous,
-      // which is what still keeps one offer from being accepted twice.
+      // Every database read in this handler is a place where a
+      // different captain can claim the same offer while it is in
+      // flight, so the offer is inspected again afterwards rather than
+      // carried across the gap: everything from that second inspection
+      // down to the broadcast is synchronous, which is what still keeps
+      // one offer from being accepted twice.
       if (opening.offer.flexible) {
         const [myLevel, theirLevel] = await Promise.all([
           authoritativeRenownLevel(s.userId),

@@ -48,6 +48,7 @@ import { rumorLean } from "@/lib/game/engine";
 import type { PortShift } from "@/lib/game/maroon";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Phase } from "@/lib/game/types";
+import { leftTheVoyage } from "@/lib/seatMarks";
 import type { Checkpoint } from "./types";
 import { bazaarList, broadcastBazaar } from "./bazaar";
 import { portShiftFor } from "./maroon";
@@ -123,9 +124,15 @@ export async function parleyCheckpoint(
 }
 
 // Every member of the room (straight from the membership table) minus
-// anyone with nothing left to ready up for (bankrupt or already at the
+// anyone with nothing left to ready up for (bankruptcy or already at the
 // endgame screen). This is also what lets the rest of a room keep
 // advancing once a captain goes bankrupt.
+//
+// The test is leftTheVoyage (see @/lib/seatMarks), which reads the phase
+// and deliberately not the marks: an Ocean Gambit seat that is written
+// off keeps its lap, its vote and its place at the table, so the room
+// keeps counting it. The mark ends that seat's race and the phase ends
+// its voyage, and only the second of those is this roster's question.
 //
 // Deliberately based on durable room membership, not on who currently
 // has a live socket connected. A member who is just slow to load still
@@ -141,8 +148,7 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
   const memberIds = await roomMemberIds(roomId);
   const out = new Set<string>();
   for (const id of memberIds) {
-    const ph = statuses?.get(id)?.phase;
-    if (ph !== "bankruptcy" && ph !== "endgame") out.add(id);
+    if (!leftTheVoyage(statuses?.get(id))) out.add(id);
   }
   return out;
 }

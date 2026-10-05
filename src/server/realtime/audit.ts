@@ -37,11 +37,16 @@ import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import {
   auditCarried,
+  auditNamesNeeded,
   auditSeed,
   drawAudit,
   normalizeOrderFills,
   pruneStaleVotes,
 } from "@/lib/game/audit";
+import {
+  SEAT_NOT_COUNTED,
+  TARGET_NOT_COUNTED,
+} from "@/lib/game/constants/copy";
 import { normalizeLarder, onShortRations } from "@/lib/game/larder";
 import { normalizeWorkerRoster } from "@/lib/game/types";
 import { survivalLayerOn } from "@/lib/game/flags";
@@ -62,6 +67,10 @@ type RoomAudit = {
   // is both the room's record to hand a joiner and the flag that makes
   // this once per voyage.
   reveal: AuditReveal | null;
+  // The leg whose Parley the vote spent, recorded the moment the count
+  // carries rather than when the reveal finishes its reads. Kept beside
+  // the reveal for the voyage; read through auditSpentLeg below.
+  carriedRound: number | null;
 };
 
 // One map per process, read only through the functions below. The
@@ -82,6 +91,7 @@ function auditStateFor(roomId: string, round: number): RoomAudit {
     round,
     votes: new Map(),
     reveal: existing?.reveal ?? null,
+    carriedRound: existing?.carriedRound ?? null,
   };
   roomAudits.set(roomId, moved);
   return moved;
@@ -92,6 +102,25 @@ function auditStateFor(roomId: string, round: number): RoomAudit {
 // reads as.
 export function auditRevealFor(roomId: string): AuditReveal | null {
   return roomAudits.get(roomId)?.reveal ?? null;
+}
+
+// Whether this leg's Parley is already spent on the audit. The spend
+// ends the leg's trading the moment the count carries, while the room is
+// still standing in the Parley phase and remains there until the
+// reveal's own ready vote carries everyone out (see Parley.tsx). So a
+// trading wire cannot lean on the phase alone: it asks this beside the
+// phase check, or an offer posts into the gap between the reveal and the
+// advance, which is exactly the trading the room just voted to end.
+export function auditSpentLeg(roomId: string, round: number): boolean {
+  return roomAudits.get(roomId)?.carriedRound === round;
+}
+
+// The refusal that answers a trading wire when the spend above is why.
+// The five wires' sentences share this template and differ only in the
+// tail that names what reopens, so the template lives here beside its
+// predicate rather than being spelled out five times over.
+export function auditSpentReason(reopens: string): string {
+  return `The harbor spent this leg's Parley on the Manifest Audit. ${reopens} again next leg.`;
 }
 
 // Wipes a room's audit. Called on room:restart and when a room is deleted
@@ -228,23 +257,188 @@ async function revealFor(
 }
 
 /**
+ * The room's count of the vote, built in one place.
+ *
+ * One builder for the three moments a frame about this vote goes out: the
+ * count after a nomination, the count a card is answered with when it
+ * opens, and nothing else, since the reveal is a different frame. One
+ * builder because the numbers have to agree whichever way a captain hears
+ * them: a card that told the table two names were in while the walk below
+ * counted three would be a card the room argued with instead of each
+ * other.
+ *
+ * The book is re-derived here against the room that exists now, the same
+ * way every nomination is re-judged at the door, so a nomination from a
+ * captain the room has stopped counting is out of the count and out of
+ * the names at once (see pruneStaleVotes), and the captains still to
+ * speak are the roster's own walk rather than a second subtraction.
+ */
+function auditTallyFrame(
+  roomId: string,
+  round: number,
+  roster: ReadonlySet<string>,
+  book: ReadonlyMap<string, string>,
+): AuditTally {
+  const votes = pruneStaleVotes(book, roster);
+  const named = new Set(votes.keys());
+  return {
+    roomId,
+    round,
+    votes: Object.fromEntries(votes),
+    roster: roster.size,
+    needed: auditNamesNeeded(roster.size),
+    awaiting: [...roster].filter((id) => !named.has(id)),
+  };
+}
+
+/**
+ * One accepted nomination, carried as far as it goes: the count the room is
+ * owed, and the one reveal a voyage gets.
+ *
+ * The book is re-derived here against the room that exists now, which is a
+ * second read rather than the door's: the door's roster was read before
+ * this call and a captain can leave the harbor in the gap. What the two
+ * reads buy is in the two branches below, and both of them are about a
+ * carry being either fully recorded or cleanly abandoned.
+ *
+ * A carry that cannot be recorded is not abandoned to nowhere. The reveal
+ * is read out of the target's own membership row, so a target who leaves
+ * the room between the carry being decided and the manifest being opened
+ * leaves the reveal with no name to print. Returning there would mean the
+ * room had been shown the tally that carried the vote and nothing else
+ * ever happened, which is a vote that visibly carried and left no record
+ * of itself. The loop re-derives instead: the departed captain's
+ * nominations come out of the book, the carry is decided again on what is
+ * left, and the room is told whenever the count it is reading moves. The
+ * loop turns at most once per nomination dropped, so it cannot spin.
+ *
+ * A carry cannot be recorded twice either. Two ballots that arrive in the
+ * same tick can both read a book that holds both of them, so both can
+ * decide the same carry and both go on to read the same reveal; the second
+ * to resume finds the room already answered and stops there, so one carry
+ * is one record, one log line and one frame. That check is after the await
+ * rather than before it, which is the half of the fix the door cannot
+ * make: the door has no wait in it, and this one does.
+ *
+ * The tally goes out once for an accepted nomination and once more
+ * wherever a later pass finds the count moved under it. Both are the same
+ * frame built by the same builder, so a room can only ever read a count
+ * the server would stand behind.
+ *
+ * The maroon's own settle is this walk's mirror rather than a call into
+ * it (see src/server/realtime/maroon.ts), and everything before the commit
+ * is shared rather than copied (the re-derived book and the walk that
+ * decides it, see pruneStaleVotes and carriedTarget above). What one
+ * shared settle would have to take as parameters is everything after it:
+ * this walk reads a reveal out of the target's own save, that one reads a
+ * display name out of their membership row, the maroon writes a mark onto
+ * the target's line and this one does not, and each makes its exactly once
+ * check on its own state after an await, which is the line suites 28 and
+ * 29 hold by frame count. A single function carrying all of that would put
+ * that check further from the state it guards than the mirror costs.
+ *
+ * `tell` is the caller's answer to whether the room is owed a frame for
+ * this pass: true for an accepted nomination, which is always news, and
+ * false for the re-derive a refusal was made of, which tells the room only
+ * when the book actually moved under it.
+ */
+async function settleAudit(
+  io: Server,
+  roomId: string,
+  round: number,
+  voyageEpoch: number,
+  state: RoomAudit,
+  tell: boolean,
+): Promise<void> {
+  for (;;) {
+    const roster = await activeRosterSet(roomId);
+    const book = pruneStaleVotes(state.votes, roster);
+    const moved = book.size !== state.votes.size;
+    state.votes = book;
+    if (tell || moved) {
+      io.to(`room:${roomId}`).emit(
+        "audit:tally",
+        auditTallyFrame(roomId, round, roster, book),
+      );
+    }
+    // Every pass after this one is a re-derive rather than a nomination, so
+    // only a count that actually moved is worth a second frame.
+    tell = false;
+    const carried = auditCarried(book, roster.size);
+    if (!carried) return;
+    // The spend is recorded before the reveal's own reads rather than
+    // after them: the wires that close with the Parley ask this field,
+    // and the answer has to be true from the tick that decided it.
+    state.carriedRound = round;
+    const reveal = await revealFor(roomId, voyageEpoch, round, carried);
+    if (!reveal) continue;
+    // The second of two ballots that carried in the same tick finds the
+    // room already answered here and stops, which is what makes one carry
+    // exactly one reveal.
+    if (state.reveal) return;
+    state.reveal = reveal;
+    // [I1: the telemetry spine] The harbor's own answer, recorded with no
+    // actor because a carried vote is the room's rather than any one
+    // captain's. Whether it was the right answer is not here: the cards are
+    // private and a record is read by whoever runs the balance pass, so the
+    // usage is counted and the verdict is left to the one place that already
+    // knew it.
+    noteTelemetry(roomId, "audit_carried", { target: carried });
+    // [B4: the log surfaces] The room's line for the same carried vote, and
+    // it names the captain by display name rather than by id, which is the
+    // only place the two differ: a record is read by an operator who was not
+    // sitting at the table, and this is read by the captains who were. The
+    // name comes off the reveal below rather than from a second query, so
+    // the line and the frame that shows the table its answer cannot name two
+    // different captains.
+    noteVoyageLog(io, roomId, {
+      kind: "audit_carried",
+      target: reveal.target.name,
+    });
+    io.to(`room:${roomId}`).emit("audit:reveal", reveal);
+    return;
+  }
+}
+
+/**
  * One captain's nomination, all the way to the room.
  *
  * Everything the vote is judged against comes from the room rather than
  * from the vote: the mode and the voyage from the room row, who counts
  * from the durable roster, and the leg from the caller, which reads it off
  * the checkpoint rather than off the payload. A nomination that arrives
- * for a captain the room has stopped counting is dropped rather than
- * counted, because the arithmetic below divides by that roster and a vote
- * outside it would move a majority with nobody behind it, and the same
- * roster re-judges the votes already in the book, so a nomination the
- * room has stopped counting stays out even if it was cast while it still
- * counted.
+ * for a captain the room has stopped counting is refused rather than
+ * dropped silently, because the arithmetic below divides by that roster
+ * and a vote outside it would move a majority with nobody behind it, and
+ * the same roster re-judges the votes already in the book, so a
+ * nomination the room has stopped counting stays out even if it was cast
+ * while it still counted.
+ *
+ * A captain names one captain a leg. The second nomination, whether it
+ * repeats the first or asks for a different captain, is refused here at
+ * the root rather than written into the book: the table was shown a name
+ * and a count, and a count that could move after the fact is a count
+ * nobody can argue against. The refusal is what keeps a double press, a
+ * reloaded client and a hand written frame from reading as three votes,
+ * so the check and the write below are in the same uninterrupted step
+ * with no await between them, and two presses that arrive together cannot
+ * both find the seat empty.
+ *
+ * The shapes this hands back are the draft's own: null where the
+ * nomination was accepted, and a sentence for the captain who sent it
+ * wherever it was refused. A refusal the caller cannot read is a refusal
+ * that looks like the vote was taken, which is the reply a captain is
+ * least able to act on.
  *
  * The tally goes out after every vote including the last one, and the
  * reveal only ever goes out once. Both are broadcast, and neither carries
- * anything that is not public: the tally is who nominated whom, and the
- * reveal is the manifest the room voted to open.
+ * anything that is not public: the tally is who nominated whom and the
+ * count they are counted against, and the reveal is the manifest the room
+ * voted to open. A refusal is the one case that does not tell the room
+ * anything, and it is also the case where the room can be reading a count
+ * that no longer holds: the room is told when the refusal's own re-derive
+ * moved the book, and not otherwise, so a captain pressing twice cannot
+ * move the count the table is arguing over.
  */
 export async function recordAuditVote(
   io: Server,
@@ -252,61 +446,92 @@ export async function recordAuditVote(
   voterId: string,
   round: number,
   targetUserId: string,
-): Promise<void> {
+): Promise<string | null> {
   const gate = await auditRoomGate(roomId);
-  if (!gate) return;
-  if (round < gate.opensAt) return;
+  // Silence where the room itself is wrong, which is the wiring's call as
+  // much as this one's: a harbor with no manifest to open has nothing to
+  // tell a captain who asked for one.
+  if (!gate) return null;
+  if (round < gate.opensAt) return `The audit opens from leg ${gate.opensAt}.`;
   const voyageEpoch = gate.voyageEpoch;
   const state = auditStateFor(roomId, round);
-  if (state.reveal) return;
+  if (state.reveal) return "This voyage's audit has already carried.";
   const roster = await activeRosterSet(roomId);
-  if (!roster.has(voterId) || !roster.has(targetUserId)) return;
   // The book is re-derived against the room that exists now, not the room
   // that existed when each nomination was cast. A vote from a captain who
   // has since gone bankrupt would otherwise sit under a shrunken roster
   // and carry a majority with nobody behind it, which is the same flaw the
-  // door check above closes for fresh votes (see pruneStaleVotes).
-  state.votes = pruneStaleVotes(state.votes, roster);
+  // door checks below close for fresh votes (see pruneStaleVotes). The
+  // re-derive runs before the door rather than after it so that a refusal
+  // made because a captain left still leaves the room with the count that
+  // captain's leaving produced: a nomination the prune drops is the room's
+  // news rather than this ballot's, and it goes out whether the ballot
+  // lands or not.
+  const book = pruneStaleVotes(state.votes, roster);
+  const moved = book.size !== state.votes.size;
+  state.votes = book;
+  // The room's count, owed only where the re-derive moved it: a refused
+  // ballot leaves the book alone otherwise, and the count the room is
+  // already reading is still the count.
+  const refuse = (sentence: string): string => {
+    if (moved)
+      io.to(`room:${roomId}`).emit(
+        "audit:tally",
+        auditTallyFrame(roomId, round, roster, state.votes),
+      );
+    return sentence;
+  };
+  if (!roster.has(voterId)) return refuse(SEAT_NOT_COUNTED);
+  if (!roster.has(targetUserId)) return refuse(TARGET_NOT_COUNTED);
+  // The one name a captain gets. Checked and written without a pause so
+  // two presses in the same tick cannot both pass it.
+  if (state.votes.has(voterId))
+    return refuse("Your name is already in for this leg's audit.");
   state.votes.set(voterId, targetUserId);
   // [I1: the telemetry spine] The nomination, recorded where the vote is
   // accepted and before the tally goes out, so a record and the room can
-  // never disagree about whether it happened. A captain who changes their
-  // nomination in the same leg files a second ask, which is what the
-  // table saw happen.
+  // never disagree about whether it happened. A nomination refused at the
+  // door files nothing, which is the same rule: the record counts what
+  // the table saw happen, and the table was shown a refusal.
   noteTelemetry(roomId, "audit_asked", {
     actor: voterId,
     target: targetUserId,
   });
+  await settleAudit(io, roomId, round, voyageEpoch, state, true);
+  return null;
+}
 
-  const tally: AuditTally = {
-    roomId,
-    round,
-    votes: Object.fromEntries(state.votes),
-  };
-  io.to(`room:${roomId}`).emit("audit:tally", tally);
-
-  const carried = auditCarried(state.votes, roster.size);
-  if (!carried) return;
-  const reveal = await revealFor(roomId, voyageEpoch, round, carried);
-  if (!reveal) return;
-  state.reveal = reveal;
-  // [I1: the telemetry spine] The harbor's own answer, recorded with no
-  // actor because a carried vote is the room's rather than any one
-  // captain's. Whether it was the right answer is not here: the cards are
-  // private and a record is read by whoever runs the balance pass, so the
-  // usage is counted and the verdict is left to the one place that already
-  // knew it.
-  noteTelemetry(roomId, "audit_carried", { target: carried });
-  // [B4: the log surfaces] The room's line for the same carried vote, and
-  // it names the captain by display name rather than by id, which is the
-  // only place the two differ: a record is read by an operator who was not
-  // sitting at the table, and this is read by the captains who were. The
-  // name comes off the reveal below rather than from a second query, so
-  // the line and the frame that shows the table its answer cannot name two
-  // different captains.
-  noteVoyageLog(io, roomId, {
-    kind: "audit_carried",
-    target: reveal.target.name,
+/**
+ * The room's count as it stands, for the captain whose card has just
+ * opened.
+ *
+ * A leg's book is built by the captains in it and the empty one is never
+ * broadcast, so a card opened before anyone has nominated has no frame to
+ * read: it asks, and this answers in the same shape the broadcast carries
+ * rather than a second one, so the first vote a captain sees arrive
+ * changes the numbers in place instead of redrawing the block around
+ * them.
+ *
+ * Read only. Nothing here spends a nomination, records telemetry or
+ * writes a book: a captain who asks twice is answered twice, which is
+ * what a stateless ask is for. The leg is the caller's, read off the
+ * checkpoint rather than off the payload, for the reason every other leg
+ * in this module is.
+ */
+export async function auditTallyFor(
+  roomId: string,
+  round: number,
+): Promise<AuditTally | null> {
+  const room = await db.room.findUnique({
+    where: { id: roomId },
+    select: { mode: true },
   });
-  io.to(`room:${roomId}`).emit("audit:reveal", reveal);
+  // The same gate the vote itself passes, asked as a question rather than
+  // as a permission: a harbor whose mode opens no manifest has no count to
+  // offer, and a card in it is not drawn.
+  if (auditOpensAt(room?.mode) === null) return null;
+  const state = roomAudits.get(roomId);
+  const book = state && state.round === round ? state.votes : new Map();
+  const roster = await activeRosterSet(roomId);
+  return auditTallyFrame(roomId, round, roster, book);
 }

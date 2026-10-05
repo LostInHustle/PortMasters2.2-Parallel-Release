@@ -31,18 +31,25 @@ import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
-import { tallyRows } from "@/lib/voteTally";
+import { captainName, tallyRows } from "@/lib/voteTally";
+import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
-import { VoteCardShell } from "./VoteCardShell";
+import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
 import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
 
+// What the card needs to know about the rest of the room, and nothing
+// else: the mark a vote may not be aimed at. Structural rather than the
+// roster hook's whole record, the same shape the maroon card takes, so
+// this card cannot reach for anything it has no business reading.
+type Marks = Record<string, SeatStatus>;
+
 /**
  * The two questions the Parley board asks about this vote, answered once
  * beside the vote itself so the card and the Harbor Business fold that
- * holds it cannot disagree about when the harbor is voting (W4, UX-3 in
- * docs/STUDIO_AUDIT.md; see Parley.tsx).
+ * holds it cannot disagree about when the harbor is voting (see
+ * Parley.tsx).
  */
 export function auditVoteOpen(game: GameState, audit: Audit): boolean {
   const opensAt = auditOpensAt(game.mode);
@@ -54,9 +61,9 @@ export function auditVoteOpen(game: GameState, audit: Audit): boolean {
 export function auditCardShown(game: GameState, audit: Audit): boolean {
   const opensAt = auditOpensAt(game.mode);
   if (opensAt === null || game.phase !== "parley") return false;
-  // (a) of UX-3: the open window, or a window this voyage can still
-  // reach. A spent audit is neither, and it leaves the board because the
-  // reveal strip carries the finding from there.
+  // The open window, or a window this voyage can still reach. A spent
+  // audit is neither, and it leaves the board because the reveal strip
+  // carries the finding from there.
   return (
     auditVoteOpen(game, audit) ||
     (audit.reveal === null && opensAt <= game.maxRounds)
@@ -68,31 +75,42 @@ export function AuditVoteCard({
   members,
   me,
   audit,
+  statuses,
 }: {
   game: GameState;
   members: PublicUser[];
   me: PublicUser;
   audit: Audit;
+  statuses?: Marks;
 }) {
-  const [target, setTarget] = useState("");
+  // The leg is carried with the pick rather than reset by an effect: a
+  // target chosen in a leg the vote fell short in is not a target this
+  // leg's card keeps one press away, and a reading that cannot represent
+  // a stale choice beats one cleared a frame after it showed.
+  const [pick, setPick] = useState({ round: -1, target: "" });
+  const target = pick.round === game.currentRound ? pick.target : "";
 
-  // The visibility rule is the reader's ((a) of UX-3 in
-  // docs/STUDIO_AUDIT.md): the open window, or a window still ahead this
-  // voyage. The rung is read off the mode's own record rather than
-  // compared against a constant, so this panel and the server's vote ask
-  // one question: a mode whose rung is null has no manifest to open, and
-  // that is what draws nothing here (see auditOpensAt in @/lib/game/mode).
-  // The body still explains the vote before the rung, because a mode
-  // whose headline mechanic nobody has heard of is a mechanic nobody
-  // uses, and inside the Harbor Business fold that explanation costs the
-  // board nothing (see Parley.tsx).
+  // The visibility rule is the reader's (auditCardShown): the open
+  // window, or a window still ahead this voyage. The rung is read off
+  // the mode's own record rather than compared against a constant, so
+  // this panel and the server's vote ask one question: a mode whose rung
+  // is null has no manifest to open, and that is what draws nothing here
+  // (see auditOpensAt in @/lib/game/mode). The body still explains the
+  // vote before the rung, because a mode whose headline mechanic nobody
+  // has heard of is a mechanic nobody uses, and inside the Harbor
+  // Business fold that explanation costs the board nothing (see
+  // Parley.tsx).
   const opensAt = auditOpensAt(game.mode);
   if (opensAt === null) return null;
   if (!auditCardShown(game, audit)) return null;
   const open = auditVoteOpen(game, audit);
   const rows = tallyRows(audit.votes, members);
-  const nameOf = (id: string) =>
-    members.find((m) => m.id === id)?.displayName ?? "a captain";
+  const nameOf = (id: string) => captainName(members, id);
+  // The server refuses a vote aimed at a captain it has already written
+  // off, so the list does not offer one, the same rule and the same
+  // predicate the maroon card reads: an option that quietly does nothing
+  // is worse than no option.
+  const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
 
   return (
     <VoteCardShell tone="intel" icon="🔎" title="Manifest Audit">
@@ -101,20 +119,26 @@ export function AuditVoteCard({
           <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
             A majority of the captains still sailing can open one manifest. What
             comes back is a sample of what they filed, and the harbor trades no
-            more this leg.
+            more this leg. When one name carries, the manifest opens to the
+            whole harbor and the leg&apos;s trading closes with it; the voyage
+            carries on at the next leg.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Select
               value={target}
-              onChange={(e) => setTarget(e.target.value)}
+              onChange={(e) =>
+                setPick({ round: game.currentRound, target: e.target.value })
+              }
               aria-label="Captain to audit"
             >
               <option value="">Choose a captain</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
-                </option>
-              ))}
+              {members
+                .filter((m) => !marked(m.id))
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
+                  </option>
+                ))}
             </Select>
             <Button
               variant="outline"
@@ -124,20 +148,38 @@ export function AuditVoteCard({
               Call the audit
             </Button>
           </div>
-          {audit.myVote && (
-            <p className="text-[11px] text-muted-foreground mt-2">
-              You named {nameOf(audit.myVote)}. Waiting on the rest of the
-              harbor.
+          {members.some((m) => marked(m.id)) && (
+            <p className="text-[10px] text-muted-foreground/80 mt-2">
+              A captain the harbor has written off cannot be audited.
             </p>
           )}
-          <VoteTallyRows rows={rows} />
+          {/* A captain who has named someone is told what they said and when
+              they may name again, because the one question a spent button
+              leaves is whether it comes back. It does not come back this
+              leg, and the harbor opens one manifest a voyage, so the
+              sentence answers the leg and the voyage at once. */}
+          {audit.myVote && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              You named {nameOf(audit.myVote)}. Your name is in for this leg,
+              and a captain names one captain a leg: the harbor opens one
+              manifest a voyage, so a later leg can call this vote again. There
+              is nothing else to press on this vote.
+            </p>
+          )}
+          <VoteRefusal error={audit.error} onDismiss={audit.clearError} />
+          <VoteTallyRows
+            rows={rows}
+            census={audit.census}
+            members={members}
+            myVote={audit.myVote}
+          />
           <p className="text-[10px] text-muted-foreground/80 mt-2">
             {AUDIT_VOTE_RULE}
           </p>
         </>
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: ${AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley.`}
+          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: ${AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley. The harbor opens one manifest a voyage, and a vote that does not carry can be called again on a later leg.`}
         </p>
       )}
     </VoteCardShell>
@@ -231,9 +273,11 @@ export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
       )}
 
       <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        {reveal.flagged
-          ? "The harbor's own checks could not reconcile this manifest, so its lines are withheld."
-          : "A random sample of this captain's most recent order fulfillments, opened by a vote of the harbor. Their card, their Gold and the rest of their hold were not opened."}
+        {`${
+          reveal.flagged
+            ? "The harbor's own checks could not reconcile this manifest, so its lines are withheld."
+            : "A random sample of this captain's most recent order fulfillments, opened by a vote of the harbor. Their card, their Gold and the rest of their hold were not opened."
+        } Opened by a majority in leg ${reveal.round}, which closed that leg's trading; the finding stays on the table for the rest of the voyage.`}
       </p>
     </div>
   );

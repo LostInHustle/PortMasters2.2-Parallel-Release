@@ -11,7 +11,7 @@
  * which fields are secret, ESLint does not read payloads, and the smoke
  * suite only sweeps the harbors it happens to sail.
  *
- * Seven rules. Each one names a single path and fails when a second
+ * Eight rules. Each one names a single path and fails when a second
  * appears, and each one is worth a sentence about what it cannot catch,
  * because a gate that reads as stronger than it is is worse than none.
  *
@@ -44,6 +44,16 @@
  *      lays every seat's cards in front of the table. What it cannot catch
  *      is the same thing the sixth rule cannot catch, the event reached
  *      through a variable rather than written at the emit.
+ *   8. The bazaar board, which carries one captain's own view of the rumor
+ *      rows: a standing row's direction belongs to its publisher until the
+ *      market it moves has been drawn, so a board sent to a room channel
+ *      hands the whole table the lean the feature exists to keep. It is
+ *      the sixth and seventh rules' shape for their reason, and its
+ *      emitters are the union of theirs because two files deliver this
+ *      frame rather than one. What it cannot catch is what they cannot
+ *      catch either, the event reached through a variable holding it,
+ *      which is how the client's own hook names it (see
+ *      src/lib/use-bazaar-rumors.ts).
  *
  * Rules 1 to 4 are about the server and the client's one hook. They say
  * nothing about the save path, which the review reads by hand and which
@@ -138,6 +148,24 @@ const DRAFT_FRAME_EMITTERS = [
   ...PER_RECIPIENT_EMITTERS,
   "socket.emit(",
   "io.to(socket.id).emit(",
+];
+
+/* Rule 8. The frame that carries one captain's board of rumors, and the
+   emitters that may deliver it. It is rules 6 and 7's shape for their
+   reason: the direction a captain leaned is public only once the market it
+   moves has been drawn, so the board a captain is sent is built for them
+   and the frame losing its one recipient is what leaks. The list is the
+   two named delivery paths, a reply on the asking socket, and both
+   spellings of a send to one socket id, because this frame goes out from
+   two files and the older of the two sends through the presence map's own
+   socket id rather than through a reply (see broadcastBazaar in
+   src/server/realtime/bazaar.ts). */
+const BAZAAR_FRAME_EVENT = '"bazaar:update"';
+const BAZAAR_FRAME_EMITTERS = [
+  ...PER_RECIPIENT_EMITTERS,
+  "socket.emit(",
+  "io.to(socket.id).emit(",
+  "io.to(sid).emit(",
 ];
 
 /* The scanner's own file. It holds the rule table above and the doc
@@ -319,6 +347,33 @@ for (const file of files) {
   });
 }
 
+// ========== Rule 8: the bazaar board goes to one captain ==========
+for (const file of files) {
+  const relativePath = rel(file);
+  if (!relativePath.startsWith("src/")) continue;
+  const text = lines(file);
+  text.forEach((line, index) => {
+    // Gathered from the emit, like the seventh rule: this frame is written
+    // with its event name on the line below the call in the two places
+    // that send it, so the delivery is the end of the statement to read
+    // from rather than the name.
+    if (!line.includes(".emit(")) return;
+    const statement = gather(text, index);
+    if (!statement.includes(BAZAAR_FRAME_EVENT)) return;
+    if (BAZAAR_FRAME_EMITTERS.some((name) => statement.includes(name))) {
+      return;
+    }
+    problems.push({
+      file: relativePath,
+      line: index + 1,
+      message:
+        `delivers ${BAZAAR_FRAME_EVENT} to a room. That frame is one captain's own board, since a` +
+        " standing row's direction is stripped for every reader but its publisher," +
+        " so it goes out one socket at a time (see BAZAAR_FRAME_EMITTERS in this script).",
+    });
+  });
+}
+
 function gather(text: readonly string[], from: number): string {
   let out = "";
   let depth = 0;
@@ -340,7 +395,7 @@ function gather(text: readonly string[], from: number): string {
 
 const scanned = `${files.length} files scanned`;
 if (problems.length === 0) {
-  console.log(`The private paths hold. ${scanned}, seven rules, no finding.`);
+  console.log(`The private paths hold. ${scanned}, eight rules, no finding.`);
   process.exit(0);
 }
 

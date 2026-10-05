@@ -1,14 +1,14 @@
 {
-  "name": "portmasters2.2parallelrelease",
+  "name": "portmasters-2-2-parallel-release",
   "version": "0.2.1",
   "private": true,
-  "description": "A browser based multiplayer trading game on the maritime Silk Road. One npm project serves the site, the API and the realtime channel on a single port.",
+  "description": "PortMasters 2.2 Parallel Release: a browser based multiplayer trading game on the maritime Silk Road. One npm project serves the site, the API and the realtime channel on a single port.",
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "prisma generate && tsx scripts/tags.ts && tsx scripts/cards.ts && next build",
+    "build": "prisma generate && tsx scripts/tags.ts && tsx scripts/cards.ts && tsx scripts/status.ts && next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -16,6 +16,7 @@
     "check:palette": "tsx scripts/palette.ts",
     "check:tags": "tsx scripts/tags.ts",
     "check:cards": "tsx scripts/cards.ts",
+    "check:status": "tsx scripts/status.ts",
     "check:private": "tsx scripts/private-scan.ts",
     "report:bands": "tsx scripts/bands.ts",
     "report:gates": "tsx scripts/gates.ts",

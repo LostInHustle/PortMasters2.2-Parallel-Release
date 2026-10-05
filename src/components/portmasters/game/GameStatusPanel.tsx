@@ -44,28 +44,20 @@ export type RosterEntry = WorkerType & {
 /**
  * The captain's own rail.
  *
- * This used to be five sections stacked in a single narrow column (Captain's
- * Log, Vessel Status, Cargo Hold, Outstanding Loans, Round End Obligations)
- * with the ledger dropped underneath all of it. In a rail roughly 260px wide
- * that is unavoidably a long vertical scroll, and the ledger, which a captain
- * consults constantly, sat furthest from the eye.
- *
- * So the handful of numbers that are checked every few seconds (round, waters,
+ * The handful of numbers that are checked every few seconds (round, waters,
  * funds, reputation, and what is owed at round end) lead the column, and
- * everything else is a tab. The ledger becomes a peer tab rather than a
- * footnote below the fold.
+ * everything else is a tab, so the ledger is a peer tab rather than a
+ * footnote below the fold. Five sections stacked in one narrow column
+ * (Captain's Log, Vessel Status, Cargo Hold, Outstanding Loans, Round End
+ * Obligations) would be an unavoidably long vertical scroll in a rail
+ * roughly 260px wide, and the ledger, which a captain consults constantly,
+ * would sit furthest from the eye.
  *
  * The panel is one scroll container at every window height, and the tabs are
  * laid out at their natural height inside it: scrolling the rail moves the
  * whole column, head included, and no section box ever owns a scrollbar of
  * its own (the ledger's tail box is the one deliberate exception, because a
- * log's whole job is to scroll its own newest lines into view). This took
- * three shapes to get right. The first pinned the head and let each tab
- * scroll inside its own box, which the field reported as "only the four
- * boxes scroll". The second made the panel the scroll container but kept a
- * floor under the tab box, so the one column scroll only engaged on a short
- * window and the field reported the same thing again at ordinary heights.
- * The third drops the floor and the inner scroll boxes outright: whatever
+ * log's whole job is to scroll its own newest lines into view). Whatever
  * the window, content taller than the rail scrolls the rail, and content
  * shorter than the rail does not scroll at all.
  *

@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cardText } from "@/lib/game/cards";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
-import { tipsText } from "@/lib/game/constants/tips";
+import { tipsHeading, tipsText } from "@/lib/game/constants/tips";
 import type { Difficulty } from "@/lib/game/difficulty";
 // The two modals below that quote a voyage's length take the mode as well
 // as the tier, because the length is the voyage's rather than the tier's
@@ -29,6 +29,7 @@ import {
 } from "@/lib/game/pools";
 import type { GameState } from "@/lib/game/types";
 import { getIntelCost, phaseLabel } from "@/lib/game/engine";
+import { SKILLED_LEGEND } from "@/lib/game/status-copy";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
 import type { PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
@@ -179,7 +180,11 @@ export function TipsModal({
       onOpenChange={onOpenChange}
       badge={<Lightbulb className="h-5 w-5 text-advisor" />}
       title="Trade Strategy Advice"
-      description="Bankruptcy avoidance strategies"
+      // The description is the advice page's own heading (see tipsHeading
+      // in @/lib/game/constants/tips), so the dialog names the strategy
+      // the body under it actually prints for this mode rather than the
+      // founding voyage's subject on every table.
+      description={tipsHeading(mode)}
       body={tipsText(mode, difficulty)}
     />
   );
@@ -276,9 +281,10 @@ export function RumorBoardModal({
   game: GameState;
   onBuy: () => void;
 }) {
-  // intelCost is now derived from whether the Brokers Network module is
-  // equipped (see getIntelCost in engine/pricing), so the modal stays in
-  // sync with the live state without reading a field that no longer exists.
+  // The rumor price is derived, through getIntelCost (see
+  // engine/pricing), from whether the Broker's Network module is
+  // equipped, so the modal cannot show a price the engine would not
+  // charge.
   const intelCost = getIntelCost(game);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -297,7 +303,7 @@ export function RumorBoardModal({
         {/* The button greys outside Market because the engine refuses the
             press there (see purchaseIntel): a rumor bought after the board
             is dealt could never be honoured, and a dialog left open across
-            the rest of the lap is exactly how that press used to happen. */}
+            the rest of the lap is exactly how that press happens. */}
         <div className="flex flex-col items-center my-2 gap-1.5">
           <Button
             className="pm-grad-rumors rounded-xl"
@@ -566,9 +572,9 @@ function CargoRow({
  * Laid out as a profile: the standings first (an identity header, the
  * headline figures, the comparison against your own seat and the legacy
  * card), and the reference half (cargo, workers, modules and the log)
- * folded behind them (W4, UX-9 in docs/STUDIO_AUDIT.md). The figures a
- * captain opens this to compare are readable without a press, and the
- * lists they might look up are one press away.
+ * folded behind them. The figures a captain opens this to compare are
+ * readable without a press, and the lists they might look up are one
+ * press away.
  */
 export function PlayerDetailModal({
   open,
@@ -719,11 +725,10 @@ export function PlayerDetailModal({
 
             {legacy && <CaptainLegacyCard legacy={legacy} compact />}
 
-            {/* The reference half, behind one fold (W4, UX-9 in
-                docs/STUDIO_AUDIT.md): cargo, workers, modules and the log
-                used to run this popup well past a laptop viewport under
-                the figures it exists to show, and the figures are what a
-                captain opens it for. */}
+            {/* The reference half, behind one fold: cargo, workers,
+                modules and the log would run this popup well past a
+                laptop viewport under the figures it exists to show, and
+                the figures are what a captain opens it for. */}
             <FoldRow
               tone="profile"
               icon="🗂️"
@@ -774,6 +779,19 @@ export function PlayerDetailModal({
                     <h4 className="text-xs font-semibold text-muted-foreground mb-2">
                       👥 Workers
                     </h4>
+                    {/* [W3: the status convention] The star the idle rows
+                        carry, defined where it appears for the same reason
+                        the bench carries the legend: this modal draws the
+                        same roster, and a mark should not be met here
+                        without the sentence that explains it anywhere on
+                        the screen. */}
+                    {workerGroups.some((g) =>
+                      g.list.some((w) => w.isSkilled),
+                    ) && (
+                      <p className="mb-2 text-[11px] text-muted-foreground">
+                        {SKILLED_LEGEND}
+                      </p>
+                    )}
                     {workerGroups.every((g) => g.list.length === 0) ? (
                       <p className="text-xs text-muted-foreground">
                         No artisans hired yet.
@@ -951,11 +969,10 @@ function ComparisonBar({
   );
 }
 
-// One colour for both captains. The type used to carry myTone and
-// theirTone as two fields, and every entry set them to the same string,
-// so the pair only ever read as an invitation to give one captain a
-// different colour from the other, which is not what the bar does: the
-// bar compares two numbers, and the tint names the stat.
+// One colour for both captains: the bar compares two numbers, and the
+// tint names the stat rather than the captain. Two tone fields, one per
+// captain, would read as an invitation to give one captain a different
+// colour from the other, which is not what the bar does.
 type ComparisonStat = {
   label: string;
   mine: number;

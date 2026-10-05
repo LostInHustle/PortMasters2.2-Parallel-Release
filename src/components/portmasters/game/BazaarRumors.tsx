@@ -13,12 +13,24 @@ import {
   BAZAAR_SELLER_PATH,
   bazaarGoods,
   canPublishRumor,
+  rumorCanLand,
+  rumorClosingLine,
   rumorCooldownLeft,
-  rumorCooldownLine,
   rumorDirectionLine,
+  rumorNextLeg,
   type PublicRumor,
   type RumorDirection,
 } from "@/lib/game/engine";
+// The three readers the desk names and reads its legs with, taken from the
+// module that states the rule rather than from the engine barrel: the
+// barrel's bazaar block carries the readers it already had, and these are
+// the desk's own naming of a leg, which is where the rule and the sentence
+// about it were one edit apart until they moved here.
+import {
+  rumorLandedLine,
+  rumorLandsOn,
+  rumorWaitLine,
+} from "@/lib/game/engine/bazaar";
 import { bazaarRumorsOn } from "@/lib/game/flags";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
@@ -54,11 +66,26 @@ const SELLER_PATH = pathConfig(BAZAAR_SELLER_PATH)!;
  * well enough to be suspicious of a price correctly, which is the whole
  * measurement the plan sets.
  *
+ * Every reader is then handed the desk's own answer to the one question
+ * they came here with, whichever of the two readers they are. That block
+ * is the half of this panel that was missing, and it is missing from a
+ * market this shape more easily than from the two above it: an escort and
+ * a refit are bought and sold by captains who hold no path, so their desks
+ * have something to draw for everybody, while a rumor is one path's single
+ * action. So the block below says, for the captain who may speak, whether
+ * they may speak now and, if not, exactly why and which leg the wait ends
+ * on; and for the captain who may not, that this seat is not theirs and
+ * what reading the board is for. Neither answer is a decoration: the plan's
+ * own worry is a table that cannot tell the feature from a defect, and a
+ * captain who holds no path has no other way to learn that the silence is
+ * somebody else's turn rather than a broken button.
+ *
  * Everything a captain can do here is one socket frame and nothing else.
  * The desk draws the same rules the server enforces (the cooldown, the
- * goods the coming market trades, the path) so that a refusal is read
- * before the click rather than after it, and none of those readings makes
- * the row: the server's own check is what puts a rumor on the board.
+ * goods the coming market trades, the path, and the closing leg that has
+ * no market left to move) so that a refusal is read before the click
+ * rather than after it, and none of those readings makes the row: the
+ * server's own check is what puts a rumor on the board.
  *
  * A captain who holds no path reads the board and nothing else, which is
  * what makes this a market rather than a screen: the fleet needs to see
@@ -81,11 +108,17 @@ export function BazaarRumors({
 
   if (!bazaarRumorsOn(game.mode)) return null;
 
+  // The leg a rumor spoken right now would be priced by, read through the
+  // one reader for it (see rumorLandsOn) rather than counted here: the
+  // goods list below is read against this leg and so is every line this
+  // desk prints about it, so a desk whose two readings of one leg came
+  // apart is not a shape this file can take.
+  const landsOn = rumorLandsOn({ round: game.currentRound });
   // The goods the market being priced next will trade, which is the list
   // the server checks a publish against and the only list this desk may
   // offer. Read one leg ahead because that is the leg a rumor moves, which
   // is the same reading bazaarGoods itself makes of the leg it is handed.
-  const goods = bazaarGoods(game.difficulty, game.currentRound + 1);
+  const goods = bazaarGoods(game.difficulty, landsOn);
   // A selection that is no longer on the list reads as the list's first
   // good rather than as a stale one, which is what keeps the select from
   // drawing a choice the button would then be refused for. A tier that
@@ -93,91 +126,178 @@ export function BazaarRumors({
   const chosen = goods.includes(good) ? good : (goods[0] ?? "");
   const mine = canPublishRumor(game);
   const cooldown = rumorCooldownLeft(bazaar.rumors, me.id, game.currentRound);
-  const canSpeak = mine && cooldown < 1 && goods.length > 0;
+  // The leg the bazaar hears this captain again, read off the same rows
+  // the server counts the refusal off. A count of legs answers how long
+  // and not when, and "when" is the question a captain brings to a desk
+  // with the legs already numbered above it.
+  const nextLeg = rumorNextLeg(bazaar.rumors, me.id);
+  // The leg the hush a publish right now would end on, read through the
+  // same reader the confirmation below reports with: the row this click
+  // would write stands in for itself, so the form's promise and the
+  // receipt that answers it a moment later are one number rather than two
+  // counts that agree until one of them is edited.
+  const quietUntil = rumorNextLeg(
+    [...bazaar.rumors, { publisherUserId: me.id, round: game.currentRound }],
+    me.id,
+  );
+  // The one leg of a voyage where a rumor would move nothing, read off the
+  // pinned length on this captain's own state: the same reading the server
+  // makes off the room (see rumorCanLand). The voyage length is pinned
+  // rather than recomputed for the reason every reader of it is (see
+  // maxRounds in the game types).
+  const closesHere = !rumorCanLand(game.currentRound, game.maxRounds);
+  const canSpeak = mine && !closesHere && cooldown < 1 && goods.length > 0;
+  // This captain's own row for the leg the room is standing in, which is
+  // the confirmation: a publish is answered by a broadcast rather than by
+  // an acknowledgement, so the desk reads the room's own board back rather
+  // than remembering what it asked for. A client that kept its own receipt
+  // would be a second record of a fact the server already holds.
+  const myRow = bazaar.rumors.find(
+    (row) => row.publisherUserId === me.id && row.round === game.currentRound,
+  );
+  const myLean = myRow?.direction ?? null;
+  // The reason the desk is quiet, in the one sentence that knows how long
+  // the wait is and whether this voyage reaches the leg it ends on (see
+  // rumorWaitLine): a captain who spoke late enough to be quiet past the
+  // last round is told the voyage is the reason, rather than sent to a leg
+  // that never opens.
+  const closedOn =
+    cooldown >= 1
+      ? rumorWaitLine(bazaar.rumors, me.id, game.currentRound, game.maxRounds)
+      : "";
 
   return (
     <MarketPanel
       title={`${SELLER_PATH.crest} ${SELLER_PATH.name} Bazaar`}
       intro={
         <>
-          Once every {RUMOR_COOLDOWN_ROUNDS} legs, an {SELLER_PATH.name} captain
-          may spread a word about one commodity. The next port prices that good
-          against it, by up to {Math.round(RUMOR_SHIFT_FRACTION * 100)} percent,
-          which is the same hand the Harbormaster leans a port with. The whole
-          harbor is told who spoke and which good they named, and only the
-          speaker knows which way they leaned until the market answers it.
+          Once every {RUMOR_COOLDOWN_ROUNDS} legs, each {SELLER_PATH.name}{" "}
+          captain may spread a word about one commodity, here at the Parley. The
+          next port prices that good against it, by up to{" "}
+          {Math.round(RUMOR_SHIFT_FRACTION * 100)} percent, which is the same
+          hand the Harbormaster leans a port with. The whole harbor is told who
+          spoke and which good they named, and only the speaker knows which way
+          they leaned until the port they named has priced it.
         </>
       }
     >
-      {mine && (
-        <MarketBlock>
-          {canSpeak ? (
-            <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-              <span className="text-muted-foreground">Speak for</span>
-              <Select
-                value={chosen}
-                onChange={(e) => setGood(e.target.value)}
-                aria-label="Good the rumor is about"
-              >
-                {goods.map((g) => (
-                  <option key={g} value={g}>
-                    {ICONS[g]} {g}
-                  </option>
-                ))}
-              </Select>
-              <span className="text-muted-foreground">leaning</span>
-              {/* Both directions are buttons rather than a toggle, for the
-                  reason the Harbormaster's console gives: the two are the
-                  whole of the choice, and a captain reading this for the
-                  first time should see that a price can be pushed either
-                  way. The selected one wears the phase's gradient. */}
-              <Button
-                size="sm"
-                className={cn(
-                  "h-9 rounded-lg",
-                  direction === 1 && "pm-grad-parley",
-                )}
-                variant={direction === 1 ? "default" : "secondary"}
-                onClick={() => setDirection(1)}
-              >
-                📈 Higher
-              </Button>
-              <Button
-                size="sm"
-                className={cn(
-                  "h-9 rounded-lg",
-                  direction === -1 && "pm-grad-parley",
-                )}
-                variant={direction === -1 ? "default" : "secondary"}
-                onClick={() => setDirection(-1)}
-              >
-                📉 Lower
-              </Button>
-              <Button
-                className={cn("rounded-lg pm-grad-parley")}
-                onClick={() => bazaar.publish(chosen, direction)}
-              >
-                {SELLER_PATH.crest} Publish
-              </Button>
-            </div>
-          ) : (
-            <p className="text-center text-[11px] text-muted-foreground">
-              {goods.length === 0
-                ? "No commodity on this route is traded yet, so there is nothing to say."
-                : rumorCooldownLine(cooldown)}
+      <MarketBlock>
+        {mine ? (
+          <>
+            {canSpeak ? (
+              <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+                <span className="text-muted-foreground">Speak for</span>
+                <Select
+                  value={chosen}
+                  onChange={(e) => setGood(e.target.value)}
+                  aria-label="Good the rumor is about"
+                >
+                  {goods.map((g) => (
+                    <option key={g} value={g}>
+                      {ICONS[g]} {g}
+                    </option>
+                  ))}
+                </Select>
+                <span className="text-muted-foreground">leaning</span>
+                {/* Both directions are buttons rather than a toggle, for the
+                    reason the Harbormaster's console gives: the two are the
+                    whole of the choice, and a captain reading this for the
+                    first time should see that a price can be pushed either
+                    way. The selected one wears the phase's gradient. */}
+                <Button
+                  size="sm"
+                  className={cn(
+                    "h-9 rounded-lg",
+                    direction === 1 && "pm-grad-parley",
+                  )}
+                  variant={direction === 1 ? "default" : "secondary"}
+                  onClick={() => setDirection(1)}
+                >
+                  📈 Higher
+                </Button>
+                <Button
+                  size="sm"
+                  className={cn(
+                    "h-9 rounded-lg",
+                    direction === -1 && "pm-grad-parley",
+                  )}
+                  variant={direction === -1 ? "default" : "secondary"}
+                  onClick={() => setDirection(-1)}
+                >
+                  📉 Lower
+                </Button>
+                <Button
+                  className="rounded-lg pm-grad-parley"
+                  onClick={() => bazaar.publish(chosen, direction)}
+                >
+                  {SELLER_PATH.crest} Publish
+                </Button>
+              </div>
+            ) : myLean !== null && myRow ? (
+              // The confirmation, read off the board the server sent back
+              // rather than off anything this screen remembers: the row is
+              // the receipt, and it is also the only place this captain is
+              // owed the direction they chose.
+              <p className="text-center text-xs leading-relaxed">
+                <span className="font-semibold text-due">Spoken.</span> Your
+                rumor is on the board and the harbor has your name and{" "}
+                {myRow.good}. Only you know which way it leans:{" "}
+                {rumorDirectionLine({ good: myRow.good, direction: myLean })}.
+                The table reads it the moment the port of leg{" "}
+                {rumorLandsOn(myRow)} prices it. The bazaar is quiet for you
+                until leg {nextLeg}.
+              </p>
+            ) : (
+              // Every way of being unable to speak, in the order the
+              // reasons are true. None of them is silence: a desk that drew
+              // nothing here is the state the field report was written
+              // from.
+              <p className="text-center text-[11px] text-muted-foreground">
+                {closesHere
+                  ? rumorClosingLine()
+                  : goods.length === 0
+                    ? "No commodity on this route is traded yet, so there is nothing to say."
+                    : closedOn}
+              </p>
+            )}
+            {canSpeak && (
+              // The two legs this click is about, said under the form
+              // rather than discovered after it: the port the rumor would
+              // be priced by, and the leg the hush it costs ends on. Both
+              // come off the engine's own readers, the first through
+              // rumorLandsOn and the second through the same reader the
+              // confirmation reports with, so the promise made here and
+              // the receipt that answers it are one pair of numbers.
+              <p className="text-center text-[11px] text-muted-foreground mt-1.5">
+                The port of leg {landsOn} prices it. Speaking now quiets the
+                bazaar for you until leg {quietUntil}.
+              </p>
+            )}
+            <p className="text-center text-[11px] text-muted-foreground mt-1.5">
+              The harbor sees your name and your good the moment you speak. What
+              it does not see is which way you leaned, until the port you moved
+              has priced it.
             </p>
-          )}
-          <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-            The harbor sees your name and your good the moment you speak. What
-            it does not see is which way you leaned, until the port you moved
-            has priced it.
+          </>
+        ) : (
+          // The reader who may not speak, told so rather than left to work
+          // it out from a form that is not there. What this captain is owed
+          // is not the action but the read: the path may be held by more
+          // than one captain at this table, and the whole point of the
+          // board is that everyone who did not speak can see who did and
+          // what they named.
+          <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+            Speaking at the bazaar belongs to the {SELLER_PATH.name} path, once
+            every {RUMOR_COOLDOWN_ROUNDS} legs, and you do not hold it this
+            voyage. Whoever holds it is named in the voyage log, and the board
+            below names them the moment they speak.
           </p>
-        </MarketBlock>
-      )}
+        )}
+      </MarketBlock>
 
       <MarketError error={bazaar.error} onDismiss={bazaar.clearError} />
 
-      <RumorList rumors={bazaar.rumors} me={me} round={game.currentRound} />
+      <RumorList rumors={bazaar.rumors} me={me} game={game} />
     </MarketPanel>
   );
 }
@@ -193,23 +313,31 @@ export function BazaarRumors({
  * the voyage, because the wait between two of a captain's own rumors is
  * measured off them, and what a screen draws is a different question from
  * what the rule needs.
+ *
+ * The window is the reason the empty board is two sentences rather than
+ * one. "Nobody has spoken yet this voyage" is a claim about every row the
+ * room holds, and it was being made from the two the window draws, which
+ * is false the moment a captain speaks and then lets a leg or two go by:
+ * the fleet's own rumor would be off the board while the board announced
+ * that the voyage had been silent. So the claim is read off the whole list
+ * and the two sentences say which of the two situations the reader is in.
  */
 function RumorList({
   rumors,
   me,
-  round,
+  game,
 }: {
   rumors: PublicRumor[];
   me: PublicUser;
-  round: number;
+  game: GameState;
 }) {
-  const shown = rumors.filter((r) => r.round >= round - 1);
+  const shown = rumors.filter((r) => r.round >= game.currentRound - 1);
   if (shown.length === 0) {
     return (
       <MarketEmpty>
-        Nobody has spoken at the bazaar yet this voyage. A rumor is the only way
-        an honest captain can move a price, and the whole harbor will see who
-        said it.
+        {rumors.length === 0
+          ? "Nobody has spoken at the bazaar yet this voyage. A rumor is the only way an honest captain can move a price, and the whole harbor will see who said it."
+          : "Nobody has spoken in this leg or the one before it. The board keeps those two legs and no more. Older rows moved markets the room has already priced and traded through."}
       </MarketEmpty>
     );
   }
@@ -220,7 +348,7 @@ function RumorList({
   return (
     <div className="space-y-1.5">
       {ordered.map((row) => (
-        <RumorRow key={row.id} row={row} me={me} round={round} />
+        <RumorRow key={row.id} row={row} me={me} game={game} />
       ))}
     </div>
   );
@@ -240,19 +368,35 @@ function RumorList({
 function RumorRow({
   row,
   me,
-  round,
+  game,
 }: {
   row: PublicRumor;
   me: PublicUser;
-  round: number;
+  game: GameState;
 }) {
   const mine = row.publisherUserId === me.id;
-  const standing = row.round >= round;
+  const standing = row.round >= game.currentRound;
   // Narrowed once rather than tested inside the markup, because the clause
   // below reads the direction and a row that has not been answered yet
   // carries none: what the two cases draw is the whole of the difference
   // between a rumor the table is still guessing at and one it has priced.
   const direction = row.direction;
+  // The leg this row's market opens in, off the one reader for it (see
+  // rumorLandsOn), so the leg the chip names and the leg the footnote
+  // under it names are the same leg rather than the same arithmetic
+  // written twice.
+  const landsOn = rumorLandsOn(row);
+  // The port's own answer to the row, which is readable on exactly the leg
+  // it priced the row and off exactly the cards this captain holds: from
+  // the next leg on, the state's market is the leg the room is standing
+  // in, and the reader answers null for a market that has not been drawn
+  // (see rumorLandedLine). It is drawn on this captain's own rows because
+  // it is written about their own rumor: a rumor moves each reader's own
+  // draw, so the outcome a captain can check is the outcome of their own
+  // call, and the rest of the table is owed the reveal rather than a
+  // sentence about somebody else's market.
+  const outcome =
+    mine && !standing ? rumorLandedLine(row, game.resourceCards) : null;
   return (
     <div
       className={cn(
@@ -272,7 +416,10 @@ function RumorRow({
             standing ? "text-parley" : "text-muted-foreground",
           )}
         >
-          Bazaar · {standing ? "waiting" : `leg ${row.round}`}
+          Bazaar ·{" "}
+          {standing
+            ? "waiting"
+            : `spoken in leg ${row.round} · priced at leg ${landsOn}`}
         </span>
         <span className="font-display text-sm font-semibold">
           {mine ? "You" : row.publisherName}
@@ -288,7 +435,9 @@ function RumorRow({
           ? mine
             ? "Spoken in this leg. The next port prices this good against it, and the table reads which way you leaned the moment it does."
             : "Spoken in this leg. The direction belongs to the speaker until the next port prices it, so nobody at this table can tell a call from a lie yet."
-          : "The market that opened this leg was priced against it, so the direction is public now. A price that moved is not proof of anything on its own."}
+          : `The market of this leg was priced against it, so the direction is public now.${
+              outcome ? ` ${outcome}` : ""
+            }`}
       </p>
     </div>
   );

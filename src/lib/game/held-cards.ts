@@ -186,24 +186,50 @@ export function heldPower(
 }
 
 /**
+ * [F7: the power budget] The total the durable set reads once this card
+ * has landed on it, with the card being displaced given up first.
+ *
+ * The one reading of the swap arithmetic: the sentence a refused install
+ * prints (see powerRefusal in ./engine/boons), the budget's own
+ * comparison below, and every panel that states the total for the same
+ * take all come through here, so the number a captain reads on a row and
+ * the number the engine would refuse on are one sum rather than several
+ * that could drift apart. A take that gives nothing up (a milestone boon,
+ * a charter, a purchase onto an open hull) passes null and the total
+ * carries one more card than the hull. A swap passes the card being
+ * displaced, whose power is freed before the new card's lands, which is
+ * what makes trading a heavy module for a lighter one always allowed
+ * however full the hull is. The sum is plain arithmetic over the same
+ * durable set heldPower reads, so an overfilled hull reads past the cap
+ * here exactly as it does there.
+ */
+export function powerAfterTaking(
+  state: Pick<GameState, "heldBoons" | "equippedModules" | "charter">,
+  card: CardRecord,
+  displaced: CardRecord | null = null,
+): number {
+  return heldPower(state) - (displaced?.power ?? 0) + card.power;
+}
+
+/**
  * Whether taking this card keeps the durable set within the cap.
  *
  * Two shapes in one reader because the two differ in one term rather than
  * in the answer. Taking a card on top (a milestone boon, a charter, a
- * purchase onto an open hull) passes null and the sum has one more card
+ * purchase onto an open hull) passes null and the total has one more card
  * than the hull. Replacing one (the yard's swap, where the new module
  * takes a slot an old one gives up) passes the card being displaced, and
  * that card's own power is freed before the new card's lands, which is
  * what makes trading a heavy module for a lighter one always allowed
- * however full the hull is. The bound is inclusive: a set that lands
- * exactly on the cap is at the cap, not past it.
+ * however full the hull is. The total itself is powerAfterTaking above,
+ * so this comparison and the sentence a refusal prints are one
+ * arithmetic. The bound is inclusive: a set that lands exactly on the cap
+ * is at the cap, not past it.
  */
 export function powerBudgetAllows(
   state: Pick<GameState, "heldBoons" | "equippedModules" | "charter">,
   card: CardRecord,
   displaced: CardRecord | null = null,
 ): boolean {
-  return (
-    heldPower(state) - (displaced?.power ?? 0) + card.power <= HELD_POWER_CAP
-  );
+  return powerAfterTaking(state, card, displaced) <= HELD_POWER_CAP;
 }

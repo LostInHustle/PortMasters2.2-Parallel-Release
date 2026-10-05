@@ -236,8 +236,9 @@ export async function milestoneBoonsSuite(): Promise<void> {
       "src/lib/game/engine/milestones.ts",
       "src/components/portmasters/game/phases/MilestoneDraft.tsx",
       "src/components/portmasters/game/status/HeldBoons.tsx",
+      "src/components/portmasters/game/phases/MomentOverlay.tsx",
     ].every((relative) => !carriesADash(relative)),
-    "and the five files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
+    "and the six files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
   );
 
   // ========== B. The five cards ==========

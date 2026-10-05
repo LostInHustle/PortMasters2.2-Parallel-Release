@@ -11,6 +11,7 @@ import { ENTRY_PHASE } from "@/lib/game/phases";
 import { clearAid } from "../aid";
 import { clearAudits } from "../audit";
 import { seated } from "../auth";
+import { clearBazaar } from "../bazaar";
 import { clearBoonLedger } from "../boon-ledger";
 import { clearBarter, clearFlexibleAccepted } from "../barter";
 import { clearMutedUsers, clearSessionChat, emitRoomMembers } from "../chat";
@@ -30,6 +31,7 @@ import { clearLoans } from "../loans";
 import { clearMaroons } from "../maroon";
 import { clearObjectiveTallies } from "../objective";
 import {
+  claimObjectiveRoom,
   forgetDetailRequests,
   restartingRooms,
   roomMembers,
@@ -49,21 +51,30 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
     const s = seated(socket, payload);
     if (!s) return;
     const { roomId } = s;
+    // Taken before the first await rather than after the host read below,
+    // which is the same window the departure closes at its own claim (see
+    // ./start-voyage): two restart frames in one tick both read the host's
+    // row before either had claimed, and both went on to tear the voyage
+    // down. The epoch is what a doubled turn costs: two increments for one
+    // restart, and two frames naming two different voyages. A claim is
+    // only a claim if it is taken before the first await, so it is taken
+    // here, and everything it guards, the refusal included, is answered
+    // inside the finally that releases it.
     if (restartingRooms.has(roomId)) return;
-    const room = await db.room.findUnique({
-      where: { id: roomId },
-      select: { hostId: true, voyageEpoch: true },
-    });
-    if (!room) return;
-    if (room.hostId !== s.userId) {
-      socket.emit("room:error", {
-        roomId,
-        error: HOST_ONLY_RESTART,
-      });
-      return;
-    }
     restartingRooms.add(roomId);
     try {
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: { hostId: true, voyageEpoch: true },
+      });
+      if (!room) return;
+      if (room.hostId !== s.userId) {
+        socket.emit("room:error", {
+          roomId,
+          error: HOST_ONLY_RESTART,
+        });
+        return;
+      }
       await resolveExpiredVentures(io, roomId, room.voyageEpoch, 0, true);
       const restarted = await db.room.update({
         where: { id: roomId },
@@ -114,6 +125,19 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // module in a leg, and the legs of the voyage about to start are
       // not the ones it was promised in.
       moduleTrades.clear(io, roomId);
+      // [D5: Aroma: the Bazaar Rumor] And the bazaar's rows, which are the
+      // fourth board that belongs to the voyage that just ended and the
+      // only one of the four that is not a promise. A row is load bearing
+      // in a way a listing is not: it is what a captain's cooldown is
+      // measured from, so a row left standing here would refuse the
+      // publisher in the voyage about to start, for legs they did not
+      // speak in, which is the one bug in this feature that reads as the
+      // button being broken rather than as a rule. The board goes with it,
+      // so a reopened harbor opens on a bazaar nobody has spoken at, and
+      // the leg passed is the one the harbor just reopened on: the rows
+      // are already gone by the time the frame is built, so it carries the
+      // empty board and the leg is only what the send is personalized by.
+      clearBazaar(io, roomId, restarted.currentRound);
       // A restarted voyage is a new voyage, so the flexible allowance
       // starts over with it.
       clearFlexibleAccepted(roomId);
@@ -124,7 +148,22 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // this clear cannot be left to the clients reporting zero: the
       // tally merges by max, so a zero report leaves the old number
       // standing and the new voyage would inherit the old one's board.
-      clearObjectiveTallies(roomId);
+      //
+      // The clear takes the room's commission claim first, and that is the
+      // half that makes it a clear rather than a race: a report raises its
+      // line against the commission it read, and one whose read is still in
+      // flight here would raise that line into the fresh board a moment
+      // after this ran, where no report of zero can ever take it back out
+      // again (see claimObjectiveRoom in ../presence). So this waits for
+      // the reports standing in the room to finish, and a report that
+      // arrives behind this claim reads the room again and finds the new
+      // voyage's commission rather than the dead one's.
+      const releaseObjective = await claimObjectiveRoom(roomId);
+      try {
+        clearObjectiveTallies(roomId);
+      } finally {
+        releaseObjective();
+      }
       // And the audit goes with them, for the harsher version of the same
       // reason: the reveal is the flag that makes the audit once per
       // voyage, so a new voyage that kept the old one would start having

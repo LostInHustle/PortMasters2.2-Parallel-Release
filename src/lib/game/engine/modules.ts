@@ -85,7 +85,7 @@ import {
   movementApplied,
   type ConsentTerms,
 } from "./consent";
-import { addOwnedAmount, getOwnedAmount } from "./core";
+import { addOwnedAmount, paidFee } from "./core";
 import { installModuleAccounting, unequipModuleAccounting } from "./boons";
 
 /**
@@ -186,15 +186,18 @@ export function applyModuleTradeSide(
 
   if (isBuyer) {
     // Paid by a purse that is allowed to be empty, the reading both sibling
-    // markets take: the buyer's accept was guarded by their own balance, so
-    // a shortfall here is a purse that moved between the two clicks, and
-    // the honest answer is the Gold that is actually there rather than a
-    // negative hold. The seller credits the agreed price, because the price
-    // rather than the payment is what the two captains shook hands on.
-    const paid = Math.max(
-      0,
-      Math.min(trade.fee, getOwnedAmount(state, "Gold")),
-    );
+    // markets take, and the asymmetry is deliberate: the guard that keeps an
+    // honest buyer out of this branch is not here, because the server has
+    // never read a purse and this settle has to complete on both machines
+    // whether the buyer's can cover the fee or not. It lives one layer up,
+    // on the desks a captain clicks from, where it is the same predicate the
+    // module market's blocked chain and the refit bench's own row read (see
+    // canPayFee in ./core). A shortfall that reaches this line is a purse
+    // that moved between the two clicks, and the honest answer is the Gold
+    // that is actually there rather than a negative hold. The seller credits
+    // the agreed price, because the price rather than the payment is what
+    // the two captains shook hands on.
+    const paid = paidFee(state, trade.fee);
     addOwnedAmount(state, "Gold", -paid);
     state.modulesBought += 1;
     state.moduleFeesPaid += paid;

@@ -28,6 +28,7 @@
 import { api } from "@/lib/api";
 import { ShieldCheck, KeyRound } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants/brand";
+import { NOT_AN_ADMINISTRATOR } from "@/lib/game/constants/copy";
 import { DISPLAY_NAME_MAX } from "@/lib/credentials";
 import {
   CHOSEN_NAME,
@@ -38,9 +39,9 @@ import {
   type DoorProps,
 } from "@/components/portmasters/CredentialCard";
 
-// The same sentence the server refuses a non operator with, so the two
-// cannot describe the same refusal differently.
-const NOT_AN_OPERATOR = "This account is not an administrator.";
+// The refusal is the server's own sentence, read from the shared constant
+// rather than typed here, so the two surfaces cannot describe the same
+// refusal differently.
 
 // The register tab: the setup code the server was configured with, then
 // the captain's own two fields with the roster's display name between
@@ -112,7 +113,8 @@ export function AdminGate({ onAuthed, notice, onDismissNotice }: DoorProps) {
         // refuses a banned account outright, which is also why an operator
         // banned from another console cannot get back in through here.
         const { user } = await api.me();
-        if (!user || user.role !== "admin") throw new Error(NOT_AN_OPERATOR);
+        if (!user || user.role !== "admin")
+          throw new Error(NOT_AN_ADMINISTRATOR);
         return { user, token };
       }}
       labels={{ login: "Open the Console", register: "Create Operator" }}

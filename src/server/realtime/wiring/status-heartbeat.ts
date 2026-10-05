@@ -126,10 +126,47 @@ export function wireStatusHeartbeat(io: Server, socket: Socket): void {
     // server with the clock switched off both come back with the
     // deadline still null, which is what keeps this a no-op for them.
     if (room?.started && cp.endsAt === null) armPhaseClock(io, roomId, cp);
+    withdrawVoteForAScreen(cp, broadcast.phase, s.userId);
     await broadcastReadyState(io, roomId, cp);
     await maybeAdvance(io, roomId);
     if (broadcast.gameOver) await maybeConcludeVoyage(io, roomId);
   });
+}
+
+// A vote is a promise about the seat the reporting captain was standing in,
+// and the yard's two screens are the seats a captain can leave that promise
+// from without leaving the checkpoint: the draft and the swap fold onto Dusk
+// (see PHASE_FACES), so a captain who opens one is reported at Dusk's rank
+// while they are working in a screen of their own.
+//
+// The fold is what keeps the room waiting on a captain inside the yard at
+// all (see waitingRosterSet), and read on its own it also counted the
+// captain who had already voted at the seat and then gone back to work: the
+// room left the moment the rest of the table had voted, and that captain's
+// own client ran the catch up every client runs for a seat the room has
+// moved past, which cancels a module draft under the hands of the captain
+// still reading it. That is the field report this article ends on, and the
+// way back to it is the client's own reload: a vote lives on the server,
+// while the client that cast it comes back with no memory of the wait, so
+// it draws the yard's doors again and the captain walks back into the draft
+// with their vote still standing.
+//
+// This is where the two promises meet, and the newer one wins: a report
+// naming a personal screen that stands in the seat the room is standing at
+// withdraws that captain's vote, and it comes back the way every vote at a
+// seat does, by being cast at the seat again. No screen is named here:
+// whether a phase is a personal screen is read off the registry, which is
+// the one place that sentence is written, and a report naming a seat of the
+// lap is left alone because a seat has no screen to step back into.
+function withdrawVoteForAScreen(
+  cp: Checkpoint,
+  phase: Phase,
+  userId: string,
+): void {
+  const named = normalizePhase(phase);
+  const seat = seatOf(named);
+  if (seat === named || seat !== cp.phase) return;
+  cp.readyUserIds.delete(userId);
 }
 
 // Only the newest socket for a user is allowed to update the

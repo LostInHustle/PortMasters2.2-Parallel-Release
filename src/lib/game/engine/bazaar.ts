@@ -38,7 +38,7 @@ import {
 import { bazaarRumorsOn } from "../flags";
 import type { PathId } from "../paths";
 import { unlockedResources } from "../pools";
-import type { GameState } from "../types";
+import type { GameState, ResourceCard } from "../types";
 
 /**
  * The path whose ability is the bazaar, as a reading of the record rather
@@ -165,20 +165,70 @@ export function rumorGoodAllowed(
 }
 
 /**
- * How many legs the bazaar is quiet for this captain, counting the leg
- * they are standing in. Zero means they may speak now.
+ * Whether a rumor spoken in this leg has a market to move.
  *
- * The cooldown is measured from the captain's last publication rather
- * than from a counter wound down each leg, which is the same choice the
- * refit's leg stamps make and for the same reason: a row is a fact the
- * room already holds, a counter would be a second place the same fact is
- * written, and the second one is the one that survives a reload.
+ * A rumor is a claim about the port the room has not reached yet, so the
+ * market that answers it is the one after the leg it was spoken in, which
+ * is the same expression rumorLean below reads from the other end. That
+ * makes the closing leg the one leg of a voyage where a rumor has nothing
+ * to land on: a row published there would lean a market that never opens,
+ * which is the settlement the plan's own Rollback note asks to be skipped
+ * cleanly rather than left half applied, and it costs the publisher their
+ * whole cooldown to learn it.
  *
- * Zero rows means zero legs of waiting, and that is written out rather
- * than left to the arithmetic. A captain who has never spoken has no
- * last leg to count from, and reading that as leg zero would put two legs
- * of silence in front of a first publication on a voyage that has only
- * just started.
+ * The Harbormaster's hand is refused on exactly this reading (see
+ * recordPortShift in src/server/realtime/maroon), and this is the same
+ * question asked one leg earlier: a call lands on the market that opens
+ * after it, so a call made in the closing leg would lean a market that
+ * never opens. The two ends that ask here are the server that writes the
+ * row and the desk that offers it.
+ *
+ * The length is passed in rather than read off a mode in here, because
+ * this module knows the rule and not the voyage: the server reads the
+ * length off the room and the desk reads it off the pinned length on its
+ * own state (see maxRounds in ../types).
+ */
+export function rumorCanLand(round: number, voyageRounds: number): boolean {
+  return round + 1 <= voyageRounds;
+}
+
+/**
+ * The sentence a captain at the closing leg is shown and refused with.
+ *
+ * Here rather than in the panel for the reason rumorCooldownLine is: the
+ * server refuses a publish on the same reading, so the sentence a captain
+ * reads before the click and the sentence the server sends back if they
+ * click anyway are one sentence rather than two that agree until one of
+ * them is edited.
+ *
+ * It says why rather than only that, which is the half a bare refusal
+ * leaves out: a captain told "no" at the last port has no way to tell a
+ * closed window from a defect, and the one thing this feature cannot
+ * afford is a screen that looks broken at the exact moment the design
+ * wants the fleet to trust it.
+ */
+export function rumorClosingLine(): string {
+  return "A rumor is priced by the port one leg after the leg it was spoken in, and this is the last leg of the voyage, so a rumor spoken here would move nothing.";
+}
+
+/**
+ * The leg this captain last spoke in, and nothing at all for one who has
+ * never spoken.
+ *
+ * The one reader of "when did this captain last publish", which the wait
+ * and the leg it ends on are both worked out from, so a desk that tells a
+ * captain when the bazaar will hear them again and a server that refuses
+ * them until then cannot be counting from two places. The cooldown is
+ * measured off this rather than off a counter wound down each leg, which
+ * is the same choice the refit's leg stamps make and for the same reason:
+ * a row is a fact the room already holds, a counter would be a second
+ * place the same fact is written, and the second one is the one that
+ * survives a reload.
+ *
+ * Zero is "never", and it is deliberately not leg one: a captain standing
+ * in the first leg of a voyage has no publication to count from, and
+ * reading their silence as a publication would put two legs of quiet in
+ * front of a first rumor on the leg the voyage began.
  *
  * It reads two fields rather than a whole row, and that is what lets the
  * client ask the same question the server does: a board this captain is
@@ -187,16 +237,105 @@ export function rumorGoodAllowed(
  * captain's own rumors is a fact about who spoke and in which leg, which
  * both shapes carry.
  */
-export function rumorCooldownLeft(
+export function rumorSpokeIn(
   rows: readonly Pick<BazaarRumor, "publisherUserId" | "round">[],
   userId: string,
-  round: number,
 ): number {
   let last = 0;
   for (const row of rows) {
     if (row.publisherUserId !== userId) continue;
     if (row.round > last) last = row.round;
   }
+  return last;
+}
+
+/**
+ * The leg this captain may speak again, which is the wait above read from
+ * the other end.
+ *
+ * Zero for a captain who has never spoken, the same "nothing to count
+ * from" the reader above answers with, and a leg rather than a number of
+ * legs for everyone else. A desk that printed only the count would leave
+ * the captain counting legs to answer the one question they came to the
+ * desk with, which is when they may speak again, and on a voyage whose
+ * legs are already numbered that is arithmetic the screen can do.
+ */
+export function rumorNextLeg(
+  rows: readonly Pick<BazaarRumor, "publisherUserId" | "round">[],
+  userId: string,
+): number {
+  const last = rumorSpokeIn(rows, userId);
+  return last < 1 ? 0 : last + RUMOR_COOLDOWN_ROUNDS;
+}
+
+/**
+ * The wait as the desk prints it, for a desk that also knows the voyage.
+ *
+ * The two readers above answer how long the quiet is and which leg it
+ * ends on, and neither of them knows where the voyage stops. That is the
+ * gap this closes: a captain can speak as late as the second to last leg
+ * of a voyage, and the cooldown they pay for it runs past the last one, so
+ * a desk printing the ordinary sentence at the eleventh leg of a twelve
+ * leg voyage tells them the bazaar hears them again at leg thirteen. There
+ * is no leg thirteen. The captain reads a countdown to a moment their
+ * table never reaches, which is the one thing a rule about legs cannot
+ * afford to say at the end of a voyage: the wait is real, and the leg it
+ * would have ended on is the voyage's business rather than the rule's.
+ *
+ * So the voyage's length is an argument and the sentence turns on it.
+ * Past the last round the desk keeps the fact that is true (the leg the
+ * captain spoke in) and drops the leg they would have come back at,
+ * because the voyage, not the bazaar, is what ends that wait. Before it,
+ * the sentence is the one rumorCooldownLine already writes, with the two
+ * legs the desk holds beside it.
+ *
+ * The length is passed in rather than read off a mode here, for the
+ * reason rumorCanLand gives: this module knows the rule and not the
+ * voyage. The desk reads it off the length its own state pinned at
+ * departure (see maxRounds in ../types) and the server reads it off the
+ * room when it refuses a row (see voyageRoundsFor in ../mode).
+ *
+ * Total rather than guarded, like rumorCooldownLine: a captain the bazaar
+ * will hear is told so, so the desk never has to ask two questions in the
+ * right order to print one sentence.
+ */
+export function rumorWaitLine(
+  rows: readonly Pick<BazaarRumor, "publisherUserId" | "round">[],
+  userId: string,
+  round: number,
+  voyageRounds: number,
+): string {
+  const left = rumorCooldownLeft(rows, userId, round);
+  if (left < 1) return rumorCooldownLine(0);
+  const spoke = rumorSpokeIn(rows, userId);
+  const next = rumorNextLeg(rows, userId);
+  if (next > voyageRounds) {
+    return `The bazaar is quiet for you to the end of this voyage. You spoke in leg ${spoke}.`;
+  }
+  return `${rumorCooldownLine(left)} You spoke in leg ${spoke}, so the bazaar hears you again at leg ${next}.`;
+}
+
+/**
+ * How many legs the bazaar is quiet for this captain, counting the leg
+ * they are standing in. Zero means they may speak now.
+ *
+ * Written as the two facts it is rather than as one subtraction: a
+ * captain who has never spoken waits for nothing, and a captain who has
+ * waits until their newest row is RUMOR_COOLDOWN_ROUNDS legs old. The
+ * first is not the second with leg zero in it, which is why it is stated
+ * here: reading a silent captain as having spoken in leg zero would put
+ * two legs of quiet in front of a first publication on a voyage that has
+ * only just started.
+ *
+ * Both facts come off rumorSpokeIn above, so the count a desk prints and
+ * the refusal a server sends are the same reading of the same rows.
+ */
+export function rumorCooldownLeft(
+  rows: readonly Pick<BazaarRumor, "publisherUserId" | "round">[],
+  userId: string,
+  round: number,
+): number {
+  const last = rumorSpokeIn(rows, userId);
   if (last < 1) return 0;
   return Math.max(0, last + RUMOR_COOLDOWN_ROUNDS - round);
 }
@@ -217,6 +356,28 @@ export function rumorCooldownLine(left: number): string {
   return left === 1
     ? "The bazaar is quiet for you for one more leg."
     : `The bazaar is quiet for you for ${left} more legs.`;
+}
+
+/**
+ * The leg that prices this row: the one after the leg it was spoken in.
+ *
+ * The whole feature is one leg of delay, so this number is named in four
+ * places at the desk (the chip a row wears, the footnote under it, the
+ * line the form promises and the confirmation a publish draws), and the
+ * market names it once more when it decides which rows lean it (see
+ * rumorLean). Written here rather than as `row.round + 1` at each of
+ * them, because a leg a captain is told is a promise about a market: a
+ * desk offering one leg and a market pricing another is a lie about a
+ * lie, and it is the stranger of the two readings that a captain will
+ * plan a trade around.
+ *
+ * It takes a row rather than a leg for the reason rumorSpokeIn does: a
+ * caller holding only a leg has already decided which row it is asking
+ * about, and rebuilding the row to ask is how the two readings come
+ * apart.
+ */
+export function rumorLandsOn(row: Pick<BazaarRumor, "round">): number {
+  return row.round + 1;
 }
 
 /**
@@ -241,6 +402,45 @@ export function rumorStanding(
   round: number,
 ): boolean {
   return row.round >= round;
+}
+
+/**
+ * What the port did with a row that has just landed, which is the one
+ * thing the direction becoming public still leaves open.
+ *
+ * A landed row tells the table which way a captain leaned and nothing
+ * about whether the lean found anything to move. Each captain's market is
+ * drawn from their own seed, so the good a rumor names may not be in this
+ * captain's port at all, and a rumor whose good the port never drew is
+ * one that moved no price anybody could buy. Saying so is the difference
+ * between a rumor that failed and a market that never carried it, which
+ * is the half of the reveal the fleet was left to guess at.
+ *
+ * What this reports is presence rather than a price, and that is the
+ * choice the two sentences are made of. The cards are this captain's own
+ * drawn market, so the presence of a good is a fact they hold, while the
+ * price it drew is a number the row never carried and this reader has no
+ * business inventing. The leg the sentence names is rumorLandsOn above,
+ * so the leg a captain reads here and the leg their chip named are one
+ * leg.
+ *
+ * A market that has not been drawn answers null rather than "drew no":
+ * an empty list of cards is a port that has not priced this leg yet, and
+ * the two absences are not the same fact. Callers print the sentence when
+ * they get one and the plain footnote when they do not.
+ */
+export function rumorLandedLine(
+  row: Pick<BazaarRumor, "good" | "round">,
+  cards: readonly ResourceCard[],
+): string | null {
+  if (cards.length === 0) return null;
+  const leg = rumorLandsOn(row);
+  const drew = cards.some((card) =>
+    card.resources.some((resource) => resource.type === row.good),
+  );
+  return drew
+    ? `The port of leg ${leg} drew ${row.good} and priced it against your rumor.`
+    : `The port of leg ${leg} drew no ${row.good}, so your rumor moved no price you could buy.`;
 }
 
 /**

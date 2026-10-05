@@ -61,17 +61,16 @@ export function Purchase({
         tone="warn"
         note="(a matching order is guaranteed at Orders, buy accordingly)."
       />
-      {/* The offer leads, because it is the screen. It used to sit under
-          every reading of it, which put the six cards a captain came here
-          to buy two and a half screens down a column that scrolls, behind
-          the price table, the deal ranks, the depth strip, the larder and
-          the bench. Each card answers for itself (it prices its own goods,
-          marks what is a deal and what is dear, and says whether this
-          captain can afford it), so it does not need to be introduced by
-          the panels that read it. What those panels are, now that they
-          follow it, is the second pass: what this is worth against the
-          usual price, which of the six is the best of them, and how many
-          cards are carrying each good. */}
+      {/* The offer leads, because it is the screen: each card answers for
+          itself (it prices its own goods, marks what is a deal and what is
+          dear, and says whether this captain can afford it), so it does
+          not need to be introduced by the panels that read it. Sitting
+          under every reading of it would put the six cards a captain came
+          here to buy two and a half screens down a column that scrolls,
+          behind the price table, the deal ranks, the depth strip, the
+          larder and the bench. Those panels follow it as the second pass:
+          what this is worth against the usual price, which of the six is
+          the best of them, and how many cards are carrying each good. */}
       <PurchaseBoard game={game} act={act} colorFor={resolveColor} />
       {/* The four readings of the board, folded to one row until asked
           for. They are the second pass rather than the screen: what this

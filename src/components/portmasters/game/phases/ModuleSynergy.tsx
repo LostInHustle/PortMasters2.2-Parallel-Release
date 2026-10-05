@@ -15,10 +15,9 @@ import { cn } from "@/lib/utils";
  * can state: each is a claim about what two of them do together. The
  * names inside those claims are not hand written: they are asked of the
  * records through cardName, so a card renamed for its captain is renamed
- * here the same afternoon. Four labels had drifted before that was true,
- * calling the Tax Evasion Ledger, the Bulk Hauler Rigging and the
- * Maritime Bureau Token by shorter forms and the Ocean Interpreter by
- * the words of its own id.
+ * here the same afternoon. A hand written label drifts, calling the Tax
+ * Evasion Ledger, the Bulk Hauler Rigging and the Maritime Bureau Token
+ * by shorter forms and the Ocean Interpreter by the words of its own id.
  *
  * Every rule pairs hull cards. A boon cannot be a participant: the
  * equipped set this analyzer reads holds what is installed on the ship,
@@ -84,12 +83,10 @@ const SYNERGY_TONES: Record<"gain" | "intel" | "warn", string> = {
  * single module has no interaction to analyze.
  *
  * The active bonus list reads each equipped module's own catalogue entry
- * rather than a second copy of it. The copy that used to live here had
- * drifted badly: ten of the fourteen modules wore the wrong icon, and
- * every penalty clause had been left off, so the analysis showed a
- * captain the Smuggler's Hold's purchase discount with none of its income
- * tax and a Salvage Crane that "refunds 30% per completed order" when it
- * is a 30% chance of refunding the freight alone.
+ * rather than a second copy of it. A copy kept here drifts: it wears
+ * whatever icons and clauses it was written with, so the analysis could
+ * show a captain a module's purchase discount with none of its income tax,
+ * or a refund promise the catalogue does not make.
  */
 export function ModuleSynergyAnalyzer({
   modules,

@@ -1,9 +1,8 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: game constants
 // Balance, descriptions, and overall wording are carried over verbatim
-// from the original PortMasters build this project branches from; only
-// the project's own name has been updated where it appears in this text,
-// to match the rebrand (see README.md).
+// from PortMasters 2 Parallel Release, the build this one follows; where
+// this text names the game it says the current name (see README.md).
 // =====================================================================
 
 // Single source of truth for the project's display name. Every screen,

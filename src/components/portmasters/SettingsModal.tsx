@@ -70,9 +70,8 @@ export function SettingsModal({
 
   // There is deliberately no load effect here. Every preference on this
   // screen is read from localStorage by its own lazy initializer when the
-  // state is created, so there is nothing left for an effect to do on open.
-  // One used to sit here anyway, with a body that was a single comment
-  // saying so, which cost a render pass on every open to accomplish nothing.
+  // state is created, so there is nothing for an effect to do on open and
+  // nothing opens a render pass it cannot fill.
 
   const saveVolume = (v: number) => {
     onVolumeChange(v);
@@ -177,11 +176,17 @@ export function SettingsModal({
                 />
               </Section>
 
-              {/* Notifications */}
+              {/* Notifications. [W3: the status convention] The first
+                  description used to promise join, leave and system
+                  messages, which this switch never gated: the "room"
+                  category has exactly one writer, the harbor chat push in
+                  GameRoom (see the chat:room handler), so the description
+                  now names that one thing. The label matches the panel
+                  the notification opens. */}
               <Section icon={Bell} title="Notifications">
                 <ToggleRow
-                  label="Room events"
-                  description="Captains joining, leaving, and system messages"
+                  label="Harbor chat"
+                  description="Messages from the other captains in the harbor"
                   checked={notifRoom}
                   onChange={() => toggleNotif("room", setNotifRoom, notifRoom)}
                 />

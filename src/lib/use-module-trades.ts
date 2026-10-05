@@ -74,12 +74,20 @@ export function useModuleTrades(
     [socket, roomId, clearError],
   );
 
+  // The seller's own withdrawal. The last refusal is cleared first, the
+  // same clear the escort's cancel and the bench's make and for the same
+  // reason: the refusal this press can meet is the one saying the row
+  // moved past an offer before the press landed, and the previous
+  // sentence must not be left standing over the answer to this one (see
+  // ./use-escort-contracts and ./use-refit-contracts, whose cancels carry
+  // the identical call).
   const cancel = useCallback(
     (tradeId: string) => {
       if (!socket) return;
+      clearError();
       socket.emit("module:cancel", { roomId, tradeId });
     },
-    [socket, roomId],
+    [socket, roomId, clearError],
   );
 
   return {

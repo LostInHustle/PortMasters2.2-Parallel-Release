@@ -19,7 +19,9 @@ import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
   buyRag,
+  canPayFee,
   canSellRefit,
+  getOwnedAmount,
   mendGarment,
   ragsLeftAtPort,
   refitRoomFor,
@@ -112,9 +114,9 @@ export function RefitBench({
 
   return (
     <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5">
-      {/* The bench's own heading line is gone (W4): the fold row above it
-          already names the desk, so the only thing a header here added was
-          a third repetition of the same sentence between the row and the
+      {/* No heading line of its own on the bench (W4): the fold row above
+          it already names the desk, and a header here would add a third
+          repetition of the same sentence between the row and the
           paragraph that explains the trade. */}
       <p className="text-[11px] text-muted-foreground mb-2 max-w-2xl">
         Clothes lose a point of wear every leg and two on a cold one. A{" "}
@@ -333,19 +335,31 @@ function RefitRow({
   // The server's own refusals, shown before the click rather than after it.
   // The bound is read on the seller's side here because that is the side
   // this market bounds (see refitSellerBusy): a customer may buy a refit for
-  // every garment they own, and a Loom has two hands and one leg.
+  // every garment they own, and a Loom has two hands and one leg. The
+  // customer's own side is the purse, and it is the last condition for the
+  // reason the escort's row gives it last: the fee moves at the handshake on
+  // the customer's machine, and a settle that ran short would pay what the
+  // purse holds while the seller is credited the agreed price (see
+  // canPayFee).
+  const hold = getOwnedAmount(game, "Gold");
   const blocked = stale
     ? STALE_OFFER
     : points < 1
       ? `Nothing left to put right on your ${row.good}.`
       : refitSellerBusy(refit.refits, row.sellerUserId, game.currentRound)
         ? "That captain has already taken on a refit this leg."
-        : null;
+        : !canPayFee(game, row.fee)
+          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${row.fee}.`
+          : null;
 
   return (
     <OfferRow
       mine={mine}
       line={refitLine(row, me)}
+      // The bench's own reading of whether this row is still an offer, which
+      // is what draws the buttons on it: the aim is not the offer, and a row
+      // posted to the whole harbor is an offer like any other (see OfferRow).
+      standing={row.status === "offered"}
       chip={
         row.status === "offered" && row.buyerUserId
           ? { forMe: isBuyer, name: row.buyerName }

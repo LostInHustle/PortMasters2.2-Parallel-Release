@@ -36,11 +36,16 @@ import { HELD_POWER_CAP } from "../constants/cards";
 import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
-import { heldFlagsOf, heldPower, powerBudgetAllows } from "../held-cards";
+import {
+  heldFlagsOf,
+  powerAfterTaking,
+  powerBudgetAllows,
+} from "../held-cards";
 import { feedCrew } from "../larder";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
+import { moduleSlotsOpen } from "./core";
 import { noteDawnMilestones } from "./milestones";
 
 // The three cards a leg puts in front of a captain.
@@ -112,12 +117,9 @@ export function upgradeShip(state: GameState, logs: string[]) {
 // is how a captain whose hull went to the harbor would keep paying the
 // surcharge for a module that went with it.
 //
-// [REFACTOR] brokers_network used to set state.intelCost = 5 here on
-// unequip (and = 2 on equip below). With intelCost now derived from
-// hasModule(state, "brokers_network") in ./pricing.ts#getIntelCost,
-// these writes are dead and the field is gone from GameState; the
-// discount is read live off the equipped set, so equip and unequip no
-// longer need to keep a parallel field in sync.
+// The intel discount is read live off the equipped set: getIntelCost in
+// ./pricing.ts derives it from hasModule(state, "brokers_network"), so
+// equip and unequip carry no parallel intelCost field to keep in sync.
 export function unequipModuleAccounting(
   state: GameState,
   mod: CardRecord,
@@ -211,7 +213,7 @@ function equipModule(
     state.equippedModules[swapIdx] = mod;
     logs.push(`🔄 Swapped ${cardName(old.id)} for ${cardName(mod.id)}!`);
   } else {
-    if (state.equippedModules.length < state.shipLevel) {
+    if (moduleSlotsOpen(state) > 0) {
       state.equippedModules.push(mod);
       logs.push(`✅ Installed ${cardName(mod.id)}!`);
     } else {
@@ -363,18 +365,121 @@ function rollModuleChoices(state: GameState): CardRecord[] {
   return picks;
 }
 
-// [F7: the power budget] Whether this yard can bolt this card onto this
-// hull without passing the cap, over either path the pick can take. A
-// hull with an open slot installs on top, so the card is weighed against
-// the held power as it stands. A full hull can only swap, and the swap
-// may give up any equipped module, so the card fits if it fits over the
-// heaviest one, which is the most room the hull can make. Everywhere
-// this answer gates an action the panel names the sentence for, and the
-// two install paths below refuse as well: the refusals are the floor,
-// the filter above is the screen.
-function moduleFitsHull(state: GameState, card: CardRecord): boolean {
+// What a reroll can deal instead of the batch it replaces, in the two
+// halves the question has: the cards this hull has not seen, and the
+// cards the table it is replacing can still fill a seat with.
+//
+// [field report: the batch that would not change] The reroll used to be
+// the round's own draw run a second time over the same candidates, and
+// the candidates are the fitting pool less what the hull already
+// carries. A full hull in a six module mode leaves exactly three such
+// cards, so that draw had one outcome and the swap re-served the batch
+// it was pressed to replace: the screen promised a fresh batch and the
+// same three cards stayed on it. A reroll is a swap, so what it deals is
+// what the round has not already shown. The unheld cards the table does
+// not hold come first, drawn at the pool's own weights; where those
+// cannot fill three seats the rest come from the batch being replaced,
+// which is still this hull's business even though the round has shown it.
+// Only a hull the round has shown every card it could be dealt has
+// nothing to swap to, and that answer belongs to the caller in words
+// rather than to a third serving of the same three cards.
+function swapCandidates(state: GameState): {
+  fresh: Array<[CardRecord, number]>;
+  carried: CardRecord[];
+} {
+  const shown = new Set((state._draftChoices ?? []).map((card) => card.id));
+  const equipped = new Set(state.equippedModules.map((card) => card.id));
+  const pool = offerPool("module", state).filter(([card]) =>
+    moduleFitsHull(state, card),
+  );
+  return {
+    fresh: pool.filter(
+      ([card]) => !equipped.has(card.id) && !shown.has(card.id),
+    ),
+    // The batch being replaced is read through the same two guards the
+    // pool is, because the hull can move between the roll and the swap:
+    // a pick confirmed at the floor above takes one of these cards onto
+    // the hull, and a seat that has since become a card the captain
+    // carries is not a seat this screen may deal again.
+    carried: (state._draftChoices ?? []).filter(
+      (card) => !equipped.has(card.id) && moduleFitsHull(state, card),
+    ),
+  };
+}
+
+// The once a round swap's own draw over the two halves swapCandidates
+// hands back: the round's own draw with the table it replaces taken out
+// of the pool, and a top up behind it for the seats the fresh cards
+// cannot fill. It reads the halves rather than the state so the press and
+// the button's own question judge the same emptiness before either draws.
+function rerollModuleChoices(
+  state: GameState,
+  fresh: Array<[CardRecord, number]>,
+  carried: CardRecord[],
+): CardRecord[] {
+  const picks = drawOffer(fresh, CARDS_PER_OFFER);
+  const seats = CARDS_PER_OFFER - picks.length;
+  if (seats > 0) {
+    // Even weight for the top up, the reading the charter's wildcard
+    // takes: the pool's own weights are what put these cards on the
+    // table once already, and a second weighting over the same three
+    // would only decide which of them a hull that is short on cards
+    // gets to look at twice.
+    picks.push(
+      ...drawOffer(
+        carried.map((card) => [card, 1] as [CardRecord, number]),
+        seats,
+      ),
+    );
+  }
+  // [bug cycle: the swap that dealt short] Both draws above read pools a
+  // Parley trade can empty between the roll and the press. A module bought
+  // at the table lands on this captain's own hull on this captain's own
+  // machine (see applyModuleTradeSide in ./modules), which takes its id out
+  // of fresh and out of carried without the table being dealt again, and a
+  // hull whose fitting pool is mostly aboard by then has seats left when
+  // both draws come back empty: the screen promised a fresh batch and dealt
+  // a short one, which is the broken screen the roll's own fallback exists
+  // to prevent (see rollModuleChoices). The last resort below is that
+  // fallback read at the press: the fitting pool itself, less whatever this
+  // batch already holds, because a card the hull carries is a card a seat
+  // can still be spent on, while an empty seat is nothing a captain can
+  // press. Even weight again, for the top up's own reason, and it stays
+  // best effort rather than a promise: a hull with fewer than three fitting
+  // cards left in the whole pool has nothing to fill the last seat with and
+  // deals what the pool holds.
+  const rest = CARDS_PER_OFFER - picks.length;
+  if (rest > 0) {
+    const held = new Set(picks.map((card) => card.id));
+    const pool = offerPool("module", state)
+      .filter(([card]) => moduleFitsHull(state, card) && !held.has(card.id))
+      .map(([card]) => [card, 1] as [CardRecord, number]);
+    picks.push(...drawOffer(pool, rest));
+  }
+  for (const card of picks) noteCardOffer(state.cardTally, card);
+  return picks;
+}
+
+/**
+ * [F7: the power budget] Whether this yard can bolt this card onto this
+ * hull without passing the cap, over either path the pick can take. A
+ * hull with an open slot installs on top, so the card is weighed against
+ * the held power as it stands. A full hull can only swap, and the swap
+ * may give up any equipped module, so the card fits if it fits over the
+ * heaviest one, which is the most room the hull can make. Everywhere
+ * this answer gates an action the panel names the sentence for, and the
+ * two install paths below refuse as well: the refusals are the floor,
+ * the filter above is the screen.
+ *
+ * Exported for the power budget's own suite, which holds the arithmetic
+ * against a hull it knows by hand (see scripts/smoke/suites/
+ * 52-powerBudget.ts) and reads it as the draft's own answers do. The
+ * engine barrel still does not carry it, because it is the yard's private
+ * test rather than a door a component opens.
+ */
+export function moduleFitsHull(state: GameState, card: CardRecord): boolean {
   const heaviest = heaviestEquipped(state);
-  if (state.equippedModules.length < state.shipLevel) {
+  if (moduleSlotsOpen(state) > 0) {
     return powerBudgetAllows(state, card);
   }
   return powerBudgetAllows(state, card, heaviest);
@@ -394,13 +499,16 @@ function heaviestEquipped(state: GameState): CardRecord | null {
 // else, since which card left is the slot's business and the arithmetic
 // is the same either way. The two numbers are on the sentence because a
 // refusal a captain can check is a refusal they can plan around, and the
-// plan's own reading of the cap is a floor rather than a mystery.
+// plan's own reading of the cap is a floor rather than a mystery. The
+// total is the shared reader (see powerAfterTaking in ../held-cards), so
+// this refusal and every panel that states a total for the same take
+// print one sum.
 function powerRefusal(
   state: GameState,
   card: CardRecord,
   displaced: CardRecord | null,
 ): string {
-  const total = heldPower(state) - (displaced?.power ?? 0) + card.power;
+  const total = powerAfterTaking(state, card, displaced);
   return `❌ ${cardName(card.id)} would put your hull at ${total} power, and a hull carries at most ${HELD_POWER_CAP}.`;
 }
 
@@ -419,6 +527,27 @@ export function moduleDraftPossible(state: GameState): boolean {
   );
 }
 
+/**
+ * Whether the draft's swap has a batch to deal this hull, which is the
+ * draft screen's own question asked before the button the way the
+ * Shipyard's door asks moduleDraftPossible.
+ *
+ * The whole difference between this and the press it guards is the draw:
+ * the press rerolls and spends the round's one use, and this reads the
+ * same two halves without one. So a hull the round has shown every card
+ * it could be dealt reads a disabled button and a sentence rather than a
+ * press that changes nothing: a swap that hands back the batch it
+ * replaced is not a swap the yard performed, and here it cannot be
+ * offered as one. It writes nothing, for moduleDraftPossible's own
+ * reason: no draw, no tally, no state.
+ */
+export function moduleSwapPossible(state: GameState): boolean {
+  return (
+    (state._draftChoices?.length ?? 0) > 0 &&
+    swapCandidates(state).fresh.length > 0
+  );
+}
+
 // Only rolls a fresh pool the first time this is called for the round
 // (state._draftChoices reset to undefined by startBoonDrafting above).
 // Reopening the draft screen afterwards, including via the
@@ -434,6 +563,13 @@ export function startModuleDrafting(state: GameState) {
 // Rerolls the current module pool, once per round, at no cost (unlike the
 // boon swap, the scarce resource here is the equippable slots themselves,
 // not gold). Available whether or not the pool's already been picked from.
+//
+// [field report: the batch that would not change] The reroll is the swap
+// draw rather than the round's draw run again, which is the difference
+// between a swap and a reshuffle of cards the captain is already looking
+// at (see swapCandidates). A yard with nothing new to deal refuses and
+// leaves the round's one use unspent, because a press that could not
+// change the table is not the use the round spends its swap on.
 export function swapModuleChoices(state: GameState, logs: string[]) {
   if (state.moduleSwapUsed) {
     logs.push("❌ You've already swapped your module choices this round");
@@ -443,7 +579,14 @@ export function swapModuleChoices(state: GameState, logs: string[]) {
     logs.push("❌ Nothing to swap, draft your modules first");
     return;
   }
-  state._draftChoices = rollModuleChoices(state);
+  const { fresh, carried } = swapCandidates(state);
+  if (fresh.length === 0) {
+    logs.push(
+      "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next leg.",
+    );
+    return;
+  }
+  state._draftChoices = rerollModuleChoices(state, fresh, carried);
   state.moduleSwapUsed = true;
   logs.push("🔄 Swapped Module Choices for a fresh batch");
 }
@@ -465,7 +608,7 @@ export function handleModuleSelect(
     logs.push(powerRefusal(state, mod, null));
     return;
   }
-  if (state.equippedModules.length < state.shipLevel) {
+  if (moduleSlotsOpen(state) > 0) {
     equipModule(state, mod, null, logs);
     // Direct installs resolve immediately, so the pick is final: drop it
     // from the pool now. A pick that instead needs a slot freed up (the
@@ -492,6 +635,27 @@ export function finalizeModuleSwap(
 ) {
   const mod = state._newModule;
   if (!mod) return;
+  // [bug cycle: the hull that moved under the picker] The row a captain
+  // pressed names a seat on the hull as it stood when the picker was drawn,
+  // and the hull can move under it. A Parley module trade settles on this
+  // captain's own machine whenever the frame carrying the agreement arrives
+  // (see applyModuleTradeSide in ./modules), which is the whole leg rather
+  // than the tick of the accept, and the seller's side takes the module off
+  // the hull without asking this screen. The index then names a seat the
+  // hull no longer carries, and without the guard below the arithmetic runs
+  // against an empty slot and hands it to equipModule, which reads the
+  // module it is displacing off the hull and throws on nothing. A seat the
+  // hull does not carry is refused here, in words, which is the shape
+  // handleModuleSelect already gives a card the table no longer holds: the
+  // pick stays parked, so Back to Draft still shows it, and taking the card
+  // again fits it to the hull as it stands.
+  const displaced = state.equippedModules[slotIdx];
+  if (!displaced) {
+    logs.push(
+      "❌ That seat is no longer on your hull, so there is nothing there to replace. Back to Draft and take the card again: the yard fits it to the hull as it stands.",
+    );
+    return;
+  }
   // [F7: the power budget] The per-slot half of the yard's gate: the roll
   // only promised this card fits over SOME equipped module, and this is
   // the slot the captain chose, so the arithmetic runs against what that
@@ -499,7 +663,6 @@ export function finalizeModuleSwap(
   // still holds the choice, Back to Draft still works), and the panel
   // disables these rows before the click the same way the market's
   // accept is disabled.
-  const displaced = state.equippedModules[slotIdx] ?? null;
   if (!powerBudgetAllows(state, mod, displaced)) {
     logs.push(powerRefusal(state, mod, displaced));
     return;

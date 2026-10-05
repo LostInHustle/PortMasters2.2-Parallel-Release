@@ -833,6 +833,22 @@ export async function launchGatesSuite(
         normalizeLarderFedRound(2.5) === 2,
       "a save this build cannot read heals to a full hold rather than to a hungry one, a count outside the hold's ends is clamped rather than dropped, and a missing leg stamp lands on a leg no voyage has",
     );
+
+    // The four saved leg stamps are one reader's work, the Larder's two,
+    // the crew's run of hungry legs and the wardrobe's tick (see wholeStamp
+    // in src/lib/game/types.ts, which every one of them heals through).
+    // This check holds all four to the same fraction at once, which is the
+    // invariant the sharing exists to keep: it sits beside the Larder's own
+    // stamp because the other three are read, by their own words, the same
+    // way the Larder's is, and a path that grew its own arithmetic would
+    // fail here even while its own check still passed.
+    check(
+      normalizeLarderFedRound(3.9) === 3 &&
+        normalizeLarderSpoilRound(3.9) === 3 &&
+        normalizeHungryLegs(3.9) === 3 &&
+        normalizeGarmentsTickRound(3.9) === 3,
+      "and the four leg stamps a save can carry, the Larder's fed and spoil rounds, the crew's hungry legs and the wardrobe's tick round, floor a fraction to the same whole leg, because one reader answers for all four",
+    );
   });
 
   // ---- The crew, by name ----

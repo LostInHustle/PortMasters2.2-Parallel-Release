@@ -21,14 +21,13 @@ const notoSerif = Noto_Serif_SC({
 });
 
 // Read from the one constant rather than written out again here, the same
-// rule every other screen follows. The title used to spell out an older,
-// longer name, so the browser tab and the game's own masthead disagreed
-// about what this build is called. The authors field went with it: it
-// named a studio that does not exist, and nothing in the app reads it.
+// rule every other screen follows, so the browser tab and the game's own
+// masthead can never disagree about what this build is called. The authors
+// field stays undeclared: it would name a studio that does not exist, and
+// nothing in the app reads it.
 export const metadata: Metadata = {
   title: APP_NAME,
-  description:
-    "A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
+  description: `${APP_NAME}: a multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.`,
   keywords: [APP_NAME, "Silk Road", "trading game", "multiplayer", "maritime"],
 };
 

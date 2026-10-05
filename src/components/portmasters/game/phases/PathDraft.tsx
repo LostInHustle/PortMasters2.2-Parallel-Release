@@ -173,8 +173,8 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
         />
       )}
 
-      {/* The beat's own banner, where a countdown used to sit: the step, and
-          the sentence that says what this step is asking for. */}
+      {/* The beat's own banner: the step, and the sentence that says what
+          this step is asking for. */}
       <div className="mb-3 rounded-xl border border-path-draft/20 bg-path-draft/[0.04] px-3.5 py-2.5 text-center">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-path-draft">
           {face.title}

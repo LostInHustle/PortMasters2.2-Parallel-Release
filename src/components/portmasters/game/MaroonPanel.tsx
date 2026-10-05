@@ -33,9 +33,9 @@ import {
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
-import { tallyRows } from "@/lib/voteTally";
+import { captainName, tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
-import { VoteCardShell } from "./VoteCardShell";
+import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 
 type Maroon = ReturnType<typeof useMaroon>;
@@ -49,8 +49,8 @@ type Marks = Record<string, SeatStatus>;
 /**
  * The two questions the Parley board asks about this vote, answered once
  * beside the vote itself so the card and the Harbor Business fold that
- * holds it cannot disagree about when the harbor is voting (W4, UX-3 in
- * docs/STUDIO_AUDIT.md; see Parley.tsx).
+ * holds it cannot disagree about when the harbor is voting (see
+ * Parley.tsx).
  */
 export function maroonVoteOpen(game: GameState, maroon: Maroon): boolean {
   const rung = modeConfig(game.mode).maroonFrom;
@@ -60,9 +60,9 @@ export function maroonVoteOpen(game: GameState, maroon: Maroon): boolean {
 export function maroonCardShown(game: GameState, maroon: Maroon): boolean {
   const rung = modeConfig(game.mode).maroonFrom;
   if (rung === null || game.phase !== "parley") return false;
-  // (a) of UX-3: the open window, or a window this voyage can still
-  // reach. A carried vote is neither, and it leaves the board because
-  // the result strip carries it from there.
+  // The open window, or a window this voyage can still reach. A carried
+  // vote is neither, and it leaves the board because the result strip
+  // carries it from there.
   return (
     maroonVoteOpen(game, maroon) ||
     (maroon.result === null && rung <= game.maxRounds)
@@ -82,21 +82,25 @@ export function MaroonVoteCard({
   maroon: Maroon;
   statuses?: Marks;
 }) {
-  const [target, setTarget] = useState("");
+  // The leg is carried with the pick rather than reset by an effect: a
+  // target chosen in a leg the vote fell short in is not a target this
+  // leg's card keeps one press away, and a reading that cannot represent
+  // a stale choice beats one cleared a frame after it showed.
+  const [pick, setPick] = useState({ round: -1, target: "" });
+  const target = pick.round === game.currentRound ? pick.target : "";
 
-  // The visibility rule is the reader's ((a) of UX-3 in
-  // docs/STUDIO_AUDIT.md): the open window, or a window still ahead this
-  // voyage. The body still explains the vote before the rung, for the
-  // reason the audit's does: a mode whose headline mechanic nobody has
-  // heard of is a mechanic nobody uses, and inside the Harbor Business
-  // fold that explanation costs the board nothing (see Parley.tsx).
+  // The visibility rule is the reader's (maroonCardShown): the open
+  // window, or a window still ahead this voyage. The body still explains
+  // the vote before the rung, for the reason the audit card's does: a
+  // mode whose headline mechanic nobody has heard of is a mechanic nobody
+  // uses, and inside the Harbor Business fold that explanation costs the
+  // board nothing (see Parley.tsx).
   const rung = modeConfig(game.mode).maroonFrom;
   if (rung === null) return null;
   if (!maroonCardShown(game, maroon)) return null;
   const open = maroonVoteOpen(game, maroon);
   const rows = tallyRows(maroon.votes, members);
-  const nameOf = (id: string) =>
-    members.find((m) => m.id === id)?.displayName ?? "a captain";
+  const nameOf = (id: string) => captainName(members, id);
   // The server refuses a vote aimed at a captain it has already written
   // off, so the list does not offer one: an option that quietly does
   // nothing is worse than no option. The rule itself lives in seatMarks,
@@ -106,49 +110,79 @@ export function MaroonVoteCard({
   return (
     <VoteCardShell tone="alarm" icon="🏝️" title="Maroon">
       {open ? (
-        <>
-          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-            Two thirds of the captains still sailing can put one captain ashore.
-            The vote is public, it is spent for the whole voyage, and the
-            captain who loses it keeps their seat at the table.
+        maroon.carried ? (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            The harbor has already named {maroon.carried.name} this voyage. The
+            vote is spent: nothing more is asked of this table until a new
+            voyage.
           </p>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Select
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              aria-label="Captain to maroon"
-            >
-              <option value="">Choose a captain</option>
-              {members
-                .filter((m) => !marked(m.id))
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
-                  </option>
-                ))}
-            </Select>
-            <Button
-              variant="outline"
-              disabled={!target || !maroon.canVote}
-              onClick={() => maroon.vote(target)}
-            >
-              Call the vote
-            </Button>
-          </div>
-          {maroon.myVote && (
-            <p className="text-[11px] text-muted-foreground mt-2">
-              You named {nameOf(maroon.myVote)}. Waiting on the rest of the
-              harbor.
+        ) : (
+          <>
+            {/* The rule in plain words, and the two consequences a captain
+              cannot read off the board: the vote is spent the moment it
+              carries, and the captain it names is still sitting here.
+              "One vote a voyage" alone would leave a failed vote looking
+              like a spent one. */}
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              Two thirds of the captains still sailing, rounded up, can put one
+              captain ashore. The vote is public. Once a vote carries it is
+              spent for the whole voyage, a vote that falls short can be called
+              again on a later leg, and the captain who loses it keeps their
+              seat at the table.
             </p>
-          )}
-          <VoteTallyRows rows={rows} />
-          <p className="text-[10px] text-muted-foreground/80 mt-2">
-            {MAROON_VOTE_SHARE} of the captains still in the voyage carries it.
-          </p>
-        </>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Select
+                value={target}
+                onChange={(e) =>
+                  setPick({ round: game.currentRound, target: e.target.value })
+                }
+                aria-label="Captain to maroon"
+              >
+                <option value="">Choose a captain</option>
+                {members
+                  .filter((m) => !marked(m.id))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.id === me.id
+                        ? `${m.displayName} (you)`
+                        : m.displayName}
+                    </option>
+                  ))}
+              </Select>
+              <Button
+                variant="outline"
+                disabled={!target || !maroon.canVote}
+                onClick={() => maroon.vote(target)}
+              >
+                {target ? `Put ${nameOf(target)} ashore` : "Call the vote"}
+              </Button>
+            </div>
+            {/* What this captain said, and when they may speak again: the
+              captain's own record of their press, naming who they named.
+              The count block below is where the room is read. */}
+            {maroon.myVote && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                You named {nameOf(maroon.myVote)}. Your name is in for this leg,
+                and a captain names one captain a leg: a later leg can put this
+                vote to the harbor again, until one carries. There is nothing
+                else to press on this vote.
+              </p>
+            )}
+            <VoteRefusal error={maroon.error} onDismiss={maroon.clearError} />
+            <VoteTallyRows
+              rows={rows}
+              census={maroon.census}
+              members={members}
+              myVote={maroon.myVote}
+            />
+            <p className="text-[10px] text-muted-foreground/80 mt-2">
+              {`${MAROON_VOTE_SHARE} of the captains still in the voyage carry it, rounded up, and the vote is public: every name behind a target is on this board.`}
+            </p>
+          </>
+        )
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${rung}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
+          {`From leg ${rung}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing, rounded up, may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. One vote can carry a voyage, and a vote that falls short can be called again on a later leg.`}
         </p>
       )}
     </VoteCardShell>
@@ -250,6 +284,11 @@ export function PortShiftStrip({
  * Both directions are buttons rather than a toggle beside one button,
  * because the two are the whole of the power and a captain reading this
  * for the first time should see that prices can be pushed either way.
+ *
+ * It carries its own refusal block, the same one the two vote cards
+ * print: this is the only place a call can be refused and this is the
+ * only surface the captain who made it is looking at (see the shiftError
+ * in use-maroon for why it is not the card's block that answers here).
  */
 export function HarbormasterConsole({
   game,
@@ -302,6 +341,10 @@ export function HarbormasterConsole({
           Lean prices down
         </Button>
       </div>
+      <VoteRefusal
+        error={maroon.shiftError}
+        onDismiss={maroon.clearShiftError}
+      />
       {pending && (
         <p className="text-center text-[11px] mt-2">
           Your call stands for leg {pending.round + 1}:{" "}

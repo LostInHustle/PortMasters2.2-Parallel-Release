@@ -390,10 +390,10 @@ export function applyPortShift(state: GameState, shift: PortShift | null) {
 // so the leg nothing was published has to clear whatever was published
 // last leg rather than leave it leaning. The server sends the answer for
 // every market it opens, which is what makes that possible.
-export function applyBazaarLean(
-  state: GameState,
-  lean: Record<string, number>,
-) {
+// Not exported: applyMarketLeans above is the one reader of a lean, and
+// the barrel carried this name without an importer behind it until the
+// cleanup cycle retired it.
+function applyBazaarLean(state: GameState, lean: Record<string, number>) {
   state.bazaarLean = lean;
 }
 

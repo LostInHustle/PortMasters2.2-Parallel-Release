@@ -54,7 +54,7 @@ import {
   movementApplied,
   type ConsentTerms,
 } from "./consent";
-import { addOwnedAmount, getOwnedAmount } from "./core";
+import { addOwnedAmount, getOwnedAmount, paidFee } from "./core";
 
 /**
  * The path whose ability is the refit bench, as a reading of the record
@@ -368,12 +368,9 @@ export function applyRefitSide(
     // The customer's own garment, put right by the customer's own machine.
     // The fee moves first so the log reads in the order the captain lived
     // it, and a purse that moved between the accept and this call pays what
-    // it has rather than a negative hold, the same reading the escort's
-    // buyer takes.
-    const paid = Math.max(
-      0,
-      Math.min(contract.fee, getOwnedAmount(state, "Gold")),
-    );
+    // it has rather than a negative hold, which is the reading paidFee takes
+    // for all three of the priced settles (see ./core).
+    const paid = paidFee(state, contract.fee);
     addOwnedAmount(state, "Gold", -paid);
     state.refitsBought += 1;
     state.refitFeesPaid += paid;

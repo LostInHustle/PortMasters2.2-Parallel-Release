@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { lapPhases } from "@/lib/game/checkpoint";
 import { isLegPhase, phaseFace } from "@/lib/game/phases";
+import { leftTheVoyage } from "@/lib/seatMarks";
 import type { GameMode } from "@/lib/game/mode";
 import type { LegPhase, Phase } from "@/lib/game/types";
 
@@ -14,23 +15,20 @@ import type { LegPhase, Phase } from "@/lib/game/types";
  * The phases cycle, and where they cycle TO is not written here. The
  * order is the room's mode (see src/lib/game/mode.ts), the same lap the
  * ready check and the engine walk, because the two modes run these same
- * phases in a different order. This strip used to hold its own copy of
- * the order, which is the one place a second copy would have been
- * invisible: a captain mid round on the experimental leg would have
- * seen the rail point at the phase they had already finished, and
- * nothing in the engine would have been wrong. Only the picture of it
- * would have been.
+ * phases in a different order. A copy of the order kept here instead
+ * would be invisible in the one place it matters: a captain mid round
+ * on the experimental leg would see the rail point at the phase they
+ * had already finished while nothing in the engine was wrong, only the
+ * picture of it.
  *
- * A "Voyage Progress" bar rode above the strip with the round written
- * twice under it. Both left with the declutter pass: how far the voyage
- * has run is written once, on the pinned VoyageHeader above this strip,
- * as a ring and a number, and a second bar two rows below the first was
- * two readings of one fact on one rail.
+ * How far the voyage has run is written once, on the pinned VoyageHeader
+ * above this strip, as a ring and a number, so the strip itself draws
+ * the steps alone.
  *
- * The names and glyphs come from the phase's own face for the same
- * reason ([B1]: this file used to hold a label table, the dispatcher
- * held a gradient table, and a mode's briefing chart held a third). What
- * is left here is the drawing.
+ * The names and glyphs come from the phase's own face rather than from a
+ * table here ([B1]: one face per phase, so the rail, the dispatcher and
+ * a mode's briefing chart cannot disagree about what a phase is called
+ * or drawn as). What is left here is the drawing.
  *
  * Personal sub states (module_draft, module_swap) and terminals
  * (bankruptcy, endgame) are folded into their parent step for the
@@ -74,10 +72,11 @@ export function VoyageTimeline({
     .map((phase) => ({ phase, ...phaseFace(phase) }));
   const currentKey = railStep(phase);
   const currentIndex = steps.findIndex((p) => p.phase === currentKey);
-  // The two phases that end the voyage, named rather than folded: the rail
-  // reads "no step is lit" for the pier as well, and the pier is not a
-  // voyage ending. Terminal-ness belongs to the phase, not to the rail.
-  const isTerminal = phase === "bankruptcy" || phase === "endgame";
+  // The two phases that end the voyage, read through the shared reader
+  // (see leftTheVoyage in @/lib/seatMarks) rather than spelled here: the
+  // rail reads "no step is lit" for the pier as well, and the pier is not
+  // a voyage ending. Terminal-ness belongs to the phase, not to the rail.
+  const isTerminal = leftTheVoyage({ phase });
   // The closing banner wears the terminal phase's own face, drawn above
   // rather than on a step, since a terminal phase has no step to sit on.
   const terminalFace = phaseFace(phase);

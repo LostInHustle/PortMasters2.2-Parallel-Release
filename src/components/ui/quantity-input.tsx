@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 /**
  * A numeric field that can actually be typed into.
  *
- * Every quantity field in the game used to parse and clamp on each keystroke:
+ * A quantity field that parses and clamps on each keystroke:
  *
  *   onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value, 10) || 1))}
  *
- * which produces three separate defects from one line. Deleting the last
+ * has three separate defects from one line. Deleting the last
  * character yields "", `parseInt("")` is NaN, and `NaN || 1` restores 1 before
  * the replacement can be typed, so "delete the 1 and type 4" is impossible.
  * Where a ceiling was also applied, typing a digit above the amount held was

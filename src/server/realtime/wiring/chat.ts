@@ -5,7 +5,8 @@
 
 import type { Server, Socket } from "socket.io";
 
-import { PUBLIC_USER_SELECT, db } from "@/lib/db";
+import { PUBLIC_USER_SELECT, db, publicUser } from "@/lib/db";
+import { TARGET_NOT_IN_HARBOR } from "@/lib/game/constants/copy";
 import { CHAT_MESSAGE_MAX } from "@/lib/realtime-endpoint";
 import { requireAuth, seated } from "../auth";
 import {
@@ -73,12 +74,7 @@ export function wireChat(io: Server, socket: Socket): void {
       id: msg.id,
       content: msg.content,
       createdAt: msg.createdAt,
-      sender: {
-        id: msg.sender.id,
-        username: msg.sender.username,
-        displayName: msg.sender.displayName,
-        avatarHue: msg.sender.avatarHue,
-      },
+      sender: publicUser(msg.sender),
     };
     // Only the lobby hears it. A captain at sea is not standing in this
     // square and has no surface for it, and the poster is always one of
@@ -134,18 +130,8 @@ export function wireChat(io: Server, socket: Socket): void {
         id: msg.id,
         content: msg.content,
         createdAt: msg.createdAt,
-        sender: {
-          id: msg.sender.id,
-          username: msg.sender.username,
-          displayName: msg.sender.displayName,
-          avatarHue: msg.sender.avatarHue,
-        },
-        recipient: {
-          id: msg.recipient!.id,
-          username: msg.recipient!.username,
-          displayName: msg.recipient!.displayName,
-          avatarHue: msg.recipient!.avatarHue,
-        },
+        sender: publicUser(msg.sender),
+        recipient: publicUser(msg.recipient!),
         mine: false,
       };
       socket.emit("chat:dm", { ...messagePayload, mine: true });
@@ -184,7 +170,7 @@ export function wireChat(io: Server, socket: Socket): void {
       if (!roomMembers(roomId).some((m) => m.id === targetUserId)) {
         socket.emit("room:error", {
           roomId,
-          error: "That captain is not in this harbor.",
+          error: TARGET_NOT_IN_HARBOR,
         });
         return;
       }
@@ -266,7 +252,7 @@ export function wireChat(io: Server, socket: Socket): void {
       if (!roomMembers(roomId).some((m) => m.id === targetUserId)) {
         socket.emit("room:error", {
           roomId,
-          error: "That captain is not in this harbor.",
+          error: TARGET_NOT_IN_HARBOR,
         });
         return;
       }

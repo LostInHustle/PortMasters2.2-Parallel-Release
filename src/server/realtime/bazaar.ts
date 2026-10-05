@@ -109,10 +109,16 @@ export function bazaarPayloadFor(
   };
 }
 
-// Personalized per connected socket, unlike every other room wide
-// broadcast: a standing rumor means two captains in the same room
-// legitimately see two different boards, and the whole feature depends on
-// them being handed the two they are owed.
+// Personalized per connected socket, one captain at a time, the way the
+// barter board and both consent boards are: a standing rumor means two
+// captains in the same room legitimately see two different boards, and
+// the whole feature depends on them being handed the two they are owed.
+//
+// The delivery is a rule rather than a habit, and it is held by the
+// private scan rather than by this comment: bazaar:update is its eighth
+// rule, which refuses a board that reaches a room channel at all (see
+// scripts/private-scan.ts). A later broadcast added here would be caught
+// by that rule rather than by a reader of this header.
 //
 // Iterates the presence map rather than asking Socket.IO's own room
 // registry, so this stays a synchronous, in memory operation like the

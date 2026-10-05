@@ -10,13 +10,15 @@ import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
 import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
+  canPayFee,
   canSellModule,
+  getOwnedAmount,
   moduleListedThisLeg,
   moduleSlotsOpen,
   type ModuleTrade,
 } from "@/lib/game/engine";
 import { moduleTradesOn } from "@/lib/game/flags";
-import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
+import { powerAfterTaking, powerBudgetAllows } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
 import {
   MarketBlock,
@@ -55,7 +57,9 @@ const UNKNOWN_MODULE_ICON = "🔧";
  * rather than after it: a hull with every slot full reads its accept as
  * blocked, because a purchase settles onto the hull it was bought for and
  * a captain should not learn that from a corner the board has to argue its
- * way out of. Unlike the two markets beside it, no seller's path gates the
+ * way out of. Two more readings of the same kind stand beside it, the power
+ * budget and the buyer's own purse, each stated on the row it blocks.
+ * Unlike the two markets beside it, no seller's path gates the
  * form: a module is a thing bolted on, not an ability, so any captain with
  * one to spare may list it.
  *
@@ -236,28 +240,44 @@ function ModuleRow({
   const icon = card?.icon ?? UNKNOWN_MODULE_ICON;
   const stale = trade.round !== round;
   // The server's own refusals, shown before the click rather than after it,
-  // plus the two this panel adds: a buyer with no open slot cannot bolt the
+  // plus the three this panel adds: a buyer with no open slot cannot bolt the
   // module on, and the board would settle it onto a full hull anyway rather
   // than lose it (see applyModuleTradeSide), so the honest path is told here
-  // and the corner stays unreachable from this screen; and a buyer whose
-  // hull the module would push past the cap cannot take it, which is the
-  // budget's one reachable guard on a purchase, since the server has never
-  // read a save and the settle has to complete either way (both readings
-  // are applyModuleTradeSide's own notes). A trade the pool cannot resolve
+  // and the corner stays unreachable from this screen; a buyer whose hull the
+  // module would push past the cap cannot take it, which is the budget's one
+  // reachable guard on a purchase, since the server has never read a save and
+  // the settle has to complete either way (both readings are
+  // applyModuleTradeSide's own notes). The total that guard states is the
+  // swap arithmetic's shared reader (see powerAfterTaking in
+  // @/lib/game/held-cards), so the number on the row is the number the
+  // engine's own refusal would print for the same hull. And a buyer whose
+  // purse cannot cover the fee cannot take the offer, which is the escort
+  // desk's own third refusal read through the predicate the bench reads too
+  // (see canPayFee): the fee moves at the handshake on the buyer's
+  // machine, and a settle that ran short would pay what the purse holds
+  // while the seller is credited the agreed price, which mints the
+  // difference rather than settling it. A trade the pool cannot resolve
   // blocks nothing: it is the unreachable corner the crest above stands in
   // for.
+  const hold = getOwnedAmount(game, "Gold");
   const blocked = stale
     ? STALE_OFFER
     : roomOpen < 1
       ? "Every slot on your hull is full. Make room at the yard first."
       : card !== null && !powerBudgetAllows(game, card)
-        ? `Taking it would put your hull at ${heldPower(game) + card.power} power, and a hull carries at most ${HELD_POWER_CAP}.`
-        : null;
+        ? `Taking it would put your hull at ${powerAfterTaking(game, card)} power, and a hull carries at most ${HELD_POWER_CAP}.`
+        : !canPayFee(game, trade.fee)
+          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${trade.fee}.`
+          : null;
 
   return (
     <OfferRow
       mine={mine}
       line={`${icon} ${moduleLine(trade, me)}`}
+      // The market's own reading of whether this row is still an offer, which
+      // is what draws the buttons on it: the aim is not the offer, and a row
+      // listed to the whole table is an offer like any other (see OfferRow).
+      standing={trade.status === "offered"}
       chip={
         trade.status === "offered" && trade.buyerUserId
           ? { forMe: isBuyer, name: trade.buyerName }
