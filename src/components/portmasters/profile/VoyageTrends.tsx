@@ -3,6 +3,7 @@
 import { VoyageChronicle } from "@/types/realtime/voyage";
 import { Coins, Star, TrendingUp, Trophy } from "lucide-react";
 import { TrendCard } from "./TrendCard";
+import { SectionHeading } from "./SectionHeading";
 
 export function VoyageTrends({
   chronicles,
@@ -11,9 +12,7 @@ export function VoyageTrends({
 }) {
   return (
     <div>
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Recent Voyage Trends
-      </h3>
+      <SectionHeading>Recent Voyage Trends</SectionHeading>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TrendCard
           label="Final Reputation"

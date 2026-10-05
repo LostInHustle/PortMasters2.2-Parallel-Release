@@ -192,6 +192,30 @@ export function bargeLeftAtPort(state: GameState): number {
 }
 
 /**
+ * How many rations the stores still have room for.
+ *
+ * One of the two ceilings buyFromBarge is held to along with the lot,
+ * exported so that the panel drawing the row is held to the same one. The
+ * room is measured in meals and answered as rations without a second
+ * conversion, because the Barge sells one food (see BARGE_GOOD above) and
+ * a meal of grain is a slot of grain is a ration (see FOODS in the
+ * constants): there is no arithmetic here for a second copy to get wrong.
+ */
+export function bargeRoomMeals(state: GameState): number {
+  return foodRoomMeals(state, BARGE_GOOD);
+}
+
+/**
+ * How many rations the purse can cover, the other ceiling buyFromBarge is
+ * held to. The vendor's price is a whole number of Gold by construction
+ * (see bargeRationPrice above), so the division is safe on every voyage
+ * the feature is on.
+ */
+export function bargePurseRations(state: GameState): number {
+  return Math.floor(state.money / bargeRationPrice());
+}
+
+/**
  * Buying rations off the Barge, at the premium and out of the lot the
  * vendor has this leg.
  *
@@ -238,8 +262,8 @@ export function buyFromBarge(
   }
   reconcileLarder(state);
   const price = bargeRationPrice();
-  const room = foodRoomMeals(state, BARGE_GOOD);
-  const affordable = Math.floor(state.money / price);
+  const room = bargeRoomMeals(state);
+  const affordable = bargePurseRations(state);
   const wanted = Math.min(Math.floor(rations), left, room, affordable);
   if (wanted < 1) {
     if (Math.floor(rations) < 1) {

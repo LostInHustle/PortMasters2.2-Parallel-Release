@@ -1,8 +1,7 @@
 "use client";
 
 import { cardName } from "@/lib/game/cards";
-import { WORKER_TYPES } from "@/lib/game/constants/crew";
-import { getHireCost, leavePhase } from "@/lib/game/engine";
+import { leavePhase, wageBill } from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -55,30 +54,20 @@ export function SettlementBills({
   "game" | "ctx" | "aid" | "backing" | "me" | "phaseSync" | "members"
 >) {
   const myUserId = me.id;
-  // One pass over the whole roster, deliberately mirroring payWages in
-  // engine.ts rather than listing artisans by hand. This screen used to total
-  // only the three founding types, so once a charter opened a Coppersmith,
-  // Potter, Perfumer or Jeweler, the bill shown here was lower than the bill
-  // actually charged a moment later. That also silently gated the aid request
-  // below, since canAfford decides whether it appears at all: a captain who
-  // genuinely could not pay was told they could, never got the chance to ask
-  // the harbor for help, and went bankrupt anyway.
-  //
-  // The pair of numbers below come off that one pass rather than off a
-  // second walk of it. They used to run in lockstep with WORKER_TYPES as a
-  // bare array of counts read back by index, which is the shape that goes
-  // quietly wrong the day either list is reordered on its own, and the
-  // name it carried was already spoken for by the live roster in
-  // PhasePanelProps.
-  const hires = WORKER_TYPES.map((w) => ({
-    type: w,
-    count: (game.workers[w.id] ?? []).length,
-  }));
-  const wagesDue = hires.reduce(
-    (sum, h) => sum + h.count * getHireCost(game, h.type.id),
-    0,
-  );
-  const nWorkers = hires.reduce((sum, h) => sum + h.count, 0);
+  // The bill comes off the engine's own reader rather than off a walk this
+  // screen makes alone (see wageBill). The sheet used to total every hired
+  // hand and knew nothing of the Jade Pavilion pledge, which waives a
+  // sponsored artisan's first wage: a pledged captain saw exactly one wage
+  // too many, the settle button warned of a bankruptcy the run would never
+  // deliver, and the harbor aid request below was seeded with a shortfall
+  // that did not exist (it gates on canAfford). The earlier shape of this
+  // walk had its own scar: it totalled only the three founding types, so a
+  // charter's Coppersmith or Potter was billed here for less than the
+  // engine charged a breath later.
+  const bill = wageBill(game);
+  const wagesDue = bill.reduce((sum, b) => sum + b.due, 0);
+  const nWorkers = bill.reduce((sum, b) => sum + b.count + b.sponsored, 0);
+  const sponsored = bill.reduce((sum, b) => sum + b.sponsored, 0);
   const maintCost = game.fixedCost + game.maintenancePenalty;
   const totalDue = wagesDue + maintCost;
   const canAfford = game.money >= totalDue;
@@ -134,6 +123,23 @@ export function SettlementBills({
         >
           <span className="font-bold">{wagesDue} Gold</span>
         </BillRow>
+        {sponsored > 0 && (
+          // Why the figure above is lower than the roster times the trades'
+          // wages: the pledge the engine will spend a breath later, named
+          // in the engine's own shape so the sheet and the log line that
+          // replaces it tell one story.
+          <div className="text-[11px] text-muted-foreground pl-2.5">
+            ↳ 🪷 Jade Pavilion covers the wage for{" "}
+            {bill
+              .filter((b) => b.sponsored > 0)
+              .map(
+                (b) =>
+                  `${b.sponsored} ${b.sponsored === 1 ? b.label : b.plural}`,
+              )
+              .join(", ")}{" "}
+            this round
+          </div>
+        )}
         <BillRow size="text-sm" label="🔧 Ship Maintenance Fee">
           <span className="font-bold">{maintCost} Gold</span>
         </BillRow>

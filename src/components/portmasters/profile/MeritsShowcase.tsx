@@ -7,13 +7,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SectionHeading } from "./SectionHeading";
 
 export function MeritsShowcase({ meritIds }: { meritIds: string[] }) {
   return (
     <div>
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Merits ({meritIds.length} of 9)
-      </h3>
+      <SectionHeading>Merits ({meritIds.length} of 9)</SectionHeading>
       <div className="flex flex-wrap gap-3">
         {meritIds.length === 0 && (
           <p className="text-sm text-muted-foreground">

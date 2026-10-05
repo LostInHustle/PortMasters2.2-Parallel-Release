@@ -4,10 +4,16 @@
 // orders, and the round's intel pool.
 //
 // The seed carries the captain's own id as well as the room's (see the
-// seedBase in useGameSession), so the charter is reproducible per captain
+// seedBase in useGameSession), so a draw is reproducible per captain
 // rather than shared by the table. Two captains in one harbor sail
 // different markets and are dealt different orders, and reloading a tab
 // replays the same ones rather than rerolling them.
+//
+// The charter's wildcard is the one draw that is not per captain: its
+// seed is the voyage epoch alone (see charterChoices in ./charters), so
+// the whole table is dealt the same third card, and that is the design
+// rather than an oversight. A card that must not move between becoming
+// due and being answered cannot hang on which machine asks for it.
 // =====================================================================
 
 // Hash an arbitrary string into a 32 bit unsigned integer (xfnv1a).

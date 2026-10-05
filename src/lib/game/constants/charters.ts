@@ -46,17 +46,17 @@
 import type { PathId } from "../paths";
 import { GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
 
-// The leg the moment lands on: the fourth of the voyage's twelve (see
-// VOYAGE_LEGS for the length and ../charters for the due read). A
-// constant rather than a literal at the read site, because the plan
-// names the number once, in the goal's own title, and the suite holds
+// The leg the moment lands on: the fourth of the voyage's twelve (see the
+// voyageLegs field in ../mode for the length and ../charters for the due
+// read). A constant rather than a literal at the read site, because the
+// plan names the number once, in the goal's own title, and the suite holds
 // the due check to this line.
 export const CHARTER_LEG = 4;
 
 // What a captain meets when the moment arrives: the glyph and the two
 // lines the overlay prints, the same three fields a milestone moment
 // carries, because the same overlay prints both (see ./milestones).
-export interface CharterMoment {
+interface CharterMoment {
   icon: string;
   title: string;
   line: string;

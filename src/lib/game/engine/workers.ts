@@ -16,7 +16,12 @@
 // and discounts, was a balance inconsistency that this refactor closes.
 // =====================================================================
 import { ICONS } from "../constants/brand";
-import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
+import {
+  CREW_LOSS_AFTER_HUNGRY_LEGS,
+  WORKER_TYPES,
+  workerType,
+  type WorkerTypeId,
+} from "../constants/crew";
 import { RECIPES } from "../constants/goods";
 import { onShortRations, shortRationsYield } from "../larder";
 import { newCrewIdentity } from "../crew";
@@ -166,7 +171,7 @@ export function assignTask(
   }
   logs.push(
     frozen
-      ? "❌ The only free hands are out of action this leg with frostbite."
+      ? "❌ The only free hands are frozen out this leg: the crew went into the cold short of warm clothes, and they are back next leg. A warmer layer before a cold leg keeps every hand working."
       : "❌ All workers are already assigned tasks!",
   );
 }
@@ -200,11 +205,13 @@ export function processProduction(state: GameState, logs: string[]) {
   // because it is one fact about the captain rather than one per artisan:
   // the ship either went hungry this leg or it did not. The line below is
   // said once for the same reason, so the smaller numbers that follow it
-  // have an explanation above them instead of a note on every row.
+  // have an explanation above them instead of a note on every row, and it
+  // names the stake as well as the state so the empty larder's price is
+  // read before it is paid.
   const short = onShortRations(state);
   if (short)
     logs.push(
-      "⚠️ The crew is on short rations, so every artisan works the leg at a slower pace.",
+      `⚠️ The crew is on short rations, so every artisan works the leg at a slower pace, and ${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard.`,
     );
   for (const { list, name, weaves } of allLists) {
     for (const w of list) {
@@ -216,7 +223,9 @@ export function processProduction(state: GameState, logs: string[]) {
       // after this one.
       if (isFrostbitten(w, state.currentRound)) {
         if (w.task)
-          logs.push(`🥶 ${w.name} is out of action and cannot work this leg.`);
+          logs.push(
+            `🥶 ${w.name} is frozen out this leg: the crew went into the cold short of warm clothes, and the work on ${w.task} waits for next leg.`,
+          );
         continue;
       }
       if (w.task) {
@@ -261,37 +270,75 @@ export function processProduction(state: GameState, logs: string[]) {
   }
 }
 
+/**
+ * The wage bill a payroll run is about to charge, read without charging
+ * it.
+ *
+ * payWages is that run; this is the same arithmetic standing still, and
+ * the two are one reader for a reason. Four surfaces used to walk the
+ * roster themselves, and none of them knew about the Jade Pavilion
+ * pledge: a sponsored hand's first wage is waived, so every surface that
+ * counted hands and multiplied by the trade's wage over-billed a pledged
+ * captain by exactly one wage. The button on the settle screen warned of
+ * a bankruptcy the run would never deliver, the harbor aid request was
+ * seeded with a shortfall that did not exist (it gates on affordability),
+ * and the rail and the advice line quoted the same figure one wage high.
+ * The pledge is read here and spent in payWages, which is the half of
+ * this pair that is allowed to write: a reader that cleared the flag
+ * would spend the waiver on whichever screen happened to render first.
+ */
+type WageBillRow = {
+  id: WorkerTypeId;
+  // Hands whose wage is due, and hands the Pavilion covers. The two
+  // together are the roster the row's label counts.
+  count: number;
+  sponsored: number;
+  label: string;
+  plural: string;
+  due: number;
+};
+
+export function wageBill(state: GameState): WageBillRow[] {
+  return WORKER_TYPES.map((w) => {
+    const roster = state.workers[w.id] ?? [];
+    let sponsored = 0;
+    for (const worker of roster) {
+      if (worker.freeFirstWage) sponsored++;
+    }
+    const count = roster.length - sponsored;
+    return {
+      id: w.id,
+      count,
+      sponsored,
+      label: w.label,
+      plural: w.plural,
+      due: count * getHireCost(state, w.id),
+    };
+  });
+}
+
 export function payWages(
   state: GameState,
   logs: string[],
 ): true | "bankruptcy" {
-  // One pass over the roster rather than a hardcoded line per artisan type, so
-  // a charter that brings new artisans is paid for without touching this.
-  //
+  // The bill comes off the shared reader above, so the figure charged
+  // here and the figure every screen quotes are one reading of one
+  // roster rather than five. A type whose only artisan is sponsored owes
+  // nothing but is kept, because it still has a pledge to report below.
+  const bills = wageBill(state).filter((b) => b.count > 0 || b.sponsored > 0);
   // This is also where a Jade Pavilion pledge is spent. The waiver is
-  // cleared in the same pass that counts it, before any early return below,
-  // because it covers exactly one payroll run whether or not a bill follows
-  // from it: leaving it set would quietly excuse that artisan every round
-  // for the rest of the voyage instead of only the round they joined.
-  const bills = WORKER_TYPES.map((w) => {
-    const roster = state.workers[w.id] ?? [];
-    let sponsored = 0;
-    for (const worker of roster) {
+  // cleared before any early return below, because it covers exactly one
+  // payroll run whether or not a bill follows from it: leaving it set
+  // would quietly excuse that artisan every round for the rest of the
+  // voyage instead of only the round they joined. The bill above was
+  // read before this line, which is what lets one pass both print the
+  // pledge and charge the wage it replaced.
+  for (const w of WORKER_TYPES) {
+    for (const worker of state.workers[w.id] ?? []) {
       if (!worker.freeFirstWage) continue;
       worker.freeFirstWage = false;
-      sponsored++;
     }
-    const paying = roster.length - sponsored;
-    return {
-      count: paying,
-      sponsored,
-      label: w.label,
-      plural: w.plural,
-      due: paying * getHireCost(state, w.id),
-    };
-    // Kept when either half is non zero: a type whose only artisan is
-    // sponsored owes nothing but still has a pledge to report below.
-  }).filter((b) => b.count > 0 || b.sponsored > 0);
+  }
   for (const b of bills) {
     if (b.sponsored > 0)
       logs.push(

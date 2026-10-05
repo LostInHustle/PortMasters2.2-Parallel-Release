@@ -4,9 +4,9 @@
 // every member who has pledged to that House. Captains without a pledge
 // are not folded into any House's totals.
 //
-// Mirrors the shape of GET /api/house so the frontend's
-// `getHouseStandings` wrapper reads both the standings and the viewer's
-// own pledge in one request.
+// One request serves both the standings and the viewer's own line, which
+// is what the frontend's `getHouseStandings` wrapper reads (the pledge
+// itself is written by the house route's own POST).
 import { HouseStanding } from "@/types/realtime/standings";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";

@@ -23,6 +23,12 @@ import { bazaarRumorsOn } from "@/lib/game/flags";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import {
+  MarketBlock,
+  MarketEmpty,
+  MarketError,
+  MarketPanel,
+} from "./OfferBoard";
 import type { Bazaar } from "./phases/PhaseShared";
 
 // The speaking path's own record, resolved once at module load rather than
@@ -90,21 +96,21 @@ export function BazaarRumors({
   const canSpeak = mine && cooldown < 1 && goods.length > 0;
 
   return (
-    <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
-      <h3 className="text-center font-semibold mb-1 text-sm">
-        {SELLER_PATH.crest} {SELLER_PATH.name} Bazaar
-      </h3>
-      <p className="text-center text-[11px] text-muted-foreground mb-3 max-w-xl mx-auto">
-        Once every {RUMOR_COOLDOWN_ROUNDS} legs, an {SELLER_PATH.name} captain
-        may spread a word about one commodity. The next port prices that good
-        against it, by up to {Math.round(RUMOR_SHIFT_FRACTION * 100)} percent,
-        which is the same hand the Harbormaster leans a port with. The whole
-        harbor is told who spoke and which good they named, and only the speaker
-        knows which way they leaned until the market answers it.
-      </p>
-
+    <MarketPanel
+      title={`${SELLER_PATH.crest} ${SELLER_PATH.name} Bazaar`}
+      intro={
+        <>
+          Once every {RUMOR_COOLDOWN_ROUNDS} legs, an {SELLER_PATH.name} captain
+          may spread a word about one commodity. The next port prices that good
+          against it, by up to {Math.round(RUMOR_SHIFT_FRACTION * 100)} percent,
+          which is the same hand the Harbormaster leans a port with. The whole
+          harbor is told who spoke and which good they named, and only the
+          speaker knows which way they leaned until the market answers it.
+        </>
+      }
+    >
       {mine && (
-        <div className="rounded-lg border border-parley/15 bg-background/40 p-3 mb-3">
+        <MarketBlock>
           {canSpeak ? (
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
               <span className="text-muted-foreground">Speak for</span>
@@ -166,24 +172,13 @@ export function BazaarRumors({
             it does not see is which way you leaned, until the port you moved
             has priced it.
           </p>
-        </div>
+        </MarketBlock>
       )}
 
-      {bazaar.error && (
-        <p className="text-center text-[11px] text-alarm mb-2">
-          {bazaar.error}{" "}
-          <button
-            type="button"
-            onClick={bazaar.clearError}
-            className="underline"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
+      <MarketError error={bazaar.error} onDismiss={bazaar.clearError} />
 
       <RumorList rumors={bazaar.rumors} me={me} round={game.currentRound} />
-    </div>
+    </MarketPanel>
   );
 }
 
@@ -211,11 +206,11 @@ function RumorList({
   const shown = rumors.filter((r) => r.round >= round - 1);
   if (shown.length === 0) {
     return (
-      <p className="text-center text-xs text-muted-foreground py-3">
+      <MarketEmpty>
         Nobody has spoken at the bazaar yet this voyage. A rumor is the only way
         an honest captain can move a price, and the whole harbor will see who
         said it.
-      </p>
+      </MarketEmpty>
     );
   }
   // Newest first, and within one leg the last captain to speak first. The

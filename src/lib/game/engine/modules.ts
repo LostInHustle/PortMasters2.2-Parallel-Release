@@ -3,8 +3,9 @@
 //
 // [F3: modules in the shipyard ladder, and trading them between captains]
 // The shipyard has climbed the same ladder since the first voyage: a hull
-// takes one more module for every level it gains, three at level three,
-// four at four and five at five, and a module bolted on is permanent until
+// takes one more module for every level it gains, up to three at ship
+// level three (the top of the climb, see MAX_SHIP_LEVEL in
+// ../constants/ships), and a module bolted on is permanent until
 // a swap at the yard takes it off (see moduleSlotsOpen in ./core and
 // equipModule in ./boons). What the ladder never had is a way for a module
 // to leave the hull it was drafted into and join another. That is the whole
@@ -85,7 +86,7 @@ import {
   type ConsentTerms,
 } from "./consent";
 import { addOwnedAmount, getOwnedAmount } from "./core";
-import { unequipModuleAccounting } from "./boons";
+import { installModuleAccounting, unequipModuleAccounting } from "./boons";
 
 /**
  * Whether this captain has anything to sell, which is the panel's question
@@ -209,6 +210,15 @@ export function applyModuleTradeSide(
     const card = cardById(trade.module);
     if (card !== null && card.kind === "module") {
       state.equippedModules.push(card);
+      // The bolt-on is the one door onto a hull that does not pass through
+      // equipModule (its slot guard must not stand between an agreed trade
+      // and its settle), so it calls the same install accounting every
+      // other landing site calls. Without it the card landed bare: the
+      // surcharge two modules carry was never charged, and the first
+      // unwind then subtracted one that was never added, which read as a
+      // negative bill that paid the captain every Resolve (see
+      // installModuleAccounting in ./boons).
+      installModuleAccounting(state, card);
       logs.push(`🔧 ${name} is bolted to the hull.`);
     } else {
       logs.push(`❌ The yard has no ${name} to bolt on.`);

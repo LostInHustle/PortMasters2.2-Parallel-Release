@@ -22,8 +22,8 @@
 // in one long body.
 //
 // Five of those values are assigned back into variables declared here
-// rather than destructured at the call site: the two captains and the
-// three harbor ids the cleanup below has to be able to read, whether the
+// rather than destructured at the call site: the three captains and the
+// two harbor ids the cleanup below has to be able to read, whether the
 // run passed or threw.
 // =====================================================================
 import "@/server/env";
@@ -85,6 +85,14 @@ import { publicOffersSuite } from "./suites/49-publicOffers";
 import { brokersWhisperSuite } from "./suites/50-brokersWhisper";
 import { chartersSuite } from "./suites/51-charters";
 import { powerBudgetSuite } from "./suites/52-powerBudget";
+import { theSeatWaitsInsideTheYardSuite } from "./suites/53-theSeatWaitsInsideTheYard";
+import { theFleetsOwnOutcomeSuite } from "./suites/54-theFleetsOwnOutcome";
+import { theLegacyPhaseMovesSuite } from "./suites/55-theLegacyPhaseMoves";
+import { theMarksAndTheGatesSuite } from "./suites/56-theMarksAndTheGates";
+import { theOrderThatSettlesSuite } from "./suites/57-theOrderThatSettles";
+import { theWageTheBillQuotesSuite } from "./suites/58-theWageTheBillQuotes";
+import { theDoorsAndTheLoadSuite } from "./suites/59-theDoorsAndTheLoad";
+import { theMirrorAndTheChargeSuite } from "./suites/60-theMirrorAndTheCharge";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -99,9 +107,6 @@ async function main(): Promise<void> {
   let roomId: string | null = null;
   let quickStartRoomId: string | null = null;
 
-  // Everything else one smoke run accumulates. A field here is a fact some
-  // article produced and a later one acts on; a local inside an article is
-  // that article's own business.
   // Every harbor that already exists before this run starts. Cleanup only
   // ever deletes a room this run created, so a Quick Start that seats the
   // test captains into somebody's real open harbor cannot take that harbor
@@ -445,6 +450,36 @@ async function main(): Promise<void> {
     // ready check stays last.
     console.log("\nThe power budget");
     await powerBudgetSuite();
+    // The yard's article is the ready check's sibling, and it runs just
+    // ahead of it: both need a live harbor, and this one is done in a few
+    // seconds rather than watched through a grace, which is the only
+    // reason the ready check stays last.
+    console.log("\nThe seat that waits inside the yard");
+    await theSeatWaitsInsideTheYardSuite(run);
+    // The fleet's own outcome's article is the yard's sibling: both drive
+    // a live harbor with raw reports and neither spends a wall clock on a
+    // grace. It sits after the yard because it is the newer article and
+    // the ready check stays last.
+    console.log("\nThe fleet's own outcome");
+    await theFleetsOwnOutcomeSuite(run);
+    // The correctness articles below open no harbor: each is a pure read
+    // of a state in process (a load heal, a flag contract, a settlement, a
+    // wage bill, a bolt onto a hull and the load that reconciles it, and
+    // the two price mirrors held to the charges they quote), so
+    // they sit together after the harbor articles and ahead
+    // of the ready check, which stays last for the reason below.
+    console.log("\nThe legacy phase that moves");
+    await theLegacyPhaseMovesSuite();
+    console.log("\nThe marks and the gates");
+    await theMarksAndTheGatesSuite();
+    console.log("\nThe order that settles");
+    await theOrderThatSettlesSuite();
+    console.log("\nThe wage the bill quotes");
+    await theWageTheBillQuotesSuite();
+    console.log("\nThe doors and the load");
+    await theDoorsAndTheLoadSuite();
+    console.log("\nThe mirror and the charge");
+    await theMirrorAndTheChargeSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

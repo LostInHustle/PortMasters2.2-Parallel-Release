@@ -356,13 +356,10 @@ export function tallyCardPurchases(
 // [MANIFEST 01: The Harbor Pulse] Stamps the room wide pulse the server
 // computed for this round onto local state, so genResourceCard picks it up
 // the moment startMarket runs below. A plain setter kept as its own function,
-// the same convention purchaseIntel/receiveLoan/etc already follow, so the
-// client's phase advance handler can call it through the same act() dispatch
-// as every other socket driven state change.
-export function applyHarborPulse(
-  state: GameState,
-  pulse: Record<string, number>,
-) {
+// the same convention purchaseIntel/receiveLoan/etc already follow, called
+// by applyMarketLeans below in the same act() dispatch as every other socket
+// driven state change.
+function applyHarborPulse(state: GameState, pulse: Record<string, number>) {
   state.harborPulse = pulse;
 }
 
@@ -437,7 +434,7 @@ export type MarketLeans = {
 export function applyMarketLeans(state: GameState, leans: MarketLeans): void {
   if (leans.harborPulse) applyHarborPulse(state, leans.harborPulse);
   if (leans.portShift !== undefined) {
-    applyPortShift(state, leans.portShift ?? null);
+    applyPortShift(state, leans.portShift);
   }
   if (leans.bazaarLean) applyBazaarLean(state, leans.bazaarLean);
 }
@@ -497,10 +494,20 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   state.purchasedCards.push(card.id);
   state.purchaseCount++;
   if (card.isProductCard) {
+    // The line names the card's one goods line, and a save carrying a
+    // product card with an empty line is guarded the way the engine's
+    // other taxed line reader guards it: the purchase stands and the
+    // line falls back to the plain receipt rather than throwing a read
+    // off a line that is not there (the bug audit's finding, closed on
+    // every reader of the same shape).
     const r = card.resources[0];
-    logs.push(
-      `🛒 Bought Product at ${card.port}: ${ICONS[r.type]}${r.type}×${r.quantity} (@${r.price} Gold/item, Mat Cost ${r.materialCost} Gold), Total ${cost} Gold`,
-    );
+    if (r) {
+      logs.push(
+        `🛒 Bought Product at ${card.port}: ${ICONS[r.type]}${r.type}×${r.quantity} (@${r.price} Gold/item, Mat Cost ${r.materialCost} Gold), Total ${cost} Gold`,
+      );
+    } else {
+      logs.push(`🛒 Bought Product at ${card.port}, Total ${cost} Gold`);
+    }
     logs.push("   💡 Tip: VAT applies when selling finished products");
   } else {
     const txt = card.resources

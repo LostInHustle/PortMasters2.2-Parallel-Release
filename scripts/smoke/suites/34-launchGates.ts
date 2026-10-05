@@ -53,6 +53,7 @@ import {
   refitsOn,
   startBoonDrafting,
 } from "@/lib/game/engine";
+import { processProduction } from "@/lib/game/engine/workers";
 import {
   bazaarRumorsOn,
   escortContractsOn,
@@ -1260,11 +1261,16 @@ export async function launchGatesSuite(
         "and a good is read as a garment only when the catalogue says so, so a save naming a raw material, a key the object's prototype happens to carry, or the one finished good the plan leaves out is read as a captain with nothing on rather than as warmth nobody can account for",
       );
 
-      // Wearing, and the three ways it refuses. The hire writes into a
-      // throwaway log so the four lines counted below are the wardrobe's
-      // own.
+      // Wearing, and the ways it refuses, on a leg that is actually asking
+      // for warmth: the cold round is found by asking the rule rather than
+      // written down as a number that was cold once, the same way the
+      // weather checks below find theirs. The hire writes into a throwaway
+      // log so the lines counted below are the wardrobe's own.
       const wardrobe = voyageState();
       wardrobe.money = 1000;
+      for (let round = 1; round <= 60 && !legIsCold(wardrobe); round++) {
+        wardrobe.currentRound = round;
+      }
       const dressLines: string[] = [];
       const crewless = wearGarment(wardrobe, "Brocade", dressLines) === false;
       hireWorker(wardrobe, "weaver", []);
@@ -1286,14 +1292,55 @@ export async function launchGatesSuite(
         "putting a garment on takes it out of the hold and onto the crew at its full durability, and the three ways it can fail each say why: nobody aboard, nothing of that good in the hold, or a good that is not clothing at all",
       );
 
-      // The sum, and the multiplier under it.
+      // The two presses the need rule turns away, which the field asked
+      // for after closets walked onto backs no cold had asked about: a
+      // crew the cold leg is already answered for, and a crew the sea is
+      // not asking anything of at all. Neither spends a stitch.
+      const dressedAgain =
+        wearGarment(wardrobe, "Brocade", dressLines) === false;
+      const mildDress = voyageState();
+      mildDress.money = 1000;
+      for (let round = 1; round <= 60 && legIsCold(mildDress); round++) {
+        mildDress.currentRound = round;
+      }
+      hireWorker(mildDress, "weaver", []);
+      mildDress.inventory["Linen Clothes"] = 1;
+      const mildLines: string[] = [];
+      const mildRefused =
+        wearGarment(mildDress, "Linen Clothes", mildLines) === false;
+      check(
+        dressedAgain &&
+          wardrobe.inventory.Brocade === 1 &&
+          wardrobe.garments.length === 1 &&
+          dressLines.length === 5 &&
+          dressLines[4].includes("already meets this cold leg") &&
+          mildRefused &&
+          mildDress.inventory["Linen Clothes"] === 1 &&
+          (mildDress.garments ?? []).length === 0 &&
+          mildLines.length === 1 &&
+          mildLines[0].includes("mild this leg") &&
+          !shortOfWarmth(mildDress),
+        "while a crew the leg is not asking about is left in the hold exactly as found: a second press on a cold leg already answered and a press on a mild leg are each turned away with the reason the wardrobe is shut, so clothes stop walking onto backs for legs that asked for nothing and the hold keeps what it carried",
+      );
+
+      // The sum, and the multiplier under it. The wardrobe is set rather
+      // than dressed on, because dressing a crew past the leg's own cold
+      // is exactly what the need check above turns away: this fixture is
+      // about the arithmetic rather than about the way in.
       const tailor = voyageState();
       tailor.money = 1000;
       hireWorker(tailor, "weaver", []);
-      for (const good of ["Linen Clothes", "Cotton Clothes", "Brocade"]) {
-        tailor.inventory[good] = 1;
-        wearGarment(tailor, good, []);
-      }
+      tailor.garments = [
+        {
+          good: "Linen Clothes",
+          durability: GARMENTS["Linen Clothes"].durability,
+        },
+        {
+          good: "Cotton Clothes",
+          durability: GARMENTS["Cotton Clothes"].durability,
+        },
+        { good: "Brocade", durability: GARMENTS.Brocade.durability },
+      ];
       const aWholeBack = warmthScore(tailor) === 1 + 2 + 3;
       tailor.garments[1].durability = 4;
       tailor.garments[2].durability = 8;
@@ -1462,6 +1509,81 @@ export async function launchGatesSuite(
         "clothes lose one of their warmth a leg and two on a cold one, and a leg that arrives twice wears them once, since the tick stamps the round it read before it reads anything else",
       );
 
+      // [Status copy] A status a captain can act on. The lines the cold and
+      // the larder write about a hand's state used to say the state and
+      // nothing else, and a state with no why and no way back is a mood
+      // rather than a message: the field read "out of action" as the sea
+      // having taken a hand for good, and read "slower pace" without ever
+      // learning the empty larder was two legs from costing them one.
+      check(
+        bareLines.some(
+          (line) =>
+            line.includes("Frostbite") &&
+            line.includes(newestHand) &&
+            line.includes("short of warm clothes") &&
+            line.includes("keeps every hand working"),
+        ),
+        "and the line that stands a hand down for the cold names what the cold caught them short of and what keeps every hand working, because warm clothes before the cold are the whole of the remedy and a warning that hides them leaves a captain reading a funeral into a laundry problem",
+      );
+
+      const statusSnowed = voyageState();
+      statusSnowed.voyageEpoch = 4242;
+      statusSnowed.money = 1000;
+      statusSnowed.currentRound = coldRound + 1;
+      hireWorker(statusSnowed, "weaver", []);
+      const snowedHand = statusSnowed.workers.weaver[0];
+      snowedHand.task = "Linen Clothes";
+      snowedHand.frostbittenRound = coldRound + 1;
+      const snowedLines: string[] = [];
+      processProduction(statusSnowed, snowedLines);
+      check(
+        snowedLines.some(
+          (line) =>
+            line.includes(snowedHand.name) &&
+            line.includes("frozen out this leg") &&
+            line.includes("short of warm clothes") &&
+            line.includes("waits for next leg"),
+        ) &&
+          snowedHand.task === "Linen Clothes" &&
+          (statusSnowed.inventory["Linen Clothes"] ?? 0) === 0,
+        "and a hand the cold has taken says from the bench why they are missing and that the work waits for them, since their materials were spent when the task was set and a captain watching an empty output line is owed the sentence that says the order survives the leg",
+      );
+
+      const statusHungry = voyageState();
+      statusHungry.voyageEpoch = 4242;
+      statusHungry.money = 1000;
+      statusHungry.currentRound = mildRound;
+      hireWorker(statusHungry, "weaver", []);
+      statusHungry.larder = 0;
+      const statusHungryLines: string[] = [];
+      processProduction(statusHungry, statusHungryLines);
+      check(
+        statusHungryLines.some(
+          (line) =>
+            line.includes("short rations") &&
+            line.includes("slower pace") &&
+            line.includes("costs the newest hand aboard"),
+        ),
+        "and the line about a hungry leg carries the stake as well as the slowdown, because the empty larder's real price is the newest hand and a captain told only about speed cannot know which leg is the one that takes them",
+      );
+
+      const statusRefused = voyageState();
+      statusRefused.voyageEpoch = 4242;
+      statusRefused.money = 1000;
+      statusRefused.currentRound = coldRound + 1;
+      hireWorker(statusRefused, "weaver", []);
+      statusRefused.workers.weaver[0].frostbittenRound = coldRound + 1;
+      const statusRefusalLines: string[] = [];
+      assignTask(statusRefused, "weaver", "Linen Clothes", statusRefusalLines);
+      check(
+        statusRefusalLines.length === 1 &&
+          statusRefusalLines[0].includes("frozen out this leg") &&
+          statusRefusalLines[0].includes("short of warm clothes") &&
+          statusRefusalLines[0].includes("keeps every hand working") &&
+          statusRefused.workers.weaver[0].task === null,
+        "and a task refused over hands the cold has taken says the same why and the same way back as the row does, so a refusal about a full bench never lands on a bench that is standing idle",
+      );
+
       // The rags at the bottom of that, and what they pay.
       const ragged = voyageState();
       ragged.voyageEpoch = 4242;
@@ -1515,9 +1637,13 @@ export async function launchGatesSuite(
       // through each check, since the dash rule is about the whole set.
       survivalLines.push(
         ...dressLines,
+        ...mildLines,
         ...bareLines,
         ...warmLines,
         ...ragLines,
+        ...snowedLines,
+        ...statusHungryLines,
+        ...statusRefusalLines,
       );
 
       // The switch off, read on its own so the checks above can stay about

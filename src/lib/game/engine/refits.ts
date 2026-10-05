@@ -46,7 +46,7 @@ import {
 import { cargoRoom } from "../larder";
 import type { PathId } from "../paths";
 import { createRng } from "../rng";
-import type { GameState } from "../types";
+import { wholeStamp, type GameState } from "../types";
 import {
   consentPartyBusy,
   floorTallies,
@@ -385,7 +385,14 @@ export function applyRefitSide(
       // Reachable only if the garment left the wardrobe between the offer
       // being accepted and this call. The board hides the accept when there
       // is no work to do, so this is the sentence for a state that moved
-      // underneath the agreement rather than for an ordinary one.
+      // underneath the agreement rather than for an ordinary one. The fee
+      // stands as it was moved above, and deliberately: the seller's own
+      // machine credits the agreed price on its own side of this same
+      // function, so the two saves cannot unpay what one of them already
+      // banked, which is the same reading the module trade takes when its
+      // card fails to resolve (see the buyer branch in ./modules). The
+      // sentence is what the captain gets for the price, rather than
+      // silence.
       logs.push(`❌ There is no worn ${contract.good} left to work on.`);
     }
   } else {
@@ -433,13 +440,11 @@ export function normalizeRefitState(state: GameState): void {
  * Zero is a leg no voyage has, which is the direction both stamps heal in:
  * a save that predates this feature lands on "the harbor has not worked on
  * the crew yet" rather than on a leg that reads as already spent. Written
- * once for the two stamps because the second copy of it would be the one
- * that kept a fraction.
+ * once for the two stamps, on the one arithmetic every stamp in the game
+ * shares (see wholeStamp in ../types).
  */
 function legStamp(raw: unknown): number {
-  return typeof raw === "number" && Number.isFinite(raw)
-    ? Math.max(0, Math.floor(raw))
-    : 0;
+  return wholeStamp(raw);
 }
 
 // =====================================================================

@@ -32,6 +32,7 @@ import "@/server/env";
 import { createServer } from "node:http";
 import next from "next";
 import { loadServerConfig } from "@/lib/config";
+import { APP_NAME } from "@/lib/game/constants/brand";
 import type { attachRealtime, closeRealtime } from "@/server/realtime";
 
 type Realtime = ReturnType<typeof attachRealtime>;
@@ -100,7 +101,7 @@ async function main(): Promise<void> {
 
   const shown = host === "0.0.0.0" ? "localhost" : host;
   console.log("");
-  console.log("  PortMasters 2.2 Parallel Release");
+  console.log(`  ${APP_NAME}`);
   console.log(`  Site, API and realtime all on http://${shown}:${port}`);
   console.log(`  Mode: ${isProduction ? "production" : "development"}`);
   console.log("");

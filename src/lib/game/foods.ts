@@ -56,7 +56,7 @@ import {
 } from "./constants/supplies";
 import { survivalLayerOn } from "./flags";
 import { holdCapacityOn, storeRoomMeals } from "./hold";
-import type { GameState, LarderLot } from "./types";
+import { wholeStamp, type GameState, type LarderLot } from "./types";
 
 // The most lots a voyage can legitimately be carrying. Purchases merge
 // into the lot of the same food bought in the same leg, so a twelve leg
@@ -379,7 +379,19 @@ export function normalizeLarderLots(
       if (!entry || typeof entry !== "object") continue;
       const lot = entry as Partial<LarderLot>;
       const food = lot.food;
-      if (typeof food !== "string" || !(food in FOODS)) continue;
+      // The table is asked for the key's own presence rather than through
+      // the in operator, which answers true for every member of
+      // Object.prototype: a damaged save carrying { food: "toString" }
+      // survived an in check, and the reads after it walked
+      // FOODS["toString"].mealsPerSlot, which is undefined, into NaN and
+      // out through the provisioning arithmetic into the captain's purse.
+      // The same own-property guard the wardrobe's reader takes (see
+      // garmentSpec in ./garments).
+      if (
+        typeof food !== "string" ||
+        !Object.prototype.hasOwnProperty.call(FOODS, food)
+      )
+        continue;
       const meals = lot.meals;
       if (typeof meals !== "number" || !Number.isFinite(meals)) continue;
       const whole = Math.floor(meals);
@@ -409,6 +421,5 @@ export function normalizeLarderLots(
  * been sailing this build all along.
  */
 export function normalizeLarderSpoilRound(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }

@@ -9,9 +9,9 @@
 // quickstart:matched with the roomId and roomCode, and their client
 // joins the room exactly as if they'd typed the code in by hand.
 //
-// The queue is a plain in process Set: no horizontal scaling, so that's
+// The queue is a plain in process Map: no horizontal scaling, so that's
 // all the durability it needs. A captain who disconnects while queued
-// is removed on disconnect (see the handler in index.ts).
+// is removed on disconnect (see the handler in wiring/disconnect.ts).
 // =====================================================================
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
@@ -61,7 +61,7 @@ export function matchQueuedCaptains(io: Server): Promise<void> {
 }
 
 // Tries to pair every queued captain into a room. Walks the queue in
-// insertion order (Set iteration is insertion ordered in JS). For each
+// insertion order (Map iteration is insertion ordered in JS). For each
 // captain, finds an existing open public room that hasn't started and
 // has fewer than 4 members, or creates a fresh one. The captain is
 // added as a member and told to join via quickstart:matched.

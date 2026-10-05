@@ -10,11 +10,11 @@ import { currentAge, nextAgeChange, type Age } from "@/lib/game/engine";
  * client side computation off the shared clock. No fetch, no realtime
  * subscription, no state: the same Age for the lifetime of a render.
  *
- * The Age is recomputed on every render, but since `currentAge` is a pure
- * function of `Date.now()` and a render takes milliseconds, the value is
- * stable across a session unless a captain keeps a tab open across the
- * fortnight boundary. The Lobby's Age chip reads this hook on mount and
- * again on any navigation, which is plenty for a two week cycle.
+ * The Age is computed once per mount, from a single clock read (see the
+ * memo below), and does not tick: a tab left open across the fortnight
+ * boundary keeps the Age it mounted with until the next navigation. That
+ * is plenty for a two week cycle, and it means every captain sharing a
+ * moment reads the same Age off the same shared clock.
  *
  * `nextChange` is the instant that same Age hands over, read from the same
  * clock as the Age itself. It is fixed at mount and does not tick, which

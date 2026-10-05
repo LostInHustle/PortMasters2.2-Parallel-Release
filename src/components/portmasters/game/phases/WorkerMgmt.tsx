@@ -2,7 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { RECIPES } from "@/lib/game/constants/goods";
-import { getHireCost, hireWorker, leavePhase } from "@/lib/game/engine";
+import {
+  getHireCost,
+  hireWorker,
+  leavePhase,
+  wageBill,
+} from "@/lib/game/engine";
 import { phaseFace } from "@/lib/game/phases";
 import { unlockedProducts, unlockedWorkerTypes } from "@/lib/game/pools";
 import { cn } from "@/lib/utils";
@@ -42,6 +47,7 @@ export function WorkerMgmt({
   // type's craftable goods are derived from the recipes that name it, which
   // is also what keeps the Master's inherited weaver goods correct.
   const openProducts = unlockedProducts(game.difficulty, game.currentRound);
+  const payroll = new Map(wageBill(game).map((b) => [b.id, b]));
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
     (w) => {
       const list = game.workers[w.id] ?? [];
@@ -50,7 +56,16 @@ export function WorkerMgmt({
         ...w,
         list,
         cost,
-        due: list.length * cost,
+        // The wage this type's hands are due, from the engine's own bill
+        // (see wageBill) rather than from a hand count multiplied here. A
+        // Jade Pavilion pledge waives a sponsored hand's first wage, and
+        // the multiplication this replaces counted that hand anyway: the
+        // payroll block below billed one wage too many and the efficiency
+        // ratio under it was divided by the inflated number. A type
+        // outside the engine's roster is one payWages does not charge
+        // either, which is why a missing row reads as no wages due rather
+        // than as a second opinion about the same absence.
+        due: payroll.get(w.id)?.due ?? 0,
         // Every product has a recipe, which is what makes it a product,
         // so this lookup is read straight. The other six reads of RECIPES
         // in this project do the same.

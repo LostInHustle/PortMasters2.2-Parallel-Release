@@ -10,15 +10,14 @@
 // Renown, and the switch is published to the fleet log where everyone
 // sees it."
 //
-// This module is the rule half of that sentence and holds no state, no
-// clock and no socket: the deck, the pass, the window (both the legs it
-// spans and the seats it opens on) and the fee. The hand a captain is
-// dealt is private information and is dealt by the server (see
-// src/server/realtime/draft), which is the plan's own reason ("a hand of
-// cards is private information and the client cannot be trusted to deal
-// it"), and the one thing that crosses back into a save is the path a
-// captain kept, written by the engine half (see applyDraftPath in
-// ./engine/draft).
+// This module is the rule half of that sentence and holds no state and no
+// socket: the deck, the pass, the window (both the legs it spans and the
+// seats it opens on) and the fee. The hand a captain is dealt is private
+// information and is dealt by the server (see src/server/realtime/draft),
+// which is the plan's own reason ("a hand of cards is private information
+// and the client cannot be trusted to deal it"), and the one thing that
+// crosses back into a save is the path a captain kept, written by the
+// engine half (see applyDraftPath in ./engine/draft).
 //
 // The reading of the pass rule, written down here because the sentence
 // carries two keeps and one discard and a reader is owed the arithmetic:
@@ -219,12 +218,16 @@ export function passLeft(rests: readonly PathId[][]): PathId[][] {
 }
 
 /**
- * The card the server keeps for a captain who let the clock run out.
+ * The card the server lays for a captain whose seat has gone quiet.
  *
  * The first card in that captain's own hand, which is a card they were
- * dealt rather than a card the server liked, so a captain who walks away
- * still sails with something from their own deal and the table is not held
- * for them. See the clock in src/server/realtime/draft.
+ * dealt rather than a card the server liked, so a captain whose connection
+ * dropped still sails with something from their own deal and the table is
+ * not held for a captain who is no longer there. The room holds for its
+ * captains, not for clocks: a seat that still has a live connection holds
+ * the table however long it takes, and this card is only ever laid for a
+ * seat whose last socket has gone (see the absence watch in
+ * src/server/realtime/draft).
  */
 export const DRAFT_AUTO_PICK = 0;
 

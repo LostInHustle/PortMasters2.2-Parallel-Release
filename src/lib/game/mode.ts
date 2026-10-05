@@ -534,8 +534,10 @@ export const MODES: Record<GameMode, ModeConfig> = {
     //
     // Every sentence here is written for a captain rather than for the
     // engine, so a round is a round here and not a leg. The engine's own
-    // word for one lap of the voyage is a leg (see GameState.maxRounds,
-    // the leg reports in ./telemetry, and the rail), and the two words
+    // fields count rounds (GameState.currentRound and maxRounds), and
+    // the guide defines the word the same way; the leg register that
+    // some of the newer systems write in is recorded where it ships (see
+    // the leg reports in ./telemetry and the voyage log). The two words
     // name one thing: a voyage is the whole run, and it is measured in
     // rounds. The tutorial used to call each lap a voyage, which is what
     // left a captain who read the guide and then looked at the rail
@@ -562,8 +564,19 @@ export const MODES: Record<GameMode, ModeConfig> = {
     // orders before parley, where Classic reads parley before orders. The
     // six names are the design's, and the artisan bench, which used to be a
     // checkpoint of its own after the table, is the second half of Market.
+    //
+    // [W2: the path draft] And the seat this mode opens its rounds at: the
+    // hands are dealt as the voyage leaves the dock, so the first thing a
+    // round asks this table is which cards each captain keeps, and Dawn
+    // opens behind it. It is written here rather than folded in by a lap
+    // reader because it is one of this mode's own rules, like the orders
+    // order above it; the reader that honors the draft's own switch folds
+    // the seat back out of the lap when the switch is off (see lapOrder in
+    // ./checkpoint.ts), so the rolled back build walks the same seven
+    // entries it always did and opens at Dawn.
     checkpointPhaseOrder: [
       "harbor",
+      "path_draft",
       "dawn",
       "market",
       "orders",

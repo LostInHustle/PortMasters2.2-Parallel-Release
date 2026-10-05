@@ -11,6 +11,7 @@ import {
   drawAudit,
   fulfillmentLine,
   normalizeOrderFills,
+  pruneStaleVotes,
 } from "@/lib/game/audit";
 import { LARDER_MAX } from "@/lib/game/constants/supplies";
 import { checkSave, snapshotFromSave } from "@/lib/game/integrity";
@@ -164,6 +165,33 @@ export async function manifestAuditSuite(
     "a room split across two captains carries nothing, and neither does a room with no votes in it",
   );
 
+  // The book of nominations, re-judged against the room that exists now.
+  // A nomination is cast by one captain and for another, so both ends are
+  // the roster's: a vote either of them has left behind is dropped rather
+  // than counted under a shrunken roster, which is the same flaw the door
+  // check closes for fresh votes, read on the votes already in the book.
+  const liveRoster = new Set(["voter-0", "voter-1", "voter-2"]);
+  const prunedBook = pruneStaleVotes(
+    new Map([
+      ["voter-0", "voter-1"],
+      ["voter-1", "voter-0"],
+      ["voter-2", "gone-captain"],
+    ]),
+    liveRoster,
+  );
+  check(
+    prunedBook.size === 2 &&
+      prunedBook.get("voter-0") === "voter-1" &&
+      prunedBook.get("voter-1") === "voter-0" &&
+      !prunedBook.has("voter-2"),
+    "a nomination for a captain the room has stopped counting is dropped from the book, and one between counted captains stays",
+  );
+  check(
+    pruneStaleVotes(new Map([["gone-captain", "voter-0"]]), liveRoster).size ===
+      0 && pruneStaleVotes(new Map(), liveRoster).size === 0,
+    "and a nomination cast by a captain the room has stopped counting goes the same way",
+  );
+
   // The record behind the sample, which is the one thing in the mode a
   // whole table reads and believes, so its shape is judged here rather
   // than trusted.
@@ -213,6 +241,24 @@ export async function manifestAuditSuite(
         { round: 1, port: "Quanzhou Port", items: [{ type: "Tea", qty: 1 }] },
       ]).length === 0,
     "a save with no manifest, or with lines that are not one, reads as a captain who has filed nothing",
+  );
+  // The leg bound, which landed with the bug audit: a fill dated past the
+  // leg the room itself has reached cannot be a thing the captain did, so
+  // a reader that knows the room's leg drops it. Read from both sides
+  // here, because both readers exist and they disagree on purpose: the
+  // audit reveal passes the leg the vote carried in, the finish ledger
+  // passes the voyage's own length, and the load path passes nothing,
+  // because a save being healed has no room to be read against yet.
+  const futureFills = [
+    manifestFill(4, "Quanzhou Port", "Tea", 1, 10),
+    manifestFill(5, "Ningbo Port", "Silk", 1, 10),
+    manifestFill(6, "Fuzhou Port", "Porcelain Clay", 1, 10),
+  ];
+  check(
+    normalizeOrderFills(futureFills, 5).length === 2 &&
+      normalizeOrderFills(futureFills, 5).every((fill) => fill.round <= 5) &&
+      normalizeOrderFills(futureFills).length === 3,
+    "a fill dated past the leg the room has reached is dropped by the reader that knows the leg, and kept by the one that does not",
   );
 
   // [J1: the private information review] The bounds the review put on a
@@ -598,14 +644,22 @@ export async function manifestAuditSuite(
   // suite that assumed they shared a switch would pass here while lying
   // about a live deployment.
   const hasLarder = auditRevealFrame?.larder !== undefined;
+  // The provisions pair rides together or not at all: the count the badge
+  // prints and the engine's own short rations reading the sentence prints
+  // (see AuditReveal.shortRations). Both are the same disclosure, so the
+  // shape below has two forms rather than three.
   check(
     Object.keys(auditRevealFrame ?? {})
       .sort()
       .join(",") ===
       (hasLarder
-        ? "fulfillments,larder,roomId,round,target"
+        ? "fulfillments,larder,roomId,round,shortRations,target"
         : "fulfillments,roomId,round,target"),
-    "the reveal's fields are the plan's allow list and nothing else, with the Larder on it when the provisions layer is on",
+    "the reveal's fields are the plan's allow list and nothing else, with the Larder pair on it when the provisions layer is on: the count the badge prints and the engine's own short rations reading the sentence prints, so the reveal says what the rule says rather than what the number suggests",
+  );
+  check(
+    !hasLarder || typeof auditRevealFrame?.shortRations === "boolean",
+    "and the reading beside the count is that rule's own answer as a boolean, where a sentence drawn from the count alone used to describe a captain who lost every hand as a crew on short rations",
   );
   check(
     !hasLarder ||
@@ -739,5 +793,190 @@ export async function manifestAuditSuite(
   check(
     (await staleReveal) === null,
     "and a harbor that has just reopened hands nobody the last voyage's finding",
+  );
+
+  // [bug audit] The room that reopens is the room the two walks below
+  // sail. The first is the stale nomination: a vote the book still holds
+  // from a captain the room has stopped counting must not carry a
+  // majority with nobody behind it. The book below holds two, the second
+  // captain goes bankrupt mid leg, and the room is four. Without the
+  // prune the third nomination would be the third vote in the book and
+  // the manifest would open two captains early; with it, the third vote
+  // is two of four and the fourth is what opens.
+  const auditVoyageTwo = auditSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === auditRoomId,
+    ),
+  );
+  auditSockets[0].emit("room:start", { roomId: auditRoomId });
+  await Promise.all(auditVoyageTwo);
+  auditSockets[1].emit("game:status", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 120,
+    reputation: 12,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== AUDIT_FROM_ROUND ||
+      (await auditRoomRow())?.currentPhase !== "parley") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const revealBase = revealFrames.length;
+  const tallyBase = tallyFrames.length;
+  auditSockets[0].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  auditSockets[1].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  // The second captain goes bankrupt mid leg. The room stops counting
+  // them there and then, and the nomination they already cast stays in
+  // the book until the next one forces the book to be re-read.
+  auditSockets[1].emit("game:status", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    phase: "bankruptcy",
+    phaseLabel: "Bankrupt",
+    gold: 0,
+    reputation: 0,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  await auditSettle();
+  auditSockets[2].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  const prunedTally = tallyFrames[tallyFrames.length - 1];
+  check(
+    // A tally reaches every captain, so one vote is one frame per socket.
+    tallyFrames.length === tallyBase + auditSockets.length * 3 &&
+      revealFrames.length === revealBase &&
+      Object.keys(prunedTally?.votes ?? {}).length === 2 &&
+      !(gambitSecond.id in (prunedTally?.votes ?? {})) &&
+      prunedTally?.votes[gambitHost.id] === auditTargetId &&
+      prunedTally?.votes[gambitThird.id] === auditTargetId,
+    "a nomination from a captain the room has stopped counting leaves the book when the next one lands, so two of the four still sailing open nothing",
+  );
+  auditSockets[3].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  check(
+    tallyFrames.length === tallyBase + auditSockets.length * 4 &&
+      revealFrames.length === revealBase + auditSockets.length &&
+      revealFrames[revealFrames.length - 1]?.reveal?.target?.userId ===
+        auditTargetId,
+    "and the fourth nomination is the majority of four, so the pruned book carries for real",
+  );
+
+  // The second walk is the marked manifest: a row the Ledger Integrity
+  // Pass has judged impossible is the one save the room must not read
+  // anything out of, because every number in it is exactly as
+  // trustworthy as the number that failed. The reveal for it withholds
+  // the lines and the Larder and carries the flag instead, the same
+  // choice the finish ledger makes for a forged voyage. The lines are
+  // filed below on purpose: an empty manifest would read the same way
+  // whether or not the withholding worked, so the check is that a
+  // manifest this captain filed did not come out.
+  auditSockets[0].emit("room:restart", { roomId: auditRoomId });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== 1 ||
+      (await auditRoomRow())?.currentPhase !== "harbor") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const auditVoyageThree = auditSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === auditRoomId,
+    ),
+  );
+  auditSockets[0].emit("room:start", { roomId: auditRoomId });
+  await Promise.all(auditVoyageThree);
+  auditSockets[1].emit("game:status", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 120,
+    reputation: 12,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== AUDIT_FROM_ROUND ||
+      (await auditRoomRow())?.currentPhase !== "parley") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const flaggedSeeded = await call<{ ok: boolean }>("/api/game/state", {
+    method: "PUT",
+    cookie: gambitFourth.cookie,
+    body: JSON.stringify({
+      roomId: auditRoomId,
+      data: { orderFills: auditFills, money: 9_999_999_999 },
+    }),
+  });
+  const flaggedRow = await db.gameState.findUnique({
+    where: { userId_roomId: { userId: auditTargetId, roomId: auditRoomId } },
+    select: { integritySeverity: true },
+  });
+  check(
+    flaggedSeeded.status === 200 &&
+      flaggedRow?.integritySeverity === "impossible",
+    "a save whose books the Ledger Integrity Pass cannot reconcile is marked before the room ever looks at it",
+  );
+  const flaggedBase = revealFrames.length;
+  for (const voter of [auditSockets[0], auditSockets[2], auditSockets[4]]) {
+    voter.emit("audit:vote", {
+      roomId: auditRoomId,
+      round: AUDIT_FROM_ROUND,
+      targetUserId: auditTargetId,
+    });
+  }
+  await auditSettle();
+  const flaggedFrame = revealFrames[revealFrames.length - 1]?.reveal;
+  check(
+    revealFrames.length === flaggedBase + auditSockets.length &&
+      flaggedFrame?.flagged === true &&
+      (flaggedFrame?.fulfillments?.length ?? -1) === 0 &&
+      flaggedFrame?.larder === undefined,
+    "and the marked manifest opens withheld: the flag instead of the lines, and the Larder off the frame rather than zeroed",
+  );
+  check(
+    Object.keys(flaggedFrame ?? {})
+      .sort()
+      .join(",") === "flagged,fulfillments,roomId,round,target",
+    "with the reveal's exact field list one word longer than the ordinary one, and nothing else on it",
   );
 }

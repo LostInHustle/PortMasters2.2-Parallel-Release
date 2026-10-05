@@ -299,9 +299,22 @@ export function showWelcome(state: GameState, logs: string[]) {
 // own, so folding it into Market removed a case rather than adding one; the
 // bartering case is the Parley case with a new name, because the exchange it
 // closes is the same exchange.
+//
+// [W2: the path draft] And a seventh case beside them, which breaks rather
+// than settling anything: the draft's seat has no work of its own to commit
+// at the departure, because the whole of its work happened on the server
+// before the room was told to move. The picks were laid as they were taken,
+// the settled path rides the view this client already read (see
+// applyDraftPath), and the departure is the lap's own step off the seat.
 export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
-  const from = state.phase;
+  // Read through the same normalizer the load heal uses (see heal-save):
+  // a token this build does not speak moves as the phase it means rather
+  // than falling to the default below, where the seat would advance
+  // nothing while the ready check refuses it.
+  const from = normalizePhase(state.phase);
   switch (from) {
+    case "path_draft":
+      break;
     case "market":
       // Leaving the market settles the port purchase half of the phase. The
       // artisan half settles nothing: the phase exists so every captain buys
@@ -396,12 +409,16 @@ const AUTO_COMMIT_PRESSES = 3;
 // The room gates five seats, and every one of them is left by doing the seat's
 // work and then stepping off it: the market settles, the parley closes, the
 // orders are counted, the raid and then the books are settled, the yard is
-// skipped. Two seats are not left that way and have no generic departure at
+// skipped. Three seats are not left that way and have no generic departure at
 // all. The pier is left by the host setting sail, which is an order rather
 // than a vote. Dawn is left by choosing: a boon is not confirmed, it is
 // picked, so the only departure from it is lockInBoon with a card in hand.
-// A captain standing anywhere else (inside the module draft, at the terminal
-// screens) is not standing at a seat the room is waiting on at all.
+// And the draft's seat [W2] is left by the deal settling rather than by any
+// captain's press: the server announces the advance when every seat holds a
+// card, so a ready vote here would be a promise about a step that is not the
+// room's to take early. A captain standing anywhere else (inside the module
+// draft, at the terminal screens) is not standing at a seat the room is
+// waiting on at all.
 //
 // This is asked before a ready vote rather than after one, because the vote is
 // a promise the whole table pays for. The room announces the advance once
@@ -418,6 +435,7 @@ export function canLeavePhase(state: {
   return (
     !state.gameOver &&
     state.phase !== "dawn" &&
+    state.phase !== "path_draft" &&
     isGatedPhase(state.mode, state.phase)
   );
 }
@@ -508,6 +526,19 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
     lockInBoon(state, ctx, boonId, logs);
     return;
   }
+  // [W2: the path draft] The draft's seat is left by the deal settling
+  // rather than by a press, which is why the generic departure below cannot
+  // carry it: canLeavePhase refuses this seat on purpose, so that no ready
+  // vote can promise the room a step only the settle may take. The
+  // departure still runs here, because this function is what a client runs
+  // when the room's own advance frame arrives, and that frame only ever
+  // comes after settleDraft has put every seat's path in its captain's
+  // hands. The step off is the lap's, the same one a ready set would have
+  // taken, and no standing order has anything to do at this seat.
+  if (state.phase === "path_draft") {
+    nextPhase(state, ctx, logs);
+    return;
+  }
   // The three seats whose work is a set of presses rather than the departure
   // itself: the captain's instructions do what they can, and the departure
   // below then leaves the seat on the lap's own terms, exactly as it does for
@@ -545,6 +576,14 @@ function enterPhase(
   phaseStr: string,
 ): void {
   switch (normalizePhase(phaseStr)) {
+    case "path_draft":
+      // [W2] Nothing on the captain's own sheet belongs to this seat, the
+      // way the pier belongs to the host: the hand was dealt and answered
+      // on the server, and the path lands the moment the settled view is
+      // read (see applyDraftPath). So entering it is standing in it, and
+      // the state is the whole of what there is to set.
+      state.phase = "path_draft";
+      return;
     case "dawn":
       startBoonDrafting(state, logs);
       return;

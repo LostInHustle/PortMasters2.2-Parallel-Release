@@ -31,6 +31,7 @@ import {
   rememberSocket,
   reconcileMembershipAfterBoot,
   forgetDetailRequests,
+  clearDepartureTimers,
   type DepartureCleanup,
 } from "./presence";
 import { clearRoomStatuses } from "./status";
@@ -358,6 +359,14 @@ export function closeRealtime(io: Server): Promise<void> {
       io.disconnectSockets(true);
     } catch (err) {
       console.error("[realtime] error while dropping sockets", err);
+    }
+    // What the dropped sockets may have just armed, and what earlier
+    // departures were still holding: a shutdown is no one leaving, so no
+    // seat is reaped over it (see armDeparture in ./presence).
+    try {
+      clearDepartureTimers();
+    } catch (err) {
+      console.error("[realtime] error while releasing presence timers", err);
     }
     try {
       io.close(() => resolve());

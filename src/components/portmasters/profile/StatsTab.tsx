@@ -23,10 +23,6 @@ export function StatsTab({
   chronicles: VoyageChronicle[];
 }) {
   if (!legacy || !stats) {
-    // The test sits inside the AnimatePresence rather than above it, so the
-    // panel is still in the tree for the frame its exit animation runs.
-    // Returning null up here instead drops it instantly and makes that exit
-    // prop dead. The dialogs in this folder are written the same way.
     return (
       <div className="py-12 text-center text-muted-foreground">
         No voyage records yet. Set sail to begin your legacy.

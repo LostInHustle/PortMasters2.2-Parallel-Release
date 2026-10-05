@@ -25,7 +25,7 @@ import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { normalizeOrderFills } from "@/lib/game/audit";
 import { modeConfig } from "@/lib/game/mode";
-import { objectiveProgress } from "@/lib/game/objectives";
+import { fleetTrace, objectiveProgress } from "@/lib/game/objectives";
 import {
   evaluateVictory,
   readEnding,
@@ -39,7 +39,10 @@ import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import { unlockLineFor } from "@/lib/unlock";
 import { maroonResultFor } from "../maroon";
 import type { RivalStanding } from "../rival";
-import type { FinishedCaptain, StandingRow, VoyageRun } from "./voyage";
+import type { FinishedCaptain, VoyageRun } from "./voyage";
+// The standings row is declared with the wire shape it travels in; the
+// builder here is its sole producer (see the type's own comment).
+import type { StandingRow } from "@/types/realtime/voyage";
 
 // What the harbor decided about one captain before anything else is read
 // about them.
@@ -249,6 +252,7 @@ function readHeldCards(data: Record<string, unknown>): string[] {
 async function concludeFinisher(
   f: FinishedCaptain,
   ctx: FinisherContext,
+  objectiveMet: boolean,
 ): Promise<FinisherRows> {
   const forged = ctx.forgedUsers.has(f.userId);
   const crowned = f.userId === ctx.winnerId;
@@ -261,9 +265,9 @@ async function concludeFinisher(
   const legacy = await bankCaptainLegacy(f, ctx.run, facts);
   const outcome: FinisherOutcome = { ...facts, ...legacy };
   const newMerits = await awardCaptainMerits(f, ctx.run, outcome);
-  const record = readCaptainRecord(f, ctx, outcome);
+  const record = readCaptainRecord(f, ctx, outcome, objectiveMet);
   await writeChronicleRow(f, ctx, outcome, record);
-  const revealed = revealRow(f, outcome, record);
+  const revealed = revealRow(f, outcome, record, ctx.run.rounds);
   const standing = standingRow(f, outcome, record, newMerits);
   const rival = rivalRow(f, outcome);
 
@@ -429,11 +433,16 @@ async function awardCaptainMerits(
 }
 
 // What this captain's own save says about the voyage: the chronicle's
-// extras, the commission's standing, and the verdicts decided on them.
+// extras and the verdicts decided on them. The commission's standing is
+// the one input that is not read here: it is a fact about the fleet, so
+// the caller decides it once for the voyage (see readFleetMet) and hands
+// the same answer to every captain, which is what keeps two rows of one
+// voyage from disagreeing about it.
 function readCaptainRecord(
   f: FinishedCaptain,
   ctx: FinisherContext,
   outcome: FinisherOutcome,
+  objectiveMet: boolean,
 ): CaptainRecord {
   // The blob this captain's own save was parsed into, read with the rest
   // of the harbor's above and handed to both readers below: the
@@ -441,19 +450,6 @@ function readCaptainRecord(
   // row for reads as the absence an unreadable save gives.
   const save = ctx.saves.get(f.userId) ?? null;
   const extras = extractChronicleExtras(save, outcome.forged, f.reputation);
-  // Whether the commission was met is read from the last leg this
-  // captain's client recorded, which is the only place it was ever
-  // known: the fleet's total is transient server state and is gone by
-  // the time the voyage concludes.
-  const lastSeen = extras.objectiveTrace[extras.objectiveTrace.length - 1];
-  // Whether the fleet's commission was met, computed once and used
-  // twice, because the column below and the verdict under it must not be
-  // able to disagree: a row recording one answer while the win was
-  // decided on another is the one contradiction this row must never
-  // carry.
-  const objectiveMet = ctx.run.objective
-    ? objectiveProgress(ctx.run.objective, lastSeen?.delivered ?? {}).met
-    : false;
   // [H4: the Broker] Whether this captain won the game their card set
   // them. A forged finish wins nothing, the same way it banks no Renown:
   // the account keeps no memory of the voyage at all, and the verdict is
@@ -593,6 +589,7 @@ function revealRow(
   f: FinishedCaptain,
   outcome: FinisherOutcome,
   record: CaptainRecord,
+  roundsAllowed: number,
 ): RevealedCaptain {
   // [H8: the reveal and the replay ledger] This captain's row on the
   // ledger, built from the verdict and the marks decided just above. Two
@@ -617,7 +614,13 @@ function revealRow(
     reputation: f.reputation,
     peerTradeProfit: outcome.forged ? 0 : ending.peerTradeProfit,
     delivered: outcome.forged ? {} : ending.delivered,
-    fills: outcome.forged ? [] : normalizeOrderFills(save?.orderFills),
+    // The manifest is read with the voyage's own length as its ceiling:
+    // a line dated past the last leg is a line no round of this voyage
+    // could have run, so it is dropped rather than printed on the room's
+    // ledger (see normalizeOrderFills).
+    fills: outcome.forged
+      ? []
+      : normalizeOrderFills(save?.orderFills, roundsAllowed),
   };
 }
 
@@ -669,6 +672,41 @@ type FinisherTally = {
   traces: ObjectiveTraceEntry[][];
 };
 
+// Whether the fleet filled its commission, decided once for the voyage.
+//
+// The fact this answers is about the fleet rather than about any one
+// client, so it is read the way the reveal ledger below reads it: every
+// non-forged finisher's own record of how the board stood, merged by max
+// per good per leg. A captain whose client missed the last leg is the one
+// this merge exists for. Read per captain, their row would have read
+// short while the ledger under it painted the commission filled, and the
+// verdict under their own goal would have been decided on their
+// observation rather than on the voyage. Reading it once, before the
+// loop, is what victory.ts promises the row: the same answer on every
+// Chronicle of one voyage, so two rows cannot disagree about a number the
+// whole table watched fill.
+//
+// A forged captain's record is dropped from the merge, the rule the
+// ledger's own merge already applies, and the flag itself is written for
+// them like anyone else: their verdict is false whatever this says, and
+// the column is a fact about the voyage they sailed rather than about
+// their books.
+function readFleetMet(
+  finished: readonly FinishedCaptain[],
+  ctx: FinisherContext,
+): boolean {
+  if (!ctx.run.objective) return false;
+  const traces: ObjectiveTraceEntry[][] = [];
+  for (const f of finished) {
+    if (ctx.forgedUsers.has(f.userId)) continue;
+    const save = ctx.saves.get(f.userId) ?? null;
+    traces.push(readObjectiveTrace(save?.objectiveTrace));
+  }
+  const merged = fleetTrace(traces);
+  const lastSeen = merged[merged.length - 1];
+  return objectiveProgress(ctx.run.objective, lastSeen?.delivered ?? {}).met;
+}
+
 // Every finisher, one at a time, in seat order.
 export async function concludeFinishers(
   io: Server,
@@ -692,8 +730,12 @@ export async function concludeFinishers(
   // finisher as a tie rather than a win or loss.
   const rivalStandings: RivalStanding[] = [];
 
+  // The fleet's own outcome, read once for every verdict below and for
+  // every row they write.
+  const objectiveMet = readFleetMet(finished, ctx);
+
   for (const f of finished) {
-    const rows = await concludeFinisher(f, ctx);
+    const rows = await concludeFinisher(f, ctx, objectiveMet);
     revealed.push(rows.revealed);
     // What this captain's client saw the fleet hand over, leg by leg, kept
     // for the merge below. A forged captain's record is dropped for the

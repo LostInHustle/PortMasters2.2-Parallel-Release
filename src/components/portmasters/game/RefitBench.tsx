@@ -14,6 +14,7 @@ import {
   REWEAVE_RAGS,
 } from "@/lib/game/constants/garments";
 import { RAGS } from "@/lib/game/constants/goods";
+import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
@@ -30,8 +31,7 @@ import {
 import { garmentRoom, garmentSpec } from "@/lib/game/garments";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { Shirt } from "lucide-react";
-import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
+import { MarketBlock, MarketEmpty, MarketError, OfferRow } from "./OfferBoard";
 import type { Refit } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than on
@@ -111,14 +111,11 @@ export function RefitBench({
   ).filter((worn) => garmentRoom(game, worn) > 0);
 
   return (
-    <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5 mb-3.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-refit mb-1.5">
-        <Shirt className="h-3.5 w-3.5" />
-        {SELLER_PATH.crest} Loom Refit Bench
-        <span className="font-normal text-muted-foreground ml-1">
-          a garment put right in one leg
-        </span>
-      </div>
+    <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5">
+      {/* The bench's own heading line is gone (W4): the fold row above it
+          already names the desk, so the only thing a header here added was
+          a third repetition of the same sentence between the row and the
+          paragraph that explains the trade. */}
       <p className="text-[11px] text-muted-foreground mb-2 max-w-2xl">
         Clothes lose a point of wear every leg and two on a cold one. A{" "}
         {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a
@@ -130,7 +127,7 @@ export function RefitBench({
           who holds no path reads the board below it and the tailors' row,
           which is what makes this a market rather than a screen. */}
       {canSell && (
-        <div className="rounded-lg border border-refit/15 bg-background/40 p-3 mb-3">
+        <MarketBlock tone="refit">
           {takenOn ? (
             <p className="text-center text-[11px] text-muted-foreground">
               You have already taken on a refit this leg, and one pair of hands
@@ -178,14 +175,14 @@ export function RefitBench({
               </p>
             </>
           )}
-        </div>
+        </MarketBlock>
       )}
 
       {/* The harbor's pile. A Loom captain's supply is the scrap the fleet
           brought ashore, which is why this row is drawn for that path alone
           and why it reads the same weather the crew freezes in. */}
       {canSell && (
-        <div className="rounded-lg border border-refit/15 bg-background/40 p-3 mb-3">
+        <MarketBlock tone="refit">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
             <span className="text-muted-foreground">Harbor pile</span>
             <span className="font-bold text-refit">{pile}</span>
@@ -220,71 +217,76 @@ export function RefitBench({
               ? "No rags came ashore this leg. The pile only fills after a cold one."
               : `The pile is what the fleet's scrap comes to after a cold leg, and it is drawn from the voyage's own weather. ${REWEAVE_RAGS} rags go back on the loom as one ${REWEAVE_GOOD}.`}
           </p>
-        </div>
+        </MarketBlock>
       )}
 
       {/* What every captain can do alone, and the price a refit is measured
-          against. One point a leg, once, whatever the path. */}
-      <div className="rounded-lg border border-black/5 dark:border-white/10 bg-background/40 p-3 mb-3">
+          against. One point a leg, once, whatever the path.
+
+          A leg whose mend is spent keeps the whole row on screen rather
+          than swapping it for a sentence: the field read the row vanishing
+          as every button having fired, and no panel that deletes its own
+          record can argue with that. The worked garment's number has moved
+          and the others' have not, which is the receipt, and the disabled
+          press says tomorrow without taking the numbers down. */}
+      <MarketBlock tone="plain">
         <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
           <span className="text-muted-foreground">Harbor tailors</span>
           {mendedThisLeg ? (
             <span className="text-muted-foreground">
-              have already worked on the crew this leg. They take another
-              garment tomorrow.
+              have already worked on the crew this leg. Another garment waits
+              for tomorrow.
             </span>
           ) : mendable.length === 0 ? (
             <span className="text-muted-foreground">
-              have nothing to put right. The crew's clothes are whole.
+              {(game.garments ?? []).length === 0
+                ? "have nothing to put right. Nobody in the crew is wearing anything."
+                : "have nothing to put right. The crew's clothes are whole."}
             </span>
           ) : (
-            <>
-              <span className="text-muted-foreground">
-                will put {TAILOR_WORK} back for {MEND_GOLD_PER_POINT} Gold, once
-                a leg.
-              </span>
-              {mendable.map((worn) => {
-                const spec = garmentSpec(worn);
-                const left = spec
-                  ? spec.durability - garmentRoom(game, worn)
-                  : 0;
-                return (
-                  <Button
-                    key={worn}
-                    size="sm"
-                    className="h-7 rounded-lg px-2.5 text-[11px]"
-                    onClick={() => act((g, l) => mendGarment(g, worn, l))}
-                  >
-                    🪡 Mend {worn} ({left}
-                    {spec ? ` of ${spec.durability}` : ""},{" "}
-                    {MEND_GOLD_PER_POINT}💰)
-                  </Button>
-                );
-              })}
-            </>
+            <span className="text-muted-foreground">
+              will put {TAILOR_WORK} back for {MEND_GOLD_PER_POINT} Gold, once a
+              leg.
+            </span>
           )}
+          {/* The row of buttons stays a row after the mend: the same
+              buttons, greyed, with the numbers the mend left behind. The
+              spent leg reads the whole wardrobe, because a garment already
+              whole has no room to mend and would otherwise vanish from a
+              row whose whole job is to account for where the points went. */}
+          {(mendedThisLeg
+            ? Array.from(
+                new Set((game.garments ?? []).map((garment) => garment.good)),
+              )
+            : mendable
+          ).map((worn) => {
+            const spec = garmentSpec(worn);
+            const left = spec ? spec.durability - garmentRoom(game, worn) : 0;
+            return (
+              <Button
+                key={worn}
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={mendedThisLeg ? "secondary" : "default"}
+                disabled={mendedThisLeg}
+                onClick={() => act((g, l) => mendGarment(g, worn, l))}
+              >
+                🪡 Mend {worn} ({left}
+                {spec ? ` of ${spec.durability}` : ""}, {MEND_GOLD_PER_POINT}💰)
+              </Button>
+            );
+          })}
         </div>
-      </div>
+      </MarketBlock>
 
-      {refit.error && (
-        <p className="text-center text-[11px] text-alarm mb-2">
-          {refit.error}{" "}
-          <button
-            type="button"
-            onClick={refit.clearError}
-            className="underline"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
+      <MarketError error={refit.error} onDismiss={refit.clearError} />
 
       {refit.refits.length === 0 ? (
-        <p className="text-center text-xs text-muted-foreground py-2">
+        <MarketEmpty className="py-2">
           {canSell
             ? "Nothing on the bench yet. Your offer is the first."
             : "No refit work on offer this leg."}
-        </p>
+        </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
           {refit.refits.map((row) => (
@@ -333,7 +335,7 @@ function RefitRow({
   // this market bounds (see refitSellerBusy): a customer may buy a refit for
   // every garment they own, and a Loom has two hands and one leg.
   const blocked = stale
-    ? "That offer belongs to an earlier leg."
+    ? STALE_OFFER
     : points < 1
       ? `Nothing left to put right on your ${row.good}.`
       : refitSellerBusy(refit.refits, row.sellerUserId, game.currentRound)
@@ -341,43 +343,19 @@ function RefitRow({
         : null;
 
   return (
-    <PathDeskRow mine={mine}>
-      <span className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-medium">{refitLine(row, me)}</span>
-        {row.status === "offered" && row.buyerUserId && (
-          <JustForChip forMe={isBuyer} name={row.buyerName} />
-        )}
-      </span>
-
-      {row.status === "offered" &&
-        (mine ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-7 px-2.5 text-[10px] rounded shrink-0"
-            onClick={() => refit.cancel(row.id)}
-          >
-            Cancel
-          </Button>
-        ) : (
-          <span className="flex flex-col items-end gap-0.5 shrink-0">
-            <Button
-              size="sm"
-              className="h-7 px-2.5 text-[10px] rounded"
-              variant={blocked ? "secondary" : "default"}
-              disabled={blocked !== null}
-              onClick={() => refit.accept(row.id)}
-            >
-              {crest} Take It
-            </Button>
-            {blocked && (
-              <span className="text-[9px] text-muted-foreground">
-                {blocked}
-              </span>
-            )}
-          </span>
-        ))}
-    </PathDeskRow>
+    <OfferRow
+      mine={mine}
+      line={refitLine(row, me)}
+      chip={
+        row.status === "offered" && row.buyerUserId
+          ? { forMe: isBuyer, name: row.buyerName }
+          : null
+      }
+      acceptLabel={`${crest} Take It`}
+      blocked={blocked}
+      onCancel={() => refit.cancel(row.id)}
+      onAccept={() => refit.accept(row.id)}
+    />
   );
 }
 

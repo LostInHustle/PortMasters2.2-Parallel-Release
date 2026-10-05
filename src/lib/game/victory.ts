@@ -28,8 +28,9 @@
 //
 // The numbers below are the mode's balance knobs, and each one is the
 // first thing to move when a band reads wrong rather than the role itself.
-// The plan's bands are an honest side between 52 and 58 percent, a Broker
-// between 35 and 45, and a Pirate between 20 and 26.
+// The plan's bands live in one place, WIN_RATE_TARGETS in ./balance: an
+// honest side's share of voyage wins, with a Broker's and a Pirate's
+// beside it.
 // =====================================================================
 
 import type { Objective } from "./objectives";

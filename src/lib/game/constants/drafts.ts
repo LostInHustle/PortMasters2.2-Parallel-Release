@@ -38,6 +38,12 @@
 // =====================================================================
 import { BOTH_MODES, GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
 
+// The emergency loan's figure, named because two surfaces print it: the
+// card a captain is dealt and the manual's own line about the draft. The
+// record's effect and both of its strings read this constant, so the
+// number shown and the number the purse receives cannot come apart.
+export const EMERGENCY_LOAN_GOLD = 40;
+
 export const BOONS_TIER0: CardRecord[] = [
   {
     id: "silk_wind",
@@ -140,14 +146,17 @@ export const BOONS_TIER0: CardRecord[] = [
     pathWeight: NO_LEAN,
     trigger: "boon_draft",
     condition: { kind: "gold_below", amount: 30, weight: 4.0, otherwise: 0.2 },
-    effect: { kind: "flags", flags: { instant_gold: 40 } },
+    effect: { kind: "flags", flags: { instant_gold: EMERGENCY_LOAN_GOLD } },
     modes: BOTH_MODES,
     strings: {
       en: {
         name: "Emergency Loan",
-        desc: "Gain 40 Gold immediately. No strings attached.",
+        desc: `Gain ${EMERGENCY_LOAN_GOLD} Gold immediately. No strings attached.`,
       },
-      zh: { name: "应急借款", desc: "立即获得 40 金，无需偿还。" },
+      zh: {
+        name: "应急借款",
+        desc: `立即获得 ${EMERGENCY_LOAN_GOLD} 金，无需偿还。`,
+      },
     },
   },
   {
@@ -593,7 +602,7 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Tax Evasion Ledger",
-        desc: "Income tax and VAT are halved. A completed order risks a 20 Gold audit.",
+        desc: "Income tax and VAT are halved. A completed order has a 15% chance of a 20 Gold audit.",
       },
       zh: {
         name: "逃税账簿",

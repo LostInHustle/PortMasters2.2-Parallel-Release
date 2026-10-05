@@ -155,7 +155,7 @@ export type CardEffect =
 // that mode's pool rather than unlikely in it: a card the base mode does
 // not run is a card the base mode does not offer, and the ceiling check in
 // ./cards is what keeps the two halves of that statement from drifting.
-export type ModeWeights = Record<GameMode, number>;
+type ModeWeights = Record<GameMode, number>;
 
 // The ceiling each mode runs. Classic is the competitive table, so it runs
 // the tight one; Ocean Gambit shares its headline objective across the
@@ -201,14 +201,14 @@ export const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
 // that could arrive with a name in one language and a description in the
 // other.
 export type CardText = { name: string; desc: string };
-export type Language = "en" | "zh";
+type Language = "en" | "zh";
 export const LANGUAGES: readonly Language[] = ["en", "zh"];
 
 // The language the tree prints. Named rather than implied, so J3's switch
 // is a change to this line plus whatever reads it, and never a hunt for
 // the places a pool was read in the wrong one.
 export const SHIPPED_LANGUAGE: Language = "en";
-export type CardStrings = Record<Language, CardText>;
+type CardStrings = Record<Language, CardText>;
 
 // The record itself. Every field the plan's F2 names, in the plan's order.
 export interface CardRecord {

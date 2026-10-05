@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
+import { STALE_OFFER } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   ESCORT_SELLER_PATH,
@@ -16,7 +17,13 @@ import { escortContractsOn } from "@/lib/game/flags";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
+import {
+  MarketBlock,
+  MarketEmpty,
+  MarketError,
+  MarketPanel,
+  OfferRow,
+} from "./OfferBoard";
 import type { Escort } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than
@@ -76,23 +83,23 @@ export function EscortMarket({
   const beatenOff = `${Math.round(escortCoverage() * 100)}%`;
 
   return (
-    <div className="rounded-xl border border-parley/15 bg-parley/[0.03] p-4 mb-4">
-      <h3 className="text-center font-semibold mb-1 text-sm">
-        {SELLER_PATH.crest} {SELLER_PATH.name} Escort Market
-      </h3>
-      <p className="text-center text-[11px] text-muted-foreground mb-3 max-w-xl mx-auto">
-        One leg of protection, at a price the two of you agree. A raid that
-        would have taken the buyer's hold meets the seller's cannons instead:
-        the guns beat off {beatenOff} of it, and whatever is left lands on the
-        seller's own Gold. The fee is paid when you shake hands, and the cover
-        lasts the leg it was sold for.
-      </p>
-
+    <MarketPanel
+      title={`${SELLER_PATH.crest} ${SELLER_PATH.name} Escort Market`}
+      intro={
+        <>
+          One leg of protection, at a price the two of you agree. A raid that
+          would have taken the buyer&apos;s hold meets the seller&apos;s cannons
+          instead: the guns beat off {beatenOff} of it, and whatever is left
+          lands on the seller&apos;s own Gold. The fee is paid when you shake
+          hands, and the cover lasts the leg it was sold for.
+        </>
+      }
+    >
       {/* The posting form belongs to the path that sells the protection. A
           captain who holds no path reads the board below it and nothing
           else, which is what makes this a market rather than a screen. */}
       {canSell && (
-        <div className="rounded-lg border border-parley/15 bg-background/40 p-3 mb-3">
+        <MarketBlock>
           <PrivateOffer
             lead={
               <span className="text-muted-foreground">
@@ -119,28 +126,17 @@ export function EscortMarket({
             One open offer per captain you name, and an offer nobody takes
             before the Parley closes is gone.
           </p>
-        </div>
+        </MarketBlock>
       )}
 
-      {escort.error && (
-        <p className="text-center text-[11px] text-alarm mb-2">
-          {escort.error}{" "}
-          <button
-            type="button"
-            onClick={escort.clearError}
-            className="underline"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
+      <MarketError error={escort.error} onDismiss={escort.clearError} />
 
       {escort.contracts.length === 0 ? (
-        <p className="text-center text-xs text-muted-foreground py-3">
+        <MarketEmpty>
           {canSell
             ? "Nothing on the market yet. Your offer is the first."
             : "No protection on offer this Parley."}
-        </p>
+        </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
           {escort.contracts.map((contract) => (
@@ -155,7 +151,7 @@ export function EscortMarket({
           ))}
         </div>
       )}
-    </div>
+    </MarketPanel>
   );
 }
 
@@ -193,55 +189,25 @@ function ContractRow({
   const blocked = covered
     ? "You are already covered for this leg."
     : stale
-      ? "That offer belongs to an earlier leg."
+      ? STALE_OFFER
       : null;
 
   return (
-    <PathDeskRow
+    <OfferRow
       mine={mine}
       className={cn(contract.status === "claimed" && "opacity-70")}
-    >
-      <span className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-medium">
-          {crest} {contractLine(contract, me)}
-        </span>
-        {contract.status === "offered" && contract.buyerUserId && (
-          <JustForChip forMe={isBuyer} name={contract.buyerName} />
-        )}
-      </span>
-
-      {contract.status === "offered" &&
-        (mine ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="h-7 px-2.5 text-[10px] rounded shrink-0"
-            onClick={() => escort.cancel(contract.id)}
-          >
-            Cancel
-          </Button>
-        ) : (
-          <span className="flex flex-col items-end gap-0.5 shrink-0">
-            <Button
-              size="sm"
-              className={cn(
-                "h-7 px-2.5 text-[10px] rounded",
-                !blocked && "pm-grad-parley",
-              )}
-              variant={blocked ? "secondary" : "default"}
-              disabled={blocked !== null}
-              onClick={() => escort.accept(contract.id)}
-            >
-              {crest} Take Cover
-            </Button>
-            {blocked && (
-              <span className="text-[9px] text-muted-foreground">
-                {blocked}
-              </span>
-            )}
-          </span>
-        ))}
-    </PathDeskRow>
+      line={`${crest} ${contractLine(contract, me)}`}
+      chip={
+        contract.status === "offered" && contract.buyerUserId
+          ? { forMe: isBuyer, name: contract.buyerName }
+          : null
+      }
+      acceptLabel={`${crest} Take Cover`}
+      acceptClassName="pm-grad-parley"
+      blocked={blocked}
+      onCancel={() => escort.cancel(contract.id)}
+      onAccept={() => escort.accept(contract.id)}
+    />
   );
 }
 

@@ -1,8 +1,8 @@
 // POST /api/check-in: claim today's Daily Check In reward for the current
 // user. One claim per UTC day; grants escalating Renown XP and advances the
-// seven day cycle (see src/lib/game/checkin.ts). Together with the voyage
-// conclusion write in the realtime layer, this is the only place a
-// CaptainLegacy row is ever written.
+// seven day cycle (see src/lib/game/checkin.ts). One of the three places a
+// CaptainLegacy row is ever written, alongside the voyage conclusion write
+// in the realtime layer and the Great House pledge in the house route.
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";

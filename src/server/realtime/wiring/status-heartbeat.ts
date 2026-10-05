@@ -247,6 +247,12 @@ async function advanceCheckpointFromReport(
   cp.phase = seatOf(report.phase);
   cp.readyUserIds.clear();
   cp.advancing = false;
+  // The hold is spent per seat (see yardHeld on the Checkpoint), and this
+  // is the seat moving: a hold carried onto the next seat would extend it
+  // by a budget that seat never spent, and the seat after the yard would
+  // be the one that lost the room its second chance rather than the yard
+  // keeping it.
+  cp.yardHeld = false;
   // The announcement this report answers has now been answered, so the watch
   // armed for it is done. Cancelled rather than left to fire, because a fire
   // would find the room already moved and return, and a timer per seat of
@@ -339,10 +345,16 @@ function sweepLegBoards(io: Server, roomId: string, cp: Checkpoint): void {
   // [F3: modules in the shipyard ladder, and trading them between
   // captains] The module market's sweep, which is the escort's rule read
   // at the same phase: a listing dies with the Parley it was posted in,
-  // and an agreed trade lives the leg it was agreed for, since the two
-  // clients settle it within a tick of the accept. Both facts are on the
-  // rows (see expireConsent), so the sweep only has to hand the board the
-  // checkpoint it is standing at.
+  // and an agreed trade lives the leg it was agreed for, because the two
+  // clients settle it within a tick of the accept. That tick is where the
+  // rule's one imperfect edge sits, and it stays for the reason the
+  // expiry is shared: a seller who goes dark between the accept and their
+  // own apply has the rest of the leg to load again and settles on that
+  // load, and one who never returns leaves the module standing on both
+  // hulls, which is the same one leg bound the escort and the refit rows
+  // carry rather than a property of this market alone (see expireConsent
+  // in @/lib/game/engine/consent). Both facts are on the rows, so the
+  // sweep only has to hand the board the checkpoint it is standing at.
   moduleTrades.sweep(io, roomId, {
     phase: cp.phase,
     round: cp.round,

@@ -7,6 +7,7 @@ import { Avatar } from "./shared";
 import { cn } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon, Anchor, Utensils } from "lucide-react";
 import { seatMarks } from "@/lib/seatMarks";
+import { HUNGRY_CREW_TOOLTIP } from "@/lib/game/constants/copy";
 
 /**
  * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
@@ -83,7 +84,7 @@ export function FleetTicker({
               {st?.shortRations && (
                 <span
                   className="flex items-center text-alarm"
-                  title="Going hungry: the crew is on short rations and working at a slower pace"
+                  title={HUNGRY_CREW_TOOLTIP}
                 >
                   <Utensils className="h-3 w-3" />
                 </span>

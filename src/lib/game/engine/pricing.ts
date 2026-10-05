@@ -121,6 +121,21 @@ export function explainTransportCost(
   const base = totalItems * 2;
   let cost = base;
 
+  // The harbor's minimum freight, taken where the charge takes it: the
+  // function above floors the run's freight at five Gold before any
+  // discount is applied, and this mirror used to reach that floor only
+  // when a ship level or a flat discount existed to trigger a branch. A
+  // light run of one or two lots therefore quoted two or four Gold above
+  // its base while the settlement took five, and an empty card quoted
+  // nothing at all. The floor is drawn as its own step rather than folded
+  // into the base, because the base is the run's own size and a captain
+  // reading the breakdown is asking where each Gold went.
+  const floored = Math.max(5, cost);
+  if (floored !== cost) {
+    steps.push({ label: "Minimum freight", delta: floored - cost });
+    cost = floored;
+  }
+
   const shipDiscount = state.shipLevel * SHIP_DISCOUNT_PER_LEVEL;
   if (shipDiscount > 0) {
     const next = Math.max(5, cost - shipDiscount);
@@ -396,7 +411,7 @@ export function explainCardPrice(
     const reduction = card.resources.reduce(
       (sum, r) =>
         carriesTag("good", r.type, "bulk")
-          ? sum + r.quantity! * hempReduction
+          ? sum + (r.quantity ?? 0) * hempReduction
           : sum,
       0,
     );
@@ -616,8 +631,17 @@ export function getHireCost(state: GameState, type: string): number {
 // exists. Reading it once per purchase keeps the Brokers Network module's
 // discount live the instant it is equipped, with no separate state write
 // needed to keep the field current.
+// The two prices of one rumor, named rather than left inline: the guide
+// states the first to every captain, and a second copy of either number
+// would be the one that went stale. The discounted price is read only by
+// the reader just below, so it is not exported.
+export const INTEL_COST = 5;
+const INTEL_COST_WITH_NETWORK = 2;
+
 export function getIntelCost(state: GameState): number {
-  return hasModule(state, "brokers_network") ? 2 : 5;
+  return hasModule(state, "brokers_network")
+    ? INTEL_COST_WITH_NETWORK
+    : INTEL_COST;
 }
 
 // ========== Broker's Favor ==========

@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import {
   DRAFT_DEAL,
   DRAFT_QUARTERMASTER_MIN,
-  DRAFT_STEP_SECONDS,
+  DRAFT_WATCH_MS,
   PATH_SWITCH_FEE_BASE,
   PATH_SWITCH_FEE_MAX,
   PATH_SWITCH_FEE_PER_LEVEL,
@@ -78,9 +78,9 @@ export async function pathDraftSuite(
   // ---- the deal's arithmetic ----
   check(
     DRAFT_DEAL === 3 &&
-      DRAFT_STEP_SECONDS * DRAFT_DEAL === 45 &&
+      DRAFT_WATCH_MS === 15_000 &&
       DRAFT_QUARTERMASTER_MIN >= 2,
-    "the deal is three cards a captain over three steps of fifteen seconds, which is the plan's forty five second interface read off the constants rather than typed into a rule, with the Quartermaster floor at the two the plan asks to be in circulation",
+    "the deal is three cards a captain over three steps that close when every hand is in, and the only clock the feature owns is the fifteen second absence window a seat that went dark is given, which nobody is ever shown, with the Quartermaster floor at the two the plan asks to be in circulation",
   );
 
   // The composition, over every table this lap can seat. Two properties
@@ -497,7 +497,7 @@ export async function pathDraftSuite(
     body: JSON.stringify({ code: draftRoom.body.room.code }),
   });
 
-  const draftSeats: Array<{
+  type DraftSeat = {
     captain: Captain;
     socket: Socket;
     views: DraftView[];
@@ -505,19 +505,12 @@ export async function pathDraftSuite(
     closed: number;
     switched: PathSwitched[];
     errors: string[];
-  }> = [];
-  for (const captain of [draftHost, draftMate]) {
-    const socket = await openAuthedSocket(captain);
-    run.sockets.push(socket);
-    const seat = {
-      captain,
-      socket,
-      views: [] as DraftView[],
-      frames: [] as Array<{ event: string; text: string }>,
-      closed: 0,
-      switched: [] as PathSwitched[],
-      errors: [] as string[],
-    };
+  };
+  // One seat's ears, attached as a function because the mate's seat is
+  // filled twice in this block: the socket that goes dark and the fresh one
+  // that re seats the same captain must both record into the same seat, or
+  // the privacy sweep at the end would read half a wire.
+  const recordSeat = (seat: DraftSeat, socket: Socket): void => {
     // Every frame this socket receives, on any event rather than on the
     // three the draft is known to use, so the privacy check at the end of
     // the deal reads the wire rather than the events the feature happens
@@ -541,6 +534,21 @@ export async function pathDraftSuite(
         seat.errors.push(payload.error);
       }
     });
+  };
+  const draftSeats: DraftSeat[] = [];
+  for (const captain of [draftHost, draftMate]) {
+    const socket = await openAuthedSocket(captain);
+    run.sockets.push(socket);
+    const seat: DraftSeat = {
+      captain,
+      socket,
+      views: [],
+      frames: [],
+      closed: 0,
+      switched: [],
+      errors: [],
+    };
+    recordSeat(seat, socket);
     const seated = waitForEvent<WireHistory>(
       socket,
       "chat:history",
@@ -578,10 +586,9 @@ export async function pathDraftSuite(
         view !== null &&
         view.hand.length === DRAFT_DEAL &&
         view.open === 2 &&
-        view.path === null &&
-        view.deadline > Date.now(),
+        view.path === null,
     ),
-    "every captain at the table is dealt their own three cards face down, told the whole table is still to choose and given the server's clock, and nobody holds a path until the last step closes",
+    "every captain at the table is dealt their own three cards face down and told the whole table is still to choose, and nobody holds a path until the last step closes",
   );
   const openingHands = openingViews.map((view) => view!.hand);
   const openingCounts = PATH_IDS.reduce(
@@ -598,14 +605,40 @@ export async function pathDraftSuite(
     `the two hands on the table are the deck this tree says a table of two is owed, to the last card (${PATH_IDS.map((id) => `${id} ${openingCounts[id]}`).join(", ")})`,
   );
 
-  // The host keeps the card the plan's evaluation watches for and the mate
-  // keeps nothing at all: their step is left to run out, which is the one
-  // path through this feature that only a clock can prove.
+  // The host keeps the card the plan's evaluation watches for and the
+  // mate's seat goes dark: absence rather than silence is what arms the
+  // room's one timer, because a captain who is present and thinking holds
+  // the table however long they take (see the header of
+  // src/server/realtime/draft.ts). The socket going is the beat the old
+  // interface proved with a countdown.
   const pickOf = (hand: readonly PathId[]): number => {
     const quartermaster = hand.indexOf("quartermaster");
     return quartermaster >= 0 ? quartermaster : DRAFT_AUTO_PICK;
   };
   const hostFirstPick = pickOf(openingHands[0]!);
+  // The step a pick was read off rides the answer, and the room holds
+  // that at the door: an index is only a card against one hand, so an
+  // answer stamped with a step the table is not standing in is refused
+  // rather than read against the cards in front of it. The beat is the
+  // one the article's own settle checks turn on, because the hands
+  // change at every turn over and a misread index would settle a captain
+  // on a paper they never chose. This probe lays nothing, which the keep
+  // below proves by being accepted: the host's own first card goes down
+  // a line later and the table counts it.
+  const staleReading = waitForEvent<{ roomId?: string; error?: string }>(
+    draftSeats[0]!.socket,
+    "draft:error",
+    (payload) => payload?.roomId === draftRoomId,
+  );
+  draftSeats[0]!.socket.emit("draft:keep", {
+    roomId: draftRoomId,
+    pick: hostFirstPick,
+    step: "last",
+  });
+  check(
+    (await staleReading)?.error === "The table has moved past that step.",
+    "an answer stamped with a step the table has left is refused for the step it names rather than read against the hand in front of it, so a pick that crossed a step's close can never settle a captain on a card they never chose",
+  );
   const countDropping = waitForEvent<DraftView>(
     draftSeats[0]!.socket,
     "draft:update",
@@ -618,17 +651,12 @@ export async function pathDraftSuite(
     draftSeats[0]!.socket,
     "draft:update",
     (payload) => payload?.roomId === draftRoomId && payload?.step === "second",
-    DRAFT_STEP_SECONDS * 1000 + 10000,
-  );
-  const mateSecond = waitForEvent<DraftView>(
-    draftSeats[1]!.socket,
-    "draft:update",
-    (payload) => payload?.roomId === draftRoomId && payload?.step === "second",
-    DRAFT_STEP_SECONDS * 1000 + 10000,
+    DRAFT_WATCH_MS + 10000,
   );
   draftSeats[0]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: hostFirstPick,
+    step: openingViews[0]!.step,
   });
   check(
     (await countDropping)?.open === 1,
@@ -642,19 +670,50 @@ export async function pathDraftSuite(
   draftSeats[0]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: hostFirstPick,
+    step: openingViews[0]!.step,
   });
   check(
     (await secondCard)?.error === "Your card is already laid down.",
     "and a captain who lays a second card down in the same step is told what happened rather than ignored, because the first answer is the one the table has been shown",
   );
+  // The mate's tab closes. The room gives a gone seat DRAFT_WATCH_MS to
+  // come back and then lays the first card of that captain's own hand,
+  // which is what closes the step. The beat is timed from the socket going
+  // rather than from a constant, so the check below reads the window the
+  // room actually waited rather than the window it was supposed to.
+  const awayAt = Date.now();
+  draftSeats[1]!.socket.close();
   const atSecond = (await hostSecond)!;
-  const mateAtSecond = (await mateSecond)!;
   check(
     atSecond !== null &&
-      mateAtSecond !== null &&
       atSecond.hand.length === 2 &&
-      mateAtSecond.hand.length === 2,
-    "the step the mate never answered closes on the room's own clock and the two cards they were passed arrive without them having chosen anything",
+      Date.now() - awayAt >= DRAFT_WATCH_MS - 2000,
+    "a step a gone seat never answered stays open through the room's whole absence window and then closes on that window alone, so what turns a step over is the table answering rather than any clock face, and the two cards the gone seat was passed travel without them having chosen anything",
+  );
+  // The mate walks back in, inside the thirty second departure grace the
+  // room keeps for a returning seat (see scheduleDeparture): a fresh socket
+  // for the same captain, whose join is answered with the step the room is
+  // standing in rather than the one the seat left.
+  const mateBack = await openAuthedSocket(draftMate);
+  run.sockets.push(mateBack);
+  draftSeats[1]!.socket = mateBack;
+  recordSeat(draftSeats[1]!, mateBack);
+  const mateSecond = waitForEvent<DraftView>(
+    mateBack,
+    "draft:update",
+    (payload) => payload?.roomId === draftRoomId && payload?.step === "second",
+  );
+  const mateSeated = waitForEvent<WireHistory>(
+    mateBack,
+    "chat:history",
+    (payload) => payload?.roomId === draftRoomId,
+  );
+  mateBack.emit("room:join", { roomId: draftRoomId });
+  await mateSeated;
+  const mateAtSecond = (await mateSecond)!;
+  check(
+    mateAtSecond !== null && mateAtSecond.hand.length === 2,
+    "and the seat that walks back in is handed the step the room is in rather than the beat it left, so what a returning captain is shown is the cards that are actually on the table",
   );
   // The pass, read off both frames: each captain holds the two cards the
   // other did not keep, in the order they were dealt and not kept in. The
@@ -674,12 +733,23 @@ export async function pathDraftSuite(
   );
   check(
     draftSeats[1]!.errors.length === 0,
-    "the captain who said nothing is never told they did anything wrong, and the card the room laid for them was one of their own",
+    "the captain whose seat went dark is never told they did anything wrong, and the card the room laid for them was one of their own",
   );
 
-  // The second keep, answered by both this time, and then the last step:
-  // the two cards a captain holds at the end are their own two keeps, and
-  // the voyage is sailed on whichever of them they hold on to.
+  // The second keep and then the last, and the two answers a captain
+  // sends into them are not the same kind of answer. The host is present
+  // and answers both in person. The mate's seat went dark inside the
+  // first step, so the room's absence watch has already laid that seat's
+  // second card by the time the seat walks back in (the fire carries a
+  // whole step over, and the check beside the close above is the one
+  // that watched it happen). The mate's own second keep therefore lands
+  // on a card that is already down or on a step the table has left,
+  // depending on how the two keeps race, and is refused either way; what
+  // the article reads is that the refusal costs the seat nothing, because
+  // the mate's last keep is their real answer, the settle takes it, and
+  // the path that captain sails on is the paper they chose. The keeps
+  // below each name the step they were read off, which is what makes
+  // that the whole of the story rather than a race.
   const hostLast = waitForEvent<DraftView>(
     draftSeats[0]!.socket,
     "draft:update",
@@ -705,10 +775,12 @@ export async function pathDraftSuite(
   draftSeats[0]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: hostSecondPick,
+    step: atSecond.step,
   });
   draftSeats[1]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: mateSecondPick,
+    step: mateAtSecond.step,
   });
   const hostAtLast = (await hostLast)!;
   const mateAtLast = (await mateLast)!;
@@ -737,10 +809,12 @@ export async function pathDraftSuite(
   draftSeats[0]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: hostLastPick,
+    step: hostAtLast.step,
   });
   draftSeats[1]!.socket.emit("draft:keep", {
     roomId: draftRoomId,
     pick: mateLastPick,
+    step: mateAtLast.step,
   });
   const settledViews = [await hostSettled, await mateSettled];
   const hostPath = hostAtLast.hand[hostLastPick]!;
@@ -800,7 +874,11 @@ export async function pathDraftSuite(
       if (frame.event !== "draft:update" || !payload) {
         return [`a hand rode ${frame.event} to ${seat.captain.username}`];
       }
-      const key = `${payload.step}@${payload.deadline}`;
+      // A beat is named by its step, which the wire carries and a clock
+      // used to shadow: the deadline that stood here went with the
+      // countdown, and a step is still dealt to one seat once with no
+      // pick moving its cards until the next one.
+      const key = payload.step;
       const hand = payload.hand.join(".");
       const seen = beats.get(key);
       if (seen === undefined) {
@@ -815,6 +893,40 @@ export async function pathDraftSuite(
   check(
     strayHands.length === 0,
     `the only frames either socket received that name a hand are the draft's own, one hand a captain a beat (${draftSeats.reduce((count, seat) => count + seat.frames.length, 0)} frames read on every event across the two sockets), so a hand is private in its whole shape: the frame goes to the captain it was dealt to and to no one else`,
+  );
+
+  // ---- the seat the settle could not reach ----
+  // The bug cycle's own shape, fixed in the reader: the settled view is
+  // emitted to sockets and the draft is deleted in the same breath, so a
+  // captain whose socket was dark from the last pick through the settle
+  // was sent the result into nothing and every later request answered
+  // null, leaving their save pathless while the fleet's log and the
+  // room's book went on naming their path. The book the settle wrote
+  // still holds it, and the join below is the request a reload sends
+  // (see draftViewFor). The socket is kept off the seats above on
+  // purpose: it hears the result frame rather than a beat, and the sweep
+  // over there judges the deal's beats.
+  const walkedBack = await openAuthedSocket(draftMate);
+  run.sockets.push(walkedBack);
+  const repaired = waitForEvent<DraftView>(
+    walkedBack,
+    "draft:update",
+    (payload) => payload?.roomId === draftRoomId && payload?.step === "done",
+  );
+  const walkedSeated = waitForEvent<WireHistory>(
+    walkedBack,
+    "chat:history",
+    (payload) => payload?.roomId === draftRoomId,
+  );
+  walkedBack.emit("room:join", { roomId: draftRoomId });
+  await walkedSeated;
+  const repairedView = await repaired;
+  check(
+    repairedView !== null &&
+      repairedView.path === matePath &&
+      repairedView.hand.join() === matePath &&
+      repairedView.open === 0,
+    "a captain whose socket was dark through the settle is handed the result when they walk back into the harbor: the path the fleet was told rides the same settled view a live seat heard, so the deal cannot be lost to a tab that was closed while the last card was laid",
   );
 
   // ---- the switch, published to the fleet ----
@@ -1104,7 +1216,7 @@ export async function pathDraftSuite(
       !carriesADash("src/lib/game/engine/draft.ts") &&
       !carriesADash("src/server/realtime/draft.ts") &&
       !carriesADash("src/lib/use-path-draft.ts") &&
-      !carriesADash("src/components/portmasters/game/PathDraft.tsx") &&
+      !carriesADash("src/components/portmasters/game/phases/PathDraft.tsx") &&
       !carriesADash("src/components/portmasters/game/status/PathChip.tsx"),
     "every file the draft's and the switch's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { getHireCost } from "@/lib/game/engine";
+import { wageBill } from "@/lib/game/engine";
 import { onShortRations } from "@/lib/game/larder";
 import { survivalLayerOn } from "@/lib/game/flags";
 import {
@@ -23,6 +23,7 @@ import { CargoHold } from "./status/CargoHold";
 import { ShipTab } from "./status/ShipTab";
 import { DuesTab } from "./status/DuesTab";
 import { ConvoyVentures } from "./status/ConvoyVentures";
+import { Term } from "../Term";
 
 // One crew type of the unlocked roster, with the hands of that type aboard
 // and what they are owed at the round end. Built here, where the difficulty
@@ -50,15 +51,27 @@ export type RosterEntry = WorkerType & {
  * consults constantly, sat furthest from the eye.
  *
  * So the handful of numbers that are checked every few seconds (round, waters,
- * funds, reputation, and what is owed at round end) are pinned at the top and
- * never scroll, and everything else is a tab. Each tab is short enough to read
- * without scrolling in the common case and scrolls inside its own box when it
- * is not, so the page itself never grows. The ledger becomes a peer tab rather
- * than a footnote below the fold.
+ * funds, reputation, and what is owed at round end) lead the column, and
+ * everything else is a tab. The ledger becomes a peer tab rather than a
+ * footnote below the fold.
  *
- * The pinned "Due" figure carries the safe/short tone, because that is the one
- * number that decides whether a captain is about to go bankrupt, and it should
- * be readable without opening anything.
+ * The panel is one scroll container at every window height, and the tabs are
+ * laid out at their natural height inside it: scrolling the rail moves the
+ * whole column, head included, and no section box ever owns a scrollbar of
+ * its own (the ledger's tail box is the one deliberate exception, because a
+ * log's whole job is to scroll its own newest lines into view). This took
+ * three shapes to get right. The first pinned the head and let each tab
+ * scroll inside its own box, which the field reported as "only the four
+ * boxes scroll". The second made the panel the scroll container but kept a
+ * floor under the tab box, so the one column scroll only engaged on a short
+ * window and the field reported the same thing again at ordinary heights.
+ * The third drops the floor and the inner scroll boxes outright: whatever
+ * the window, content taller than the rail scrolls the rail, and content
+ * shorter than the rail does not scroll at all.
+ *
+ * The due figure in the head carries the safe/short tone, because that is the
+ * one number that decides whether a captain is about to go bankrupt, and it
+ * should be readable without opening anything.
  */
 export function GameStatusPanel({
   game,
@@ -99,11 +112,19 @@ export function GameStatusPanel({
   const warmth = warmthScore(game);
   const shortWarmth = shortOfWarmth(game);
 
-  // Summed across the whole unlocked roster, not the three founding types.
+  // Summed across the whole unlocked roster, not the three founding types,
+  // and priced off the engine's own bill (see wageBill) rather than a hand
+  // count multiplied here: the multiplication this replaces billed a Jade
+  // Pavilion captain one wage too many, which inflated the obligations
+  // figure this rail exists to show and could paint a solvent captain's
+  // rail in the alarm tone. A type outside the engine's roster is one
+  // payWages does not charge either, so a missing row reads as no wages
+  // due rather than as a second opinion about the same absence.
+  const payroll = new Map(wageBill(game).map((b) => [b.id, b]));
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
     (w) => {
       const list = game.workers[w.id] ?? [];
-      return { ...w, list, due: list.length * getHireCost(game, w.id) };
+      return { ...w, list, due: payroll.get(w.id)?.due ?? 0 };
     },
   );
   const pendWages = roster.reduce((sum, r) => sum + r.due, 0);
@@ -114,9 +135,10 @@ export function GameStatusPanel({
   const duesAlert = (showObligations && !safe) || game.debts.length > 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Pinned: never scrolls, so the numbers a captain checks constantly
-          are always in the same place. */}
+    <div className="pm-scroll flex h-full min-h-0 flex-col overflow-y-auto">
+      {/* The head leads the column rather than pinning above it: the whole
+          rail scrolls as one, so these numbers travel with their tabs and a
+          scrolled rail never hides half a board behind a frozen head. */}
       <div className="shrink-0">
         <VoyageHeader
           currentRound={game.currentRound}
@@ -138,19 +160,20 @@ export function GameStatusPanel({
         <VoyageTimeline phase={game.phase} mode={game.mode} className="mt-2" />
       </div>
 
-      <Tabs
-        defaultValue="hold"
-        className="mt-2.5 flex min-h-0 flex-1 flex-col gap-2"
-      >
+      <Tabs defaultValue="hold" className="mt-2.5 flex flex-col gap-2">
         <TabsList className="grid w-full shrink-0 grid-cols-4">
           <TabsTrigger value="hold" className="text-[11px]">
-            Hold
+            <Term term="Hold" focusable={false}>
+              Hold
+            </Term>
           </TabsTrigger>
           <TabsTrigger value="ship" className="text-[11px]">
             Ship
           </TabsTrigger>
           <TabsTrigger value="dues" className="text-[11px]">
-            Dues
+            <Term term="Dues" focusable={false}>
+              Dues
+            </Term>
             {duesAlert && (
               <span
                 className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-alarm"
@@ -163,10 +186,7 @@ export function GameStatusPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent
-          value="hold"
-          className="pm-scroll min-h-0 flex-1 overflow-y-auto"
-        >
+        <TabsContent value="hold">
           <CargoHold
             game={game}
             roster={roster}
@@ -175,17 +195,11 @@ export function GameStatusPanel({
           />
         </TabsContent>
 
-        <TabsContent
-          value="ship"
-          className="pm-scroll min-h-0 flex-1 overflow-y-auto"
-        >
+        <TabsContent value="ship">
           <ShipTab shipLevel={game.shipLevel} modules={game.equippedModules} />
         </TabsContent>
 
-        <TabsContent
-          value="dues"
-          className="pm-scroll min-h-0 flex-1 overflow-y-auto"
-        >
+        <TabsContent value="dues">
           <DuesTab
             showObligations={showObligations}
             workerCount={nW}
@@ -206,7 +220,7 @@ export function GameStatusPanel({
           )}
         </TabsContent>
 
-        <TabsContent value="log" className="min-h-0 flex-1">
+        <TabsContent value="log">
           <GameLogPanel logs={logs} />
         </TabsContent>
       </Tabs>

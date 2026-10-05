@@ -131,7 +131,7 @@ export function brokersFavorPayoutCap(now: Date = new Date()): number {
 }
 
 // The highest payout cap any Age can put in force. The plausibility bound
-// in ../../integrity.ts reads this rather than the live cap, because a
+// in ../integrity.ts reads this rather than the live cap, because a
 // save is judged whenever it is next loaded rather than when it was
 // written: a captain who collected a Broker's Age payout last fortnight
 // must not read as impossible today.

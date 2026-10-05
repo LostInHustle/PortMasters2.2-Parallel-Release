@@ -25,7 +25,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
-import { portShiftLine } from "@/lib/game/maroon";
+import {
+  MAROON_VOTE_SHARE,
+  PORT_SHIFT_FRACTION,
+  portShiftLine,
+} from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
@@ -42,6 +46,29 @@ type Maroon = ReturnType<typeof useMaroon>;
 // reach for anything it has no business reading.
 type Marks = Record<string, SeatStatus>;
 
+/**
+ * The two questions the Parley board asks about this vote, answered once
+ * beside the vote itself so the card and the Harbor Business fold that
+ * holds it cannot disagree about when the harbor is voting (W4, UX-3 in
+ * docs/STUDIO_AUDIT.md; see Parley.tsx).
+ */
+export function maroonVoteOpen(game: GameState, maroon: Maroon): boolean {
+  const rung = modeConfig(game.mode).maroonFrom;
+  return rung !== null && maroon.result === null && game.currentRound >= rung;
+}
+
+export function maroonCardShown(game: GameState, maroon: Maroon): boolean {
+  const rung = modeConfig(game.mode).maroonFrom;
+  if (rung === null || game.phase !== "parley") return false;
+  // (a) of UX-3: the open window, or a window this voyage can still
+  // reach. A carried vote is neither, and it leaves the board because
+  // the result strip carries it from there.
+  return (
+    maroonVoteOpen(game, maroon) ||
+    (maroon.result === null && rung <= game.maxRounds)
+  );
+}
+
 export function MaroonVoteCard({
   game,
   members,
@@ -57,18 +84,16 @@ export function MaroonVoteCard({
 }) {
   const [target, setTarget] = useState("");
 
-  // Three states, and the panel is worth showing in all of them, for the
-  // reason the audit's is: a mode whose headline mechanic nobody has heard
-  // of is a mechanic nobody uses. Before the rung it explains itself,
-  // during it offers the vote, and once the vote has carried it says so
-  // rather than going quiet. The closed states wear one row rather than a
-  // card of prose (see VoteCardShell), the same fold the audit wears: what
-  // this board is for is the market, and the explanation is one chevron
-  // away rather than a screenful above it.
+  // The visibility rule is the reader's ((a) of UX-3 in
+  // docs/STUDIO_AUDIT.md): the open window, or a window still ahead this
+  // voyage. The body still explains the vote before the rung, for the
+  // reason the audit's does: a mode whose headline mechanic nobody has
+  // heard of is a mechanic nobody uses, and inside the Harbor Business
+  // fold that explanation costs the board nothing (see Parley.tsx).
   const rung = modeConfig(game.mode).maroonFrom;
-  if (rung === null || game.phase !== "parley") return null;
-  const spent = maroon.result !== null;
-  const open = game.currentRound >= rung;
+  if (rung === null) return null;
+  if (!maroonCardShown(game, maroon)) return null;
+  const open = maroonVoteOpen(game, maroon);
   const rows = tallyRows(maroon.votes, members);
   const nameOf = (id: string) =>
     members.find((m) => m.id === id)?.displayName ?? "a captain";
@@ -79,25 +104,15 @@ export function MaroonVoteCard({
   const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
 
   return (
-    <VoteCardShell
-      tone="alarm"
-      icon="🏝️"
-      title="Maroon"
-      gist={
-        spent
-          ? "This voyage's maroon has been called. The harbor gets one."
-          : `From leg ${rung}: two thirds may put one captain ashore.`
-      }
-      live={open && !spent}
-    >
-      {open && !spent ? (
+    <VoteCardShell tone="alarm" icon="🏝️" title="Maroon">
+      {open ? (
         <>
-          <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
             Two thirds of the captains still sailing can put one captain ashore.
             The vote is public, it is spent for the whole voyage, and the
             captain who loses it keeps their seat at the table.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <Select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -121,19 +136,19 @@ export function MaroonVoteCard({
             </Button>
           </div>
           {maroon.myVote && (
-            <p className="text-center text-[11px] text-muted-foreground mt-2">
+            <p className="text-[11px] text-muted-foreground mt-2">
               You named {nameOf(maroon.myVote)}. Waiting on the rest of the
               harbor.
             </p>
           )}
           <VoteTallyRows rows={rows} />
-          <p className="text-center text-[10px] text-muted-foreground/80 mt-2">
-            Two thirds of the captains still in the voyage carries it.
+          <p className="text-[10px] text-muted-foreground/80 mt-2">
+            {MAROON_VOTE_SHARE} of the captains still in the voyage carries it.
           </p>
         </>
       ) : (
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${rung}, two thirds of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {`From leg ${rung}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. The harbor gets one vote a voyage.`}
         </p>
       )}
     </VoteCardShell>
@@ -255,7 +270,8 @@ export function HarbormasterConsole({
       </h3>
       <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
         The harbor put you ashore and left you its own lever: once a leg, name a
-        port and lean every price at it by a tenth, up or down. The call is
+        port and lean every price at it by{" "}
+        {Math.round(PORT_SHIFT_FRACTION * 100)} percent, up or down. The call is
         public, and the market that opens next leg is the one that answers it.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">

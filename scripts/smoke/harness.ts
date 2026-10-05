@@ -238,7 +238,7 @@ export async function call<T>(
   return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
 }
 
-export function cookieFrom(res: Response): string {
+function cookieFrom(res: Response): string {
   const raw = res.headers.getSetCookie?.() ?? [];
   return raw.map((c) => c.split(";")[0]).join("; ");
 }

@@ -17,10 +17,12 @@ export function GameLogPanel({ logs }: { logs: string[] }) {
   }, [logs]);
 
   return (
-    // h-full plus a flex column so the ledger fills whatever height the tab
-    // gives it, which on the pinned desktop rail is a real share of the
-    // viewport.
-    <div className="flex h-full flex-col">
+    // The rail above this is one scroll column at every window height (see
+    // GameStatusPanel), so the ledger no longer stretches to fill a tab box:
+    // the tail box caps its own height and scrolls, which keeps the newest
+    // lines pinned into view and stops a hundred line voyage from pushing
+    // the head of the rail thousands of pixels away.
+    <div className="flex flex-col">
       <div className="flex items-center justify-between mb-1.5 px-1 shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground tracking-wide">
           📜 Ledger
@@ -31,7 +33,7 @@ export function GameLogPanel({ logs }: { logs: string[] }) {
       </div>
       <div
         ref={ref}
-        className="pm-scroll overflow-y-auto pr-2 font-mono text-[11px] leading-relaxed min-h-0 flex-1"
+        className="pm-scroll overflow-y-auto pr-2 font-mono text-[11px] leading-relaxed max-h-[min(60vh,28rem)]"
       >
         {logs.length === 0 ? (
           <div className="text-muted-foreground italic px-1 py-2">

@@ -6,13 +6,12 @@ import {
   renownTitleForLevel,
 } from "@/lib/game/legacy";
 import { cn } from "@/lib/utils";
+import { SectionHeading } from "./SectionHeading";
 
 export function RenownProgression({ renownLevel }: { renownLevel: number }) {
   return (
     <div>
-      <h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Renown Progression
-      </h3>
+      <SectionHeading>Renown Progression</SectionHeading>
       <div className="pm-glass rounded-2xl p-4">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">

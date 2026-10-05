@@ -65,7 +65,7 @@ export const MILESTONE_TRIGGERS: readonly MilestoneTrigger[] = [
 // is made of. Written here rather than at the screen for the reason
 // ./phases writes its faces: a moment whose prose lived in a component
 // would be a moment the engine's own line could not name.
-export interface MilestoneMoment {
+interface MilestoneMoment {
   icon: string;
   title: string;
   line: string;

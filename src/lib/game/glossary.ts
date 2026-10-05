@@ -86,6 +86,37 @@ export const GLOSSARY: Record<string, string> = {
   "Financial Aid":
     "A loan from another captain when you can't cover this round's wages or maintenance on your own. The lender's Gold transfers to you immediately; you owe it back before the voyage ends, or it's deducted automatically and handed to them at the voyage's final round.",
   Debt: "Gold you owe another captain after taking a loan. Repay it any time before the voyage ends. If you still can't cover it by the final round, the amount still owed comes straight out of your funds and you're marked bankrupt when the voyage finishes.",
+
+  // The round's own vocabulary, for the four words a captain meets on the
+  // rail before any mode's briefing has explained them. The food note on
+  // the Dawn entry is worded for both modes rather than assuming the
+  // larder: the rail draws these phases on every voyage, and a Classic
+  // captain told about rations would be reading a rule their table does
+  // not run.
+  Dawn: "The round's opening phase: the boon draft deals three cards and you keep one, and it bends the rules for the round ahead. On a voyage that keeps a larder, this is also when the crew eats a ration a head.",
+  Parley:
+    "The round's trading floor. Captains post barter offers and take each other's here, and the table's votes (a manifest audit, a maroon) are called here too.",
+  Resolve:
+    "The round's reckoning. Pirates may strike first, then the wages, maintenance and taxes come due. The Dues tab is the list of what this phase will ask for.",
+  Dusk: "The round's last phase and the shipyard's seat: upgrade the hull, or draft and rig a module.",
+
+  // The four nouns of the rail and the provisions header, each drawn as a
+  // label on the surface that keeps it: the two tabs, the larder and
+  // stores figures. The Stores entry is reachable only while the split
+  // hold is on, because the figure it explains is only drawn then.
+  Dues: "What this captain owes at the round end: the crew's wages and the ship's upkeep in one total, with any outstanding loans listed underneath. This tab keeps the running count.",
+  Hold: "The cargo hold: the goods stowed aboard, one slot per unit of cargo, plus the crew that works them. This tab lists it all.",
+  Stores:
+    "The pantry half of the hold: the foods aboard, measured in slots. The Larder counts the meals inside them.",
+  Larder:
+    "The meals aboard for the crew, one ration a head eaten at each Dawn. Run it dry and the crew works hungry, and a long stretch without rations costs a hand.",
+
+  // Two words the money surfaces use without explaining: the cut a broker
+  // takes, and the holding state an offer or a pledge sits in.
+  Commission:
+    "The broker's cut on a Broker's Favor order: a share of the reward, paid when the order fills. The card prints the cut before you fill it.",
+  Escrow:
+    "Gold or goods held aside the moment an offer, a pledge or a barter is posted, until the deal settles. Held goods cannot be spent or traded meanwhile, and they come back whole if the deal is canceled or expires.",
 };
 
 // [F2: the card record, and the mode weighting field] The two card entries a

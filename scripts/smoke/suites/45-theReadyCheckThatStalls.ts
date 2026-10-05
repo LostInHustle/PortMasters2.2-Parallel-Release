@@ -62,6 +62,7 @@ const GAMBIT: GameMode = "ocean_gambit";
 // the last two are a voyage that is already over for that captain.
 const NOT_A_DEPARTURE = [
   "harbor",
+  "path_draft",
   "dawn",
   "module_draft",
   "module_swap",
@@ -69,12 +70,13 @@ const NOT_A_DEPARTURE = [
   "endgame",
 ] as const;
 
-// And the two seats a press cannot leave that are nonetheless seats of
-// the lap, which is the distinction this whole article turns on: the pier
-// is not a step of the leg, and Dawn is a step a captain leaves by
-// choosing a card rather than by pressing the bar. Everything else the
-// lap walks is a departure by press.
-const LEFT_BY_CHOOSING = ["harbor", "dawn"] as const;
+// And the seats a press cannot leave that are nonetheless seats of the
+// lap, which is the distinction this whole article turns on: the pier
+// is not a step of the leg, the path draft is a step a captain leaves by
+// laying their cards, and Dawn is a step a captain leaves by choosing a
+// card rather than by pressing the bar. Everything else the lap walks is
+// a departure by press.
+const LEFT_BY_CHOOSING = ["harbor", "path_draft", "dawn"] as const;
 
 // The cure's own sentence, read off the wire. Held as a fragment rather
 // than as the whole line, so the article is checking that the harbor named

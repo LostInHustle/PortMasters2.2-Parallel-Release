@@ -30,6 +30,7 @@ import {
 import { BookOpen, Gift, Landmark, Loader2, Star } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { Pill } from "@/components/portmasters/shared";
+import { RENOWN_BONUS_LINE } from "@/lib/game/constants/copy";
 import { CaptainLegacyCard } from "@/components/portmasters/CaptainLegacyCard";
 import { HouseLeaderboard } from "@/components/portmasters/HouseLeaderboard";
 import {
@@ -74,9 +75,8 @@ export function LegacyDialog({
         </DialogHeader>
         <CaptainLegacyCard legacy={legacy} className="p-5" />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Every Renown level grants a small Gold bonus at the start of your next
-          fresh voyage. It grows from the Reputation you bank across the voyage,
-          so it only ever goes up, even for a captain whose books fail.
+          {RENOWN_BONUS_LINE}. It grows from the Reputation you bank across the
+          voyage, so it only ever goes up, even for a captain whose books fail.
         </p>
       </DialogContent>
     </Dialog>

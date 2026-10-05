@@ -70,6 +70,7 @@ import { CHARTERS } from "@/lib/game/constants/charters";
 import { BOONS, CARDS_PER_OFFER, MODULES } from "@/lib/game/constants/drafts";
 import type { TagList } from "@/lib/game/constants/tags";
 import {
+  cancelModuleDraft,
   handleModuleSelect,
   startBoonDrafting,
   startModuleDrafting,
@@ -525,6 +526,37 @@ export async function cardRecordSuite(): Promise<void> {
       offeredBefore === 1 &&
       (hull._draftChoices ?? []).every((card) => card.id !== chosen.id),
     "while a module picked with a slot open installs, moves the leg on, drops out of the table since the pick is final, and is counted as taken where the card actually lands: a module parked for a swap can still be backed out of, and only a card that joined the hull is a card that was taken",
+  );
+
+  // ---- Backing out is not a reroll ----
+  // The bug cycle's own shape: the "Back to Shipyard" press cleared the
+  // round's table, and startModuleDrafting rolls a fresh pool whenever the
+  // table is empty, so Back followed by Draft again dealt an unlimited run
+  // of fresh trios at no cost: exactly the free reroll the once a round
+  // swap cap exists to close. The record's own contract is the other way:
+  // the pool, once rolled, is fixed for the round, and backing out and
+  // reopening reshows the same trio.
+  const backedOut = voyageState();
+  startModuleDrafting(backedOut);
+  const firstTrio = (backedOut._draftChoices ?? [])
+    .map((card) => card.id)
+    .join(",");
+  handleModuleSelect(backedOut, 0, []);
+  const parkedBeforeBack = backedOut._newModule !== undefined;
+  cancelModuleDraft(backedOut);
+  const keptAfterCancel =
+    parkedBeforeBack &&
+    backedOut._newModule === undefined &&
+    backedOut.phase === "dusk" &&
+    (backedOut._draftChoices ?? []).map((card) => card.id).join(",") ===
+      firstTrio;
+  startModuleDrafting(backedOut);
+  check(
+    keptAfterCancel &&
+      backedOut.phase === "module_draft" &&
+      (backedOut._draftChoices ?? []).map((card) => card.id).join(",") ===
+        firstTrio,
+    "backing out to the shipyard parks the half chosen swap and nothing else: the round's trio is the record's own stored draw and reopening the draft reshows it card for card, so Back is a way out rather than a free reroll",
   );
 
   // ---- The tally and the report ----

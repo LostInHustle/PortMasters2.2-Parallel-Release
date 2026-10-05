@@ -36,7 +36,7 @@
 // written into this file before C1: the plan named a number this tree did
 // not have, and a save carried no food, so a reveal that printed one would
 // have put a figure on screen that no rule ever moved. The reading itself
-// belongs to ./server/realtime/audit, which is the side that holds the
+// belongs to src/server/realtime/audit.ts, which is the side that holds the
 // save the Larder is written into, and this module stays what it was: the
 // sample, its seed, and the shape a manifest line may take. Nothing here
 // reads a Larder, and it should not start.
@@ -66,6 +66,19 @@ export const AUDIT_WINDOW = 5;
 // verdict and away from a signal, which is the property the epic's
 // evaluation watches.
 export const AUDIT_REVEAL_COUNT = 2;
+
+// The count above, in the words the vote card states it in: the reveal
+// opens this many order fulfillments, and the sentence below promises the
+// same number to the room, so a retune moves both or the card would say
+// "a pair" over a reveal that opened three.
+export const AUDIT_REVEAL_WORDS = "a random pair";
+
+// The rule a carried audit is decided by, stated here rather than in the
+// panel that renders it: the comparison below is what a majority means in
+// this vote (strictly more than half of the roster), and the tally line a
+// captain reads is a rendering of that comparison, not a second rule.
+export const AUDIT_VOTE_RULE =
+  "A majority is more than half of the captains still in the voyage.";
 
 /**
  * The seed one audit's sample is drawn from.
@@ -136,6 +149,18 @@ export function drawAudit(
  * normalizeInventory scrubs rather than trusts: a fractional count is a
  * damaged save, and a damaged save should read as a slightly wrong line
  * rather than as a broken screen in front of the whole table.
+ *
+ * A third job landed with the bug audit: the leg bound. A line dated past
+ * the leg the room itself has reached cannot be a thing the captain did,
+ * so a save that files one is filing evidence the voyage never produced,
+ * and the reader who can catch it is the one that knows the room's own
+ * leg. The bound is a parameter rather than a constant for exactly that
+ * reason: the audit reveal passes the leg the vote carried in, the finish
+ * ledger passes the voyage's own length, and the load path passes
+ * nothing, because a save being healed on its way into the room has no
+ * room to be read against yet. A bounded reader drops the impossible
+ * lines rather than trimming the manifest around them: what survives is
+ * the shape an honest voyage files.
  */
 // [J1: the private information review] Two bounds on a fill's shape, for
 // the one reason a normalizer needs them: these lines are read by the
@@ -161,7 +186,10 @@ const FILL_ITEMS_MAX = 4;
 // game can produce and does not belong on a shared screen.
 const FILL_QTY_MAX = 999;
 
-export function normalizeOrderFills(raw: unknown): OrderFill[] {
+export function normalizeOrderFills(
+  raw: unknown,
+  maxRound?: number,
+): OrderFill[] {
   if (!Array.isArray(raw)) return [];
   const clean: OrderFill[] = [];
   for (const entry of raw) {
@@ -176,6 +204,10 @@ export function normalizeOrderFills(raw: unknown): OrderFill[] {
     const round = Math.floor(fill.round);
     const reward = Math.floor(fill.reward);
     if (round < 1 || reward < 0) continue;
+    // The leg bound, when the reader knows the room's own leg: a line from
+    // a leg the voyage has not reached is a line the captain could not
+    // have filed, so it is dropped rather than shown as evidence.
+    if (maxRound !== undefined && round > maxRound) continue;
     if (!Array.isArray(fill.items)) continue;
     if (fill.items.length > FILL_ITEMS_MAX) continue;
     const items: OrderFill["items"] = [];
@@ -221,6 +253,33 @@ export function auditCarried(
     if (count * 2 > roster) return target;
   }
   return null;
+}
+
+/**
+ * The nominations a majority may still count, re-derived against the room
+ * that exists now.
+ *
+ * The vote map outlives the voters: a captain nominates and then goes
+ * bankrupt or reaches the endgame, and their nomination sits in the book
+ * while the roster below it shrinks. Counting that vote would let a
+ * captain the room has stopped counting carry a majority with nobody
+ * behind it, which is the one thing the roster denominator above exists
+ * to prevent, so every nomination is re-judged the way a fresh one is at
+ * the door: both the voter and the captain they named must still be on
+ * the active roster. A vote either of them has left behind is dropped
+ * rather than frozen, and the room is free to nominate again in the same
+ * leg, which is what a table that watched a captain walk out would do
+ * anyway.
+ */
+export function pruneStaleVotes(
+  votes: ReadonlyMap<string, string>,
+  roster: ReadonlySet<string>,
+): Map<string, string> {
+  const kept = new Map<string, string>();
+  for (const [voter, target] of votes) {
+    if (roster.has(voter) && roster.has(target)) kept.set(voter, target);
+  }
+  return kept;
 }
 
 /**

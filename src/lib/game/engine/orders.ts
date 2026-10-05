@@ -218,7 +218,11 @@ export function completeOrder(
   // beside them.
   const hasWoven = cargoCarriesTag(order.resources, "woven");
   let transport = calcTransportCost(state, order.totalItems, hasWoven);
-  for (const r of order.resources) state.inventory[r.type] -= r.required!;
+  // Read through the same absence the shortfall check above reads: a line
+  // without a count takes nothing, rather than subtracting an undefined
+  // and poisoning every number the hold reports for the rest of the
+  // voyage.
+  for (const r of order.resources) state.inventory[r.type] -= r.required ?? 0;
   let reward = order.reward;
   // [D6: Free Captain: Opportunist] The borrow's penalty lands here, on the
   // face value and before anything else touches the number, so every step
@@ -239,14 +243,15 @@ export function completeOrder(
     logs.push(opportunistLine(state, order.reward, reward));
   }
   let totalVat = 0;
-  if (order.isProductOrder) {
-    const product = order.resources[0].type;
-    const unitVat = calcVAT(
-      state,
-      product,
-      reward / order.resources[0].required!,
-    );
-    totalVat = unitVat * order.resources[0].required!;
+  // The taxed line is read once, and only a line that actually sells
+  // something is taxed: a card with no resource lines, or a line without
+  // a count, pays its reward and no VAT rather than dividing by an
+  // absence and carrying a NaN payout into the ledger.
+  const productRef = order.isProductOrder ? order.resources[0] : undefined;
+  const productUnits = productRef?.required ?? 0;
+  if (productRef && productUnits > 0) {
+    const unitVat = calcVAT(state, productRef.type, reward / productUnits);
+    totalVat = unitVat * productUnits;
     reward -= totalVat;
     state.vatPaid += totalVat;
     logs.push(`🧾 Product Sales VAT: ${totalVat} Gold`);
@@ -416,12 +421,19 @@ export function completeOrder(
   state.orderFills.push({
     round: state.currentRound,
     port: order.demandPort,
-    items: order.resources.map((r) => ({ type: r.type, qty: r.required! })),
+    // The engine's own reading of a missing count, the one canFillOrder
+    // and the deduction above both take (`?? 0`): the fill record says
+    // what was actually deducted rather than asserting a count onto a
+    // line that does not carry one. The audit's reader drops a zero
+    // line the same way it drops a non number, so the sample is
+    // unchanged; what changes is that the save never holds a record
+    // disagreeing with the settlement that wrote it.
+    items: order.resources.map((r) => ({ type: r.type, qty: r.required ?? 0 })),
     reward,
   });
   state.orderFills = state.orderFills.slice(-AUDIT_WINDOW);
   const txt = order.resources
-    .map((r) => `${ICONS[r.type]}${r.type}×${r.required}`)
+    .map((r) => `${ICONS[r.type]}${r.type}×${r.required ?? 0}`)
     .join(" + ");
   logs.push(`📦 Completed Order at ${order.demandPort}: ${txt}`);
   logs.push(
@@ -538,10 +550,21 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(`❌ Need ${cost} Gold for a rumor`);
     return;
   }
-  // Ocean Interpreter adds a rumor that is genuinely free: only the paid
-  // reveals below deduct the fee, so the extra one costs nothing.
+  // One press is one purchase, and one fee: what the hull's modules
+  // change is how many whispers the one purchase brings back. The
+  // Brokers' Network brings two and the Ocean Interpreter adds a third
+  // on the house, which is what the module's own card promises: a rumor
+  // at 2 Gold that reveals two.
   const paidCount = hasModule(state, "brokers_network") ? 2 : 1;
   const count = paidCount + (hasModule(state, "ocean_relay") ? 1 : 0);
+  // [bug cycle: one purchase, one fee] The fee is paid once, here, which
+  // is the price the button that led to this press displayed and the
+  // price the guard above checked against. It used to be billed inside
+  // the loop, once per paid reveal, so a hull carrying the Brokers'
+  // Network paid double the price its own button named, and a captain
+  // holding more than one fee but less than two passed a guard that
+  // only ever read one and left the press with a negative purse.
+  state.money -= cost;
   for (let i = 0; i < count; i++) {
     if (!state.marketDemandTags.length) break;
     const item =
@@ -555,7 +578,6 @@ export function purchaseIntel(state: GameState, logs: string[]) {
     logs.push(
       `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
     );
-    if (i < paidCount) state.money -= cost;
     // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
     // delivered and always true, on every tier: the intel guarantee is never
     // touched. What a corrupt broker does instead is also sell word of this

@@ -7,6 +7,7 @@ import {
   TIDEWATCH_SURGE_THRESHOLD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "@/lib/game/constants/world";
+import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -40,7 +41,6 @@ import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
 import { PrivateCard } from "./game/PrivateCard";
-import { PathDraft } from "./game/PathDraft";
 import { PathChip } from "./game/status/PathChip";
 import { HeldBoons } from "./game/status/HeldBoons";
 import { PanelHeader } from "./PanelHeader";
@@ -126,6 +126,13 @@ function leaveRefusal(phase: GameState["phase"]): string {
   switch (phase) {
     case "harbor":
       return "A voyage leaves the pier when the host sets sail, not by readying up.";
+    // [W2: the path draft] The deal's own seat. It is left by the table
+    // rather than by any one captain, so the refusal says what actually
+    // turns the step over instead of pointing at a button that never
+    // existed: see canLeavePhase, which refuses this seat, and the panel
+    // in ./game/phases/PathDraft, which draws no ready footer at all.
+    case "path_draft":
+      return "The Path Draft is left by laying your cards down. Each step turns over when every hand is in.";
     case "dawn":
       return "Dawn is left by locking in a Boon. Pick one of the cards and it goes with you.";
     case "bankruptcy":
@@ -274,10 +281,11 @@ export function GameRoom({
     escort.claim(pending.contractId, pending.raidGold);
   }, [state.game.pendingEscortClaim, socket, act, escort.claim]);
 
-  // The six effects: join the room channel on every reconnect, watch for
+  // The seven effects: join the room channel on every reconnect, watch for
   // voyage conclusion, relay the engine's pending debt settlements, relay
-  // the Word on the Docks claim, watch for the docks race resolution, and
-  // watch for the Tidewatch surge flip.
+  // the Word on the Docks claim, watch for the docks race resolution,
+  // watch for the Tidewatch surge flip, and hand a captain back to the
+  // Lobby when the room closes.
 
   useEffect(() => {
     if (!socket || !authed) return;
@@ -446,14 +454,14 @@ export function GameRoom({
       act((g, l) => applyTidewatchSurge(g, l));
       toast("🌊 Tidewatch Alert", {
         description:
-          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board for the rest of this voyage.",
+          "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board, every round, for the rest of this voyage.",
       });
       notifications.push({
         icon: "🌊",
         title: "Tidewatch Alert",
         lines: [
           `The harbor crossed ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation.`,
-          "One extra cargo lot joins every Port Purchase board.",
+          "One extra cargo lot joins every Port Purchase board, every round.",
         ],
         category: "tidewatch",
       });
@@ -703,7 +711,7 @@ export function GameRoom({
     });
   }, [state.newLines, state.loaded, notifications.push]);
 
-  const openDmRef = useCallback(
+  const openDm = useCallback(
     async (user: PublicUser) => {
       if (user.id === me.id) return;
       setDmTarget(user);
@@ -724,10 +732,6 @@ export function GameRoom({
     },
     [me.id, memberIds],
   );
-  // Reference the openDm declared above so the chat notification effect
-  // keeps the stable identity; this alias keeps the existing call sites
-  // (DM tab onPick, etc.) readable without reorganising the JSX.
-  const openDm = openDmRef;
 
   // Every room/DM message pops up as its own notification too, regardless
   // of which chat tab is currently open. Clicking it jumps to the
@@ -825,7 +829,7 @@ export function GameRoom({
 
   const handleRestart = useCallback(() => {
     if (!isHost) {
-      toast.error("Only the host can restart the voyage");
+      toast.error(HOST_ONLY_RESTART);
       return;
     }
     setRestartConfirmOpen(true);
@@ -980,28 +984,12 @@ export function GameRoom({
             three columns rather than inside one of them. It is capped at a
             share of the window on a wide screen and scrolls inside that cap.
             Uncapped it is what pushed the columns off the fold, because a
-            voyage carrying a draft and three notices stacks half a window of
-            strips before the first column starts. The draft leads the band
-            rather than following the ticker: it is the one entry here with a
-            deadline on it, and reading it should never mean scrolling for
-            it. */}
+            voyage carrying three notices stacks half a window of strips
+            before the first column starts. The draft's own panel used to
+            lead this band and no longer lives here at all: the deal is a
+            seat of the lap now, drawn in the stage like every other seat
+            (see the PathDraft case in ./game/GamePhasePanel). */}
         <div className="shrink-0 space-y-3 lg:max-h-[45vh] lg:overflow-y-auto pm-scroll lg:pr-1">
-          {/* [D7: the draft, and switching] The deal, at the very top of the
-              voyage's own column because of when it happens rather than what
-              it is: it is dealt as the voyage leaves the dock, over the
-              opening leg, so a captain who is reading this panel is also
-              reading their first market behind it. Renders nothing at all
-              outside a live draft (see PathDraft), and the hook holding the
-              hand is fed by the server rather than by anything on this
-              screen. */}
-          {draft.view && (
-            <PathDraft
-              view={draft.view}
-              error={draft.error}
-              onKeep={draft.keep}
-              onDismissError={draft.clearError}
-            />
-          )}
           <FleetTicker
             socket={socket}
             roomId={room.id}
@@ -1115,6 +1103,7 @@ export function GameRoom({
               />
               <PathChip
                 game={state.game}
+                inDeal={draft.view !== null}
                 error={draft.error}
                 onSwitch={draft.switchPath}
                 onDismissError={draft.clearError}
@@ -1159,7 +1148,7 @@ export function GameRoom({
               </Button>
               <span
                 className="pb-1 text-[11px] font-semibold tabular-nums text-muted-foreground"
-                title={`Leg ${state.game.currentRound}`}
+                title={`Round ${state.game.currentRound}`}
               >
                 {state.game.currentRound > 0
                   ? `R${state.game.currentRound}`
@@ -1255,6 +1244,10 @@ export function GameRoom({
                   onTutorialOpen={() => setTutOpen(true)}
                   colorFor={colorFor}
                   roster={roster}
+                  // [W2: the path draft] The room's deal, for the stage at
+                  // the draft's own seat. The chip in the rail above reads
+                  // the same hook for its in deal state.
+                  draft={draft}
                 />
                 {/* The captain's own card. It sits at the foot of the stage
                     rather than up among the controls, because it is

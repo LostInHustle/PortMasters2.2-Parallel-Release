@@ -98,6 +98,29 @@ export const PHASE_FACES: Record<Phase, PhaseFace> = {
     // as the table takes. It is the one seat with no clock.
     seconds: null,
   },
+  // [W2: the path draft] The seat a Gambit departure opens at, between the
+  // pier and Dawn: every captain reads the three cards they were dealt,
+  // keeps one at a time, and the round begins once every seat holds its
+  // path. It is not one of the leg's six on purpose. The leg's phases are
+  // the work a round is made of, and this is the deal that precedes the
+  // first of them, so the rail, the briefing chart and every leg walk
+  // leave it out while the lap itself carries it (see ./mode.ts and
+  // ./checkpoint.ts), which is what lets the rank, the ready gate and the
+  // catch up all place a captain here without a word of their own.
+  //
+  // seconds is null and stays null: the room waits at this seat for its
+  // captains rather than for a clock, and nothing is shown to hurry them.
+  // A seat that has gone quiet is rescued on the server's own watch, which
+  // no surface ever displays (see armDraftWatch in
+  // src/server/realtime/draft.ts).
+  path_draft: {
+    label: "Path Draft",
+    short: "Paths",
+    icon: "🃏",
+    gradient: "pm-grad-path-draft",
+    leg: false,
+    seconds: null,
+  },
   dawn: {
     label: "Dawn",
     short: "Dawn",

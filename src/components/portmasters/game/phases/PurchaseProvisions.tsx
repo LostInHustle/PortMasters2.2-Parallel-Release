@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { HUNGRY_CREW_RULE } from "@/lib/game/constants/copy";
 import {
   FOODS,
   FOODS_DRAW_ORDER,
@@ -10,15 +12,17 @@ import {
   RATION_PRICE,
   type FoodId,
 } from "@/lib/game/constants/supplies";
-import { crewSize, onShortRations, provisionFood } from "@/lib/game/larder";
 import {
-  foodRoomMeals,
-  mealsOf,
-  pantryLines,
-  preserveFood,
-} from "@/lib/game/foods";
+  cargoCapacity,
+  crewSize,
+  legRationCost,
+  onShortRations,
+  provisionAffordable,
+  provisionFood,
+  provisionRoom,
+} from "@/lib/game/larder";
+import { mealsOf, pantryLines, preserveFood } from "@/lib/game/foods";
 import {
-  cargoSlots,
   holdCapacityOn,
   storesSlots,
   usedCargoSlots,
@@ -28,13 +32,16 @@ import { survivalLayerOn } from "@/lib/game/flags";
 import {
   bargeLeftAtPort,
   bargePortAtLeg,
+  bargePurseRations,
   bargeRationPrice,
+  bargeRoomMeals,
   buyFromBarge,
 } from "@/lib/game/engine";
 import { Utensils } from "lucide-react";
+import { FoldRow } from "../FoldRow";
+import { Term } from "../../Term";
 import {
   HuePanel,
-  PanelLabel,
   PanelNote,
   PanelStat,
   type PhasePanelProps,
@@ -90,6 +97,14 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
  * because it is the one move that spends food to buy time, and it is
  * offered only when there is a whole batch of produce to spend.
  *
+ * The three rows and the preserve move sit inside one fold, because they
+ * are one decision read four ways and the fold's own gist still points a
+ * captain at the preserve the moment a batch is ready. The fold sits under
+ * the hunger warning rather than above it, so a hungry crew's alarm is
+ * never behind a click: what the fold hides is the buying, not the state,
+ * and the header above both carries the larder count and the price of a
+ * leg that the buying is about.
+ *
  * The hold's two halves are printed only when the split is on (see
  * holdCapacityOn), because they are the split: with it off there is one
  * unbounded pool for goods and the Larder's own meal ceiling for food, and
@@ -114,33 +129,34 @@ export function Provisions({
   game,
   act,
 }: Pick<PhasePanelProps, "game" | "act">) {
+  const [bargeFoldOpen, setBargeFoldOpen] = useState(false);
+  const [rationsFoldOpen, setRationsFoldOpen] = useState(false);
   if (!survivalLayerOn(game.mode)) return null;
   const crew = crewSize(game);
-  const legCost = crew * RATION_PRICE;
+  const legCost = legRationCost(game);
   const short = onShortRations(game);
   const capacity = holdCapacityOn(game.mode);
   // What a press of each button would actually buy, held to the same two
-  // ceilings provisionFood applies, so the cost printed on the button is
-  // the cost the captain is charged.
-  const affordable = legCost > 0 ? Math.floor(game.money / legCost) : 0;
-  const legsFor = (food: FoodId) =>
-    crew > 0 ? Math.floor(foodRoomMeals(game, food) / crew) : 0;
+  // ceilings provisionFood applies, read from the same two functions the
+  // sale itself reads rather than computed a second time here, so the
+  // cost printed on the button is the cost the captain is charged.
+  const affordable = provisionAffordable(game);
   const aboard = new Map(pantryLines(game).map((line) => [line.food, line]));
-  const anyRoom = FOODS_DRAW_ORDER.some((food) => legsFor(food) > 0);
+  const anyRoom = FOODS_DRAW_ORDER.some(
+    (food) => provisionRoom(game, food) > 0,
+  );
   const batches = Math.floor(mealsOf(game, "Produce") / PRESERVE_MEALS_IN);
   // [E1: the Supply Barge] The fallback, read the way the rows above are:
   // the port and the lot come off the voyage's own numbers, the price off
   // the constants, and what a press would actually buy is held to the same
-  // three ceilings the sale applies, so the cost on the button is the cost
-  // the captain is charged.
+  // ceilings the sale applies, two of them through the sale's own readers
+  // (see bargeRoomMeals and bargePurseRations), so the cost on the button
+  // is the cost the captain is charged.
   const bargePort = bargePortAtLeg(game);
   const bargePrice = bargeRationPrice();
   const bargeLeft = bargeLeftAtPort(game);
-  // A ration is a meal of grain and a slot of grain is a meal (see FOODS in
-  // ./constants), so the stores' room in meals is the room in rations and
-  // there is no second conversion to get wrong here.
-  const bargeRoom = Math.max(0, foodRoomMeals(game, "Grain"));
-  const bargePurse = bargePrice > 0 ? Math.floor(game.money / bargePrice) : 0;
+  const bargeRoom = bargeRoomMeals(game);
+  const bargePurse = bargePurseRations(game);
   const bargeOpen = crew > 0 && bargeLeft > 0;
   const bargeOne = bargeOpen
     ? Math.min(1, bargeLeft, bargeRoom, bargePurse)
@@ -149,16 +165,21 @@ export function Provisions({
 
   return (
     <HuePanel tone="larder">
-      <PanelLabel
-        tone="text-larder"
-        note="one ration a head, eaten at each Dawn"
-      >
-        <Utensils className="h-3.5 w-3.5" />
-        Provisions
-      </PanelLabel>
+      {/* The stats live on the header row (W4): the label, the one line
+          that says what the panel is, and the five figures a captain
+          checks before buying were two stacked rows that said one thing,
+          and the panel that leads with its numbers is the shape every
+          other desk on this screen already wears. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-larder">
+          <Utensils className="h-3.5 w-3.5" />
+          Provisions
+          <span className="font-normal text-muted-foreground ml-1">
+            one ration a head, eaten at each Dawn
+          </span>
+        </span>
         <PanelStat
-          label="Larder"
+          label={<Term term="Larder">Larder</Term>}
           value={game.larder}
           valueClassName={short ? "text-alarm" : "text-larder"}
           suffix={
@@ -173,7 +194,7 @@ export function Provisions({
                 stores round up and the cargo, counted one unit a slot, does
                 not have to (see ./hold). */}
             <PanelStat
-              label="Stores"
+              label={<Term term="Stores">Stores</Term>}
               value={Math.ceil(usedStoreSlots(game))}
               suffix={
                 <span className="text-muted-foreground">
@@ -189,7 +210,16 @@ export function Provisions({
               suffix={
                 <span className="text-muted-foreground">
                   {" "}
-                  / {cargoSlots(short)}
+                  {/*
+                    The engine's own capacity reader rather than the raw
+                    slot count: the market's purchase gate reads
+                    cargoCapacity, which folds in the path's cargo
+                    modifier and the hungry crew's quarter (see
+                    cargoRoom in @/lib/game/larder), and the tile used
+                    to print the unmodified number, so a Convoy captain
+                    was told 30 while the market refused at 24.
+                  */}
+                  / {cargoCapacity(game)}
                 </span>
               }
             />
@@ -206,78 +236,93 @@ export function Provisions({
       {short && (
         <PanelNote tone="alarm">
           ⚠️ The larder is empty and the crew is working hungry: every artisan
-          produces less until this is filled.
+          produces less, and {HUNGRY_CREW_RULE} Fill it before the next Dawn.
         </PanelNote>
       )}
-      <div className="mt-2 space-y-1">
-        {FOODS_DRAW_ORDER.map((food) => {
-          const line = aboard.get(food);
-          const room = legsFor(food);
-          const fillLegs = Math.min(room, affordable);
-          const oneLeg = Math.min(1, room, affordable);
-          return (
-            <div
-              key={food}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1"
-            >
-              <span className="w-32 text-[11px]">
-                <span className="mr-1">{FOODS[food].icon}</span>
-                <span className="font-medium">{food}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  {line?.meals ?? 0}
-                </span>
-              </span>
-              <span className="w-56 text-[10px] text-muted-foreground">
-                {keeping(food, line?.meals ?? 0, line?.legsLeft ?? null)}
-              </span>
-              {/* The buttons wear the theme's own primary rather than the
-                  market fill the card buttons below wear. A fill is a widget
-                  claiming a rung, and this panel already has one of its own:
-                  painting its controls in the phase's green would say the
-                  Larder is part of the market board rather than the fourth
-                  panel on it. */}
+      <div className="mt-2">
+        <FoldRow
+          tone="larder"
+          icon="🌾"
+          title="Rations"
+          gist={
+            batches > 0
+              ? "The three foods the crew eats, and a batch of Produce ready to preserve."
+              : "The three foods the crew eats, and what each keeps."
+          }
+          open={rationsFoldOpen}
+          onToggle={() => setRationsFoldOpen((v) => !v)}
+        >
+          <div className="space-y-1">
+            {FOODS_DRAW_ORDER.map((food) => {
+              const line = aboard.get(food);
+              const room = provisionRoom(game, food);
+              const fillLegs = Math.min(room, affordable);
+              const oneLeg = Math.min(1, room, affordable);
+              return (
+                <div
+                  key={food}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                >
+                  <span className="w-32 text-[11px]">
+                    <span className="mr-1">{FOODS[food].icon}</span>
+                    <span className="font-medium">{food}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      {line?.meals ?? 0}
+                    </span>
+                  </span>
+                  <span className="w-56 text-[10px] text-muted-foreground">
+                    {keeping(food, line?.meals ?? 0, line?.legsLeft ?? null)}
+                  </span>
+                  {/* The buttons wear the theme's own primary rather than the
+                      market fill the card buttons below wear. A fill is a widget
+                      claiming a rung, and this panel already has one of its own:
+                      painting its controls in the phase's green would say the
+                      Larder is part of the market board rather than the fourth
+                      panel on it. */}
+                  <Button
+                    size="sm"
+                    className="h-7 rounded-lg px-2.5 text-[11px]"
+                    variant={oneLeg > 0 ? "default" : "secondary"}
+                    disabled={oneLeg <= 0}
+                    onClick={() => act((g, l) => provisionFood(g, food, 1, l))}
+                  >
+                    {FOODS[food].icon} Buy{" "}
+                    {oneLeg > 0 ? `1 Leg (${legCost}💰)` : "Rations"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 rounded-lg px-2.5 text-[11px]"
+                    variant={fillLegs > 1 ? "default" : "secondary"}
+                    disabled={fillLegs <= 1}
+                    onClick={() =>
+                      act((g, l) => provisionFood(g, food, fillLegs, l))
+                    }
+                  >
+                    Fill
+                    {fillLegs > 1
+                      ? ` (${fillLegs} Legs, ${fillLegs * legCost}💰)`
+                      : ""}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          {batches > 0 && (
+            <div className="mt-2">
               <Button
                 size="sm"
                 className="h-7 rounded-lg px-2.5 text-[11px]"
-                variant={oneLeg > 0 ? "default" : "secondary"}
-                disabled={oneLeg <= 0}
-                onClick={() => act((g, l) => provisionFood(g, food, 1, l))}
+                variant="secondary"
+                onClick={() => act((g, l) => preserveFood(g, l))}
               >
-                {FOODS[food].icon} Buy{" "}
-                {oneLeg > 0 ? `1 Leg (${legCost}💰)` : "Rations"}
-              </Button>
-              <Button
-                size="sm"
-                className="h-7 rounded-lg px-2.5 text-[11px]"
-                variant={fillLegs > 1 ? "default" : "secondary"}
-                disabled={fillLegs <= 1}
-                onClick={() =>
-                  act((g, l) => provisionFood(g, food, fillLegs, l))
-                }
-              >
-                Fill
-                {fillLegs > 1
-                  ? ` (${fillLegs} Legs, ${fillLegs * legCost}💰)`
-                  : ""}
+                🐟 Preserve {batches * PRESERVE_MEALS_IN} Produce into{" "}
+                {batches * PRESERVE_MEALS_OUT} Salt Fish
               </Button>
             </div>
-          );
-        })}
+          )}
+        </FoldRow>
       </div>
-      {batches > 0 && (
-        <div className="mt-2">
-          <Button
-            size="sm"
-            className="h-7 rounded-lg px-2.5 text-[11px]"
-            variant="secondary"
-            onClick={() => act((g, l) => preserveFood(g, l))}
-          >
-            🐟 Preserve {batches * PRESERVE_MEALS_IN} Produce into{" "}
-            {batches * PRESERVE_MEALS_OUT} Salt Fish
-          </Button>
-        </div>
-      )}
 
       {/* [E1: the Supply Barge] The fallback, and it is drawn last on this
           panel because that is what it is: the row a captain reads after
@@ -295,39 +340,55 @@ export function Provisions({
           it: the row names what a ration costs against what the port
           above charges for one. */}
       {bargePort !== null && (
-        <div className="mt-2 rounded-lg border border-larder/15 bg-background/40 p-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[11px]">
-              <span className="mr-1">⛵</span>
-              <span className="font-medium">Supply Barge</span>
-              <span className="text-muted-foreground"> at {bargePort}</span>
-            </span>
-            <Button
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
-              variant={bargeOne > 0 ? "default" : "secondary"}
-              disabled={bargeOne <= 0}
-              onClick={() => act((g, l) => buyFromBarge(g, 1, l))}
-            >
-              🌾 Buy {bargeOne > 0 ? `1 Ration (${bargePrice}💰)` : "Rations"}
-            </Button>
-            <Button
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
-              variant={bargeLot > 1 ? "default" : "secondary"}
-              disabled={bargeLot <= 1}
-              onClick={() => act((g, l) => buyFromBarge(g, bargeLeft, l))}
-            >
-              Take the Lot
-              {bargeLot > 1 ? ` (${bargeLot}, ${bargeLot * bargePrice}💰)` : ""}
-            </Button>
+        <FoldRow
+          tone="larder"
+          icon="⛵"
+          title="Supply Barge"
+          gist={
+            bargeLeft < 1
+              ? "The barge has nothing left for you this leg."
+              : `An unnamed trader on the quay: ${bargePrice} Gold a ration against the port's ${RATION_PRICE}.`
+          }
+          open={bargeFoldOpen}
+          onToggle={() => setBargeFoldOpen((v) => !v)}
+          className="mt-2"
+        >
+          <div className="rounded-lg border border-larder/15 bg-background/40 p-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-[11px]">
+                <span className="mr-1">⛵</span>
+                <span className="font-medium">Supply Barge</span>
+                <span className="text-muted-foreground"> at {bargePort}</span>
+              </span>
+              <Button
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={bargeOne > 0 ? "default" : "secondary"}
+                disabled={bargeOne <= 0}
+                onClick={() => act((g, l) => buyFromBarge(g, 1, l))}
+              >
+                🌾 Buy {bargeOne > 0 ? `1 Ration (${bargePrice}💰)` : "Rations"}
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 rounded-lg px-2.5 text-[11px]"
+                variant={bargeLot > 1 ? "default" : "secondary"}
+                disabled={bargeLot <= 1}
+                onClick={() => act((g, l) => buyFromBarge(g, bargeLeft, l))}
+              >
+                Take the Lot
+                {bargeLot > 1
+                  ? ` (${bargeLot}, ${bargeLot * bargePrice}💰)`
+                  : ""}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              {bargeLeft < 1
+                ? "The barge has nothing left for you this leg, and it is a fresh lot tomorrow."
+                : `${bargeLeft} ${bargeLeft === 1 ? "ration is" : "rations are"} left for you this leg.`}
+            </p>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1.5">
-            {bargeLeft < 1
-              ? "The barge has nothing left for you this leg, and it is a fresh lot tomorrow."
-              : `An unnamed trader on the quay, charging ${bargePrice} Gold a ration against the port's ${RATION_PRICE}. ${bargeLeft} ${bargeLeft === 1 ? "ration is" : "rations are"} left for you this leg.`}
-          </p>
-        </div>
+        </FoldRow>
       )}
       {crew === 0 && (
         <PanelNote>

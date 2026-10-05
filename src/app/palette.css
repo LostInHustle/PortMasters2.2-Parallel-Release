@@ -1,4 +1,4 @@
-/* The PortMasters palette.
+/* PortMasters 2.2 Parallel Release: the palette.
 
    Every widget has a colour of its own, so that two panels side by side
    never read as the same panel twice.
@@ -30,7 +30,6 @@
   --color-houses: var(--w-houses);
   --color-leaderboard: var(--w-leaderboard);
   --color-chronicles: var(--w-chronicles);
-  --color-activity: var(--w-activity);
   --color-settings: var(--w-settings);
   --color-guide: var(--w-guide);
   --color-profile: var(--w-profile);
@@ -49,6 +48,7 @@
   --color-chat: var(--w-chat);
   --color-ledger: var(--w-ledger);
   --color-harbor: var(--w-harbor);
+  --color-path-draft: var(--w-path-draft);
   --color-market: var(--w-market);
   --color-orders: var(--w-orders);
   --color-parley: var(--w-parley);
@@ -78,7 +78,6 @@
   --color-houses-fill: var(--w-houses-fill);
   --color-leaderboard-fill: var(--w-leaderboard-fill);
   --color-chronicles-fill: var(--w-chronicles-fill);
-  --color-activity-fill: var(--w-activity-fill);
   --color-settings-fill: var(--w-settings-fill);
   --color-guide-fill: var(--w-guide-fill);
   --color-profile-fill: var(--w-profile-fill);
@@ -91,6 +90,7 @@
   --color-chat-fill: var(--w-chat-fill);
   --color-ledger-fill: var(--w-ledger-fill);
   --color-harbor-fill: var(--w-harbor-fill);
+  --color-path-draft-fill: var(--w-path-draft-fill);
   --color-market-fill: var(--w-market-fill);
   --color-orders-fill: var(--w-orders-fill);
   --color-parley-fill: var(--w-parley-fill);
@@ -173,8 +173,6 @@
   --w-leaderboard: oklch(0.53 0.13 64.4);
   /* Chronicles: the record of voyages past. */
   --w-chronicles: oklch(0.53 0.13 197);
-  /* Harbor Activity: what the harbor has been doing. */
-  --w-activity: oklch(0.53 0.13 290.9);
   /* Settings: the captain's own preferences. */
   --w-settings: oklch(0.53 0.13 140.2);
   /* How to Play: the guide for a new hand. */
@@ -198,7 +196,6 @@
   --w-houses-fill: oklch(0.55 0.15 253.8);
   --w-leaderboard-fill: oklch(0.55 0.15 64.4);
   --w-chronicles-fill: oklch(0.55 0.15 197);
-  --w-activity-fill: oklch(0.55 0.15 290.9);
   --w-settings-fill: oklch(0.55 0.15 140.2);
   --w-guide-fill: oklch(0.55 0.15 103.1);
   --w-profile-fill: oklch(0.55 0.15 83.3);
@@ -244,6 +241,12 @@
   */
   /* Harbor: the pier, before the leg begins. */
   --w-harbor: oklch(0.53 0.13 68);
+  /* Path Draft: the deal a dealing Gambit departure opens at. Between the
+     pier and Dawn because that is where the room meets it, and a hue no
+     surface beside it wears: its own screen carries nothing else, so the
+     check that matters is the one against the five session surfaces every
+     phase stands among. */
+  --w-path-draft: oklch(0.53 0.13 207);
   /* Dawn: the boon draft that opens a round. */
   --w-dawn: oklch(0.53 0.13 325);
   /* Market: buying at port, and setting the artisan bench to work. The
@@ -270,6 +273,7 @@
   --w-module-swap: oklch(0.53 0.13 347);
 
   --w-harbor-fill: oklch(0.55 0.15 68);
+  --w-path-draft-fill: oklch(0.55 0.15 207);
   --w-dawn-fill: oklch(0.55 0.15 325);
   --w-market-fill: oklch(0.55 0.15 154);
   --w-orders-fill: oklch(0.55 0.15 282);
@@ -431,7 +435,6 @@
   --w-houses: oklch(0.76 0.12 253.8);
   --w-leaderboard: oklch(0.76 0.12 64.4);
   --w-chronicles: oklch(0.76 0.12 197);
-  --w-activity: oklch(0.76 0.12 290.9);
   --w-settings: oklch(0.76 0.12 140.2);
   --w-guide: oklch(0.76 0.12 103.1);
   --w-profile: oklch(0.76 0.12 83.3);
@@ -447,6 +450,7 @@
   --w-chat: oklch(0.76 0.12 240);
   --w-ledger: oklch(0.76 0.12 304);
   --w-harbor: oklch(0.76 0.12 68);
+  --w-path-draft: oklch(0.76 0.12 207);
   --w-dawn: oklch(0.76 0.12 325);
   --w-market: oklch(0.76 0.12 154);
   --w-orders: oklch(0.76 0.12 282);

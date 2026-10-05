@@ -15,8 +15,18 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
-import { ModalClose, ModalOverlay } from "@/components/ui/modal-overlay";
-import { BOON_SWAP_COST } from "@/lib/game/constants/drafts";
+import {
+  ModalClose,
+  ModalOverlay,
+  ModalSheet,
+} from "@/components/ui/modal-overlay";
+import {
+  BOON_SWAP_COST,
+  CARDS_PER_OFFER,
+  EMERGENCY_LOAN_GOLD,
+} from "@/lib/game/constants/drafts";
+import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
+import { INTEL_COST } from "@/lib/game/engine";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
@@ -73,14 +83,14 @@ const STEPS: Step[] = [
     icon: ChevronRight,
     title: "Draft a Boon",
     gradient: "pm-grad-dawn",
-    body: "Each round opens with a boon draft. Pick one of three boons that bend the rules for the coming round: cheaper purchases, faster production, a tax shelter, or an emergency loan of 40 Gold.",
+    body: `Each round opens with a boon draft. Pick one of ${CARDS_PER_OFFER} boons that bend the rules for the coming round: cheaper purchases, faster production, a tax shelter, or an emergency loan of ${EMERGENCY_LOAN_GOLD} Gold.`,
     tip: `You can swap your boon choices once per round for ${BOON_SWAP_COST} Gold if none of the three fit your strategy.`,
   },
   {
     icon: Package,
     title: "Buy at Port",
     gradient: "pm-grad-market",
-    body: "Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay 5 Gold for a Broker's Rumor that guarantees a matching order appears when Orders opens.",
+    body: `Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay ${INTEL_COST} Gold for a Broker's Rumor that guarantees a matching order appears when Orders opens.`,
     tip: "The harbor remembers what everyone bought. A good the room leans into gets pricier next round, while one nobody touches softens.",
   },
   {
@@ -95,7 +105,7 @@ const STEPS: Step[] = [
     title: "Put Artisans to Work",
     gradient: "pm-grad-market",
     body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: the goods land at Resolve next round, not this round.",
-    tip: "Hire artisans only when you can sustain at least two rounds of wages. A worker who goes unpaid strikes and sinks your voyage.",
+    tip: "Hire artisans only when you can sustain at least two rounds of wages. A crew that goes unpaid takes a bankruptcy, which ends the voyage in Classic and leaves a mark in Ocean Gambit.",
   },
   {
     icon: TrendingUp,
@@ -127,7 +137,7 @@ const STEPS: Step[] = [
     icon: Coins,
     title: "Build Your Legacy",
     gradient: "pm-grad-renown",
-    body: "Every voyage's final Reputation becomes Renown XP, multiplied by the difficulty tier. Renown levels grant titles, a small starting Gold bonus, and at level 5 unlock the Broker's Favor. The captain with the highest Reputation in a voyage is crowned Sea Master.",
+    body: `Every voyage's final Reputation becomes Renown XP, multiplied by the difficulty tier. Renown levels grant titles, a small starting Gold bonus, and at level ${BROKERS_FAVOR_UNLOCK_LEVEL} unlock the Broker's Favor. The captain with the highest Reputation in a voyage is crowned Sea Master.`,
     tip: "Check in daily for a seven day cycle of Renown XP rewards. It is not a streak, so a missed day never resets your progress.",
     // The last page, because the harbor's one locked door is about a
     // captain's record rather than about a phase, and this is the page
@@ -196,13 +206,7 @@ export function HowToPlayModal({
     <AnimatePresence>
       {open && (
         <ModalOverlay onClose={() => onOpenChange(false)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="pm-glass-strong pm-crackle relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
-          >
+          <ModalSheet maxW="max-w-2xl">
             {/* Header */}
             <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">
               <div className="pm-seigaiha absolute inset-0 opacity-30 pointer-events-none" />
@@ -345,7 +349,7 @@ export function HowToPlayModal({
                 )}
               </div>
             </div>
-          </motion.div>
+          </ModalSheet>
         </ModalOverlay>
       )}
     </AnimatePresence>

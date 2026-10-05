@@ -1,8 +1,8 @@
 // GET /api/legacy: the current user's persistent Captain's Legacy summary
 // (Renown level and XP, lifetime voyages, Sea Master crowns, best score,
-// Great House pledge). The only place this data is ever written is the
-// voyage conclusion check in the realtime layer and the check in
-// route; this route is read only.
+// Great House pledge). This data is written in three places, the voyage
+// conclusion check in the realtime layer, the check in route, and the
+// Great House pledge in the house route; this route is read only.
 import { NextResponse } from "next/server";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { legacySummaryFor } from "@/lib/captain-legacy";

@@ -8,14 +8,18 @@ import {
   autoCommit,
   canLeavePhase,
   restartGame,
-  startBoonDrafting,
+  snapToCheckpoint,
   tallyPurchasesByResource,
 } from "@/lib/game/engine";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import type { PortShift } from "@/lib/game/maroon";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { normalizeMode, type GameMode } from "@/lib/game/mode";
-import { checkpointRank, isGatedPhase } from "@/lib/game/checkpoint";
+import {
+  checkpointRank,
+  isGatedPhase,
+  openingPhase,
+} from "@/lib/game/checkpoint";
 import { normalizePhase, seatOf } from "@/lib/game/phases";
 import {
   phaseClockLabel,
@@ -378,17 +382,21 @@ export function usePhaseSync({
       // anyone who has already moved on (a late reconnect, say) ignores it.
       if (g.currentRound !== 1 || g.phase !== "harbor") return;
       // Setting sail runs the engine's own opener for the phase the room's
-      // checkpoint was just set to, which the server reads off the room's lap
-      // (see openingPhase in @/lib/game/checkpoint) rather than naming. Both
-      // modes open at the boon draft today, and startBoonDrafting is what
-      // opens it: a mode whose lap opened anywhere else would need its own
-      // opener here, which is the change that would make this call read the
-      // lap instead of naming the draft.
+      // checkpoint was just set to, read off the room's own lap (see
+      // openingPhase in @/lib/game/checkpoint) rather than named here, the
+      // same way the server pinned it: the seat a dealing Gambit build
+      // opens at is the path draft, and every other build opens at the boon
+      // draft, and snapToCheckpoint is the one entry that opens either.
+      // This used to call startBoonDrafting by name, with a comment saying
+      // a mode whose lap opened anywhere else would be the change that made
+      // this read the lap; the draft is that mode, so this is that change.
       //
       // This is the same direct entry endRound makes at the top of each later
       // round; both are round openers, not handoffs, so there is no phase
       // behind them to hand off from.
-      act((state, logs) => startBoonDrafting(state, logs));
+      act((state, logs) =>
+        snapToCheckpoint(state, ctx, 1, openingPhase(state.mode), logs),
+      );
     };
     const onError = (data: { roomId: string; error: string }) => {
       if (data.roomId === roomId) setStartError(data.error);

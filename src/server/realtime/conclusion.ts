@@ -28,6 +28,7 @@ import type { Server } from "socket.io";
 import { clearAdvanceWatch } from "./checkpoint";
 import { recordRivalOutcomes } from "./rival";
 import {
+  awaitSettlementBeat,
   clearVoyageBoards,
   closeVoyageRecord,
   pickSeaMaster,
@@ -86,19 +87,40 @@ export async function maybeConcludeVoyage(
   // on them.
   clearAdvanceWatch(roomId);
   await clearVoyageBoards(io, roomId);
-  const harbor = await readHarborSaves(roomId);
-  closeVoyageRecord(roomId, harbor.peerTradeProfits);
-
   const run = await readVoyageRun(roomId);
   await resolveOpenVentures(io, roomId, run.room);
   sweepAbsentBorrowerLoans(io, roomId, finished);
+  // [bug cycle: the settled purse] The room's own sweeps just paid out:
+  // an escrow came back to its poster when the trade board cleared, an
+  // open venture refunded its half, and a loan the harbor had written
+  // off settled at zero. Every one of those lands in the captain's own
+  // client and comes back on that client's next broadcast, so the
+  // verdicts below wait one beat for the room to speak again before the
+  // numbers they are judged on are read. Without that beat, every purse
+  // in the harbor was read one moment before the voyage paid it out:
+  // the field report's own shape, 446 gold beside a 450 purse goal while
+  // the captain's own screen was showing the refunded total.
+  await awaitSettlementBeat();
+  // The harbor's saves, read once, now behind the beat for the same
+  // reason the roster below is: an escrow refund writes goods, not coin,
+  // and the stock a flourish is judged on lives in the save a client
+  // rewrites a beat after the change.
+  const harbor = await readHarborSaves(roomId);
+  closeVoyageRecord(roomId, harbor.peerTradeProfits);
+  // The finished roster, read back once the room has had its beat. The
+  // numbers every verdict below is judged on are therefore the numbers
+  // the captains' clients just reported, which are the numbers their own
+  // endgame screens are showing. A room whose members left during the
+  // beat keeps the reading taken at the door, which is the only reading
+  // there is.
+  const settled = (await readFinishedCaptains(roomId)) ?? finished;
   const forgedUsers = readForgedUsers(
     roomId,
-    finished,
+    settled,
     harbor.marked,
     run.rounds,
   );
-  const winnerId = pickSeaMaster(finished, forgedUsers);
+  const winnerId = pickSeaMaster(settled, forgedUsers);
   const ctx: FinisherContext = {
     roomId,
     run,
@@ -107,7 +129,7 @@ export async function maybeConcludeVoyage(
     forgedUsers,
   };
 
-  const tally = await concludeFinishers(io, roomId, finished, ctx);
+  const tally = await concludeFinishers(io, roomId, settled, ctx);
   const { standings, rivalStandings, revealed, traces } = tally;
   standings.sort((a, b) => b.reputation - a.reputation);
 

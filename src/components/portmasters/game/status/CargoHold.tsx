@@ -2,6 +2,7 @@
 
 import { basePriceRange } from "@/lib/game/engine";
 import { unlockedProducts, unlockedResources } from "@/lib/game/pools";
+import { SHORT_RATIONS_YIELD } from "@/lib/game/constants/supplies";
 import type { GameState } from "@/lib/game/types";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Term } from "../../Term";
@@ -224,7 +225,14 @@ function InvItem({
       {skilled !== undefined && skilled > 0 && (
         <span
           className="mr-1.5 text-[10px] text-warn"
-          title={`${skilled} of ${count} trained: each produces 2 per round`}
+          /* The hungry case is named here because the engine's own lesson
+             is that a trained hand on short rations makes one, not two
+             (see the yield comment in engine/workers.ts), and a tooltip
+             promising the full two over a hold that gained one is the
+             ledger lying about work the captain can count. The pace is
+             the constant's own, the same percentage the larder's own
+             short rations line carries. */
+          title={`${skilled} of ${count} trained: each produces 2 per round, working at ${Math.round(SHORT_RATIONS_YIELD * 100)}% pace while the crew goes hungry`}
         >
           ⭐{skilled}
         </span>

@@ -45,11 +45,11 @@ const SRC = join(ROOT, "src");
    this close to it, in either direction round the wheel. */
 const MEANING_RED = 17;
 
-/* The Lobby is the densest screen, and it settles at twelve surfaces
-   rather than eighteen once the dialogs are counted honestly: only one
+/* The Lobby is the densest screen, and it settles at eleven surfaces
+   rather than seventeen once the dialogs are counted honestly: only one
    dialog can be open at a time and each dims the board behind it, so a
-   dialog answers to its own screen. Twelve across the 322 degrees clear
-   of the red is 26.8 degrees each, which leaves this floor comfortable
+   dialog answers to its own screen. Eleven across the 322 degrees clear
+   of the red is 29.3 degrees each, which leaves this floor comfortable
    everywhere in the tree. */
 const MIN_GAP = 20;
 
@@ -68,12 +68,14 @@ type Widget = {
 const LOBBY = "lobby";
 
 const WIDGETS: Widget[] = [
-  /* The Lobby. Twelve surfaces, because the dialogs are their own
-     screens. Twelve across the 322 degrees clear of the meaning red is
-     26.8 degrees each, which is the roomiest any dense screen gets. The
+  /* The Lobby. Eleven surfaces, because the dialogs are their own
+     screens. Eleven across the 322 degrees clear of the meaning red is
+     29.3 degrees each, which is the roomiest any dense screen gets. The
      hues are handed out on a stride rather than in page order, so two
      panels stacked next to each other are rarely two steps apart on the
-     wheel.
+     wheel. The activity rung at 290.9 left this ladder on 2026-10-04,
+     when the Harbor activity feed, the only surface that ever wore it,
+     was removed rather than left standing over an empty panel.
 
      These were counted as all being on screen at the same moment, which
      is what the floor below was set to hold. The lobby now switches
@@ -131,7 +133,6 @@ const WIDGETS: Widget[] = [
     screens: [LOBBY],
     what: "Chat, the harbor square and Direct Messages",
   },
-  { name: "activity", hue: 290.9, screens: [LOBBY], what: "Harbor Activity" },
   {
     name: "guide",
     hue: 103.1,
@@ -147,7 +148,7 @@ const WIDGETS: Widget[] = [
 
   /* The dialogs. Only one opens at a time and each dims the board behind
      it, so a dialog answers to its own screen rather than to the Lobby.
-     That is the whole reason the Lobby is twelve and not eighteen. */
+     That is the whole reason the Lobby is eleven and not seventeen. */
   /* Only one dialog opens at a time and each dims the board behind it at
      half black, so a dialog answers to its own screen and never to the
      board it covers. That exemption is load bearing, and the session
@@ -161,7 +162,7 @@ const WIDGETS: Widget[] = [
      asserting, because it reads like a hue nobody checked. Ship and
      Funds at 111, and the pair at 90, Market Pulse and the Shipyard,
      push a guide that shares their screen to 70 or below, or to 131 or
-     above. The Lobby ladder is an even twelve, so the guide is also
+     above. The Lobby ladder is eleven rungs, so the guide is also
      boxed in by the two rungs beside it and may sit only between 96.3
      and 109.9. Those two ranges do not meet, so there is no hue on the
      wheel that holds the guide twenty degrees clear of the Lobby and of
@@ -216,6 +217,23 @@ const WIDGETS: Widget[] = [
      hue and needs no hue that could collide with the panels it opens
      beside. */
   { name: "harbor", hue: 68, screens: ["phase:harbor"], what: "The pier" },
+  /* [W2: the path draft] The deal a dealing Gambit departure opens at,
+     between the pier and Dawn. It is a phase of the lap rather than one of
+     the leg's six (see PHASE_FACES), so it is listed here with a screen of
+     its own and nothing beside it: what this rung has to clear is the five
+     session surfaces every phase stands among. 207 does, with Members at
+     175 and Chat at 240 the nearest two at 32 and 33 degrees against a
+     floor of twenty, and it sits 170 degrees off the meaning red. Chart
+     at 210.4 and Standing Orders at 208 are nearer than that floor, and
+     both are legal by the dialog rule above: the one is a lobby surface
+     this screen never meets, and the other is a dialog, which dims the
+     board behind it and answers to its own screen. */
+  {
+    name: "path-draft",
+    hue: 207,
+    screens: ["phase:path-draft"],
+    what: "The Path Draft",
+  },
   {
     name: "dawn",
     hue: 325,
@@ -370,7 +388,6 @@ const WIDGETS: Widget[] = [
 /* A room's host crown is not in the table on purpose. A crown is gold,
    and --gold is already a meaning token here, so it wears that rather
    than taking a hue of its own away from a panel. */
-const ALL_WIDGETS = WIDGETS;
 
 /* The session chrome is on screen through every phase, so it has to be
    checked against each phase even though no phase lists it. Two phases
@@ -398,8 +415,8 @@ function circularGap(a: number, b: number): number {
 /* === 1 and 2: the distances === */
 
 function checkDistances() {
-  for (let i = 0; i < ALL_WIDGETS.length; i++) {
-    const a = ALL_WIDGETS[i];
+  for (let i = 0; i < WIDGETS.length; i++) {
+    const a = WIDGETS[i];
 
     const fromRed = circularGap(a.hue, MEANING_RED);
     if (fromRed < MIN_GAP) {
@@ -409,8 +426,8 @@ function checkDistances() {
       );
     }
 
-    for (let j = i + 1; j < ALL_WIDGETS.length; j++) {
-      const b = ALL_WIDGETS[j];
+    for (let j = i + 1; j < WIDGETS.length; j++) {
+      const b = WIDGETS[j];
       if (!sharesScreen(a, b)) continue;
 
       const gap = circularGap(a.hue, b.hue);
@@ -447,7 +464,7 @@ function declaredNames(): Set<string> {
 function checkTokens() {
   const declared = declaredNames();
 
-  for (const w of ALL_WIDGETS) {
+  for (const w of WIDGETS) {
     if (!declared.has(w.name)) {
       fail(
         `The table lists ${w.name}, but palette.css declares no --w-${w.name}.`,
@@ -460,7 +477,7 @@ function checkTokens() {
      is not, and the geometry above would be checking numbers that are
      no longer the ones on screen. */
   const css = readFileSync(PALETTE, "utf8");
-  for (const w of ALL_WIDGETS) {
+  for (const w of WIDGETS) {
     const decl = [
       ...css.matchAll(
         new RegExp(
@@ -480,7 +497,7 @@ function checkTokens() {
     }
   }
 
-  const tableNames = new Set(ALL_WIDGETS.map((w) => w.name));
+  const tableNames = new Set(WIDGETS.map((w) => w.name));
   /* A token may go unclaimed by the table when it is a meaning colour,
      one of the four bright fills, one of the three House colours, or one
      of the three Ages. None of those are chrome: they say what something
@@ -643,7 +660,7 @@ checkInk();
 checkRawPalette(files);
 
 const geometry =
-  `${ALL_WIDGETS.length} widgets, closest pair ${closestPair().toFixed(1)} degrees, ` +
+  `${WIDGETS.length} widgets, closest pair ${closestPair().toFixed(1)} degrees, ` +
   `closest to the meaning red ${closestRed().toFixed(1)} degrees.`;
 
 if (problems.length === 0) {
@@ -660,18 +677,15 @@ process.exit(1);
 
 function closestPair(): number {
   let best = 360;
-  for (let i = 0; i < ALL_WIDGETS.length; i++) {
-    for (let j = i + 1; j < ALL_WIDGETS.length; j++) {
-      if (!sharesScreen(ALL_WIDGETS[i], ALL_WIDGETS[j])) continue;
-      best = Math.min(
-        best,
-        circularGap(ALL_WIDGETS[i].hue, ALL_WIDGETS[j].hue),
-      );
+  for (let i = 0; i < WIDGETS.length; i++) {
+    for (let j = i + 1; j < WIDGETS.length; j++) {
+      if (!sharesScreen(WIDGETS[i], WIDGETS[j])) continue;
+      best = Math.min(best, circularGap(WIDGETS[i].hue, WIDGETS[j].hue));
     }
   }
   return best;
 }
 
 function closestRed(): number {
-  return Math.min(...ALL_WIDGETS.map((w) => circularGap(w.hue, MEANING_RED)));
+  return Math.min(...WIDGETS.map((w) => circularGap(w.hue, MEANING_RED)));
 }

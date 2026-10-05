@@ -531,11 +531,23 @@ export async function chartersSuite(): Promise<void> {
   // of them is the flag under test. The scan is for a fillable card of
   // the shape the check needs, because which order a board deals is the
   // board's business rather than something a check may assume.
-  const boardAt = (round: number) => {
+  //
+  // The scan stands on a fixed set of seeds rather than on the run's own
+  // suffix, because the board set a random run draws made the guard
+  // below a coin: a plain order (no path, no product, no broker's favor,
+  // every good unwoven) is the rare shape of the three, and measured on
+  // 2026-10-04 five of three hundred random deals held no plain order in
+  // any of the twelve rounds, so the guard was failing about one battery
+  // in sixty, which is the run that found this. A fixed list makes the
+  // deck's duty to deal the shape a deterministic reading: green because
+  // the pool ships the shape and red after a retune that stops dealing
+  // it, rather than either verdict riding on the draw.
+  const BOARD_SEEDS = ["fixture-a", "fixture-b", "fixture-c"];
+  const boardAt = (seed: string, round: number) => {
     const state = voyageState();
     snapToCheckpoint(
       state,
-      { seedBase: `smoke:charters:${suffix}`, harborId: "harbor-a" },
+      { seedBase: `smoke:charters:${seed}`, harborId: "harbor-a" },
       round,
       "orders",
       [],
@@ -550,21 +562,24 @@ export async function chartersSuite(): Promise<void> {
   const findOrder = (
     chooser: (order: OrderCard, board: GameState) => boolean,
   ) => {
-    for (let round = 1; round <= 12; round++) {
-      const board = boardAt(round);
-      const order = board.customerCards.find(
-        (card) => fillable(card, board) && chooser(card, board),
-      );
-      if (order !== undefined) return { round, order };
+    for (const seed of BOARD_SEEDS) {
+      for (let round = 1; round <= 12; round++) {
+        const board = boardAt(seed, round);
+        const order = board.customerCards.find(
+          (card) => fillable(card, board) && chooser(card, board),
+        );
+        if (order !== undefined) return { seed, round, order };
+      }
     }
     return null;
   };
   const deltaOf = (
+    seed: string,
     round: number,
     order: OrderCard,
     flags: Partial<Record<ModifierKey, number>>,
   ) => {
-    const state = boardAt(round);
+    const state = boardAt(seed, round);
     state.modifierFlags = { ...state.modifierFlags, ...flags };
     for (const r of order.resources) {
       state.inventory[r.type] =
@@ -581,8 +596,8 @@ export async function chartersSuite(): Promise<void> {
       order.resources.every((r) => !carriesTag("good", r.type, "woven")),
     );
     if (found !== null) {
-      const plain = deltaOf(found.round, found.order, {});
-      const manif = deltaOf(found.round, found.order, {
+      const plain = deltaOf(found.seed, found.round, found.order, {});
+      const manif = deltaOf(found.seed, found.round, found.order, {
         manifest_order_bonus: 0.15,
       });
       check(
@@ -601,8 +616,8 @@ export async function chartersSuite(): Promise<void> {
       order.resources.some((r) => carriesTag("good", r.type, "woven")),
     );
     if (found !== null) {
-      const plain = deltaOf(found.round, found.order, {});
-      const marked = deltaOf(found.round, found.order, {
+      const plain = deltaOf(found.seed, found.round, found.order, {});
+      const marked = deltaOf(found.seed, found.round, found.order, {
         loom_sale_bonus: 0.1,
       });
       check(

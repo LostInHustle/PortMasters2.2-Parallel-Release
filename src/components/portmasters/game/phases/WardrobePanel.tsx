@@ -115,10 +115,16 @@ export function Wardrobe({
         <PanelNote tone={short ? "alarm" : "muted"}>
           {short
             ? "⚠️ The crew is short of warm clothes. The cold takes the newest hand, who is out of action for the next leg."
-            : "The crew is dressed for the cold this leg."}
+            : "The crew is dressed for the cold this leg. The rest stay in the hold until a leg asks for more."}
         </PanelNote>
       )}
-      {crew > 0 && carried.length > 0 && (
+      {/* The wear buttons stand only where the leg is asking for warmth.
+          Everywhere else the hold keeps the clothes, and the notes below
+          say why: a garment worn is one way and wears from the day it goes
+          on, so a coat put on for a mild leg is its whole life spent on a
+          leg that asked for nothing. The rule itself lives in wearGarment,
+          which turns the same two presses away with the same reasons. */}
+      {short && crew > 0 && carried.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {/* The panel's own hue rather than the bench's, on the same
               reasoning the Provisions panel's buttons carry at the port:
@@ -136,6 +142,13 @@ export function Wardrobe({
             </Button>
           ))}
         </div>
+      )}
+      {!cold && crew > 0 && carried.length > 0 && (
+        <PanelNote>
+          The sea is mild this leg and asks for no warmth. The clothes wait in
+          the hold for a cold leg, because a garment wears from the day it goes
+          on.
+        </PanelNote>
       )}
       {crew === 0 && (
         <PanelNote>

@@ -65,6 +65,7 @@ import { flagOnFor, survivalLayerOn } from "./flags";
 import { createRng } from "./rng";
 import {
   flatWorkerRoster,
+  wholeStamp,
   type GameState,
   type Worker,
   type WornGarment,
@@ -262,6 +263,14 @@ export function isFrostbitten(
  * when the hold carries none of that good, which is the ordinary case of a
  * captain who sold the lot. And the ceiling above is the one branch play
  * cannot reach, which is why its sentence reads as the bound it is.
+ *
+ * The last refusal is the rule of the panel rather than of the hold, and it
+ * was added after the field reported warehouses being walked onto backs: a
+ * garment worn is one way and wears from the day it goes on, so clothes put
+ * on for a leg that did not ask for them cost their whole life and bought
+ * nothing. A crew the leg is not asking anything of is left alone, and the
+ * sentence that turns the press away says which of the two nothings this
+ * is: a mild leg, or a crew the cold has already been answered for.
  */
 export function wearGarment(
   state: GameState,
@@ -284,6 +293,14 @@ export function wearGarment(
   }
   if ((state.inventory[good] || 0) < 1) {
     logs.push(`❌ No ${good} in the hold to wear.`);
+    return false;
+  }
+  if (!shortOfWarmth(state)) {
+    logs.push(
+      legIsCold(state)
+        ? "❌ The crew already meets this cold leg. Clothes put on for nothing still wear, so the rest stay in the hold until a leg asks for them."
+        : "❌ The sea is mild this leg and asks for no warmth. Clothes put on now would wear from today, so the hold keeps them for a cold leg.",
+    );
     return false;
   }
   state.inventory[good] -= 1;
@@ -444,7 +461,13 @@ export function tickGarments(state: GameState, logs: string[]): void {
   }
   state.garments = kept;
   if (worn.length > 0 && rags === 0) {
-    logs.push(`🧵 Worn clothes lose ${step} of their warmth to the sea.`);
+    // The number is durability points rather than warmth, which are two
+    // units rather than one: warmth is the garment's rating scaled by the
+    // durability it has left (see warmthScore), so two points off a coat
+    // costs a fraction of its warmth. The line used to call the points
+    // warmth, and a captain watching the wardrobe could never reconcile
+    // the sentence with the numbers.
+    logs.push(`🧵 Worn clothes lose ${step} point of wear to the sea.`);
   }
 }
 
@@ -453,9 +476,11 @@ export function tickGarments(state: GameState, logs: string[]): void {
  *
  * The same rule ./crew's loss takes, through the same walk, because a voyage
  * should have one answer to which hand pays and the plan does not give a
- * second one for the cold. Out of action is exactly what it says and no
- * more: the hand is still aboard, still eats and is still paid, and the only
- * thing the mark costs them is the work of one leg.
+ * second one for the cold. The mark is one leg of work and nothing else:
+ * the hand is still aboard, still eats and is still paid. The line names
+ * the why and the way back, because "out of action" alone read as the sea
+ * having taken a hand for good, when warm clothes before the cold are all
+ * it ever asked for.
  */
 function frostbiteNewest(state: GameState, logs: string[]): void {
   const newest = newestAboard(state);
@@ -468,7 +493,7 @@ function frostbiteNewest(state: GameState, logs: string[]): void {
   hand.frostbittenRound = state.currentRound + 1;
   const label = workerType(newest.type)?.label ?? newest.type;
   logs.push(
-    `🥶 Frostbite: ${hand.name} the ${label} is out of action next leg.`,
+    `🥶 Frostbite: ${hand.name} the ${label} went into the cold short of warm clothes, and is out of action next leg. A warmer layer before a cold leg keeps every hand working.`,
   );
 }
 
@@ -532,6 +557,5 @@ export function normalizeGarments(raw: unknown): WornGarment[] {
  * been sailing this build all along.
  */
 export function normalizeGarmentsTickRound(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-  return Math.max(0, Math.floor(raw));
+  return wholeStamp(raw);
 }

@@ -18,7 +18,7 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { Avatar, Pill } from "./shared";
 import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colours";
 import { renownTitleForLevel } from "@/lib/game/legacy";
-import { ModalOverlay } from "@/components/ui/modal-overlay";
+import { ModalOverlay, ModalSheet } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 import { StatsTab } from "./profile/StatsTab";
 import { ChroniclesTab } from "./profile/ChroniclesTab";
@@ -83,13 +83,7 @@ export function CaptainProfileModal({
     <AnimatePresence>
       {open && (
         <ModalOverlay onClose={() => onOpenChange(false)}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="pm-glass-strong pm-crackle relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl"
-          >
+          <ModalSheet maxW="max-w-3xl">
             {/* Header with avatar and title */}
             <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-4 sm:p-6">
               <div className="pm-seigaiha absolute inset-0 opacity-30 pointer-events-none" />
@@ -202,7 +196,7 @@ export function CaptainProfileModal({
                 <RivalsTab rivals={data.rivals} />
               )}
             </div>
-          </motion.div>
+          </ModalSheet>
         </ModalOverlay>
       )}
     </AnimatePresence>
