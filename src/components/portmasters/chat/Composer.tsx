@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { SendHorizontal, Search, Handshake } from "lucide-react";
+import { SendHorizontal, Search, Handshake, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TradeComposer } from "../game/BarterTrade";
 import type { ChatTrade } from "../ChatPanel";
@@ -89,57 +89,81 @@ export function Composer({
   onInputChange: (value: string) => void;
   onSend: () => void;
 }) {
-  return disabled ? (
-    <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center justify-center gap-2">
-      <p className="text-center text-xs text-muted-foreground">
-        The host has muted you in room chat for the rest of this voyage.
-      </p>
-      {/* Trading is not talking, so a mute does not take the board away. */}
-      {trade && <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />}
-    </div>
-  ) : (
-    <div className="p-2.5 border-t border-black/5 dark:border-white/10 flex items-center gap-2">
-      {trade && <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />}
-      <button
-        onClick={onToggleSearch}
-        className={cn(
-          "pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-          searchOpen
-            ? "bg-celadon/5 text-celadon"
-            : "bg-black/5 text-muted-foreground dark:bg-white/10",
+  // The trade board's own refusal, drawn on the strip the press was made
+  // from: the handshake button and the composer it opens both live here, so
+  // a post the room turns away is read where the captain pressed rather
+  // than in a panel they may never open. The sentence is the frame's own,
+  // carried through the hook and never rebuilt, and the dismissal is the
+  // hook's own clearError.
+  return (
+    <div className="border-t border-black/5 dark:border-white/10">
+      {trade?.barter.error && (
+        <div className="flex items-center justify-between gap-2 border-b border-alarm/25 bg-alarm/5 px-2.5 py-1.5 text-xs text-alarm">
+          <span>⚠️ {trade.barter.error}</span>
+          <button
+            type="button"
+            onClick={trade.barter.clearError}
+            aria-label="Dismiss trade error"
+            className="pm-pressable shrink-0 rounded-full p-0.5"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <div className="p-2.5 flex items-center justify-center gap-2">
+        {disabled ? (
+          <p className="text-center text-xs text-muted-foreground">
+            The host has muted you in room chat for the rest of this voyage.
+          </p>
+        ) : (
+          <>
+            <button
+              onClick={onToggleSearch}
+              className={cn(
+                "pm-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                searchOpen
+                  ? "bg-celadon/5 text-celadon"
+                  : "bg-black/5 text-muted-foreground dark:bg-white/10",
+              )}
+              title="Search messages"
+              aria-label="Search messages"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <Input
+              value={input}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSend();
+                }
+              }}
+              placeholder={
+                {
+                  room: "Message the harbor…",
+                  lobby: "Message the lobby…",
+                  dm: `Message ${otherName ?? ""}…`,
+                }[mode]
+              }
+              className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
+              maxLength={CHAT_MESSAGE_MAX}
+            />
+            <Button
+              size="icon"
+              onClick={onSend}
+              disabled={!input.trim()}
+              className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
+            >
+              <SendHorizontal className="h-4 w-4" />
+            </Button>
+          </>
         )}
-        title="Search messages"
-        aria-label="Search messages"
-      >
-        <Search className="h-4 w-4" />
-      </button>
-      <Input
-        value={input}
-        onChange={(e) => onInputChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
-        placeholder={
-          {
-            room: "Message the harbor…",
-            lobby: "Message the lobby…",
-            dm: `Message ${otherName ?? ""}…`,
-          }[mode]
-        }
-        className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
-        maxLength={CHAT_MESSAGE_MAX}
-      />
-      <Button
-        size="icon"
-        onClick={onSend}
-        disabled={!input.trim()}
-        className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
-      >
-        <SendHorizontal className="h-4 w-4" />
-      </Button>
+        {/* Trading is not talking, so a mute does not take the board away. */}
+        {trade && (
+          <TradeButton trade={trade} me={me} fixedTarget={tradeTarget} />
+        )}
+      </div>
     </div>
   );
 }

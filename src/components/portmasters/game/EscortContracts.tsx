@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
-import { STALE_OFFER } from "@/lib/game/constants/copy";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
+import {
+  ESCORT_OFFER_DEATH,
+  STALE_OFFER,
+  consentFeeRule,
+} from "@/lib/game/constants/copy";
+import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   ESCORT_SELLER_PATH,
   canPayFee,
@@ -133,8 +137,8 @@ export function EscortMarket({
           seller&apos;s cannons that answer the raid: {beatenOff} of it is
           beaten off, and the remaining {eaten} is deducted from the
           seller&apos;s Gold. The cover lasts the leg it was sold for and no
-          other, and a raid that never comes costs the seller nothing. An offer
-          nobody takes before the Parley closes is gone.
+          other, and a raid that never comes costs the seller nothing.{" "}
+          {ESCORT_OFFER_DEATH}
         </>
       }
     >
@@ -169,10 +173,10 @@ export function EscortMarket({
             You are the seller here, so the price is yours to name: the buyer
             pays it at the handshake, and your own Gold answers whatever your
             guns do not beat off, which is {eaten} of a raid, down to the bottom
-            of your hold. A fee is a whole number of Gold from {CONSENT_FEE_MIN}{" "}
-            to {CONSENT_FEE_MAX}. An open offer is any captain&apos;s to take,
-            while a named one waits on the captain you named, and one open offer
-            plus one per captain named is the most this market holds from you.
+            of your hold. {consentFeeRule()} An open offer is any captain&apos;s
+            to take, while a named one waits on the captain you named, and one
+            open offer plus one per captain named is the most this market holds
+            from you.
           </p>
         </MarketBlock>
       )}
@@ -191,7 +195,7 @@ export function EscortMarket({
         <MarketEmpty>
           {canSell
             ? "Nothing is on the market yet. Name a price and post the first offer, or wait and let a buyer come to you."
-            : "No protection is on offer this Parley. Only a Convoy captain at this table can sell one leg of cover, so their offer is what you are waiting for. An offer aimed at one captain waits on that captain, and an offer aimed at the table is any captain's to take. Every offer dies when this Parley closes."}
+            : "No protection is on offer this Parley. Only a Convoy captain at this table can sell one leg of cover, so their offer is what you are waiting for. An offer aimed at one captain waits on that captain, and an offer aimed at the table is any captain's to take."}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
@@ -411,7 +415,7 @@ function seatLine(
     (c) => c.status === "offered" && c.buyerUserId === me.id,
   );
   if (waiting) {
-    return `⏳ ${waiting.sellerName} offers you one leg of cover for ${waiting.fee} Gold. You are the one who answers: taking it pays the fee at the handshake, turning it down leaves the row for them to read, and an offer nobody answers is gone when this Parley closes.`;
+    return `⏳ ${waiting.sellerName} offers you one leg of cover for ${waiting.fee} Gold. You are the one who answers: taking it pays the fee at the handshake, and turning it down leaves the row for them to read.`;
   }
   // The cover is read in its two moments rather than in one, because a
   // spent cover is not a standing one: the buyer of a claimed contract
@@ -443,11 +447,11 @@ function seatLine(
   if (standing.length === 1) {
     const [one] = standing;
     return one.buyerUserId
-      ? `🛡️ Your offer stands: ${one.fee} Gold for one leg of cover for ${one.buyerName ?? "a captain"}. It waits on them, and it ends when this Parley does.`
-      : `🛡️ Your offer stands: ${one.fee} Gold for one leg of cover, open to every captain here. The first to take it gets it, and it ends when this Parley does.`;
+      ? `🛡️ Your offer stands: ${one.fee} Gold for one leg of cover for ${one.buyerName ?? "a captain"}. It waits on them.`
+      : `🛡️ Your offer stands: ${one.fee} Gold for one leg of cover, open to every captain here. The first to take it gets it.`;
   }
   if (standing.length > 1) {
-    return `🛡️ ${standing.length} offers of yours stand this Parley, the newest at ${standing[standing.length - 1].fee} Gold. Each waits on the captain it names, or on the first captain to take an open one, and all of them end when this Parley does.`;
+    return `🛡️ ${standing.length} offers of yours stand this Parley, the newest at ${standing[standing.length - 1].fee} Gold. Each waits on the captain it names, or on the first captain to take an open one.`;
   }
   const refused = forLeg.find(
     (c) => c.status === "declined" && c.sellerUserId === me.id,

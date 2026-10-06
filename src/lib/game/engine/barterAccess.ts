@@ -18,9 +18,10 @@
 // An unknown level is always passed in as a number that fails, never left
 // undefined. The roster on the wire carries a captain whose client never
 // reported a level as unknown rather than as a confident zero (see the
-// renownLevel fallthrough in src/server/realtime/index.ts), so every
-// caller has to turn that unknown into a number before it reaches this
-// module, and the only safe direction to round is down.
+// renownLevel fallthrough in
+// src/server/realtime/wiring/status-heartbeat.ts), so every caller has to
+// turn that unknown into a number before it reaches this module, and the
+// only safe direction to round is down.
 // =====================================================================
 import {
   FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL,

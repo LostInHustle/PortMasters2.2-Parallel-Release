@@ -22,8 +22,6 @@
 
 import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import {
   MAROON_VOTE_SHARE,
@@ -33,18 +31,17 @@ import {
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
-import { captainName, nameCount, tallyRows } from "@/lib/voteTally";
+import { nameCount, tallyRows } from "@/lib/voteTally";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
+import {
+  VoteSeatPicker,
+  type Marks,
+} from "@/components/portmasters/game/VoteSeatPicker";
 import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
-import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 
 type Maroon = ReturnType<typeof useMaroon>;
-
-// What the card needs to know about the rest of the room, and nothing
-// else: the two marks a vote may not be aimed at. Taken as a structural
-// type rather than as the roster hook's whole record so the card cannot
-// reach for anything it has no business reading.
-type Marks = Record<string, SeatStatus>;
 
 /**
  * The two questions the Parley board asks about this vote, answered once
@@ -100,12 +97,6 @@ export function MaroonVoteCard({
   if (!maroonCardShown(game, maroon)) return null;
   const open = maroonVoteOpen(game, maroon);
   const rows = tallyRows(maroon.votes, members);
-  const nameOf = (id: string) => captainName(members, id);
-  // The server refuses a vote aimed at a captain it has already written
-  // off, so the list does not offer one: an option that quietly does
-  // nothing is worse than no option. The rule itself lives in seatMarks,
-  // beside the two other panels that read the same marks.
-  const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
 
   return (
     <VoteCardShell tone="alarm" icon="🏝️" title="Maroon">
@@ -122,55 +113,30 @@ export function MaroonVoteCard({
               cannot read off the board: the vote is spent the moment it
               carries, and the captain it names is still sitting here.
               "One vote a voyage" alone would leave a failed vote looking
-              like a spent one. */}
+              like a spent one. The share is quoted from its one home (see
+              MAROON_VOTE_SHARE), which is the same string the server's own
+              threshold is written beside. */}
             <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-              Two thirds of the captains still sailing, rounded up, can put one
-              captain ashore. The vote is public. Once a vote carries it is
-              spent for the whole voyage, a vote that falls short can be called
-              again on a later leg, and the captain who loses it keeps their
-              seat at the table.
+              {`${MAROON_VOTE_SHARE} of the captains still sailing, rounded up, can put one captain ashore. The vote is public. Once a vote carries it is spent for the whole voyage, a vote that falls short can be called again on a later leg, and the captain who loses it keeps their seat at the table.`}
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Select
-                value={target}
-                onChange={(e) =>
-                  setPick({ round: game.currentRound, target: e.target.value })
-                }
-                aria-label="Captain to maroon"
-              >
-                <option value="">Choose a captain</option>
-                {members
-                  .filter((m) => !marked(m.id))
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.id === me.id
-                        ? `${m.displayName} (you)`
-                        : m.displayName}
-                    </option>
-                  ))}
-              </Select>
-              {/* The label names the press and the moment, the same rule
-                  the audit card's button keeps: a name already in reads a
-                  button that says so rather than one that still offers
-                  the press. */}
-              <Button
-                variant="outline"
-                disabled={!target || !maroon.canVote}
-                aria-disabled={!maroon.canVote}
-                onClick={() => maroon.vote(target)}
-              >
-                {maroon.myVote
-                  ? "Your name is in"
-                  : target
-                    ? `Put ${nameOf(target)} ashore`
-                    : "Call the vote"}
-              </Button>
-            </div>
+            <VoteSeatPicker
+              selectLabel="Captain to maroon"
+              target={target}
+              onPick={(id) => setPick({ round: game.currentRound, target: id })}
+              members={members}
+              me={me}
+              statuses={statuses}
+              myVote={maroon.myVote !== null}
+              canVote={maroon.canVote}
+              onVote={() => maroon.vote(target)}
+              callLabel="Call the vote"
+              pickLabel={(name) => `Put ${name} ashore`}
+            />
             <VoteRefusal error={maroon.error} onDismiss={maroon.clearError} />
-            {/* The count, the captain's own name and what the vote does
-                with the names it needs are one reading, drawn once for
-                both of the harbor's votes: the card that said its own half
-                of it was the second answer to the same question. */}
+            {/* The block below owns every word of the count, the captain's
+                own name and what the vote does with the names it needs:
+                a panel's own half of that reading would be a second
+                answer to one question. */}
             <VoteTallyRows
               rows={rows}
               census={maroon.census}
@@ -232,9 +198,7 @@ export function MaroonResultStrip({ result }: { result: MaroonResult | null }) {
         </button>
       </div>
       <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        Voted ashore by two thirds of the harbor. The ship and everything on it
-        went to the harbor, half their Gold stayed aboard, and the
-        Harbormaster&apos;s hand is theirs for the rest of the voyage.
+        {`Voted ashore by ${MAROON_VOTE_SHARE.toLowerCase()} of the harbor. The ship and everything on it went to the harbor, half their Gold stayed aboard, and the Harbormaster's hand is theirs for the rest of the voyage.`}
       </p>
     </div>
   );

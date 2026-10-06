@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { renownTitleForLevel } from "@/lib/game/legacy";
 import { pathConfig } from "@/lib/game/paths";
 import type { DraftStep } from "@/types/realtime/draft";
+import { Term } from "../../Term";
 import { PhaseError, PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 
 // The three beats, in the words a captain reads them in.
@@ -57,12 +58,20 @@ const STEP_FACE: Record<
 // two of them are worth printing: "Hold 100%" would be a line a reader
 // learns to skip, which is the line the third of them would then be lost
 // behind. The renown line prints the rung rather than the level number,
-// which is the name the ladder itself gives it (see RENOWN_TITLES).
-function cardFacts(card: NonNullable<ReturnType<typeof pathConfig>>): string[] {
-  const facts: string[] = [];
+// which is the name the ladder itself gives it (see RENOWN_TITLES), and it
+// draws Renown as a glossary term: the deal is the first place a captain
+// meets the word, and the rung it names means nothing until the word does.
+function cardFacts(
+  card: NonNullable<ReturnType<typeof pathConfig>>,
+): ReactNode[] {
+  const facts: ReactNode[] = [];
   const hold = Math.round(card.cargoModifier * 100);
   if (hold !== 100) facts.push(`Hold ${hold}%`);
-  facts.push(`Renown to ${renownTitleForLevel(card.renownCeiling)}`);
+  facts.push(
+    <>
+      <Term>Renown</Term> to {renownTitleForLevel(card.renownCeiling)}
+    </>,
+  );
   if (card.orderPool.length > 0) {
     facts.push(`${card.orderPool.length} locked orders`);
   }
@@ -229,7 +238,12 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
                       </p>
                       {facts.length > 0 && (
                         <p className="mt-1.5 text-[10px] text-muted-foreground">
-                          {facts.join(" · ")}
+                          {facts.map((fact, index) => (
+                            <span key={index}>
+                              {index > 0 && " · "}
+                              {fact}
+                            </span>
+                          ))}
                         </p>
                       )}
                     </div>

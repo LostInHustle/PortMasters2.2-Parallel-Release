@@ -36,7 +36,7 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
  * The dispatcher takes the shared `PhasePanelProps` shape, plus the
  * optional extras its own `Props` type adds for the overlays and
  * payloads not every caller wires up, among them `onTutorialOpen`
- * (used by the Welcome screen's New Player Tutorial button) and
+ * (used by the Welcome screen's New Captain Tutorial button) and
  * `voyageResult` (the harbor wide standings payload the server emits on
  * voyage:complete, also consumed by Endgame). Each is optional so a
  * caller that hasn't wired one in still compiles and renders a sensible
@@ -56,6 +56,9 @@ type Props = PhasePanelProps & {
   reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
+  // The room's leave flow, threaded to the two finished voyage screens so
+  // a captain waiting on the host can set out for a new harbor instead.
+  onLeave?: () => void;
 };
 
 export function GamePhasePanel(props: Props) {
@@ -166,6 +169,7 @@ function ActivePhase(props: Props) {
     reveal,
     myLegacy,
     onRestart,
+    onLeave,
     roster,
     draft,
   } = props;
@@ -342,6 +346,7 @@ function ActivePhase(props: Props) {
           // two screens a finished voyage can end on offer the same call.
           room={room}
           onRestart={onRestart}
+          onLeave={onLeave}
         />
       );
     case "endgame":
@@ -354,6 +359,7 @@ function ActivePhase(props: Props) {
           reveal={reveal}
           myLegacy={myLegacy}
           onRestart={onRestart}
+          onLeave={onLeave}
         />
       );
     default:

@@ -49,6 +49,14 @@ export type ReadyState = {
   requiredUserIds: string[];
 };
 
+/**
+ * The room's ready count as a sentence, so the rail and the control bar
+ * cannot word the same number two ways.
+ */
+export function readyLine(readyCount: number, requiredCount: number): string {
+  return `${readyCount} of ${requiredCount} captains ${readyCount === 1 ? "has" : "have"} readied.`;
+}
+
 // Rank comes from the shared @/lib/game/checkpoint module so the client and
 // the realtime layer never drift on phase order, and a phase value that
 // arrives off the wire is read through @/lib/game/phases for the same reason.

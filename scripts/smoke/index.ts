@@ -95,6 +95,7 @@ import { theDoorsAndTheLoadSuite } from "./suites/59-theDoorsAndTheLoad";
 import { theMirrorAndTheChargeSuite } from "./suites/60-theMirrorAndTheCharge";
 import { theStatusConventionSuite } from "./suites/61-theStatusConvention";
 import { theMutesAndTheKeysSuite } from "./suites/62-theMutesAndTheKeys";
+import { theWayOutSuite } from "./suites/63-theWayOut";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -496,6 +497,12 @@ async function main(): Promise<void> {
     // of the run.
     console.log("\nThe mutes and the keys");
     await theMutesAndTheKeysSuite();
+    // The way out's article is the third of the pure cluster: both exits
+    // it holds are client source shapes rather than harbor state, so it
+    // opens nothing either, and it sits ahead of the ready check for the
+    // same reason the two above it do.
+    console.log("\nThe way out");
+    await theWayOutSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

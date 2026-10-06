@@ -23,6 +23,7 @@
 // not their sense, which is why the sweep's comment says so out loud.
 
 import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "./constants/crew";
+import { COLD_LEG_WARMTH } from "./constants/garments";
 
 /** The three clauses every status family carries. */
 type StatusClause = "state" | "cause" | "remedy";
@@ -93,6 +94,28 @@ export function frozenWorkLog(name: string, task: string): string {
     and lets the cause and the way back carry the rest. */
 export function frozenFrostbiteLog(name: string, label: string): string {
   return `🥶 Frostbite: ${name} the ${label} ${FROZEN_CREW.cause}, and is out of action next leg. ${FROZEN_CREW.remedy}.`;
+}
+
+// ---- The cold leg chip, as the rail says it ----
+
+/**
+ * The rail's cold leg chip: the weather read before the leg settles,
+ * which is the reason the chip is drawn at all (a warning that first
+ * appears in the settlement has already cost the hand). The way back is
+ * drawn with it rather than left to a hover title, because the captain
+ * reading it on a phone has no hover, and because it is still
+ * actionable while the chip is on screen: the bench's wardrobe closes
+ * the warmth gap while the leg is open, so the sentence points at the
+ * clothes rather than at the next cold leg. The weather itself, the
+ * warmth sum the crew is wearing against what the leg asks, is passed
+ * in already written by the caller (see warmthText in ./garments),
+ * which keeps this module clear of the garments reader.
+ */
+export function coldLegChipLine(warmth: string, shortWarmth: boolean): string {
+  const reading = `❄️ A cold leg: warmth ${warmth} of ${COLD_LEG_WARMTH}`;
+  return shortWarmth
+    ? `${reading}, so the cold will take a hand. ${FROZEN_CREW.remedy}.`
+    : `${reading}, and the crew is dressed for it.`;
 }
 
 // ---- Short rations, as its surfaces say it ----
@@ -202,6 +225,16 @@ export const STATUS_SENTENCES: readonly StatusSentence[] = [
     family: "frozen",
     build: () => frozenFrostbiteLog("A hand", "Weaver"),
     declares: ["cause", "remedy"],
+  },
+  {
+    surface: "the rail's cold leg chip while the warmth falls short",
+    family: "frozen",
+    build: () => coldLegChipLine("1", true),
+    // The state clause is left out on purpose: this chip's state is the
+    // weather reading it leads with, and the family's name for the
+    // aftermath ("Frozen out this leg") belongs to the legs that read
+    // that row. The chip is held to the clause every surface must carry.
+    declares: ["remedy"],
   },
   {
     surface:

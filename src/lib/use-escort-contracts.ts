@@ -99,13 +99,15 @@ export function useEscortContracts(
   // The covered captain's report that a raid arrived and the guns answered
   // it. It carries the Gold the raid would have taken, which only that
   // captain's own client can know, and the seller's client is what turns it
-  // into a bill (see escortClaimFrom and applyEscortSide).
+  // into a bill (see escortClaimFrom and applyEscortSide). The previous
+  // refusal is cleared first, the same as every other press on this board.
   const claim = useCallback(
     (contractId: string, raidGold: number) => {
       if (!socket) return;
+      clearError();
       socket.emit("contract:claim", { roomId, contractId, raidGold });
     },
-    [socket, roomId],
+    [socket, roomId, clearError],
   );
 
   return {

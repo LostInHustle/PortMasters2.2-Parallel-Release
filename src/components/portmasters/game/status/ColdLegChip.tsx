@@ -1,6 +1,6 @@
 "use client";
 
-import { COLD_LEG_WARMTH } from "@/lib/game/constants/garments";
+import { coldLegChipLine } from "@/lib/game/status-copy";
 import { warmthText } from "@/lib/game/garments";
 import { cn } from "@/lib/utils";
 
@@ -12,8 +12,10 @@ import { cn } from "@/lib/utils";
    mild one asks nothing of anybody, and it wears the meaning
    colours rather than a hue of its own: the sea while the crew is
    dressed for the weather, the alarm red the moment the clothes
-   on their backs are not enough. The Wardrobe panel on the bench
-   prints the same sum from the same function. */
+   on their backs are not enough. The two sentences are authored in
+   status-copy with the rest of the status lines (see
+   coldLegChipLine), and the Wardrobe panel on the bench prints the
+   same sum from the same function. */
 export function ColdLegChip({
   warmth,
   shortWarmth,
@@ -28,9 +30,7 @@ export function ColdLegChip({
         shortWarmth ? "bg-alarm/5 text-alarm" : "bg-sea/5 text-sea",
       )}
     >
-      {shortWarmth
-        ? `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, so the cold will take a hand.`
-        : `❄️ A cold leg: warmth ${warmthText(warmth)} of ${COLD_LEG_WARMTH}, and the crew is dressed for it.`}
+      {coldLegChipLine(warmthText(warmth), shortWarmth)}
     </div>
   );
 }

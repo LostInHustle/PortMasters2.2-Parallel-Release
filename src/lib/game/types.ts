@@ -678,11 +678,12 @@ export type GameState = {
   orderFills: OrderFill[];
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
-  // game:status handler in src/server/realtime/index.ts, which is where every
-  // captain's Reputation is already visible). Read by startMarket to add one
-  // extra card to this captain's board from the next round onward; never
-  // flips back, and never touches maxRounds, difficulty, or which tier's
-  // content is visible, all of which stay the host's own choice.
+  // game:status handler in src/server/realtime/wiring/status-heartbeat.ts,
+  // which is where every captain's Reputation is already visible). Read by
+  // startMarket to add one extra card to this captain's board from the next
+  // round onward; never flips back, and never touches maxRounds,
+  // difficulty, or which tier's content is visible, all of which stay the
+  // host's own choice.
   tidewatchSurge: boolean;
   // The captain's persistent Renown level (see src/lib/game/legacy.ts),
   // copied onto the voyage state so the engine can gate Renown locked skills
@@ -889,21 +890,19 @@ export type GameState = {
   bargeSpend: number;
   // Loans currently owed to other captains (debts) and by other captains
   // to this one (loansGiven). Settled voluntarily at any time, or forced
-  // at the end of Round 8 (see settleOutstandingDebts in
+  // at the voyage's final round (see settleOutstandingDebts in
   // src/lib/game/engine/aid.ts).
   debts: Loan[];
   loansGiven: Loan[];
-  // Set only by settleOutstandingDebts, when a forced repayment at the end
-  // of Round 8 still couldn't fully cover what was owed. Drives the
-  // endgame screen's outcome instead of the normal merchant rank.
+  // Set only by settleOutstandingDebts, when a forced repayment at the
+  // voyage's final round still couldn't fully cover what was owed. Drives
+  // the endgame screen's outcome instead of the normal merchant rank.
   defaultedDebt: boolean;
   // Transient: a signal for the React layer to relay over the aid:repay
   // socket event and then clear, since the pure engine functions that
   // populate it (settleOutstandingDebts) have no way to call socket.emit
   // themselves. Same convention as _draftChoices/_newModule above.
   _pendingDebtSettlements?: {
-    lenderId: string;
-    lenderName: string;
     amount: number;
     debtId: string;
   }[];
@@ -991,9 +990,9 @@ export function flatWorkerRoster(game: Pick<GameState, "workers">): Worker[] {
 }
 
 // Accepts whatever a save actually holds and returns a complete roster: any
-// artisan type the save predates comes back empty rather than undefined, and a
-// save written before the roster existed is read from the three separate
-// arrays it used to carry. Deliberately tolerant, since this runs on every
+// artisan type the save predates comes back empty rather than undefined, and
+// the older shape that keeps the roster as three separate arrays is read as
+// well. Deliberately tolerant, since this runs on every
 // load and a malformed roster should cost a captain their artisans, not their
 // whole voyage.
 //

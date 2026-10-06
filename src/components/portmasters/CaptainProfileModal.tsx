@@ -16,7 +16,7 @@ import {
 import { api, type PublicUser } from "@/lib/api";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { Avatar, Pill } from "./shared";
-import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colours";
+import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colors";
 import { renownTitleForLevel } from "@/lib/game/legacy";
 import { ModalOverlay, ModalSheet } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";

@@ -71,9 +71,9 @@ export const REFIT_SELLER_PATH: PathId = "loom";
  * leaving the consent primitive in place for later use". So the switch takes
  * the bench and leaves the primitive, and with it off no refit can be offered
  * (the server refuses one, see the refit handlers in
- * src/server/realtime/index.ts), no board is drawn and none of the three
- * counters does anything: no tailor puts a point back, no rag comes off the
- * pile and nothing is rewoven.
+ * src/server/realtime/wiring/refits.ts), no board is drawn and none of the
+ * three counters does anything: no tailor puts a point back, no rag comes
+ * off the pile and nothing is rewoven.
  *
  * It is judged here rather than in ./flags for the reason that module's
  * header gives: it stands on the wardrobe as well as on itself, because a

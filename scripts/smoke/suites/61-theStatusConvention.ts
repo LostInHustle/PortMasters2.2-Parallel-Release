@@ -38,6 +38,7 @@ import {
   SKILLED_LEGEND,
   STATUS_FAMILIES,
   STATUS_SENTENCES,
+  coldLegChipLine,
   frozenAssignRefusal,
   frozenBenchLine,
   frozenFrostbiteLog,
@@ -148,8 +149,9 @@ export async function theStatusConventionSuite(): Promise<void> {
       frozenAssignRefusal(),
       frozenWorkLog("A hand", "the nets"),
       frozenFrostbiteLog("A hand", "Weaver"),
+      coldLegChipLine("1", true),
     ].every((line) => line.includes(FROZEN_CREW.remedy)),
-    "all four cold sentences give the same way back to within their wording, which is the drift this convention closes: the bench's row had dropped the remedy while the engine kept it, and one account of the cold is now one account",
+    "every cold sentence gives the same way back to within its wording, which is the drift this convention closes: the bench's row had dropped the remedy while the engine kept it, the rail's chip warned without saying what to do about it, and one account of the cold is now one account",
   );
 
   check(

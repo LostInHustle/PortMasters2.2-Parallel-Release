@@ -4,6 +4,7 @@ import { cardName, cardText } from "@/lib/game/cards";
 import { MODULES } from "@/lib/game/constants/drafts";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { HuePanel } from "./PhasePanels";
 
 /**
  * Module interaction rules. Each rule names a set of module IDs and the
@@ -104,7 +105,7 @@ export function ModuleSynergyAnalyzer({
   const activeBonuses = MODULES.filter((m) => ids.has(m.id));
 
   return (
-    <div className="rounded-xl border border-modules/15 bg-modules/[0.02] p-3.5 mb-4">
+    <HuePanel tone="modules" className="p-3.5 mb-4">
       <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-2">
         Module Synergy Analysis
       </div>
@@ -153,6 +154,6 @@ export function ModuleSynergyAnalyzer({
           No special interactions detected between equipped modules.
         </div>
       )}
-    </div>
+    </HuePanel>
   );
 }

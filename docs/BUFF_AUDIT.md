@@ -140,7 +140,7 @@ The lean is the gap between a good's share of harbor buying and the baseline, so
 
 The tooltip on each shelf row, at `src/components/portmasters/game/phases/PurchasePriceReference.tsx:42`, calls `explainExpectedPrice`. It used to apply `purchase_discount`, `hemp_price_reduction` and `smugglers_hold` but not the Kiln Cellar or the Foreign Quarter Pass, both of which `getCardFinalCost` does apply at the counter, so a captain holding either module was quoted high on that panel and charged low at the till. The error was in the captain's favor, but the reference number the panel exists to provide was wrong.
 
-The reader applies both module lines now (`explainExpectedPrice`, `src/lib/game/engine/pricing.ts:504`, the Kiln Cellar at `:550` and the Foreign Quarter Pass at `:560`), so the quote and the counter agree.
+The reader applies both module lines now (`explainExpectedPrice`, `src/lib/game/engine/pricing.ts:519`, the Kiln Cellar at `:565` and the Foreign Quarter Pass at `:575`), so the quote and the counter agree.
 
 ### A load timeout and a load error both drop the Renown bonus
 

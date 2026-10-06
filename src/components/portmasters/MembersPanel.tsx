@@ -18,7 +18,7 @@ import { SystemNotices } from "./roster/SystemNotices";
 /**
  * Live roster of room members, collapsed down to what matters at a glance:
  * gold, reputation, and whether they're still in the run. Click a row to
- * open the full detail popup (cargo, workers, log) in GameModals.tsx.
+ * open the full detail popup (cargo, workers, log) in PlayerDetailModal.tsx.
  *
  * [MANIFEST: Partial Sight] Each non self row carries an eye button that
  * opens a small popover showing a banded cargo read of the target captain.

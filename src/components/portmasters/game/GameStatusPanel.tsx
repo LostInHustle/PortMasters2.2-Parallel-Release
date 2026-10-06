@@ -12,7 +12,7 @@ import {
 import type { GameState } from "@/lib/game/types";
 import type { WorkerType } from "@/lib/game/constants/crew";
 import { unlockedWorkerTypes } from "@/lib/game/pools";
-import type { ConvoyVenture } from "@/lib/use-convoy";
+import { useConvoy } from "@/lib/use-convoy";
 import { VoyageTimeline } from "./VoyageTimeline";
 import { GameLogPanel } from "./GameLogPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -76,13 +76,9 @@ export function GameStatusPanel({
   game: GameState;
   logs: string[];
   onRepayLoan?: (debtId: string) => void;
-  convoy?: {
-    ventures: ConvoyVenture[];
-    locked: boolean;
-    error: string | null;
-    post: (targetGold: number, deadlineRound: number) => void;
-    contribute: (ventureId: string, amount: number) => void;
-  };
+  // The hook's own return rather than a shape written out again here, so a
+  // field the hook gains reaches the panel below with it.
+  convoy?: ReturnType<typeof useConvoy>;
   myUserId?: string;
   colorFor?: (item: string) => string | undefined;
 }) {

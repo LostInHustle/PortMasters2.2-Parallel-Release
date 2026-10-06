@@ -15,9 +15,9 @@ export type { BarterOffer };
  *
  * Both surfaces post through the one call, and both take the offered
  * goods out of the hold before they do (the engine's post escrows on the
- * spot, which is what stops one stock from being promised twice). So the
- * shape a post is sent in is also the shape of the escrow a refused one
- * has to hand back, and that is what this type is read for.
+ * spot, which stops one stock from being promised twice). So the shape a
+ * post is sent in is also the shape of the escrow a refused one hands
+ * back, which is what this type is read for.
  */
 export type PostedOffer = {
   offerItem: string;
@@ -31,15 +31,14 @@ export type PostedOffer = {
 /**
  * Whether a post and something the room said about one are the same
  * offer. A refusal frame echoes the fields the poster sent and a board
- * row carries the same fields on the offer it made, so the fields are
+ * row carries the same fields on the offer it made, so those fields are
  * all a match can read: the room mints the offer id after the post is
  * accepted, and a refusal names an offer that never got one.
  *
- * Two offers of one shape are indistinguishable, and they are allowed to
- * exist (posting is free, and a captain may advertise the same intent in
- * several places). That is why only one waiting post is answered by one
- * refusal: whichever of the two it matches, the escrow that goes back is
- * one post's worth and exactly one post's worth.
+ * Two offers of one shape are indistinguishable and are allowed to exist,
+ * since posting is free and a captain may advertise the same intent in
+ * several places. One refusal answers one waiting post, so the escrow
+ * that goes back is exactly one post's worth.
  */
 function sameShape(post: PostedOffer, other: Partial<PostedOffer>): boolean {
   return (
@@ -54,12 +53,11 @@ function sameShape(post: PostedOffer, other: Partial<PostedOffer>): boolean {
 
 /**
  * The post a refusal is about, taken out of the ones still waiting. The
- * frame names the offer it refused, so what comes back is the escrow
- * that post took. A frame from a server older than this bundle names
- * nothing, and the oldest post still waiting is then the only thing it
- * can be about.
+ * frame names the offer it refused, so what comes back is the escrow that
+ * post took; a frame that names nothing falls back to the oldest post
+ * still waiting, which is the only thing it can then be about.
  */
-export function takeRefusedPost(
+function takeRefusedPost(
   pending: PostedOffer[],
   refused: Partial<PostedOffer>,
 ): PostedOffer | null {
@@ -72,17 +70,15 @@ export function takeRefusedPost(
  * The other way a post's wait ends: the room listed it. A post the room
  * accepted comes back as an offer of mine on the board, and from that
  * moment its escrow has a home on the board and nothing is owed back, so
- * it leaves the waiting list. Only board rows this client has not seen
- * before are handed here, since an offer that was already up when a post
- * went out answers that post no more than it answered its own.
+ * it leaves the waiting list. Only this captain's own fresh rows are
+ * handed here, since an offer that was already up when a post went out
+ * answers that post no more than it answered its own.
  */
 function dropConfirmedPosts(
   pending: PostedOffer[],
   board: readonly BarterOffer[],
-  myUserId: string,
 ): void {
   for (const offer of board) {
-    if (offer.fromUserId !== myUserId) continue;
     const matched = pending.findIndex((post) => sameShape(post, offer));
     if (matched >= 0) pending.splice(matched, 1);
   }
@@ -193,9 +189,8 @@ export function useBarter(
 
   // The posts this client has sent that the room has not answered yet, in
   // the order they went out, each one holding the shape its escrow was
-  // taken in. A refusal answers the oldest of them (or the one its frame
-  // names) and a board row answers the one it matches, so the list is
-  // only ever as long as the posts in flight.
+  // taken in. One answer takes one of them: the oldest, the one a
+  // refusal's frame names, or the one a board row matches.
   const pendingPostsRef = useRef<PostedOffer[]>([]);
 
   useEffect(() => {
@@ -220,7 +215,7 @@ export function useBarter(
         if (!myOpenRef.current.has(o.id) && !settledRef.current.has(o.id))
           fresh.push(o);
       }
-      dropConfirmedPosts(pendingPostsRef.current, fresh, myUserId);
+      dropConfirmedPosts(pendingPostsRef.current, fresh);
       for (const [id, offer] of myOpenRef.current) {
         if (!next.has(id) && !settledRef.current.has(id))
           onRefundRef.current(offer);
@@ -253,8 +248,11 @@ export function useBarter(
     // A post the room turned away. The frame names the offer it refused
     // (see the post handler in src/server/realtime/wiring/barter), which
     // is what lets the escrow that has to come back be found rather than
-    // guessed at. The message is shown as before, and the post's own
-    // amounts go back to the hold through the caller.
+    // guessed at. The sentence is the frame's own and lands in this hook's
+    // error state, which a voyage arriving does not replace, so it is the
+    // one thing here that needs no holding; the post's own amounts go back
+    // to the hold through the caller, which holds that write until the
+    // voyage has arrived.
     const onPostError = (data: {
       roomId: string;
       error: string;
@@ -286,34 +284,37 @@ export function useBarter(
   }, [socket, roomId, myUserId]);
 
   // The whole offer rather than a row of positional arguments, because
-  // `flexible` has to travel with it. It names which surface the post came
-  // from, which is the one thing that decides from here on whether the
-  // offer is held to the Renown gate and the flexible allowance or whether
-  // it is a plain Captain's Exchange offer with neither.
+  // `flexible` has to travel with it: that flag is the one thing that
+  // decides whether the offer is held to the Renown gate and the flexible
+  // allowance or is a plain Captain's Exchange offer with neither.
   //
-  // The post is written down as it goes out. The caller has already taken
-  // the offered goods out of its hold (that is what posting means), so the
-  // wait for an answer is the only thing that can give them back, and an
-  // answer can arrive before this call has even returned to the caller.
+  // The post is written down as it goes out, and the refusal standing from
+  // an earlier press is cleared first, so a refusal cannot outlive the
+  // situation it was about. The caller has already taken the offered goods
+  // out of its hold (that is what posting means), so the wait for an
+  // answer is the only thing that can give them back, and an answer can
+  // arrive before this call has returned to the caller.
   const post = useCallback(
     (offer: PostedOffer) => {
       if (!socket) return;
+      setError(null);
       pendingPostsRef.current.push(offer);
       socket.emit("barter:post", { roomId, ...offer });
     },
     [socket, roomId],
   );
 
-  // Withdrawing only asks. The goods come back the same way a swept
-  // offer's do, when the board stops listing it, and never at this
-  // moment: a buyer's accept can already be on the wire, and paying the
-  // goods back on an offer the room has just sold pays the poster twice.
-  // So there is no refund here, and nothing is marked settled either: the
-  // refund a departure earns is decided by what the board reported, which
-  // is the same rule for every offer that leaves it.
+  // Withdrawing only asks, and clears the previous refusal first. The goods
+  // come back the way a swept offer's do, when the board stops listing it,
+  // and never at this moment: a buyer's accept can already be on the wire,
+  // and paying the goods back on an offer the room has just sold would pay
+  // the poster twice. So nothing is refunded and nothing is marked settled
+  // here: the refund a departure earns is decided by what the board
+  // reported, the same rule for every offer that leaves it.
   const cancel = useCallback(
     (offer: BarterOffer) => {
       if (!socket) return;
+      setError(null);
       socket.emit("barter:cancel", { roomId, offerId: offer.id });
     },
     [socket, roomId],

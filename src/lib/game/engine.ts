@@ -289,10 +289,10 @@ export {
   // before the Draft button, and the answer has to be the roll's own
   // predicate rather than a second guess written at the button.
   moduleDraftPossible,
-  // [field report: the batch that would not change] The draft's
-  // swap-or-not question, forwarded for the same reason: the swap button
-  // asks it before the press, and the answer has to be the reroll's own
-  // predicate rather than a second guess written at the button.
+  // The draft's swap-or-not question, forwarded for the same reason: the
+  // swap button asks it before the press, and the answer has to be the
+  // reroll's own predicate rather than a second guess written at the
+  // button.
   moduleSwapPossible,
   // The load's own reconcile for the two surcharge fields, forwarded for
   // the reason the rest of this block is: the heal has to read the same
@@ -552,11 +552,11 @@ export {
 } from "./engine/convoyState";
 
 // ========== Voyage lifecycle and phase orchestration ==========
-// The departures are deliberately not forwarded. completeOrders,
-// finishSettlement and skipUpgrade used to be here because the panels
-// called them directly, which is what gave the engine a second route
-// around the lap. Every panel reaches the spine through nextPhase or
-// lockInBoon now, so those three are private to ./engine/lifecycle.ts.
+// The departures are deliberately not forwarded: completeOrders,
+// finishSettlement and skipUpgrade are private to ./engine/lifecycle.ts.
+// Every panel reaches the spine through nextPhase or lockInBoon, and
+// re-exporting one of the three would give the engine a second route
+// around the lap.
 //
 // The same goes for the per phase enter and complete steps further up
 // this file: completeMarket, startOrders, completeParley and selectBoon

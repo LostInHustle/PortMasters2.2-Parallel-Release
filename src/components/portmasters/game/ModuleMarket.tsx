@@ -8,6 +8,7 @@ import type { PublicUser } from "@/lib/api";
 import { cardById, cardName, cardText } from "@/lib/game/cards";
 import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
 import { STALE_OFFER } from "@/lib/game/constants/copy";
+import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   canPayFee,
@@ -120,10 +121,10 @@ export function ModuleMarket({
           A module bolted to a hull, sold at a price the two of you agree. It
           comes off the seller&apos;s hull and onto the buyer&apos;s the moment
           the two of you shake hands, so the buyer needs an open slot, and a
-          hull&apos;s ladder tops out at three slots at ship level three. The
-          fee is paid when you shake hands. One listing per module a leg, one
-          open offer per captain you name, and an offer nobody takes before the
-          Parley closes is gone.
+          hull&apos;s ladder tops out at {MAX_SHIP_LEVEL} slots at ship level{" "}
+          {MAX_SHIP_LEVEL}. The fee is paid when you shake hands. One listing
+          per module a leg, one open offer per captain you name, and an offer
+          nobody takes before the Parley closes is gone.
         </>
       }
     >

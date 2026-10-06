@@ -123,6 +123,8 @@ export function RefitBench({
         {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a
         single leg for whatever fee the two of you agree, and anyone can take{" "}
         {TAILOR_WORK} from the harbor tailors for {MEND_GOLD_PER_POINT} Gold.
+        One open offer per captain you name, one refit taken on a leg, and an
+        offer nobody takes before the Market closes is gone.
       </p>
 
       {/* The offer form belongs to the path that sells the work. A captain
@@ -136,46 +138,40 @@ export function RefitBench({
               works one garment. The bench opens again next leg.
             </p>
           ) : (
-            <>
-              <PrivateOffer
-                lead={
-                  <>
-                    <span className="text-muted-foreground">Put right</span>
-                    <Select
-                      value={good}
-                      onChange={(e) => setGood(e.target.value)}
-                      aria-label="The garment this refit works on"
-                    >
-                      {SELLER_PATH.goods.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </Select>
-                    <span className="text-muted-foreground">for</span>
-                  </>
-                }
-                fee={fee}
-                onFee={setFee}
-                targetId={targetId}
-                onTarget={setTargetId}
-                others={others}
-                audienceLabel="Offer this refit to a specific captain"
-                deadline="before the Market closes."
-                action={
-                  <Button
-                    className="rounded-lg"
-                    onClick={() => refit.post(fee, good, targetId || undefined)}
+            <PrivateOffer
+              lead={
+                <>
+                  <span className="text-muted-foreground">Put right</span>
+                  <Select
+                    value={good}
+                    onChange={(e) => setGood(e.target.value)}
+                    aria-label="The garment this refit works on"
                   >
-                    {SELLER_PATH.crest} Offer a Refit
-                  </Button>
-                }
-              />
-              <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-                One open offer per captain you name, one refit taken on a leg,
-                and an offer nobody takes before the Market closes is gone.
-              </p>
-            </>
+                    {SELLER_PATH.goods.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </Select>
+                  <span className="text-muted-foreground">for</span>
+                </>
+              }
+              fee={fee}
+              onFee={setFee}
+              targetId={targetId}
+              onTarget={setTargetId}
+              others={others}
+              audienceLabel="Offer this refit to a specific captain"
+              deadline="before the Market closes."
+              action={
+                <Button
+                  className="rounded-lg"
+                  onClick={() => refit.post(fee, good, targetId || undefined)}
+                >
+                  {SELLER_PATH.crest} Offer a Refit
+                </Button>
+              }
+            />
           )}
         </MarketBlock>
       )}
@@ -287,7 +283,7 @@ export function RefitBench({
         <MarketEmpty className="py-2">
           {canSell
             ? "Nothing on the bench yet. Your offer is the first."
-            : "No refit work on offer this leg. A refit on the bench is gone when this Market closes, and a captain takes on one refit a leg."}
+            : "No refit work on offer this leg."}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">

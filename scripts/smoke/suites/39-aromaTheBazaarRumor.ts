@@ -675,12 +675,12 @@ export async function aromaTheBazaarRumorSuite(run: SmokeRun): Promise<void> {
         "captain may spread a word about one commodity, here at the Parley.",
       ) &&
       deskSource.includes(
-        "Speaking at the bazaar belongs to the {SELLER_PATH.name} path, once",
+        "Speaking at the bazaar belongs to the {SELLER_PATH.name} path, and",
       ) &&
+      deskSource.includes("Whoever holds it is named in the") &&
       deskSource.includes(
-        "voyage. Whoever holds it is named in the voyage log, and the board",
+        "voyage log, and the board below names them the moment they speak.",
       ) &&
-      deskSource.includes("below names them the moment they speak.") &&
       !deskSource.includes("named ports"),
     "and the desk's own copy names the good rather than the ports and turns on the captain rather than on the seat: the empty board explains the two leg window rather than announcing a silent voyage, the intro says each Aroma captain may speak rather than the Aroma captain, and the reader who holds no path is told who is named where rather than left to work the silence out from a form that is not there",
   );

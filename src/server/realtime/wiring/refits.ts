@@ -3,8 +3,7 @@
 // a port, ordered over ../refits' own board.
 // =====================================================================
 
-import { STALE_OFFER } from "@/lib/game/constants/copy";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
+import { consentFeeRule, STALE_OFFER } from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
 import {
@@ -83,9 +82,7 @@ export function wireRefits(io: Server, socket: Socket): void {
       // about what a price is (see consentFeeFor).
       const fee = consentFeeFor(payload?.fee);
       if (fee === null) {
-        fail(
-          `A fee is a whole number of Gold, at least ${CONSENT_FEE_MIN} and at most ${CONSENT_FEE_MAX}.`,
-        );
+        fail(consentFeeRule());
         return;
       }
       // The term is a good rather than a number, so it is validated

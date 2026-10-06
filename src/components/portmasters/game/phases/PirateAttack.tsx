@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { difficultyConfig } from "@/lib/game/difficulty";
+import { ESCORT_SHARE_RULE } from "@/lib/game/constants/copy";
 import {
   escortCost,
   escortCoverage,
@@ -120,8 +121,8 @@ export function PirateAttack({
             if (!recommend) return null;
             return (
               <div className="mt-2 rounded-lg bg-gain/5 px-2.5 py-1.5 text-[10px] text-gain">
-                Escort costs {escortFee}g but expected loss is{" "}
-                {Math.round(expectedLoss)}g. Hiring the escort saves Gold on
+                Escort costs {escortFee} Gold but expected loss is{" "}
+                {Math.round(expectedLoss)} Gold. Hiring the escort saves Gold on
                 average.
               </div>
             );
@@ -158,10 +159,12 @@ export function PirateAttack({
           {cover ? "Sail On" : "Set Sail Anyway"}
         </Button>
       </div>
+      {/* The share the escort takes, in the guide's own words: one home
+          for the sentence (see ESCORT_SHARE_RULE in
+          @/lib/game/constants/copy), so a rewording lands on both pages. */}
       {!cover && (
         <p className="text-[11px] text-muted-foreground mt-3">
-          Escort cost scales with your current Gold ({game.money}), so it is
-          cheapest exactly when you have the least to lose.
+          {ESCORT_SHARE_RULE}
         </p>
       )}
     </div>

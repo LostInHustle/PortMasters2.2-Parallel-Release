@@ -441,9 +441,10 @@ export function applyMarketLeans(state: GameState, leans: MarketLeans): void {
 
 // [MANIFEST 03: Tidewatch Alerts] Applied on every client in the room the
 // instant the server confirms the combined Reputation threshold was crossed
-// (see the game:status handler in src/server/realtime/index.ts). A one direction
-// flip: nothing in this codebase ever sets tidewatchSurge back to false
-// mid voyage, and a fresh voyage already resets it through
+// (see the game:status handler in
+// src/server/realtime/wiring/status-heartbeat.ts). A one direction flip:
+// nothing in this codebase ever sets tidewatchSurge back to false mid
+// voyage, and a fresh voyage already resets it through
 // createInitialGameState. Logged once here, at the moment it happens,
 // rather than every round afterward in startMarket.
 export function applyTidewatchSurge(state: GameState, logs: string[]) {

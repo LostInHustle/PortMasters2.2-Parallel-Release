@@ -196,7 +196,7 @@ export function Welcome({
         )}
         <Button variant="ghost" className="rounded-xl" onClick={onTutorialOpen}>
           <BookOpen className="h-4 w-4 mr-2" />
-          New Player Tutorial
+          New Captain Tutorial
         </Button>
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
@@ -251,11 +251,11 @@ export function Welcome({
             {/* It points at the button without a direction, because the
                 button sits above this panel rather than below it. */}
             {play.differences.length > 0 &&
-              " The New Player Tutorial lists everything this mode changes."}
+              " The New Captain Tutorial lists everything this mode changes."}
           </span>
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
-          <strong>💡 New Player Tip:</strong> Keep your purse above maintenance
+          <strong>💡 New Captain Tip:</strong> Keep your purse above maintenance
           plus all wages, and hire artisans only when you can sustain them.
         </div>
       </div>

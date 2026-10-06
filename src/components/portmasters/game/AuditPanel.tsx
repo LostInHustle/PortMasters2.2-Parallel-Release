@@ -19,8 +19,6 @@
 
 import { AuditReveal } from "@/types/realtime/audit";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import {
   AUDIT_REVEAL_WORDS,
@@ -31,19 +29,16 @@ import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
-import { captainName, nameCount, tallyRows } from "@/lib/voteTally";
-import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
+import { nameCount, tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
+import {
+  VoteSeatPicker,
+  type Marks,
+} from "@/components/portmasters/game/VoteSeatPicker";
 import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
 import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
-
-// What the card needs to know about the rest of the room, and nothing
-// else: the mark a vote may not be aimed at. Structural rather than the
-// roster hook's whole record, the same shape the maroon card takes, so
-// this card cannot reach for anything it has no business reading.
-type Marks = Record<string, SeatStatus>;
 
 /**
  * The two questions the Parley board asks about this vote, answered once
@@ -105,12 +100,6 @@ export function AuditVoteCard({
   if (!auditCardShown(game, audit)) return null;
   const open = auditVoteOpen(game, audit);
   const rows = tallyRows(audit.votes, members);
-  const nameOf = (id: string) => captainName(members, id);
-  // The server refuses a vote aimed at a captain it has already written
-  // off, so the list does not offer one, the same rule and the same
-  // predicate the maroon card reads: an option that quietly does nothing
-  // is worse than no option.
-  const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
 
   return (
     <VoteCardShell tone="intel" icon="🔎" title="Manifest Audit">
@@ -123,52 +112,30 @@ export function AuditVoteCard({
             count below names who is still to vote, and what the vote does when
             the names it needs land on one captain.
           </p>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Select
-              value={target}
-              onChange={(e) =>
-                setPick({ round: game.currentRound, target: e.target.value })
-              }
-              aria-label="Captain to audit"
-            >
-              <option value="">Choose a captain</option>
-              {members
-                .filter((m) => !marked(m.id))
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id === me.id ? `${m.displayName} (you)` : m.displayName}
-                  </option>
-                ))}
-            </Select>
-            {/* The label says what the press does rather than what the
-                surface is called, and it says which of the two moments
-                this captain is standing in: a name already in reads a
-                button that tells them so instead of offering the press a
-                second time. */}
-            <Button
-              variant="outline"
-              disabled={!target || !audit.canVote}
-              aria-disabled={!audit.canVote}
-              onClick={() => audit.vote(target)}
-            >
-              {audit.myVote
-                ? "Your name is in"
-                : target
-                  ? `Open ${nameOf(target)}'s manifest`
-                  : "Call the audit"}
-            </Button>
-          </div>
-          {members.some((m) => marked(m.id)) && (
-            <p className="text-[10px] text-muted-foreground/80 mt-2">
-              A captain the harbor has written off cannot be audited.
-            </p>
-          )}
+          {/* The press and the list of seats it may be aimed at are the
+              shared picker's (see VoteSeatPicker), and the note it carries
+              is this vote's: a captain the harbor has written off cannot
+              be audited, and the list says why rather than leaving its
+              short length unexplained. */}
+          <VoteSeatPicker
+            selectLabel="Captain to audit"
+            target={target}
+            onPick={(id) => setPick({ round: game.currentRound, target: id })}
+            members={members}
+            me={me}
+            statuses={statuses}
+            myVote={audit.myVote !== null}
+            canVote={audit.canVote}
+            onVote={() => audit.vote(target)}
+            callLabel="Call the audit"
+            pickLabel={(name) => `Open ${name}'s manifest`}
+            note="A captain the harbor has written off cannot be audited."
+          />
           <VoteRefusal error={audit.error} onDismiss={audit.clearError} />
-          {/* What this captain said, whose turn it is, and what the vote
-              does with the names it needs are all one reading now, so the
-              block below owns every word of them: a panel that said its
-              own half of the count was the second answer to the same
-              question. */}
+          {/* The block below owns every word of what this captain said,
+              whose turn it is, and what the vote does with the names it
+              needs: a panel's own half of that count would be a second
+              answer to one question. */}
           <VoteTallyRows
             rows={rows}
             census={audit.census}

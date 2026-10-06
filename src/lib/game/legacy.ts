@@ -2,14 +2,15 @@
 // PortMasters 2.2 Parallel Release: Captain's Legacy
 // Persistent, cross voyage progression tied to a captain's account
 // rather than any single room. A voyage's Gold, cargo, and ship level
-// always reset (see the restart flow in src/server/realtime/index.ts), but the
-// Reputation banked on the way to Round 8 is now worth something once
-// the voyage ends too: it becomes Renown XP, carried across every harbor
-// that captain ever sails in. Pure functions only, so both the client
-// (the Captain's Legacy card) and the server (the voyage conclusion in
-// src/server/realtime/conclusion.ts, alongside the check in and house
-// routes) can import this without pulling in anything React or Prisma
-// specific.
+// always reset (see the restart flow in
+// src/server/realtime/wiring/restart-voyage.ts), but the Reputation
+// banked on the way to the voyage's final round is now worth something
+// once the voyage ends too: it becomes Renown XP, carried across every
+// harbor that captain ever sails in. Pure functions only, so both the
+// client (the Captain's Legacy card) and the server (the voyage
+// conclusion in src/server/realtime/conclusion.ts, alongside the check in
+// and house routes) can import this without pulling in anything React or
+// Prisma specific.
 // =====================================================================
 
 // Triangular growth: level 2 needs 100 XP, level 3 needs 300, level 4

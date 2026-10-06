@@ -36,6 +36,7 @@ import {
   WORD_ON_THE_DOCKS_REWARD,
   WORD_ON_THE_DOCKS_THRESHOLD,
 } from "./world";
+import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "./paths";
 import { PRODUCTS_TIER0, RESOURCES_TIER0 } from "./goods";
 import { WORKER_TYPES } from "./crew";
 import {
@@ -67,6 +68,21 @@ export const RENOWN_BONUS_LINE =
 // run asserts it word for word, so the shorter form the wires drifted
 // into is the one that left.
 export const TARGET_NOT_IN_HARBOR = "That captain is not in this harbor.";
+// The consent fee's bounds, stated once for the three wires that refuse a
+// fee out of them and the one desk that hints at them.
+export function consentFeeRule(): string {
+  return `A fee is a whole number of Gold, at least ${CONSENT_FEE_MIN} and at most ${CONSENT_FEE_MAX}.`;
+}
+// The escort desk's offer-death rule: one sentence for the intro that is
+// always drawn, the empty state and the glossary's tooltip.
+export const ESCORT_OFFER_DEATH =
+  "An offer nobody takes before the Parley closes is gone.";
+
+// The escort's share rule: the guide's pirate tip and the raid screen's
+// own footnote read one sentence, so the wording lives here rather than
+// on either page.
+export const ESCORT_SHARE_RULE =
+  "The escort costs a share of whatever you're carrying that round, so it's cheapest exactly when you have the least to protect.";
 // The audit and the maroon vote read the same roster, and a captain
 // refused at either door is owed the same sentence whichever door they
 // stood at.
@@ -199,12 +215,12 @@ export function tutorialSteps(
       content: `<p>${APP_NAME} puts you on the ancient Silk Road: one voyage of ${rounds} rounds, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>
 <p>You are sailing <strong>${play.badge}</strong>: ${play.tagline}</p>
 <p>These waters are <strong>${cfg.name}</strong>: ${cfg.tagline}</p>
-<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the things that catch new players out most.</p>
+<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the things that catch new captains out most.</p>
 <p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>`,
     },
     {
       title: "🏆 What you're playing for",
-      content: `<p>After ${rounds} rounds, the player with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
+      content: `<p>After ${rounds} rounds, the captain with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
 <p>${play.failureRule}</p>
 <p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
@@ -243,7 +259,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On round${ma
     },
     {
       title: "⚠️ The artisan trap",
-      content: `<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new players is this:</p>
+      content: `<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new captains is this:</p>
 <div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">
   Assign a task this round.<br>Wages come due at Resolve either way.
 </div>
@@ -255,7 +271,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On round${ma
 <p>You get one choice before that roll happens: hire an escort for ${escortPct(cfg)} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>
 ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.</p>` : ""}
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
-  💡 The escort costs a share of whatever you're carrying that round, so it's cheapest exactly when you have the least to protect. Often worth it once your funds are already thin.
+  💡 ${ESCORT_SHARE_RULE} Often worth it once your funds are already thin.
 </div>`,
     },
     {
@@ -385,7 +401,7 @@ ${workerLine("sachet_maker", "Sachets")}
 
 📣 Word on the Docks:
 • Whichever captain is first in the harbor to complete ${WORD_ON_THE_DOCKS_THRESHOLD} trade orders total this voyage wins ${WORD_ON_THE_DOCKS_REWARD} Gold on the spot
-• It's a race against the rest of the room, not a scheduled event: it can land on any round, for any captain
+• It's a race against the rest of the harbor, not a scheduled event: it can land on any round, for any captain
 • Announced to the whole harbor the moment it's won, same as any other harbor wide milestone
 
 🌊 Tidewatch Alerts:
@@ -399,7 +415,7 @@ ${workerLine("sachet_maker", "Sachets")}
 • Reach the target in time and it fills: every contributor is paid back ${Math.round((CONVOY_VENTURE_PAYOUT_MULTIPLIER - 1) * 100)}% more Gold than they put in, split in exact proportion to their share
 • Miss the deadline and it fails: every contributor only gets back ${Math.round(CONVOY_VENTURE_FAILURE_REFUND_RATE * 100)}% of their own stake, the rest is lost
 • Contributing is a real wager on the rest of the harbor coming through, not a free favor
-• Your whole harbor only ever gets one filled venture per voyage: the moment any venture fills, every other open venture is cancelled and fully refunded, and posting a new one is disabled until the next voyage
+• Your whole harbor only ever gets one filled venture per voyage: the moment any venture fills, every other open venture is canceled and fully refunded, and posting a new one is disabled until the next voyage
 • A deadline can never land on your voyage's final round: it always leaves at least one full round afterward to actually spend whatever you're paid
 • No single captain can ever fund more than ${Math.round(CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE * 100)}% of a venture's target alone: it always needs at least one other captain to fund the rest before it can fill
 

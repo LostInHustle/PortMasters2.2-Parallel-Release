@@ -107,39 +107,23 @@ export function wireAid(io: Server, socket: Socket): void {
 
   socket.on(
     "aid:repay",
-    (payload: {
-      roomId?: string;
-      lenderId?: string;
-      amount?: number;
-      debtId?: string;
-    }) => {
+    (payload: { roomId?: string; amount?: number; debtId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
       if (!roomId || roomId !== s.roomId) return;
-      const lenderId = payload?.lenderId;
       const amount = payload?.amount;
       const debtId = payload?.debtId;
       // Both answers are spoken. The borrower's client applies nothing on
-      // its own (the debt is the room's to close, and the loan can be
-      // gone by the time the press lands), so a handler that returned
-      // silently here would leave the press unanswered and the two books
-      // disagreeing about a debt nobody could then settle. The receipt
-      // names the debt it closed, and the refusal says what the book
-      // holds instead.
+      // its own, since the debt is the room's to close and the loan can be
+      // gone by the time the press lands, so a silent return would leave
+      // the press unanswered and the two books disagreeing about a debt
+      // nobody could then settle. The receipt names the debt it closed,
+      // and the refusal carries the sentence the member screen draws.
       const refuse = (reason: string): void => {
-        socket.emit("aid:repay:fail", {
-          roomId,
-          debtId: debtId ?? null,
-          reason,
-        });
+        socket.emit("aid:repay:fail", { roomId, reason });
       };
-      if (
-        !lenderId ||
-        !debtId ||
-        !Number.isInteger(amount) ||
-        (amount as number) < 0
-      ) {
+      if (!debtId || !Number.isInteger(amount) || (amount as number) < 0) {
         refuse("Invalid repayment");
         return;
       }

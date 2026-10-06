@@ -37,7 +37,7 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 | Command                     | What it does                                                                                        |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |
 | `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                   |
-| `npm run build`             | Generates the database client, runs the tag and card checks, then produces a build                  |
+| `npm run build`             | Generates the database client, runs the tag, card and status checks, then produces a build          |
 | `npm start`                 | Runs the production build on port 8080                                                              |
 | `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                |
 | `npm run lint`              | Runs ESLint across the project                                                                      |

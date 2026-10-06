@@ -24,7 +24,7 @@ An earlier revision of this project split the realtime layer into a second proce
 
 ## What Is Conserved
 
-The entire deterministic engine. The complete constants catalogue. The Prisma schema (adapted to the sandbox datasource). The API route shapes and validation. The auth flow with scrypt and session tokens. The ready check phase sync protocol. The Ledger Integrity Pass. The convoy, backing, harbor pulse, check in, legacy, and merits pure modules. The eight phase checkpoint cycle. The trust model. The first report wins arbitration. The shared helper reputation ceiling. The one venture per voyage room wide rule. The difficulty as single source of truth. The normalize on load defensive read pattern. The wholesale replace modifier flags. The `addOwnedAmount` single mutation path.
+The entire deterministic engine. The complete constants catalogue. The Prisma schema (adapted to the sandbox datasource). The API route shapes and validation. The auth flow with scrypt and session tokens. The ready check phase sync protocol. The Ledger Integrity Pass. The convoy, backing, harbor pulse, check in, legacy, and merits pure modules. The checkpoint cycle, seven phases in Classic and eight in Ocean Gambit. The trust model. The first report wins arbitration. The shared helper reputation ceiling. The one venture per voyage room wide rule. The difficulty as single source of truth. The normalize on load defensive read pattern. The wholesale replace modifier flags. The `addOwnedAmount` single mutation path.
 
 ## What Is Refactored
 

@@ -6,27 +6,28 @@
 // The Manifest Audit and the maroon vote both put a target to the table
 // and both show the room the nominations as they come in. The rows are
 // tallyRows' (see lib/voteTally.ts, which is where the two votes already
-// share what a row is); this is the other half of that arrangement, the
-// part that was still written twice: the same paragraph, the same two
-// spans, the same muted count, in two panels.
+// share what a row is); this is the other half of that arrangement: the
+// same paragraph, the same two spans, the same muted count, in two
+// panels.
 //
-// The count block landed beside the rows because the two are one reading
-// and were once one bug. "AaronZ 1: AaronZ" is what this drew: a name, a
-// bare number and the same name again, with no roster under either, so a
-// captain could not tell whether the vote needed one more name or five.
-// The block says it in words now. How many names are in of how many
-// captains the vote is divided by, how many names carry it, each target
-// with the names behind them, and who the room is still waiting on, all
-// out of the census the server sends rather than out of arithmetic here:
-// the roster this vote divides by is the server's active roster, which is
-// not the member list a client can see (see AuditTally).
+// The whole block reads out of the census the server sends rather than
+// out of arithmetic here: the roster a vote divides by is the server's
+// active roster, which is not the member list a client can see (see
+// AuditTally). How many captains have named someone of how many the vote
+// is divided by, how many names carry it, each target with the names
+// behind them, and who the room is still waiting on.
 //
 // Nothing is counted without a census. A room whose count has not arrived
 // yet is told exactly that, because a count block guessing at its own
-// denominator would be the same bug in a longer sentence. The shortfall
+// denominator would be a wrong count in a longer sentence. The shortfall
 // line (how many more names the leading target needs) and the captain's
 // own line (whether their name is in) are arithmetic over the same frame
 // the rows come from, so there is no fourth number to keep in step.
+//
+// The count line is worded for its own number: one captain has named
+// someone, five have, one name carries it. The count half is built by the
+// shared builder (see namedCountLine in lib/voteTally.ts), so the two
+// votes cannot word one number two ways.
 //
 // The last line is the one thing here the count cannot supply: what
 // happens when the names the vote needs land on one captain, and who is
@@ -37,11 +38,6 @@
 // threshold the census carries, so the number a line names and the number
 // the server carries on are one rule (see auditNamesNeeded, and the
 // maroon's own count).
-//
-// The count line is worded for its own number: one name is in, five
-// captains have named someone, one name carries it. A block that printed
-// "1 of 5 names are in" was the arithmetic of the old bug in a longer
-// sentence, and the two singular branches below are the whole of the fix.
 // =====================================================================
 
 import {
@@ -50,6 +46,7 @@ import {
   leaderShortfall,
   nameCount,
   nameList,
+  namedCountLine,
   type TallyRow,
   type VoteCensus,
 } from "@/lib/voteTally";
@@ -89,11 +86,10 @@ export function VoteTallyRows({
   const waiting = census.awaiting.map((id) => captainName(members, id));
   const leader = leaderShortfall(rows, census.needed);
   // The count and the threshold in one line, each half worded for its own
-  // number. Both the verb and the noun move with the count, which is the
-  // one place this block used to read as arithmetic rather than as English.
+  // number: the count comes from the shared builder, and the verb of the
+  // threshold half moves with the threshold.
   const countLine =
-    `${named} of ${census.roster} captains ` +
-    `${named === 1 ? "has" : "have"} named someone. ` +
+    `${namedCountLine(named, census.roster)} ` +
     `${nameCount(census.needed)} ${census.needed === 1 ? "carries" : "carry"} it.`;
 
   return (

@@ -34,14 +34,18 @@ export function Bankruptcy({
   roster,
   room,
   onRestart,
+  onLeave,
 }: Pick<
   PhasePanelProps,
   "game" | "members" | "backing" | "me" | "roster" | "room"
 > & {
   // The host's own restart, wired from the room's one handler, so this
   // panel offers the same call the control bar and the Endgame screen
-  // offer rather than a second path of its own.
+  // offer rather than a second path of its own. onLeave is the room's
+  // leave flow, for a captain who would rather set out for a new harbor
+  // than wait on the host.
   onRestart?: () => void;
+  onLeave?: () => void;
 }) {
   const myUserId = me.id;
   const isHost = me.id === room.hostId;
@@ -236,7 +240,17 @@ export function Bankruptcy({
           ) : (
             <>
               Your voyage has ended, and the rest of the harbor has finished
-              too. Wait for the host to restart the voyage.
+              too. Wait for the host to restart the voyage, or set out for a new
+              harbor now.
+              {onLeave && (
+                <Button
+                  variant="secondary"
+                  className="mt-3 ml-1 rounded-xl px-8"
+                  onClick={onLeave}
+                >
+                  ⚓ Sail Again
+                </Button>
+              )}
             </>
           )}
         </div>

@@ -36,7 +36,7 @@ import { useBoonLedger } from "@/lib/use-boon-ledger";
 import { useMaroon } from "@/lib/use-maroon";
 import { useNotificationCenter } from "@/lib/use-notifications";
 import { useHarborBoards } from "@/lib/use-harbor-boards";
-import { PlayerDetailModal } from "./game/GameModals";
+import { PlayerDetailModal } from "./game/PlayerDetailModal";
 import { GameStatusPanel } from "./game/GameStatusPanel";
 import { GamePhasePanel } from "./game/GamePhasePanel";
 import { GameControlPanel } from "./game/GameControlPanel";
@@ -55,6 +55,7 @@ import {
   RumorBoardModal,
   TutorialModal,
   RestartConfirmModal,
+  LeaveConfirmModal,
   NotificationHistoryModal,
 } from "./game/GameModals";
 import { MembersPanel } from "./MembersPanel";
@@ -381,7 +382,7 @@ export function GameRoom({
   useEffect(() => {
     const pending = state.game._pendingDebtSettlements;
     if (!pending || pending.length === 0) return;
-    for (const s of pending) aid.repay(s.lenderId, s.amount, s.debtId);
+    for (const s of pending) aid.repay(s.amount, s.debtId);
     act((g) => {
       g._pendingDebtSettlements = [];
     });
@@ -476,14 +477,14 @@ export function GameRoom({
   // for a debt nobody is holding, with the lender paid on nothing and no
   // frame to say so. So the press only asks, and the engine runs on the
   // receipt instead (the same ask first shape the aid board's help press
-  // has always had): see the onAidRepaySettled relay in
-  // use-harbor-boards, and aid:repay in src/server/realtime/wiring/aid
-  // for the two answers a repayment can get.
+  // uses): see the onAidRepaySettled relay in use-harbor-boards, and
+  // aid:repay in src/server/realtime/wiring/aid for the two answers a
+  // repayment can get.
   const handleRepayLoan = useCallback(
     (debtId: string) => {
       const debt = state.game.debts.find((d) => d.id === debtId);
       if (!debt) return;
-      aid.repay(debt.counterpartyId, debt.amount, debtId);
+      aid.repay(debt.amount, debtId);
     },
     [aid, state.game.debts],
   );
@@ -554,6 +555,7 @@ export function GameRoom({
   const [rumorOpen, setRumorOpen] = useState(false);
   const [tutOpen, setTutOpen] = useState(false);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   // [B3: standing orders] The captain's own record, edited in place.
   const [standingOpen, setStandingOpen] = useState(false);
@@ -887,6 +889,18 @@ export function GameRoom({
     onLeave();
   }
 
+  // Steering for the harbor mouth mid voyage writes the seat off, so the
+  // press asks first and the confirm performs the leave; from the harbor
+  // (and after the voyage ends) there is nothing to forfeit and it goes
+  // straight through.
+  function requestLeave() {
+    if (state.game.phase !== "harbor" && !state.game.gameOver) {
+      setLeaveConfirmOpen(true);
+      return;
+    }
+    void handleLeave();
+  }
+
   // Renown (Captain's Legacy) is server side, account wide data. Fetched
   // fresh on every click so a captain who just finished another voyage
   // elsewhere shows their current standing.
@@ -974,7 +988,7 @@ export function GameRoom({
           notifications.markAllRead();
         }}
         me={me}
-        onLeave={handleLeave}
+        onLeave={requestLeave}
       />
 
       {/* Main layout. A column on a wide window, so the band below can be
@@ -1244,6 +1258,7 @@ export function GameRoom({
                   reveal={reveal}
                   myLegacy={myLegacy}
                   onRestart={handleRestart}
+                  onLeave={requestLeave}
                   onRumorBoardOpen={() => setRumorOpen(true)}
                   onTutorialOpen={() => setTutOpen(true)}
                   colorFor={colorFor}
@@ -1567,6 +1582,11 @@ export function GameRoom({
         open={restartConfirmOpen}
         onOpenChange={setRestartConfirmOpen}
         onConfirm={phaseSync.restartVoyage}
+      />
+      <LeaveConfirmModal
+        open={leaveConfirmOpen}
+        onOpenChange={setLeaveConfirmOpen}
+        onConfirm={handleLeave}
       />
       <NotificationHistoryModal
         open={notificationsOpen}

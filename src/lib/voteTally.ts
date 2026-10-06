@@ -74,13 +74,19 @@ export function nameCount(count: number): string {
 
 /**
  * A count of captains with its word, the same arrangement as the count
- * above and for the same reason. The two counts are not one helper with a
- * noun argument: a name is something a captain hands in and a captain is
- * someone still to hand one in, and the two lines that print them are
- * about different halves of the same book.
+ * above and for the same reason.
  */
 export function captainCount(count: number): string {
   return count === 1 ? "1 captain" : `${count} captains`;
+}
+
+/**
+ * The running count as one sentence: how many names are in of how many
+ * captains the vote is divided by. Both vote surfaces render this line
+ * rather than building it, so the number and its verb agree in one place.
+ */
+export function namedCountLine(named: number, roster: number): string {
+  return `${named} of ${roster} captains ${named === 1 ? "has" : "have"} named someone.`;
 }
 
 export function tallyRows(

@@ -70,6 +70,7 @@ import {
   settleBarterTrade,
 } from "./game/engine";
 
+import type { GameState } from "./game/types";
 import type { useGameSession } from "./use-game-session";
 import type { useSound } from "./use-sound";
 
@@ -91,14 +92,45 @@ export function useHarborBoards({
   roomId: string;
   meId: string;
   act: Act;
-  /** Whether the real voyage has arrived yet. See the held refunds below. */
+  /** Whether the real voyage has arrived yet. See the held receipts below. */
   loaded: boolean;
   playSound: PlaySound;
 }) {
+  // Everything the boards write to a voyage waits for the voyage. The save
+  // arrives over REST and the boards hydrate over the socket, so a receipt
+  // can land while state.game is still the placeholder, and anything applied
+  // then is thrown away the moment the real save replaces it (see the INIT
+  // case in ./session/reducer). A receipt that arrives first is held here
+  // instead, and everything held is replayed together, in arrival order,
+  // once the real voyage has landed. The trade this makes is deliberate:
+  // holding costs a gift of goods in the one case where the room is
+  // restarted inside that same moment, while dropping loses a captain's
+  // escrow, a loan, a payout or a garment silently, which is the worse of
+  // the two.
+  const heldReceipts = useRef<((g: GameState, l: string[]) => void)[]>([]);
+  const onVoyage = useCallback(
+    (apply: (g: GameState, l: string[]) => void) => {
+      if (!loaded) {
+        heldReceipts.current.push(apply);
+        return;
+      }
+      act(apply);
+    },
+    [act, loaded],
+  );
+  useEffect(() => {
+    if (!loaded || heldReceipts.current.length === 0) return;
+    const waiting = heldReceipts.current;
+    heldReceipts.current = [];
+    act((g, l) => {
+      for (const apply of waiting) apply(g, l);
+    });
+  }, [loaded, act]);
+
   const onBarterFulfilled = useCallback(
     (offer: BarterOffer, accepterId: string) => {
       if (accepterId === meId) {
-        act((g, l) =>
+        onVoyage((g, l) =>
           acceptBarterOffer(
             g,
             offer.requestItem,
@@ -109,7 +141,7 @@ export function useHarborBoards({
           ),
         );
       } else if (offer.fromUserId === meId) {
-        act((g, l) =>
+        onVoyage((g, l) =>
           settleBarterTrade(
             g,
             offer.requestItem,
@@ -121,25 +153,35 @@ export function useHarborBoards({
         );
       }
     },
-    [act, meId],
+    [onVoyage, meId],
   );
-  // Refunds that arrived before this captain's voyage was loaded. The board
-  // hydrates over the socket, which can be quicker than the save arriving
-  // over REST, and anything applied while state.game is still the placeholder
-  // is thrown away the moment the real save lands. They wait here instead and
-  // are applied together once it has. The trade this makes is deliberate:
-  // holding them costs a gift of goods in the one case where the room is
-  // restarted inside that same moment, while dropping them loses a captain's
-  // escrow silently, which is the worse of the two.
-  const pendingRefunds = useRef<BarterOffer[]>([]);
+  // An offer of mine the board has stopped listing: its escrow has to come
+  // back, and that is the whole of what this report says. The board never
+  // names the reason it dropped the offer, so a withdrawal and a sweep are
+  // one event here and the refund is named for the press, or for the load
+  // itself when it arrives before this captain's voyage has.
   const onBarterRefund = useCallback(
     (offer: BarterOffer) => {
       if (!loaded) {
-        pendingRefunds.current.push(offer);
+        heldReceipts.current.push((g, l) =>
+          refundBarterOffer(
+            g,
+            offer.offerItem,
+            offer.offerAmount,
+            l,
+            "pre-load",
+          ),
+        );
         return;
       }
       act((g, l) =>
-        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l),
+        refundBarterOffer(
+          g,
+          offer.offerItem,
+          offer.offerAmount,
+          l,
+          "withdrawal",
+        ),
       );
     },
     [act, loaded],
@@ -150,12 +192,16 @@ export function useHarborBoards({
   // the one thing that can give them back, and the post it names is where
   // the amounts come from (see use-barter). The goods come home through
   // the same refund a withdrawal and a sweep take, so there is one route
-  // back to a hold and one log line for all three.
+  // back to a hold for all three, and a refusal that lands before the
+  // voyage does is replayed with the rest rather than applied to a save
+  // that is about to be replaced.
   const onBarterPostRefused = useCallback(
     (post: PostedOffer) => {
-      act((g, l) => refundBarterOffer(g, post.offerItem, post.offerAmount, l));
+      onVoyage((g, l) =>
+        refundBarterOffer(g, post.offerItem, post.offerAmount, l, "refusal"),
+      );
     },
-    [act],
+    [onVoyage],
   );
   const barter = useBarter(
     socket,
@@ -165,20 +211,15 @@ export function useHarborBoards({
     onBarterRefund,
     onBarterPostRefused,
   );
-  useEffect(() => {
-    if (!loaded || pendingRefunds.current.length === 0) return;
-    const held = pendingRefunds.current;
-    pendingRefunds.current = [];
-    act((g, l) => {
-      for (const offer of held)
-        refundBarterOffer(g, offer.offerItem, offer.offerAmount, l);
-    });
-  }, [loaded, act]);
 
+  // A loan that has been granted. It is the borrower's client that hears of
+  // it without a press of its own, so it is the one this guard is really
+  // for: a helper can fund an open request while the borrower is still
+  // loading.
   const onAidGranted = useCallback(
     (loan: GrantedLoan, role: "borrower" | "helper") => {
       if (role === "borrower") {
-        act((g, l) =>
+        onVoyage((g, l) =>
           receiveLoan(
             g,
             {
@@ -191,7 +232,7 @@ export function useHarborBoards({
           ),
         );
       } else {
-        act((g, l) =>
+        onVoyage((g, l) =>
           grantLoan(
             g,
             {
@@ -205,23 +246,23 @@ export function useHarborBoards({
         );
       }
     },
-    [act],
+    [onVoyage],
   );
   const onAidRepaid = useCallback(
     (loan: RepaidLoan) => {
-      act((g, l) =>
+      onVoyage((g, l) =>
         receiveRepayment(g, loan.debtId, loan.amount, loan.fromName, l),
       );
     },
-    [act],
+    [onVoyage],
   );
   const onAidRedirectedClosed = useCallback(
     (closed: RedirectedLoanClosed) => {
-      act((g, l) =>
+      onVoyage((g, l) =>
         clearRedirectedLoan(g, closed.debtId, closed.redirectedToName, l),
       );
     },
-    [act],
+    [onVoyage],
   );
   // The receipt for a repayment this captain sent. Nothing left the hold
   // when the press went out, so this is the moment the debt and the Gold
@@ -233,9 +274,9 @@ export function useHarborBoards({
   // frame went out and the engine finds no debt to close.
   const onAidRepaySettled = useCallback(
     (settled: RepaymentSettled) => {
-      act((g, l) => repayLoan(g, settled.debtId, l));
+      onVoyage((g, l) => repayLoan(g, settled.debtId, l));
     },
-    [act],
+    [onVoyage],
   );
   const aid = useAid(
     socket,
@@ -250,13 +291,13 @@ export function useHarborBoards({
   const onBackingAccepted = useCallback(
     (loan: OutstandingLoan) => {
       if (loan.backedAmount)
-        act((g, l) => pledgeBacking(g, loan.backedAmount!, l));
+        onVoyage((g, l) => pledgeBacking(g, loan.backedAmount!, l));
     },
-    [act],
+    [onVoyage],
   );
   const onBackingResolved = useCallback(
     (resolved: BackingResolved) => {
-      act((g, l) =>
+      onVoyage((g, l) =>
         receiveBackingOutcome(
           g,
           resolved.refundAmount,
@@ -265,11 +306,11 @@ export function useHarborBoards({
         ),
       );
     },
-    [act],
+    [onVoyage],
   );
   const onBackingCovered = useCallback(
     (covered: BackingCovered) => {
-      act((g, l) =>
+      onVoyage((g, l) =>
         receiveBackedCoverage(
           g,
           covered.amount,
@@ -279,7 +320,7 @@ export function useHarborBoards({
         ),
       );
     },
-    [act],
+    [onVoyage],
   );
   const backing = useBacking(
     socket,
@@ -292,9 +333,9 @@ export function useHarborBoards({
 
   const onVentureContributed = useCallback(
     (_ventureId: string, accepted: number) => {
-      act((g, l) => contributeToVenture(g, accepted, l));
+      onVoyage((g, l) => contributeToVenture(g, accepted, l));
     },
-    [act],
+    [onVoyage],
   );
   const onVentureSettled = useCallback(
     (
@@ -304,7 +345,11 @@ export function useHarborBoards({
     ) => {
       const mine = settlements.find((s) => s.userId === meId);
       if (!mine) return;
-      act((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
+      // The purse moves on the receipt, and the receipt waits for the
+      // voyage like every other one. The two spoken outcomes below are
+      // news about the room rather than a write to the voyage, so they go
+      // out when the frame arrives, held or not.
+      onVoyage((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
       if (outcome === "filled") {
         toast.success("⚓ Venture filled!", {
           description: `Your share: +${mine.amount} Gold.`,
@@ -316,7 +361,7 @@ export function useHarborBoards({
         });
         playSound("warn");
       } else {
-        toast("⚓ Venture cancelled", {
+        toast("⚓ Venture canceled", {
           description: `Another venture in the harbor already claimed this voyage's one chance. Full refund: +${mine.amount} Gold.`,
         });
       }
@@ -343,11 +388,11 @@ export function useHarborBoards({
   // Gold has already moved.
   const onEscortSettle = useCallback(
     (contract: EscortContract) => {
-      act((g, l) => {
+      onVoyage((g, l) => {
         applyEscortSide(g, contract, meId, l);
       });
     },
-    [act, meId],
+    [onVoyage, meId],
   );
   const escort = useEscortContracts(socket, roomId, meId, onEscortSettle);
 
@@ -365,11 +410,11 @@ export function useHarborBoards({
   // already this captain's own state.
   const onRefitSettle = useCallback(
     (refit: RefitContract) => {
-      act((g, l) => {
+      onVoyage((g, l) => {
         applyRefitSide(g, refit, meId, l);
       });
     },
-    [act, meId],
+    [onVoyage, meId],
   );
   const refit = useRefitContracts(socket, roomId, meId, onRefitSettle);
 
@@ -390,11 +435,11 @@ export function useHarborBoards({
   // refusing, so an agreed trade always completes.
   const onModuleSettle = useCallback(
     (trade: ModuleTrade) => {
-      act((g, l) => {
+      onVoyage((g, l) => {
         applyModuleTradeSide(g, trade, meId, l);
       });
     },
-    [act, meId],
+    [onVoyage, meId],
   );
   const modules = useModuleTrades(socket, roomId, meId, onModuleSettle);
 

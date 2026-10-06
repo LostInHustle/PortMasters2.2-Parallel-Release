@@ -11,9 +11,9 @@
 // twice.
 //
 // The offer board itself is shared room state and lives on the server
-// (see the barter:* handlers in src/server/realtime/index.ts), and the
-// board outlives any single phase now that a captain can post from a chat
-// at any point in the voyage. So the release of escrow cannot be decided
+// (see the barter:* handlers in src/server/realtime/wiring/barter.ts), and
+// the board outlives any single phase now that a captain can post from a
+// chat at any point in the voyage. So the release of escrow cannot be decided
 // here either: it happens on the one client owned by the captain whose
 // offer left the board, reported through useBarter's onRefund the moment
 // the board stops listing it. These functions are only the local half,
@@ -107,17 +107,36 @@ export function postBarterOffer(
   return true;
 }
 
+// Why an escrowed offer's goods are coming home. A withdrawal is the
+// departure the captain asked the board for, a sweep is the board dropping
+// an offer on its own when the leg moves on, a refusal is the room turning
+// a post away, and a pre-load refund is one that arrived before this
+// captain's voyage had loaded and came home with it.
+type BarterRefundCause = "withdrawal" | "sweep" | "refusal" | "pre-load";
+
+const REFUND_PHRASE: Record<BarterRefundCause, string> = {
+  withdrawal: "withdrawn",
+  sweep: "swept when the voyage moved on",
+  refusal: "refused by the room",
+  "pre-load": "returned as the voyage loaded",
+};
+
 // Returns an escrowed offer to its owner. Called for a withdrawal the
-// captain made, and for an offer the server swept off the board when the
-// voyage moved on without anyone taking it.
+// captain made, for an offer the server swept off the board when the
+// voyage moved on without anyone taking it, and for a post the room
+// refused. The cause is what the ledger line says, and it defaults to the
+// withdrawal: the route that needs no context beyond the press.
 export function refundBarterOffer(
   state: GameState,
   offerItem: string,
   offerAmount: number,
   logs: string[],
+  cause: BarterRefundCause = "withdrawal",
 ) {
   addOwnedAmount(state, offerItem, offerAmount);
-  logs.push(`↩️ Barter offer withdrawn, ${offerAmount} ${offerItem} returned`);
+  logs.push(
+    `↩️ Barter offer ${REFUND_PHRASE[cause]}, ${offerAmount} ${offerItem} returned`,
+  );
 }
 
 // The accepting side of a completed trade: pay the requested item, then
@@ -186,10 +205,9 @@ export function settleBarterTrade(
   );
 }
 
-// Takes the ledger and nothing else, because that is genuinely all the work
-// this departure does now: settling the board is no longer part of it, and
-// where the phase leads belongs to the lap. The signature used to carry the
-// whole game state, and dropping it is the honest reading of what is left.
+// Takes the ledger and nothing else, because that is all the work this
+// departure does: settling the board is not part of it, and where the phase
+// leads belongs to the lap, so no game state is read here.
 export function completeParley(logs: string[]) {
   logs.push("⏭️ Bartering ended");
   // The successor is not named here on purpose. The trade board sits between

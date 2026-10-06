@@ -162,13 +162,13 @@ export function pathOrdersOn(mode: unknown): boolean {
  * D3's own rollback, and the plan's clause is "contracts are transient room
  * state rather than durable, so this rolls back cleanly". With the switch
  * off no contract can be posted (the server refuses one, see the contract
- * handlers in src/server/realtime/index.ts), no board is drawn, and the
- * engine reads no cover at the raid roll (see escortCoverOf in
- * ./engine/contracts), so a voyage plays exactly the raid it played before
- * this feature existed. A contract already agreed when the switch goes off
- * loses its cover the same way a rolled back path order loses its lock: the
- * room's board is not drawn from and the engine's cover answers null, so
- * the buyer sails on their own luck and no claim can be raised.
+ * handlers in src/server/realtime/wiring/escort-contracts.ts), no board is
+ * drawn, and the engine reads no cover at the raid roll (see escortCoverOf
+ * in ./engine/contracts), so a voyage plays exactly the raid it played
+ * before this feature existed. A contract already agreed when the switch
+ * goes off loses its cover the same way a rolled back path order loses its
+ * lock: the room's board is not drawn from and the engine's cover answers
+ * null, so the buyer sails on their own luck and no claim can be raised.
  */
 export function escortContractsOn(mode: unknown): boolean {
   return flagOnFor(mode, process.env.NEXT_PUBLIC_ESCORT_CONTRACTS);
@@ -185,13 +185,13 @@ export function escortContractsOn(mode: unknown): boolean {
  * would happen.
  *
  * With the switch off no rumor can be published: the server refuses one
- * (see the bazaar handlers in src/server/realtime/index.ts) and the desk is
- * not drawn at the Parley. And no band shift is applied, because the two
- * ends of the settlement read the same switch: the server sends no lean on
- * the advance that opens a market, and the engine folds none in when it
- * prices one (see startMarket in ./engine/market). That is what "skipped
- * cleanly rather than left half applied" costs, and it is the same pair of
- * reads the path orders already make.
+ * (see the bazaar handlers in src/server/realtime/wiring/bazaar.ts) and the
+ * desk is not drawn at the Parley. And no band shift is applied, because
+ * the two ends of the settlement read the same switch: the server sends no
+ * lean on the advance that opens a market, and the engine folds none in
+ * when it prices one (see startMarket in ./engine/market). That is what
+ * "skipped cleanly rather than left half applied" costs, and it is the
+ * same pair of reads the path orders already make.
  *
  * It is judged here rather than in ./engine/bazaar for the reason the
  * trailing note below gives about D4's bench read the other way around:
@@ -221,10 +221,10 @@ export function bazaarRumorsOn(mode: unknown): boolean {
  * captain is pathless, and has been for the whole life of the pathbound
  * orders, because nothing before this feature ever wrote state.path. So
  * with the switch off the deal is not made (see the deal on room:start in
- * src/server/realtime/index.ts), no card reaches a captain, and the fleet
- * sails the pathless voyage the D2 lock was written to be true about: a
- * pathless captain is locked out of every pathbound card, which is a
- * refusal the lock already answers without a single new rule.
+ * src/server/realtime/wiring/start-voyage.ts), no card reaches a captain,
+ * and the fleet sails the pathless voyage the D2 lock was written to be
+ * true about: a pathless captain is locked out of every pathbound card,
+ * which is a refusal the lock already answers without a single new rule.
  *
  * One switch covers the switch as well, and it is not an economy: a
  * captain changes the path they hold, and the only way to hold one is this

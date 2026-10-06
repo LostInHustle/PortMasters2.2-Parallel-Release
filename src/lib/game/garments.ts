@@ -31,11 +31,10 @@
 // A garment at zero leaves the wardrobe and pays the plan's four Gold as
 // scrap, which is the one way this tree can give a finished good a cash value
 // outside an order or a barter (see RAG_SCRAP_VALUE in ./constants). The
-// scrap itself used to be a bare number on the state and is now a good like
-// any other, named in the catalogue the day the Loom's bench arrived to buy
-// it off the quay and reweave it (see RAGS there), which is the one thing on
-// this page D4 changed. What a rag is worth and what it turns back into are
-// not read here: they belong to the bench's own arithmetic.
+// scrap is a good like any other rather than a bare number on the state,
+// named in the catalogue the Loom's bench buys it off the quay from and
+// reweaves (see RAGS there). What a rag is worth and what it turns back
+// into are not read here: they belong to the bench's own arithmetic.
 //
 // The weather is drawn rather than stored. Every input the tag needs is
 // already room wide on the state, so one function answers for the whole
@@ -349,10 +348,9 @@ export function isFrostbitten(
  * captain who sold the lot. And the ceiling above is the one branch play
  * cannot reach, which is why its sentence reads as the bound it is.
  *
- * The last refusal is the rule of the panel rather than of the hold, and it
- * was added after the field reported warehouses being walked onto backs: a
+ * The last refusal is the rule of the panel rather than of the hold: a
  * garment worn is one way and wears from the day it goes on, so clothes put
- * on for a leg that did not ask for them cost their whole life and bought
+ * on for a leg that did not ask for them cost their whole life and buy
  * nothing. A crew the leg is not asking anything of is left alone, and the
  * sentence that turns the press away says which of the two nothings this
  * is: a mild leg, or a crew the cold has already been answered for.

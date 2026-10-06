@@ -12,6 +12,7 @@ import {
   moduleTradesOn,
 } from "@/lib/game/flags";
 import { cn } from "@/lib/utils";
+import { namedCountLine } from "@/lib/voteTally";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
 import { AuditVoteCard, auditCardShown, auditVoteOpen } from "../AuditPanel";
@@ -25,6 +26,7 @@ import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
 import { ModuleMarket } from "../ModuleMarket";
 import { BazaarRumors } from "../BazaarRumors";
+import { MarketEmpty } from "../OfferBoard";
 import { hasLedgerRows, OpenBoons } from "../OpenBoons";
 import { FoldRow } from "../FoldRow";
 import {
@@ -153,8 +155,9 @@ export function Parley({
   // closed over: not just that a vote is open but how far along it is. The
   // count comes off the tally frame (see VoteCensus), so the fold's
   // summary and the card's count block are one reading rather than two,
-  // and the line is worded for its own number the way the block below it
-  // is: one captain has named someone, two captains have.
+  // and the count is the shared sentence the block below it renders (see
+  // namedCountLine in @/lib/voteTally), so the number and its verb agree
+  // in one place rather than in a phrasing kept beside it.
   const gistOf = (
     label: string,
     votes: Record<string, string>,
@@ -162,9 +165,7 @@ export function Parley({
   ) => {
     const named = Object.keys(votes).length;
     return census && census.roster > 0
-      ? `${label}: ${named} of ${census.roster} ${
-          named === 1 ? "captain has" : "captains have"
-        } named someone.`
+      ? `${label}: ${namedCountLine(named, census.roster)}`
       : `${label} is open.`;
   };
   const businessGist = anyLive
@@ -299,9 +300,9 @@ export function Parley({
           <HuePanel tone="ship" className="p-4 mb-4">
             <PanelHeading className="mb-3 text-sm">📋 Open Offers</PanelHeading>
             {barter.offers.length === 0 ? (
-              <p className="text-center text-xs text-muted-foreground py-4">
+              <MarketEmpty className="py-4">
                 No offers on the board yet. Be the first.
-              </p>
+              </MarketEmpty>
             ) : (
               <div className="space-y-1.5">
                 {barter.offers.map((o) => (

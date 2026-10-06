@@ -39,7 +39,8 @@ export const WORD_ON_THE_DOCKS_REWARD = 25;
 // the rest of the voyage. A one time, one direction flip per voyage, purely
 // additive on top of whatever the difficulty tier's own charter schedule is
 // already doing, and never subtracted back out. See the game:status handler
-// in src/server/realtime/index.ts for where the combined total is actually read.
+// in src/server/realtime/wiring/status-heartbeat.ts for where the combined
+// total is actually read.
 export const TIDEWATCH_SURGE_THRESHOLD = 500;
 
 // [MANIFEST 04: Convoy Ventures] A pooled, multi captain investment: gold
@@ -50,8 +51,8 @@ export const TIDEWATCH_SURGE_THRESHOLD = 500;
 // across every contributor in exact proportion to what they put in. Missing
 // the deadline instead pays every contributor back only a fraction of their
 // own stake, so joining one is a real wager on the room finishing it, not a
-// free favor with no downside. See src/server/realtime/index.ts for where a
-// venture is actually posted, contributed to, and resolved.
+// free favor with no downside. See src/server/realtime/wiring/ventures.ts
+// for where a venture is actually posted, contributed to, and resolved.
 export const CONVOY_VENTURE_MIN_TARGET = 150;
 export const CONVOY_VENTURE_MAX_TARGET = 2000;
 export const CONVOY_VENTURE_MIN_ROUNDS_AHEAD = 1;

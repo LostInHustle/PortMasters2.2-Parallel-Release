@@ -13,9 +13,10 @@
 // and the two rejections are deliberate:
 //
 //   A phase value of its own would be a value the room synchronizes on. The
-//   ready check gates exactly the values on the lap (see the ready handler in
-//   src/server/realtime/index.ts), so a station the room could stand in would
-//   put the second wait back and make one phase two again.
+//   ready check gates exactly the values on the lap (see the ready handler
+//   in src/server/realtime/wiring/phase-ready.ts), so a station the room
+//   could stand in would put the second wait back and make one phase two
+//   again.
 //
 //   A field in the save would be a new persisted field for a fact that only
 //   matters while the panel is on screen, and [B1]'s rollback clause is that

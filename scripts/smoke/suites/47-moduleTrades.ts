@@ -1142,6 +1142,24 @@ export async function moduleTradesSuite(
     "the three rules of this market stand above the seller's own block rather than inside it, so the captain who only ever takes an offer reads one listing per module a leg, one open offer per captain named and the Parley close at the desk that asks them to take one",
   );
   check(
+    marketDesk.includes("tops out at {MAX_SHIP_LEVEL} slots at ship level") &&
+      marketDesk.includes('from "@/lib/game/constants/ships"'),
+    "the slot ceiling this market quotes is the last ship level the yard's own ladder ends at rather than a figure typed into the sentence, so the intro a buyer reads and the ladder the hull climbs are one number",
+  );
+  // The two sentences the escort desk shares with the rooms that refuse the
+  // same things: the fee's bounds, which the wires quote and this desk
+  // hints at, and the offer-death rule, which the glossary tooltip prints
+  // as well. Both are the copy module's own spelling, read here the same
+  // way the desks above are, because a sentence two surfaces state is a
+  // sentence two surfaces can drift apart on.
+  check(
+    desks[1].includes("{consentFeeRule()}") &&
+      desks[1].includes("{ESCORT_OFFER_DEATH}") &&
+      desks[1].includes('from "@/lib/game/constants/copy"') &&
+      !desks[1].includes("A fee is a whole number of Gold from"),
+    "the escort desk states the fee's bounds and the offer-death rule in the copy module's own sentences rather than in a second spelling beside them, so the desk that hints at a fee and the wires that refuse one out of bounds cannot quote two ranges, and the desk that shows an offer dying and the tooltip that explains it cannot word the close two ways",
+  );
+  check(
     marketDesk.includes("Nothing on the market yet") &&
       marketDesk.includes("List a module and yours is the first row") &&
       marketDesk.includes("comes off the board when the leg turns") &&

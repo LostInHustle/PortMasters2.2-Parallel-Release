@@ -39,12 +39,12 @@ export function ModuleDraft({
   members,
 }: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
   const picks = game._draftChoices ?? [];
-  // [field report: the batch that would not change] The swap's button
-  // reads the swap's own predicate, the way the shipyard's door reads the
-  // draft's (see moduleSwapPossible): a hull the round has shown every
-  // card it could be dealt gets a disabled button and the line below it
-  // saying why, rather than a press that redraws the table it is already
-  // looking at and charges the round's one use for the privilege.
+  // The swap's button reads the swap's own predicate, the way the
+  // shipyard's door reads the draft's (see moduleSwapPossible): a hull the
+  // round has shown every card it could be dealt gets a disabled button
+  // and the line below it saying why, rather than a press that redraws the
+  // table it is already looking at and charges the round's one use for the
+  // privilege.
   const swapDealable = moduleSwapPossible(game);
   const canSwap = !game.moduleSwapUsed && swapDealable;
   return (

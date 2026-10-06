@@ -893,7 +893,11 @@ export function Lobby({
                         and this control wears a solid gradient, so the
                         variant would contribute nothing but a hover tint
                         that cannot be seen through the paint. It is a tool,
-                        the same as everything else on a shelf. */}
+                        the same as everything else on a shelf. The label
+                        shortens below the sm width, because a control with
+                        no room to shrink must fit the line it shares: the
+                        full wording leads from sm up, and the title and the
+                        aria label carry it at every width. */}
                     <button
                       onClick={() => setHowToPlayOpen(true)}
                       className="pm-tool pm-pressable pm-grad-guide text-white"
@@ -901,6 +905,7 @@ export function Lobby({
                       aria-label="How to Play"
                     >
                       <BookOpen className="h-3.5 w-3.5" />
+                      <span className="sm:hidden">Guide</span>
                       <span className="hidden sm:inline">How to Play</span>
                     </button>
                     <Button

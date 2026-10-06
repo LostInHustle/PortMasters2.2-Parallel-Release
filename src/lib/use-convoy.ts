@@ -116,9 +116,13 @@ export function useConvoy(
     };
   }, [socket, roomId]);
 
+  // Every press clears the last refusal before it goes out, so a sentence
+  // about a venture that is no longer standing cannot outlive the press
+  // that replaces it.
   const post = useCallback(
     (targetGold: number, deadlineRound: number) => {
       if (!socket) return;
+      setError(null);
       socket.emit("venture:post", { roomId, targetGold, deadlineRound });
     },
     [socket, roomId],
@@ -137,6 +141,10 @@ export function useConvoy(
     ventures,
     locked,
     error,
+    // The refusal this hook holds is a sentence about one press, so a
+    // screen that has read it hands it back rather than leaving it over
+    // the board until the next press replaces it.
+    clearError: () => setError(null),
     post,
     contribute,
   };

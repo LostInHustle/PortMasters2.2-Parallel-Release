@@ -8,6 +8,7 @@
 // =====================================================================
 import { cardText } from "./cards";
 import { BOONS, MODULES } from "./constants/drafts";
+import { ESCORT_OFFER_DEATH, RENOWN_BONUS_LINE } from "./constants/copy";
 import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "./constants/goods";
 import { CONVOY_RAID_COVERAGE } from "./constants/paths";
 import { DIFFICULTIES, pirateOddsLabel } from "./difficulty";
@@ -33,10 +34,12 @@ const ESCORT_ENTRY = `The harbor's escort, hired at Resolve by any captain: guar
 // The other escort, named so the two cannot be read as one: the market a
 // Convoy captain sells from at the Parley on a Gambit voyage, priced by
 // the two captains rather than by the charter, and read at the raid by
-// the one number above.
+// the one number above. It ends on the offer's own rule rather than a
+// second telling of it (see ESCORT_OFFER_DEATH in ./constants/copy),
+// which is the same sentence the desk that posts the offer opens with.
 const ESCORT_MARKET_ENTRY = `A Convoy path market at the Parley on a Gambit voyage: a Convoy captain sells one leg of protection to one other captain at a price the two of them agree. The buyer pays the fee at the handshake, the seller's cannons beat off ${Math.round(
   CONVOY_RAID_COVERAGE * 100,
-)}% of a raid in that leg, and the rest comes out of the seller's own Gold. An offer nobody takes before the Parley closes is gone.`;
+)}% of a raid in that leg, and the rest comes out of the seller's own Gold. ${ESCORT_OFFER_DEATH}`;
 
 // The pirate odds are a charter dial as well, and the two tiers that raise
 // theirs at the midpoint raise it to a different figure, so the one sentence
@@ -81,6 +84,13 @@ export const GLOSSARY: Record<string, string> = {
   // Core stats
   Reputation:
     "Your score for the voyage, roughly your accumulated trading profit. Highest reputation on the voyage's final round wins.",
+  // The account ladder the voyage's own score feeds, and the one word the
+  // path draft prints a rung of (see the Renown line in PathDraft), so it
+  // is explained here rather than left to be inferred from a title. The
+  // bonus it grants is the line the Legacy card already prints (see
+  // RENOWN_BONUS_LINE in ./constants/copy) rather than a second telling
+  // of the same promise.
+  Renown: `Your standing across every harbor, kept on the account rather than in one voyage: the Reputation you bank becomes Renown XP when a voyage ends. ${RENOWN_BONUS_LINE}. The title beside your level is the ladder's own name for the rung you have reached.`,
   Gold: "Your spendable funds. Hit zero with bills still due and the voyage ends in bankruptcy.",
   VAT: `A ${Math.round(VAT_RATE * 100)}% tax on the profit margin of finished good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.`,
   "Income Tax": `A ${Math.round(INCOME_TAX_RATE * 100)}% tax on your net profit for the round, charged at Resolve after everything else is paid.`,
@@ -101,7 +111,6 @@ export const GLOSSARY: Record<string, string> = {
   "Escort Market": ESCORT_MARKET_ENTRY,
   "Financial Aid":
     "A loan from another captain when you can't cover this round's wages or maintenance on your own. The lender's Gold transfers to you immediately; you owe it back before the voyage ends, or it's deducted automatically and handed to them at the voyage's final round.",
-  Debt: "Gold you owe another captain after taking a loan. Repay it any time before the voyage ends. If you still can't cover it by the final round, the amount still owed comes straight out of your funds and you're marked bankrupt when the voyage finishes.",
 
   // The round's own vocabulary, for the four words a captain meets on the
   // rail before any mode's briefing has explained them. The food note on
@@ -115,14 +124,6 @@ export const GLOSSARY: Record<string, string> = {
   Resolve:
     "The round's reckoning. Production lands first, then pirates may strike, and then the wages, maintenance and taxes come due. The Dues tab is the list of what this phase will ask for.",
   Dusk: "The round's last phase and the shipyard's seat: upgrade the hull, or draft and rig a module.",
-
-  // The private card, for the captain who met one on a Gambit voyage and
-  // wants the word explained. Written from the card record's own lines and
-  // the counts in ./gambit, so the entry cannot describe a deal the mode
-  // does not make: below four captains nothing is hidden, at four or five
-  // the one hidden card is always a Pirate, and a sixth captain is where a
-  // Broker can be dealt.
-  Role: "The private card a Gambit voyage deals each captain at departure, hidden from the rest of the table until the voyage ends. Most are Honest Captains sailing the fleet's public objective; a Pirate sails under a false flag and needs the fleet to fall short while staying solvent; a Broker sails for themselves alone and wins on what they take from other captains in trade. A table of four or more deals a Pirate among the fleet, and a table of six or more hides two, the second a Pirate or a Broker.",
 
   // The four nouns of the rail and the provisions header, each drawn as a
   // label on the surface that keeps it: the two tabs, the larder and

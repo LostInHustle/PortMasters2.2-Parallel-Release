@@ -249,9 +249,11 @@ export function BazaarRumors({
               </p>
             ) : (
               // Every way of being unable to speak, in the order the
-              // reasons are true. None of them is silence: a desk that drew
-              // nothing here is the state the field report was written
-              // from.
+              // reasons are true: the closing leg first, then a route with
+              // nothing to name on it, then the hush a recent publish
+              // left. The desk never draws silence here, because a drawer
+              // with nothing in it reads as a broken button rather than as
+              // the turn somebody else is holding.
               <p className="text-center text-[11px] text-muted-foreground">
                 {closesHere
                   ? rumorClosingLine()
@@ -273,11 +275,6 @@ export function BazaarRumors({
                 bazaar for you until leg {quietUntil}.
               </p>
             )}
-            <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-              The harbor sees your name and your good the moment you speak. What
-              it does not see is which way you leaned, until the port you moved
-              has priced it.
-            </p>
           </>
         ) : (
           // The reader who may not speak, told so rather than left to work
@@ -285,12 +282,13 @@ export function BazaarRumors({
           // is not the action but the read: the path may be held by more
           // than one captain at this table, and the whole point of the
           // board is that everyone who did not speak can see who did and
-          // what they named.
+          // what they named. The cadence stays the intro's to state, so
+          // this paragraph carries the refusal and the pointer rather than
+          // spelling the rule a second time.
           <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-            Speaking at the bazaar belongs to the {SELLER_PATH.name} path, once
-            every {RUMOR_COOLDOWN_ROUNDS} legs, and you do not hold it this
-            voyage. Whoever holds it is named in the voyage log, and the board
-            below names them the moment they speak.
+            Speaking at the bazaar belongs to the {SELLER_PATH.name} path, and
+            you do not hold it this voyage. Whoever holds it is named in the
+            voyage log, and the board below names them the moment they speak.
           </p>
         )}
       </MarketBlock>
@@ -314,13 +312,13 @@ export function BazaarRumors({
  * measured off them, and what a screen draws is a different question from
  * what the rule needs.
  *
- * The window is the reason the empty board is two sentences rather than
- * one. "Nobody has spoken yet this voyage" is a claim about every row the
- * room holds, and it was being made from the two the window draws, which
- * is false the moment a captain speaks and then lets a leg or two go by:
- * the fleet's own rumor would be off the board while the board announced
- * that the voyage had been silent. So the claim is read off the whole list
- * and the two sentences say which of the two situations the reader is in.
+ * The window is the reason the empty board's claim is read off the whole
+ * list rather than off the two legs it draws. "Nobody has spoken yet this
+ * voyage" is a claim about every row the room holds, and it would be false
+ * the moment a captain speaks and then lets a leg or two go by: the
+ * fleet's own rumor would be off the board while the board announced that
+ * the voyage had been silent. So the claim is read off the whole list and
+ * the branch below says which of the two situations the reader is in.
  */
 function RumorList({
   rumors,
@@ -336,7 +334,7 @@ function RumorList({
     return (
       <MarketEmpty>
         {rumors.length === 0
-          ? `Nobody has spoken at the bazaar yet this voyage. Only an ${SELLER_PATH.name} captain may speak here, once every ${RUMOR_COOLDOWN_ROUNDS} legs. A rumor moves one good at the next port, and the whole harbor sees who spoke and which good they named.`
+          ? "Nobody has spoken at the bazaar yet this voyage."
           : "Nobody has spoken in this leg or the one before it. The board keeps those two legs and no more. Older rows moved markets the room has already priced and traded through."}
       </MarketEmpty>
     );

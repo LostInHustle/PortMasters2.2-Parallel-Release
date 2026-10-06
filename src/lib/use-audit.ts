@@ -20,8 +20,8 @@
 //   the leg it happened in. It arrives either as the vote carrying or as
 //   the join hand-out when a captain reloads into a harbor that has
 //   already audited someone (see the room:join handler in
-//   src/server/realtime/index.ts), and the two paths carry the identical
-//   frame so nothing here has to know which one it was.
+//   src/server/realtime/wiring/room-join.ts), and the two paths carry the
+//   identical frame so nothing here has to know which one it was.
 //
 //   The refusal is this captain's own press coming back. It is a plain
 //   string for the panel to print, and it is cleared by the panel's own

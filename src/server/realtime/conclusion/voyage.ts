@@ -378,9 +378,9 @@ export function sweepAbsentBorrowerLoans(
   if (sweptAny) broadcastLoans(io, roomId);
 }
 
-// [bug cycle: the settled purse] The beat the conclusion stops for after
-// its own sweeps, before it reads the room back. The sweeps are what pays
-// the last money of a voyage out: an escrow returns to its poster when
+// The beat the conclusion stops for after its own sweeps, before it reads
+// the room back. The sweeps are what pays the last money of a voyage out:
+// an escrow returns to its poster when
 // the trade board clears, an open venture refunds its half, and each of
 // those lands in a captain's own client and comes back on that client's
 // next broadcast. Two cadences are what the number is measured against:

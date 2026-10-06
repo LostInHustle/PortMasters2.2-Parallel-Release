@@ -35,7 +35,7 @@ import { HouseLeaderboard } from "@/components/portmasters/HouseLeaderboard";
 import {
   HOUSE_CREST,
   HOUSE_FALLBACK,
-} from "@/components/portmasters/house-colours";
+} from "@/components/portmasters/house-colors";
 import type { CaptainLegacySummary, HouseId } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import { HOUSES, type House } from "@/lib/game/engine";

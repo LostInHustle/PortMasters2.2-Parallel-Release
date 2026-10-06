@@ -169,16 +169,16 @@ export async function activeRosterSet(roomId: string): Promise<Set<string>> {
 // the seat their screen folds to is what says so: the phase registry places
 // those screens inside Dusk (see seatOf in @/lib/game/phases), so the
 // question below is asked of the seat a screen is a screen inside rather
-// than of the screen's own name. Reading the raw name was the field report:
-// it dropped the draft captain from the roster, so the moment every
-// remaining captain had voted the room announced the departure, and the
-// draft captain's own client, which folds its seat the same way in every
-// guard it has, followed the announcement out of a screen they were still
-// using (autoCommit cancels the draft and leaves Dusk). The two screens draw
-// the room's own bar now, so the captain the table is waiting on can see the
-// wait and its countdown, and a captain who never comes back is moved by the
-// clock like any other, whose fire counts the active roster and never this
-// one (see forceAdvance).
+// than of the screen's own name. Reading the raw name drops the draft
+// captain from the roster, so the moment every remaining captain has
+// voted the room announces the departure, and the draft captain's own
+// client, which folds its seat the same way in every guard it has,
+// follows the announcement out of a screen they were still using
+// (autoCommit cancels the draft and leaves Dusk). The two screens draw
+// the room's own bar, so the captain the table is waiting on can see the
+// wait and its countdown, and a captain who never comes back is moved by
+// the clock like any other, whose fire counts the active roster and never
+// this one (see forceAdvance).
 //
 // A member with no status frame yet is waited on rather than skipped, which
 // is the one case not read off a seat: a captain who has just joined has no
@@ -542,16 +542,15 @@ export async function maybeAdvance(io: Server, roomId: string): Promise<void> {
   // moves, so a call that returns here is returning on a turn already
   // taken.
   if (cp.advancing) return;
-  // [bug cycle: the draft's seat is left by the settle] A room standing at
-  // the path draft is moved by the settle and by nothing else, and this is
-  // that rule made the server's rather than the button's: the client draws
-  // no ready control at the seat (see GameControlPanel), and a vote that
-  // reached here anyway, from a doctored client or a race against the
-  // settle, must not be able to walk the table out of a deal that is still
-  // on it and leave the draft unsettled behind them. The settle's own
-  // announcement does not pass through here at all (see
-  // announceDraftComplete), so nothing this guard refuses is a move the
-  // room owes anyone.
+  // A room standing at the path draft is moved by the settle and by
+  // nothing else, and this is that rule made the server's rather than the
+  // button's: the client draws no ready control at the seat (see
+  // GameControlPanel), and a vote that reached here anyway, from a
+  // doctored client or a race against the settle, must not be able to walk
+  // the table out of a deal that is still on it and leave the draft
+  // unsettled behind them. The settle's own announcement does not pass
+  // through here at all (see announceDraftComplete), so nothing this guard
+  // refuses is a move the room owes anyone.
   if (cp.phase === "path_draft") return;
   for (const id of roster) {
     if (!cp.readyUserIds.has(id)) return;
@@ -847,18 +846,18 @@ async function firePhaseClock(
   if (!cp || cp.endsAt !== armedFor) return;
   disarmPhaseClock(roomId);
   if (roomMembers(roomId).length === 0) return;
-  // [field report, 2026-10-03] The yard holds the fire, once.
+  // The yard holds the fire, once.
   //
   // A captain in the module draft is at Dusk, and their pick is a second
   // thing Dusk owes: a fire that moves the room through while they are
-  // choosing cancels the draft under them, which is the field report's
-  // first symptom (their client's autoCommit walks them out mid-pick; see
-  // use-phase-sync). So a fire that finds the yard occupied spends the
-  // seat's hold instead: the deadline moves out one more budget and the
-  // room is told the new one, and nothing else happens, because nothing
-  // else has. The hold is not a veto and cannot become one: it is spent
-  // the first time it is used, so the next fire of this same seat advances
-  // the room whether or not the yard is still occupied.
+  // choosing cancels the draft under them (their client's autoCommit
+  // walks them out mid-pick; see use-phase-sync). So a fire that finds
+  // the yard occupied spends the seat's hold instead: the deadline moves
+  // out one more budget and the room is told the new one, and nothing
+  // else happens, because nothing else has. The hold is not a veto and
+  // cannot become one: it is spent the first time it is used, so the next
+  // fire of this same seat advances the room whether or not the yard is
+  // still occupied.
   if (!cp.yardHeld && yardOccupied(roomId)) {
     cp.yardHeld = true;
     armPhaseClock(io, roomId, cp);

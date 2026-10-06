@@ -7,6 +7,7 @@ import { phaseLabel } from "@/lib/game/engine";
 import { isGatedPhase } from "@/lib/game/checkpoint";
 import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
+import { readyLine } from "@/lib/use-phase-sync";
 import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { cn } from "@/lib/utils";
 import {
@@ -172,12 +173,11 @@ export function GameControlPanel({
   // captain waiting on the crew reads both numbers in the same place, and the
   // one that is moving is the one that ends the wait.
   if (waiting) {
-    // The count is worded for its number and says what it is waiting on: a
-    // bare pair of figures reads as a scoreboard, and the one thing a
-    // captain pressing this wants to know is how close the room is to
-    // turning. The verb takes the count's number with it.
-    const readied = readyCount === 1 ? "has" : "have";
-    nextText = `⏳ ${readyCount} of ${requiredCount} captains ${readied} readied. The phase turns when the rest do.`;
+    // The count is the shared builder's sentence (see readyLine in
+    // @/lib/use-phase-sync) with this bar's own tail, because the one
+    // thing a captain pressing the button wants to know is how close the
+    // room is to turning.
+    nextText = `⏳ ${readyLine(readyCount, requiredCount)} The phase turns when the rest do.`;
     if (clock) nextText += ` · ${clock.label}`;
     nextDisabled = false;
   }

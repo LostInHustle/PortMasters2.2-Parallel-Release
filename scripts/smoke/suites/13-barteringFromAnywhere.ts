@@ -408,9 +408,23 @@ export async function barteringFromAnywhereSuite(inputs: {
     barterHook.includes("takeRefusedPost(pendingPostsRef.current, data)") &&
       barterHook.includes("onPostRefusedRef.current(refused)") &&
       boardsHook.includes(
-        "refundBarterOffer(g, post.offerItem, post.offerAmount, l)",
+        'refundBarterOffer(g, post.offerItem, post.offerAmount, l, "refusal")',
       ),
-    "a refused post's own escrow goes back to the hold, so the press that used to destroy the goods now returns them",
+    "a refused post's own escrow goes back to the hold, so a press the room turned away returns the goods it escrowed",
+  );
+  // The other half of that hand-back, and the one a refusal can lose on its
+  // own: a refund that lands while this captain's voyage is still loading
+  // would be applied to a save the real one then replaces, which destroys
+  // the goods exactly as quietly as a refusal with no refund at all. So the
+  // refusal goes through the same held queue the board's own drop does, and
+  // the queue replays in arrival order, which is what keeps two answers to
+  // one captain in the order the room sent them.
+  check(
+    boardsHook.includes("heldReceipts.current.push(apply)") &&
+      boardsHook.split("heldReceipts.current.push(").length - 1 === 2 &&
+      boardsHook.includes("for (const apply of waiting) apply(g, l)") &&
+      !boardsHook.includes("pendingRefunds"),
+    "a refusal that lands before the voyage does waits in the same queue as every other receipt, and the queue replays them in arrival order rather than discarding them with the placeholder",
   );
   // The withdrawal's half of the same escrow rule, and the second bug this
   // article holds down: a buyer's accept can already be on the wire when
@@ -497,7 +511,6 @@ export async function barteringFromAnywhereSuite(inputs: {
   );
   guestSocket.emit("aid:repay", {
     roomId: roomId,
-    lenderId: hostId,
     amount: 5,
     debtId: loanRequest?.id,
   });
@@ -516,19 +529,18 @@ export async function barteringFromAnywhereSuite(inputs: {
   // still lists the debt, and the press has to be refused rather than
   // answered with silence.
   const refusedRepay = waitForEvent<{
-    debtId?: string | null;
+    debtId?: string;
     reason?: string;
   }>(guestSocket, "aid:repay:fail", (payload) => Boolean(payload?.reason));
   guestSocket.emit("aid:repay", {
     roomId: roomId,
-    lenderId: hostId,
     amount: 5,
     debtId: loanRequest?.id,
   });
   const staleRepay = await refusedRepay;
   check(
-    staleRepay?.debtId === loanRequest?.id,
-    "a repayment of a loan the room no longer holds is refused rather than left unanswered, so a debt the room has closed cannot cost the Gold it names",
+    staleRepay !== null && staleRepay.debtId === undefined,
+    "a repayment of a loan the room no longer holds is refused rather than left unanswered, and the refusal carries no debt id because the client holds one refusal at a time rather than a row per debt",
   );
   check(
     Boolean(staleRepay?.reason?.includes("no longer outstanding")),
@@ -550,11 +562,48 @@ export async function barteringFromAnywhereSuite(inputs: {
     "utf8",
   );
   check(
-    gameRoom.includes("aid.repay(debt.counterpartyId, debt.amount, debtId)") &&
+    gameRoom.includes("aid.repay(debt.amount, debtId)") &&
       !gameRoom.includes("repayLoan") &&
       boardsHook.includes("repayLoan(g, settled.debtId, l)") &&
       aidHook.includes('socket.on("aid:repay:ok"'),
     "a repayment moves the debt on the receipt the room sends back and nowhere else, so the Gold follows a loan the room is actually holding",
+  );
+  // The wire carries the debt and the amount and nothing else. The room
+  // holds the loan, so it already knows who lent it, and a lender id sent
+  // from the client would only be a second copy of that fact to disagree
+  // with the book the press is judged against.
+  check(
+    aidHook.includes('socket.emit("aid:repay", { roomId, amount, debtId })') &&
+      !aidHook.includes("lenderId") &&
+      !gameRoom.includes("debt.counterpartyId, debt.amount"),
+    "a repayment names the debt alone, so no client supplied lender can disagree with the loan the room is actually holding",
+  );
+
+  // ========== Dismissing a refusal ==========
+  // A refusal is a sentence about one press. Every press on these hooks
+  // clears the last one before it goes out, so a captain is never left
+  // reading about a situation that has moved on, and the convoy board hands
+  // its refusal back for dismissal where it is read.
+  const convoyHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-convoy.ts"),
+    "utf8",
+  );
+  const backingHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-backing.ts"),
+    "utf8",
+  );
+  const escortHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-escort-contracts.ts"),
+    "utf8",
+  );
+  check(
+    aidHook.split("setError(null);").length - 1 === 4 &&
+      barterHook.split("setError(null);").length - 1 === 3 &&
+      convoyHook.split("setError(null);").length - 1 === 2 &&
+      backingHook.split("setError(null);").length - 1 === 2 &&
+      escortHook.includes("clearError();") &&
+      convoyHook.includes("clearError: () => setError(null),"),
+    "every press on the board hooks clears the previous refusal before it goes out, and the convoy board can be cleared by the screen that read it",
   );
 
   return { guestId };

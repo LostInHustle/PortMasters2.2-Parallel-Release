@@ -62,10 +62,9 @@ export function wireBarter(io: Server, socket: Socket): void {
       // poster's own client took the offered goods out of its hold before
       // the frame went out (posting escrows on the spot, see the engine's
       // postBarterOffer), so this echo is what tells it which escrow to
-      // hand back. A refusal that named nothing would leave the goods out
-      // of the hold and off the board for the rest of the voyage, which
-      // is exactly what a press made as the leg turns used to do. The
-      // fields are the poster's own, echoed rather than judged: the
+      // hand back: a refusal that named nothing would leave the goods out
+      // of the hold and off the board for the rest of the voyage. The
+      // fields are the poster's own, echoed rather than judged, and the
       // branch below is what judges them.
       const refuse = (error: string): void => {
         socket.emit("barter:error", {

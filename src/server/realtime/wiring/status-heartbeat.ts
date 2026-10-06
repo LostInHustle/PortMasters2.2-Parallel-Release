@@ -140,16 +140,16 @@ export function wireStatusHeartbeat(io: Server, socket: Socket): void {
 // while they are working in a screen of their own.
 //
 // The fold is what keeps the room waiting on a captain inside the yard at
-// all (see waitingRosterSet), and read on its own it also counted the
-// captain who had already voted at the seat and then gone back to work: the
-// room left the moment the rest of the table had voted, and that captain's
-// own client ran the catch up every client runs for a seat the room has
-// moved past, which cancels a module draft under the hands of the captain
-// still reading it. That is the field report this article ends on, and the
-// way back to it is the client's own reload: a vote lives on the server,
+// all (see waitingRosterSet), but it cannot stand on its own: a captain
+// who has voted at the seat and then stepped back into a screen is still
+// on the roster with their vote standing, so the room leaves the moment
+// the rest of the table has voted and that captain's own client runs the
+// catch up every client runs for a seat the room has moved past, which
+// cancels a module draft under the hands of the captain still reading it.
+// The way back is the client's own reload: a vote lives on the server,
 // while the client that cast it comes back with no memory of the wait, so
-// it draws the yard's doors again and the captain walks back into the draft
-// with their vote still standing.
+// it draws the yard's doors again and the captain walks back into the
+// draft with their vote still standing.
 //
 // This is where the two promises meet, and the newer one wins: a report
 // naming a personal screen that stands in the seat the room is standing at

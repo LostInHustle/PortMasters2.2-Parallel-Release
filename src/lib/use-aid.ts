@@ -23,9 +23,8 @@ export type RepaidLoan = {
 
 // The receipt for a repayment I sent: the room found the loan and closed
 // it, so this client's own debt can move. It carries the debt rather than
-// the Gold because the amounts are this captain's own ledger (the loan
-// was recorded here when it was granted), and the debt id is what says
-// which one of them this closes.
+// the Gold because the amount is this captain's own ledger, recorded here
+// when the loan was granted, and the debt id says which one this closes.
 export type RepaymentSettled = {
   debtId: string;
 };
@@ -139,11 +138,11 @@ export function useAid(
       if (data.roomId !== roomId) return;
       onRepaymentSettledRef.current?.(data);
     };
-    const onRepayFail = (data: {
-      roomId: string;
-      debtId: string | null;
-      reason: string;
-    }) => {
+    // The refusal writes this hook's own error state, and no debt id
+    // travels with it: only one refusal is held at a time, so the sentence
+    // is the whole of what a screen draws and the press it answers is the
+    // only one it can be about.
+    const onRepayFail = (data: { roomId: string; reason: string }) => {
       if (data.roomId !== roomId) return;
       setError(data.reason);
     };
@@ -170,9 +169,13 @@ export function useAid(
     };
   }, [socket, roomId, myUserId]);
 
+  // Every press clears the last refusal before it goes out, so a sentence
+  // about a request that is no longer standing cannot outlive the press
+  // that replaces it.
   const post = useCallback(
     (amount: number) => {
       if (!socket) return;
+      setError(null);
       socket.emit("aid:post", { roomId, amount });
     },
     [socket, roomId],
@@ -180,6 +183,7 @@ export function useAid(
 
   const cancel = useCallback(() => {
     if (!socket) return;
+    setError(null);
     socket.emit("aid:cancel", { roomId });
   }, [socket, roomId]);
 
@@ -192,16 +196,18 @@ export function useAid(
     [socket, roomId],
   );
 
-  // Repaying only asks, the same way helping does. The room holds the
-  // loan, so it is the room that says whether it can be closed, and the
-  // caller applies nothing until the receipt arrives. The forced
-  // settlement at the end of a voyage reports through this same call,
-  // where the local debts were already closed and a receipt finds
-  // nothing left to move.
+  // Repaying only asks, the same way helping does: the room holds the
+  // loan, so the room says whether it can be closed, and the caller
+  // applies nothing until the receipt arrives. The forced settlement at
+  // the end of a voyage asks through this same call, where the local
+  // debts were already closed and a receipt finds nothing to move. The
+  // debt and the amount are the whole of what the room needs: it holds
+  // the loan, so it already knows who lent it.
   const repay = useCallback(
-    (lenderId: string, amount: number, debtId: string) => {
+    (amount: number, debtId: string) => {
       if (!socket) return;
-      socket.emit("aid:repay", { roomId, lenderId, amount, debtId });
+      setError(null);
+      socket.emit("aid:repay", { roomId, amount, debtId });
     },
     [socket, roomId],
   );

@@ -1702,8 +1702,9 @@ export async function manifestAuditSuite(
   check(
     !carriesADash("src/components/portmasters/game/VoteTallyRows.tsx") &&
       !carriesADash("src/components/portmasters/game/AuditPanel.tsx") &&
-      !carriesADash("src/components/portmasters/game/MaroonPanel.tsx"),
-    "the two vote cards and the count they share read free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+      !carriesADash("src/components/portmasters/game/MaroonPanel.tsx") &&
+      !carriesADash("src/components/portmasters/game/VoteSeatPicker.tsx"),
+    "the two vote cards, the picker they draw their captain list through and the count under them read free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
   );
 
   const repoRoot = join(import.meta.dirname, "..", "..", "..");
@@ -1711,6 +1712,9 @@ export async function manifestAuditSuite(
     withoutComments(readFileSync(join(repoRoot, relative), "utf8"));
   const tallyRowCode = readSrc(
     "src/components/portmasters/game/VoteTallyRows.tsx",
+  );
+  const seatPickerCode = readSrc(
+    "src/components/portmasters/game/VoteSeatPicker.tsx",
   );
   const auditPanelCode = readSrc(
     "src/components/portmasters/game/AuditPanel.tsx",
@@ -1737,11 +1741,12 @@ export async function manifestAuditSuite(
     "and the block says what it does not have: a room whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote and the captains who have named one are both counted and worded for their own number",
   );
   check(
-    tallyRowCode.includes("captains ") &&
+    tallyRowCode.includes("namedCountLine(named, census.roster)") &&
       tallyRowCode.includes("nameCount(census.needed)") &&
       tallyRowCode.includes('"carries" : "carry"') &&
+      !tallyRowCode.includes("captains ${") &&
       !tallyRowCode.includes("names are in"),
-    "the count line states the count and the threshold in one sentence and is worded for its own number, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one",
+    "the count line states the count and the threshold in one sentence, the count half built by the shared builder (see namedCountLine in @/lib/voteTally) rather than worded here, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one, and the two votes cannot word one number two ways",
   );
   check(
     tallyRowCode.includes("nextStep(census.needed)") &&
@@ -1765,9 +1770,19 @@ export async function manifestAuditSuite(
       tallyRowCode.includes("Your name is in for") &&
       auditPanelCode.includes("audit.myVote") &&
       maroonPanelCode.includes("maroon.myVote") &&
-      auditPanelCode.includes('"Your name is in"') &&
-      maroonPanelCode.includes('"Your name is in"'),
-    "the captain's own line belongs to the one block rather than to a paragraph in each card, and the button beside it says which of the two moments the captain is standing in: a name already in reads a press that tells them so",
+      seatPickerCode.includes('"Your name is in"') &&
+      !auditPanelCode.includes('"Your name is in"') &&
+      !maroonPanelCode.includes('"Your name is in"'),
+    "the captain's own line belongs to the one block rather than to a paragraph in each card, the button beside it belongs to the one picker both cards draw rather than to either card, and that button says which of the two moments the captain is standing in: a name already in reads a press that tells them so",
+  );
+  check(
+    auditPanelCode.includes("<VoteTallyRows") &&
+      maroonPanelCode.includes("<VoteTallyRows") &&
+      !auditPanelCode.includes("named someone") &&
+      !maroonPanelCode.includes("named someone") &&
+      !auditPanelCode.includes("namedCountLine") &&
+      !maroonPanelCode.includes("namedCountLine"),
+    "both vote cards read their count off the one block rather than printing a line of their own, and the line that block prints is the shared builder's: how many captains have named someone is worded once, under the audit and the maroon alike",
   );
   check(
     Array.from({ length: 12 }, (_, i) => i + 1).every((roster) => {
@@ -1804,13 +1819,15 @@ export async function manifestAuditSuite(
     "both vote hooks lift the press that is still in flight only on the frame that carries this captain's own name, so another captain's ballot cannot put the button back while the first press is on its way, and the id the guard reads is a dependency of the effect that reads it",
   );
   check(
-    auditPanelCode.includes("import { seatMarks, type SeatStatus }") &&
-      auditPanelCode.includes("!marked(m.id)") &&
-      auditPanelCode.includes("seatMarks(statuses?.[id]).writtenOff") &&
+    seatPickerCode.includes("import { seatMarks, type SeatStatus }") &&
+      seatPickerCode.includes("!marked(m.id)") &&
+      seatPickerCode.includes("seatMarks(statuses?.[id]).writtenOff") &&
+      !auditPanelCode.includes("seatMarks") &&
+      !maroonPanelCode.includes("seatMarks") &&
       auditPanelCode.includes(
         "A captain the harbor has written off cannot be audited.",
       ),
-    "the audit's list of captains is drawn through the one predicate the server refuses on (see writtenOff in @/lib/seatMarks): a captain the harbor has written off is never offered as a name, and the card says so instead of leaving the short list unexplained",
+    "the list of captains a vote offers is drawn through the one predicate the server refuses on (see writtenOff in @/lib/seatMarks): a captain the harbor has written off is never offered as a name, the predicate belongs to the one picker rather than to a card, and the audit's card says so instead of leaving the short list unexplained",
   );
   check(
     auditPanelCode.includes("audit.reveal === null") &&
