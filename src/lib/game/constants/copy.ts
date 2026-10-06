@@ -45,6 +45,12 @@ import {
   INTEL_COST,
   VAT_RATE,
 } from "../engine/pricing";
+// The page a dealing mode adds, and the reader that decides whether it is
+// drawn: the same openingPhase fold the Welcome screen names its first seat
+// with, so the tutorial and the pier cannot disagree about what the voyage
+// opens at.
+import { openingPhase } from "../checkpoint";
+import { pathFactText, pathGuide } from "../paths";
 
 // =====================================================================
 // Player facing copy. The wording is preserved from the original game; the
@@ -201,6 +207,43 @@ ${items}
   ];
 }
 
+/**
+ * The path page: the deal and the five cards, for the mode whose lap opens
+ * at the draft.
+ *
+ * ONB-1's page, and it is built rather than written: every row is a guide
+ * row from ../paths (see pathGuide), so the names, the sentences and the
+ * numbers on this page are the record's own, and a retuned hold or ceiling
+ * changes this page, the manual's page and the draft's cards together or
+ * not at all. Whether the page is drawn at all is the same fold the
+ * Welcome screen names its first seat with (see openingPhase in
+ * ../checkpoint): a mode or build that deals no paths draws no page rather
+ * than an empty one, which is what keeps the founding voyage's tutorial
+ * exactly the length it has always been.
+ */
+function pathSteps(mode: GameMode): TutorialStep[] {
+  if (openingPhase(mode) !== "path_draft") return [];
+  const rows = pathGuide()
+    .map(
+      (entry) =>
+        `  <li><strong>${entry.crest} ${entry.name}</strong>: ${entry.signature}<br><span style="font-size:12px;color:var(--muted-foreground)">${entry.facts
+          .map(pathFactText)
+          .join(" · ")}</span></li>`,
+    )
+    .join("\n");
+  return [
+    {
+      title: "🃏 The Path Draft: keep one card",
+      content: `<p>The voyage opens with a deal rather than a market. Three cards land face down in front of you, and at each beat you keep one and pass the rest on. What you hold when the deal ends is your path for the whole voyage.</p>
+<p>Your path decides three things about your seat: your hold, how far your Renown can climb, and which trade orders lock to you. An order demanding a locked good can only be filled by the captain holding the path that carries it.</p>
+<ul style="padding-left:18px;line-height:1.7;font-size:14px">
+${rows}
+</ul>
+<p style="font-size:12px;color:var(--muted-foreground);margin:8px 0 0">Every card in the deal carries these numbers, so what you read here is what the table deals you.</p>`,
+    },
+  ];
+}
+
 export function tutorialSteps(
   mode: GameMode,
   difficulty: Difficulty,
@@ -231,6 +274,9 @@ ${roundStepHtml(mode)}
 <p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking, and a voyage is one whole run of these rounds rather than a round of its own.</p>`,
     },
     ...differenceSteps(mode),
+    // The deal the mode opens at, for the mode that opens at it: one page
+    // for the five paths, read from the record (see pathSteps).
+    ...pathSteps(mode),
     {
       title: "🏪 Market: Buying",
       content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and the rail across the top of the board always shows the order. That is the core loop.</p>

@@ -96,6 +96,7 @@ import { theMirrorAndTheChargeSuite } from "./suites/60-theMirrorAndTheCharge";
 import { theStatusConventionSuite } from "./suites/61-theStatusConvention";
 import { theMutesAndTheKeysSuite } from "./suites/62-theMutesAndTheKeys";
 import { theWayOutSuite } from "./suites/63-theWayOut";
+import { theFirstVoyageSuite } from "./suites/64-theFirstVoyage";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -503,6 +504,12 @@ async function main(): Promise<void> {
     // same reason the two above it do.
     console.log("\nThe way out");
     await theWayOutSuite();
+    // [W5] The first voyage's article is the fourth of the pure cluster:
+    // the surfaces a new captain meets before the first market are read as
+    // records and source rather than as harbor state, so it opens nothing
+    // either and sits with them ahead of the ready check.
+    console.log("\nThe first voyage");
+    await theFirstVoyageSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

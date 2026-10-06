@@ -66,7 +66,7 @@ import {
   QUARTERMASTER_HOLD_GAIN,
 } from "./constants/paths";
 import { CARGO_SLOTS, FOODS } from "./constants/supplies";
-import { RENOWN_MAX_LEVEL, RENOWN_TITLES } from "./legacy";
+import { RENOWN_MAX_LEVEL, RENOWN_TITLES, renownTitleForLevel } from "./legacy";
 
 interface PathConfig {
   // The name a captain reads on the card and the chip. Written here rather
@@ -344,4 +344,88 @@ export function pathCargoModifier(value: PathId | null): number {
  */
 export function pathLockLine(id: PathId): string {
   return `Only a captain who holds the ${PATHS[id].name} may fill this order.`;
+}
+
+// One reading a path's guide row prints, tagged with which reading it is.
+//
+// The tag exists for exactly one renderer: the draft's cards draw the
+// Renown rung through the glossary's Term so the word a captain meets
+// first is the word the glossary can explain, while the tutorial and the
+// manual print the same rung plain. The renown arm therefore carries the
+// rung's title rather than the finished sentence, and the composition of
+// "Renown to Navigator" belongs to the surface rather than to this record.
+// The other two arms are already complete fragments, so they carry text.
+export type PathFact =
+  | { kind: "hold"; text: string }
+  | { kind: "renown"; title: string }
+  | { kind: "orders"; text: string };
+
+/**
+ * A fact as the plain reading a surface prints without a glossary.
+ *
+ * The draft's cards do not call this: they draw the renown arm through
+ * their own Term instead, which is the one difference between the three
+ * surfaces that print these rows. Everything else reads a fact through
+ * this function, so a reworded rung arrives everywhere at once.
+ */
+export function pathFactText(fact: PathFact): string {
+  return fact.kind === "renown" ? `Renown to ${fact.title}` : fact.text;
+}
+
+// One path as the guide surfaces print it: the identity a card wears and
+// the few readings its numbers carry.
+export interface PathGuideEntry {
+  id: PathId;
+  crest: string;
+  name: string;
+  signature: string;
+  facts: PathFact[];
+}
+
+/**
+ * Every path as a guide row, in the record's own order.
+ *
+ * ONB-1's single source. The three surfaces a new captain meets a path on
+ * (the draft's cards, the tutorial's path page and the manual's path page)
+ * print the same numbers because they run this one function over the same
+ * record, so a retuned hold or ceiling reaches all three with no edit
+ * outside this file, and a sixth path added above is a sixth row at every
+ * surface with nothing to remember.
+ *
+ * The readings are the rule the draft's cards shipped with, moved here
+ * rather than copied: a hold factor other than one is worth printing and a
+ * bare "Hold 100%" is a line a reader learns to skip, the Renown reading
+ * prints the rung's own name through the ladder's title reader rather than
+ * a level number, and the order count appears only for a path that brings
+ * the board a pool, because a row claiming "0 locked orders" would read as
+ * a missing feature rather than as a path whose ability is an action.
+ */
+export function pathGuide(): PathGuideEntry[] {
+  return PATH_IDS.map((id) => {
+    const path = PATHS[id];
+    const facts: PathFact[] = [];
+    if (path.cargoModifier !== 1) {
+      facts.push({
+        kind: "hold",
+        text: `Hold ${Math.round(path.cargoModifier * 100)}%`,
+      });
+    }
+    facts.push({
+      kind: "renown",
+      title: renownTitleForLevel(path.renownCeiling),
+    });
+    if (path.orderPool.length > 0) {
+      facts.push({
+        kind: "orders",
+        text: `${path.orderPool.length} locked orders`,
+      });
+    }
+    return {
+      id,
+      crest: path.crest,
+      name: path.name,
+      signature: path.signature,
+      facts,
+    };
+  });
 }
