@@ -42,10 +42,9 @@ type CaptainRival = {
 // finished (see Endgame.tsx); the Lobby's card has nobody in particular to
 // name, so it leaves the prop unset and the card renders without it.
 //
-// A House Standing chip used to sit here too, fed by a houseStandingFor
-// helper. Neither survived: there is no per captain House standing
-// anywhere in the game, no schema field and no engine value, so the chip
-// had no number it could honestly print and nothing ever passed it one.
+// No House Standing chip here: there is no per captain House standing
+// anywhere in the game, no schema field and no engine value, so such a
+// chip would have no number it could honestly print.
 export function CaptainLegacyCard({
   legacy,
   className,

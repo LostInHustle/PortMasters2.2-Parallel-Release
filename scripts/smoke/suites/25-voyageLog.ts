@@ -27,6 +27,7 @@ import {
   suffix,
   waitForEvent,
   walkSrc,
+  withoutComments,
 } from "../harness";
 import type { Captain, WireDelivery, WireHistory, WireOffer } from "../wire";
 import { readFileSync } from "node:fs";
@@ -277,6 +278,37 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       !carriesADash("src/server/realtime/voyage-log.ts") &&
       !carriesADash("src/components/portmasters/game/VoyageLogPanel.tsx"),
     "and none of the words a captain reads in either log, nor the comments that explain them, carries an en dash, an em dash or a doubled hyphen",
+  );
+
+  // And the two counts over the columns, which read as bare figures for as
+  // long as a captain had to work out what they counted. Each is headed by
+  // the noun it counts and worded for its number, so a voyage with one line
+  // to read says so rather than leaving the reader to name the figure.
+  // Read with its whitespace flattened, the way the market desks are read:
+  // the check is about the words a captain reads rather than about where a
+  // formatter broke the line.
+  const panelCode = withoutComments(
+    readFileSync(
+      join(
+        import.meta.dirname,
+        "..",
+        "..",
+        "..",
+        "src",
+        "components",
+        "portmasters",
+        "game",
+        "VoyageLogPanel.tsx",
+      ),
+      "utf8",
+    ),
+  ).replace(/\s+/g, " ");
+  check(
+    panelCode.includes('entries.length === 1 ? "line" : "lines"') &&
+      panelCode.includes('privateLog.length === 1 ? "line" : "lines"') &&
+      panelCode.includes("in the harbor") &&
+      panelCode.includes("to you alone"),
+    "both counts over the two columns are headed by the noun they count and worded for their number, so the harbor's log and the private one each read as lines rather than as two figures the captain has to label for themselves",
   );
 
   // ---- The two logs, in a real harbor ----

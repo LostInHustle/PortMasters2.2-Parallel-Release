@@ -87,13 +87,12 @@ export function Shipyard({
           </PanelNote>
         )}
       </div>
-      {/* The fit folds (W4): the rows used to print every module's full
-          description inline under the hull's figures, with the synergy
-          analyzer stacked over them after that, which is a wall of small
-          print on a screen whose decision is two buttons. The gist names
-          what is aboard and what it weighs, and the rows and the analyzer
-          wait behind the one chevron, the same fold the market's readings
-          wear (see FoldRow). */}
+      {/* The fit folds (W4): the gist names what is aboard and what it
+          weighs, and the full descriptions and the synergy analyzer wait
+          behind the one chevron, the same fold the market's readings wear
+          (see FoldRow). Printing every module's description inline under
+          the hull's figures is a wall of small print on a screen whose
+          decision is two buttons. */}
       {game.equippedModules.length > 0 && (
         <FoldRow
           tone="dusk"

@@ -13,9 +13,10 @@ import {
   ventureAlreadySpentReason,
 } from "@/lib/game/convoy";
 import type { GameState } from "@/lib/game/types";
-import type { ConvoyVenture } from "@/lib/use-convoy";
+import { useConvoy } from "@/lib/use-convoy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { X } from "lucide-react";
 
 // [MANIFEST 04: Convoy Ventures] Lives in the Dues tab, right beside
 // Outstanding Loans, since both are peer to peer Gold commitments a captain
@@ -26,13 +27,10 @@ export function ConvoyVentures({
   myUserId,
 }: {
   game: GameState;
-  convoy: {
-    ventures: ConvoyVenture[];
-    locked: boolean;
-    error: string | null;
-    post: (targetGold: number, deadlineRound: number) => void;
-    contribute: (ventureId: string, amount: number) => void;
-  };
+  // The board read off the hook that owns it rather than written out a
+  // second time here: the fields this panel reads are the hook's return,
+  // so one it renames or gains reaches the panel with it.
+  convoy: ReturnType<typeof useConvoy>;
   myUserId: string;
 }) {
   const [target, setTarget] = useState("");
@@ -85,9 +83,21 @@ export function ConvoyVentures({
         ━━ Ventures ━━
       </div>
 
+      {/* The refusal is about one press, so it is handed back on request
+          rather than left standing over the board until the next press
+          replaces it (see the hook's clearError). */}
       {convoy.error && (
-        <div className="mb-1.5 rounded bg-alarm/5 px-2 py-1 text-[10px] text-alarm">
-          {convoy.error}
+        <div className="mb-1.5 flex items-start gap-1.5 rounded bg-alarm/5 px-2 py-1 text-[10px] text-alarm">
+          <p className="flex-1">{convoy.error}</p>
+          <button
+            type="button"
+            onClick={convoy.clearError}
+            className="-mr-0.5 shrink-0 rounded-full p-0.5 transition-colors hover:bg-alarm/10"
+            title="Dismiss"
+            aria-label="Dismiss"
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
 
@@ -141,13 +151,21 @@ export function ConvoyVentures({
 
           {Number.isFinite(roundsAheadCount) && (
             <p className="mb-2 text-[9px] text-muted-foreground">
-              Fills by Round {game.currentRound + roundsAheadCount}. Miss it and
-              every contributor only gets back a partial refund. This harbor
-              only gets one venture per voyage, so make it count.
+              Fills by Round {game.currentRound + roundsAheadCount}.
             </p>
           )}
         </>
       )}
+
+      {/* The two rules the board is read under, drawn here rather than in
+          the poster's own form: the refund a miss leaves behind and the
+          harbor's one chance a voyage are what a captain weighs before
+          backing somebody else's venture, and a backer never opens that
+          form, so the board has to carry them. */}
+      <p className="mb-2 text-[10px] text-muted-foreground">
+        Miss the deadline and every contributor only gets back a partial refund.
+        This harbor only gets one venture per voyage, so make it count.
+      </p>
 
       {convoy.ventures.length === 0 ? (
         <p className="py-1 text-[11px] text-muted-foreground">
@@ -178,7 +196,7 @@ export function ConvoyVentures({
                     {v.posterId === myUserId ? "Your venture" : v.posterName}
                   </span>
                   <span className="font-semibold">
-                    {v.total} / {v.targetGold}g
+                    {v.total} of {v.targetGold} Gold funded
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
@@ -189,7 +207,7 @@ export function ConvoyVentures({
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[9px] text-muted-foreground">
                   <span>By Round {v.deadlineRound}</span>
-                  {mine && <span>You have backed {mine.amount}g</span>}
+                  {mine && <span>You have backed {mine.amount} Gold</span>}
                 </div>
                 {atMyShareCap ? (
                   <p className="mt-1.5 text-[9px] text-muted-foreground">

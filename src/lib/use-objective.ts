@@ -21,7 +21,20 @@
 //   three that can be stale, so nothing is ever *shown* from it alone: the
 //   screen reads the higher of the total and this captain's own record, so
 //   a delivery is visible the instant it happens and an in-flight
-//   broadcast can never take one away.
+//   broadcast can never take one away. That one read is also what a
+//   handover is capped by, which is the half a full commission turns on:
+//   the goods a press would take are what the commission still has room
+//   for, so a fleet that has already filled it is offered no action at all
+//   and a captain pressing anyway is told nothing was taken.
+//
+//   The press is the one thing here that is not decided on this side. The
+//   goods it would move are worked out locally, against the board this
+//   screen holds, and offered to the room as the standing they would leave
+//   this captain on; what comes back is what the commission accepted of it,
+//   and only that much leaves the hold (see deliverToObjective). Two
+//   clients that read the board before either press read the same board, so
+//   the room is the only thing that can say whose press was first, and
+//   asking it is what stops two simultaneous handovers being paid twice.
 //
 // The fleet's size comes in as an argument rather than being counted here,
 // and it is the one input that can be unknown for a moment (see
@@ -48,6 +61,7 @@ import type { Socket } from "socket.io-client";
 import {
   clampObjectiveTally,
   drawObjective,
+  higherObjectiveTally,
   objectiveProgress,
   objectiveSeed,
   objectiveTaking,
@@ -71,20 +85,6 @@ const REPORT_DEBOUNCE_MS = 120;
 // clients are the record, and one report every few seconds costs nothing
 // and rebuilds the harbor's board from nothing.
 const REPORT_HEARTBEAT_MS = 8000;
-
-// The higher of two tallies, good by good. A max rather than a sum because
-// the broadcast total already contains this captain's own report: adding
-// them would double count the moment a client heard itself.
-function higherOf(
-  a: Record<string, number>,
-  b: Record<string, number>,
-): Record<string, number> {
-  const merged: Record<string, number> = { ...a };
-  for (const [good, count] of Object.entries(b)) {
-    merged[good] = Math.max(merged[good] ?? 0, count);
-  }
-  return merged;
-}
 
 export function useObjective(
   socket: Socket | null,
@@ -123,26 +123,6 @@ export function useObjective(
   } | null>(null);
   const total = held?.roomId === roomId ? held.total : {};
 
-  useEffect(() => {
-    if (!socket || !roomId || !objective) return;
-
-    const onProgress = (data: ObjectiveProgressPayload) => {
-      if (data?.roomId !== roomId) return;
-      setHeld({ roomId, total: clampObjectiveTally(objective, data.total) });
-    };
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      setHeld(null);
-    };
-
-    socket.on("objective:progress", onProgress);
-    socket.on("room:restarted", onRestarted);
-    return () => {
-      socket.off("objective:progress", onProgress);
-      socket.off("room:restarted", onRestarted);
-    };
-  }, [socket, roomId, objective]);
-
   // This captain's own contribution, as the report carries it. Held in a
   // ref as well because both things that report it outlive the render they
   // were installed on, and a heartbeat that read a value captured when it
@@ -152,6 +132,70 @@ export function useObjective(
   useEffect(() => {
     deliveredRef.current = delivered;
   }, [delivered]);
+
+  // The commission as this screen knows it: the room's board and this
+  // captain's own record merged good by good into the higher, which is one
+  // read rather than three. The bar, the count on the button and the goods
+  // the press itself would take are all measured against it, so the
+  // promise the button makes and the payment behind it cannot drift apart,
+  // and a press is judged against the fullest reading of the commission
+  // this screen holds rather than against one captain's share of it.
+  const taken = higherObjectiveTally(total, delivered);
+
+  // The same read kept for the answer to a press, which arrives a frame or
+  // two after the render the press was made in: what a press proposes is
+  // read at the press, and what a refusal is told about the commission is
+  // read when the room answers. A ref for the reason the hold above is one,
+  // and written above the listener below rather than after it, so the
+  // listener answers with the board as it stands when the answer lands.
+  const takenRef = useRef(taken);
+  useEffect(() => {
+    takenRef.current = taken;
+  }, [taken]);
+
+  // The round this captain pressed Deliver in and has not been answered
+  // about. A number rather than a boolean, the way the audit's own press
+  // is: the round turning clears it, so a press whose answer never came
+  // cannot wedge the button past the round it belongs to.
+  const [pressed, setPressed] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!socket || !roomId || !objective) return;
+
+    const onProgress = (data: ObjectiveProgressPayload) => {
+      if (data?.roomId !== roomId) return;
+      setHeld({ roomId, total: clampObjectiveTally(objective, data.total) });
+    };
+    // The answer to this captain's own press, and it is the only frame that
+    // moves goods: what the room accepted is what leaves the hold, and a
+    // grant that accepted nothing is the refusal rather than a different
+    // frame (see the engine's own sentence for a take of nothing).
+    const onGranted = (data: {
+      roomId?: string;
+      granted?: Record<string, number>;
+    }) => {
+      if (data?.roomId !== roomId) return;
+      setPressed(null);
+      if (!data.granted) return;
+      act((g, logs) =>
+        deliverToObjective(g, objective, logs, takenRef.current, data.granted),
+      );
+    };
+    const onRestarted = (data: { roomId?: string }) => {
+      if (data?.roomId !== roomId) return;
+      setHeld(null);
+      setPressed(null);
+    };
+
+    socket.on("objective:progress", onProgress);
+    socket.on("objective:granted", onGranted);
+    socket.on("room:restarted", onRestarted);
+    return () => {
+      socket.off("objective:progress", onProgress);
+      socket.off("objective:granted", onGranted);
+      socket.off("room:restarted", onRestarted);
+    };
+  }, [socket, roomId, objective, act]);
 
   const report = useCallback(() => {
     if (!socket || !roomId || !objective) return;
@@ -205,25 +249,62 @@ export function useObjective(
     });
   }, [objective, totalJson, act]);
 
+  // A press this screen is waiting on an answer to. It is one term in two
+  // places, because the two things it shuts are the same thing said twice:
+  // the count on the button, and the press the button would make.
+  const inFlight = pressed === game.currentRound;
+
   // What the screen shows, and what the button would move right now. The
   // button needs the fleet's size as much as it needs the phase: with the
   // size unknown the board on screen is the founding one, and handing goods
   // over against it would spend them on a quota the fleet is not working.
-  const progress = objective
-    ? objectiveProgress(objective, higherOf(total, delivered))
-    : null;
+  // A press in flight reads as nothing deliverable, the rule the audit's
+  // button is shut by: the room is deciding what that press takes, and the
+  // count behind a second press would come off a board the first one is
+  // about to move.
+  const progress = objective ? objectiveProgress(objective, taken) : null;
   const deliverable =
-    objective && game.phase === OBJECTIVE_DELIVERY_PHASE && seats !== null
-      ? objectiveTaking(objective, game.inventory, delivered).reduce(
+    objective &&
+    !inFlight &&
+    game.phase === OBJECTIVE_DELIVERY_PHASE &&
+    seats !== null
+      ? objectiveTaking(objective, game.inventory, taken).reduce(
           (sum, row) => sum + row.take,
           0,
         )
       : 0;
 
+  // The press. It asks the room before the goods move: what is offered is
+  // the standing this press would leave this captain on, good by good,
+  // which is the number a report carries because it is the same number. The
+  // take itself is the goods that standing is short of, read against the
+  // board this screen holds, and the room holds it to what the commission
+  // has actually left. With no socket there is no room to ask, so this
+  // captain's own reading of the board is the whole of what there is to
+  // judge by, which is what the press was before there was a room to ask.
   const deliver = useCallback(() => {
-    if (!objective) return;
-    act((g, logs) => deliverToObjective(g, objective, logs));
-  }, [act, objective]);
+    if (!objective || inFlight) return;
+    if (!socket || !roomId) {
+      act((g, logs) => deliverToObjective(g, objective, logs, taken));
+      return;
+    }
+    setPressed(game.currentRound);
+    const proposed: Record<string, number> = {};
+    for (const row of objectiveTaking(objective, game.inventory, taken)) {
+      proposed[row.type] = (game.objectiveDelivered[row.type] ?? 0) + row.take;
+    }
+    socket.emit("objective:handover", { roomId, delivered: proposed });
+  }, [
+    act,
+    game.currentRound,
+    game.inventory,
+    game.objectiveDelivered,
+    inFlight,
+    objective,
+    roomId,
+    socket,
+    taken,
+  ]);
 
   return { objective, progress, deliverable, deliver };
 }

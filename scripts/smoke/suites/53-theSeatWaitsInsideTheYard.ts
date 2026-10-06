@@ -267,4 +267,88 @@ export async function theSeatWaitsInsideTheYardSuite(
       ),
     "with both votes in and both captains at the seat, the departure is announced to every captain as it always was",
   );
+
+  // the vote the reload left standing, and the screen that withdraws it
+  //
+  // The fold above is what makes the room wait on a captain inside the
+  // yard, and read on its own it also counted a captain who had already
+  // voted at the seat and then walked back into the yard: the room left
+  // the moment the rest of the table had voted, and the draft captain's
+  // own client ran the catch up every client runs for a seat the room has
+  // moved past, which cancels a module draft under the hands of the
+  // captain still reading it. That is the field report again, one seat
+  // over from the one above, and the way in is the path a captain can
+  // walk without a doctored client: a vote lives on the server while the
+  // client that cast it can come back with no memory of the wait, so a
+  // captain who readies, reloads their tab and walks back into the yard
+  // is standing in the draft with a vote the room is still holding.
+  //
+  // The room's answer is that the newer of the two things a captain has
+  // said wins: a report naming the yard's own screen withdraws the vote
+  // that was cast at the seat, and the vote comes back the way every vote
+  // at a seat does (see withdrawVoteForAScreen). The leg below is walked
+  // on reports rather than on votes, so the departure above is behind it
+  // and this seat starts with a clear ready set.
+  const nextLeg: Seat = { round: 2, phase: "dusk" };
+  report(crew[0], nextLeg);
+  const stoodAgain = await stand(nextLeg);
+  check(
+    stoodAgain &&
+      heard.every((mine, i) => mine.advances.length === expected[i]),
+    "reporting onto the next leg's seat moves the room the way any report does and announces nothing, because a report is a captain saying where they stand rather than a vote they cast",
+  );
+
+  crew[0].socket.emit("phase:ready", { roomId: room, round: 2, phase: "dusk" });
+  await settled(
+    () => (heard[0].standing?.readyUserIds ?? []).includes(crew[0].captain.id),
+    4000,
+  );
+  check(
+    (heard[0].standing?.readyUserIds ?? []).join() === crew[0].captain.id,
+    "a captain readies at the seat and the bar counts exactly that one vote, with the other captain still to answer",
+  );
+
+  const beforeTheYard = counts();
+  report(crew[0], { round: 2, phase: "module_draft" });
+  await settled(
+    () => (heard[0].standing?.readyUserIds ?? []).length === 0,
+    4000,
+  );
+  check(
+    (heard[0].standing?.readyUserIds ?? []).length === 0 &&
+      roster().length === 2 &&
+      roster().includes(crew[0].captain.id),
+    "a captain who voted and then reloaded back into the yard has that vote withdrawn the moment the screen is reported: the bar keeps them in its denominator and reads nothing from them, because the newer of the two things they have said is that they are back at work",
+  );
+
+  crew[1].socket.emit("phase:ready", { roomId: room, round: 2, phase: "dusk" });
+  await settled(
+    () => (heard[0].standing?.readyUserIds ?? []).length === 1,
+    4000,
+  );
+  await wait(1500);
+  check(
+    counts().every((count, i) => count === beforeTheYard[i]),
+    "so the mate's vote moves nothing while the draft captain is inside the yard, which is the half of the report a vote left standing used to walk straight past",
+  );
+
+  // And the release, which is the other half of the claim: the yard is
+  // done, the captain is back at the seat, and their vote carries the
+  // room out. The vote is cast at the seat after the report that puts
+  // them there, which is the order every client runs (see the stand
+  // helper in the lap walk of scripts/smoke.ts).
+  const released = counts().map((count) => count + 1);
+  report(crew[0], nextLeg);
+  crew[0].socket.emit("phase:ready", { roomId: room, round: 2, phase: "dusk" });
+  await settled(
+    () => heard.every((mine, i) => mine.advances.length === released[i]),
+    8000,
+  );
+  check(
+    heard.every((mine, i) => mine.advances.length === released[i]) &&
+      heard.every(
+        (mine) => mine.advances[mine.advances.length - 1].phase === "dusk",
+      ),
+    "and a swap that completes releases the room: with the captain back at the seat and both votes standing, the departure the yard held is announced to every captain",
+  );
 }

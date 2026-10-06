@@ -111,10 +111,13 @@ export function useBacking(
 
   // Only the lender of one of these loans can call this meaningfully; the
   // server enforces that regardless. Pass an empty targetUserId to clear an
-  // already set redirect.
+  // already set redirect. The previous refusal is cleared first, so a
+  // sentence about a pledge that is no longer standing cannot outlive the
+  // press that replaces it.
   const redirect = useCallback(
     (debtId: string, targetUserId: string) => {
       if (!socket) return;
+      setError(null);
       socket.emit("loan:redirect", { roomId, debtId, targetUserId });
     },
     [socket, roomId],

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { HUNGRY_CREW_RULE } from "@/lib/game/constants/copy";
+import { hungryProvisionsNote } from "@/lib/game/status-copy";
 import {
   FOODS,
   FOODS_DRAW_ORDER,
@@ -233,12 +233,7 @@ export function Provisions({
           </span>
         )}
       </div>
-      {short && (
-        <PanelNote tone="alarm">
-          ⚠️ The larder is empty and the crew is working hungry: every artisan
-          produces less, and {HUNGRY_CREW_RULE} Fill it before the next Dawn.
-        </PanelNote>
-      )}
+      {short && <PanelNote tone="alarm">⚠️ {hungryProvisionsNote()}</PanelNote>}
       <div className="mt-2">
         <FoldRow
           tone="larder"

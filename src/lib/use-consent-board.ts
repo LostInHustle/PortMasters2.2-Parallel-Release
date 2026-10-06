@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
-import type { ConsentTerms } from "@/lib/game/engine";
+import { consentSettled, type ConsentTerms } from "@/lib/game/engine";
 
 /**
  * The channel one kind of agreement speaks on, which is the whole of what
@@ -42,13 +42,19 @@ type ConsentChannel = {
  * cross captain movement, so nothing here reads a purse at all.
  *
  * Noticing rather than being told is what makes that report safe to run in
- * every phase. A row is reported only when the status this captain was last
- * shown for it has changed, and only for a row that names this captain on
- * one of its two sides, so a repeated or a stale broadcast cannot move the
- * same Gold twice. The caller's own ledger is the second guard: the apply
- * functions are idempotent per movement, which is what carries a captain
- * through a reload midway between an agreement and the Gold that follows
- * it, when this hook has no memory at all and the whole board arrives anew.
+ * every phase. A row is reported only when it has settled and the status
+ * this captain was last shown for it has changed, and only for a row that
+ * names this captain on one of its two sides, so a repeated or a stale
+ * broadcast cannot move the same Gold twice and a row that came back cannot
+ * move anything at all. Which states settle is the primitive's own reading
+ * rather than a test taken here (see consentSettled): the escort's decline
+ * is a state past the offer stage that commits nobody, so a report that
+ * asked only whether a row had stopped being an offer would hand every
+ * caller a movement to apply for a price that came back. The caller's own
+ * ledger is the second guard: the apply functions are idempotent per
+ * movement, which is what carries a captain through a reload midway between
+ * an agreement and the Gold that follows it, when this hook has no memory
+ * at all and the whole board arrives anew.
  *
  * There is no refund channel here, and that is the difference between a
  * consent market and the barter board. A posted offer holds no escrow,
@@ -94,7 +100,12 @@ export function useConsentBoard<T extends ConsentTerms>(
           continue;
         }
         shown.set(row.id, row.status);
-        if (row.status === "offered") continue;
+        // Only a row that settled is worth reporting, and the state it
+        // settled in is the primitive's to name rather than this relay's:
+        // a row still on offer settles nothing, and neither does one that
+        // came back (see consentSettled, which the board's own busy rule
+        // and the escort's cover mirror read for the same reason).
+        if (!consentSettled(row.status)) continue;
         if (shownRef.current.get(row.id) === row.status) continue;
         onSettleRef.current(row);
       }

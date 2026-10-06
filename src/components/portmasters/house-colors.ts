@@ -5,10 +5,9 @@
  * a House is never one colour in one panel and another colour in the
  * next.
  *
- * This lives apart from the components because two of them draw a House
- * and they used to disagree: the Great Houses dialog painted every crest
- * gold while the leaderboard gave each House its own. One list, two
- * readers.
+ * This lives apart from the components because two of them draw a House:
+ * one list with two readers, so a House wears the same colour in the
+ * Great Houses dialog and on the leaderboard.
  */
 
 /** The crest behind a House icon. */

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { hungryMarkerLabel, hungryTooltip } from "@/lib/game/status-copy";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,33 +41,59 @@ export function StatGrid({
   larder: number;
   shortRations: boolean;
 }) {
+  // [W3: the status convention] The hungry cell's sentence opens on a tap,
+  // which is the rail's one reveal idiom (the held cards under this grid
+  // open the same way), so the why and the way back reach a touch screen
+  // rather than living in a hover title.
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <Stat label="Funds" value={`${money}`} className="text-gold-ink" />
-      <Stat label="Reputation" value={`${score}`} className="text-favor" />
-      {showObligations ? (
-        <Stat
-          label="Due"
-          value={`${pendTotal}`}
-          className={cn(safe ? "text-foreground" : "text-alarm")}
-        />
-      ) : (
-        <Stat label="Ship" value={`Lv ${shipLevel}`} className="text-sea" />
-      )}
-      {/* [C1: the Larder and Short Rations] Drawn only when the layer
-          is running, so a voyage with the switch off shows the same
-          three columns at the same width it always had rather than a
-          fourth cell reporting a number no rule moves. The colour is
-          the whole readout: the Larder's own hue while there is food
-          aboard, the meaning red the moment the crew is going without,
-          which is the hunger the captain is meant to notice from here
-          rather than only from a log line they may have scrolled past. */}
-      {larderOn && (
-        <Stat
-          label="Larder"
-          value={`${larder}`}
-          className={cn(shortRations ? "text-alarm" : "text-larder")}
-        />
+    <div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <Stat label="Funds" value={`${money}`} className="text-gold-ink" />
+        <Stat label="Reputation" value={`${score}`} className="text-favor" />
+        {showObligations ? (
+          <Stat
+            label="Due"
+            value={`${pendTotal}`}
+            className={cn(safe ? "text-foreground" : "text-alarm")}
+          />
+        ) : (
+          <Stat label="Ship" value={`Lv ${shipLevel}`} className="text-sea" />
+        )}
+        {/* [C1: the Larder and Short Rations] Drawn only when the layer
+            is running, so a voyage with the switch off shows the same
+            three columns at the same width it always had rather than a
+            fourth cell reporting a number no rule moves. [W3: the status
+            convention] The cell used to carry the hunger in colour alone,
+            which is a readout only a captain who already knows the rule
+            can read: it now swaps its label to the state's own words and
+            opens the full sentence on a tap, so a touch screen gets the
+            why and the way back rather than a hover. */}
+        {larderOn &&
+          (shortRations ? (
+            <button
+              type="button"
+              onClick={() => setOpen((was) => !was)}
+              aria-expanded={open}
+              title={hungryTooltip()}
+              className="w-full rounded-lg bg-black/[0.03] px-2 py-1.5 text-center dark:bg-white/[0.05]"
+            >
+              <div className="text-[15px] font-bold leading-tight text-alarm">
+                {larder}
+              </div>
+              <div className="text-[9px] text-muted-foreground">
+                {hungryMarkerLabel()}
+              </div>
+            </button>
+          ) : (
+            <Stat label="Larder" value={`${larder}`} className="text-larder" />
+          ))}
+      </div>
+      {larderOn && shortRations && open && (
+        <p className="mt-1 px-0.5 text-[10px] leading-snug text-muted-foreground">
+          {hungryTooltip()}
+        </p>
       )}
     </div>
   );

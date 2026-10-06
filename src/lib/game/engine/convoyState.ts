@@ -8,11 +8,12 @@ import type { GameState } from "../types";
 
 // [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
 // same moment barter posting escrows an offer (see postBarterOffer) rather
-// than waiting for the venture to actually resolve. The server (see
-// src/server/realtime/index.ts) is the one authority on whether this contribution
-// actually landed (a venture that filled or expired between the click and
-// the server's response never reaches this call at all), so this only ever
-// runs once the server has already confirmed the contribution was accepted.
+// than waiting for the venture to actually resolve. The server (see the
+// venture:contribute handler in src/server/realtime/wiring/ventures.ts) is
+// the one authority on whether this contribution actually landed (a
+// venture that filled or expired between the click and the server's
+// response never reaches this call at all), so this only ever runs once
+// the server has already confirmed the contribution was accepted.
 export function contributeToVenture(
   state: GameState,
   amount: number,
@@ -40,7 +41,8 @@ export function contributeToVenture(
 // claimed this voyage's one shared chance, so this one never got to run its
 // own course and nobody who backed it is penalized for that). Only one
 // venture can ever end "filled" in a single voyage; see venture:post and
-// venture:contribute in src/server/realtime/index.ts for where that's enforced.
+// venture:contribute in src/server/realtime/wiring/ventures.ts for where
+// that's enforced.
 export function receiveVentureSettlement(
   state: GameState,
   amount: number,
@@ -53,6 +55,6 @@ export function receiveVentureSettlement(
       ? `⚓ Venture filled! Your share: ${amount} Gold`
       : outcome === "failed"
         ? `⚓ Venture missed its deadline. Partial refund: ${amount} Gold`
-        : `⚓ Venture cancelled: another venture in the harbor already claimed this voyage's one chance. Full refund: ${amount} Gold`,
+        : `⚓ Venture canceled: another venture in the harbor already claimed this voyage's one chance. Full refund: ${amount} Gold`,
   );
 }

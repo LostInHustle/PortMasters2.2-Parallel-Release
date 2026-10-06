@@ -71,7 +71,8 @@ export interface DifficultyConfig {
 
   // Raid probability. One entry is a flat toll all voyage; two entries step up
   // at the midpoint (round > floor(rounds / 2)). Severity itself is unchanged:
-  // a raid still takes every coin, faithful to the Parallel Release identity,
+  // a raid still takes every coin, faithful to the Parallel Release line's
+  // identity,
   // so difficulty escalates the chance rather than the loss fraction.
   pirateChance: readonly [number] | readonly [number, number];
   // Escort fee as a fraction of current gold, the guaranteed safe alternative

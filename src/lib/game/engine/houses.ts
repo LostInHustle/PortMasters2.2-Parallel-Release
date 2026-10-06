@@ -67,7 +67,7 @@ export const HOUSES: House[] = [
     id: "golden_lotus",
     name: "Golden Lotus",
     icon: "🏵️",
-    motto: "Fortune favours the bold wager.",
+    motto: "Fortune favors the bold wager.",
     perk: "Wages cost 20% less, but pirate raids strike 5% more often.",
   },
 ];

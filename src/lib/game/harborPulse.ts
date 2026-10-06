@@ -9,11 +9,11 @@
 //
 // The server is still the one authority that owns *when* this runs, and
 // it takes two hands: every captain's per round purchase report is
-// tallied as it arrives in src/server/realtime/index.ts (through
-// addPulseReport in src/server/realtime/pulse.ts), and the pulse is then computed exactly once
-// by maybeAdvance in src/server/realtime/checkpoint.ts, at the moment the
-// room advances into the next round's Market. This module only owns the
-// formula itself.
+// tallied through addPulseReport in
+// src/server/realtime/wiring/pulse.ts, and the pulse is then computed
+// exactly once by maybeAdvance in src/server/realtime/checkpoint.ts, at
+// the moment the room advances into the next round's Market. This module
+// only owns the formula itself.
 // =====================================================================
 
 // Turns a round's raw summed quantities into a small per item price
@@ -24,12 +24,9 @@
 //
 // `universe` is the raw goods that round's market actually put on the board
 // (see unlockedResources). The neutral share is an even split between them,
-// so it has to be counted rather than assumed, and that is the whole of a
-// bug this function used to carry: the baseline was written as a flat one in
-// three, which was right while the harbor traded Hemp, Silk and Tea and
-// stopped being right the moment a charter opened a fourth good. From then
-// on an even split of seven read as a heavy lean away from every single one,
-// so the entire market took the full discount at once and the pulse stopped
+// so it has to be counted rather than assumed: a flat one in three is right
+// only while the harbor trades exactly three goods, and an even split of
+// seven read off a flat third would take the full discount at once and stop
 // saying anything about what the room had done. Passing nothing falls back
 // to the goods in the tally, which is the best an unknown market allows.
 const PULSE_CAP = 0.12;

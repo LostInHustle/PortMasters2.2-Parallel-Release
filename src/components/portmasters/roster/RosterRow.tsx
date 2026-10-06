@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import type { Socket } from "socket.io-client";
 import type { PlayerDetailData } from "@/lib/use-player-detail";
 import { canSeeDetail } from "@/lib/game/engine";
-import { HUNGRY_CREW_TOOLTIP } from "@/lib/game/constants/copy";
+import { hungryPillLine, hungryTooltip } from "@/lib/game/status-copy";
 import { seatMarks } from "@/lib/seatMarks";
 import { cn } from "@/lib/utils";
 import { Avatar, OnlineDot, Pill } from "../shared";
@@ -176,11 +176,16 @@ export function RosterRow({
             is about the two marks that write a seat off: a
             hungry captain is neither of those, and a badge that
             rode writtenOff would quietly take them out of the
-            running for a vote they are still entitled to. */}
+            running for a vote they are still entitled to.
+            [W3: the status convention] The pill carries the way
+            back in its own visible text rather than in a title
+            alone, because a fleet reading this board may be
+            reading it on a touch screen, where a title never
+            fires. */}
         {status?.shortRations && (
-          <span title={HUNGRY_CREW_TOOLTIP}>
+          <span title={hungryTooltip()}>
             <Pill tone="alarm">
-              <Utensils className="h-3 w-3" /> Short Rations
+              <Utensils className="h-3 w-3" /> {hungryPillLine()}
             </Pill>
           </span>
         )}

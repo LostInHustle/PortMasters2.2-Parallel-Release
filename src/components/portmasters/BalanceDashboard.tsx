@@ -133,11 +133,9 @@ export function BalanceDashboard() {
     <div className="pm-canvas min-h-screen">
       {/* The column, and the number every width decision below reads. The
           gutters live here rather than on the children, so the container
-          measures the width the panels actually have. Every breakpoint
-          under it used to read the window instead, which is how this page
-          came to change shape at 1280 while the column it draws in stayed
-          at 1024: the four front page tiles jumped from two across to four
-          across without the room for them changing at all.
+          measures the width the panels actually have, and a breakpoint
+          read off the window instead would change the page's shape while
+          the column it draws in stayed put.
 
           There is no cap. This page is a stack of panels, and a panel is a
           table with room to breathe: a window wider than the widest table
@@ -421,12 +419,12 @@ function Panel({ panel }: { panel: DashboardPanel }) {
           a line where the panel is wide enough for one, and a row per
           reading carries the same four stacked where it is not. The
           threshold is the panel's own width rather than the page's,
-          because the panel is now its own container: a panel narrower than
+          because the panel is its own container: a panel narrower than
           46rem would rather stack than squeeze four columns, whatever the
           window around it is doing. The stacked form is not a smaller
-          table: it keeps every fact, and it is the reason a reader on a
-          phone no longer has to drag the panel 308 pixels sideways to find
-          out whether a number passed. */}
+          table: it keeps every fact, and it is what spares a reader on a
+          phone the drag of 308 pixels sideways to find out whether a
+          number passed. */}
       <div className="hidden @min-[46rem]:block pm-scroll overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>

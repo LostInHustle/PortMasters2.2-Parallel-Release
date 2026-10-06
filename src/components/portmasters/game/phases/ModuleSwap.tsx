@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
 import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
 import { finalizeModuleSwap } from "@/lib/game/engine";
-import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
+import { powerAfterTaking, powerBudgetAllows } from "@/lib/game/held-cards";
 import { Term } from "../../Term";
 import {
   PhaseClockBar,
@@ -36,7 +36,6 @@ export function ModuleSwap({
 }: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
   const newMod = game._newModule;
   const newText = newMod ? cardText(newMod) : null;
-  const held = heldPower(game);
   return (
     <div className="max-w-2xl mx-auto text-center">
       <PhaseHeading layout="mb-1" tone="text-module-swap" brush>
@@ -49,13 +48,20 @@ export function ModuleSwap({
       )}
       <PhaseClockBar phaseSync={phaseSync} members={members} className="mb-4" />
       <div className="rounded-xl border border-module-swap/15 bg-module-swap/[0.03] p-4 my-4 space-y-2 text-left">
+        {/* The rows are the hull's seats rather than its cards. A hull can
+            carry two of the same module, which the draft's fallback pool
+            deals whenever the unseen cards run short (see rollModuleChoices
+            in the engine's boons), and the press below names the seat it
+            means rather than the card: a key of the card's id would draw one
+            row where two modules are bolted on and could hand a press the
+            other seat's pick (see finalizeModuleSwap). */}
         {game.equippedModules.map((card, i) => {
           const text = cardText(card);
           const blocked =
             newMod !== undefined && !powerBudgetAllows(game, newMod, card);
           return (
             <div
-              key={card.id}
+              key={`${card.id}:${i}`}
               className="flex justify-between items-center bg-background/60 rounded-md p-2.5 border border-black/5 dark:border-white/10"
             >
               <div>
@@ -68,8 +74,8 @@ export function ModuleSwap({
                 {blocked && newMod && (
                   <div className="text-[11px] text-alarm mt-1">
                     Replacing it would put your hull at{" "}
-                    {held - card.power + newMod.power} power, and a hull carries
-                    at most {HELD_POWER_CAP}.
+                    {powerAfterTaking(game, newMod, card)} power, and a hull
+                    carries at most {HELD_POWER_CAP}.
                   </div>
                 )}
               </div>

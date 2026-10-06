@@ -64,12 +64,15 @@ type EndgameProps = Pick<PhasePanelProps, "game" | "me" | "room"> & {
   // server emits on voyage:complete, reveal is the harbor's cards turned
   // face up on voyage:reveal, myLegacy is the captain's post voyage
   // CaptainLegacySummary, and onRestart is the host's "restart voyage"
-  // handler. All four are optional so the Endgame panel still renders a
-  // sane waiting state when the parent hasn't wired them through yet.
+  // handler. onLeave is the room's leave flow, offered to a captain who
+  // would rather set out for a new harbor than wait on the host. All five
+  // are optional so the Endgame panel still renders a sane waiting state
+  // when the parent hasn't wired them through yet.
   voyageResult?: VoyageResult | null;
   reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
+  onLeave?: () => void;
 };
 
 export function Endgame({
@@ -80,6 +83,7 @@ export function Endgame({
   reveal,
   myLegacy,
   onRestart,
+  onLeave,
 }: EndgameProps) {
   const myUserId = me.id;
   const isHost = me.id === room.hostId;
@@ -139,9 +143,20 @@ export function Endgame({
           🔄 Restart Voyage
         </Button>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Waiting for the host to restart the voyage…
-        </p>
+        <div className="flex flex-col items-center gap-2.5">
+          <p className="text-sm text-muted-foreground">
+            Waiting for the host to restart the voyage…
+          </p>
+          {onLeave && (
+            <Button
+              variant="secondary"
+              className="rounded-xl px-8"
+              onClick={onLeave}
+            >
+              ⚓ Sail Again
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -19,7 +19,9 @@ import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
   buyRag,
+  canPayFee,
   canSellRefit,
+  getOwnedAmount,
   mendGarment,
   ragsLeftAtPort,
   refitRoomFor,
@@ -112,15 +114,17 @@ export function RefitBench({
 
   return (
     <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5">
-      {/* The bench's own heading line is gone (W4): the fold row above it
-          already names the desk, so the only thing a header here added was
-          a third repetition of the same sentence between the row and the
+      {/* No heading line of its own on the bench (W4): the fold row above
+          it already names the desk, and a header here would add a third
+          repetition of the same sentence between the row and the
           paragraph that explains the trade. */}
       <p className="text-[11px] text-muted-foreground mb-2 max-w-2xl">
         Clothes lose a point of wear every leg and two on a cold one. A{" "}
         {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a
         single leg for whatever fee the two of you agree, and anyone can take{" "}
         {TAILOR_WORK} from the harbor tailors for {MEND_GOLD_PER_POINT} Gold.
+        One open offer per captain you name, one refit taken on a leg, and an
+        offer nobody takes before the Market closes is gone.
       </p>
 
       {/* The offer form belongs to the path that sells the work. A captain
@@ -134,46 +138,40 @@ export function RefitBench({
               works one garment. The bench opens again next leg.
             </p>
           ) : (
-            <>
-              <PrivateOffer
-                lead={
-                  <>
-                    <span className="text-muted-foreground">Put right</span>
-                    <Select
-                      value={good}
-                      onChange={(e) => setGood(e.target.value)}
-                      aria-label="The garment this refit works on"
-                    >
-                      {SELLER_PATH.goods.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </Select>
-                    <span className="text-muted-foreground">for</span>
-                  </>
-                }
-                fee={fee}
-                onFee={setFee}
-                targetId={targetId}
-                onTarget={setTargetId}
-                others={others}
-                audienceLabel="Offer this refit to a specific captain"
-                deadline="before the Market closes."
-                action={
-                  <Button
-                    className="rounded-lg"
-                    onClick={() => refit.post(fee, good, targetId || undefined)}
+            <PrivateOffer
+              lead={
+                <>
+                  <span className="text-muted-foreground">Put right</span>
+                  <Select
+                    value={good}
+                    onChange={(e) => setGood(e.target.value)}
+                    aria-label="The garment this refit works on"
                   >
-                    {SELLER_PATH.crest} Offer a Refit
-                  </Button>
-                }
-              />
-              <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-                One open offer per captain you name, one refit taken on a leg,
-                and an offer nobody takes before the Market closes is gone.
-              </p>
-            </>
+                    {SELLER_PATH.goods.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </Select>
+                  <span className="text-muted-foreground">for</span>
+                </>
+              }
+              fee={fee}
+              onFee={setFee}
+              targetId={targetId}
+              onTarget={setTargetId}
+              others={others}
+              audienceLabel="Offer this refit to a specific captain"
+              deadline="before the Market closes."
+              action={
+                <Button
+                  className="rounded-lg"
+                  onClick={() => refit.post(fee, good, targetId || undefined)}
+                >
+                  {SELLER_PATH.crest} Offer a Refit
+                </Button>
+              }
+            />
           )}
         </MarketBlock>
       )}
@@ -333,19 +331,31 @@ function RefitRow({
   // The server's own refusals, shown before the click rather than after it.
   // The bound is read on the seller's side here because that is the side
   // this market bounds (see refitSellerBusy): a customer may buy a refit for
-  // every garment they own, and a Loom has two hands and one leg.
+  // every garment they own, and a Loom has two hands and one leg. The
+  // customer's own side is the purse, and it is the last condition for the
+  // reason the escort's row gives it last: the fee moves at the handshake on
+  // the customer's machine, and a settle that ran short would pay what the
+  // purse holds while the seller is credited the agreed price (see
+  // canPayFee).
+  const hold = getOwnedAmount(game, "Gold");
   const blocked = stale
     ? STALE_OFFER
     : points < 1
       ? `Nothing left to put right on your ${row.good}.`
       : refitSellerBusy(refit.refits, row.sellerUserId, game.currentRound)
         ? "That captain has already taken on a refit this leg."
-        : null;
+        : !canPayFee(game, row.fee)
+          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${row.fee}.`
+          : null;
 
   return (
     <OfferRow
       mine={mine}
       line={refitLine(row, me)}
+      // The bench's own reading of whether this row is still an offer, which
+      // is what draws the buttons on it: the aim is not the offer, and a row
+      // posted to the whole harbor is an offer like any other (see OfferRow).
+      standing={row.status === "offered"}
       chip={
         row.status === "offered" && row.buyerUserId
           ? { forMe: isBuyer, name: row.buyerName }

@@ -18,10 +18,9 @@ type SortKey =
 
 // The four ways the harbor can be sorted, one row each: the button that
 // picks it, the field on an entry it reads, and the two labels it prints.
-// The row that renders a captain used to rebuild all of that for itself
-// out of eight `sortKey ===` tests, four for the metric and four for its
-// caption, each pair reading the same option the button above already
-// named.
+// The row that renders a captain reads this table rather than rebuilding
+// the pairs for itself, so the metric button and the caption under a name
+// can never disagree about what is being sorted.
 const SORT_OPTIONS: {
   key: SortKey;
   label: string;

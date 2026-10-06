@@ -57,7 +57,9 @@ export function VoyageLogPanel({
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-dusk">The voyage log</h3>
         <span className="text-[10px] text-muted-foreground">
-          {entries.length} in the harbor, {privateLog.length} to you alone
+          {entries.length} {entries.length === 1 ? "line" : "lines"} in the
+          harbor, {privateLog.length}{" "}
+          {privateLog.length === 1 ? "line" : "lines"} to you alone
         </span>
       </div>
       {/* The two columns split once the stage is wide enough to hold them

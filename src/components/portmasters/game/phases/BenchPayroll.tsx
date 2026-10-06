@@ -28,8 +28,7 @@ export function BenchPayroll({
     list: Worker[];
   }[];
   /** The figure the block above prints as the total, passed in rather than
-      summed again here: the two used to be two accumulators over the same
-      rows, and the panel printed both. */
+      summed again here so one set of rows has one accumulator. */
   totalWages: number;
   /** The phase the note, the heading and the tile above name, through the
       face rather than typed, so they cannot come apart. */
@@ -66,20 +65,16 @@ export function BenchPayroll({
       {/* Wage Efficiency Indicator */}
       {(() => {
         // What the artisans actually turned out, weighed against the
-        // payroll figure already totalled for the block above. A
-        // second accumulator used to sit in this loop summing r.due
-        // into its own totalWagesPaid, skipping empty worker types on
-        // the way: an empty type's due is zero, so it was rebuilding
-        // the same number under a different name, and the panel then
-        // printed both, in the denominator and in the caption beside
-        // it.
+        // payroll figure already totalled for the block above, so the
+        // denominator and the caption beside it are one number rather
+        // than two accumulators over the same rows.
         let totalProducedValue = 0;
         for (const r of rows) {
           for (const w of r.list) {
             // The recipe is asked for rather than trusted: task is a
-            // RECIPES key for every hand the engine assigns, and a
+            // RECIPES key for every hand the engine assigns, but a
             // damaged save is the one carrier a task naming no recipe
-            // arrives on, which used to index the table and throw out
+            // arrives on, and indexing the table with it would throw out
             // of this panel (or, for a prototype key, print NaN into a
             // caption beside real numbers).
             const recipe = w.task ? RECIPES[w.task] : undefined;

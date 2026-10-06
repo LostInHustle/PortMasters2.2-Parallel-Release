@@ -5,11 +5,13 @@
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
+import { TARGET_NOT_IN_HARBOR } from "@/lib/game/constants/copy";
 import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
+import { auditSpentLeg, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";
 import {
   authoritativeRenownLevel,
@@ -30,6 +32,7 @@ import { getCheckpoint } from "../checkpoint";
 import { emitToUser } from "../presence";
 import { noteTelemetry } from "../telemetry";
 import { noteVoyageLog } from "../voyage-log";
+import { rowId } from "../ids";
 
 export function wireBarter(io: Server, socket: Socket): void {
   socket.on("barter:state:request", (payload: { roomId?: string }) => {
@@ -55,6 +58,28 @@ export function wireBarter(io: Server, socket: Socket): void {
       const { roomId } = s;
       const { offerItem, offerAmount, requestItem, requestAmount } =
         payload ?? {};
+      // Every refusal this handler sends names the post it refused. The
+      // poster's own client took the offered goods out of its hold before
+      // the frame went out (posting escrows on the spot, see the engine's
+      // postBarterOffer), so this echo is what tells it which escrow to
+      // hand back: a refusal that named nothing would leave the goods out
+      // of the hold and off the board for the rest of the voyage. The
+      // fields are the poster's own, echoed rather than judged, and the
+      // branch below is what judges them.
+      const refuse = (error: string): void => {
+        socket.emit("barter:error", {
+          roomId,
+          error,
+          offerItem,
+          offerAmount,
+          requestItem,
+          requestAmount,
+          ...(typeof payload?.targetUserId === "string" && payload.targetUserId
+            ? { targetUserId: payload.targetUserId }
+            : {}),
+          flexible: payload?.flexible === true,
+        });
+      };
       if (
         typeof offerItem !== "string" ||
         !offerItem ||
@@ -66,20 +91,14 @@ export function wireBarter(io: Server, socket: Socket): void {
         !Number.isInteger(requestAmount) ||
         (requestAmount as number) < 1
       ) {
-        socket.emit("barter:error", {
-          roomId,
-          error: "Invalid barter offer",
-        });
+        refuse("Invalid barter offer");
         return;
       }
       let targetUserId: string | undefined;
       let targetName: string | undefined;
       if (payload?.targetUserId) {
         if (payload.targetUserId === s.userId) {
-          socket.emit("barter:error", {
-            roomId,
-            error: "You can't direct an offer to yourself.",
-          });
+          refuse("You can't direct an offer to yourself.");
           return;
         }
         const targetMember = await db.roomMember.findUnique({
@@ -89,10 +108,7 @@ export function wireBarter(io: Server, socket: Socket): void {
           include: { user: { select: { displayName: true } } },
         });
         if (!targetMember) {
-          socket.emit("barter:error", {
-            roomId,
-            error: "That captain isn't in this harbor.",
-          });
+          refuse(TARGET_NOT_IN_HARBOR);
           return;
         }
         targetUserId = payload.targetUserId;
@@ -112,12 +128,23 @@ export function wireBarter(io: Server, socket: Socket): void {
       // and during the phase there is nothing to gain by claiming it,
       // since the exchange is open to everyone anyway.
       const flexible = payload?.flexible === true;
-      if (!flexible && (await getCheckpoint(roomId)).phase !== "parley") {
-        socket.emit("barter:error", {
-          roomId,
-          error: "The Captain's Exchange is only open during the Parley phase.",
-        });
-        return;
+      if (!flexible) {
+        const cp = await getCheckpoint(roomId);
+        if (cp.phase !== "parley") {
+          refuse(
+            "The Captain's Exchange is only open during the Parley phase.",
+          );
+          return;
+        }
+        // The audit's price is the rest of that leg's Parley, so the
+        // spend closes this board on the tick it lands rather than on
+        // the advance that follows it (see auditSpentLeg). Flexible
+        // offers are not gated on the phase and are not gated here: they
+        // travel the chat road, and no parley clock ever priced them.
+        if (auditSpentLeg(roomId, cp.round)) {
+          refuse(auditSpentReason("The exchange opens"));
+          return;
+        }
       }
 
       // The flexible gate, checked here rather than trusted from the
@@ -130,17 +157,11 @@ export function wireBarter(io: Server, socket: Socket): void {
       if (flexible) {
         const myLevel = await authoritativeRenownLevel(s.userId);
         if (myLevel === null) {
-          socket.emit("barter:error", {
-            roomId,
-            error: renownUnavailableReason(),
-          });
+          refuse(renownUnavailableReason());
           return;
         }
         if (!flexibleBarterUnlocked(myLevel)) {
-          socket.emit("barter:error", {
-            roomId,
-            error: flexibleLockedReason(),
-          });
+          refuse(flexibleLockedReason());
           return;
         }
         // Posting is free and always allowed while there is something
@@ -156,32 +177,23 @@ export function wireBarter(io: Server, socket: Socket): void {
             flexibleOffersAccepted(roomId, s.userId),
           ) === 0
         ) {
-          socket.emit("barter:error", {
-            roomId,
-            error: flexibleSpentReason(),
-          });
+          refuse(flexibleSpentReason());
           return;
         }
         if (targetUserId) {
           const theirLevel = await authoritativeRenownLevel(targetUserId);
           if (theirLevel === null) {
-            socket.emit("barter:error", {
-              roomId,
-              error: renownUnavailableReason(),
-            });
+            refuse(renownUnavailableReason());
             return;
           }
           if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
-            socket.emit("barter:error", {
-              roomId,
-              error: otherCaptainLockedReason(),
-            });
+            refuse(otherCaptainLockedReason());
             return;
           }
         }
       }
       const offer = {
-        id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        id: rowId(roomId, s.userId),
         fromUserId: s.userId,
         fromName: s.user.displayName,
         offerItem,
@@ -256,18 +268,31 @@ export function wireBarter(io: Server, socket: Socket): void {
         return;
       }
 
+      // The audit's spend closes the leg's trading the moment the count
+      // carries (see auditSpentLeg), and a standing exchange offer is
+      // trading the same as a fresh one: without this gate an offer
+      // posted before the carry could settle into the very leg the room
+      // voted to close. Flexible offers are not gated here or at the
+      // post, for the reason the post handler gives: they travel the
+      // chat road, and no parley clock ever priced them.
+      if (!opening.offer.flexible) {
+        const cp = await getCheckpoint(roomId);
+        if (auditSpentLeg(roomId, cp.round)) {
+          fail(auditSpentReason("The exchange opens"));
+          return;
+        }
+      }
+
       // Only a flexible offer has anything left to check, and only a
-      // flexible offer needs the database at all. An exchange offer
-      // from the Captain's Exchange is open to every captain at every
-      // Renown level, so it is accepted here without a level being read
-      // for either side.
+      // flexible offer needs the Renown reads at all: an exchange offer
+      // is open to every captain at every level.
       //
-      // The reads below are the one thing in this handler that waits on
-      // the database, and a different captain can claim the same offer
-      // while they are in flight. So the offer is inspected again
-      // afterwards rather than carried across the gap: everything from
-      // that second inspection down to the broadcast is synchronous,
-      // which is what still keeps one offer from being accepted twice.
+      // Every database read in this handler is a place where a
+      // different captain can claim the same offer while it is in
+      // flight, so the offer is inspected again afterwards rather than
+      // carried across the gap: everything from that second inspection
+      // down to the broadcast is synchronous, which is what still keeps
+      // one offer from being accepted twice.
       if (opening.offer.flexible) {
         const [myLevel, theirLevel] = await Promise.all([
           authoritativeRenownLevel(s.userId),

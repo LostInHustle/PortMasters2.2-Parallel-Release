@@ -1,11 +1,14 @@
 // PortMasters 2.2 Parallel Release, smoke run: the module trade.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ModuleTradeBoard } from "@/types/realtime/boards";
 import { db } from "@/lib/db";
 import { cardById, cardName, cardsOfKind } from "@/lib/game/cards";
 import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   applyModuleTradeSide,
+  canPayFee,
   canSellModule,
   expireConsent,
   isModuleId,
@@ -36,6 +39,7 @@ import {
   voyageState,
   waitForEvent,
   withEnv,
+  withoutComments,
 } from "../harness";
 import type { Captain, WireHistory } from "../wire";
 import type { Socket } from "socket.io-client";
@@ -288,6 +292,43 @@ export async function moduleTradesSuite(
         broke.equippedModules.some((card) => card.id === "bulk_hauler") &&
         brokeLogs.some((line) => line.includes("paid 5 Gold")),
       "a purse that moved between the accept and the settlement pays what it holds rather than a negative hold, and the module still lands, because the price was agreed in the open and the purse is the buyer's own business",
+    );
+
+    // The guard the desks ask before that click, and the minting it stands
+    // in front of (G1). The settle above is deliberately asymmetric, the
+    // boundary the escort's own settle shares and pins (suite 37), so this
+    // pair reads the same agreed trade at two purses: one that covers the
+    // fee, where the payment and the credit are one number, and one that
+    // cannot, where the seller's machine credits the agreed price while the
+    // buyer's wallet moves what it held. The second half is what a desk
+    // without the guard let an honest buyer reach.
+    const coveredPurse = hullState({ currentRound: 3, money: 100 });
+    const coveredLogs: string[] = [];
+    check(
+      canPayFee(coveredPurse, agreed.fee) &&
+        applyModuleTradeSide(coveredPurse, agreed, "buyer", coveredLogs) &&
+        coveredPurse.moduleFeesPaid === agreed.fee &&
+        coveredPurse.money === 100 - agreed.fee &&
+        coveredLogs.some((line) => line.includes(`paid ${agreed.fee} Gold`)),
+      "a buyer whose purse covers the fee pays it whole, so the payment the buyer's side moves and the price the seller's side credits are one number on both machines",
+    );
+
+    const shortPurse = hullState({ currentRound: 3, money: 5 });
+    const shortPurseLogs: string[] = [];
+    const shortBook = hullState({
+      currentRound: 3,
+      equippedModules: [hauler],
+    });
+    const shortBookLogs: string[] = [];
+    check(
+      !canPayFee(shortPurse, agreed.fee) &&
+        applyModuleTradeSide(shortPurse, agreed, "buyer", shortPurseLogs) &&
+        applyModuleTradeSide(shortBook, agreed, "seller", shortBookLogs) &&
+        shortPurse.moduleFeesPaid === 5 &&
+        shortPurse.money === 0 &&
+        shortBook.moduleFeesEarned === agreed.fee &&
+        shortBook.money === 500 + agreed.fee,
+      "and a purse that cannot cover the fee is the hole the guard closes: the buyer pays the 5 Gold they hold while the seller's own machine credits the agreed price in full, which mints the difference, so the two desks read canPayFee before the click and an honest buyer never reaches the branch",
     );
 
     const unknown = hullState({ currentRound: 3 });
@@ -813,6 +854,65 @@ export async function moduleTradesSuite(
     "and an offer that is off the board cannot be taken from a stale screen, which the server answers with the sentence rather than with a resurrection",
   );
 
+  // The field report's own case, on the row shape it met: a listing posted
+  // to the whole table, taken by a captain the table offered it to. The
+  // third module this captain has not listed this leg, so the kind's own
+  // bound is what says the row below is a fresh listing rather than a
+  // second one.
+  const modOpenTakePosted = modSettles(modBuyer, (board) =>
+    board.some(
+      (t) =>
+        t.sellerUserId === modSeller.id &&
+        t.module === "overdrive_engine" &&
+        t.status === "offered",
+    ),
+  );
+  modSocketOf(modSeller).emit("module:post", {
+    roomId: modRoomId,
+    fee: 33,
+    module: "overdrive_engine",
+  });
+  const modOpenTakeRow = ((await modOpenTakePosted)?.moduleTrades ?? []).find(
+    (t) => t.sellerUserId === modSeller.id && t.module === "overdrive_engine",
+  );
+  check(
+    modOpenTakeRow?.status === "offered" &&
+      modOpenTakeRow.buyerUserId === null &&
+      modOpenTakeRow.round === 1,
+    "a listing posted to the whole table is a fresh row on it, addressed to nobody, after the first open row was withdrawn",
+  );
+  const modOpenTaken = modSettles(modSeller, (board) =>
+    board.some((t) => t.id === modOpenTakeRow?.id && t.status === "agreed"),
+  );
+  modSocketOf(modForeigner).emit("module:accept", {
+    roomId: modRoomId,
+    tradeId: modOpenTakeRow?.id ?? "",
+  });
+  const modOpenTakenRow = ((await modOpenTaken)?.moduleTrades ?? []).find(
+    (t) => t.id === modOpenTakeRow?.id,
+  );
+  check(
+    modOpenTakenRow?.status === "agreed" &&
+      modOpenTakenRow.buyerUserId === modForeigner.id,
+    "and any captain the table offered it to can take it: the open row settles with the taker's own id written on it, which is the press the field report could not find",
+  );
+
+  // The duplicate press, which is the other half of a single settlement:
+  // the row is already agreed, so the second accept is refused by the
+  // same guard a cancelled row meets, and the agreement on the board is
+  // the one the first press made rather than a second one over it.
+  const modOpenSecondPress = await modRefused(modForeigner, "module:accept", {
+    tradeId: modOpenTakeRow?.id ?? "",
+  });
+  check(
+    modOpenSecondPress !== null &&
+      modOpenSecondPress.includes("already gone") &&
+      modBoardOf(modSeller).filter(
+        (t) => t.id === modOpenTakeRow?.id && t.status === "agreed",
+      ).length === 1,
+    "and a second press of the same Take settles nothing: the server refuses it with the sentence it refuses every gone row with, and the board still carries one agreement rather than a second over the first",
+  );
+
   // A captain who is not the seller of a row has no button for it, and the
   // silence is the answer rather than an error: reading a row that is
   // somebody else's is not a mistake anybody has made.
@@ -860,12 +960,24 @@ export async function moduleTradesSuite(
     module: modAgreedRow?.module ?? "",
     fee: modAgreedRow?.fee ?? 0,
   });
+  // The open row's own sale, which is the line the duplicate press above
+  // would have doubled if the second accept had settled anything: one
+  // line for one agreement is what a single settlement looks like on the
+  // surface the whole room reads.
+  const modSoldOpenLine = voyageLogLine({
+    kind: "module_sold",
+    captain: modOpenTakenRow?.sellerName ?? "",
+    taker: modOpenTakenRow?.buyerName ?? "",
+    module: modOpenTakenRow?.module ?? "",
+    fee: modOpenTakenRow?.fee ?? 0,
+  });
   check(
     modOpenRow !== undefined &&
       modAgreedRow !== undefined &&
       modLines.includes(modPostedLine) &&
-      modLines.includes(modSoldLine),
-    "the room's log carries the trade as the board wrote it, the listing and the sale, with the price and the module on both lines and the taker named on the second",
+      modLines.includes(modSoldLine) &&
+      modLines.filter((line) => line === modSoldOpenLine).length === 1,
+    "the room's log carries the trade as the board wrote it, the listing and the sale, with the price and the module on both lines and the taker named on the second, and the sale the third captain took stands on exactly one line rather than two",
   );
 
   // The leg moves on. Everything on the board was sold for the leg that
@@ -895,6 +1007,180 @@ export async function moduleTradesSuite(
   check(
     modReopenedRow?.round === 2 && modReopenedRow?.fee === 12,
     "and the same module can be listed again on the new leg, which is what makes the one listing a leg a bound the voyage reads a leg at a time rather than a ceiling on the trade",
+  );
+
+  // The listing that was still standing when its leg moved, which is the
+  // expiry the reporter's recipient meets with a screen they left open:
+  // the sweep took the row off every board, and the accept is refused
+  // rather than resurrecting an offer the voyage has already left behind.
+  modSeat(modSeller, 3, "parley");
+  await modSettle();
+  const modExpiredRefused = await modRefused(modForeigner, "module:accept", {
+    tradeId: modReopenedRow?.id ?? "",
+  });
+  check(
+    modReopenedRow?.status === "offered" &&
+      modExpiredRefused !== null &&
+      modExpiredRefused.includes("already gone") &&
+      modBoardOf(modForeigner).length === 0 &&
+      modBoardOf(modSeller).length === 0,
+    "an offer that expires with the leg it was posted for cannot be taken afterwards: the row that was still a live listing when the seat moved is off every board, and the accept from a stale screen is answered with the sentence rather than with a settlement",
+  );
+
+  // The named offer's own bound, read in a live harbor rather than on a
+  // row this file built: the primitive keeps one open offer per seller per
+  // buyer, so a second listing aimed at the same captain meets the sentence
+  // that names them. The modules are two this seller has not listed this
+  // leg, so the kind's own lock is not what the second post meets.
+  const modNamedPosted = modSettles(modBuyer, (board) =>
+    board.some(
+      (t) => t.sellerUserId === modSeller.id && t.status === "offered",
+    ),
+  );
+  modSocketOf(modSeller).emit("module:post", {
+    roomId: modRoomId,
+    fee: 18,
+    module: "bulk_hauler",
+    targetUserId: modBuyer.id,
+  });
+  const modNamedRow = ((await modNamedPosted)?.moduleTrades ?? []).find(
+    (t) => t.sellerUserId === modSeller.id && t.status === "offered",
+  );
+  const modNamedAccount = await db.user.findUnique({
+    where: { id: modBuyer.id },
+    select: { displayName: true },
+  });
+  const modNamedSecond = await modRefused(modSeller, "module:post", {
+    fee: 19,
+    module: "smugglers_hold",
+    targetUserId: modBuyer.id,
+  });
+  check(
+    modNamedRow?.buyerUserId === modBuyer.id &&
+      modNamedRow?.buyerName === modNamedAccount?.displayName &&
+      modNamedSecond !== null &&
+      modNamedSecond.includes("already have an offer standing") &&
+      modNamedSecond.includes(modNamedAccount?.displayName ?? "no captain"),
+    "a listing aimed at a named captain is the only open offer that seller may have standing with them: a second listing addressed to the same captain is refused with the sentence that names them, which is the primitive's own bound met in the harbor rather than on a row built by hand",
+  );
+
+  // The third transition the room's own expiry reads: the close of the
+  // phase a listing was posted in. The sweep runs on the seat move, so a
+  // listing still standing when the Parley ends is off every board at
+  // Resolve, and the accept a captain left open is answered rather than
+  // settled. The refusal is the gone sentence rather than the phase one,
+  // and that is the order the handler asks its guards in: the sweep runs
+  // ahead of the phase check, so a row the closing phase took no longer
+  // exists to be refused for its phase.
+  modSeat(modSeller, 3, "resolve");
+  await modSettle();
+  const modPhaseRefused = await modRefused(modBuyer, "module:accept", {
+    tradeId: modNamedRow?.id ?? "",
+  });
+  check(
+    modNamedRow?.status === "offered" &&
+      modPhaseRefused !== null &&
+      modPhaseRefused.includes("already gone") &&
+      modBoardOf(modSeller).length === 0 &&
+      modBoardOf(modBuyer).length === 0 &&
+      modBoardOf(modForeigner).length === 0,
+    "an offer dies with the phase it was posted in as well as with the leg: the seat moving to Resolve takes the standing listing off every board, and the accept from a screen that was left open is answered with the sentence rather than with a settlement",
+  );
+
+  // The row shape itself, with its comments taken out, because these two
+  // checks are about what a captain can press rather than about what the
+  // files say. The field report's first half was a board that drew no
+  // buttons at all, and the shape of that defect is written down here so
+  // a later pass cannot put it back: the controls hang on whether the row
+  // is still an offer, and the chip hangs on whether it was aimed.
+  const deskSource = (relative: string) =>
+    withoutComments(
+      readFileSync(
+        join(import.meta.dirname, "..", "..", "..", relative),
+        "utf8",
+      ),
+    );
+  const rowSource = deskSource(
+    "src/components/portmasters/game/OfferBoard.tsx",
+  );
+  // The desks are read with their whitespace flattened, so the check is
+  // about the reading a desk hands the row rather than about where a
+  // formatter broke the line, and the escort's own reading is a named
+  // local rather than an inline expression for its own reasons.
+  const flatDesk = (relative: string) =>
+    deskSource(relative).replace(/\s+/g, " ");
+  const desks = [
+    flatDesk("src/components/portmasters/game/ModuleMarket.tsx"),
+    flatDesk("src/components/portmasters/game/EscortContracts.tsx"),
+    flatDesk("src/components/portmasters/game/RefitBench.tsx"),
+  ];
+  check(
+    rowSource.includes("standing &&") &&
+      rowSource.includes("chip &&") &&
+      desks.every(
+        (text) =>
+          text.includes("standing={") && text.includes('status === "offered"'),
+      ),
+    "the offer row draws its buttons from whether the row is still an offer rather than from whether it was aimed at one captain, and the three desks that sell between captains hand it that reading off the row's own status: the aim draws the chip and the standing draws the press, which is the distinction the field report met as an open listing with no Take for the table and no Cancel for the seller",
+  );
+
+  // The rules a captain is held to at this desk, read off the drawing
+  // rather than off a module's memory, and read out of the file the same
+  // way the two checks above read the row: the sentence that states them
+  // stands at the panel's door, above the seller's own block, which is
+  // where a captain who is only ever a buyer reads it (see the hoisted
+  // intro in ModuleMarket). The second check names what takes a listing
+  // off the board, so the empty seat a swept seller meets cannot read as
+  // a board that never held their row.
+  const marketDesk = flatDesk(
+    "src/components/portmasters/game/ModuleMarket.tsx",
+  );
+  check(
+    marketDesk.includes("One listing per module a leg") &&
+      marketDesk.indexOf("One listing per module a leg") <
+        marketDesk.indexOf("{canSell &&"),
+    "the three rules of this market stand above the seller's own block rather than inside it, so the captain who only ever takes an offer reads one listing per module a leg, one open offer per captain named and the Parley close at the desk that asks them to take one",
+  );
+  check(
+    marketDesk.includes("tops out at {MAX_SHIP_LEVEL} slots at ship level") &&
+      marketDesk.includes('from "@/lib/game/constants/ships"'),
+    "the slot ceiling this market quotes is the last ship level the yard's own ladder ends at rather than a figure typed into the sentence, so the intro a buyer reads and the ladder the hull climbs are one number",
+  );
+  // The two sentences the escort desk shares with the rooms that refuse the
+  // same things: the fee's bounds, which the wires quote and this desk
+  // hints at, and the offer-death rule, which the glossary tooltip prints
+  // as well. Both are the copy module's own spelling, read here the same
+  // way the desks above are, because a sentence two surfaces state is a
+  // sentence two surfaces can drift apart on.
+  check(
+    desks[1].includes("{consentFeeRule()}") &&
+      desks[1].includes("{ESCORT_OFFER_DEATH}") &&
+      desks[1].includes('from "@/lib/game/constants/copy"') &&
+      !desks[1].includes("A fee is a whole number of Gold from"),
+    "the escort desk states the fee's bounds and the offer-death rule in the copy module's own sentences rather than in a second spelling beside them, so the desk that hints at a fee and the wires that refuse one out of bounds cannot quote two ranges, and the desk that shows an offer dying and the tooltip that explains it cannot word the close two ways",
+  );
+  check(
+    marketDesk.includes("Nothing on the market yet") &&
+      marketDesk.includes("List a module and yours is the first row") &&
+      marketDesk.includes("comes off the board when the leg turns") &&
+      marketDesk.includes("Any captain with a module bolted on can list one"),
+    "and the empty board tells the seller what took a row of theirs off it and the buyer who may list at all, so the invitation to be first cannot be read as a claim that a listing already posted is still standing",
+  );
+
+  // The buyer's purse, which is the one condition the settle deliberately
+  // does not ask and the desks therefore have to (G1). The rule is stated
+  // once, in the engine's core beside the purse reader it folds, and each
+  // desk's blocked chain reads it rather than writing the comparison a
+  // second time on the screen, so the three desks that price their own
+  // deal cannot drift apart from each other or from the two numbers the
+  // check above the live block holds.
+  const engineSource = flatDesk("src/lib/game/engine/core.ts");
+  check(
+    desks[0].includes("canPayFee(game, trade.fee)") &&
+      desks[2].includes("canPayFee(game, row.fee)") &&
+      desks[1].includes("canPayFee(game, contract.fee)") &&
+      engineSource.includes('return getOwnedAmount(state, "Gold") >= fee;'),
+    "the desks that price their own deal read the buyer's purse before the click, through one engine predicate rather than a comparison written on each screen, which is the guard that keeps an honest buyer out of a settle whose seller is credited the agreed price",
   );
 
   // The house rule, over the copy this feature added: the sentences a

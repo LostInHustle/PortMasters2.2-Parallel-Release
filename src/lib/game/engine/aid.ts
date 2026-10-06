@@ -5,8 +5,8 @@
 // barter trade. Both sides need to agree it happened, but neither side's
 // Gold total is the server's to know, so posting a request and finding a
 // captain to help happen over the aid:* socket events
-// (src/server/realtime/index.ts, src/lib/use-aid.ts) while the functions here
-// only move the money on whichever client they run on.
+// (src/server/realtime/wiring/aid.ts, src/lib/use-aid.ts) while the
+// functions here only move the money on whichever client they run on.
 //
 // grantHelperReputation lives here rather than in ./backingState because
 // lending and backing deliberately share one per voyage Reputation
@@ -99,10 +99,11 @@ export function grantLoan(
   }
 }
 
-// Voluntary, captain initiated repayment. The caller (GameRoom.tsx) reads
-// the debt's amount and lender from state.debts before calling this, the
-// same already known values pattern the Bartering panel uses for posting
-// an offer, so it can relay the matching aid:repay itself right after.
+// The debtor's side of a repayment, voluntary or forced. The receipt for
+// the press is the one caller (see onAidRepaySettled in
+// src/lib/use-harbor-boards.ts): the press asks the room and applies
+// nothing, and the debt this closes is the one the room's answer names, so
+// a loan the room no longer holds can never be debited here.
 export function repayLoan(state: GameState, debtId: string, logs: string[]) {
   const debt = state.debts.find((d) => d.id === debtId);
   if (!debt) return;
@@ -159,8 +160,6 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
   if (!state.debts.length) return;
   logs.push("\n📋=== Settling Outstanding Loans ===");
   const settlements: {
-    lenderId: string;
-    lenderName: string;
     amount: number;
     debtId: string;
   }[] = [];
@@ -168,15 +167,14 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
     const paid = Math.min(state.money, debt.amount);
     state.money -= paid;
     // Reported even when paid is 0. This record is not only "credit the
-    // lender", it is also the one signal that closes the debt on the server's
-    // ledger and resolves any Backing pledge on it (see aid:repay in
-    // src/server/realtime/index.ts). Skipping it for a total default used to strand
-    // the loan open forever: the backer's escrowed Gold was neither returned
-    // nor called, and the lender never received the coverage that pledge
-    // existed for, which is precisely the case Backing is meant to cover.
+    // lender", it is also the one signal that closes the debt on the
+    // server's ledger and resolves any Backing pledge on it (see the
+    // aid:repay handler in src/server/realtime/wiring/aid.ts). A total
+    // default skipped here would strand the loan open: the backer's
+    // escrowed Gold would be neither returned nor called, and the lender
+    // would never receive the coverage that pledge exists for, which is
+    // precisely the case Backing is meant to cover.
     settlements.push({
-      lenderId: debt.counterpartyId,
-      lenderName: debt.counterpartyName,
       amount: paid,
       debtId: debt.id,
     });

@@ -8,9 +8,8 @@ import { cn } from "@/lib/utils";
 // What the round does with what this bench sets going, in the words this
 // panel uses for it. One note per phase of the leg rather than one per tile,
 // because the strip below draws whichever phases this voyage still has in
-// front of it and both modes dock here: written for the four it used to
-// draw, the strip would have had nothing to say about the fifth, and a
-// missing note is a tile a captain has to guess at.
+// front of it and both modes dock here: a map written for one mode's four
+// would leave the fifth a tile a captain has to guess at.
 //
 // These are not the phase's face. A face says what a phase is called; this
 // says what the phase does to a hold, and it belongs to the bench that
@@ -50,10 +49,8 @@ export function BenchCycle({
       <strong>⏱️ Production Cycle: What Happens When</strong>
       {/* One tile per phase the round still has in front of it, each
           wearing the colour of the phase it names, so the strip is a map
-          of this voyage's round rather than four unrelated swatches. It
-          used to be four tiles numbered one to four, which was the old
-          numbered vocabulary, in one mode's order, on a strip both modes
-          dock at. */}
+          of this voyage's round rather than four unrelated swatches in
+          one mode's order. */}
       <div className="flex gap-1.5 mt-2 text-center">
         {cycle.map((p, i) => {
           const face = phaseFace(p);

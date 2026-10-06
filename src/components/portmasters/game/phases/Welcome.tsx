@@ -131,10 +131,10 @@ export function Welcome({
   // build it is the path draft, and the round pill below names it as the
   // first thing that will be asked of the captain.
   const opening = openingPhase(game.mode);
-  // The InfoCard numbers derive from the room's difficulty tier rather
-  // than the old hardcoded founding trade figures. Fair Winds reads
-  // exactly like the original (20% raid, 15 Gold maintenance), while
-  // Open Waters and Monsoon advertise their real dials.
+  // The InfoCard numbers derive from the room's difficulty tier, so each
+  // tier advertises its real dials: Fair Winds reads exactly like the
+  // founding trade figures (20% raid, 15 Gold maintenance), while Open
+  // Waters and Monsoon print their own.
   const cfg = difficultyConfig(game.difficulty);
   const stockLine = ["Hemp", "Silk", "Tea"]
     .map((r) => `${r}×${STARTING_STOCK[r]}`)
@@ -158,11 +158,9 @@ export function Welcome({
             with the length of a voyage they are not on (see voyageLegs in
             src/lib/game/mode).
 
-            It counts rounds, and it used to call them voyages, which is
-            the one word this game cannot afford to blur: a voyage is the
-            whole run and a round is one lap of it, and a captain reading
-            "8 Voyages await" on the first screen of an eight round voyage
-            had been told the wrong thing about the game before it began. */}
+            It counts rounds rather than voyages: a voyage is the whole
+            run and a round is one lap of it, and this is the one word
+            the first screen of the game cannot afford to blur. */}
         🌊 {game.maxRounds} rounds await, become the Sea Master!
       </p>
       <div className="flex flex-col items-center gap-3 mb-6">
@@ -198,23 +196,18 @@ export function Welcome({
         )}
         <Button variant="ghost" className="rounded-xl" onClick={onTutorialOpen}>
           <BookOpen className="h-4 w-4 mr-2" />
-          New Player Tutorial
+          New Captain Tutorial
         </Button>
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
-        {/* The count this label used to carry is gone, and its absence is
-            the fix rather than an omission. It read "4 Phases per Voyage"
-            above a mode record that counts its own steps, and the Gambit
-            record lists five, so the headline contradicted the sentence it
-            was introducing, on one row of one pill. A number that has to
-            agree with a list beside it is a second copy of that list, and
-            the label is the copy that rots: a mode changes its lap and
-            rewrites its own description, and nobody remembers the number
-            on the pill above it. So the legs are counted where they are
-            written, and the label introduces them without one. The wording
-            avoids "in Order" for the same reason it avoids a count: in
-            this game Order is a noun, and the leg the mode moved is the
-            one that carries it.
+        {/* The label carries no count of the legs: they are counted where
+            they are written, in the mode record. A number that has to agree
+            with a list beside it is a second copy of that list, and the
+            label is the copy that rots: a mode changes its lap and rewrites
+            its own description, and nobody remembers the number on the pill
+            above it. The wording avoids "in Order" for the same reason it
+            avoids a count: in this game Order is a noun, and the leg the
+            mode moved is the one that carries it.
 
             What follows the label is whatever shape the mode briefs in,
             and the shape is the mode's decision rather than this screen's:
@@ -225,14 +218,13 @@ export function Welcome({
             rather than a second panel beside the first. */}
         {/* One pill for the two questions this screen exists to answer,
             what you are playing and what it costs you to fail (W4): the
-            round and the mode's own line were two tinted boxes saying
-            one thing, and a captain reading their first lobby met three
-            competing pills before they met the start button. The badge
-            line rides under the round chart as a lighter wing of the
-            same box, and the list of what a mode changes is still not
-            printed here: it belongs on the surfaces built for lists, and
-            this panel says where it is rather than carrying another copy
-            of it. */}
+            round and the mode's own line are one thing said twice, and a
+            captain reading their first lobby should meet the start button
+            before a stack of competing pills. The badge line rides under
+            the round chart as a lighter wing of the same box, and the list
+            of what a mode changes is still not printed here: it belongs on
+            the surfaces built for lists, and this panel says where it is
+            rather than carrying another copy of it. */}
         <div className="rounded-lg bg-sea/[0.06] border border-sea/15 px-3.5 py-2.5 text-xs">
           <strong>🔄 How a Round Runs:</strong>{" "}
           {briefing.kind === "line" ? (
@@ -259,22 +251,22 @@ export function Welcome({
             {/* It points at the button without a direction, because the
                 button sits above this panel rather than below it. */}
             {play.differences.length > 0 &&
-              " The New Player Tutorial lists everything this mode changes."}
+              " The New Captain Tutorial lists everything this mode changes."}
           </span>
         </div>
         <div className="rounded-lg bg-intel/[0.06] border border-intel/15 px-3.5 py-2.5 text-xs">
-          <strong>💡 New Player Tip:</strong> Keep your purse above maintenance
+          <strong>💡 New Captain Tip:</strong> Keep your purse above maintenance
           plus all wages, and hire artisans only when you can sustain them.
         </div>
       </div>
       {/* The five founding numbers, folded to a row at the foot of the
           screen, below the round chart and the mode's own line because
           those two are what this screen is for and these are what a
-          captain looks up. They used to stand open under the start
-          button: five cards of figures above the one thing the screen
-          exists for (getting the table sailing), read once and never
-          again, on the first screen of the voyage. Folded, the pier
-          opens on the button and the figures wait a press away. */}
+          captain looks up. Standing open under the start button, five
+          cards of figures would sit above the one thing the screen exists
+          for (getting the table sailing), read once and never again, on
+          the first screen of the voyage. Folded, the pier opens on the
+          button and the figures wait a press away. */}
       <div className="max-w-2xl mx-auto mt-3">
         <FoldRow
           tone="harbor"

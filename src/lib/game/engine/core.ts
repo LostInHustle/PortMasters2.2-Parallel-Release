@@ -53,6 +53,40 @@ export function getOwnedAmount(state: GameState, item: string): number {
   return item === "Gold" ? state.money || 0 : state.inventory[item] || 0;
 }
 
+// The one question every priced handshake asks of a purse before a click:
+// whether it covers the fee. D3's escort asked it first, the module market
+// and the refit bench asked it again in their own words, and three copies
+// of one comparison are the drift this tree keeps catching, so the
+// comparison lives here beside the purse reader it folds.
+//
+// The settles deliberately do not ask it, because the server has never
+// read a purse and a sale has to complete on both machines whether the
+// buyer can cover the fee or not, and the seller's side credits the
+// agreed price either way. The settles pay what the purse holds instead
+// (see paidFee below), and this reader is the guard that keeps an honest
+// buyer out of that asymmetry in the first place: a buyer whose purse is
+// short would pay the Gold that is there while the seller credits the
+// full agreed price, which mints the difference rather than settling a
+// debt.
+//
+// The whole state is the parameter rather than the purse alone, because
+// the reading goes through the tree's own purse reader above: a save
+// whose purse arrived damaged reads as empty there rather than as a
+// comparison against NaN, and a guard that reached for the field itself
+// would call every such captain unable to pay and leave them with no
+// market at all.
+export function canPayFee(state: GameState, fee: number): boolean {
+  return getOwnedAmount(state, "Gold") >= fee;
+}
+
+// What a buyer's settle actually moves: the fee when the purse covers it,
+// and the Gold that is really there when the purse moved between the
+// press and the settle's own line. Floored at zero, so a damaged or
+// overdrawn purse can never turn a payment into a credit.
+export function paidFee(state: GameState, fee: number): number {
+  return Math.max(0, Math.min(fee, getOwnedAmount(state, "Gold")));
+}
+
 // Exported here because the modules split out of engine.ts need it, but
 // deliberately NOT forwarded from the engine barrel: it was private to
 // engine.ts before the split and stays private to the engine from the

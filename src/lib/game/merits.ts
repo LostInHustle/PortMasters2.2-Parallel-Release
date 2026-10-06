@@ -99,9 +99,9 @@ export function meritById(id: string): MeritDef | undefined {
 // Everything the voyage conclusion check needs to decide which merits a
 // captain qualifies for, gathered into one plain object so the rule set
 // itself stays a pure function (see maybeConcludeVoyage in
-// src/server/realtime/index.ts for where each field comes from). All the
-// "new" fields already include this voyage's own contribution, since the
-// caller has usually just computed them anyway for Renown.
+// src/server/realtime/conclusion.ts for where each field comes from). All
+// the "new" fields already include this voyage's own contribution, since
+// the caller has usually just computed them anyway for Renown.
 type MeritEvalInput = {
   newVoyagesCompleted: number;
   crowned: boolean;

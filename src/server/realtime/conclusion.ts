@@ -90,16 +90,15 @@ export async function maybeConcludeVoyage(
   const run = await readVoyageRun(roomId);
   await resolveOpenVentures(io, roomId, run.room);
   sweepAbsentBorrowerLoans(io, roomId, finished);
-  // [bug cycle: the settled purse] The room's own sweeps just paid out:
-  // an escrow came back to its poster when the trade board cleared, an
-  // open venture refunded its half, and a loan the harbor had written
-  // off settled at zero. Every one of those lands in the captain's own
-  // client and comes back on that client's next broadcast, so the
-  // verdicts below wait one beat for the room to speak again before the
-  // numbers they are judged on are read. Without that beat, every purse
-  // in the harbor was read one moment before the voyage paid it out:
-  // the field report's own shape, 446 gold beside a 450 purse goal while
-  // the captain's own screen was showing the refunded total.
+  // The room's own sweeps just paid out: an escrow came back to its poster
+  // when the trade board cleared, an open venture refunded its half, and a
+  // loan the harbor had written off settled at zero. Every one of those
+  // lands in the captain's own client and comes back on that client's next
+  // broadcast, so the verdicts below wait one beat for the room to speak
+  // again before the numbers they are judged on are read. Without that
+  // beat, every purse in the harbor would be read one moment before the
+  // voyage paid it out, while the captain's own screen was already showing
+  // the refunded total.
   await awaitSettlementBeat();
   // The harbor's saves, read once, now behind the beat for the same
   // reason the roster below is: an escrow refund writes goods, not coin,

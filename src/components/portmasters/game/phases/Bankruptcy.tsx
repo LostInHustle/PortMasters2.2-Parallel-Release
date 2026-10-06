@@ -3,7 +3,9 @@
 import { GameStatusUpdate } from "@/types/realtime/status";
 import { motion } from "framer-motion";
 import { Eye, Trophy, Coins, Anchor } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
+import { leftTheVoyage } from "@/lib/seatMarks";
 import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
 
@@ -18,6 +20,11 @@ import { Avatar, Pill } from "../../shared";
  * the harbor finish the voyage. The live standings board shows every
  * still active captain's current phase, Gold, and Reputation, updating
  * in real time as they play.
+ *
+ * The ended branch carries the host's own restart when the rest of the
+ * harbor has finished too, the same call the control bar and the Endgame
+ * screen make: a solo practice voyage's host is the captain reading this
+ * panel, so the control belongs where the sentence that names it stands.
  */
 export function Bankruptcy({
   game,
@@ -25,8 +32,23 @@ export function Bankruptcy({
   backing,
   me,
   roster,
-}: Pick<PhasePanelProps, "game" | "members" | "backing" | "me" | "roster">) {
+  room,
+  onRestart,
+  onLeave,
+}: Pick<
+  PhasePanelProps,
+  "game" | "members" | "backing" | "me" | "roster" | "room"
+> & {
+  // The host's own restart, wired from the room's one handler, so this
+  // panel offers the same call the control bar and the Endgame screen
+  // offer rather than a second path of its own. onLeave is the room's
+  // leave flow, for a captain who would rather set out for a new harbor
+  // than wait on the host.
+  onRestart?: () => void;
+  onLeave?: () => void;
+}) {
   const myUserId = me.id;
+  const isHost = me.id === room.hostId;
   const statuses = roster?.statuses ?? {};
   const activeCaptains = members
     .filter((m) => m.id !== myUserId)
@@ -35,19 +57,18 @@ export function Bankruptcy({
       status: statuses[m.id],
     }))
     // Stated as a type predicate rather than left to be re asserted at
-    // every read below: the six `status?.` and `?? 0` this replaces were
-    // all saying the same thing, and one of them would eventually have
-    // been written without the guard.
+    // every read below, so the standings can trust the status the filter
+    // kept. The terminal test itself is the shared reader (see
+    // leftTheVoyage in @/lib/seatMarks), the same question the roster
+    // asks, so this board and the roster cannot disagree about who is
+    // still sailing.
     .filter(
       (
         s,
       ): s is {
         member: PublicUser;
         status: GameStatusUpdate;
-      } =>
-        Boolean(s.status) &&
-        s.status.phase !== "bankruptcy" &&
-        s.status.phase !== "endgame",
+      } => Boolean(s.status) && !leftTheVoyage(s.status),
     )
     .sort((a, b) => b.status.reputation - a.status.reputation);
 
@@ -201,8 +222,37 @@ export function Bankruptcy({
 
       {activeCaptains.length === 0 && (
         <div className="mt-4 rounded-xl border border-sea/15 bg-sea/[0.04] px-4 py-3 text-sm text-muted-foreground">
-          Your voyage has ended, and the rest of the harbor has finished too.
-          Wait for the host to restart the voyage.
+          {isHost ? (
+            <>
+              Your voyage has ended, and the rest of the harbor has finished
+              too.
+              {/* The host's own restart, the call the control bar and the
+                  Endgame screen make, drawn where a failed seat waits for
+                  it: on a solo practice voyage the host is this captain. */}
+              <Button
+                className="pm-grad-endgame mt-3 ml-1 rounded-xl px-8"
+                onClick={onRestart}
+                disabled={!onRestart}
+              >
+                🔄 Restart Voyage
+              </Button>
+            </>
+          ) : (
+            <>
+              Your voyage has ended, and the rest of the harbor has finished
+              too. Wait for the host to restart the voyage, or set out for a new
+              harbor now.
+              {onLeave && (
+                <Button
+                  variant="secondary"
+                  className="mt-3 ml-1 rounded-xl px-8"
+                  onClick={onLeave}
+                >
+                  ⚓ Sail Again
+                </Button>
+              )}
+            </>
+          )}
         </div>
       )}
 

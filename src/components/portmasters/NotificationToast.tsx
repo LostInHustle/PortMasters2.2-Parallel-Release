@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
  * The body for every popup notification (ledger digests, harbor chat,
  * direct messages). Built as plain stacked lines rather than a single
  * joined string, since a toast's default CSS collapses literal newlines
- * down to spaces, which is what made earlier multi line digests read as
- * one squished run on sentence.
+ * down to spaces, which is what a multi line digest would read as: one
+ * squished run on sentence.
  *
  * The close button is always present and separate from the click to
  * activate area: activating (jumping to the chat tab a message came

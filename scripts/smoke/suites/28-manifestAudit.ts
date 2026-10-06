@@ -1,12 +1,16 @@
 // PortMasters 2.2 Parallel Release, smoke run: The Manifest Audit.
 
-import { AuditReveal } from "@/types/realtime/audit";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { AuditReveal, AuditTally } from "@/types/realtime/audit";
+import type { PublicUser } from "@/lib/api";
 import { db } from "@/lib/db";
 import {
   AUDIT_FROM_ROUND,
   AUDIT_REVEAL_COUNT,
   AUDIT_WINDOW,
   auditCarried,
+  auditNamesNeeded,
   auditSeed,
   drawAudit,
   fulfillmentLine,
@@ -15,15 +19,19 @@ import {
 } from "@/lib/game/audit";
 import { LARDER_MAX } from "@/lib/game/constants/supplies";
 import { checkSave, snapshotFromSave } from "@/lib/game/integrity";
+import { maroonCarried, maroonNamesNeeded } from "@/lib/game/maroon";
 import type { OrderFill } from "@/lib/game/types";
+import { leaderShortfall, tallyRows } from "@/lib/voteTally";
 import {
   CARRIES_A_DASH,
   LEDGER_PHRASE,
   call,
+  carriesADash,
   check,
   openAuthedSocket,
   suffix,
   waitForEvent,
+  withoutComments,
 } from "../harness";
 import type { WireHistory } from "../wire";
 import type { Socket } from "socket.io-client";
@@ -163,6 +171,157 @@ export async function manifestAuditSuite(
     auditCarried(votesFor(["a", "b", "b"]), 5) === null &&
       auditCarried(new Map(), 5) === null,
     "a room split across two captains carries nothing, and neither does a room with no votes in it",
+  );
+
+  // The count a card prints, held against the comparison that decides the
+  // vote rather than against a second statement of the same rule. A card
+  // that told the room one name fewer was enough, or one more, would be a
+  // card the table argued with instead of each other, and the two were
+  // written apart: the walk below is the one that keeps them one rule.
+  const neededCarries = (roster: number) => {
+    const needed = auditNamesNeeded(roster);
+    return (
+      auditCarried(
+        votesFor(Array.from({ length: needed }, () => "a")),
+        roster,
+      ) === "a" &&
+      (needed === 0 ||
+        auditCarried(
+          votesFor(Array.from({ length: needed - 1 }, () => "a")),
+          roster,
+        ) === null)
+    );
+  };
+  check(
+    Array.from({ length: 12 }, (_, i) => i + 1).every(neededCarries) &&
+      auditNamesNeeded(0) === 0,
+    "the count a card prints is the count the vote carries on: at every roster from one to twelve, one name fewer carries nothing and the count carries",
+  );
+  check(
+    auditNamesNeeded(4) === 3 &&
+      auditNamesNeeded(5) === 3 &&
+      auditNamesNeeded(6) === 4,
+    "which is more than half read as whole names: three of four, three of five and four of six",
+  );
+
+  // The other half of what a card prints, and the question a captain
+  // actually asks of a running count: how many more names the leading
+  // target needs before it carries (see leaderShortfall in
+  // @/lib/voteTally). It reads off the same rows the count block draws
+  // and the same threshold the walk above carries on, so the sentence a
+  // captain reads and the arithmetic the server decides on cannot come
+  // apart, and a book with no names in it has no leader to be short.
+  const shortfallMembers: PublicUser[] = [
+    {
+      id: "captain-a",
+      username: "captain-a",
+      displayName: "AaronZ",
+      avatarHue: 10,
+    },
+    {
+      id: "captain-b",
+      username: "captain-b",
+      displayName: "Bess",
+      avatarHue: 200,
+    },
+  ];
+  const shortfallRows = (names: number, target = "captain-a") =>
+    tallyRows(
+      Object.fromEntries(
+        Array.from({ length: names }, (_, i) => [`voter-${i}`, target]),
+      ),
+      shortfallMembers,
+    );
+  check(
+    leaderShortfall(tallyRows({}, []), 3) === null &&
+      leaderShortfall([], 1) === null,
+    "a book with no names in it has no leader, so the count prints no shortfall for a vote nobody has spoken in rather than a leader short by the whole of it",
+  );
+  const shortfallAt = (roster: number) => {
+    const needed = auditNamesNeeded(roster);
+    const full = leaderShortfall(shortfallRows(needed), needed);
+    const oneShort = leaderShortfall(shortfallRows(needed - 1), needed);
+    return (
+      full?.short === 0 &&
+      (needed === 1 ? oneShort === null : oneShort?.short === 1)
+    );
+  };
+  check(
+    Array.from({ length: 12 }, (_, i) => i + 1).every(shortfallAt),
+    "at every roster from one to twelve the leading name is short by nothing once the book holds the names the vote needs, and by one name when one fewer is in, which is the line the count prints rather than a second sum",
+  );
+  const loneLeader = leaderShortfall(shortfallRows(1), auditNamesNeeded(7));
+  check(
+    auditNamesNeeded(7) === 4 &&
+      loneLeader?.name === "AaronZ" &&
+      loneLeader?.short === 3,
+    "and a lone name in a four name vote is short by three, so the line counts the names still missing rather than always saying one more",
+  );
+  const splitLeader = leaderShortfall(
+    tallyRows(
+      {
+        "voter-0": "captain-a",
+        "voter-1": "captain-b",
+        "voter-2": "captain-a",
+      },
+      shortfallMembers,
+    ),
+    3,
+  );
+  check(
+    splitLeader?.name === "AaronZ" && splitLeader?.short === 1,
+    "a book split across two names reports the shortfall of the one it is standing behind: two names for AaronZ against one for Bess leaves AaronZ one short of the three",
+  );
+  const tiedLeader = leaderShortfall(
+    tallyRows(
+      { "voter-0": "captain-a", "voter-1": "captain-b" },
+      shortfallMembers,
+    ),
+    2,
+  );
+  check(
+    tiedLeader?.name === "AaronZ" && tiedLeader?.short === 1,
+    "and a tie goes to the row the map yielded first, which is the order the nominations arrived in on this side rather than a winner settled by name",
+  );
+
+  // The other threshold the same walk carries, pinned beside this one
+  // because the two votes are one count read at two thresholds rather than
+  // two counts (see carriedTarget in @/lib/game/audit). The band is the
+  // sizes this mode deals, and it is walked through both votes at once so
+  // a change to either threshold, or to the walk under both, is a failure
+  // here rather than a difference found by playing: at five seats the plan
+  // reads four votes against three.
+  const carriesExactlyAt = (
+    carried: (
+      votes: ReadonlyMap<string, string>,
+      roster: number,
+    ) => string | null,
+    needed: (roster: number) => number,
+    roster: number,
+  ) => {
+    const at = needed(roster);
+    return (
+      carried(votesFor(Array.from({ length: at }, () => "a")), roster) ===
+        "a" &&
+      (at === 0 ||
+        carried(votesFor(Array.from({ length: at - 1 }, () => "a")), roster) ===
+          null)
+    );
+  };
+  check(
+    [3, 4, 5, 6, 7].every(
+      (roster) =>
+        carriesExactlyAt(auditCarried, auditNamesNeeded, roster) &&
+        carriesExactlyAt(maroonCarried, maroonNamesNeeded, roster),
+    ),
+    "the audit's majority and the maroon's two thirds are one walk read at two thresholds: at every table from three seats to seven each vote carries at its own whole count of names, and one name fewer carries neither",
+  );
+  check(
+    auditNamesNeeded(5) === 3 &&
+      maroonNamesNeeded(5) === 4 &&
+      auditNamesNeeded(7) === 4 &&
+      maroonNamesNeeded(7) === 5,
+    "which at a five seat harbor is four votes against three and at seven is five against four, so the maroon stays the deliberately harder of the two to call",
   );
 
   // The book of nominations, re-judged against the room that exists now.
@@ -388,11 +547,26 @@ export async function manifestAuditSuite(
   }
 
   const auditTargetId = gambitFourth.id;
-  const tallyFrames: Array<{ votes: Record<string, string> }> = [];
+  // The tally is read for its whole frame rather than for the map alone:
+  // the roster the vote is divided by, the count that carries it and the
+  // captains still to name someone all ride with the names, and a card
+  // that printed a threshold of its own would print one the server does
+  // not agree with (see AuditTally).
+  const tallyFrames: Array<{
+    votes: Record<string, string>;
+    roster: number;
+    needed: number;
+    awaiting: string[];
+  }> = [];
   const revealFrames: Array<{ socket: number; reveal: AuditReveal }> = [];
   auditSockets.forEach((socket, index) => {
-    socket.on("audit:tally", (payload: { votes?: Record<string, string> }) => {
-      tallyFrames.push({ votes: payload?.votes ?? {} });
+    socket.on("audit:tally", (payload: AuditTally) => {
+      tallyFrames.push({
+        votes: payload?.votes ?? {},
+        roster: payload?.roster ?? 0,
+        needed: payload?.needed ?? 0,
+        awaiting: payload?.awaiting ?? [],
+      });
     });
     socket.on("audit:reveal", (payload: AuditReveal) => {
       revealFrames.push({ socket: index, reveal: payload });
@@ -525,6 +699,76 @@ export async function manifestAuditSuite(
       revealFrames.length === 0,
     "a nomination reaches every captain in the harbor, and one of five opens nothing",
   );
+  // What the card needs to say out loud, on the frame rather than worked
+  // out on the client: five captains still sailing, three names to carry
+  // it, and the four who have not named anyone yet. The captain who is not
+  // in this harbor is not among the four, because the roster behind the
+  // count is the room's own and not the account list.
+  const firstTally = tallyFrames[0];
+  const firstAwaiting = firstTally?.awaiting ?? [];
+  check(
+    firstTally?.roster === auditSockets.length &&
+      firstTally?.needed === auditNamesNeeded(auditSockets.length) &&
+      firstTally?.needed === 3 &&
+      firstAwaiting.length === auditSockets.length - 1 &&
+      !firstAwaiting.includes(gambitSecond.id) &&
+      [gambitHost.id, gambitThird.id, gambitFourth.id, gambitFifth.id].every(
+        (id) => firstAwaiting.includes(id),
+      ),
+    "and the count travels with the names: five still sailing, three names to carry, and the four captains the room is still waiting on",
+  );
+  // The shortfall the card prints, derived from the frame the card is
+  // reading rather than sent as a fourth number on it: the census still
+  // balances against the names in the book, so the roster, the threshold
+  // and the captains still to speak are all there to read, and one name
+  // in leaves the leader exactly one short of the count that carries.
+  const firstRows = tallyRows(firstTally?.votes ?? {}, []);
+  const firstLeader = leaderShortfall(firstRows, firstTally?.needed ?? 0);
+  check(
+    firstTally?.awaiting.length ===
+      (firstTally?.roster ?? -1) -
+        firstRows.reduce((count, row) => count + row.voters.length, 0) &&
+      firstLeader?.short === (firstTally?.needed ?? -1) - 1,
+    "and the shortfall read off that frame is the frame's own arithmetic: one name in leaves two more needed, and the census it was read against still balances the captains still to speak against the names in the book",
+  );
+
+  // A captain names one captain a leg. Both ways a second press can arrive
+  // are refused here at the door: the same name again, and a different
+  // name, which is the press that could move the table's count after the
+  // table was shown it. The refusal is a sentence, because a captain whose
+  // press did not land is owed the reason rather than silence.
+  const auditRefusals: string[] = [];
+  auditSockets[1].on("audit:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") auditRefusals.push(payload.error);
+  });
+  auditSockets[1].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  auditSockets[1].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: gambitHost.id,
+  });
+  await auditSettle();
+  check(
+    auditRefusals.length === 2 &&
+      auditRefusals.every(
+        (line) => line.length > 0 && !CARRIES_A_DASH.test(line),
+      ),
+    "a captain votes once: a second press, for the same name or for another, is refused with a sentence a captain can read",
+  );
+  check(
+    tallyFrames.length === auditSockets.length &&
+      tallyFrames.every(
+        (frame) =>
+          Object.keys(frame.votes).length === 1 &&
+          frame.votes[gambitSecond.id] === auditTargetId,
+      ) &&
+      revealFrames.length === 0,
+    "and the count does not move: the book still holds the one name the table was shown, whatever the refused presses asked for",
+  );
 
   auditSockets[2].emit("audit:vote", {
     roomId: auditRoomId,
@@ -537,10 +781,17 @@ export async function manifestAuditSuite(
     "two of five is still not a majority, so the count moves and the manifest stays shut",
   );
 
-  // A nomination of a captain this harbor is not counting is dropped
+  // A nomination of a captain this harbor is not counting is refused
   // rather than tallied: a majority is a share of this table, and a vote
   // counted for someone outside it would move a number with nobody
-  // behind it.
+  // behind it. The refusal is a sentence for the captain who sent it,
+  // which is what keeps a nomination that did not land from reading as a
+  // nomination that did.
+  const strangerRefusals: string[] = [];
+  auditSockets[3].on("audit:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string")
+      strangerRefusals.push(payload.error);
+  });
   auditSockets[3].emit("audit:vote", {
     roomId: auditRoomId,
     round: AUDIT_FROM_ROUND,
@@ -548,8 +799,10 @@ export async function manifestAuditSuite(
   });
   await auditSettle();
   check(
-    tallyFrames.length === auditSockets.length * 2,
-    "and a captain who is not in this harbor cannot be nominated into one",
+    tallyFrames.length === auditSockets.length * 2 &&
+      strangerRefusals.length === 1 &&
+      !CARRIES_A_DASH.test(strangerRefusals[0] ?? ""),
+    "a captain who is not in this harbor cannot be nominated into one, and the captain who tried is told so",
   );
 
   // The third of five carries. What opens is the sample the seed draws
@@ -681,8 +934,15 @@ export async function manifestAuditSuite(
     "and the frame's shape is that allow list, field for field",
   );
 
-  // One audit a voyage. Nothing tells the room it is spent: a later
-  // nomination, of anyone, is simply not the first one.
+  // One audit a voyage. The room watched it carry, so the card is gone
+  // from every screen; a frame that names another captain anyway is
+  // refused at the door and answered with the reason, because a captain
+  // whose press did nothing is owed the sentence rather than a silence
+  // there is nothing to read.
+  const spentRefusals: string[] = [];
+  auditSockets[4].on("audit:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") spentRefusals.push(payload.error);
+  });
   auditSockets[4].emit("audit:vote", {
     roomId: auditRoomId,
     round: AUDIT_FROM_ROUND,
@@ -693,6 +953,10 @@ export async function manifestAuditSuite(
     tallyFrames.length === auditSockets.length * 3 &&
       revealFrames.length === auditSockets.length,
     "a harbor gets one audit a voyage: a later nomination changes nothing",
+  );
+  check(
+    spentRefusals.length === 1 && !CARRIES_A_DASH.test(spentRefusals[0] ?? ""),
+    "and the captain who sent it is told the voyage's audit has carried rather than left watching a count that never moved",
   );
 
   // The audit spends the leg's Parley, and the room leaves it the way a
@@ -832,6 +1096,31 @@ export async function manifestAuditSuite(
   ) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+  // The count before anyone has voted, which is the one count no
+  // broadcast carries: a leg's book is built by the captains in it, so
+  // the empty one is never sent, and a card that opens first has to ask
+  // (see audit:state:request in src/server/realtime/wiring/audit.ts). The
+  // answer is the tally frame itself, so the numbers a card reads before
+  // the first vote are the numbers it reads after it.
+  const askedTally = waitForEvent<AuditTally>(
+    auditSockets[0],
+    "audit:tally",
+    (payload) => payload?.roomId === auditRoomId,
+  );
+  auditSockets[0].emit("audit:state:request", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+  });
+  const auditBoard = await askedTally;
+  check(
+    auditBoard?.round === AUDIT_FROM_ROUND &&
+      Object.keys(auditBoard?.votes ?? {}).length === 0 &&
+      auditBoard?.roster === auditSockets.length &&
+      auditBoard?.needed === 3 &&
+      auditBoard?.awaiting.length === auditSockets.length,
+    "a card that has just opened can read the count before anyone has voted: five still sailing, three names to carry, nobody named yet and every captain still to name someone",
+  );
+
   const revealBase = revealFrames.length;
   const tallyBase = tallyFrames.length;
   auditSockets[0].emit("audit:vote", {
@@ -876,6 +1165,17 @@ export async function manifestAuditSuite(
       prunedTally?.votes[gambitHost.id] === auditTargetId &&
       prunedTally?.votes[gambitThird.id] === auditTargetId,
     "a nomination from a captain the room has stopped counting leaves the book when the next one lands, so two of the four still sailing open nothing",
+  );
+  const prunedAwaiting = prunedTally?.awaiting ?? [];
+  check(
+    prunedTally?.roster === auditSockets.length - 1 &&
+      prunedTally?.needed === 3 &&
+      prunedAwaiting.length === 2 &&
+      !prunedAwaiting.includes(gambitSecond.id) &&
+      [gambitFourth.id, gambitFifth.id].every((id) =>
+        prunedAwaiting.includes(id),
+      ),
+    "and the count the card reads agrees with the book: four still sailing, three names to carry, the captain who left not among the two the room is waiting on",
   );
   auditSockets[3].emit("audit:vote", {
     roomId: auditRoomId,
@@ -978,5 +1278,561 @@ export async function manifestAuditSuite(
       .sort()
       .join(",") === "flagged,fulfillments,roomId,round,target",
     "with the reveal's exact field list one word longer than the ordinary one, and nothing else on it",
+  );
+
+  // ---- The two halves of a carry ----
+  // The fourth walk, and the two ways a carry can fall through; both of
+  // them are about a room that moves while the vote is standing rather
+  // than about the arithmetic, which is why they are read on the wire.
+  //
+  // The first is the membership row. A captain who walks out gives up
+  // their seat through the route the Leave button posts to, and that row
+  // is what the roster is read from, so a nomination they cast a moment
+  // earlier is a vote the room has stopped counting. The socket is left
+  // open on purpose: no room:leave is sent, which is the shape a client
+  // that walked out without cleaning up leaves behind, and it is also the
+  // shape the frame counts below are read in, since a socket stays in the
+  // harbor's broadcast room until it says otherwise, so one broadcast is
+  // still one frame on each of the five.
+  //
+  // The second is the pair of presses that arrive together once the count
+  // is one short of carrying. Both handlers read a book that already
+  // carries, so both decide the same carry and both go looking for the
+  // same manifest; what the room must see is one manifest per socket,
+  // which is the check that fails when the second write is not refused.
+  auditSockets[0].emit("room:restart", { roomId: auditRoomId });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== 1 ||
+      (await auditRoomRow())?.currentPhase !== "harbor") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const auditVoyageFour = auditSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === auditRoomId,
+    ),
+  );
+  auditSockets[0].emit("room:start", { roomId: auditRoomId });
+  await Promise.all(auditVoyageFour);
+  auditSockets[1].emit("game:status", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 120,
+    reputation: 12,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== AUDIT_FROM_ROUND ||
+      (await auditRoomRow())?.currentPhase !== "parley") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const leftRefusals: string[] = [];
+  auditSockets[4].on("audit:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") leftRefusals.push(payload.error);
+  });
+  const carryTallyBase = tallyFrames.length;
+  const carryRevealBase = revealFrames.length;
+
+  // The two names the table is shown before the captain walks out.
+  auditSockets[1].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  auditSockets[4].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  check(
+    tallyFrames.length === carryTallyBase + auditSockets.length * 2 &&
+      revealFrames.length === carryRevealBase &&
+      Object.keys(tallyFrames[carryTallyBase]?.votes ?? {}).length === 1,
+    "two of the five sailing is still not this voyage's majority, so the count goes out twice and nothing opens",
+  );
+
+  // The seat goes by the route the Leave button uses, and only the seat.
+  const walkedOut = await call<{ ok: boolean }>(
+    `/api/rooms/${auditRoomId}/leave`,
+    { method: "POST", cookie: gambitFifth.cookie },
+  );
+  const walkedOutRow = await db.roomMember.findUnique({
+    where: {
+      userId_roomId: { userId: gambitFifth.id, roomId: auditRoomId },
+    },
+    select: { id: true },
+  });
+  check(
+    walkedOut.status === 200 && walkedOutRow === null,
+    "a captain gives up their seat in the middle of a vote, which is the row the roster is read from and not the socket",
+  );
+
+  // The ballot from the seat that is gone. It is refused, and the refusal
+  // is also the moment the room learns that the count it is reading has
+  // moved: the nomination the captain cast while they still held the seat
+  // is out of the book, and the four still sailing are what the count is
+  // divided by now.
+  auditSockets[4].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  const movedTally = tallyFrames[tallyFrames.length - 1];
+  const movedAwaiting = movedTally?.awaiting ?? [];
+  check(
+    leftRefusals.length === 1 &&
+      !CARRIES_A_DASH.test(leftRefusals[0] ?? "") &&
+      tallyFrames.length === carryTallyBase + auditSockets.length * 3 &&
+      Object.keys(movedTally?.votes ?? {}).length === 1 &&
+      !(gambitFifth.id in (movedTally?.votes ?? {})) &&
+      movedTally?.votes[gambitSecond.id] === auditTargetId &&
+      revealFrames.length === carryRevealBase,
+    "a ballot from a captain who left the harbor is refused with a sentence rather than counted, and the count the room was reading goes out corrected with it: the name they cast is out of the book",
+  );
+  check(
+    movedTally?.roster === auditSockets.length - 1 &&
+      movedTally?.needed === auditNamesNeeded(auditSockets.length - 1) &&
+      movedAwaiting.length === auditSockets.length - 2 &&
+      !movedAwaiting.includes(gambitFifth.id),
+    "and the numbers behind it are the four still sailing rather than the five the last count was divided by, with the captain who left not among the captains the room is waiting on",
+  );
+
+  // A standing exchange offer, posted while the leg's Parley is still
+  // open. The accept checks below need a membership the post refusals
+  // cannot reach, because a captain can carry an offer across the spend
+  // rather than only make one inside it. Cloth is the offered side so the
+  // spent window's own board check, which watches that no Wood listing
+  // arrived, reads the refusal it is about rather than this setup.
+  const standingOffer = { id: "" };
+  auditSockets[1].on(
+    "barter:update",
+    (payload: { offers?: Array<{ id?: string; offerItem?: string }> }) => {
+      const mine = (payload?.offers ?? []).find(
+        (offer) => offer?.offerItem === "Cloth",
+      );
+      if (mine?.id) standingOffer.id = mine.id;
+    },
+  );
+  auditSockets[1].emit("barter:post", {
+    roomId: auditRoomId,
+    offerItem: "Cloth",
+    offerAmount: 1,
+    requestItem: "Wood",
+    requestAmount: 1,
+  });
+  await auditSettle();
+  check(
+    standingOffer.id !== "",
+    "a captain can hold an offer across the spend: one is posted while the leg's parley is open and the room reads it back by id",
+  );
+
+  // Two names in, one short of the three that carry. The pair below is the
+  // same tick: both presses are in the book by the time either decides the
+  // carry, so both of them carry it.
+  auditSockets[2].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  auditSockets[0].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  auditSockets[3].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  const carriedFrames = revealFrames.slice(carryRevealBase);
+  check(
+    tallyFrames.length === carryTallyBase + auditSockets.length * 6 &&
+      carriedFrames.length === auditSockets.length &&
+      new Set(carriedFrames.map((frame) => frame.socket)).size ===
+        auditSockets.length &&
+      carriedFrames.every(
+        (frame) =>
+          frame.reveal?.roomId === auditRoomId &&
+          frame.reveal?.round === AUDIT_FROM_ROUND &&
+          frame.reveal?.target?.userId === auditTargetId,
+      ),
+    "and the two ballots that arrive together carry it exactly once: the count goes out for both and the manifest opens once on every socket, rather than once per ballot",
+  );
+  const carriedTallies = tallyFrames.slice(
+    carryTallyBase + auditSockets.length * 3,
+  );
+  check(
+    tallyFrames.length === carryTallyBase + auditSockets.length * 6 &&
+      carriedTallies.length === auditSockets.length * 3 &&
+      carriedTallies.every(
+        (frame) =>
+          frame.roster === auditSockets.length - 1 &&
+          frame.needed === auditNamesNeeded(auditSockets.length - 1),
+      ) &&
+      carriedTallies.some((frame) => Object.keys(frame.votes).length === 4),
+    "and every count from there on is divided by the four still sailing rather than the five the leg started with, the last of them holding the four names that carried it",
+  );
+
+  // The spend closes the boards on the tick the count carries, while the
+  // room still stands in the Parley: a trade posted into that window is
+  // refused as spent rather than as out of phase, which is the sentence
+  // the phase gate alone would never write. The gate is auditSpentLeg
+  // (src/server/realtime/audit.ts), asked beside the phase by the wires
+  // that trade.
+  const spentTradeRefusals: string[] = [];
+  const spent = {
+    board: null as { offers?: Array<{ offerItem?: string }> } | null,
+  };
+  auditSockets[0].on("barter:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") {
+      spentTradeRefusals.push(payload.error);
+    }
+  });
+  auditSockets[0].on(
+    "barter:update",
+    (payload: { offers?: Array<{ offerItem?: string }> }) => {
+      spent.board = payload;
+    },
+  );
+  auditSockets[0].emit("barter:post", {
+    roomId: auditRoomId,
+    offerItem: "Wood",
+    offerAmount: 1,
+    requestItem: "Cloth",
+    requestAmount: 1,
+  });
+  await auditSettle();
+  auditSockets[0].emit("barter:state:request", { roomId: auditRoomId });
+  await auditSettle();
+  check(
+    spentTradeRefusals.length === 1 &&
+      (spentTradeRefusals[0] ?? "").includes("spent this leg's Parley") &&
+      !CARRIES_A_DASH.test(spentTradeRefusals[0] ?? ""),
+    "a trade posted into the spent parley is refused with its own sentence rather than the phase's",
+  );
+  check(
+    (spent.board?.offers ?? []).every((offer) => offer?.offerItem !== "Wood"),
+    "and nothing of it reaches the board",
+  );
+
+  // The escort desk reads the same predicate beside its own phase gate,
+  // so the same window is closed there: protection posted into the spent
+  // parley is refused as spent rather than as out of phase.
+  const spentEscortRefusals: string[] = [];
+  auditSockets[0].on("contract:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") {
+      spentEscortRefusals.push(payload.error);
+    }
+  });
+  auditSockets[0].emit("contract:post", { roomId: auditRoomId, fee: 8 });
+  await auditSettle();
+  check(
+    spentEscortRefusals.length === 1 &&
+      (spentEscortRefusals[0] ?? "").includes("spent this leg's Parley"),
+    "the escort desk refuses a post into the spent parley with the same sentence",
+  );
+
+  // And the module market, the third wire trading this leg, reads the
+  // same predicate beside its own phase gate.
+  const spentModuleRefusals: string[] = [];
+  auditSockets[0].on("module:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") {
+      spentModuleRefusals.push(payload.error);
+    }
+  });
+  auditSockets[0].emit("module:post", {
+    roomId: auditRoomId,
+    fee: 8,
+    module: "salvage_crane",
+  });
+  await auditSettle();
+  check(
+    spentModuleRefusals.length === 1 &&
+      (spentModuleRefusals[0] ?? "").includes("spent this leg's Parley"),
+    "and the module market refuses its listing into the spent parley the same way",
+  );
+
+  // And the standing offer from the still-open parley above is not a door
+  // either: accepting it is trading this leg the same as posting one, so
+  // the accept wire reads auditSpentLeg as well, and the offer stays where
+  // it stands rather than settling into the very leg the room voted to
+  // close.
+  const spentAcceptFails: string[] = [];
+  auditSockets[0].on(
+    "barter:accept:fail",
+    (payload: { offerId?: string; reason?: string }) => {
+      if (typeof payload?.reason === "string") {
+        spentAcceptFails.push(payload.reason);
+      }
+    },
+  );
+  auditSockets[0].emit("barter:accept", {
+    roomId: auditRoomId,
+    offerId: standingOffer.id,
+  });
+  await auditSettle();
+  check(
+    spentAcceptFails.length === 1 &&
+      (spentAcceptFails[0] ?? "").includes("spent this leg's Parley") &&
+      !CARRIES_A_DASH.test(spentAcceptFails[0] ?? ""),
+    "a standing offer accepted into the spent parley is refused with the spend's own sentence rather than settling",
+  );
+  const standingBoard = {
+    offers: null as Array<{ id?: string }> | null,
+  };
+  auditSockets[0].on(
+    "barter:update",
+    (payload: { offers?: Array<{ id?: string }> }) => {
+      standingBoard.offers = payload?.offers ?? null;
+    },
+  );
+  auditSockets[0].emit("barter:state:request", { roomId: auditRoomId });
+  await auditSettle();
+  check(
+    (standingBoard.offers ?? []).some(
+      (offer) => offer?.id === standingOffer.id,
+    ),
+    "and the offer is still standing afterwards, because the refusal is a door rather than a sweep",
+  );
+
+  // The pair of presses that arrive together, which is the pair the
+  // door's own comment is about (see recordAuditVote). The fourth walk
+  // above holds the pair that arrives from two sockets; this one holds
+  // the pair from a single socket, which is the shape a bounce on the
+  // button or a doubled client takes. The door's check and its write are
+  // one uninterrupted step, so one of the two lands and the other is
+  // refused, and the count the room is shown never holds the same
+  // captain's name twice. A fresh voyage is what makes the book below
+  // empty and the audit unspent.
+  auditSockets[0].emit("room:restart", { roomId: auditRoomId });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== 1 ||
+      (await auditRoomRow())?.currentPhase !== "harbor") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const auditVoyageFive = auditSockets.map((socket) =>
+    waitForEvent<{ roomId: string }>(
+      socket,
+      "room:started",
+      (payload) => payload?.roomId === auditRoomId,
+    ),
+  );
+  auditSockets[0].emit("room:start", { roomId: auditRoomId });
+  await Promise.all(auditVoyageFive);
+  auditSockets[1].emit("game:status", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 120,
+    reputation: 12,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  for (
+    let waited = 0;
+    ((await auditRoomRow())?.currentRound !== AUDIT_FROM_ROUND ||
+      (await auditRoomRow())?.currentPhase !== "parley") &&
+    waited < 5000;
+    waited += 250
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const pairRefusals: string[] = [];
+  auditSockets[0].on("audit:error", (payload: { error?: string }) => {
+    if (typeof payload?.error === "string") pairRefusals.push(payload.error);
+  });
+  const pairTallyBase = tallyFrames.length;
+  const pairRevealBase = revealFrames.length;
+  auditSockets[0].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  auditSockets[0].emit("audit:vote", {
+    roomId: auditRoomId,
+    round: AUDIT_FROM_ROUND,
+    targetUserId: auditTargetId,
+  });
+  await auditSettle();
+  const pairTally = tallyFrames[tallyFrames.length - 1];
+  check(
+    pairRefusals.length === 1 &&
+      pairRefusals[0] === "Your name is already in for this leg's audit." &&
+      tallyFrames.length === pairTallyBase + auditSockets.length &&
+      Object.keys(pairTally?.votes ?? {}).length === 1 &&
+      pairTally?.votes[gambitHost.id] === auditTargetId &&
+      revealFrames.length === pairRevealBase,
+    "two ballots from one socket in the same tick are one nomination: exactly one lands in the book, the count goes out once rather than twice, and the second press is answered with the sentence that says the name is already in",
+  );
+
+  // ===== The seams a socket cannot reach =====
+  // The count and the two cards are React files this run has no browser to
+  // mount, so what the count renders and how the two hooks lift a press
+  // are held in source the way suite 38 holds its relay: the line is read
+  // off the file that draws it, and the guard is read off the hook rather
+  // than trusted to a frame nobody here can deliver twice. The house rule
+  // over the same files is read whole, comments included, because the
+  // notes in them are the record the next reader works from.
+  check(
+    !carriesADash("src/components/portmasters/game/VoteTallyRows.tsx") &&
+      !carriesADash("src/components/portmasters/game/AuditPanel.tsx") &&
+      !carriesADash("src/components/portmasters/game/MaroonPanel.tsx") &&
+      !carriesADash("src/components/portmasters/game/VoteSeatPicker.tsx"),
+    "the two vote cards, the picker they draw their captain list through and the count under them read free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
+  );
+
+  const repoRoot = join(import.meta.dirname, "..", "..", "..");
+  const readSrc = (relative: string) =>
+    withoutComments(readFileSync(join(repoRoot, relative), "utf8"));
+  const tallyRowCode = readSrc(
+    "src/components/portmasters/game/VoteTallyRows.tsx",
+  );
+  const seatPickerCode = readSrc(
+    "src/components/portmasters/game/VoteSeatPicker.tsx",
+  );
+  const auditPanelCode = readSrc(
+    "src/components/portmasters/game/AuditPanel.tsx",
+  );
+  const auditHookCode = readSrc("src/lib/use-audit.ts");
+  const maroonHookCode = readSrc("src/lib/use-maroon.ts");
+  const maroonPanelCode = readSrc(
+    "src/components/portmasters/game/MaroonPanel.tsx",
+  );
+
+  check(
+    tallyRowCode.includes("leaderShortfall(rows, census.needed)") &&
+      tallyRowCode.includes("leader.short === 1") &&
+      tallyRowCode.includes("has every name the vote needs") &&
+      !tallyRowCode.includes("needed -"),
+    "the shared count renders its leader line off leaderShortfall and works out no subtraction of its own, so the sentence a captain reads and the count the server carries the vote on cannot come apart",
+  );
+  check(
+    tallyRowCode.includes("count has not arrived yet") &&
+      tallyRowCode.includes('"carries" : "carry"') &&
+      tallyRowCode.includes('"has" : "have"') &&
+      tallyRowCode.includes("No name is in yet") &&
+      tallyRowCode.includes("Your name is not in yet"),
+    "and the block says what it does not have: a room whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote and the captains who have named one are both counted and worded for their own number",
+  );
+  check(
+    tallyRowCode.includes("namedCountLine(named, census.roster)") &&
+      tallyRowCode.includes("nameCount(census.needed)") &&
+      tallyRowCode.includes('"carries" : "carry"') &&
+      !tallyRowCode.includes("captains ${") &&
+      !tallyRowCode.includes("names are in"),
+    "the count line states the count and the threshold in one sentence, the count half built by the shared builder (see namedCountLine in @/lib/voteTally) rather than worded here, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one, and the two votes cannot word one number two ways",
+  );
+  check(
+    tallyRowCode.includes("nextStep(census.needed)") &&
+      auditPanelCode.includes("closes this leg's trading") &&
+      maroonPanelCode.includes("puts that captain ashore") &&
+      !auditPanelCode.includes("puts that captain ashore") &&
+      !maroonPanelCode.includes("census.needed -") &&
+      !auditPanelCode.includes("census.needed -"),
+    "and the sentence that says what the vote does with the names it needs belongs to the vote rather than to the block: the audit's card names the manifest, the maroon's card names the shore, and neither panel works out a shortfall of its own to say how far off the count is",
+  );
+  check(
+    tallyRowCode.includes("captainCount(waiting.length)") &&
+      tallyRowCode.includes('"has" : "have"') &&
+      tallyRowCode.includes("not named anyone") &&
+      tallyRowCode.includes("nameList(waiting)"),
+    "and the line that says who still has to act names them and counts them, so a captain reads how many of the harbor has yet to name someone rather than a list of names with no length on it",
+  );
+  check(
+    !auditPanelCode.includes("There is nothing else to press") &&
+      !maroonPanelCode.includes("There is nothing else to press") &&
+      tallyRowCode.includes("Your name is in for") &&
+      auditPanelCode.includes("audit.myVote") &&
+      maroonPanelCode.includes("maroon.myVote") &&
+      seatPickerCode.includes('"Your name is in"') &&
+      !auditPanelCode.includes('"Your name is in"') &&
+      !maroonPanelCode.includes('"Your name is in"'),
+    "the captain's own line belongs to the one block rather than to a paragraph in each card, the button beside it belongs to the one picker both cards draw rather than to either card, and that button says which of the two moments the captain is standing in: a name already in reads a press that tells them so",
+  );
+  check(
+    auditPanelCode.includes("<VoteTallyRows") &&
+      maroonPanelCode.includes("<VoteTallyRows") &&
+      !auditPanelCode.includes("named someone") &&
+      !maroonPanelCode.includes("named someone") &&
+      !auditPanelCode.includes("namedCountLine") &&
+      !maroonPanelCode.includes("namedCountLine"),
+    "both vote cards read their count off the one block rather than printing a line of their own, and the line that block prints is the shared builder's: how many captains have named someone is worded once, under the audit and the maroon alike",
+  );
+  check(
+    Array.from({ length: 12 }, (_, i) => i + 1).every((roster) => {
+      const needed = auditNamesNeeded(roster);
+      return Array.from({ length: needed + 1 }, (_, k) => k).every((k) => {
+        const rows = shortfallRows(k);
+        const short = leaderShortfall(rows, needed)?.short ?? needed;
+        return (
+          short === needed - k &&
+          rows.reduce((count, row) => count + row.voters.length, 0) === k
+        );
+      });
+    }),
+    "the count the card prints and the shortfall it prints always sum to the threshold the server carries on, at every roster this game deals and every book from empty to one name over the line, and the rows hold exactly the names the book holds",
+  );
+  const pairMembers: PublicUser[] = Object.keys(pairTally?.votes ?? {}).map(
+    (id, i) => ({ id, username: id, displayName: id, avatarHue: i }),
+  );
+  const pairVoters = tallyRows(pairTally?.votes ?? {}, pairMembers).flatMap(
+    (row) => row.voters,
+  );
+  check(
+    pairVoters.length === Object.keys(pairTally?.votes ?? {}).length &&
+      new Set(pairVoters).size === pairVoters.length,
+    "and the rows of the count hold every name in the book exactly once, so the pair of presses that arrived in one tick cannot put the same captain's name under two targets or twice under one",
+  );
+  check(
+    auditHookCode.includes("if (data.votes?.[myUserId]) setPressed(null)") &&
+      maroonHookCode.includes("if (data.votes?.[myUserId]) setPressed(null)") &&
+      auditHookCode.includes("pressed !== game.currentRound") &&
+      maroonHookCode.includes("pressed !== game.currentRound") &&
+      auditHookCode.includes("[socket, roomId, myUserId]") &&
+      maroonHookCode.includes("[socket, roomId, myUserId]"),
+    "both vote hooks lift the press that is still in flight only on the frame that carries this captain's own name, so another captain's ballot cannot put the button back while the first press is on its way, and the id the guard reads is a dependency of the effect that reads it",
+  );
+  check(
+    seatPickerCode.includes("import { seatMarks, type SeatStatus }") &&
+      seatPickerCode.includes("!marked(m.id)") &&
+      seatPickerCode.includes("seatMarks(statuses?.[id]).writtenOff") &&
+      !auditPanelCode.includes("seatMarks") &&
+      !maroonPanelCode.includes("seatMarks") &&
+      auditPanelCode.includes(
+        "A captain the harbor has written off cannot be audited.",
+      ),
+    "the list of captains a vote offers is drawn through the one predicate the server refuses on (see writtenOff in @/lib/seatMarks): a captain the harbor has written off is never offered as a name, the predicate belongs to the one picker rather than to a card, and the audit's card says so instead of leaving the short list unexplained",
+  );
+  check(
+    auditPanelCode.includes("audit.reveal === null") &&
+      auditHookCode.includes("thisReveal ? null :") &&
+      auditHookCode.includes("!thisReveal &&"),
+    "the audit card is gone the moment the reveal is in hand: the reader that draws it closes on the reveal and the hook stops offering a press on the same term, so a count that still holds the names the vote carried on cannot draw the card again",
   );
 }

@@ -187,5 +187,5 @@ export function ventureAnnouncementFor(outcome: VentureOutcome): string {
   if (outcome === "failed") {
     return `⚓ A Venture missed its deadline. Every contributor gets back a partial refund.`;
   }
-  return `⚓ A Venture was cancelled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
+  return `⚓ A Venture was canceled: another venture in the harbor already claimed this voyage's one chance. Every contributor gets back their full stake.`;
 }

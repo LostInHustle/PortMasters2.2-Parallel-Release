@@ -4,6 +4,7 @@ import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Term } from "../../Term";
+import { loanSettleLine } from "../phases/SettlementAid";
 import { Row, SubRow } from "./Rows";
 import type { RosterEntry } from "../GameStatusPanel";
 
@@ -64,7 +65,7 @@ export function DuesTab({
               <SubRow
                 key={r.id}
                 label={`↳ ${r.list.length}× ${r.label}`}
-                value={`${r.due}g`}
+                value={`${r.due} Gold`}
               />
             ))}
           <div
@@ -111,7 +112,7 @@ export function DuesTab({
               </span>
               <div className="flex shrink-0 items-center gap-1.5">
                 <span className="text-[12px] font-bold text-alarm">
-                  {d.amount}g
+                  {d.amount} Gold
                 </span>
                 {onRepayLoan && (
                   <Button
@@ -136,11 +137,11 @@ export function DuesTab({
                 </span>
               }
             >
-              <span className="font-bold text-gain">{l.amount}g</span>
+              <span className="font-bold text-gain">{l.amount} Gold</span>
             </Row>
           ))}
           <p className="pt-1 text-[10px] text-muted-foreground">
-            Unpaid loans settle automatically at the end of Round {maxRounds}.
+            {loanSettleLine(maxRounds)}
           </p>
         </div>
       )}

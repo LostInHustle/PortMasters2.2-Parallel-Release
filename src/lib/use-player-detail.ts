@@ -21,6 +21,20 @@ export type PlayerDetailData = {
   logs: string[];
 };
 
+// How long a peek may wait for an answer that is not coming. The answer
+// is written by another captain's client, so it can be late or simply
+// never sent: the target's tab can be closed after the server took the
+// question (the server answers null for a captain with no socket, but a
+// socket that is up and a client that never answers is a different
+// thing), the question itself expires on the server's own clock, and a
+// voyage that restarts takes every open question with it. The wait is
+// timed for the reason the operator console's is (see use-admin.ts): a
+// latch only a response can clear is a row that spins for the rest of the
+// session. Five seconds clears the slowest honest answer a live client
+// gives and is short enough that the row is still in front of the captain
+// when it stops spinning.
+const PEEK_TIMEOUT_MS = 5_000;
+
 /**
  * Fetches another captain's cargo/workers/log on demand instead of
  * broadcasting it to the whole room constantly. Most of a room never
@@ -41,6 +55,26 @@ export function usePlayerDetail(
   useEffect(() => {
     myDetailRef.current = myDetail;
   }, [myDetail]);
+
+  // One timer per captain being asked about, so a second press re-arms the
+  // wait rather than stacking a second clock on the same row.
+  const peekTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const stopWaiting = useCallback((targetUserId: string) => {
+    const timer = peekTimers.current.get(targetUserId);
+    if (timer) clearTimeout(timer);
+    peekTimers.current.delete(targetUserId);
+  }, []);
+
+  // A timer that outlives the popup has nothing to clear.
+  useEffect(
+    () => () => {
+      for (const timer of peekTimers.current.values()) clearTimeout(timer);
+      peekTimers.current.clear();
+    },
+    [],
+  );
 
   // Whether this instance answers requests at all. A boolean rather than
   // the callback itself, so the effect below is not torn down and rebuilt
@@ -73,6 +107,7 @@ export function usePlayerDetail(
       data: PlayerDetailData | null;
     }) => {
       if (data.roomId !== roomId) return;
+      stopWaiting(data.targetUserId);
       setDetail((prev) => ({ ...prev, [data.targetUserId]: data.data }));
       setLoading((prev) => ({ ...prev, [data.targetUserId]: false }));
     };
@@ -98,15 +133,26 @@ export function usePlayerDetail(
       socket.off("player:detail:request", onRequest);
       socket.off("player:detail:response", onResponse);
     };
-  }, [socket, roomId, answers]);
+  }, [socket, roomId, answers, stopWaiting]);
 
   const requestDetail = useCallback(
     (targetUserId: string) => {
       if (!socket) return;
       setLoading((prev) => ({ ...prev, [targetUserId]: true }));
+      // The give up. A target whose client never answers still needs the
+      // row to stop waiting, or the eye spins for the rest of the
+      // session.
+      stopWaiting(targetUserId);
+      peekTimers.current.set(
+        targetUserId,
+        setTimeout(() => {
+          peekTimers.current.delete(targetUserId);
+          setLoading((prev) => ({ ...prev, [targetUserId]: false }));
+        }, PEEK_TIMEOUT_MS),
+      );
       socket.emit("player:detail:request", { roomId, targetUserId });
     },
-    [socket, roomId],
+    [socket, roomId, stopWaiting],
   );
 
   return { detail, loading, requestDetail };

@@ -208,8 +208,9 @@ export async function chartersSuite(): Promise<void> {
       "src/lib/game/constants/charters.ts",
       "src/lib/game/engine/charters.ts",
       "src/components/portmasters/game/phases/CharterDraft.tsx",
+      "src/components/portmasters/game/phases/MomentOverlay.tsx",
     ].every((relative) => !carriesADash(relative)),
-    "and the four files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
+    "and the five files the feature is written in hold the rule too, comments included, because the directive is about the record the next maintainer reads and not only about the strings a captain meets",
   );
 
   // ========== B. The ten cards ==========

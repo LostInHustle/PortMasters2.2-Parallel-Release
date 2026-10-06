@@ -37,6 +37,10 @@ import {
 import type { Server, Socket } from "socket.io";
 import { db } from "@/lib/db";
 import { BANNED_ACCOUNT_ERROR } from "@/lib/auth";
+import {
+  NO_LONGER_AN_ADMINISTRATOR,
+  NOT_AN_ADMINISTRATOR,
+} from "@/lib/game/constants/copy";
 import { roomIdsForUser } from "@/lib/rooms";
 import {
   detachUser,
@@ -110,7 +114,7 @@ export async function requireAdmin(socket: Socket): Promise<AdminActor | null> {
   });
   if (!actor || actor.bannedAt || actor.role !== "admin") {
     socket.emit("admin:error", {
-      error: "This account is not an administrator.",
+      error: NOT_AN_ADMINISTRATOR,
     });
     return null;
   }
@@ -347,7 +351,7 @@ export async function revokeAdmin(
   // role again. Saying so now means an open console reports it instead of
   // going quiet until something is asked of it.
   emitToUser(io, target.id, "admin:error", {
-    error: "This account is no longer an administrator.",
+    error: NO_LONGER_AN_ADMINISTRATOR,
   });
   return { ok: true };
 }

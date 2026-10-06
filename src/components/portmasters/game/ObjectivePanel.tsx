@@ -7,8 +7,8 @@
 // by the whole harbor and a fact the whole harbor shares does not belong
 // in one captain's column. Which mode the harbor runs is a fact about
 // the room, written on the room's card before entry and worn by the
-// boards themselves; this strip used to say it a third time, beside its
-// own title, and the title is what a captain needs here.
+// boards themselves, so this strip does not say it beside its own title:
+// the title is what a captain needs here.
 //
 // It wears gold, and gold specifically. The commission is an imperial
 // one, so it wears the colour the Imperial Mandate already wears on the
@@ -93,6 +93,17 @@ export function ObjectivePanel({
         {!progress.met && (
           <span className="text-[11px] text-muted-foreground tabular-nums">
             {outstanding} Gold still on the table
+          </span>
+        )}
+        {/* The filled state, said rather than implied. The gold line above
+            goes quiet when the commission is met and the button below is
+            not drawn at all, because what a press would take is what the
+            commission still has room for and there is none, so the strip
+            would otherwise simply lose a line and offer nothing in its
+            place. A captain reading it is owed the reason. */}
+        {progress.met && (
+          <span className="text-[11px] font-semibold text-gain">
+            The commission is met, and nothing more is owed.
           </span>
         )}
         {open && deliverable > 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReadyState } from "@/lib/use-phase-sync";
+import { readyLine, type ReadyState } from "@/lib/use-phase-sync";
 import type { PhaseClock } from "@/lib/phase-clock";
 import type { PublicUser } from "@/lib/api";
 import { Avatar } from "../shared";
@@ -53,8 +53,11 @@ export function ReadyBar({
         className,
       )}
     >
+      {/* The count is the shared builder's sentence rather than this
+          bar's own (see readyLine in @/lib/use-phase-sync), so the bar
+          and the control panel word one number one way. */}
       <span className="text-[11px] font-semibold text-muted-foreground">
-        {ready.readyUserIds.length}/{ready.requiredUserIds.length} ready
+        {readyLine(ready.readyUserIds.length, ready.requiredUserIds.length)}
       </span>
       {clock ? (
         <span

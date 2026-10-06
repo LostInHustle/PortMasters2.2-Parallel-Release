@@ -4,32 +4,54 @@ import { cardText } from "@/lib/game/cards";
 import type { CardRecord } from "@/lib/game/constants/cards";
 import { heldBoonCards, heldCharterCard } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 /**
  * One held card on the rail: the card's own glyph and name, read through
  * the pool by id so a retuned card is the card a captain holds on the
  * next frame (the same resolution the effects themselves use, see
- * heldBoonCards), with its effect line on the tooltip rather than in the
- * row, because a rail counts its rows and five full descriptions would
- * be a paragraph in the middle of it. The line shown on hover is the
- * card's own English description, which is the sentence the overlay that
- * dealt it printed.
+ * heldBoonCards). The effect line is the card's own English description,
+ * which is the sentence the overlay that dealt it printed.
+ *
+ * [W3: the status convention] The line lives on the tooltip and behind a
+ * tap rather than in the row, because a rail counts its rows and five
+ * full descriptions would be a paragraph in the middle of it. The tap is
+ * the half a hover title cannot do: a touch screen never fires a title,
+ * so the chip is a button that opens the line under the row, one card at
+ * a time so the rail's height stays a reading rather than a wall.
  *
  * One chip for both kinds of held card, because the dress is the row's
  * rather than the card's: a boon and a charter sit side by side here and
  * a second copy of the same six classes is the file asking a reader to
  * diff two identical spans.
  */
-function HeldChip({ card }: { card: CardRecord }) {
+function HeldChip({
+  card,
+  open,
+  onToggle,
+}: {
+  card: CardRecord;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const text = cardText(card);
   return (
-    <span
+    <button
+      type="button"
       title={text.desc}
-      className="inline-flex min-w-0 items-center gap-1 rounded-md border border-dawn/20 bg-dawn/[0.06] px-1.5 py-0.5 text-[11px] font-medium"
+      aria-expanded={open}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex min-w-0 cursor-pointer items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
+        open
+          ? "border-dawn/50 bg-dawn/[0.14]"
+          : "border-dawn/20 bg-dawn/[0.06]",
+      )}
     >
       <span className="leading-none">{card.icon}</span>
       <span className="pm-truncate">{text.name}</span>
-    </span>
+    </button>
   );
 }
 
@@ -62,17 +84,38 @@ function HeldChip({ card }: { card: CardRecord }) {
  * screen lying about effects the captain still holds.
  */
 export function HeldBoons({ game }: { game: GameState }) {
+  const [openId, setOpenId] = useState<string | null>(null);
   const cards = heldBoonCards(game);
   const charter = heldCharterCard(game);
   if (cards.length === 0 && charter === null) return null;
+  const all = charter !== null ? [...cards, charter] : cards;
+  const openCard = all.find((card) => card.id === openId);
   return (
     <div className="shrink-0">
       <div className="flex flex-wrap gap-1.5">
         {cards.map((card) => (
-          <HeldChip key={card.id} card={card} />
+          <HeldChip
+            key={card.id}
+            card={card}
+            open={openId === card.id}
+            onToggle={() => setOpenId(openId === card.id ? null : card.id)}
+          />
         ))}
-        {charter !== null && <HeldChip card={charter} />}
+        {charter !== null && (
+          <HeldChip
+            card={charter}
+            open={openId === charter.id}
+            onToggle={() =>
+              setOpenId(openId === charter.id ? null : charter.id)
+            }
+          />
+        )}
       </div>
+      {openCard && (
+        <p className="mt-1 px-0.5 text-[11px] leading-snug text-muted-foreground">
+          {cardText(openCard).desc}
+        </p>
+      )}
     </div>
   );
 }

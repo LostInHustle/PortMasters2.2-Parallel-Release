@@ -36,22 +36,27 @@ import { HELD_POWER_CAP } from "../constants/cards";
 import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
 import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
-import { heldFlagsOf, heldPower, powerBudgetAllows } from "../held-cards";
+import {
+  heldFlagsOf,
+  powerAfterTaking,
+  powerBudgetAllows,
+} from "../held-cards";
 import { feedCrew } from "../larder";
 import type { GameState } from "../types";
 import { resetEscortLeg } from "./contracts";
 import { resetConsentLedger } from "./consent";
+import { moduleSlotsOpen } from "./core";
 import { noteDawnMilestones } from "./milestones";
 
 // The three cards a leg puts in front of a captain.
 //
-// [F2: the card record, and the mode weighting field] What used to be a
-// switch statement here, one arm per card, reading inventory and roster by
-// name, is now the card's own condition (see CardCondition in
-// ./constants/cards and the records in ./constants/drafts). The engine no
-// longer holds a single card's id at the draft: it asks the pool what is on
-// offer for this captain, which is what makes a card added to the content
-// arrive with its own offer behaviour rather than with an edit here.
+// [F2: the card record, and the mode weighting field] The three cards are
+// the card's own condition (see CardCondition in ./constants/cards and the
+// records in ./constants/drafts), not a switch statement with one arm per
+// card reading inventory and roster by name. The engine never holds a
+// single card's id at the draft: it asks the pool what is on offer for
+// this captain, which is what makes a card added to the content arrive
+// with its own offer behaviour rather than with an edit here.
 //
 // The tally is written where the card is put in front of the captain rather
 // than where it is chosen, because the plan's measure is the pair ("Offer to
@@ -112,12 +117,9 @@ export function upgradeShip(state: GameState, logs: string[]) {
 // is how a captain whose hull went to the harbor would keep paying the
 // surcharge for a module that went with it.
 //
-// [REFACTOR] brokers_network used to set state.intelCost = 5 here on
-// unequip (and = 2 on equip below). With intelCost now derived from
-// hasModule(state, "brokers_network") in ./pricing.ts#getIntelCost,
-// these writes are dead and the field is gone from GameState; the
-// discount is read live off the equipped set, so equip and unequip no
-// longer need to keep a parallel field in sync.
+// The intel discount is read live off the equipped set: getIntelCost in
+// ./pricing.ts derives it from hasModule(state, "brokers_network"), so
+// equip and unequip carry no parallel intelCost field to keep in sync.
 export function unequipModuleAccounting(
   state: GameState,
   mod: CardRecord,
@@ -141,28 +143,23 @@ const OVERDRIVE_PENALTY = 10;
 // The arrival side of the accounting, and the one place a landed module is
 // written down.
 //
-// The increment used to live inline at the end of equipModule while the
-// decrement above was already its own exported function, and the two
-// drifted the moment a module gained a third way onto a hull: the buyer's
-// side of a Parley module trade (see applyModuleTradeSide in ./modules)
-// bolts the card on without passing through equipModule, because
-// equipModule's slot guard must not stand between an agreed trade and its
-// settle. That branch pushed the card bare, so a traded bulk_hauler or
-// overdrive_engine was never charged its surcharge, and the first unwind
-// of that hull then subtracted one that was never added: the penalty read
-// -15 or -10, and payMaintenance's sum went below the tier fee line and
-// paid the captain Gold every Resolve instead of billing them. Every site
-// that bolts a module on now calls this one function, so "installed" is
-// one event wherever the card lands.
+// Every site that bolts a module on calls this one function, so "installed"
+// is one event wherever the card lands: the draft, the swap, and the
+// buyer's side of a Parley module trade (see applyModuleTradeSide in
+// ./modules), which bolts the card on without passing through equipModule
+// because equipModule's slot guard must not stand between an agreed trade
+// and its settle. The increment and the unwind above have to be run as a
+// pair: an install that skipped the increment would leave the next unwind
+// of that hull subtracting a surcharge that was never added, dropping the
+// penalty to -15 or -10 and pushing payMaintenance's sum below the tier fee
+// line, which pays the captain Gold every Resolve instead of billing them.
 //
-// The tally rides here for the reason the install site used to carry
-// alone: the draft's swap flow parks a choice in _newModule and a captain
-// can still back out of it, so counting at the park would count cards that
-// were never taken. It runs for the swap branch and the install branch
-// both, which the old inline call in the install branch alone did not: a
-// swapped-in module joins the hull the same as a fresh one, and a module
-// the trade delivered is counted the same way because its branch calls
-// this function too.
+// The tally rides here rather than at the park: the draft's swap flow parks
+// a choice in _newModule and a captain can still back out of it, so
+// counting at the park would count cards that were never taken. It runs for
+// the swap branch and the install branch both, so a swapped-in module joins
+// the hull the same as a fresh one, and a module the trade delivered is
+// counted the same way because its branch calls this function too.
 export function installModuleAccounting(
   state: GameState,
   mod: CardRecord,
@@ -211,7 +208,7 @@ function equipModule(
     state.equippedModules[swapIdx] = mod;
     logs.push(`🔄 Swapped ${cardName(old.id)} for ${cardName(mod.id)}!`);
   } else {
-    if (state.equippedModules.length < state.shipLevel) {
+    if (moduleSlotsOpen(state) > 0) {
       state.equippedModules.push(mod);
       logs.push(`✅ Installed ${cardName(mod.id)}!`);
     } else {
@@ -331,13 +328,13 @@ export function selectBoon(
   return true;
 }
 
-// The shipyard's draw, which is a weighted draw now rather than the uniform
-// one it used to be: the weights are the mode's and the captain's own lean
-// (see offerPool in ../cards), so a module leans toward the path its trade
-// belongs to while the pool itself stays unfiltered. A captain who has
-// already equipped most of what is on offer falls back to the whole pool
-// rather than to two cards, because a draft with empty seats is not a
-// tighter draft, it is a broken screen.
+// The shipyard's draw is a weighted draw rather than a uniform one: the
+// weights are the mode's and the captain's own lean (see offerPool in
+// ../cards), so a module leans toward the path its trade belongs to while
+// the pool itself stays unfiltered. A captain who has already equipped
+// most of what is on offer falls back to the whole pool rather than to two
+// cards, because a draft with empty seats is not a tighter draft, it is a
+// broken screen.
 //
 // [F7: the power budget] The pool is filtered through moduleFitsHull
 // before the equipped filter and the fallback, so the fallback stays
@@ -363,18 +360,119 @@ function rollModuleChoices(state: GameState): CardRecord[] {
   return picks;
 }
 
-// [F7: the power budget] Whether this yard can bolt this card onto this
-// hull without passing the cap, over either path the pick can take. A
-// hull with an open slot installs on top, so the card is weighed against
-// the held power as it stands. A full hull can only swap, and the swap
-// may give up any equipped module, so the card fits if it fits over the
-// heaviest one, which is the most room the hull can make. Everywhere
-// this answer gates an action the panel names the sentence for, and the
-// two install paths below refuse as well: the refusals are the floor,
-// the filter above is the screen.
-function moduleFitsHull(state: GameState, card: CardRecord): boolean {
+// What a reroll can deal instead of the batch it replaces, in the two
+// halves the question has: the cards this hull has not seen, and the
+// cards the table it is replacing can still fill a seat with.
+//
+// A reroll is a swap, so what it deals is what the round has not already
+// shown. Reading the candidates as the fitting pool less what the hull
+// already carries would give a full hull in a six module mode exactly
+// three cards and one possible draw: the swap would re-serve the batch it
+// was pressed to replace, and the screen would promise a fresh batch while
+// the same three cards stayed on it. So the unheld cards the table does
+// not hold come first, drawn at the pool's own weights; where those
+// cannot fill three seats the rest come from the batch being replaced,
+// which is still this hull's business even though the round has shown it.
+// Only a hull the round has shown every card it could be dealt has
+// nothing to swap to, and that answer belongs to the caller in words
+// rather than to a third serving of the same three cards.
+function swapCandidates(state: GameState): {
+  fresh: Array<[CardRecord, number]>;
+  carried: CardRecord[];
+} {
+  const shown = new Set((state._draftChoices ?? []).map((card) => card.id));
+  const equipped = new Set(state.equippedModules.map((card) => card.id));
+  const pool = offerPool("module", state).filter(([card]) =>
+    moduleFitsHull(state, card),
+  );
+  return {
+    fresh: pool.filter(
+      ([card]) => !equipped.has(card.id) && !shown.has(card.id),
+    ),
+    // The batch being replaced is read through the same two guards the
+    // pool is, because the hull can move between the roll and the swap:
+    // a pick confirmed at the floor above takes one of these cards onto
+    // the hull, and a seat that has since become a card the captain
+    // carries is not a seat this screen may deal again.
+    carried: (state._draftChoices ?? []).filter(
+      (card) => !equipped.has(card.id) && moduleFitsHull(state, card),
+    ),
+  };
+}
+
+// The once a round swap's own draw over the two halves swapCandidates
+// hands back: the round's own draw with the table it replaces taken out
+// of the pool, and a top up behind it for the seats the fresh cards
+// cannot fill. It reads the halves rather than the state so the press and
+// the button's own question judge the same emptiness before either draws.
+function rerollModuleChoices(
+  state: GameState,
+  fresh: Array<[CardRecord, number]>,
+  carried: CardRecord[],
+): CardRecord[] {
+  const picks = drawOffer(fresh, CARDS_PER_OFFER);
+  const seats = CARDS_PER_OFFER - picks.length;
+  if (seats > 0) {
+    // Even weight for the top up, the reading the charter's wildcard
+    // takes: the pool's own weights are what put these cards on the
+    // table once already, and a second weighting over the same three
+    // would only decide which of them a hull that is short on cards
+    // gets to look at twice.
+    picks.push(
+      ...drawOffer(
+        carried.map((card) => [card, 1] as [CardRecord, number]),
+        seats,
+      ),
+    );
+  }
+  // Both draws read pools a Parley trade can empty between the roll and
+  // the press. A module bought
+  // at the table lands on this captain's own hull on this captain's own
+  // machine (see applyModuleTradeSide in ./modules), which takes its id out
+  // of fresh and out of carried without the table being dealt again, and a
+  // hull whose fitting pool is mostly aboard by then has seats left when
+  // both draws come back empty: the screen promised a fresh batch and dealt
+  // a short one, which is the broken screen the roll's own fallback exists
+  // to prevent (see rollModuleChoices). The last resort below is that
+  // fallback read at the press: the fitting pool itself, less whatever this
+  // batch already holds, because a card the hull carries is a card a seat
+  // can still be spent on, while an empty seat is nothing a captain can
+  // press. Even weight again, for the top up's own reason, and it stays
+  // best effort rather than a promise: a hull with fewer than three fitting
+  // cards left in the whole pool has nothing to fill the last seat with and
+  // deals what the pool holds.
+  const rest = CARDS_PER_OFFER - picks.length;
+  if (rest > 0) {
+    const held = new Set(picks.map((card) => card.id));
+    const pool = offerPool("module", state)
+      .filter(([card]) => moduleFitsHull(state, card) && !held.has(card.id))
+      .map(([card]) => [card, 1] as [CardRecord, number]);
+    picks.push(...drawOffer(pool, rest));
+  }
+  for (const card of picks) noteCardOffer(state.cardTally, card);
+  return picks;
+}
+
+/**
+ * [F7: the power budget] Whether this yard can bolt this card onto this
+ * hull without passing the cap, over either path the pick can take. A
+ * hull with an open slot installs on top, so the card is weighed against
+ * the held power as it stands. A full hull can only swap, and the swap
+ * may give up any equipped module, so the card fits if it fits over the
+ * heaviest one, which is the most room the hull can make. Everywhere
+ * this answer gates an action the panel names the sentence for, and the
+ * two install paths below refuse as well: the refusals are the floor,
+ * the filter above is the screen.
+ *
+ * Exported for the power budget's own suite, which holds the arithmetic
+ * against a hull it knows by hand (see scripts/smoke/suites/
+ * 52-powerBudget.ts) and reads it as the draft's own answers do. The
+ * engine barrel still does not carry it, because it is the yard's private
+ * test rather than a door a component opens.
+ */
+export function moduleFitsHull(state: GameState, card: CardRecord): boolean {
   const heaviest = heaviestEquipped(state);
-  if (state.equippedModules.length < state.shipLevel) {
+  if (moduleSlotsOpen(state) > 0) {
     return powerBudgetAllows(state, card);
   }
   return powerBudgetAllows(state, card, heaviest);
@@ -394,13 +492,16 @@ function heaviestEquipped(state: GameState): CardRecord | null {
 // else, since which card left is the slot's business and the arithmetic
 // is the same either way. The two numbers are on the sentence because a
 // refusal a captain can check is a refusal they can plan around, and the
-// plan's own reading of the cap is a floor rather than a mystery.
+// plan's own reading of the cap is a floor rather than a mystery. The
+// total is the shared reader (see powerAfterTaking in ../held-cards), so
+// this refusal and every panel that states a total for the same take
+// print one sum.
 function powerRefusal(
   state: GameState,
   card: CardRecord,
   displaced: CardRecord | null,
 ): string {
-  const total = heldPower(state) - (displaced?.power ?? 0) + card.power;
+  const total = powerAfterTaking(state, card, displaced);
   return `❌ ${cardName(card.id)} would put your hull at ${total} power, and a hull carries at most ${HELD_POWER_CAP}.`;
 }
 
@@ -419,6 +520,27 @@ export function moduleDraftPossible(state: GameState): boolean {
   );
 }
 
+/**
+ * Whether the draft's swap has a batch to deal this hull, which is the
+ * draft screen's own question asked before the button the way the
+ * Shipyard's door asks moduleDraftPossible.
+ *
+ * The whole difference between this and the press it guards is the draw:
+ * the press rerolls and spends the round's one use, and this reads the
+ * same two halves without one. So a hull the round has shown every card
+ * it could be dealt reads a disabled button and a sentence rather than a
+ * press that changes nothing: a swap that hands back the batch it
+ * replaced is not a swap the yard performed, and here it cannot be
+ * offered as one. It writes nothing, for moduleDraftPossible's own
+ * reason: no draw, no tally, no state.
+ */
+export function moduleSwapPossible(state: GameState): boolean {
+  return (
+    (state._draftChoices?.length ?? 0) > 0 &&
+    swapCandidates(state).fresh.length > 0
+  );
+}
+
 // Only rolls a fresh pool the first time this is called for the round
 // (state._draftChoices reset to undefined by startBoonDrafting above).
 // Reopening the draft screen afterwards, including via the
@@ -434,6 +556,13 @@ export function startModuleDrafting(state: GameState) {
 // Rerolls the current module pool, once per round, at no cost (unlike the
 // boon swap, the scarce resource here is the equippable slots themselves,
 // not gold). Available whether or not the pool's already been picked from.
+//
+// The reroll is the swap draw rather than the round's draw run again,
+// which is the difference between a swap and a reshuffle of cards the
+// captain is already looking at (see swapCandidates). A yard with nothing
+// new to deal refuses and leaves the round's one use unspent, because a
+// press that could not change the table is not the use the round spends
+// its swap on.
 export function swapModuleChoices(state: GameState, logs: string[]) {
   if (state.moduleSwapUsed) {
     logs.push("❌ You've already swapped your module choices this round");
@@ -443,7 +572,14 @@ export function swapModuleChoices(state: GameState, logs: string[]) {
     logs.push("❌ Nothing to swap, draft your modules first");
     return;
   }
-  state._draftChoices = rollModuleChoices(state);
+  const { fresh, carried } = swapCandidates(state);
+  if (fresh.length === 0) {
+    logs.push(
+      "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next leg.",
+    );
+    return;
+  }
+  state._draftChoices = rerollModuleChoices(state, fresh, carried);
   state.moduleSwapUsed = true;
   logs.push("🔄 Swapped Module Choices for a fresh batch");
 }
@@ -465,7 +601,7 @@ export function handleModuleSelect(
     logs.push(powerRefusal(state, mod, null));
     return;
   }
-  if (state.equippedModules.length < state.shipLevel) {
+  if (moduleSlotsOpen(state) > 0) {
     equipModule(state, mod, null, logs);
     // Direct installs resolve immediately, so the pick is final: drop it
     // from the pool now. A pick that instead needs a slot freed up (the
@@ -492,6 +628,27 @@ export function finalizeModuleSwap(
 ) {
   const mod = state._newModule;
   if (!mod) return;
+  // The row a captain pressed names a seat on the hull as it stood when
+  // the picker was drawn, and the hull can move under it. A Parley
+  // module trade settles on this captain's own machine whenever the frame
+  // carrying the agreement arrives
+  // (see applyModuleTradeSide in ./modules), which is the whole leg rather
+  // than the tick of the accept, and the seller's side takes the module off
+  // the hull without asking this screen. The index then names a seat the
+  // hull no longer carries, and without the guard below the arithmetic runs
+  // against an empty slot and hands it to equipModule, which reads the
+  // module it is displacing off the hull and throws on nothing. A seat the
+  // hull does not carry is refused here, in words, which is the shape
+  // handleModuleSelect already gives a card the table no longer holds: the
+  // pick stays parked, so Back to Draft still shows it, and taking the card
+  // again fits it to the hull as it stands.
+  const displaced = state.equippedModules[slotIdx];
+  if (!displaced) {
+    logs.push(
+      "❌ That seat is no longer on your hull, so there is nothing there to replace. Back to Draft and take the card again: the yard fits it to the hull as it stands.",
+    );
+    return;
+  }
   // [F7: the power budget] The per-slot half of the yard's gate: the roll
   // only promised this card fits over SOME equipped module, and this is
   // the slot the captain chose, so the arithmetic runs against what that
@@ -499,7 +656,6 @@ export function finalizeModuleSwap(
   // still holds the choice, Back to Draft still works), and the panel
   // disables these rows before the click the same way the market's
   // accept is disabled.
-  const displaced = state.equippedModules[slotIdx] ?? null;
   if (!powerBudgetAllows(state, mod, displaced)) {
     logs.push(powerRefusal(state, mod, displaced));
     return;
@@ -518,15 +674,15 @@ export function finalizeModuleSwap(
 // leg calls Dusk, and clears the one transient the draft might have parked:
 // the half chosen swap target (`_newModule`).
 //
-// [bug cycle: backing out is not a reroll] The round's table is kept, not
-// cleared. The draw is stored rather than re-derived precisely so that
-// reopening the draft screen, including through this Back and then Draft
-// again loop, reshows whatever the round already has on offer (see
-// startModuleDrafting above); clearing it here re-enabled the unlimited
-// free reroll that the once a round swap cap below exists to close, since
-// startModuleDrafting rolls a fresh pool whenever the table is empty. The
-// half chosen swap target still goes, because a captain who left the yard
-// has not chosen anything, and the reopen shows every original option.
+// The round's table is kept, not cleared. The draw is stored rather than
+// re-derived precisely so that reopening the draft screen, including
+// through this Back and then Draft again loop, reshows whatever the round
+// already has on offer (see startModuleDrafting above); clearing it here
+// would re-enable the unlimited free reroll that the once a round swap cap
+// below exists to close, since startModuleDrafting rolls a fresh pool
+// whenever the table is empty. The half chosen swap target still goes,
+// because a captain who left the yard has not chosen anything, and the
+// reopen shows every original option.
 //
 // Note: canceling here does NOT refund a `swapModuleChoices` reroll, on
 // purpose. The reroll was already spent the moment the new pool was rolled
@@ -542,7 +698,8 @@ export function cancelModuleDraft(state: GameState) {
 // A captain joining a room for the first time should drop into the voyage
 // wherever the room currently is rather than back at round 1, otherwise
 // they'd never be able to ready up for the same checkpoint as everyone
-// else (see the ready check protocol in src/server/realtime/index.ts). This runs
-// the same setup calls a normal transition would, just once, up front, so
-// a fresh captain lands on a fully formed phase (cards generated, etc.)
-// instead of an empty one.
+// else (see the ready check protocol in
+// src/server/realtime/wiring/phase-ready.ts). This runs the same setup
+// calls a normal transition would, just once, up front, so a fresh
+// captain lands on a fully formed phase (cards generated, etc.) instead of
+// an empty one.

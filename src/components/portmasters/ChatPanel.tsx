@@ -47,8 +47,7 @@ export type ChatTrade = {
  * split the same way on the server, where a room's chat dies with the voyage
  * and the square's is written down. Live messages arrive over the socket.
  * Mine uses the celadon pm-grad-chat, others get a soft black tint so the
- * conversation reads as two sides of a brush without leaning on the rose
- * tint the old build used for the same distinction.
+ * conversation reads as two sides of a brush.
  *
  * Given a `trade`, the panel also carries the shared offer board: open
  * offers that belong to this conversation appear in the stream where they
@@ -146,8 +145,8 @@ export function ChatPanel({
   // in progress render and immediately re renders with the new state, instead
   // of committing one pass and then cascading a second one, which is what an
   // effect calling setState synchronously does (react-hooks/set-state-in-effect).
-  // The trigger is the same pair the old effect's dependency list used, the
-  // conversation identity and the incoming history, so seeding is unchanged.
+  // The trigger is the conversation identity and the incoming history: a
+  // change to either reseeds the stream.
   const seedKey = `${mode}:${roomId ?? ""}:${other?.id ?? ""}`;
   const [seed, setSeed] = useState<{
     key: string;

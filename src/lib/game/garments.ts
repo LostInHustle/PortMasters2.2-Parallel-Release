@@ -31,11 +31,10 @@
 // A garment at zero leaves the wardrobe and pays the plan's four Gold as
 // scrap, which is the one way this tree can give a finished good a cash value
 // outside an order or a barter (see RAG_SCRAP_VALUE in ./constants). The
-// scrap itself used to be a bare number on the state and is now a good like
-// any other, named in the catalogue the day the Loom's bench arrived to buy
-// it off the quay and reweave it (see RAGS there), which is the one thing on
-// this page D4 changed. What a rag is worth and what it turns back into are
-// not read here: they belong to the bench's own arithmetic.
+// scrap is a good like any other rather than a bare number on the state,
+// named in the catalogue the Loom's bench buys it off the quay from and
+// reweaves (see RAGS there). What a rag is worth and what it turns back
+// into are not read here: they belong to the bench's own arithmetic.
 //
 // The weather is drawn rather than stored. Every input the tag needs is
 // already room wide on the state, so one function answers for the whole
@@ -62,6 +61,7 @@ import {
 import { newestAboard } from "./crew";
 import { crewSize } from "./larder";
 import { flagOnFor, survivalLayerOn } from "./flags";
+import { frozenFrostbiteLog } from "./status-copy";
 import { createRng } from "./rng";
 import {
   flatWorkerRoster,
@@ -153,18 +153,55 @@ export function legIsCold(
   return createRng(seed)() < COLD_LEG_CHANCE;
 }
 
+// =====================================================================
+// The wardrobe's own denominator: the one arithmetic the score below is
+// taken in.
+//
+// The score is a sum of fractions (a rating times the share of a garment
+// that is left), and a fraction like a sixth or an eighth is not a number
+// binary can hold. Summed as doubles, a crew whose warmth is exactly the
+// two a cold leg asks can come out a hair under it, and the check that
+// reads the sum then takes a hand over a rounding error in the sea's own
+// arithmetic: two Linen Clothes at two and four of six beside Cold
+// Hardened is the smallest such crew. So every contribution is taken in
+// whole units of this scale and the total is divided once at the end, and
+// the number the check reads, the number the panel prints and the number
+// the log line quotes are the wardrobe table's own fraction rather than
+// whatever a chain of additions left behind.
+//
+// The scale is read off the table rather than written down, for the reason
+// every derived number in this tree is: a balance pass that retunes a
+// maximum moves it along, where a constant here would have gone quietly
+// inexact the day the table moved. A contribution is whole exactly while
+// the maximum divides the scale, which is what a smallest common multiple
+// is, and both the maxima and the ratings are whole numbers (see
+// ./constants/garments for the table and its own note).
+// =====================================================================
+function greatestCommonDivisor(a: number, b: number): number {
+  return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
+const GARMENT_SCALE = Object.values(GARMENTS).reduce(
+  (scale, spec) =>
+    (spec.durability * scale) / greatestCommonDivisor(spec.durability, scale),
+  1,
+);
+
 /**
- * The warmth a garment gives right now: its rating times the fraction of
- * itself that is left, which is the plan's multiplier.
+ * The warmth a garment gives right now, as a whole number of the scale's
+ * units: its rating times the fraction of itself that is left, which is the
+ * plan's multiplier, kept in the one denominator every maximum divides.
  *
  * A damaged durability is read through the same healing the load site uses
  * rather than trusted as arithmetic, so a save cannot hand this sum a NaN or
  * a fraction outside the garment's own maximum. In play it is always a whole
  * number inside the maximum, because every write to it is this module's.
+ *
+ * Units rather than the score itself because the score is a sum, and it is
+ * the sum that has to stay exact: see the scale above and warmthScore.
  */
-function warmthOf(garment: WornGarment, spec: GarmentSpec): number {
+function warmthUnits(garment: WornGarment, spec: GarmentSpec): number {
   const left = durabilityOf(garment.durability, spec);
-  return spec.warmth * (left / spec.durability);
+  return spec.warmth * left * (GARMENT_SCALE / spec.durability);
 }
 
 /**
@@ -200,15 +237,25 @@ export function shortOfWarmth(state: GameState): boolean {
  * Exported because two readers print it as well as compare it, and a panel
  * that did the arithmetic again would be a second opinion about the number
  * the crew freezes against.
+ *
+ * Taken in whole units of GARMENT_SCALE and divided once, rather than by
+ * adding the fractions up as doubles, because this is the number a hand is
+ * decided on: the drift of a fraction chain is around a quadrillionth of a
+ * point of warmth, which is nothing anywhere except at the comparison
+ * below, where a mathematically exact meeting can land a hair under the ask
+ * and cost the crew a hand (see the scale's own note).
  */
 export function warmthScore(
   state: Pick<GameState, "garments" | "modifierFlags">,
 ): number {
-  let total = 0;
+  let units = 0;
   for (const garment of state.garments ?? []) {
-    total += garmentWarmth(garment);
+    const spec = garmentSpec(garment?.good);
+    if (!spec) continue;
+    units += warmthUnits(garment, spec);
   }
-  return total + (state.modifierFlags.cold_hardened ?? 0);
+  units += (state.modifierFlags.cold_hardened ?? 0) * GARMENT_SCALE;
+  return units / GARMENT_SCALE;
 }
 
 /**
@@ -220,21 +267,58 @@ export function warmthScore(
  * the multiplication again would be a second place the plan's multiplier is
  * written, and the two would agree right up until one of them moved. Takes
  * the garment rather than the state so a reader can ask about one of them.
+ *
+ * Read through the same units the sum is taken in, so a part is the sum's
+ * own arithmetic asked one garment at a time rather than a second rounding
+ * of the same fraction (see GARMENT_SCALE).
  */
 export function garmentWarmth(garment: WornGarment | undefined | null): number {
   const spec = garmentSpec(garment?.good);
   if (!spec || !garment) return 0;
-  return warmthOf(garment, spec);
+  return warmthUnits(garment, spec) / GARMENT_SCALE;
 }
 
+// The tolerance the printed warmth is read with, a billionth of a point of
+// warmth.
+//
+// It swallows the only lie the arithmetic tells: a score is exact by
+// construction (see GARMENT_SCALE) but a double still carries the divided
+// total to within a quadrillionth or so of it, so a score that is exactly a
+// tenth of warmth would otherwise print as the tenth below. The other side
+// of it is the seam between two real readings: a score is a whole number of
+// the scale's units, and one unit is a hundred and twentieth at the table's
+// current maxima, eight orders of magnitude wider than this can move.
+const WARMTH_PRINT_TOLERANCE = 1e-9;
+
 /**
- * The score as a captain reads it: one decimal, and a whole number left
- * whole. Used by the log line and the panel both, so the number the warning
- * was about and the number the settlement reports are the same string.
+ * The score as a captain reads it: one decimal, a whole number left whole,
+ * and read down to the tenth the crew certainly has rather than to the
+ * nearest one. Used by the log line and the panel both, so the number the
+ * warning was about and the number the settlement reports are the same
+ * string.
+ *
+ * The direction of the rounding is a rule rather than a taste, and the field
+ * reported it: the number printed here is the number a captain measures
+ * against the leg's ask (the panel's line asking for 2, the chip's sentence,
+ * the shortfall the settlement names), while what the cold actually reads is
+ * the score itself (see shortOfWarmth and tickGarments). Rounded to nearest,
+ * a crew a hair under the two a cold leg asks printed "2" beside a panel
+ * that still said the ask was unmet, and so a captain who had just paid the
+ * harbor tailors for a mend could watch the wardrobe's own number meet the
+ * ask while the sea went on to take a hand. Read down, the tenth printed
+ * meets the ask exactly when the score does, and that belongs to the two
+ * sides of the comparison rather than to the two numbers the constants
+ * happen to carry today.
+ *
+ * Reading down is also what holds a panel's parts inside its own total: each
+ * of the wardrobe's rows prints this function of its own garment's
+ * contribution, and a reader who adds those tenths up can never arrive above
+ * the tenth printed under them, because a sum of floors is never above the
+ * floor of the sum.
  */
 export function warmthText(score: number): string {
-  const rounded = Math.round(score * 10) / 10;
-  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+  const tenth = Math.floor(score * 10 + WARMTH_PRINT_TOLERANCE) / 10;
+  return Number.isInteger(tenth) ? `${tenth}` : tenth.toFixed(1);
 }
 
 /**
@@ -264,10 +348,9 @@ export function isFrostbitten(
  * captain who sold the lot. And the ceiling above is the one branch play
  * cannot reach, which is why its sentence reads as the bound it is.
  *
- * The last refusal is the rule of the panel rather than of the hold, and it
- * was added after the field reported warehouses being walked onto backs: a
+ * The last refusal is the rule of the panel rather than of the hold: a
  * garment worn is one way and wears from the day it goes on, so clothes put
- * on for a leg that did not ask for them cost their whole life and bought
+ * on for a leg that did not ask for them cost their whole life and buy
  * nothing. A crew the leg is not asking anything of is left alone, and the
  * sentence that turns the press away says which of the two nothings this
  * is: a mild leg, or a crew the cold has already been answered for.
@@ -480,7 +563,9 @@ export function tickGarments(state: GameState, logs: string[]): void {
  * the hand is still aboard, still eats and is still paid. The line names
  * the why and the way back, because "out of action" alone read as the sea
  * having taken a hand for good, when warm clothes before the cold are all
- * it ever asked for.
+ * it ever asked for. [W3: the status convention] The sentence itself is
+ * composed in ./status-copy, so the bite, the work log and the bench all
+ * phrase the cold from one set of clauses.
  */
 function frostbiteNewest(state: GameState, logs: string[]): void {
   const newest = newestAboard(state);
@@ -492,9 +577,7 @@ function frostbiteNewest(state: GameState, logs: string[]): void {
   if (!hand) return;
   hand.frostbittenRound = state.currentRound + 1;
   const label = workerType(newest.type)?.label ?? newest.type;
-  logs.push(
-    `🥶 Frostbite: ${hand.name} the ${label} went into the cold short of warm clothes, and is out of action next leg. A warmer layer before a cold leg keeps every hand working.`,
-  );
+  logs.push(frozenFrostbiteLog(hand.name, label));
 }
 
 /**

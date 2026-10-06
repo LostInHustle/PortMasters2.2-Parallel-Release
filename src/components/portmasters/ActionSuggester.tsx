@@ -141,9 +141,9 @@ export function ActionSuggester({ game }: { game: GameState }) {
 
 /**
  * The core analyzer. Given the current game state, returns the single
- * best recommendation for the active phase, or null if there is
- * nothing to suggest (the pier, a module draft, the two terminals, and
- * the phases that are other captains rather than ledgers).
+ * best recommendation for the active phase, or null if the seat has no
+ * move of its own to name (the pier, the path draft, the two module sub
+ * states, and the two terminals).
  */
 function analyzePhase(game: GameState): Suggestion | null {
   const phase = game.phase;
@@ -159,10 +159,13 @@ function analyzePhase(game: GameState): Suggestion | null {
     // what the phase still has left to do rather than where they clicked.
     case "market":
       return analyzePurchase(game) ?? analyzeWorkerMgmt(game);
+    // The table is where the fleet trades directly, so the move to name is
+    // the trade itself: posting an offer is this captain's own move on
+    // every board around them. A hold carrying nothing of theirs reads the
+    // other honest answer, that readying up is the move that costs nothing
+    // (see analyzeParley).
     case "parley":
-      // The table is not a ledger. The exchange, the audit vote and the
-      // maroon are all other captains, so there is no best move to name.
-      return null;
+      return analyzeParley(game);
     case "orders":
       return analyzeOrders(game);
     case "resolve":
@@ -400,6 +403,38 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
   return null;
 }
 
+// Parley is where a captain recovers from a bad draw, so the move to name
+// is the trade itself. What they can offer is read off the hold, their
+// largest stack first, and a hold carrying nothing names the other half
+// honestly, that readying up is the move that costs nothing. The sentence
+// about orders stays mode blind: a Gambit lap runs the manifest before
+// this table and a Classic lap runs it after, so the good named is the one
+// this captain is still short of rather than one waiting on a later phase.
+function analyzeParley(game: GameState): Suggestion {
+  let top = "";
+  let count = 0;
+  for (const [good, held] of Object.entries(game.inventory)) {
+    if (held > count) {
+      top = good;
+      count = held;
+    }
+  }
+  if (count < 1) {
+    return {
+      icon: "🤝",
+      title: "Ready up when you are done",
+      body: "Your hold carries no goods to trade this Parley. Post a Gold offer for the good you still need, or ready up so the fleet can move on.",
+      tone: "intel",
+    };
+  }
+  return {
+    icon: "🤝",
+    title: "Post a barter offer",
+    body: `You are holding ${count} ${top}. Post what your voyage can spare and name the good you are still short of, then ready up once the table is done with you.`,
+    tone: "gold",
+  };
+}
+
 function analyzeOrders(game: GameState): Suggestion | null {
   const orders = game.customerCards ?? [];
   if (orders.length === 0) return null;
@@ -491,13 +526,12 @@ function analyzeSettlement(game: GameState): Suggestion | null {
     //
     // The engine's own bill (see wageBill), so the advice quotes the figure
     // payWages is about to charge rather than a second opinion about the
-    // same roster: this sum used to count every hired hand, the wage a Jade
-    // Pavilion pledge waives included, so it could warn a captain who was
-    // about to settle cleanly that they were going bankrupt. An earlier
-    // shape of it multiplied the whole roster by one artisan's wage, wrong
-    // twice over (the trades do not share a wage, and every wage carries
-    // the captain's own modifiers), which once let it call a captain
-    // solvent on the round they went bankrupt.
+    // same roster: a sum counted off the raw roster would include the wage
+    // a Jade Pavilion pledge waives and could warn a captain about to
+    // settle cleanly that they were going bankrupt, and a flat per artisan
+    // multiple would be wrong twice over (the trades do not share a wage,
+    // and every wage carries the captain's own modifiers), which could
+    // call a captain solvent on the round they went bankrupt.
     const wagesDue = wageBill(game).reduce((sum, b) => sum + b.due, 0);
     const totalDue = game.fixedCost + game.maintenancePenalty + wagesDue;
 

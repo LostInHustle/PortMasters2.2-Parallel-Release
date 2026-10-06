@@ -5,6 +5,7 @@ import {
   BookOpen,
   Ship,
   Compass,
+  Shuffle,
   Handshake,
   Wrench,
   Package,
@@ -28,6 +29,8 @@ import {
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { INTEL_COST } from "@/lib/game/engine";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
+import { openingPhase } from "@/lib/game/checkpoint";
+import { pathFactText, pathGuide } from "@/lib/game/paths";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +58,11 @@ type Step = {
   gradient: string;
   body: string;
   // A list under the body, for a page whose content is a set of rules
-  // rather than a paragraph. One page uses it today: the mode's own page,
-  // which prints the differences the mode record lists. Written as an
-  // array of sentences rather than as one long paragraph so that a reader
-  // can count what a mode changes, which is the question they came with.
+  // rather than a paragraph. Two pages use it today: the mode's own page,
+  // which prints the differences the mode record lists, and the paths
+  // page, which prints one row per path. Written as an array of sentences
+  // rather than as one long paragraph so that a reader can count what a
+  // mode changes, which is the question they came with.
   points?: readonly string[];
   tip: string;
   // [H9: the unlock code] The manual's own appendix, printed on the step it
@@ -98,14 +102,7 @@ const STEPS: Step[] = [
     title: "Barter with Captains",
     gradient: "pm-grad-parley",
     body: "At the Parley you can trade goods and Gold directly with the other captains, whether your voyage runs it before the orders or after them. Post an offer of what you have and what you want, or accept an offer someone else posted. Offered goods are escrowed the moment you post.",
-    tip: "You can target a specific captain with a Direct Barter Offer if you want to trade with only them.",
-  },
-  {
-    icon: Wrench,
-    title: "Put Artisans to Work",
-    gradient: "pm-grad-market",
-    body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: the goods land at Resolve next round, not this round.",
-    tip: "Hire artisans only when you can sustain at least two rounds of wages. A crew that goes unpaid takes a bankruptcy, which ends the voyage in Classic and leaves a mark in Ocean Gambit.",
+    tip: "You can target a specific captain with a Direct Barter Offer if you want to trade with only them. The Markets station of the Parley holds the escort market, the module market and the bazaar window.",
   },
   {
     icon: TrendingUp,
@@ -118,11 +115,9 @@ const STEPS: Step[] = [
     icon: Skull,
     title: "Survive Settlement",
     gradient: "pm-grad-resolve",
-    // The last sentence this page used to end on stated the founding
-    // mode's rule for a failed seat as if it were the game's, so a Gambit
-    // captain was told here that failing the bills ends the voyage. What
-    // happens instead is the mode's own rule, and it is stated on the
-    // mode's page rather than repeated on this one.
+    // What a failed seat means is the mode's own rule, stated on the
+    // mode's page rather than repeated here: the founding mode's ending
+    // would be wrong for a Gambit captain, whose voyage carries on.
     body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Round End Obligations panel before you spend anything.",
     tip: "Ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
@@ -175,6 +170,71 @@ function voyagePage(mode: GameMode): Step {
   };
 }
 
+/**
+ * The artisan page, whose advice ends on the voyage's own stake rather
+ * than on the manual's summary of both stakes.
+ *
+ * The page reads the mode the way the mode's own page above does, and
+ * it is the close of the deferral W1 recorded: the tip used to compare
+ * the two modes' consequences in words of the manual's own ("ends the
+ * voyage in Classic and leaves a mark in Ocean Gambit"), a second
+ * telling of a rule the mode record already owns, printed a page after
+ * the record's own telling of it at the top of the same manual. The
+ * last sentence is the record's now (see play.failureRule), so the
+ * sentence a captain reads here, on the voyage page and in the room's
+ * tutorial is one sentence rather than three paraphrases of one rule.
+ */
+function artisanPage(mode: GameMode): Step {
+  const play = modeConfig(mode);
+  return {
+    icon: Wrench,
+    title: "Put Artisans to Work",
+    gradient: "pm-grad-market",
+    // Artisan management is the port stop's second half (see the legacy
+    // phase table in @/lib/game/phases, where the worker bench folds into
+    // Market), which is why this page follows Buy at Port.
+    body: "Hire weavers, potters, coppersmiths, and other artisans, then assign each a product to craft. Production does not happen instantly: a task assigned now delivers at this round's Resolve, after Orders has already closed.",
+    tip: `Hire artisans only when you can sustain at least two rounds of wages. ${play.failureRule}`,
+  };
+}
+
+/**
+ * The paths page: the deal a dealing voyage opens with, and the five cards
+ * it can hand a captain.
+ *
+ * ONB-1's manual half, and it is built from the record rather than
+ * written: every entry under the body is a guide row from pathGuide, the
+ * same rows the tutorial's path page and the draft's cards print, so a
+ * path retuned in @/lib/game/paths changes all three together. The page is
+ * drawn only for a mode whose lap opens at the draft (the fold the Welcome
+ * screen and the tutorial read too), which keeps the founding voyage's
+ * manual the length it has always been rather than adding a page about a
+ * deal that mode never makes.
+ *
+ * The body states the rule the rows cannot (what a path decides about a
+ * seat), and the tip is the sentence a new captain needs before the first
+ * deal: weigh the numbers, because the flavour sentence is a promise and
+ * the numbers are the promise kept.
+ */
+function pathsPage(mode: GameMode): Step[] {
+  if (openingPhase(mode) !== "path_draft") return [];
+  return [
+    {
+      icon: Shuffle,
+      title: "Draft Your Path",
+      gradient: "pm-grad-path-draft",
+      body: "A dealing voyage opens with a card deal rather than a market. Three cards land face down, and at each beat you keep one and pass the rest on: what you hold at the end is your path for the whole voyage. Your path decides your hold, how far your Renown can climb, and which trade orders lock to you.",
+      points: pathGuide().map(
+        (entry) =>
+          `${entry.crest} ${entry.name}: ${entry.signature} ${entry.facts
+            .map(pathFactText)
+            .join(", ")}.`,
+      ),
+      tip: "Weigh the numbers under each name rather than the crest. The five paths trade different holds, Renown ceilings and locked order pools, and the one you keep sails with you to the end.",
+    },
+  ];
+}
+
 export function HowToPlayModal({
   open,
   onOpenChange,
@@ -187,8 +247,21 @@ export function HowToPlayModal({
   const [step, setStep] = useState(0);
   // The mode's page is second, right after the harbor, because it answers
   // the question a captain arrives with before the pages that answer the
-  // questions they have not asked yet.
-  const pages = [STEPS[0], voyagePage(mode), ...STEPS.slice(1)];
+  // questions they have not asked yet. The paths page follows it for a
+  // mode that opens at the deal: the deck is the first seat of that
+  // voyage, so its page stands before the pages about the seats after it,
+  // and a mode that deals no paths draws no page (see pathsPage). The
+  // artisan page is drawn from its own function in the slot the step
+  // table used to hold (see artisanPage), so the two pages that state a
+  // mode's own rules read the record rather than the table.
+  const pages = [
+    STEPS[0],
+    voyagePage(mode),
+    ...pathsPage(mode),
+    ...STEPS.slice(1, 3),
+    artisanPage(mode),
+    ...STEPS.slice(3),
+  ];
   // The mode can change while this manual is closed, and a shorter list
   // would leave the reader on a page that no longer exists: the index is
   // clamped where it is read rather than reset, so the state stays what the
@@ -284,8 +357,8 @@ export function HowToPlayModal({
                 </div>
                 {/* The manual's appendix, under the advice rather than
                     inside it: the tip is one voice and the world's own
-                    prose is another, and the two used to be told apart by
-                    their colour here too. */}
+                    prose is another, and the charter tint is what tells
+                    the two apart. */}
                 {current.aside && (
                   <div className="rounded-xl bg-charter/[0.07] p-3">
                     <p className="text-xs leading-relaxed text-charter">

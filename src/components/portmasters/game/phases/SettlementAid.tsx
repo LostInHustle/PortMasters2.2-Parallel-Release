@@ -8,6 +8,18 @@ import { HandCoins } from "lucide-react";
 import { type PhasePanelProps } from "./PhaseShared";
 
 /**
+ * What happens to a loan nobody repays, as the one sentence every surface
+ * that shows a loan renders: the ask this desk posts, the list of asks
+ * beside it, and the Dues tab on the rail. The round is the voyage's own
+ * last one, read off maxRounds, so the sentence names the leg this voyage
+ * settles on rather than a figure typed in beside it, and the borrower and
+ * the lender read one wording of one rule.
+ */
+export function loanSettleLine(maxRounds: number): string {
+  return `Unpaid loans settle automatically at the end of Round ${maxRounds}, and the Gold goes to the lender.`;
+}
+
+/**
  * The shortfall desk: the ask this captain may post when the bills are
  * beyond the purse, and the asks the rest of the harbor has posted. It owns
  * the amount being asked for, which follows the shortfall until the captain
@@ -88,8 +100,7 @@ export function HarborAid({
           )}
           <p className="text-[11px] text-muted-foreground mt-2">
             A loan transfers instantly if someone helps. Repay it any time
-            before the voyage ends, or it is deducted automatically at Round{" "}
-            {game.maxRounds} and handed to them.
+            before the voyage ends. {loanSettleLine(game.maxRounds)}
           </p>
         </div>
       )}
@@ -129,6 +140,9 @@ export function HarborAid({
               );
             })}
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            {loanSettleLine(game.maxRounds)}
+          </p>
         </div>
       )}
     </>

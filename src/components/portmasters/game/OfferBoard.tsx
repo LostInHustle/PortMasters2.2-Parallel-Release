@@ -136,31 +136,54 @@ export function MarketEmpty({
  *
  * The row's sentence, its crest or icon and its blocked reading all
  * arrive from the market that owns them. What the row itself carries is
- * the half all three desks had written out three times: the chip an
- * aimed offer wears, the seller's own Cancel press, and the buyer's Take
- * button with the refusal note under it. The chip being present is what
- * marks the row an open offer rather than a settled one, which is the
- * same test every desk applies, written once.
+ * the half all three desks had written out three times: the state label
+ * an offer wears, the chip an aimed offer wears, the seller's own Cancel
+ * press, and the buyer's Take and Turn Down buttons with the refusal note
+ * under them.
+ *
+ * The two readings the row draws its buttons from are deliberately two
+ * rather than one. `standing` is whether this row is still an offer somebody
+ * may act on, which is what the buttons answer to; `chip` is whether the
+ * offer was aimed at one captain rather than at the table, which is what
+ * the lock chip answers to. Reading the chip as both would draw no controls
+ * at all for an offer posted to the whole harbor, which is the default a
+ * seller posts with: not a Take for the table it was offered to, and not a
+ * Cancel for the seller who posted it.
+ *
+ * `state` is a node rather than a string because the two questions a state
+ * answers (waiting on whom, settled how) are the market's own, and the row
+ * only owes it a place to stand beside the line.
  */
 export function OfferRow({
   mine,
   className,
   line,
+  state,
   chip,
+  standing = false,
   acceptLabel,
   acceptClassName,
+  declineLabel,
   blocked,
   onCancel,
+  onDecline,
   onAccept,
 }: {
   mine: boolean;
   className?: string;
   line: React.ReactNode;
+  /** The state this row is in, drawn beside the line. */
+  state?: React.ReactNode;
   chip: { forMe: boolean; name?: string | null } | null;
+  /** Whether the row is still an offer, which is what draws its buttons. */
+  standing?: boolean;
   acceptLabel: React.ReactNode;
   acceptClassName?: string;
+  /** The addressed captain's own refusal, where the market has one. */
+  declineLabel?: React.ReactNode;
   blocked: string | null;
   onCancel: () => void;
+  onDecline?: () => void;
   onAccept: () => void;
 }) {
   return (
@@ -168,9 +191,10 @@ export function OfferRow({
       <span className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium">{line}</span>
         {chip && <JustForChip forMe={chip.forMe} name={chip.name} />}
+        {state}
       </span>
 
-      {chip &&
+      {standing &&
         (mine ? (
           <Button
             size="sm"
@@ -182,18 +206,30 @@ export function OfferRow({
           </Button>
         ) : (
           <span className="flex flex-col items-end gap-0.5 shrink-0">
-            <Button
-              size="sm"
-              className={cn(
-                "h-7 px-2.5 text-[10px] rounded",
-                !blocked && acceptClassName,
+            <span className="flex items-center gap-1">
+              <Button
+                size="sm"
+                className={cn(
+                  "h-7 px-2.5 text-[10px] rounded",
+                  !blocked && acceptClassName,
+                )}
+                variant={blocked ? "secondary" : "default"}
+                disabled={blocked !== null}
+                onClick={onAccept}
+              >
+                {acceptLabel}
+              </Button>
+              {onDecline && declineLabel && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 text-[10px] rounded"
+                  onClick={onDecline}
+                >
+                  {declineLabel}
+                </Button>
               )}
-              variant={blocked ? "secondary" : "default"}
-              disabled={blocked !== null}
-              onClick={onAccept}
-            >
-              {acceptLabel}
-            </Button>
+            </span>
             {blocked && (
               <span className="text-[9px] text-muted-foreground">
                 {blocked}

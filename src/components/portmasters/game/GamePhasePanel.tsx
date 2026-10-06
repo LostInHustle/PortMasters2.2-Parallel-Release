@@ -21,29 +21,26 @@ import { Endgame } from "./phases/Endgame";
 import type { PhasePanelProps } from "./phases/PhaseShared";
 
 /**
- * The dispatcher for every phase screen. Each phase used to be a nested
- * function component declared directly in this file (a 2500+ line single
- * file holding all twenty of them); they are now one module per phase
- * under ./phases, each still a module level export for the same reason
- * they were pulled out of GamePhasePanel's own body in the first place:
- * a stable component identity across renders, so React re renders a phase
- * in place on every game state update instead of unmounting and
- * remounting the whole subtree (which used to reset local useState mid
- * interaction, see PhaseShared.tsx's ReadyFooter comment for the
- * original incident).
+ * The dispatcher for every phase screen. Every phase is its own module
+ * under ./phases and a module level export, so a stable component
+ * identity holds across renders and React re renders a phase in place on
+ * every game state update instead of unmounting and remounting the whole
+ * subtree, which would reset local useState mid interaction (see the
+ * ReadyFooter comment in PhaseShared.tsx for the failure this avoids).
  *
- * The motion wrapper keeps the original sync transition: a fresh
+ * The motion wrapper runs one sync transition: a fresh
  * `${phase}:${currentRound}` key swaps the subtree in one tick, so a
  * phase change reads as one cross fade rather than a stack of
  * overlapping panels.
  *
- * The dispatcher takes the shared `PhasePanelProps` shape, plus two
- * optional extras that not every caller wires up: `onTutorialOpen`
- * (used by the Welcome screen's New Player Tutorial button) and
+ * The dispatcher takes the shared `PhasePanelProps` shape, plus the
+ * optional extras its own `Props` type adds for the overlays and
+ * payloads not every caller wires up, among them `onTutorialOpen`
+ * (used by the Welcome screen's New Captain Tutorial button) and
  * `voyageResult` (the harbor wide standings payload the server emits on
  * voyage:complete, also consumed by Endgame). Each is optional so a
- * caller that hasn't wired them in still compiles and renders a
- * sensible default.
+ * caller that hasn't wired one in still compiles and renders a sensible
+ * default.
  */
 
 // Everything a phase panel takes lives in PhaseShared, and every panel
@@ -59,19 +56,20 @@ type Props = PhasePanelProps & {
   reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
+  // The room's leave flow, threaded to the two finished voyage screens so
+  // a captain waiting on the host can set out for a new harbor instead.
+  onLeave?: () => void;
 };
 
 export function GamePhasePanel(props: Props) {
   const { game } = props;
   // The phase's own accent, read from its face in @/lib/game/phases, which
-  // is the one table that describes a phase. This file used to hold a
-  // second copy of that fact: a Record<Phase, string> of gradients whose
-  // keys were the union written out a second time, so a phase renamed in
-  // the engine left a stale key here and a panel wearing the wrong colour.
-  // There is nowhere left for the two to disagree.
+  // is the one table that describes a phase: the gradient is not written
+  // down again here, so a phase renamed in the engine cannot leave a stale
+  // key beside a panel wearing the wrong colour.
   const accentGradient = phaseFace(game.phase).gradient;
-  // The floor under the stage is a share of the viewport rather than the
-  // flat 520px it used to be: the floor exists so a short phase does not
+  // The floor under the stage is a share of the viewport rather than a
+  // flat one: the floor exists so a short phase does not
   // leave a postage stamp of a card over a column of buttons while the
   // page is the thing doing the scrolling, and what reads as a stage
   // scales with the window it stands on, the same reasoning the rails
@@ -125,9 +123,7 @@ export function GamePhasePanel(props: Props) {
 /* The accent strip along the top of the panel, one colour per phase.
    The colours live in the phase's own face (see @/lib/game/phases) and
    in src/app/palette.css behind them, so what is left here is the
-   lookup. The table that used to sit here held twelve keys and the
-   gradients to go with them; it was the second copy of a fact the face
-   table owns.
+   lookup: this file writes no gradient table of its own.
 
    Two pairs do share a hue, and neither pair can ever be on screen
    together: bankruptcy wears Dawn's hue because a voyage that ends there
@@ -140,11 +136,11 @@ export function GamePhasePanel(props: Props) {
 // deep, which is what lets mode="sync" actually cross fade between two
 // phase trees rather than nesting them.
 //
-// Each case destructures only the subset of props that panel needs, the
-// same pattern the original GamePhasePanel used: explicit prop picking
-// keeps the contract between dispatcher and panel documented at the
-// call site, so adding a new prop to a panel is a one line change here
-// rather than a silent re build of the panel's whole prop surface.
+// Each case destructures only the subset of props that panel needs:
+// explicit prop picking keeps the contract between dispatcher and panel
+// documented at the call site, so adding a new prop to a panel is a one
+// line change here rather than a silent re build of the panel's whole
+// prop surface.
 function ActivePhase(props: Props) {
   const {
     game,
@@ -173,6 +169,7 @@ function ActivePhase(props: Props) {
     reveal,
     myLegacy,
     onRestart,
+    onLeave,
     roster,
     draft,
   } = props;
@@ -193,13 +190,11 @@ function ActivePhase(props: Props) {
     case "path_draft":
       // [W2: the path draft] The deal's own screen, at the seat a dealing
       // Gambit departure opens at. It is a whole stage rather than a strip
-      // above the board, which is the change the seat itself made: the
-      // cards used to be dealt over the opening leg and drawn as a band
-      // across the table, and a captain reading them was reading their
-      // first market behind the cards. The panel takes the deal's own
-      // board and nothing else; the wait inside it is the room's count
-      // rather than a button, so there is no ready footer here to draw
-      // (see canLeavePhase, which refuses this seat).
+      // above the board, because cards dealt as a band across the table
+      // have a captain reading their first market behind them. The panel
+      // takes the deal's own board and nothing else; the wait inside it is
+      // the room's count rather than a button, so there is no ready footer
+      // here to draw (see canLeavePhase, which refuses this seat).
       return <PathDraft draft={draft} />;
     case "dawn":
       return (
@@ -346,6 +341,12 @@ function ActivePhase(props: Props) {
           backing={backing}
           me={me}
           roster={roster}
+          // The host's restart travels with the panel for the same reason
+          // it travels to Endgame: the room owns the one handler, and the
+          // two screens a finished voyage can end on offer the same call.
+          room={room}
+          onRestart={onRestart}
+          onLeave={onLeave}
         />
       );
     case "endgame":
@@ -358,6 +359,7 @@ function ActivePhase(props: Props) {
           reveal={reveal}
           myLegacy={myLegacy}
           onRestart={onRestart}
+          onLeave={onLeave}
         />
       );
     default:
@@ -377,7 +379,7 @@ function ActivePhase(props: Props) {
             Round {game.currentRound}
           </h2>
           <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-            The harbor master is fetching the tide tables.
+            The Harbormaster is fetching the tide tables.
           </p>
         </div>
       );

@@ -1,6 +1,8 @@
 // PortMasters 2.2 Parallel Release, smoke run: The detail popup's question and answer.
 
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BASE, check, waitForEvent } from "../harness";
 import type { Socket } from "socket.io-client";
 import { connect } from "socket.io-client";
@@ -158,5 +160,27 @@ export async function detailPopupSQuestionSuite(
   check(
     hydratedStatus?.gold === 777,
     "a captain who reloads is hydrated with the last known status",
+  );
+
+  // Four. The question the target's client never answers. The answer is
+  // written on the target's own machine, so it can be late, or never:
+  // their tab can close after their socket took the question, the
+  // question expires on the server's own clock, and a restarted voyage
+  // takes every open question with it. A latch only a response can clear
+  // is then a row that spins for the rest of the session, so the wait is
+  // timed. Read off the hook rather than driven, for the reason the
+  // operator console's own timer was read off its file: the latch lives
+  // in a React hook and this suite has no browser to press the eye in.
+  const repoRoot = join(import.meta.dirname, "..", "..", "..");
+  const peekHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-player-detail.ts"),
+    "utf8",
+  );
+  const waitSites = peekHook.split("PEEK_TIMEOUT_MS").length - 1;
+  check(
+    waitSites === 2 &&
+      peekHook.includes("{ ...prev, [targetUserId]: false }") &&
+      peekHook.includes("stopWaiting(data.targetUserId)"),
+    "a peek whose answer never comes stops waiting on its own clock, and one that does come stops the clock instead",
   );
 }

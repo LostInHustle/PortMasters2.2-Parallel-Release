@@ -50,13 +50,14 @@ import { escortContractsOn } from "../flags";
 import type { PathId } from "../paths";
 import type { EscortClaim, EscortCover, GameState } from "../types";
 import {
+  consentSettled,
   floorTallies,
   markMovement,
   movementApplied,
   visibleConsent,
   type ConsentTerms,
 } from "./consent";
-import { addOwnedAmount, getOwnedAmount } from "./core";
+import { addOwnedAmount, getOwnedAmount, paidFee } from "./core";
 
 /**
  * The path whose ability is the escort market, as a reading of the record
@@ -139,12 +140,20 @@ export function escortCoverOf(
  * covers them this leg.
  *
  * The rules read here rather than in the component so there is one place
- * that decides what covering means: the contract must be past the offer
- * stage (an offer nobody took protects nobody), it must name this captain as
- * the buyer, and it must be the round the voyage is standing in, because a
- * contract covers one leg and a board that lags a checkpoint must not
- * protect the wrong one. A captain who somehow reads as the buyer of two
- * contracts takes the first, which the server's own rule makes unreachable.
+ * that decides what covering means: the contract must be one the two
+ * captains actually shook hands on, it must name this captain as the buyer,
+ * and it must be the round the voyage is standing in, because a contract
+ * covers one leg and a board that lags a checkpoint must not protect the
+ * wrong one. A captain who somehow reads as the buyer of two contracts
+ * takes the first, which the server's own rule makes unreachable.
+ *
+ * The status test asks the primitive whether the row settled rather than
+ * ruling the offer out here, which is what it used to read and what a third
+ * status silently broke: an offer nobody took protects nobody, and an offer
+ * its addressee turned down protects nobody either, while both of those
+ * rows name a captain as the buyer and would otherwise have been read as
+ * cover by a test that only ruled out the offer (see consentSettled in
+ * ./consent).
  */
 export function coverFromBoard(
   contracts: EscortContract[],
@@ -152,7 +161,7 @@ export function coverFromBoard(
   round: number,
 ): EscortCover | null {
   for (const contract of contracts) {
-    if (contract.status === "offered") continue;
+    if (!consentSettled(contract.status)) continue;
     if (contract.buyerUserId !== userId || contract.round !== round) continue;
     return { contractId: contract.id, sellerName: contract.sellerName };
   }
@@ -164,37 +173,56 @@ export function coverFromBoard(
  * them says.
  *
  * The rows come from the shared primitive, which is where the privacy rule
- * lives (see visibleConsent in ./consent). What this adds is the one field
- * the escort carries that is not public: `raidGold` is the covered
- * captain's own report of what a raid would have taken, and it is on the
- * board for one reader, the seller, who is the captain the number turns
- * into a bill. Everyone else, the buyer included, reads the row without it.
- * That is a filtering rule rather than a field the wire leaves out, so a
- * client that asked for the board directly reads the same row the broadcast
- * carried.
+ * lives (see visibleConsent in ./consent). What this adds is the two things
+ * only an escort answers for.
+ *
+ * The first is the aim a turned down offer still wears. The primitive makes
+ * everything past the offer stage public, which is right for an agreement:
+ * the price was agreed in the open. A refusal was not, and it is the one
+ * row that would hand the table what a private offer is for, since a
+ * seller asked one captain a price and that captain said no. The row is
+ * kept rather than deleted so the seller reads what came back instead of
+ * reading nothing (see the withdrawn note in src/server/realtime/wiring/
+ * escort-contracts.ts), and it is kept for the two captains it names,
+ * which is the shape the aimed offer had in the first place.
+ *
+ * The second is the one field the escort carries that is not public:
+ * `raidGold` is the covered captain's own report of what a raid would have
+ * taken, and it is on the board for one reader, the seller, who is the
+ * captain the number turns into a bill. Everyone else, the buyer included,
+ * reads the row without it. That is a filtering rule rather than a field
+ * the wire leaves out, so a client that asked for the board directly reads
+ * the same row the broadcast carried.
  */
 export function visibleContracts(
   contracts: EscortContract[],
   userId: string,
 ): EscortContract[] {
-  return visibleConsent(contracts, userId).map((c) =>
-    c.raidGold === undefined || c.sellerUserId === userId
-      ? c
-      : { ...c, raidGold: undefined },
-  );
+  return visibleConsent(contracts, userId)
+    .filter(
+      (c) =>
+        c.status !== "declined" ||
+        c.buyerUserId === userId ||
+        c.sellerUserId === userId,
+    )
+    .map((c) =>
+      c.raidGold === undefined || c.sellerUserId === userId
+        ? c
+        : { ...c, raidGold: undefined },
+    );
 }
 
-/* The board's other three rules are the primitive's, and the escort no
+/* The board's other rules are the primitive's, and the escort no
    longer names them: the expiry, the one offer per seller per buyer bound
    and the accept that sweeps the rest are the same rules for both kinds, so
    they are read from ./consent by the server and by the panels rather than
    forwarded from here. What stays in this file is what only an escort can
    answer: who may sell, what a contract does to a purse, which side of this
    market is bounded to one agreement a leg (the buyer's, because one
-   captain's cover is one field), and which rows carry a number the rest of
-   the table must not read. A wrapper for each of the rest would be a second
-   name for one rule, which is the thing this tree deletes rather than
-   writes. */
+   captain's cover is one field), whether a buyer can pay the fee at all,
+   and which rows carry a number the rest of the table must not read. A
+   wrapper for each of the rest would be a second name for one rule, which
+   is the thing this tree deletes rather than writes. */
 
 // =====================================================================
 // The settlement rule: what a contract does to a purse, applied by the
@@ -226,11 +254,14 @@ export function resetEscortLeg(state: GameState): void {
  * (buyer's fee, seller's fee, seller's absorbed raid, and the immaterial
  * fourth) differ in three numbers and agree on everything else: who they
  * are, whether the movement has already been applied, and the rule that
- * only the holder of a purse writes to it. The ledger is the idempotence:
- * a reload between the agreement and the claim, or between the claim and
- * the broadcast that carries it, must not move the same Gold twice, so
- * every applied movement is recorded as "id:fee" or "id:claim" and a
- * second call with the same key does nothing.
+ * only the holder of a purse writes to it. The fourth case is any row that
+ * moved no Gold, which is a row somebody is reading about somebody else and
+ * a row that was turned down, and it falls through to false without a
+ * branch of its own because there is nothing to apply and nothing to say.
+ * The ledger is the idempotence: a reload between the agreement and the
+ * claim, or between the claim and the broadcast that carries it, must not
+ * move the same Gold twice, so every applied movement is recorded as
+ * "id:fee" or "id:claim" and a second call with the same key does nothing.
  *
  * Returns whether the state changed, which is what the React layer uses to
  * decide whether it owes the captain a re-render rather than to read the
@@ -252,16 +283,14 @@ export function applyEscortSide(
     if (movementApplied(state, key)) return false;
     if (isBuyer) {
       // The hire that was agreed in the market, paid at once, and paid by a
-      // purse that is allowed to be empty: the buyer's accept was guarded by
-      // their own balance, so a shortfall here is a purse that moved between
-      // the two, and the honest answer is the Gold that is actually there
-      // rather than a negative hold. The seller credits the price that was
-      // agreed, because the price, not the payment, is what the two captains
-      // shook hands on.
-      const paid = Math.max(
-        0,
-        Math.min(contract.fee, getOwnedAmount(state, "Gold")),
-      );
+      // purse that is allowed to be empty: the buyer's accept is guarded by
+      // their own balance before they press (see canPayFee in ./core, which
+      // the panel asks), so a shortfall here is a purse that moved between the
+      // press and this line, and the honest answer is the Gold that is
+      // actually there rather than a negative hold. The seller credits the
+      // price that was agreed, because the price, not the payment, is what
+      // the two captains shook hands on.
+      const paid = paidFee(state, contract.fee);
       addOwnedAmount(state, "Gold", -paid);
       state.escortBought += 1;
       state.escortFeesPaid += paid;
@@ -352,7 +381,20 @@ export function normalizeEscortState(state: GameState): void {
 // which imports this shape rather than declaring a second one).
 // =====================================================================
 export type EscortContract = ConsentTerms & {
-  status: "offered" | "agreed" | "claimed";
+  // Four states, and each one is a different thing for a reader to do: an
+  // offer is a price waiting on a press, an agreement is the leg's cover, a
+  // claim is that cover spent, and a decline is the offer that came back.
+  //
+  // The decline is a state rather than a deletion because of what a
+  // deletion would say. The seller posted a price and no longer reads it:
+  // with the row gone the seller cannot tell a captain who said no from a
+  // board that lost their row, and this tree already settled that question
+  // one desk over, where a spent mend keeps its row on screen rather than
+  // vanishing (see RefitBench). The row stays for the leg it was made in,
+  // carries no action for either captain, and settles nothing (see
+  // applyEscortSide), which is what makes a turned down offer unable to
+  // settle at all rather than merely unlikely to.
+  status: "offered" | "agreed" | "claimed" | "declined";
   // The Gold a raid would have taken from the covered captain, carried on
   // the claim so the seller's client can price what it eats.
   raidGold?: number;

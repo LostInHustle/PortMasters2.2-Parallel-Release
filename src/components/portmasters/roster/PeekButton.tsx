@@ -90,7 +90,7 @@ export function PeekButton({
           </div>
         )}
         <p className="mt-1.5 text-[10px] text-muted-foreground">
-          Bands are read from {targetName}'s live snapshot. The harbor master
+          Bands are read from {targetName}'s live snapshot. The Harbormaster
           only shares what your standing allows.
         </p>
       </PopoverContent>

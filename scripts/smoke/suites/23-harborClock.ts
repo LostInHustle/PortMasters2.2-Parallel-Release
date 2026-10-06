@@ -314,14 +314,15 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
   // The frame read is the first one standing at a seat of the lap rather
   // than the first one on the socket, and the difference is not a detail:
   // joining a room hands the joiner the room's ready state as it stands
-  // (src/server/realtime/index.ts:530), so a captain who walks into a
-  // lobby is told about the pier first. That frame is the other half of
-  // this pair rather than an obstacle to it, since the pier is the seat
-  // with no clock, and a field that reads null there is the design: an
-  // absence rather than a zero, which no client can draw as a countdown
-  // that has already run out. The seat the deal opens at answers the same
-  // way, and for its own reason: it is answered by the table rather than
-  // hurried along by anything, so it has no countdown to publish.
+  // (see readyStatePayload in src/server/realtime/wiring/room-join.ts), so
+  // a captain who walks into a lobby is told about the pier first. That
+  // frame is the other half of this pair rather than an obstacle to it,
+  // since the pier is the seat with no clock, and a field that reads null
+  // there is the design: an absence rather than a zero, which no client
+  // can draw as a countdown that has already run out. The seat the deal
+  // opens at answers the same way, and for its own reason: it is answered
+  // by the table rather than hurried along by anything, so it has no
+  // countdown to publish.
   const readyStates = clockA.crew[0].frames.filter(
     (frame) => frame.event === "phase:ready_update",
   );

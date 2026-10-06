@@ -75,7 +75,8 @@ export function ExpectedPriceTooltip({ price }: { price: ExpectedPrice }) {
 // market reference strip, the cards themselves), not just where a price
 // already happens to be printed. Outside Market this returns
 // undefined and the caller's <Term> falls back to its normal glossary
-// lookup, since the user only wants this while the board is open. Actual
+// lookup: a market price belongs to the board, and the blurb alone is
+// what a name carries elsewhere. Actual
 // demand and prices later in the voyage can vary.
 export function priceAwareTermContent(game: GameState, itemType: string) {
   if (game.phase !== "market") return undefined;

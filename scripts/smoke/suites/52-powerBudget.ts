@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CARDS, cardById } from "@/lib/game/cards";
+import { CARDS, cardById, offerPool } from "@/lib/game/cards";
 import { charterChoices, charterPending } from "@/lib/game/charters";
 import {
   MAX_HELD_CARDS,
@@ -23,7 +23,7 @@ import {
   CHARTER_PATH,
   CHARTERS,
 } from "@/lib/game/constants/charters";
-import { MILESTONE_BOONS } from "@/lib/game/constants/drafts";
+import { CARDS_PER_OFFER, MILESTONE_BOONS } from "@/lib/game/constants/drafts";
 import {
   MILESTONE_TRIGGERS,
   type MilestoneTrigger,
@@ -32,17 +32,28 @@ import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
 import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
 import { milestoneChoices, milestonePending } from "@/lib/game/milestones";
 import type { GameMode } from "@/lib/game/mode";
+import type { GameState } from "@/lib/game/types";
 import { answerCharter } from "@/lib/game/engine/charters";
 import {
   answerMilestone,
   queueMilestoneMoment,
 } from "@/lib/game/engine/milestones";
+// The two readers this suite holds that the engine barrel deliberately
+// does not carry: the yard's own fit test, which the barrel section below
+// asserts stays private to the yard and its suites, and the load path's
+// heal, which belongs to the session layer rather than to the engine.
+import { moduleFitsHull } from "@/lib/game/engine/boons";
+import { healLoadedVoyage } from "@/lib/session/heal-save";
 import * as engineBarrel from "@/lib/game/engine";
 import {
+  cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
   moduleDraftPossible,
+  moduleSwapPossible,
+  snapToCheckpoint,
   startModuleDrafting,
+  swapModuleChoices,
 } from "@/lib/game/engine";
 import {
   CARRIES_A_DASH,
@@ -615,6 +626,526 @@ export async function powerBudgetSuite(): Promise<void> {
     "the swap runs its arithmetic per slot: the same five power module is refused over the light slot that frees two power and taken over the heavy one that frees five, which is the displaced arm read at the seat the captain actually chose",
   );
 
+  // [field report: the batch that would not change] The draft's once a
+  // round swap, which is the second half of the field report against this
+  // market. The reroll used to be the round's own draw run a second time
+  // over the same candidates, and the candidates are the fitting pool
+  // less what the hull already carries, so a full hull at a table whose
+  // pool it has already seen in full had exactly one outcome left and the
+  // swap re served the batch it was pressed to replace: the screen said a
+  // fresh batch was coming and the same three cards stayed on it. What
+  // the checks below hold is the shape of the repair: a swap draws
+  // what the round has not shown, a swap that cannot fill three seats
+  // from the unseen cards tops up from the table it replaces rather than
+  // dealing an empty seat, and a yard with nothing left to deal refuses
+  // in words with the round's one use unspent.
+  const trioOf = (state: GameState): string[] =>
+    (state._draftChoices ?? []).map((card) => card.id);
+  const sortedTrio = (state: GameState): string =>
+    [...trioOf(state)].sort().join("|");
+
+  // A hull with room to spare at an Ocean Gambit table: eight modules are
+  // live in this mode and this hull carries none, so the round showed
+  // three of them and the swap has five it has never seen to draw from.
+  const freshYard = voyageState();
+  freshYard.shipLevel = 3;
+  startModuleDrafting(freshYard);
+  const freshBefore = trioOf(freshYard);
+  // What a read of the question is allowed to touch, held as one string
+  // so the check below is about the state rather than about one field of
+  // it: the tally the roll writes, the table the round holds, and the use
+  // the press spends.
+  const swapRead = () =>
+    JSON.stringify({
+      tally: freshYard.cardTally,
+      trio: trioOf(freshYard),
+      used: freshYard.moduleSwapUsed,
+    });
+  const beforeRead = swapRead();
+  const freshPossible = moduleSwapPossible(freshYard);
+  check(
+    freshPossible && swapRead() === beforeRead,
+    "the swap's own question, which the button reads before the press, is a read: a hull with room around it answers yes and asking it writes no tally, no table and no use, which is the shape every door predicate in this yard keeps (see moduleDraftPossible)",
+  );
+  const freshLogs: string[] = [];
+  swapModuleChoices(freshYard, freshLogs);
+  const freshAfter = trioOf(freshYard);
+  check(
+    freshBefore.length === 3 &&
+      freshYard.moduleSwapUsed &&
+      freshAfter.length === 3 &&
+      freshAfter.every((id) => !freshBefore.includes(id)) &&
+      freshAfter.every((id) =>
+        freshYard.equippedModules.every((card) => card.id !== id),
+      ) &&
+      freshLogs.some((line) => line.includes("fresh batch")),
+    "and a swap on that hull deals a genuinely new trio: three cards the round has not shown, every seat of them a card this hull does not already carry, and the once a round use is what the press spends",
+  );
+
+  // The round's table is fixed once rolled, which the swap does not
+  // change: backing out to the yard and drawing again reshow the batch
+  // the swap dealt, card for card, because the only reroll the round has
+  // is the one it just spent.
+  cancelModuleDraft(freshYard);
+  const backedOut = trioOf(freshYard);
+  startModuleDrafting(freshYard);
+  check(
+    freshYard.phase === "module_draft" &&
+      backedOut.join("|") === freshAfter.join("|") &&
+      trioOf(freshYard).join("|") === freshAfter.join("|"),
+    "and a captain who swaps, backs out to the yard and draws again is shown the batch the swap dealt in the order it dealt it rather than a third serving: the round's table is rolled once and the swap is the only way it moves",
+  );
+
+  // A hull carrying three of Ocean Gambit's eight: the round showed the
+  // three it was dealt, five were candidates and the hull carries three
+  // of them, so exactly two cards in the whole pool have never been on
+  // this screen. Two seats fill from those and the third is topped up
+  // from the table being replaced, because a swap that dealt two cards
+  // is a broken screen rather than a tighter draft.
+  const toppedUp = voyageState();
+  toppedUp.shipLevel = 3;
+  toppedUp.equippedModules.push(
+    cardOf("smugglers_hold"),
+    cardOf("bulk_hauler"),
+    cardOf("artisans_workshop"),
+  );
+  startModuleDrafting(toppedUp);
+  const toppedBefore = trioOf(toppedUp);
+  const toppedLogs: string[] = [];
+  swapModuleChoices(toppedUp, toppedLogs);
+  const toppedAfter = trioOf(toppedUp);
+  const repeats = toppedAfter.filter((id) => toppedBefore.includes(id));
+  check(
+    toppedBefore.length === 3 &&
+      toppedUp.moduleSwapUsed &&
+      sortedTrio(toppedUp) !== [...toppedBefore].sort().join("|") &&
+      toppedAfter.length === 3 &&
+      repeats.length === 1 &&
+      toppedAfter.every(
+        (id) =>
+          cardById(id)?.kind === "module" &&
+          toppedUp.equippedModules.every((card) => card.id !== id),
+      ) &&
+      toppedLogs.some((line) => line.includes("fresh batch")),
+    "a swap on a hull that has seen most of the pool tops up rather than dealing short: two seats come from the cards this hull has never been shown and one from the batch being replaced, so even the swap that cannot fill three seats from the unseen cards hands back a different batch of three real modules",
+  );
+
+  // [field report: the batch that would not change] The promise the three
+  // checks above pin on named hulls, held over two hundred hulls a hand
+  // would not think to build: both modes, every level, hulls carrying
+  // nothing and hulls carrying most of the pool, so wherever the ladder
+  // and the cap leave the candidates the press is held to its three rules.
+  // The hulls and levels come from a local LCG seeded here rather than
+  // from Math.random, so the run is the same run every time the battery
+  // reads it, while the swap's own draw stays the live draw the game runs.
+  let fuzzSeed = 0x2f6e2b1;
+  const fuzzNext = (): number => {
+    fuzzSeed = (fuzzSeed * 1103515245 + 12345) & 0x7fffffff;
+    return fuzzSeed / 0x7fffffff;
+  };
+  const fuzzFailures: string[] = [];
+  for (let trial = 0; trial < 200; trial++) {
+    const randomHull = voyageState({
+      mode: trial % 2 === 0 ? GAMBIT : CLASSIC,
+    });
+    const level = 1 + Math.floor(fuzzNext() * 4);
+    randomHull.shipLevel = level;
+    const hullPool = offerPool("module", randomHull).map(([card]) => card.id);
+    const order = [...hullPool].sort(() => fuzzNext() - 0.5);
+    for (const id of order.slice(0, Math.min(level, order.length))) {
+      randomHull.equippedModules.push(cardOf(id));
+    }
+    startModuleDrafting(randomHull);
+    const replaced = trioOf(randomHull);
+    const dealable = moduleSwapPossible(randomHull);
+    const fuzzLogs: string[] = [];
+    swapModuleChoices(randomHull, fuzzLogs);
+    const dealt = trioOf(randomHull);
+    if (dealable) {
+      if (dealt.length !== CARDS_PER_OFFER)
+        fuzzFailures.push(`trial ${trial}: a batch of ${dealt.length}`);
+      if (new Set(dealt).size !== dealt.length)
+        fuzzFailures.push(`trial ${trial}: one seat dealt twice`);
+      if (!dealt.every((id) => moduleFitsHull(randomHull, cardOf(id))))
+        fuzzFailures.push(`trial ${trial}: a seat this hull cannot take`);
+      if (sortedTrio(randomHull) === [...replaced].sort().join("|"))
+        fuzzFailures.push(`trial ${trial}: the trio the press replaced`);
+    } else {
+      if (
+        !fuzzLogs.some(
+          (line) =>
+            line.includes("nothing new to deal") ||
+            line.includes("Nothing to swap"),
+        )
+      )
+        fuzzFailures.push(`trial ${trial}: a refusal that said nothing`);
+      if (randomHull.moduleSwapUsed)
+        fuzzFailures.push(`trial ${trial}: a refusal that spent the use`);
+      if (sortedTrio(randomHull) !== [...replaced].sort().join("|"))
+        fuzzFailures.push(`trial ${trial}: a refusal that moved the table`);
+    }
+  }
+  if (fuzzFailures.length > 0)
+    console.log(`    [swap fuzz] ${fuzzFailures.slice(0, 3).join("; ")}`);
+  check(
+    fuzzFailures.length === 0,
+    "and the swap keeps that promise over two hundred random hulls: wherever the button is dealable the press hands back a whole batch of three distinct seats that all fit this hull and never the trio it replaced, and wherever it is not the press is refused in words with the table and the round's one use left standing",
+  );
+
+  // The same press at the two rungs of the ladder a hull can still have
+  // room on: the level one hull carries nothing and the level two hull
+  // carries one five power module beside its open slot. Both read the
+  // open slot arm of the fit test, and both are hulls whose every unseen
+  // card fits, so the checks are about the batch rather than about the
+  // cap.
+  const ladderHull = (level: number, ids: string[]) => {
+    const state = voyageState();
+    state.shipLevel = level;
+    state.equippedModules.push(...ids.map((id) => cardOf(id)));
+    return state;
+  };
+  const openSlotSwaps = [ladderHull(1, []), ladderHull(2, ["tax_evasion"])].map(
+    (hull) => {
+      startModuleDrafting(hull);
+      const before = trioOf(hull);
+      const logs: string[] = [];
+      swapModuleChoices(hull, logs);
+      return { hull, before, after: trioOf(hull), logs };
+    },
+  );
+  check(
+    openSlotSwaps.every(
+      ({ hull, before, after, logs }) =>
+        before.length === CARDS_PER_OFFER &&
+        after.length === CARDS_PER_OFFER &&
+        sortedTrio(hull) !== [...before].sort().join("|") &&
+        after.every((id) => !before.includes(id)) &&
+        after.every(
+          (id) =>
+            hull.equippedModules.every((card) => card.id !== id) &&
+            moduleFitsHull(hull, cardOf(id)),
+        ) &&
+        logs.some((line) => line.includes("fresh batch")),
+    ),
+    "a swap on a hull with an open slot deals a genuinely new batch of three whatever rung it stands on: the level one hull and the level two hull each draw seats the round never showed, none of them a card the hull already carries, and every one a card the fit test would let that hull bolt on",
+  );
+
+  // The press on a hull standing exactly at the cap, which is the hull
+  // every one of these gates was built for: five of the mode's eight
+  // modules are still unseen and the hull carries three, so two seats
+  // come from the unseen cards and the third is a top up from the table
+  // being replaced. Every seat still passes the fit test, because the
+  // swap arm of it weighs the card over the heaviest module the hull
+  // could give up, which is the most room this hull can make.
+  const cappedSwap = swapState();
+  startModuleDrafting(cappedSwap);
+  const cappedBefore = trioOf(cappedSwap);
+  const cappedLogs: string[] = [];
+  swapModuleChoices(cappedSwap, cappedLogs);
+  const cappedAfter = trioOf(cappedSwap);
+  check(
+    heldPower(cappedSwap) === HELD_POWER_CAP &&
+      cappedBefore.length === CARDS_PER_OFFER &&
+      cappedAfter.length === CARDS_PER_OFFER &&
+      cappedAfter.filter((id) => cappedBefore.includes(id)).length === 1 &&
+      cappedAfter.every(
+        (id) =>
+          cappedSwap.equippedModules.every((card) => card.id !== id) &&
+          moduleFitsHull(cappedSwap, cardOf(id)),
+      ) &&
+      cappedSwap.moduleSwapUsed,
+    "a hull standing exactly at the cap still swaps to a whole batch, and every seat of it is a card that hull can actually take: the seats are read through the same fit test the roll screens with, so a card the cap would refuse is never dealt, and the batch is one seat from the table being replaced rather than the same three cards again",
+  );
+
+  // The corner the top up behind the fresh draw cannot reach. A Parley
+  // trade lands a module on this hull between the roll and the press
+  // (see applyModuleTradeSide), and three of them empty the table onto
+  // it: what is left unseen is the two cards the round never showed and
+  // there is nothing else to top up from, so before the last resort the
+  // press dealt a two seat batch into a screen that promises a swap.
+  const tradedOut = voyageState();
+  tradedOut.shipLevel = 3;
+  tradedOut.equippedModules.push(
+    cardOf("smugglers_hold"),
+    cardOf("bulk_hauler"),
+    cardOf("artisans_workshop"),
+  );
+  startModuleDrafting(tradedOut);
+  const tradedBefore = trioOf(tradedOut);
+  for (const id of tradedBefore) tradedOut.equippedModules.push(cardOf(id));
+  const tradedLogs: string[] = [];
+  swapModuleChoices(tradedOut, tradedLogs);
+  const tradedAfter = trioOf(tradedOut);
+  check(
+    tradedBefore.length === CARDS_PER_OFFER &&
+      tradedOut.equippedModules.length === 6 &&
+      tradedOut.moduleSwapUsed &&
+      tradedAfter.length === CARDS_PER_OFFER &&
+      sortedTrio(tradedOut) !== [...tradedBefore].sort().join("|") &&
+      tradedAfter.every((id) => moduleFitsHull(tradedOut, cardOf(id))) &&
+      tradedLogs.some((line) => line.includes("fresh batch")),
+    "a table the round's own trades have emptied onto the hull still deals a whole batch: the three landed cards leave just the two modules this round never showed, and the swap falls back to the fitting pool the round's own roll reads when the unseen cards run out rather than dealing two seats and calling it a swap",
+  );
+
+  // The last resort reads the pool by id, so the duplicate a hull may
+  // legitimately carry (the fallback pool above deals one whenever the
+  // unseen cards run short, see rollModuleChoices) fills one seat rather
+  // than two. This hull carries two copies of one module and three trades
+  // land the whole table on it, which leaves two unseen cards and nothing
+  // to top up from: the fallback pool deals the third seat, and the check
+  // is that the seat it fills is one card, with every seat of the batch
+  // distinct and fit for this hull.
+  const twinSwap = voyageState();
+  twinSwap.shipLevel = 3;
+  twinSwap.equippedModules.push(
+    cardOf("brokers_network"),
+    cardOf("salvage_crane"),
+    cardOf("overdrive_engine"),
+    cardOf("brokers_network"),
+  );
+  startModuleDrafting(twinSwap);
+  const twinBefore = trioOf(twinSwap);
+  for (const id of twinBefore) twinSwap.equippedModules.push(cardOf(id));
+  const twinSwapLogs: string[] = [];
+  swapModuleChoices(twinSwap, twinSwapLogs);
+  const twinAfter = trioOf(twinSwap);
+  check(
+    twinAfter.length === CARDS_PER_OFFER &&
+      new Set(twinAfter).size === CARDS_PER_OFFER &&
+      twinAfter.every((id) => moduleFitsHull(twinSwap, cardOf(id))) &&
+      twinSwap.equippedModules.filter((card) => card.id === "brokers_network")
+        .length === 2 &&
+      twinSwap.equippedModules.length === 7 &&
+      twinSwap.moduleSwapUsed,
+    "a hull carrying the same module twice never draws it twice in one batch: the pools a swap reads hold cards rather than copies, so one id fills at most one seat, every seat of the batch is distinct and fit for this hull, and the swap leaves both copies bolted where they were",
+  );
+
+  // A Classic hull carrying three of the six modules that mode runs:
+  // the round's table is the whole of what is left, so every module the
+  // yard could deal this hull is on the screen already. The press is
+  // refused in words and the round keeps its use, because a swap that
+  // handed back the same three cards is not a swap the yard performed.
+  const classicHeld = ["smugglers_hold", "bulk_hauler", "artisans_workshop"];
+  const collapsed = voyageState({ mode: CLASSIC });
+  collapsed.shipLevel = 3;
+  collapsed.equippedModules.push(...classicHeld.map((id) => cardOf(id)));
+  startModuleDrafting(collapsed);
+  const collapsedLeftover = offerPool("module", collapsed)
+    .map(([card]) => card.id)
+    .filter((id) => !classicHeld.includes(id))
+    .sort()
+    .join("|");
+  const collapsedBefore = sortedTrio(collapsed);
+  const collapsedPossible = moduleSwapPossible(collapsed);
+  const collapsedLogs: string[] = [];
+  swapModuleChoices(collapsed, collapsedLogs);
+  check(
+    collapsedBefore === collapsedLeftover &&
+      !collapsedPossible &&
+      !collapsed.moduleSwapUsed &&
+      sortedTrio(collapsed) === collapsedBefore &&
+      collapsedLogs.some((line) => line.includes("nothing new")),
+    "the reported collapse reads as a refusal rather than as a repeat: a Classic hull the round has shown every module it could be dealt draws a disabled swap and a press that is answered in words, the table stays where it was, and the once a round use is still the captain's to spend on a leg where the yard has something to deal",
+  );
+
+  // The three refusals as the captain reads them, held here rather than
+  // as fragments: a press that changes nothing has to say why, and the
+  // sentence is the whole of what the captain gets back for it. The
+  // collapse above is the third one, read off its own press.
+  check(
+    collapsedLogs.some(
+      (line) =>
+        line ===
+        "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next leg.",
+    ) && !CARRIES_A_DASH.test(collapsedLogs.join(" ")),
+    "the refusal a dry pool writes names the three ways forward in one sentence, and every line the press wrote is free of dashes like the rest of the game's copy",
+  );
+
+  // The press the field report's own screen makes twice: two dispatches in
+  // one tick, which is what a double click is and what the reducer applies
+  // one after the other against the state the first press left (see the
+  // APPLY half of src/lib/session/reducer.ts). The round has one swap, and
+  // what the second press must not do is deal a second batch out of the
+  // seats the first one left.
+  const twicePressed = voyageState();
+  twicePressed.shipLevel = 3;
+  startModuleDrafting(twicePressed);
+  const tickBefore = trioOf(twicePressed);
+  const tickLogs: string[] = [];
+  swapModuleChoices(twicePressed, tickLogs);
+  const afterFirstPress = trioOf(twicePressed);
+  swapModuleChoices(twicePressed, tickLogs);
+  check(
+    tickBefore.length === CARDS_PER_OFFER &&
+      afterFirstPress.length === CARDS_PER_OFFER &&
+      afterFirstPress.every((id) => !tickBefore.includes(id)) &&
+      trioOf(twicePressed).join("|") === afterFirstPress.join("|") &&
+      twicePressed.moduleSwapUsed &&
+      tickLogs.filter(
+        (line) =>
+          line === "❌ You've already swapped your module choices this round",
+      ).length === 1,
+    "two presses of the swap in one tick are one swap and one refusal: the round's use is what the second press meets, so the batch the first press dealt is the batch the screen keeps rather than a third draw from the seats that are left",
+  );
+
+  // The two ways a press can arrive with nothing to swap, read for the
+  // order of the two guards as well as for the words: a captain with the
+  // use already spent is told that, a captain with no table is told to
+  // draft first, and neither press spends the round's one swap.
+  const noTable = voyageState();
+  const noTablePhase = noTable.phase;
+  const noTableLogs: string[] = [];
+  swapModuleChoices(noTable, noTableLogs);
+  const spentFirst = voyageState();
+  spentFirst.moduleSwapUsed = true;
+  const spentLogs: string[] = [];
+  swapModuleChoices(spentFirst, spentLogs);
+  check(
+    noTableLogs.some(
+      (line) => line === "❌ Nothing to swap, draft your modules first",
+    ) &&
+      !noTable.moduleSwapUsed &&
+      (noTable._draftChoices?.length ?? 0) === 0 &&
+      noTable.phase === noTablePhase &&
+      spentLogs.some(
+        (line) =>
+          line === "❌ You've already swapped your module choices this round",
+      ) &&
+      !spentLogs.some((line) => line.includes("Nothing to swap")),
+    "a press on a table the yard has not dealt is refused for the table and a press on a spent round is refused for the use, in those two sentences rather than one: the use is read before the table, so a captain who has already swapped is never told to draft modules for a screen that is standing right there",
+  );
+
+  // The reload, which is the one rollback a captain causes without the
+  // server: the whole save goes up as it stands, transients and all (see
+  // use-auto-save), and the load path opens the room's seat over it (see
+  // snapToCheckpoint and enterPhase). Both halves of the round's yard
+  // ride the save, so the reload is a screen that looks again rather
+  // than a round that rolls again.
+  const reloaded = voyageState();
+  reloaded.shipLevel = 3;
+  startModuleDrafting(reloaded);
+  const reloadBefore = trioOf(reloaded);
+  const reloadLogs: string[] = [];
+  swapModuleChoices(reloaded, reloadLogs);
+  const reloadSwapped = trioOf(reloaded);
+  const reloadCtx = { seedBase: "smoke:f7:reload", harborId: "harbor-f7" };
+  snapToCheckpoint(reloaded, reloadCtx, reloaded.currentRound, "dusk", []);
+  const afterReload = trioOf(reloaded);
+  startModuleDrafting(reloaded);
+  check(
+    reloadBefore.length === CARDS_PER_OFFER &&
+      reloadSwapped.length === CARDS_PER_OFFER &&
+      reloadSwapped.every((id) => !reloadBefore.includes(id)) &&
+      afterReload.join("|") === reloadSwapped.join("|") &&
+      reloaded.phase === "module_draft" &&
+      trioOf(reloaded).join("|") === reloadSwapped.join("|") &&
+      reloaded.moduleSwapUsed,
+    "a reload mid dusk cannot re deal the batch the room has seen: the save carries the round's table and the use that moved it, the load path opens the seat over that save rather than rolling, and the draft the reloaded captain walks back into holds the swapped batch card for card with the round's one use still spent",
+  );
+
+  // The same reload read the way a browser reads it rather than through
+  // the seat move above: the save the client writes goes up as JSON (see
+  // use-auto-save), and the load path parses it and heals it before any
+  // screen reads it (see healLoadedVoyage). The round's table and the use
+  // are transients the heal deliberately does not roll, so a captain
+  // reloading into the yard meets the batch the swap dealt, card for card
+  // and in the order it was dealt, with the round's one use still spent.
+  const reloadHealed = voyageState();
+  reloadHealed.shipLevel = 3;
+  startModuleDrafting(reloadHealed);
+  const reloadHealedLogs: string[] = [];
+  swapModuleChoices(reloadHealed, reloadHealedLogs);
+  const healedTrio = trioOf(reloadHealed);
+  const loadedBack = JSON.parse(JSON.stringify(reloadHealed)) as GameState;
+  healLoadedVoyage(loadedBack, { legacyRenownLevel: null });
+  check(
+    healedTrio.length === CARDS_PER_OFFER &&
+      loadedBack.moduleSwapUsed &&
+      JSON.stringify(trioOf(loadedBack)) === JSON.stringify(healedTrio) &&
+      (loadedBack._draftChoices ?? []).every(
+        (card) => cardById(card.id)?.kind === "module",
+      ),
+    "a reload through the path a browser takes keeps the swapped batch card for card: the save is JSON, the load path parses and heals it, the round's table and its one use survive the heal untouched, and every seat of it still resolves through the pool this build shipped",
+  );
+
+  // The hull that moves under the picker. A Parley module trade settles on
+  // this captain's own machine when the agreement arrives, which can be
+  // after the yard has opened, and the seller's side takes a module off
+  // the hull without asking the screen (see applyModuleTradeSide). The row
+  // a captain then presses names a seat the hull no longer carries.
+  const soldAway = swapState();
+  soldAway._newModule = cardOf("tax_evasion");
+  soldAway.phase = "module_swap";
+  const carriedBefore = soldAway.equippedModules.length;
+  soldAway.equippedModules = soldAway.equippedModules.filter(
+    (card) => card.id !== "silk_monopoly",
+  );
+  const soldLogs: string[] = [];
+  finalizeModuleSwap(soldAway, carriedBefore - 1, soldLogs);
+  check(
+    soldLogs.some(
+      (line) =>
+        line ===
+        "❌ That seat is no longer on your hull, so there is nothing there to replace. Back to Draft and take the card again: the yard fits it to the hull as it stands.",
+    ) &&
+      soldAway.equippedModules.length === carriedBefore - 1 &&
+      soldAway._newModule?.id === "tax_evasion" &&
+      soldAway.phase === "module_swap" &&
+      soldLogs.every((line) => !line.includes("Swapped")),
+    "and a press naming a seat the hull gave up is refused in words rather than swapping under the wrong module: the hull is left as the trade left it, the pick stays parked so Back to Draft still shows it, the screen stays where it is, and nothing is written as a swap the captain did not make",
+  );
+
+  // A hull carrying two of the same module, which the fallback pool above
+  // deals whenever the unseen cards run short (see rollModuleChoices), so
+  // the picker's rows are drawn one per seat and the press names the seat
+  // rather than the card. The engine is the floor under that reading.
+  const twins = voyageState();
+  twins.shipLevel = 3;
+  twins.equippedModules.push(
+    cardOf("brokers_network"),
+    cardOf("brokers_network"),
+    cardOf("smugglers_hold"),
+  );
+  twins._newModule = cardOf("silk_monopoly");
+  twins.phase = "module_swap";
+  const twinLogs: string[] = [];
+  finalizeModuleSwap(twins, 1, twinLogs);
+  check(
+    twins.equippedModules.filter((card) => card.id === "brokers_network")
+      .length === 1 &&
+      twins.equippedModules[0]?.id === "brokers_network" &&
+      twins.equippedModules[1]?.id === "silk_monopoly" &&
+      twins.equippedModules[2]?.id === "smugglers_hold" &&
+      twins._newModule === undefined &&
+      twinLogs.some((line) => line.includes("Swapped")),
+    "and a hull carrying two of the same module swaps by seat rather than by card: the press names the second seat, one copy of the light module leaves, the card it was drafted for lands in that seat, and the copy on the seat beside it is untouched, which is the positional promise the picker's rows are keyed on",
+  );
+
+  // The tally a swap writes, which is the record the card conversion
+  // report reads a voyage back through (see noteCardOffer in
+  // @/lib/game/cards and scripts/cardConversion.ts): one offer is noted
+  // per seat the batch deals and nothing else is, so a batch of three is
+  // three counters a reader can hold against the table the captain saw.
+  const tallySum = (tally: GameState["cardTally"]): number =>
+    Object.values(tally).reduce((sum, entry) => sum + entry.offered, 0);
+  const tallied = voyageState();
+  tallied.shipLevel = 3;
+  startModuleDrafting(tallied);
+  const tallyBefore = JSON.parse(
+    JSON.stringify(tallied.cardTally),
+  ) as GameState["cardTally"];
+  const talliedLogs: string[] = [];
+  swapModuleChoices(tallied, talliedLogs);
+  const talliedTrio = trioOf(tallied);
+  const seatOffers = (id: string): number =>
+    (tallied.cardTally[id]?.offered ?? 0) - (tallyBefore[id]?.offered ?? 0);
+  check(
+    talliedTrio.length === CARDS_PER_OFFER &&
+      tallySum(tallied.cardTally) - tallySum(tallyBefore) === CARDS_PER_OFFER &&
+      talliedTrio.every((id) => seatOffers(id) === 1),
+    "a swap writes exactly three offers into the round's tally, one per seat the batch deals: the three fresh seats are each noted once, nothing else is noted at all, and the record a later reading is turned over starts at the table the captain actually saw",
+  );
+
   // ========== F. The one home, and the settle the gates sit beside ==========
 
   const repoRoot = join(import.meta.dirname, "..", "..", "..");
@@ -668,7 +1199,7 @@ export async function powerBudgetSuite(): Promise<void> {
     sourceOf("src/components/portmasters/game/ModuleMarket.tsx"),
   ].map(flat);
   const marketSentence =
-    "Taking it would put your hull at ${heldPower(game) + card.power} power, and a hull carries at most ${HELD_POWER_CAP}.";
+    "Taking it would put your hull at ${powerAfterTaking(game, card)} power, and a hull carries at most ${HELD_POWER_CAP}.";
   const swapSentence = "carries at most {HELD_POWER_CAP}";
   check(
     panels.every((text) => text.includes("HELD_POWER_CAP")) &&
@@ -678,6 +1209,22 @@ export async function powerBudgetSuite(): Promise<void> {
       !CARRIES_A_DASH.test(marketSentence) &&
       !CARRIES_A_DASH.test(swapSentence),
     "every surface that gates a click names the constant rather than its number: the market row, the swap rows and the Shipyard's empty draft each read the one home, and the sentences a captain meets are free of dashes",
+  );
+
+  // The draft's swap button is the fourth surface that gates a click, and
+  // the sentence under its disabled state is the one a captain reads when
+  // the yard has nothing new to deal (see moduleSwapPossible).
+  const draftPanel = flat(
+    sourceOf("src/components/portmasters/game/phases/ModuleDraft.tsx"),
+  );
+  const emptySwapSentence =
+    "Nothing new to deal: every module the yard could offer this hull is either on this table already or aboard. Take one of these, or come back next leg.";
+  check(
+    draftPanel.includes("moduleSwapPossible(game)") &&
+      draftPanel.includes("swapModuleChoices(g, l)") &&
+      draftPanel.includes(emptySwapSentence) &&
+      !CARRIES_A_DASH.test(emptySwapSentence),
+    "and the swap button reads the swap's own question before its press, with the disabled state explained in words rather than left silent, which is the same two part shape the Shipyard's Draft button has carried since the cap shipped",
   );
 
   // ========== G. The instrument ==========
@@ -829,10 +1376,13 @@ export async function powerBudgetSuite(): Promise<void> {
 
   check(
     "moduleDraftPossible" in engineBarrel &&
+      "moduleSwapPossible" in engineBarrel &&
       !("rollModuleChoices" in engineBarrel) &&
+      !("swapCandidates" in engineBarrel) &&
+      !("rerollModuleChoices" in engineBarrel) &&
       !("moduleFitsHull" in engineBarrel) &&
       !("heaviestEquipped" in engineBarrel) &&
       !("powerRefusal" in engineBarrel),
-    "only the Draft button's own question crosses the engine's barrel: the roll, the hull test, the heaviest slot and the refusal sentence stay in the yard's module, so a caller meets the cap the way the panel does",
+    "only the two door questions cross the engine's barrel, the draft's and the swap's: the roll, the swap's own draw and its two candidate halves, the hull test, the heaviest slot and the refusal sentence stay in the yard's module, so a caller meets the cap the way the panel does",
   );
 }

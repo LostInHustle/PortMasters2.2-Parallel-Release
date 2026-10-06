@@ -17,13 +17,13 @@ import { cn } from "@/lib/utils";
  * a `filter` or a `clip-path` is one of the things that does. The controls in
  * this game carry two of those at various moments: a pressable button lifts
  * and scales on hover, which is a `transform`, and the same rule brightens it,
- * which is a `filter`. Opening a dialog from inside one of them used to centre
- * it on that button rather than on the viewport, and the part of it taller
- * than the button ran off the top of the screen where nothing could reach it.
- * Portalling to the body lifts a dialog out of that ancestry
- * entirely, so its centring holds wherever it is opened from. Deleting the
- * portal on the grounds that the old reason has gone would bring the whole
- * fault back, because the reasons above are still true.
+ * which is a `filter`. A dialog opened from inside one of them would centre
+ * on that button rather than on the viewport, and the part of it taller
+ * than the button would run off the top of the screen where nothing could
+ * reach it. Portalling to the body lifts a dialog out of that ancestry
+ * entirely, so its centring holds wherever it is opened from, and deleting
+ * the portal would bring the whole fault back, because the reasons above
+ * are still true.
  *
  * Every call site mounts this behind state that starts false, so it only ever
  * renders in the browser. The guard below covers the server pass, where
@@ -92,12 +92,13 @@ export function ModalCard({ children }: { children: ReactNode }) {
  * whose header and body the caller hands in as children.
  *
  * The guide, the settings, the captain's profile and the leaderboard are
- * the four dialogs this serves, and before it existed each of them wrote
- * out the same motion props and the same eleven glass classes, agreeing
- * on everything but the two numbers this takes: how wide the panel may be
- * and how tall. The card above keeps its own shape because its content is
- * one centred column and the four are scrolled regions under fixed
- * headers; the paper here is one width, one height and the stack.
+ * the four dialogs this serves. They agree on everything but the two
+ * numbers this takes: how wide the panel may be and how tall. The motion
+ * props and the glass classes live here, so a caller cannot drift from
+ * the shape the four share. The card above keeps its own shape because
+ * its content is one centred column and the four are scrolled regions
+ * under fixed headers; the paper here is one width, one height and the
+ * stack.
  */
 export function ModalSheet({
   maxW = "max-w-md",
@@ -127,12 +128,11 @@ export function ModalSheet({
  * icon, and nothing chosen by the caller but the two words a screen reader
  * reads out.
  *
- * It is here because the note above used to say the close button was the
- * caller's business, on the grounds that the callers did not agree about it.
- * They agree completely: five dialogs had each written this button out, and
- * the five were identical down to the icon's size, with the label the only
- * part any of them had actually picked. Five copies of a look is how a look
- * drifts, and the drift is invisible until two dialogs are open side by side.
+ * The five dialogs that draw a close button agree on every part of it down
+ * to the icon's size, and the label is the only piece any of them picks for
+ * itself. Five copies of a look is how a look drifts, and the drift is
+ * invisible until two dialogs are open side by side, so the look lives here
+ * and each caller passes only the label.
  */
 export function ModalClose({
   label,

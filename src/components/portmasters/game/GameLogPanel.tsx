@@ -18,7 +18,7 @@ export function GameLogPanel({ logs }: { logs: string[] }) {
 
   return (
     // The rail above this is one scroll column at every window height (see
-    // GameStatusPanel), so the ledger no longer stretches to fill a tab box:
+    // GameStatusPanel), so the ledger does not stretch to fill a tab box:
     // the tail box caps its own height and scrolls, which keeps the newest
     // lines pinned into view and stops a hundred line voyage from pushing
     // the head of the rail thousands of pixels away.
@@ -28,7 +28,7 @@ export function GameLogPanel({ logs }: { logs: string[] }) {
           📜 Ledger
         </span>
         <span className="text-[10px] text-muted-foreground">
-          {logs.length} entries
+          {logs.length} {logs.length === 1 ? "entry" : "entries"}
         </span>
       </div>
       <div

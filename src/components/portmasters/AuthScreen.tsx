@@ -134,9 +134,8 @@ function HarborHeader() {
       <h1 className="font-display text-xl font-bold tracking-tight">
         <span className="text-brand">{APP_NAME}</span>
       </h1>
-      {/* A tagline, not a second title. This line used to carry the
-          game's old subtitle, which left the screen showing two
-          different names for one game. */}
+      {/* A tagline, not a second title: the screen prints one name for
+          the game, and this line is only the sentence under it. */}
       <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Waves className="h-3.5 w-3.5" /> Maritime trade on the ancient Silk
         Road
@@ -166,7 +165,7 @@ export function AuthScreen({ onAuthed, notice, onDismissNotice }: DoorProps) {
               displayName: values.displayName.trim() || undefined,
             })
       }
-      labels={{ login: "Set Sail", register: "Hoist the Colours" }}
+      labels={{ login: "Set Sail", register: "Hoist the Colors" }}
       icons={{
         login: <Ship className="mr-2 h-4 w-4" />,
         register: <Anchor className="mr-2 h-4 w-4" />,

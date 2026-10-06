@@ -4,14 +4,11 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // The two votes share one shape: a heading in the meaning colour of what
-// the vote costs, and the body of whichever state its window is in. The
-// shell used to choose between a full card and a fold of its own, one per
-// vote, stacked at the top of the Parley board; both votes live inside
-// the one Harbor Business fold now (W4, UX-3 in docs/STUDIO_AUDIT.md), so
-// the fold owns the disclosure and the shell owns the heading and the
-// section rhythm. The heading wears the same uppercase label the reveal
-// strips wear, because the card and the strip are the same vote read at
-// two moments.
+// the vote costs, and the body of whichever state its window is in. Both
+// votes live inside the one Harbor Business fold, so the fold owns the
+// disclosure and the shell owns the heading and the section rhythm. The
+// heading wears the same uppercase label the reveal strips wear, because
+// the card and the strip are the same vote read at two moments.
 export function VoteCardShell({
   tone,
   icon,
@@ -36,5 +33,32 @@ export function VoteCardShell({
       </h4>
       {children}
     </div>
+  );
+}
+
+/**
+ * Where a vote's refusal lands: the server's own sentence and a dismiss
+ * press, one block for both votes so a refused nomination reads the same
+ * whichever vote it came back from. It is the market desks' block (see
+ * MarketError in ./OfferBoard) rather than a second look for the same kind
+ * of line, and it is drawn only where there is something to read: a
+ * refusal is per captain and is never the room's news, so it is not a
+ * strip and not a toast.
+ */
+export function VoteRefusal({
+  error,
+  onDismiss,
+}: {
+  error: string | null;
+  onDismiss: () => void;
+}) {
+  if (!error) return null;
+  return (
+    <p className="text-[11px] text-alarm mt-2">
+      {error}{" "}
+      <button type="button" onClick={onDismiss} className="underline">
+        Dismiss
+      </button>
+    </p>
   );
 }

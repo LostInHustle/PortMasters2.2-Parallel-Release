@@ -70,9 +70,10 @@ function pathForfeitLine(count: number): string {
  * It is one function rather than two checks at each caller because two
  * callers have to agree about both, and they are on opposite sides of the
  * wire: the engine charges a captain for a switch (below) and the room
- * publishes one (see the path:switch handler in src/server/realtime), and a
- * handler that accepted a switch the fee would refuse, or the reverse, is a
- * fleet log contradicting a captain's ledger. The copy lives here for the
+ * publishes one (see the path:switch handler in
+ * src/server/realtime/wiring/path-draft.ts), and a handler that accepted a
+ * switch the fee would refuse, or the reverse, is a fleet log
+ * contradicting a captain's ledger. The copy lives here for the
  * same reason: the two refusals are the same fact told once per surface, so
  * there is one sentence per fact, the shape rumorCooldownLine takes.
  *
@@ -103,9 +104,10 @@ export function pathSwitchOpenLine(
  * It is a sentence of its own rather than a line inside pathSwitchBlocked
  * below because it is told from two sides of the wire: the engine's guard
  * refuses the press and the room refuses the frame (see the path:switch
- * handler in src/server/realtime), and a room that refused a second switch
- * in words of its own would be one rule reported twice, which is the drift
- * pathSwitchOpenLine above is written the way it is to prevent.
+ * handler in src/server/realtime/wiring/path-draft.ts), and a room that
+ * refused a second switch in words of its own would be one rule reported
+ * twice, which is the drift pathSwitchOpenLine above is written the way it
+ * is to prevent.
  */
 export function pathSwitchSpentLine(): string {
   return "A captain changes their papers once a voyage, and yours are already changed.";
@@ -126,7 +128,7 @@ export function pathSwitchSpentLine(): string {
  * The path this reads is the captain's own save, which is why the server
  * cannot answer any of it: a switch is refused by the captain's own
  * engine and published by the room. See the path:switch handler in
- * src/server/realtime/index.ts for the half the room can check.
+ * src/server/realtime/wiring/path-draft.ts for the half the room can check.
  */
 export function pathSwitchBlocked(state: GameState, to: PathId): string | null {
   if (state.path === null) return "You hold no path to set aside.";

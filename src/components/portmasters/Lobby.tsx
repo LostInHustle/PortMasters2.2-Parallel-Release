@@ -144,12 +144,11 @@ export function Lobby({
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Which half of the lobby panel is showing. The board and the create form
-  // used to be two stacked cards, and the form is the taller of the two by a
-  // wide margin, so the room list started a screen and a half down on the
-  // one screen whose whole job is showing rooms. A switch gives each of them
-  // the panel. Opens on browse, because the list is what a captain arrives
-  // wanting to see.
+  // Which half of the lobby panel is showing. One panel with a switch rather
+  // than two stacked cards, because the create form is the taller of the two
+  // by a wide margin, and stacked it pushes the room list a screen and a half
+  // down on the one screen whose whole job is showing rooms. Opens on browse,
+  // because the list is what a captain arrives wanting to see.
   const [view, setView] = useState<"browse" | "create">("browse");
 
   // [MANIFEST: Quick Start Match] While queued, the Quick Start button
@@ -197,8 +196,8 @@ export function Lobby({
     // Kicked off on a timer rather than called straight from the effect body,
     // so the first refresh's setLoadingRooms(true) isn't a synchronous setState
     // inside an effect. Nothing changes visually: loadingRooms already starts
-    // true, so that first set was a no op anyway, and the interval's later
-    // calls were never inside an effect body.
+    // true, so that first set is a no op anyway, and the interval's calls all
+    // run long after this effect has returned.
     const kickoff = setTimeout(refreshRooms, 0);
     const t = setInterval(refreshRooms, 8000);
     return () => {
@@ -251,7 +250,7 @@ export function Lobby({
       }
     } catch {
       toast.error("Check in failed", {
-        description: "Could not reach the harbour master. Try again.",
+        description: "Could not reach the Harbormaster. Try again.",
       });
     } finally {
       setClaiming(false);
@@ -316,8 +315,8 @@ export function Lobby({
     }
 
     // Queueing needs a live, authenticated socket. Without one the emit
-    // goes nowhere at all, which is what used to leave this button
-    // spinning forever.
+    // goes nowhere at all and the button would spin until the timeout, so
+    // a missing socket is refused here rather than waited on.
     if (!socket || !authed) {
       setError("Still connecting to the harbor. Try again in a moment.");
       setQuickStarting(false);
@@ -354,10 +353,9 @@ export function Lobby({
   // exactly as if the captain had typed the code in by hand.
   useEffect(() => {
     // The live socket off the hook, not a second one fetched from the
-    // module. They were the same object, but only the hook's is in any
-    // dependency array: this effect listed neither, so a socket that was
-    // torn down and rebuilt on a sign out left it listening on a dead
-    // connection while the queue effect above moved to the new one.
+    // module: only the hook's is in a dependency array, so a module level
+    // listener would stay on a socket torn down at sign out while the
+    // queue effect above moves to the new one.
     if (!socket) return;
 
     const onMatched = (data: { roomId: string }) => {
@@ -481,12 +479,10 @@ export function Lobby({
     }
   }
 
-  // There is no effect here watching dmTarget to seed the thread. One sat
-  // here, keyed on the target's id, and openDm above is the only thing in
-  // the whole file that ever sets a target, so opening a captain fired the
-  // same history request twice and the second answer landed on top of the
-  // first. The clear, the loading flag and the request now all belong to
-  // the one click that changes the target, and the thread is fetched once.
+  // There is no effect here watching dmTarget to seed the thread: openDm
+  // above is the only thing in the whole file that ever sets a target, so
+  // the clear, the loading flag and the request all belong to that one
+  // click that changes the target, and the thread is fetched once.
 
   // The square's backlog, read once on landing. Nothing re seeds it later,
   // and nothing needs to: this channel is written down rather than held in
@@ -558,20 +554,15 @@ export function Lobby({
       {/* ===============================================================
           The masthead.
 
-          This used to be two stacked bars, one of tools and one of
-          numbers, and between them they stated the harbor's population and
-          this captain's Renown twice. Every tool had also picked its own
-          height, its own corners and its own tint, so eight controls doing
-          the same kind of job read as eight unrelated widgets that merely
-          happened to share a line.
-
-          It is one card now, answering one question in two rows: what can
-          I reach from here, and what is the harbor doing. The tools sit on
-          a single shelf, all of them the same height and the same shape,
+          One card, answering one question in two rows: what can I reach
+          from here, and what is the harbor doing. The tools sit on a
+          single shelf, all of them the same height and the same shape,
           quiet by default, with colour spent on the one thing actually
-          waiting for the captain. The harbor's numbers sit under a hairline
-          as a gauge row, and the figure that also opens a panel is the
-          control that opens it, so nothing has to be printed twice.
+          waiting for the captain, so a row of controls doing the same
+          kind of job reads as one instrument. The harbor's numbers sit
+          under a hairline as a gauge row, and the figure that also opens
+          a panel is the control that opens it, so nothing is printed
+          twice.
          =============================================================== */}
       <header className="sticky top-0 z-30 px-4 pb-2 pt-3 sm:px-6">
         {/* A scrim, so the board fades out as it slides under the masthead
@@ -579,22 +570,21 @@ export function Lobby({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-background/85 to-transparent" />
         <div className="pm-glass pm-panel-bar relative mx-auto max-w-7xl">
           {/* Wraps so the tool shelf can drop to its own row on a phone. The
-              shelf cannot shrink and the title cannot grow past it, so below
-              roughly a tablet the shelf used to win the whole row and the
-              ship's name drew straight underneath the buttons. */}
+              shelf cannot shrink and the title cannot grow past it, so
+              without the wrap, below roughly a tablet, the shelf wins the
+              whole row and the ship's name draws underneath the buttons. */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="pm-seal pm-grad-brand">
               <Anchor className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              {/* The name, then a tagline. The name used to be followed on
-                  the same line by a trailing word and a subtitle that was
-                  itself an older title, so the header read as three
-                  different names stacked on top of one another. */}
+              {/* The name, then a tagline on its own line: the header
+                  prints one title and one sentence under it, with nothing
+                  trailing the name on its line. */}
               <h1 className="font-display text-sm font-bold leading-tight tracking-tight">
-                {/* block, because pm-truncate cannot clip an inline box: the
-                    title drew its full width out past its own column instead
-                    of ending in an ellipsis. */}
+                {/* block, because pm-truncate cannot clip an inline box:
+                    without it the title draws its full width out past its
+                    own column instead of ending in an ellipsis. */}
                 <span className="text-brand pm-truncate block">{APP_NAME}</span>
               </h1>
               <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
@@ -603,10 +593,10 @@ export function Lobby({
             </div>
 
             {/* The shelf. One height, one shape, one quiet skin for every
-                tool on it. The tints this replaces were nine different
-                colours across one bar, which is a lot of signal for a row
-                of things that all do the same kind of job; colour is kept
-                for Check In, the only tool that is ever waiting. */}
+                tool on it, because the tools all do the same kind of job
+                and a row of different tints reads as a row of unrelated
+                widgets; colour is kept for Check In, the only tool that is
+                ever waiting. */}
             <div className="flex basis-full items-center gap-1.5 sm:basis-auto">
               <button
                 onClick={openChronicle}
@@ -688,9 +678,8 @@ export function Lobby({
               icon size, the same quiet label and the same tabular figure,
               divided by hairlines rather than scattered, so they read as
               one instrument instead of four loose labels. Your Renown is a
-              button because the panel behind it is the rest of the story;
-              it used to be a tool on the shelf as well, which meant the
-              same number sat in two places on the same screen. */}
+              button because the panel behind it is the rest of the story,
+              and it is printed here and nowhere else on the screen. */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 dark:border-white/[0.08]">
             <Gauge
               icon={Users}
@@ -790,9 +779,10 @@ export function Lobby({
                 Match instantly with the next captain who hits Quick Start.
               </p>
             </div>
-            {/* The vermilion seal, the same colour the harbor uses for a thing
-                that must not be missed. Quick Start used to wear the Houses
-                gold, which left two unrelated controls in the same skin. */}
+            {/* The vermilion seal, the same colour the harbor uses for a
+                thing that must not be missed: the button wears the
+                quickstart hue, so no two unrelated controls share a
+                skin. */}
             <Button
               onClick={handleQuickStart}
               disabled={quickStarting || busy}
@@ -812,10 +802,10 @@ export function Lobby({
 
           {/* This column is one panel holding two views rather than three
               stacked cards. Charting a harbor and walking the open ones are
-              the two things a captain comes here to do, and they were
-              fighting over the same scroll: the create form is the tallest
+              the two things a captain comes here to do, and stacked they
+              fight over the same scroll: the create form is the tallest
               thing on the screen by a wide margin, so the board beneath it
-              started around a screen and a half down and the room list was
+              starts around a screen and a half down and the room list is
               never in view on the screen whose whole job is showing rooms.
               A switch hands each of them the panel instead. */}
           <div className="pm-glass pm-panel">
@@ -856,9 +846,9 @@ export function Lobby({
               </TabsList>
 
               {/* Whatever went wrong last, whichever view it went wrong in.
-                  It sits above both views because a create or a join failure
-                  used to print itself inside the board, which is the one
-                  place a captain typing a room name is not looking. */}
+                  It sits above both views rather than inside the board,
+                  because the board is the one place a captain typing a room
+                  name is not looking. */}
               <AnimatePresence>
                 {error && (
                   <motion.div
@@ -899,12 +889,15 @@ export function Lobby({
                       Every harbor the fleet has open right now.
                     </p>
                     {/* How to Play is a plain button rather than the Button
-                        primitive. It was dressed as a ghost, a variant that
-                        exists to be transparent, and then painted over with a
-                        solid gradient, so the variant contributed nothing but
-                        a hover tint that could not be seen through the paint.
-                        It is a tool now, the same as everything else on a
-                        shelf. */}
+                        primitive: the ghost variant exists to be transparent
+                        and this control wears a solid gradient, so the
+                        variant would contribute nothing but a hover tint
+                        that cannot be seen through the paint. It is a tool,
+                        the same as everything else on a shelf. The label
+                        shortens below the sm width, because a control with
+                        no room to shrink must fit the line it shares: the
+                        full wording leads from sm up, and the title and the
+                        aria label carry it at every width. */}
                     <button
                       onClick={() => setHowToPlayOpen(true)}
                       className="pm-tool pm-pressable pm-grad-guide text-white"
@@ -912,6 +905,7 @@ export function Lobby({
                       aria-label="How to Play"
                     >
                       <BookOpen className="h-3.5 w-3.5" />
+                      <span className="sm:hidden">Guide</span>
                       <span className="hidden sm:inline">How to Play</span>
                     </button>
                     <Button
@@ -933,11 +927,10 @@ export function Lobby({
                   </div>
 
                   {/* Join by code is the other half of "get into a room I did
-                      not make", so it belongs here beside Quick Start rather
-                      than at the foot of the create form, which is where it
-                      used to sit. One line rather than a labelled stack,
-                      because a captain who has a code has exactly one thing
-                      to do with it. */}
+                      not make", so it belongs here in the browse view, beside
+                      Quick Start, rather than at the foot of the create form.
+                      One line rather than a labelled stack, because a captain
+                      who has a code has exactly one thing to do with it. */}
                   <div className="flex items-center gap-2">
                     <Label
                       htmlFor="join-code"
@@ -989,10 +982,10 @@ export function Lobby({
 
               {/* Charting a harbor. Everything the form asks for stays on
                   this side: the name, the voyage, the waters, the tier in a
-                  sentence, and the advisor. Nothing was cut to make the
-                  switch pay for itself, because the panel is the same height
-                  either way and the board no longer has to be scrolled past
-                  to reach the end of it. */}
+                  sentence, and the advisor. The switch costs the form
+                  nothing, because the panel is the same height either way
+                  and the board needs no scrolling past to reach the end of
+                  it. */}
               <TabsContent
                 value="create"
                 forceMount

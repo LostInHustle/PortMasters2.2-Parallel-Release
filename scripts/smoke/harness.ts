@@ -247,7 +247,7 @@ function cookieFrom(res: Response): string {
  * Registers a captain and keeps the token and cookie the app hands back.
  *
  * The label has a short leash: a username is capped at 20 characters and
- * this builds `smoke_<label>_<6 random>`, so a label longer than eight
+ * this builds `smoke_<label>_<6 random>`, so a label longer than seven
  * characters is refused by the server rather than by anything here.
  */
 export async function signUp(label: string): Promise<Captain> {

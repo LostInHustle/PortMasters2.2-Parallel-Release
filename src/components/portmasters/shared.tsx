@@ -100,10 +100,9 @@ export function OnlineDot({
  *
  * Every entry is a soft wash of its own token, so the thing wearing it
  * and the words inside it are the same colour in both modes and neither
- * needs a dark variant. Four copies of this rule used to sit in three
- * files: a Pill, the two stat tiles in the captain profile, and the
- * suggestion toggle. They all say the same kind of thing about a number
- * and have to say it in the same colour, so they read this one map now.
+ * needs a dark variant. A Pill, the two stat tiles in the captain profile
+ * and the suggestion toggle all say the same kind of thing about a number
+ * and have to say it in the same colour, so they read this one map.
  *
  * This covers the whole meaning half of the palette, and a surface may
  * offer a subset of it. The warn tone landed for the balance dashboard's

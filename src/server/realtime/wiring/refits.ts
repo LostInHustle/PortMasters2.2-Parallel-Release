@@ -3,15 +3,12 @@
 // a port, ordered over ../refits' own board.
 // =====================================================================
 
-import { STALE_OFFER } from "@/lib/game/constants/copy";
-import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
+import { consentFeeRule, STALE_OFFER } from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
-import { db } from "@/lib/db";
 import {
   agreeConsent,
   consentFeeFor,
-  consentOfferStanding,
   refitSellerBusy,
   refitsOn,
   type RefitContract,
@@ -19,8 +16,14 @@ import {
 import { garmentSpec } from "@/lib/game/garments";
 import { requireAuth, seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
+import { rowId } from "../ids";
 import { refitContracts } from "../refits";
 import { noteVoyageLog } from "../voyage-log";
+import { offerStandingRefusal, resolveNamedBuyer } from "./consent-shared";
+
+// The refusal every gate in this market answers with when the switch is
+// off, said once so its three handlers cannot drift apart.
+const BENCH_OFF = "The refit bench is not running in this harbor.";
 
 export function wireRefits(io: Server, socket: Socket): void {
   //
@@ -71,7 +74,7 @@ export function wireRefits(io: Server, socket: Socket): void {
         socket.emit("refit:error", { roomId, error });
       };
       if (!refitsOn(s.mode)) {
-        fail("The refit bench is not running in this harbor.");
+        fail(BENCH_OFF);
         return;
       }
       // The fee is read through the same reader the panel reads it
@@ -79,9 +82,7 @@ export function wireRefits(io: Server, socket: Socket): void {
       // about what a price is (see consentFeeFor).
       const fee = consentFeeFor(payload?.fee);
       if (fee === null) {
-        fail(
-          `A fee is a whole number of Gold, at least ${CONSENT_FEE_MIN} and at most ${CONSENT_FEE_MAX}.`,
-        );
+        fail(consentFeeRule());
         return;
       }
       // The term is a good rather than a number, so it is validated
@@ -102,26 +103,17 @@ export function wireRefits(io: Server, socket: Socket): void {
         fail("A refit is agreed at a port, in the Market phase.");
         return;
       }
-      let buyerUserId: string | null = null;
-      let buyerName: string | null = null;
-      if (payload?.targetUserId) {
-        if (payload.targetUserId === s.userId) {
-          fail("You can't sell a refit to yourself.");
-          return;
-        }
-        const targetMember = await db.roomMember.findUnique({
-          where: {
-            userId_roomId: { userId: payload.targetUserId, roomId },
-          },
-          select: { user: { select: { displayName: true } } },
-        });
-        if (!targetMember) {
-          fail("That captain isn't in this harbor.");
-          return;
-        }
-        buyerUserId = payload.targetUserId;
-        buyerName = targetMember.user.displayName;
+      const named = await resolveNamedBuyer(
+        roomId,
+        s.userId,
+        payload?.targetUserId,
+        "You can't sell a refit to yourself.",
+      );
+      if (!named.ok) {
+        fail(named.reason);
+        return;
       }
+      const { buyerUserId, buyerName } = named;
       const list = refitContracts.list(roomId);
       // The bench's own bound, refused where the seller is the one who can
       // act on it. An offer standing after the captain's hands are full
@@ -132,16 +124,18 @@ export function wireRefits(io: Server, socket: Socket): void {
         fail("You have already taken on a refit this leg.");
         return;
       }
-      if (consentOfferStanding(list, s.userId, buyerUserId)) {
-        fail(
-          buyerUserId === null
-            ? "You already have an offer standing for anyone at this table."
-            : `You already have an offer standing for ${buyerName}.`,
-        );
+      const standing = offerStandingRefusal(
+        list,
+        s.userId,
+        buyerUserId,
+        buyerName,
+      );
+      if (standing !== null) {
+        fail(standing);
         return;
       }
       const contract: RefitContract = {
-        id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        id: rowId(roomId, s.userId),
         sellerUserId: s.userId,
         sellerName: s.user.displayName,
         buyerUserId,
@@ -181,7 +175,7 @@ export function wireRefits(io: Server, socket: Socket): void {
         socket.emit("refit:error", { roomId, error });
       };
       if (!refitsOn(s.mode)) {
-        fail("The refit bench is not running in this harbor.");
+        fail(BENCH_OFF);
         return;
       }
       const cp = await getCheckpoint(roomId);
@@ -248,7 +242,7 @@ export function wireRefits(io: Server, socket: Socket): void {
         socket.emit("refit:error", { roomId, error });
       };
       if (!refitsOn(s.mode)) {
-        fail("The refit bench is not running in this harbor.");
+        fail(BENCH_OFF);
         return;
       }
       const board = refitContracts.list(roomId);

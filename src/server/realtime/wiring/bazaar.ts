@@ -6,11 +6,14 @@ import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
 import {
+  rumorCanLand,
+  rumorClosingLine,
   rumorCooldownLeft,
   rumorCooldownLine,
   rumorGoodAllowed,
 } from "@/lib/game/engine";
 import { bazaarRumorsOn } from "@/lib/game/flags";
+import { voyageRoundsFor } from "@/lib/game/mode";
 import { seated } from "../auth";
 import {
   bazaarList,
@@ -20,6 +23,9 @@ import {
 } from "../bazaar";
 import { getCheckpoint } from "../checkpoint";
 import { noteVoyageLog } from "../voyage-log";
+
+// The refusal the desk answers with when the switch is off.
+const BAZAAR_OFF = "The bazaar is not running in this harbor.";
 
 export function wireBazaar(io: Server, socket: Socket): void {
   //
@@ -34,9 +40,11 @@ export function wireBazaar(io: Server, socket: Socket): void {
   // about the row that can be checked without reading anyone's save, which
   // is more than either of the other two markets can check about theirs.
   //
-  // It is authoritative about the three things a row has to be true about
+  // It is authoritative about the four things a row has to be true about
   // for the feature to work at all. A rumor is spoken at the Parley, so
-  // the table hears it and so the market it moves is the next one. It
+  // the table hears it and so the market it moves is the next one. It is
+  // spoken in a leg that has a leg after it, so the market it names is one
+  // this voyage opens rather than a settlement that never comes. It
   // names a good the coming market actually trades, so a lean always lands
   // on a price rather than on nothing. And it respects the cooldown, which
   // is measured off the room's own rows rather than off a counter a client
@@ -49,7 +57,9 @@ export function wireBazaar(io: Server, socket: Socket): void {
   // through the payload builder, which strips a standing row's direction
   // from every reader but its publisher (see publicRumors). There is no
   // frame in this feature that carries a live direction to the room, and
-  // the private scan holds that rather than trusting this comment.
+  // the delivery is held rather than trusted here: bazaar:update is the
+  // private scan's eighth rule, which refuses a board that reaches a room
+  // channel (see scripts/private-scan.ts).
   socket.on("bazaar:state:request", async (payload: { roomId?: string }) => {
     const s = seated(socket, payload);
     if (!s) return;
@@ -72,7 +82,7 @@ export function wireBazaar(io: Server, socket: Socket): void {
         socket.emit("bazaar:error", { roomId, error });
       };
       if (!bazaarRumorsOn(s.mode)) {
-        fail("The bazaar is not running in this harbor.");
+        fail(BAZAAR_OFF);
         return;
       }
       // The lean itself, checked before anything is read: a row whose
@@ -88,15 +98,41 @@ export function wireBazaar(io: Server, socket: Socket): void {
       // rule, stated there for the same reason: two votes, two publishes
       // or two publishes and a phase change arriving together must not be
       // able to interleave inside a handler that has already decided.
-      const cp = await getCheckpoint(roomId);
+      //
+      // The order between the two reads is part of that rule rather than
+      // an accident of how the handler grew. The room's row is read first
+      // because it is the read that waits on the database, and the
+      // checkpoint is read last because its leg and its phase are what
+      // every check below judges and what the row gets written with: a
+      // checkpoint read before the wait would be a checkpoint a phase
+      // change could have moved during it, and the refusal below would
+      // then be deciding against the seat the room has already left. Both
+      // reads stay ahead of every check, and nothing between the last one
+      // and publishBazaarRumor below yields.
       const room = await db.room.findUnique({
         where: { id: roomId },
-        select: { difficulty: true },
+        select: { difficulty: true, mode: true },
       });
+      const cp = await getCheckpoint(roomId);
       if (cp.phase !== "parley") {
         fail(
           "A rumor is spread at the Parley, where the whole table hears it.",
         );
+        return;
+      }
+      // The one leg a rumor has nothing to land on. A row is a claim about
+      // the port one leg ahead, so a row written in the closing leg would
+      // lean a market this voyage never opens: the settlement the plan's
+      // own Rollback note asks to be skipped cleanly rather than left half
+      // applied, paid for with the publisher's whole cooldown. Read off the
+      // voyage's length rather than off the tier, because the two answer
+      // different voyages in a mode that pins a length of its own (see
+      // voyageRoundsFor), and refused before the good is looked at because
+      // there is no coming market to read a good against.
+      if (
+        !rumorCanLand(cp.round, voyageRoundsFor(room?.mode, room?.difficulty))
+      ) {
+        fail(rumorClosingLine());
         return;
       }
       // The good is read against the market the rumor will move, which is

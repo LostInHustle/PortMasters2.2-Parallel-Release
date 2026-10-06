@@ -132,6 +132,58 @@ export function forgetDetailRequests(roomId: string): void {
 export const startingRooms = new Set<string>();
 export const restartingRooms = new Set<string>();
 
+// The room's commission board, and the reports settling against it.
+//
+// It sits beside the two claims above because it is the same kind of
+// thing, an in process lock a room's own frames share, and it differs
+// from them in one respect: a caller queues on it rather than being
+// turned away. Two captains pressing Deliver in the same instant are
+// both standing over the goods their press names, so both are owed an
+// answer and the second is settled after the first rather than dropped
+// (see recordObjectiveHandover in ./objective). A restart is the other
+// caller and wants the opposite of a turn: it takes the same claim so
+// that the report it is waiting on finishes against the board that
+// report read before the new voyage's board is cleared underneath it,
+// which is the one window in which a line accepted against the dead
+// objective could be seeded into the fresh one (see the
+// clearObjectiveTallies call in ./wiring/restart-voyage).
+//
+// A map rather than the sets above, and the reason is the waiting: a
+// queue needs something to await, so each entry is the tail of that
+// room's queue and the keys are the rooms a claim is held on.
+const objectiveRooms = new Map<string, Promise<void>>();
+
+/**
+ * Waits for one room's commission board to be free, takes it, and hands
+ * back the release.
+ *
+ * The claim is held from before the caller's first await to after its
+ * last write, which is what makes it a claim rather than a check: both
+ * callers run their stretch inside a try/finally, so a claim that threw
+ * releases rather than wedging the room's board for good. A claim that
+ * arrives while one is held waits for it, in the order the claims were
+ * made, so the second of two presses is settled against the board the
+ * first one left rather than against the board both of them read.
+ */
+export async function claimObjectiveRoom(roomId: string): Promise<() => void> {
+  const previous = objectiveRooms.get(roomId) ?? Promise.resolve();
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // The queue's new tail. It resolves when this claim is released, so the
+  // arrival behind it waits on this caller rather than on the one before.
+  const mine = previous.then(() => held);
+  objectiveRooms.set(roomId, mine);
+  await previous;
+  return () => {
+    release();
+    // Only the tail clears the room, so a release cannot drop the claim a
+    // captain behind this one is already waiting on.
+    if (objectiveRooms.get(roomId) === mine) objectiveRooms.delete(roomId);
+  };
+}
+
 export function rememberSocket(socketId: string, state: SocketState): void {
   sockets.set(socketId, state);
 }

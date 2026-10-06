@@ -27,6 +27,7 @@ import {
   type Objective,
 } from "@/lib/game/objectives";
 import { readPeerTradeProfit } from "@/lib/game/victory";
+import { bankruptMark, leftTheVoyage } from "@/lib/seatMarks";
 import { checkSave, describeFindings } from "@/lib/game/integrity";
 import type { ObjectiveTraceEntry } from "@/lib/game/types";
 import { clearBarter, clearFlexibleAccepted } from "../barter";
@@ -86,14 +87,18 @@ export async function readFinishedCaptains(
   const finished: FinishedCaptain[] = [];
   for (const id of memberIds) {
     const st = statuses.get(id);
-    const phase = st ? String(st.phase) : "";
-    if (!st || (phase !== "endgame" && phase !== "bankruptcy")) return null;
+    // Every seat has to have left the voyage for the harbor to have one
+    // to conclude, read through the roster's own predicate: a member with
+    // no status frame at all and a member still sailing are the same
+    // answer here, which is that there is nothing to conclude yet (see
+    // leftTheVoyage in @/lib/seatMarks).
+    if (!st || !leftTheVoyage(st)) return null;
     finished.push({
       userId: id,
       user: st.user,
       reputation: st.reputation,
       gold: st.gold,
-      phase,
+      phase: String(st.phase),
       bankrupt: st.bankrupt === true,
     });
   }
@@ -353,13 +358,12 @@ export function sweepAbsentBorrowerLoans(
   // and with it skipped the pledge riding on the loan never resolved
   // either.
   //
-  // The mark is read from either signal for the reason above: Classic
-  // reports it as the bankruptcy phase, and Ocean Gambit, where the seat
-  // survives, reports it as the flag.
+  // The mark is read from either signal for the reason above, through the
+  // one reader that owns the rule: Classic reports it as the bankruptcy
+  // phase, and Ocean Gambit, where the seat survives, reports it as the
+  // flag (see bankruptMark in @/lib/seatMarks).
   const bankrupt = new Set(
-    finished
-      .filter((f) => f.bankrupt || f.phase === "bankruptcy")
-      .map((f) => f.userId),
+    finished.filter((f) => bankruptMark(f)).map((f) => f.userId),
   );
   let sweptAny = false;
   for (const loan of [...loanList(roomId)]) {
@@ -374,9 +378,9 @@ export function sweepAbsentBorrowerLoans(
   if (sweptAny) broadcastLoans(io, roomId);
 }
 
-// [bug cycle: the settled purse] The beat the conclusion stops for after
-// its own sweeps, before it reads the room back. The sweeps are what pays
-// the last money of a voyage out: an escrow returns to its poster when
+// The beat the conclusion stops for after its own sweeps, before it reads
+// the room back. The sweeps are what pays the last money of a voyage out:
+// an escrow returns to its poster when
 // the trade board clears, an open venture refunds its half, and each of
 // those lands in a captain's own client and comes back on that client's
 // next broadcast. Two cadences are what the number is measured against:

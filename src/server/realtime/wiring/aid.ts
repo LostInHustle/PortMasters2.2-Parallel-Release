@@ -12,6 +12,7 @@ import {
   setAidRequest,
 } from "../aid";
 import { requireAuth, seated } from "../auth";
+import { rowId } from "../ids";
 import {
   broadcastLoans,
   loanList,
@@ -40,7 +41,7 @@ export function wireAid(io: Server, socket: Socket): void {
       return;
     }
     const request = {
-      id: `${roomId}:${s.userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+      id: rowId(roomId, s.userId),
       fromUserId: s.userId,
       fromName: s.user.displayName,
       amount: amount as number,
@@ -106,51 +107,61 @@ export function wireAid(io: Server, socket: Socket): void {
 
   socket.on(
     "aid:repay",
-    (payload: {
-      roomId?: string;
-      lenderId?: string;
-      amount?: number;
-      debtId?: string;
-    }) => {
+    (payload: { roomId?: string; amount?: number; debtId?: string }) => {
       const s = requireAuth(socket);
       if (!s) return;
       const roomId = payload?.roomId ?? s.roomId;
-      const lenderId = payload?.lenderId;
+      if (!roomId || roomId !== s.roomId) return;
       const amount = payload?.amount;
       const debtId = payload?.debtId;
-      if (
-        !roomId ||
-        roomId !== s.roomId ||
-        !lenderId ||
-        !debtId ||
-        !Number.isInteger(amount) ||
-        (amount as number) < 0
-      )
+      // Both answers are spoken. The borrower's client applies nothing on
+      // its own, since the debt is the room's to close and the loan can be
+      // gone by the time the press lands, so a silent return would leave
+      // the press unanswered and the two books disagreeing about a debt
+      // nobody could then settle. The receipt names the debt it closed,
+      // and the refusal carries the sentence the member screen draws.
+      const refuse = (reason: string): void => {
+        socket.emit("aid:repay:fail", { roomId, reason });
+      };
+      if (!debtId || !Number.isInteger(amount) || (amount as number) < 0) {
+        refuse("Invalid repayment");
         return;
-      const loan = loanList(roomId).find((l) => l.debtId === debtId);
-      if (loan && loan.borrowerId === s.userId) {
-        removeLoan(roomId, debtId);
-        const payeeId = loan.redirectToUserId ?? loan.lenderId;
-        if ((amount as number) > 0) {
-          const repaid = {
-            roomId,
-            debtId,
-            amount,
-            fromUserId: s.userId,
-            fromName: s.user.displayName,
-          };
-          emitToUser(io, payeeId, "aid:repaid", repaid);
-        }
-        if (loan.redirectToUserId) {
-          emitToUser(io, loan.lenderId, "aid:redirected", {
-            roomId,
-            debtId,
-            redirectedToName: loan.redirectToName ?? "another captain",
-          });
-        }
-        resolveBackingFor(io, roomId, loan, amount as number);
-        broadcastLoans(io, roomId);
       }
+      const loan = loanList(roomId).find((l) => l.debtId === debtId);
+      if (!loan) {
+        refuse("That loan is no longer outstanding.");
+        return;
+      }
+      if (loan.borrowerId !== s.userId) {
+        refuse("That loan is not yours to repay.");
+        return;
+      }
+      removeLoan(roomId, debtId);
+      const payeeId = loan.redirectToUserId ?? loan.lenderId;
+      if ((amount as number) > 0) {
+        const repaid = {
+          roomId,
+          debtId,
+          amount,
+          fromUserId: s.userId,
+          fromName: s.user.displayName,
+        };
+        emitToUser(io, payeeId, "aid:repaid", repaid);
+      }
+      if (loan.redirectToUserId) {
+        emitToUser(io, loan.lenderId, "aid:redirected", {
+          roomId,
+          debtId,
+          redirectedToName: loan.redirectToName ?? "another captain",
+        });
+      }
+      resolveBackingFor(io, roomId, loan, amount as number);
+      broadcastLoans(io, roomId);
+      // The receipt, to the captain who paid. Emitted from this same
+      // synchronous block as the bookkeeping above, so the client that
+      // sent the press can never read the receipt before the loan is
+      // actually closed.
+      socket.emit("aid:repay:ok", { roomId, debtId });
     },
   );
 

@@ -328,6 +328,15 @@ export async function dealPaths(
     step: "first",
     openedAt: Date.now(),
   };
+  // Read a second time rather than trusted from the top, with nothing
+  // awaited since the first read. The names read above is a database
+  // call, and a database call is somewhere a second deal can get in: two
+  // departures in one tick both find no draft, both wait on that line,
+  // and both go on to seat the table. A deal that arrives here to find
+  // one already standing hands its deck to nobody, which costs the deal
+  // that lost the race nothing but the draw, and the draft that stays is
+  // the one the settle and the absence watch both already know.
+  if (drafts.has(roomId)) return true;
   drafts.set(roomId, draft);
   // A departure seats the roster as it stands, and a member whose tab
   // closed moments before the host set sail is in that roster while

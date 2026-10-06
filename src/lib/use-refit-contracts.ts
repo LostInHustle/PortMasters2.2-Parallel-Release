@@ -70,12 +70,19 @@ export function useRefitContracts(
     [socket, roomId, clearError],
   );
 
+  // The seller's own withdrawal. The last refusal is cleared first, the
+  // same clear the escort's cancel makes and for the same reason: the
+  // refusal this press can meet is the one saying the row moved past an
+  // offer before the press landed, and the previous sentence must not be
+  // left standing over the answer to this one (see ./use-escort-contracts,
+  // whose cancel carries the identical call).
   const cancel = useCallback(
     (contractId: string) => {
       if (!socket) return;
+      clearError();
       socket.emit("refit:cancel", { roomId, contractId });
     },
-    [socket, roomId],
+    [socket, roomId, clearError],
   );
 
   return {

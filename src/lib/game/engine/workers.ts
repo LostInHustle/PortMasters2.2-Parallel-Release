@@ -16,16 +16,16 @@
 // and discounts, was a balance inconsistency that this refactor closes.
 // =====================================================================
 import { ICONS } from "../constants/brand";
-import {
-  CREW_LOSS_AFTER_HUNGRY_LEGS,
-  WORKER_TYPES,
-  workerType,
-  type WorkerTypeId,
-} from "../constants/crew";
+import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
 import { RECIPES } from "../constants/goods";
 import { onShortRations, shortRationsYield } from "../larder";
 import { newCrewIdentity } from "../crew";
 import { isFrostbitten } from "../garments";
+import {
+  frozenAssignRefusal,
+  frozenWorkLog,
+  hungryProductionNote,
+} from "../status-copy";
 import type { GameState } from "../types";
 import { hasModule } from "./core";
 import { getHireCost } from "./pricing";
@@ -50,11 +50,9 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
   // The pledge is only spent once the artisan is actually on the roster, so
   // a hire that bails out above leaves it intact for the next attempt.
   if (!list) return;
-  // [REFACTOR] Removed the dead `names` map that used to live here: every
-  // branch already fell through to `def?.label` for the log line, and the
-  // map only ever held the same three labels WORKER_TYPES already carries.
-  // `progress: 0` is also gone from the new worker, since Worker.progress
-  // was always 0 and unused (see types.ts).
+  // The log line takes its label from WORKER_TYPES through `def?.label`,
+  // and a new worker carries no progress field (see Worker in types.ts):
+  // progress was always 0, so the roster tracks produced counts alone.
   //
   // [C2: crew loss by name] Who the new hand is, drawn here rather than
   // inside their object literal, because the draw reads the roster and the
@@ -81,7 +79,7 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
   if (pledged) {
     state.housePerks.jadeFreeHireAvailable = false;
     logs.push(
-      "🪷 Jade Pavilion pledge honoured: this artisan joins at no cost, so the first wage is on the House.",
+      "🪷 Jade Pavilion pledge honored: this artisan joins at no cost, so the first wage is on the House.",
     );
   }
 }
@@ -94,11 +92,9 @@ export function fireWorker(
 ) {
   const list = state.workers[type as WorkerTypeId];
   if (!list) return;
-  // [REFACTOR] Was `WAGES[type]`. Severance now reads the same
-  // getHireCost(state, type) the hire and payroll paths use, so a boon or
-  // module that shifts the wage also shifts the severance in lockstep,
-  // closing the old inconsistency where severance ignored both surcharges
-  // and discounts.
+  // Severance reads the same getHireCost(state, type) the hire and
+  // payroll paths use, so a boon or module that shifts the wage shifts
+  // the severance in lockstep.
   const wage = getHireCost(state, type);
   const label = workerType(type)?.label ?? type;
   if (idx < 0 || idx >= list.length) return;
@@ -171,7 +167,7 @@ export function assignTask(
   }
   logs.push(
     frozen
-      ? "❌ The only free hands are frozen out this leg: the crew went into the cold short of warm clothes, and they are back next leg. A warmer layer before a cold leg keeps every hand working."
+      ? frozenAssignRefusal()
       : "❌ All workers are already assigned tasks!",
   );
 }
@@ -207,12 +203,11 @@ export function processProduction(state: GameState, logs: string[]) {
   // said once for the same reason, so the smaller numbers that follow it
   // have an explanation above them instead of a note on every row, and it
   // names the stake as well as the state so the empty larder's price is
-  // read before it is paid.
+  // read before it is paid. [W3: the status convention] The sentence is
+  // composed in ../status-copy, where the hunger family's three clauses
+  // are authored once and its way back is held to every surface.
   const short = onShortRations(state);
-  if (short)
-    logs.push(
-      `⚠️ The crew is on short rations, so every artisan works the leg at a slower pace, and ${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row without rations costs the newest hand aboard.`,
-    );
+  if (short) logs.push(hungryProductionNote());
   for (const { list, name, weaves } of allLists) {
     for (const w of list) {
       // [C3: garments and the cold] The bench will not hand work to a hand
@@ -222,10 +217,7 @@ export function processProduction(state: GameState, logs: string[]) {
       // materials were spent when it was assigned, and it produces the leg
       // after this one.
       if (isFrostbitten(w, state.currentRound)) {
-        if (w.task)
-          logs.push(
-            `🥶 ${w.name} is frozen out this leg: the crew went into the cold short of warm clothes, and the work on ${w.task} waits for next leg.`,
-          );
+        if (w.task) logs.push(frozenWorkLog(w.name, w.task));
         continue;
       }
       if (w.task) {

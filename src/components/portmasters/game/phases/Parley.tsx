@@ -12,6 +12,7 @@ import {
   moduleTradesOn,
 } from "@/lib/game/flags";
 import { cn } from "@/lib/utils";
+import { namedCountLine } from "@/lib/voteTally";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
 import { AuditVoteCard, auditCardShown, auditVoteOpen } from "../AuditPanel";
@@ -25,6 +26,7 @@ import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
 import { ModuleMarket } from "../ModuleMarket";
 import { BazaarRumors } from "../BazaarRumors";
+import { MarketEmpty } from "../OfferBoard";
 import { hasLedgerRows, OpenBoons } from "../OpenBoons";
 import { FoldRow } from "../FoldRow";
 import {
@@ -43,10 +45,10 @@ import {
 // is the activity half this screen shares with a chat composer and not the
 // seat the room waits on.
 //
-// The screen used to be one stack ten sections deep: the exchange, the
-// two votes, the fleet's ledger and the three markets all open at once,
-// which put the markets under the fold at a middling window and made the
-// phase read as a wall. It wears two stations now, the same shape
+// The screen wears two stations rather than one stack ten sections deep:
+// the exchange, the two votes, the fleet's ledger and the three markets
+// all open at once would put the markets under the fold at a middling
+// window and make the phase read as a wall. It is the same shape
 // Market.tsx uses and for the reasons written there: the station is local
 // state rather than a phase value or a saved field, so a captain who
 // switches stations has told the room nothing, and the wait a ready vote
@@ -56,12 +58,12 @@ import {
 // Harbormaster's console, the two votes and the fleet's ledger draw under
 // the strip on both stations, because a vote a captain cannot see is a
 // vote they cannot cast, and because the ledger is where the table argues
-// about what each seat passed on. Those three are one fold now (W4,
-// UX-3 in docs/STUDIO_AUDIT.md): below the console and above the board,
-// led open while a vote is live and collapsed to one row otherwise. The
-// strip itself draws only when a market is switched on, so a Classic
-// harbor opens exactly the exchange it always had, with no second
-// station to visit and no business fold at all.
+// about what each seat passed on. Those three are one fold, below the
+// console and above the board, led open while a vote is live and
+// collapsed to one row otherwise. The strip itself draws only when a
+// market is switched on, so a Classic harbor opens exactly the exchange
+// it always had, with no second station to visit and no business fold at
+// all.
 type Station = "exchange" | "markets";
 
 const STATIONS: { id: Station; label: string; icon: string }[] = [
@@ -117,11 +119,11 @@ export function Parley({
   const otherMembers = members.filter((m) => m.id !== me.id);
   const [station, setStation] = useState<Station>("exchange");
 
-  // The harbor's business, behind one fold (W4, UX-3 in
-  // docs/STUDIO_AUDIT.md). The override is a tri-state on purpose: null
-  // means "however the table stands", so the fold leads open the moment a
-  // vote is live and closes itself when the last one is spent, while a
-  // captain who has pressed the row keeps the answer they gave.
+  // The harbor's business, behind one fold. The override is a tri-state
+  // on purpose: null means "however the table stands", so the fold leads
+  // open the moment a vote is live and closes itself when the last one is
+  // spent, while a captain who has pressed the row keeps the answer they
+  // gave.
   const [bizOpen, setBizOpen] = useState<boolean | null>(null);
 
   // Whether this harbor has a market to trade with. The strip draws only
@@ -147,12 +149,31 @@ export function Parley({
   const businessShown =
     auditCardShown(game, audit) || maroonCardShown(game, maroon) || ledgerShown;
   const businessOpen = bizOpen ?? anyLive;
+  //
+  // A live vote's gist carries the room's own count when the server has
+  // said one, which is the sentence that answers the question the fold is
+  // closed over: not just that a vote is open but how far along it is. The
+  // count comes off the tally frame (see VoteCensus), so the fold's
+  // summary and the card's count block are one reading rather than two,
+  // and the count is the shared sentence the block below it renders (see
+  // namedCountLine in @/lib/voteTally), so the number and its verb agree
+  // in one place rather than in a phrasing kept beside it.
+  const gistOf = (
+    label: string,
+    votes: Record<string, string>,
+    census: { roster: number } | null,
+  ) => {
+    const named = Object.keys(votes).length;
+    return census && census.roster > 0
+      ? `${label}: ${namedCountLine(named, census.roster)}`
+      : `${label} is open.`;
+  };
   const businessGist = anyLive
     ? auditLive && maroonLive
-      ? "Two votes are open: the audit and the maroon."
+      ? `Two votes are open. ${gistOf("The audit vote", audit.votes, audit.census)} ${gistOf("The maroon vote", maroon.votes, maroon.census)}`
       : auditLive
-        ? "The audit vote is open."
-        : "The maroon vote is open."
+        ? gistOf("The audit vote", audit.votes, audit.census)
+        : gistOf("The maroon vote", maroon.votes, maroon.census)
     : ledgerShown
       ? "No vote is open. The fleet's picks are on the record."
       : "No vote is open yet.";
@@ -224,18 +245,18 @@ export function Parley({
 
       {/* [H6: the Manifest Audit, H7: Maroon, F5: public offers] The
           harbor's business, behind one fold: the two votes and the
-          fleet's ledger used to stack up to three panels, two of them
-          folds of their own, between the strip and the board. They are
-          one row now, and the row leads open exactly while a vote is
-          live, because a vote a captain cannot see is a vote they cannot
-          cast. Each vote card leaves the board once its vote is spent
-          (the strips carry the outcome) and each stays inside this fold
-          until its window has passed the voyage by, so a mode's headline
-          mechanic is still explained to the first captain who opens the
-          row. The ledger is the plan's evaluation surface, where the
-          table argues about what each seat passed on, so it sits where
-          the argument happens rather than where the picks were made, and
-          it draws nothing at all until a first pick lands. */}
+          fleet's ledger are one row rather than up to three panels, two
+          of them folds of their own, between the strip and the board.
+          The row leads open exactly while a vote is live, because a vote
+          a captain cannot see is a vote they cannot cast. Each vote card
+          leaves the board once its vote is spent (the strips carry the
+          outcome) and each stays inside this fold until its window has
+          passed the voyage by, so a mode's headline mechanic is still
+          explained to the first captain who opens the row. The ledger is
+          the plan's evaluation surface, where the table argues about
+          what each seat passed on, so it sits where the argument happens
+          rather than where the picks were made, and it draws nothing at
+          all until a first pick lands. */}
       {businessShown && (
         <FoldRow
           tone="intel"
@@ -246,7 +267,13 @@ export function Parley({
           onToggle={() => setBizOpen(!businessOpen)}
           className="mb-4"
         >
-          <AuditVoteCard game={game} members={members} me={me} audit={audit} />
+          <AuditVoteCard
+            game={game}
+            members={members}
+            me={me}
+            audit={audit}
+            statuses={roster?.statuses}
+          />
           <MaroonVoteCard
             game={game}
             members={members}
@@ -273,9 +300,9 @@ export function Parley({
           <HuePanel tone="ship" className="p-4 mb-4">
             <PanelHeading className="mb-3 text-sm">📋 Open Offers</PanelHeading>
             {barter.offers.length === 0 ? (
-              <p className="text-center text-xs text-muted-foreground py-4">
+              <MarketEmpty className="py-4">
                 No offers on the board yet. Be the first.
-              </p>
+              </MarketEmpty>
             ) : (
               <div className="space-y-1.5">
                 {barter.offers.map((o) => (

@@ -27,49 +27,61 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
     const s = seated(socket, payload);
     if (!s) return;
     const { roomId } = s;
+    // Taken before the first await rather than after the reads below,
+    // because the reads are the whole of the race: two departure frames
+    // for one harbor can arrive in the same tick, and a map consulted
+    // after them is consulted after both have already passed it. Both
+    // frames then read a room that had not set sail, both wait on the
+    // database calls below, and both go on to move the room, open its
+    // records and deal its table: a voyage announced twice, with the two
+    // deals colliding on the alignment table's own key (see
+    // dealAlignments, whose re-read is the second line of defense here).
+    // A claim is only a claim if it is taken before the first await, so
+    // it is taken here, and everything it guards, the refusals included,
+    // is answered inside the finally that releases it.
     if (startingRooms.has(roomId)) return;
-    const room = await db.room.findUnique({
-      where: { id: roomId },
-      select: {
-        id: true,
-        hostId: true,
-        started: true,
-        mode: true,
-        difficulty: true,
-        voyageEpoch: true,
-        createdAt: true,
-      },
-    });
-    if (!room) return;
-    if (room.started) {
-      socket.emit("room:error", {
-        roomId,
-        error: "This voyage has already set sail.",
-      });
-      return;
-    }
-    if (room.hostId !== s.userId) {
-      socket.emit("room:error", {
-        roomId,
-        error: "Only the host can start the voyage.",
-      });
-      return;
-    }
-    const roster = await roomMemberIds(roomId);
-    // Solo Practice Mode: a host may start the voyage alone. The
-    // ready check protocol still advances the room with just the one
-    // captain (activeRosterSet returns the single member). This makes
-    // the game playable for a solo captain who wants to learn the
-    // ropes or test a build without waiting for a second human.
-    if (roster.length < 1) {
-      socket.emit("room:error", {
-        roomId,
-        error: "Need at least one captain in the harbor to set sail.",
-      });
-      return;
-    }
     startingRooms.add(roomId);
     try {
+      const room = await db.room.findUnique({
+        where: { id: roomId },
+        select: {
+          id: true,
+          hostId: true,
+          started: true,
+          mode: true,
+          difficulty: true,
+          voyageEpoch: true,
+          createdAt: true,
+        },
+      });
+      if (!room) return;
+      if (room.started) {
+        socket.emit("room:error", {
+          roomId,
+          error: "This voyage has already set sail.",
+        });
+        return;
+      }
+      if (room.hostId !== s.userId) {
+        socket.emit("room:error", {
+          roomId,
+          error: "Only the host can start the voyage.",
+        });
+        return;
+      }
+      const roster = await roomMemberIds(roomId);
+      // Solo Practice Mode: a host may start the voyage alone. The
+      // ready check protocol still advances the room with just the one
+      // captain (activeRosterSet returns the single member). This makes
+      // the game playable for a solo captain who wants to learn the
+      // ropes or test a build without waiting for a second human.
+      if (roster.length < 1) {
+        socket.emit("room:error", {
+          roomId,
+          error: "Need at least one captain in the harbor to set sail.",
+        });
+        return;
+      }
       // Where a voyage opens is the mode's business, not this handler's,
       // so it is read from the lap rather than written as "5" here.
       const opening = openingPhase(room.mode);

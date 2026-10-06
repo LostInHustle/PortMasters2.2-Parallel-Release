@@ -31,8 +31,8 @@ type WatersStop<T extends string> = {
 // Rising fill, one step per tier. Built from bg-sea at stepped opacity rather
 // than from a from-sea gradient, because opacity on the sea token is what the
 // rest of the tree already leans on and a gradient on it is unproven here. The
-// classes stay literal, the same way the old dial kept grid-cols-2 and
-// grid-cols-3 literal, so the stylesheet can still see them.
+// classes stay literal rather than built from a template, so the stylesheet
+// can still see them.
 const WATERS_FILL = ["bg-sea/20", "bg-sea/45", "bg-sea/70"] as const;
 
 export function WatersScale<T extends string>({

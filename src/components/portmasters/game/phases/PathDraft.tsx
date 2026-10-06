@@ -3,9 +3,9 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { renownTitleForLevel } from "@/lib/game/legacy";
-import { pathConfig } from "@/lib/game/paths";
+import { pathGuide } from "@/lib/game/paths";
 import type { DraftStep } from "@/types/realtime/draft";
+import { Term } from "../../Term";
 import { PhaseError, PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 
 // The three beats, in the words a captain reads them in.
@@ -46,28 +46,13 @@ const STEP_FACE: Record<
   },
 };
 
-// The small facts a card prints under its own sentence, read off the same
-// path record the rule reads (see @/lib/game/paths). The record is where a
-// path's numbers live, so a retuned hold or ceiling is printed here the
-// moment it is retuned there; nothing on this panel carries a number of its
-// own.
-//
-// The hold line only appears where the record actually claims something
-// (a factor other than one), because every path carries a factor and only
-// two of them are worth printing: "Hold 100%" would be a line a reader
-// learns to skip, which is the line the third of them would then be lost
-// behind. The renown line prints the rung rather than the level number,
-// which is the name the ladder itself gives it (see RENOWN_TITLES).
-function cardFacts(card: NonNullable<ReturnType<typeof pathConfig>>): string[] {
-  const facts: string[] = [];
-  const hold = Math.round(card.cargoModifier * 100);
-  if (hold !== 100) facts.push(`Hold ${hold}%`);
-  facts.push(`Renown to ${renownTitleForLevel(card.renownCeiling)}`);
-  if (card.orderPool.length > 0) {
-    facts.push(`${card.orderPool.length} locked orders`);
-  }
-  return facts;
-}
+// The guide rows, keyed by id and built once at module load: the small
+// facts a card prints under its own sentence are the record's own reading
+// (see pathGuide in @/lib/game/paths), the same rows the tutorial's path
+// page and the manual's path page print. This panel carries no arithmetic
+// of its own about them, so a retuned hold or ceiling reaches the cards,
+// the two pages and nothing else has to move.
+const PATH_GUIDE = new Map(pathGuide().map((entry) => [entry.id, entry]));
 
 /**
  * [W2: the path draft] The deal, drawn as the stage a dealing Gambit
@@ -162,7 +147,9 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
       </PhaseHeading>
       <p className="mb-3 text-center text-sm text-muted-foreground">
         Three cards each, dealt face down. What you hold at the end is the path
-        you sail this voyage.
+        you sail this voyage, and the deal comes first because every stop after
+        it reads your path: your hold, your Renown ceiling and the orders that
+        lock to you.
       </p>
 
       {draft.error && (
@@ -173,8 +160,8 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
         />
       )}
 
-      {/* The beat's own banner, where a countdown used to sit: the step, and
-          the sentence that says what this step is asking for. */}
+      {/* The beat's own banner: the step, and the sentence that says what
+          this step is asking for. */}
       <div className="mb-3 rounded-xl border border-path-draft/20 bg-path-draft/[0.04] px-3.5 py-2.5 text-center">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-path-draft">
           {face.title}
@@ -199,8 +186,7 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
               // The cards in a hand are PathIds, the reader above having
               // answered null for anything else (see readDraftView in
               // @/lib/use-path-draft), so this lookup always answers.
-              const card = pathConfig(path)!;
-              const facts = cardFacts(card);
+              const entry = PATH_GUIDE.get(path)!;
               return (
                 <motion.div
                   // A deck with a floor can deal one captain two cards of
@@ -218,18 +204,35 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-3">
                     <span aria-hidden className="text-3xl leading-none">
-                      {card.crest}
+                      {entry.crest}
                     </span>
                     <div className="min-w-0">
                       <div className="font-display text-sm font-semibold text-foreground">
-                        {card.name}
+                        {entry.name}
                       </div>
                       <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                        {card.signature}
+                        {entry.signature}
                       </p>
-                      {facts.length > 0 && (
+                      {entry.facts.length > 0 && (
                         <p className="mt-1.5 text-[10px] text-muted-foreground">
-                          {facts.join(" · ")}
+                          {entry.facts.map((fact, index) => (
+                            <span key={index}>
+                              {index > 0 && " · "}
+                              {/* The rung's own title, drawn through the
+                                  glossary's Term rather than printed
+                                  plain: the deal is the first place a
+                                  captain meets the word Renown, and the
+                                  rung it names means nothing until the
+                                  word does. */}
+                              {fact.kind === "renown" ? (
+                                <>
+                                  <Term>Renown</Term> to {fact.title}
+                                </>
+                              ) : (
+                                fact.text
+                              )}
+                            </span>
+                          ))}
                         </p>
                       )}
                     </div>

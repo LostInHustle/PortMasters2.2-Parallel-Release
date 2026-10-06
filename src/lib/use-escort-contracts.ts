@@ -13,7 +13,7 @@ export type { EscortContract };
 
 // The events this market speaks on. The channel is the whole of what this
 // hook adds to the shared relay, and it is declared beside the emitters
-// below rather than inlined at the call so a reader can see the four names
+// below rather than inlined at the call so a reader can see the five names
 // together (see useConsentBoard in ./use-consent-board).
 const CHANNEL = {
   update: "contract:update",
@@ -29,9 +29,9 @@ const CHANNEL = {
  * when a contract this captain is party to moves past the offer stage are
  * the shared relay's (see ./use-consent-board, which is where the
  * stale-broadcast guard and the reload story are written). What is left
- * here is what only the escort can say: the four actions a captain takes
- * against this market, and the claim, which no other kind has because it is
- * about a raid.
+ * here is what only the escort can say: the five actions a captain takes
+ * against this market (post, accept, decline, withdraw, and the claim,
+ * which no other kind has because it is about a raid).
  */
 export function useEscortContracts(
   socket: Socket | null,
@@ -67,24 +67,47 @@ export function useEscortContracts(
     [socket, roomId, clearError],
   );
 
+  // The addressed captain's own refusal. It is not the seller's cancel and
+  // it is deliberately a frame of its own rather than that one reused: a
+  // cancel takes an offer off the board, and a decline leaves the row where
+  // its seller can read that the price came back (see the handler in
+  // src/server/realtime/wiring/escort-contracts.ts).
+  const decline = useCallback(
+    (contractId: string) => {
+      if (!socket) return;
+      clearError();
+      socket.emit("contract:decline", { roomId, contractId });
+    },
+    [socket, roomId, clearError],
+  );
+
+  // The seller's own withdrawal, which is the one press on this board that
+  // carries no sentence of its own on success: the row leaves the board,
+  // which is what a withdrawal is. The refusal it can meet (an offer that
+  // has since been agreed) arrives like every other, and the previous
+  // refusal is cleared first so a press that lands does not leave the last
+  // one standing over it.
   const cancel = useCallback(
     (contractId: string) => {
       if (!socket) return;
+      clearError();
       socket.emit("contract:cancel", { roomId, contractId });
     },
-    [socket, roomId],
+    [socket, roomId, clearError],
   );
 
   // The covered captain's report that a raid arrived and the guns answered
   // it. It carries the Gold the raid would have taken, which only that
   // captain's own client can know, and the seller's client is what turns it
-  // into a bill (see escortClaimFrom and applyEscortSide).
+  // into a bill (see escortClaimFrom and applyEscortSide). The previous
+  // refusal is cleared first, the same as every other press on this board.
   const claim = useCallback(
     (contractId: string, raidGold: number) => {
       if (!socket) return;
+      clearError();
       socket.emit("contract:claim", { roomId, contractId, raidGold });
     },
-    [socket, roomId],
+    [socket, roomId, clearError],
   );
 
   return {
@@ -93,6 +116,7 @@ export function useEscortContracts(
     clearError,
     post,
     accept,
+    decline,
     cancel,
     claim,
   };

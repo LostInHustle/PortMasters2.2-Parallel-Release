@@ -10,7 +10,7 @@ import {
   HOUSE_BAR_FALLBACK,
   HOUSE_CREST,
   HOUSE_FALLBACK,
-} from "./house-colours";
+} from "./house-colors";
 
 /**
  * Great Houses Leaderboard. A richer view of the harbor wide house

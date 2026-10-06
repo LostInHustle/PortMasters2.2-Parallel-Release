@@ -11,9 +11,8 @@ import type { NotificationItem } from "@/lib/use-notifications";
  *
  * Below the wide layout it is fixed at bottom left, the mirror corner
  * of the bankruptcy and endgame help button (bottom right, see
- * GameRoom.tsx), so it never sits over the center game board the way
- * the old stacked sonner toasts did: below the breakpoint there is no
- * rail to cover, only the one scroll.
+ * GameRoom.tsx), so it never sits over the center game board: below the
+ * breakpoint there is no rail to cover, only the one scroll.
  *
  * At lg it stops being fixed and anchors to the stage column instead
  * (the relative wrapper around the scroller in GameRoom.tsx). Bottom

@@ -24,7 +24,7 @@ import type { HouseId } from "@/lib/game/legacy";
 // where it is used, so the cap and the trim that applies it cannot drift
 // apart, and so the toast effect's "what's new" window stays in step with
 // the ledger it is reading from.
-export const LEDGER_LINE_CAP = 500;
+const LEDGER_LINE_CAP = 500;
 
 // Exported (along with Action and reducer below) so the reducer, a pure
 // function with no React dependency, can be unit tested directly without

@@ -7,6 +7,7 @@ import { phaseLabel } from "@/lib/game/engine";
 import { isGatedPhase } from "@/lib/game/checkpoint";
 import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
+import { readyLine } from "@/lib/use-phase-sync";
 import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { cn } from "@/lib/utils";
 import {
@@ -172,7 +173,11 @@ export function GameControlPanel({
   // captain waiting on the crew reads both numbers in the same place, and the
   // one that is moving is the one that ends the wait.
   if (waiting) {
-    nextText = `⏳ Waiting… (${readyCount}/${requiredCount} ready)`;
+    // The count is the shared builder's sentence (see readyLine in
+    // @/lib/use-phase-sync) with this bar's own tail, because the one
+    // thing a captain pressing the button wants to know is how close the
+    // room is to turning.
+    nextText = `⏳ ${readyLine(readyCount, requiredCount)} The phase turns when the rest do.`;
     if (clock) nextText += ` · ${clock.label}`;
     nextDisabled = false;
   }
@@ -204,12 +209,12 @@ export function GameControlPanel({
         <ActionSuggester game={game} />
       </div>
       {/* The four voyage buttons and the line about the save, in a group
-          that wraps like the bar it sits in. It used to be one line that
-          could not break, which was invisible on a desktop and a sideways
-          page on a phone: "Standing orders" alone is wider than a third of
-          a phone, and four of them plus their icons and gaps are wider than
-          the viewport itself, so the row pushed the whole page 35 pixels
-          wide and every screen in the harbor scrolled sideways with it.
+          that wraps like the bar it sits in. An unbreakable row would be
+          invisible on a desktop and a sideways page on a phone: "Standing
+          orders" alone is wider than a third of a phone, and four of them
+          plus their icons and gaps are wider than the viewport itself, so
+          the row would push the whole page 35 pixels wide and every
+          screen in the harbor would scroll sideways with it.
           Below the sm width the four wear their glyphs alone, with the
           name kept in the title, the aria label and the wider layouts:
           four labelled buttons wrap to a row of their own on a phone,

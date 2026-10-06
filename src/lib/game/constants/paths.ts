@@ -3,12 +3,11 @@
 //
 // The cooldown is the plan's "once every three legs" written as the number
 // of legs between two publications rather than as a count of them, so a
-// captain may speak in the first leg of a voyage and again in the fourth,
-// the seventh and the tenth. Three is also what makes the last word of a
-// twelve leg voyage land before the voyage ends, which the plan's Rollback
-// asks for without naming: "the band shift itself is a settlement step, so
-// make sure it is skipped cleanly rather than left half applied", and a
-// publication from the closing leg would be a settlement that never comes.
+// captain's next word comes three legs after their last. The interval is
+// what the plan's Rollback asks for without naming: "the band shift itself
+// is a settlement step, so make sure it is skipped cleanly rather than
+// left half applied", and a publication from a voyage's closing leg would
+// be a settlement that never comes.
 //
 // The shift is the same tenth the Harbormaster's hand is (see
 // PORT_SHIFT_FRACTION in ./maroon), and that agreement is the point rather

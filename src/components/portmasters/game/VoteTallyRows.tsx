@@ -1,34 +1,145 @@
 "use client";
 
 // =====================================================================
-// Who named whom, drawn once for the harbor's two votes.
+// The count, and who named whom, drawn once for the harbor's two votes.
 //
 // The Manifest Audit and the maroon vote both put a target to the table
 // and both show the room the nominations as they come in. The rows are
 // tallyRows' (see lib/voteTally.ts, which is where the two votes already
-// share what a row is); this is the other half of that arrangement, the
-// part that was still written twice: the same paragraph, the same two
-// spans, the same muted count, in two panels.
+// share what a row is); this is the other half of that arrangement: the
+// same paragraph, the same two spans, the same muted count, in two
+// panels.
 //
-// Drawing nothing for an empty tally rather than leaving the guard to the
-// call sites, because a row list with no rows is nothing either way.
+// The whole block reads out of the census the server sends rather than
+// out of arithmetic here: the roster a vote divides by is the server's
+// active roster, which is not the member list a client can see (see
+// AuditTally). How many captains have named someone of how many the vote
+// is divided by, how many names carry it, each target with the names
+// behind them, and who the room is still waiting on.
+//
+// Nothing is counted without a census. A room whose count has not arrived
+// yet is told exactly that, because a count block guessing at its own
+// denominator would be a wrong count in a longer sentence. The shortfall
+// line (how many more names the leading target needs) and the captain's
+// own line (whether their name is in) are arithmetic over the same frame
+// the rows come from, so there is no fourth number to keep in step.
+//
+// The count line is worded for its own number: one captain has named
+// someone, five have, one name carries it. The count half is built by the
+// shared builder (see namedCountLine in lib/voteTally.ts), so the two
+// votes cannot word one number two ways.
+//
+// The last line is the one thing here the count cannot supply: what
+// happens when the names the vote needs land on one captain, and who is
+// still to act. Every word of it is the vote's own rather than the
+// block's, because the audit and the maroon spend different things, so it
+// arrives as a function of the threshold (see nextStep) rather than as
+// copy this file would have to keep two versions of. It reads the
+// threshold the census carries, so the number a line names and the number
+// the server carries on are one rule (see auditNamesNeeded, and the
+// maroon's own count).
 // =====================================================================
 
-import type { TallyRow } from "@/lib/voteTally";
+import {
+  captainCount,
+  captainName,
+  leaderShortfall,
+  nameCount,
+  nameList,
+  namedCountLine,
+  type TallyRow,
+  type VoteCensus,
+} from "@/lib/voteTally";
+import type { PublicUser } from "@/lib/api";
 
-export function VoteTallyRows({ rows }: { rows: TallyRow[] }) {
-  if (rows.length === 0) return null;
+export function VoteTallyRows({
+  rows,
+  census,
+  members,
+  myVote = null,
+  nextStep,
+}: {
+  rows: TallyRow[];
+  /** The server's count for this leg, or null before its first word. */
+  census: VoteCensus | null;
+  /** The roster a name is read out of, for the captains still to speak. */
+  members: PublicUser[];
+  /** This captain's own nomination, so the block can say whose turn it is not. */
+  myVote?: string | null;
+  /**
+   * What this vote does with the names it needs, said in the vote's own
+   * words and read off the threshold: the last line of the block. A
+   * function rather than a sentence so the number in it is the census'
+   * own, and not a second copy of the arithmetic kept beside the first.
+   */
+  nextStep: (needed: number) => string;
+}) {
+  if (!census || census.roster <= 0) {
+    return (
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        The room&apos;s count has not arrived yet. It comes with this leg&apos;s
+        vote.
+      </p>
+    );
+  }
+  const named = rows.reduce((count, row) => count + row.voters.length, 0);
+  const waiting = census.awaiting.map((id) => captainName(members, id));
+  const leader = leaderShortfall(rows, census.needed);
+  // The count and the threshold in one line, each half worded for its own
+  // number: the count comes from the shared builder, and the verb of the
+  // threshold half moves with the threshold.
+  const countLine =
+    `${namedCountLine(named, census.roster)} ` +
+    `${nameCount(census.needed)} ${census.needed === 1 ? "carries" : "carry"} it.`;
+
   return (
-    <div className="mt-3 space-y-0.5">
-      {rows.map((row) => (
-        <p key={row.targetId} className="text-[11px]">
-          <span className="font-medium">{row.name}</span>
-          <span className="text-muted-foreground">
-            {" "}
-            {row.voters.length}: {row.voters.join(", ")}
-          </span>
+    <div className="mt-3 space-y-1">
+      <p className="text-[11px]">{countLine}</p>
+      {leader === null ? (
+        <p className="text-[11px] text-muted-foreground">
+          {`No name is in yet. ${nameCount(census.needed)} on one captain ${
+            census.needed === 1 ? "carries" : "carry"
+          } it.`}
         </p>
-      ))}
+      ) : leader.short > 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          {`${leader.name} needs ${
+            leader.short === 1 ? "1 more name" : `${leader.short} more names`
+          } to carry it.`}
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          {leader.name} has every name the vote needs.
+        </p>
+      )}
+      {rows.length > 0 && (
+        <div className="space-y-0.5">
+          {rows.map((row) => (
+            <p key={row.targetId} className="text-[11px]">
+              <span className="font-medium">{row.name}</span>{" "}
+              <span className="text-muted-foreground">
+                has {nameCount(row.voters.length)}, from {nameList(row.voters)}.
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
+      <p className="text-[11px] text-muted-foreground">
+        {myVote === null
+          ? "Your name is not in yet. Pick a captain and press the button."
+          : `Your name is in for ${captainName(members, myVote)}. Nothing else is asked of you this leg.`}
+      </p>
+      {/* Who is still to act, said as a count and as names, and then what
+          the vote does with the names it needs. The two are one line
+          because they are one question: the room reads how far the count
+          has to travel and who is still walking it. */}
+      <p className="text-[11px] text-muted-foreground">
+        {waiting.length > 0
+          ? `${captainCount(waiting.length)} ${
+              waiting.length === 1 ? "has" : "have"
+            } not named anyone: ${nameList(waiting)}. ${nextStep(census.needed)}`
+          : "Every captain still sailing has named someone, so nothing more can land this leg. A later leg can call this vote again."}
+      </p>
     </div>
   );
 }

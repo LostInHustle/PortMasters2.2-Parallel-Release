@@ -35,15 +35,38 @@ export type AuditVote = {
 
 /**
  * The nominations so far this leg, broadcast after every vote including
- * the one that carries. Keyed by voter rather than counted, because the
- * count is arithmetic the client can do and the names are the part it
- * cannot reconstruct.
+ * the one that carries, and answered to the captain whose card asks (see
+ * audit:state:request in src/server/realtime/wiring/audit.ts).
+ *
+ * Keyed by voter rather than counted, because the count is arithmetic the
+ * client can do and the names are the part it cannot reconstruct.
+ *
+ * The three numbers beside the names are the room's own count, and they
+ * are on the frame because a card cannot work them out for itself: the
+ * roster this vote is divided by is the active one (see activeRosterSet),
+ * and the member list a client holds is a different set, since a captain
+ * who has gone bankrupt keeps their seat at the table and their name in
+ * the roster the client reads while dropping out of this count. A card
+ * left to subtract one from the other would print a threshold that
+ * disagreed with the server, so the server states it. All three are
+ * public for the reason the names are: none of them says anything about
+ * a manifest or about who is lying, only about who has spoken so far.
  */
 export type AuditTally = {
   roomId: string;
   round: number;
   /** voter id -> the captain they nominated. */
   votes: Record<string, string>;
+  /** How many captains the vote is divided by: the roster still sailing. */
+  roster: number;
+  /** How many names one captain needs to carry it (see auditNamesNeeded). */
+  needed: number;
+  /**
+   * The captains the count is divided by who have not named anyone yet
+   * this leg, which is who the room is waiting on. Ids, so the reader
+   * names them from the roster it already has.
+   */
+  awaiting: string[];
 };
 
 /**

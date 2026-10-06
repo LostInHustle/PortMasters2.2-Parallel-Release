@@ -3,13 +3,12 @@
 // =====================================================================
 // The harbor screen's four dialogs, in one place.
 //
-// Each of these used to sit inline in the middle of Lobby's return, which
-// is where they read worst: a dialog is a small self contained screen with
-// a title, a body and one thing it can do, and next to fifteen hundred
-// lines of board and rail it was hard to see where one ended and the next
-// began. Gathered here they are four named units that take what they draw
-// and hand back what they were asked to do, and the lobby's return is the
-// screen rather than the screen plus four overlays.
+// The dialogs are gathered here as named units that take what they draw and
+// hand back what they were asked to do, so the lobby's return is the screen
+// rather than the screen plus four overlays. A dialog is a small self
+// contained screen with a title, a body and one thing it can do, and inline
+// next to fifteen hundred lines of board and rail it is hard to see where
+// one ends and the next begins.
 //
 // None of them owns state. Every one of them is opened, filled and closed
 // by the lobby, which is the only thing that knows where the data came
@@ -36,21 +35,20 @@ import { HouseLeaderboard } from "@/components/portmasters/HouseLeaderboard";
 import {
   HOUSE_CREST,
   HOUSE_FALLBACK,
-} from "@/components/portmasters/house-colours";
+} from "@/components/portmasters/house-colors";
 import type { CaptainLegacySummary, HouseId } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import { HOUSES, type House } from "@/lib/game/engine";
 
 // Renown, and what it does on the next fresh voyage. The paragraph under
 // the card is the rule as a captain needs it, and it names no number of
-// rounds on purpose. It used to: the round it printed was Fair Winds'
-// eight, and the lobby is where a captain reads it before choosing a
-// voyage, so the number was wrong for Open Waters' twelve, wrong for
-// Monsoon's sixteen, and wrong for every Gambit table, which pins twelve
-// on every tier. The rule it was decorating needs no number to be true,
-// and "ends in bankruptcy" was Classic's ending rather than the game's: a
-// captain whose books fail in Gambit sails on, and still banks what they
-// earned.
+// rounds on purpose: the lobby is where a captain reads it before choosing
+// a voyage, and a number written in would be wrong for every table but one
+// (Open Waters' twelve and Monsoon's sixteen, and every Gambit table, which
+// pins twelve on every tier). The rule needs no number to be true, and it
+// does not say "ends in bankruptcy", which is Classic's ending rather than
+// the game's: a captain whose books fail in Gambit sails on, and still
+// banks what they earned.
 export function LegacyDialog({
   open,
   onOpenChange,
@@ -179,7 +177,7 @@ export function ChronicleDialog({
             Voyage Chronicles
           </DialogTitle>
           <DialogDescription>
-            The harbour master&apos;s ledger of your finished voyages, newest
+            The Harbormaster&apos;s ledger of your finished voyages, newest
             first.
           </DialogDescription>
         </DialogHeader>

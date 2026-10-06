@@ -160,14 +160,17 @@ export async function voyageBriefingsSuite(): Promise<void> {
     );
   }
   // The page count, which is the other half of the same claim: a mode with
-  // nothing to say about itself adds no page, and a mode that changes
-  // rules adds exactly one, so a new captain's manual is as long as the
-  // mode they picked has something to teach them.
+  // nothing to say about itself adds no page, and the experimental voyage
+  // adds two, the list of what it changes and the path deal its lap opens
+  // at (see pathSteps; suite 64 holds the path page's own content and its
+  // gate). The count is pinned as the shipping build's answer rather than
+  // derived here, so a page that arrives or leaves without its reason does
+  // so loudly.
   check(
     tutorialSteps("ocean_gambit", "fair_winds").length ===
-      tutorialSteps("classic", "fair_winds").length + 1 &&
+      tutorialSteps("classic", "fair_winds").length + 2 &&
       MODES.classic.differences.length === 0,
-    "the experimental voyage adds one page to the tutorial, the list of what it changes, where the founding voyage's manual is the length it has always been",
+    "the experimental voyage adds its two pages to the tutorial, the list of what it changes and the path deal, where the founding voyage's manual is the length it has always been",
   );
   // Every word those surfaces print, with the markup stripped: the
   // directive's rule applied to the documentation a captain reads. The

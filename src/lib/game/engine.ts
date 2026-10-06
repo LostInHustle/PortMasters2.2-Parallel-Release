@@ -72,7 +72,7 @@
 // asking a hull the same question and all of them wanting the same
 // floored answer (see its own comment in ./engine/core for why a
 // subtraction rather than a comparison).
-export { getOwnedAmount, moduleSlotsOpen } from "./engine/core";
+export { canPayFee, getOwnedAmount, moduleSlotsOpen } from "./engine/core";
 
 // ========== Pricing, taxes and wages ==========
 // The explain* breakdowns are here because the tooltips are: Purchase,
@@ -102,7 +102,6 @@ export {
 
 // ========== Market: the port board ==========
 export {
-  applyBazaarLean,
   applyMarketLeans,
   applyPortShift,
   applyTidewatchSurge,
@@ -117,9 +116,10 @@ export {
 // visibility rule, the lean and the healing) is here, and the room's board
 // is beside the socket that speaks on it (see
 // src/server/realtime/bazaar.ts). The server reads rumorCooldownLeft,
-// rumorGoodAllowed, rumorId, rumorLean and publicRumors off this barrel
-// and every one of them takes its rows and its leg as arguments, so the
-// suite holds the rule without opening a server.
+// rumorCanLand, rumorGoodAllowed, rumorId, rumorLean and publicRumors off
+// this barrel, and the desk reads rumorSpokeIn and rumorNextLeg beside
+// them, and every one of them takes its rows and its leg as arguments, so
+// the suite holds the rule without opening a server.
 //
 // canPublishRumor is the desk's, and it is the Aroma path's own reader
 // rather than a second copy of the flag: it asks the switch and the path
@@ -130,12 +130,16 @@ export {
   normalizeBazaarRumor,
   normalizeRumorLean,
   publicRumors,
+  rumorCanLand,
+  rumorClosingLine,
   rumorCooldownLeft,
   rumorCooldownLine,
   rumorDirectionLine,
   rumorGoodAllowed,
   rumorId,
   rumorLean,
+  rumorNextLeg,
+  rumorSpokeIn,
   rumorStanding,
   BAZAAR_SELLER_PATH,
   type BazaarRumor,
@@ -285,6 +289,11 @@ export {
   // before the Draft button, and the answer has to be the roll's own
   // predicate rather than a second guess written at the button.
   moduleDraftPossible,
+  // The draft's swap-or-not question, forwarded for the same reason: the
+  // swap button asks it before the press, and the answer has to be the
+  // reroll's own predicate rather than a second guess written at the
+  // button.
+  moduleSwapPossible,
   // The load's own reconcile for the two surcharge fields, forwarded for
   // the reason the rest of this block is: the heal has to read the same
   // accounting the doors write rather than a second copy of the rules.
@@ -316,9 +325,12 @@ export {
 // a row, when an offer expires and what an accept consumes; they live in the
 // game layer rather than in the socket closures for the reason ./convoy.ts
 // gives about its own arithmetic, so a rule can be tested without a live
-// server. The client layer reads consentFeeFor for the form a seller types
-// into, and floorTallies, movementApplied and normalizeConsentLedger at the
-// load site, where a save is healed.
+// server. consentSettled is the one reading of which states commit, and it
+// is exported for the three callers that judge a status rather than carry
+// one: the busy rule, the escort's cover mirror and the client relay that
+// reports a settled row. The client layer reads consentFeeFor for the form a
+// seller types into, and floorTallies, movementApplied and
+// normalizeConsentLedger at the load site, where a save is healed.
 //
 // The type is the other half of the export and the more important one: both
 // ends of the wire import ConsentTerms from here rather than each declaring
@@ -328,6 +340,7 @@ export {
   consentFeeFor,
   consentOfferStanding,
   consentPartyBusy,
+  consentSettled,
   expireConsent,
   floorTallies,
   markMovement,
@@ -346,8 +359,9 @@ export {
 // captain's side of a contract reads applyEscortSide and coverFromBoard,
 // both of them from the room, which is where a relay becomes a state change.
 // The two screens that draw the market read the questions a captain asks of
-// it: canSellEscort, escortCoverage and ESCORT_SELLER_PATH at the Parley
-// table, and escortCoverOf on the Resolve screen, where it says whose guns
+// it: canSellEscort, escortCoverage, canPayFee and ESCORT_SELLER_PATH
+// at the Parley table, and escortCoverOf on the Resolve screen, where it
+// says whose guns
 // are standing over the raid. That last one is read here rather than
 // testing the switch and the field on the screen, so a build with the
 // market off reads as uncovered wherever it is asked. visibleContracts is
@@ -370,6 +384,12 @@ export {
 // answers that question by calling pathConfig on the id it was handed (see
 // Orders.tsx). A second way to ask it would have been a second answer to
 // what a path looks like.
+//
+// canPayEscortFee was here as well and is now ./core's canPayFee, forwarded
+// from the core re-export above: the escort asked the purse question first,
+// the module market and the refit bench asked it again in their own words,
+// and one comparison in one place is worth more than three beside their own
+// fees.
 export {
   applyEscortSide,
   canSellEscort,
@@ -532,11 +552,11 @@ export {
 } from "./engine/convoyState";
 
 // ========== Voyage lifecycle and phase orchestration ==========
-// The departures are deliberately not forwarded. completeOrders,
-// finishSettlement and skipUpgrade used to be here because the panels
-// called them directly, which is what gave the engine a second route
-// around the lap. Every panel reaches the spine through nextPhase or
-// lockInBoon now, so those three are private to ./engine/lifecycle.ts.
+// The departures are deliberately not forwarded: completeOrders,
+// finishSettlement and skipUpgrade are private to ./engine/lifecycle.ts.
+// Every panel reaches the spine through nextPhase or lockInBoon, and
+// re-exporting one of the three would give the engine a second route
+// around the lap.
 //
 // The same goes for the per phase enter and complete steps further up
 // this file: completeMarket, startOrders, completeParley and selectBoon
