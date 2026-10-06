@@ -336,7 +336,7 @@ function RumorList({
     return (
       <MarketEmpty>
         {rumors.length === 0
-          ? "Nobody has spoken at the bazaar yet this voyage. A rumor is the only way an honest captain can move a price, and the whole harbor will see who said it."
+          ? `Nobody has spoken at the bazaar yet this voyage. Only an ${SELLER_PATH.name} captain may speak here, once every ${RUMOR_COOLDOWN_ROUNDS} legs. A rumor moves one good at the next port, and the whole harbor sees who spoke and which good they named.`
           : "Nobody has spoken in this leg or the one before it. The board keeps those two legs and no more. Older rows moved markets the room has already priced and traded through."}
       </MarketEmpty>
     );

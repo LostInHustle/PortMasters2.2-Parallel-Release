@@ -33,7 +33,7 @@ import {
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useMaroon } from "@/lib/use-maroon";
-import { captainName, tallyRows } from "@/lib/voteTally";
+import { captainName, nameCount, tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
@@ -149,31 +149,36 @@ export function MaroonVoteCard({
                     </option>
                   ))}
               </Select>
+              {/* The label names the press and the moment, the same rule
+                  the audit card's button keeps: a name already in reads a
+                  button that says so rather than one that still offers
+                  the press. */}
               <Button
                 variant="outline"
                 disabled={!target || !maroon.canVote}
+                aria-disabled={!maroon.canVote}
                 onClick={() => maroon.vote(target)}
               >
-                {target ? `Put ${nameOf(target)} ashore` : "Call the vote"}
+                {maroon.myVote
+                  ? "Your name is in"
+                  : target
+                    ? `Put ${nameOf(target)} ashore`
+                    : "Call the vote"}
               </Button>
             </div>
-            {/* What this captain said, and when they may speak again: the
-              captain's own record of their press, naming who they named.
-              The count block below is where the room is read. */}
-            {maroon.myVote && (
-              <p className="text-[11px] text-muted-foreground mt-2">
-                You named {nameOf(maroon.myVote)}. Your name is in for this leg,
-                and a captain names one captain a leg: a later leg can put this
-                vote to the harbor again, until one carries. There is nothing
-                else to press on this vote.
-              </p>
-            )}
             <VoteRefusal error={maroon.error} onDismiss={maroon.clearError} />
+            {/* The count, the captain's own name and what the vote does
+                with the names it needs are one reading, drawn once for
+                both of the harbor's votes: the card that said its own half
+                of it was the second answer to the same question. */}
             <VoteTallyRows
               rows={rows}
               census={maroon.census}
               members={members}
               myVote={maroon.myVote}
+              nextStep={(needed) =>
+                `${nameCount(needed)} on one captain puts that captain ashore and spends the vote for the voyage.`
+              }
             />
             <p className="text-[10px] text-muted-foreground/80 mt-2">
               {`${MAROON_VOTE_SHARE} of the captains still in the voyage carry it, rounded up, and the vote is public: every name behind a target is on this board.`}
@@ -182,7 +187,7 @@ export function MaroonVoteCard({
         )
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${rung}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing, rounded up, may put one captain ashore. The ship and its hold go to the harbor, half their Gold stays aboard, and the captain is handed the Harbormaster's hand for the rest of the voyage. One vote can carry a voyage, and a vote that falls short can be called again on a later leg.`}
+          {`This vote opens at leg ${rung}, and this is leg ${game.currentRound}. ${MAROON_VOTE_SHARE} of the captains still sailing, rounded up, then put one captain ashore: the ship and its hold go to the harbor, half their Gold stays aboard, and the Harbormaster's hand is theirs for the rest of the voyage. One vote can carry a voyage, and a vote that falls short can be called again on a later leg.`}
         </p>
       )}
     </VoteCardShell>

@@ -141,13 +141,21 @@ export function ConvoyVentures({
 
           {Number.isFinite(roundsAheadCount) && (
             <p className="mb-2 text-[9px] text-muted-foreground">
-              Fills by Round {game.currentRound + roundsAheadCount}. Miss it and
-              every contributor only gets back a partial refund. This harbor
-              only gets one venture per voyage, so make it count.
+              Fills by Round {game.currentRound + roundsAheadCount}.
             </p>
           )}
         </>
       )}
+
+      {/* The two rules the board is read under, drawn here rather than in
+          the poster's own form: the refund a miss leaves behind and the
+          harbor's one chance a voyage are what a captain weighs before
+          backing somebody else's venture, and a contributor never opens
+          the form that used to be the only place they were written. */}
+      <p className="mb-2 text-[10px] text-muted-foreground">
+        Miss the deadline and every contributor only gets back a partial refund.
+        This harbor only gets one venture per voyage, so make it count.
+      </p>
 
       {convoy.ventures.length === 0 ? (
         <p className="py-1 text-[11px] text-muted-foreground">
@@ -178,7 +186,7 @@ export function ConvoyVentures({
                     {v.posterId === myUserId ? "Your venture" : v.posterName}
                   </span>
                   <span className="font-semibold">
-                    {v.total} / {v.targetGold}g
+                    {v.total} of {v.targetGold} Gold funded
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">

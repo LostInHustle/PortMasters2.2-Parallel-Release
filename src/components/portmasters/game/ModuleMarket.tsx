@@ -121,7 +121,9 @@ export function ModuleMarket({
           comes off the seller&apos;s hull and onto the buyer&apos;s the moment
           the two of you shake hands, so the buyer needs an open slot, and a
           hull&apos;s ladder tops out at three slots at ship level three. The
-          fee is paid when you shake hands.
+          fee is paid when you shake hands. One listing per module a leg, one
+          open offer per captain you name, and an offer nobody takes before the
+          Parley closes is gone.
         </>
       }
     >
@@ -173,11 +175,6 @@ export function ModuleMarket({
                   </Button>
                 }
               />
-              <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-                One listing per module a leg, one open offer per captain you
-                name, and an offer nobody takes before the Parley closes is
-                gone.
-              </p>
             </>
           )}
         </MarketBlock>
@@ -188,8 +185,8 @@ export function ModuleMarket({
       {modules.moduleTrades.length === 0 ? (
         <MarketEmpty>
           {canSell
-            ? "Nothing on the market yet. Your listing is the first."
-            : "No modules on offer this Parley."}
+            ? "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the leg turns or the Parley closes, so a row you posted earlier may already be gone."
+            : "No modules on offer this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain."}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">

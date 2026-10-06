@@ -152,15 +152,21 @@ export function Parley({
   // said one, which is the sentence that answers the question the fold is
   // closed over: not just that a vote is open but how far along it is. The
   // count comes off the tally frame (see VoteCensus), so the fold's
-  // summary and the card's count block are one reading rather than two.
+  // summary and the card's count block are one reading rather than two,
+  // and the line is worded for its own number the way the block below it
+  // is: one captain has named someone, two captains have.
   const gistOf = (
     label: string,
     votes: Record<string, string>,
     census: { roster: number } | null,
-  ) =>
-    census && census.roster > 0
-      ? `${label}: ${Object.keys(votes).length} of ${census.roster} names are in.`
+  ) => {
+    const named = Object.keys(votes).length;
+    return census && census.roster > 0
+      ? `${label}: ${named} of ${census.roster} ${
+          named === 1 ? "captain has" : "captains have"
+        } named someone.`
       : `${label} is open.`;
+  };
   const businessGist = anyLive
     ? auditLive && maroonLive
       ? `Two votes are open. ${gistOf("The audit vote", audit.votes, audit.census)} ${gistOf("The maroon vote", maroon.votes, maroon.census)}`

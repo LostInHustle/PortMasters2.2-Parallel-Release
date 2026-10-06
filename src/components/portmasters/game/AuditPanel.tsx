@@ -31,7 +31,7 @@ import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import type { useAudit } from "@/lib/use-audit";
 import { cn } from "@/lib/utils";
-import { captainName, tallyRows } from "@/lib/voteTally";
+import { captainName, nameCount, tallyRows } from "@/lib/voteTally";
 import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
@@ -118,10 +118,10 @@ export function AuditVoteCard({
         <>
           <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
             A majority of the captains still sailing can open one manifest. What
-            comes back is a sample of what they filed, and the harbor trades no
-            more this leg. When one name carries, the manifest opens to the
-            whole harbor and the leg&apos;s trading closes with it; the voyage
-            carries on at the next leg.
+            comes back is a sample of what they filed. A carried vote ends this
+            leg&apos;s trading, and the voyage carries on at the next leg. The
+            count below names who is still to vote, and what the vote does when
+            the names it needs land on one captain.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Select
@@ -140,12 +140,22 @@ export function AuditVoteCard({
                   </option>
                 ))}
             </Select>
+            {/* The label says what the press does rather than what the
+                surface is called, and it says which of the two moments
+                this captain is standing in: a name already in reads a
+                button that tells them so instead of offering the press a
+                second time. */}
             <Button
               variant="outline"
               disabled={!target || !audit.canVote}
+              aria-disabled={!audit.canVote}
               onClick={() => audit.vote(target)}
             >
-              Call the audit
+              {audit.myVote
+                ? "Your name is in"
+                : target
+                  ? `Open ${nameOf(target)}'s manifest`
+                  : "Call the audit"}
             </Button>
           </div>
           {members.some((m) => marked(m.id)) && (
@@ -153,25 +163,20 @@ export function AuditVoteCard({
               A captain the harbor has written off cannot be audited.
             </p>
           )}
-          {/* A captain who has named someone is told what they said and when
-              they may name again, because the one question a spent button
-              leaves is whether it comes back. It does not come back this
-              leg, and the harbor opens one manifest a voyage, so the
-              sentence answers the leg and the voyage at once. */}
-          {audit.myVote && (
-            <p className="text-[11px] text-muted-foreground mt-2">
-              You named {nameOf(audit.myVote)}. Your name is in for this leg,
-              and a captain names one captain a leg: the harbor opens one
-              manifest a voyage, so a later leg can call this vote again. There
-              is nothing else to press on this vote.
-            </p>
-          )}
           <VoteRefusal error={audit.error} onDismiss={audit.clearError} />
+          {/* What this captain said, whose turn it is, and what the vote
+              does with the names it needs are all one reading now, so the
+              block below owns every word of them: a panel that said its
+              own half of the count was the second answer to the same
+              question. */}
           <VoteTallyRows
             rows={rows}
             census={audit.census}
             members={members}
             myVote={audit.myVote}
+            nextStep={(needed) =>
+              `${nameCount(needed)} on one captain opens that captain's manifest to the whole harbor and closes this leg's trading.`
+            }
           />
           <p className="text-[10px] text-muted-foreground/80 mt-2">
             {AUDIT_VOTE_RULE}
@@ -179,7 +184,7 @@ export function AuditVoteCard({
         </>
       ) : (
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {`From leg ${opensAt}, a simple majority of the harbor may open one captain's manifest: ${AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. Calling it spends the rest of that leg's Parley. The harbor opens one manifest a voyage, and a vote that does not carry can be called again on a later leg.`}
+          {`This vote opens at leg ${opensAt}, and this is leg ${game.currentRound}. A simple majority of the captains still sailing then opens one captain's manifest: ${AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. A carried vote ends that leg's trading, the voyage carries on at the next leg, and the harbor opens one manifest a voyage.`}
         </p>
       )}
     </VoteCardShell>

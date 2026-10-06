@@ -54,7 +54,8 @@ export function ReadyBar({
       )}
     >
       <span className="text-[11px] font-semibold text-muted-foreground">
-        {ready.readyUserIds.length}/{ready.requiredUserIds.length} ready
+        {ready.readyUserIds.length} of {ready.requiredUserIds.length} captains
+        {ready.readyUserIds.length === 1 ? " has" : " have"} readied.
       </span>
       {clock ? (
         <span

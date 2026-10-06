@@ -16,9 +16,10 @@
 //
 // Both of these act on the shared board through useBarter, which is the
 // only client side copy of what is still open. Nothing here decides when
-// escrow comes back: withdrawing reports it to the hook, which is also
-// what reports an offer the server swept, so there is exactly one route
-// by which goods return to a hold.
+// escrow comes back: a post the room refuses is the room's to answer, and
+// a withdrawal is the room's to confirm, and useBarter is what turns
+// either one into the return of the goods, so there is exactly one route
+// by which goods come back to a hold.
 // =====================================================================
 import { useState } from "react";
 import { Select } from "@/components/ui/select";

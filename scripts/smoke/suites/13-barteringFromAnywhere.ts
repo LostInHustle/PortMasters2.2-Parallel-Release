@@ -3,6 +3,8 @@
 import { db } from "@/lib/db";
 import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants/goods";
 import { phaseFace } from "@/lib/game/phases";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { call, check, waitForEvent } from "../harness";
 import type { WireOffer } from "../wire";
 import type { Socket } from "socket.io-client";
@@ -348,6 +350,212 @@ export async function barteringFromAnywhereSuite(inputs: {
     cookie: third.cookie,
   });
   check(thirdLeft.status === 200, "the third captain can leave the harbor");
+
+  // ========== What a refusal has to give back ==========
+  // Posting escrows on the spot: the poster's own client takes the offered
+  // goods out of its hold the moment the press lands, before the frame is
+  // even sent (see the engine's postBarterOffer, and why the escrow works
+  // that way). So a refusal has to be able to say which post it refused,
+  // or a press made as the leg turns destroys the goods outright: out of
+  // the hold, never on the board, gone for the voyage. This is that
+  // frame, and the echo is the whole reason it carries anything.
+  const refusedPostEcho = waitForEvent<{
+    error?: string;
+    offerItem?: string;
+    offerAmount?: number;
+    requestItem?: string;
+    requestAmount?: number;
+    flexible?: boolean;
+  }>(guestSocket, "barter:error", (payload) => Boolean(payload?.error));
+  guestSocket.emit("barter:post", {
+    roomId: roomId,
+    offerItem: "Hemp",
+    offerAmount: 2,
+    requestItem: "Gold",
+    requestAmount: 3,
+    flexible: false,
+  });
+  const refusedPost = await refusedPostEcho;
+  check(
+    refusedPost !== null,
+    "an exchange offer made outside the Parley is refused, as above",
+  );
+  check(
+    refusedPost?.offerItem === "Hemp" &&
+      refusedPost?.offerAmount === 2 &&
+      refusedPost?.requestItem === "Gold" &&
+      refusedPost?.requestAmount === 3 &&
+      refusedPost?.flexible === false,
+    "and the refusal names the offer it refused, field for field, so the client knows which escrow to hand back",
+  );
+
+  // The client's own half of that trade, read off the files rather than
+  // driven because the escrow lives in a React hook and this suite has no
+  // browser to press it in. Two claims, one per side: the hook writes a
+  // post down as it goes out and hands the named one back when it is
+  // refused, and the boards hook is what actually returns the goods,
+  // through the same refund a sweep takes.
+  const repoRoot = join(import.meta.dirname, "..", "..", "..");
+  const barterHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-barter.ts"),
+    "utf8",
+  );
+  const boardsHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-harbor-boards.ts"),
+    "utf8",
+  );
+  check(
+    barterHook.includes("takeRefusedPost(pendingPostsRef.current, data)") &&
+      barterHook.includes("onPostRefusedRef.current(refused)") &&
+      boardsHook.includes(
+        "refundBarterOffer(g, post.offerItem, post.offerAmount, l)",
+      ),
+    "a refused post's own escrow goes back to the hold, so the press that used to destroy the goods now returns them",
+  );
+  // The withdrawal's half of the same escrow rule, and the second bug this
+  // article holds down: a buyer's accept can already be on the wire when
+  // the poster presses Cancel, and the room may have sold the offer by
+  // then. A refund taken at the moment of the press would pay the poster
+  // twice for one offer, once in goods and once in the price, so there is
+  // exactly one place a refund can come from and it is the board dropping
+  // the offer (the same rule a swept offer follows, and the one the
+  // fulfilled frame settles first so it never fires).
+  const refundSites = barterHook.split("onRefundRef.current(").length - 1;
+  check(
+    refundSites === 1 && barterHook.includes('socket.emit("barter:cancel"'),
+    "a withdrawal asks the room and refunds nothing itself, so the sale that won the race and the refund can never both pay",
+  );
+
+  // ========== The harbor's other peer board: one loan ==========
+  // Gold between two captains is the second thing the room routes between
+  // players, and it settles by the same shape as the goods above: the room
+  // holds the record and each side applies what the room says. What is
+  // checked is the repayment's two answers, because a repayment used to be
+  // applied to the borrower's own book on the spot and sent on their own
+  // word: a loan the room had already closed took the Gold locally, paid
+  // the lender nothing, and left the press unanswered, with nothing on
+  // either screen to say which had happened.
+  const loanAsked = waitForEvent<{
+    requests: { id: string; fromUserId: string; amount: number }[];
+  }>(hostSocket, "aid:update", (payload) =>
+    (payload?.requests ?? []).some((r) => r.fromUserId === guestId),
+  );
+  guestSocket.emit("aid:post", { roomId: roomId, amount: 5 });
+  const loanRequest = (await loanAsked)?.requests.find(
+    (r) => r.fromUserId === guestId,
+  );
+  check(
+    Boolean(loanRequest),
+    "a captain short of Gold can ask the harbor for a loan",
+  );
+
+  const grantedToBorrower = waitForEvent<{
+    requestId?: string;
+    amount?: number;
+    helperId?: string;
+  }>(
+    guestSocket,
+    "aid:granted",
+    (payload) => payload?.requestId === loanRequest?.id,
+  );
+  const grantedToHelper = waitForEvent<{
+    requestId?: string;
+    amount?: number;
+  }>(
+    hostSocket,
+    "aid:granted",
+    (payload) => payload?.requestId === loanRequest?.id,
+  );
+  hostSocket.emit("aid:help", { roomId: roomId, requestId: loanRequest?.id });
+  const loan = await grantedToBorrower;
+  check(
+    loan?.amount === 5 && loan?.helperId === hostId,
+    "and another captain can cover it, with the borrower told the amount and the lender",
+  );
+  check(
+    (await grantedToHelper) !== null,
+    "and the lender is told the same loan rather than one of their own making",
+  );
+
+  // The repayment itself. The borrower asks and the room answers: the
+  // receipt is what lets their client move the debt and the Gold, and it
+  // is the frame the old shape of this press never had, which is why a
+  // closed loan used to cost a captain their Gold in silence.
+  const receiptForPayer = waitForEvent<{ debtId?: string }>(
+    guestSocket,
+    "aid:repay:ok",
+    (payload) => payload?.debtId === loanRequest?.id,
+  );
+  const repaidToLender = waitForEvent<{
+    debtId?: string;
+    amount?: number;
+    fromUserId?: string;
+  }>(
+    hostSocket,
+    "aid:repaid",
+    (payload) => payload?.debtId === loanRequest?.id,
+  );
+  guestSocket.emit("aid:repay", {
+    roomId: roomId,
+    lenderId: hostId,
+    amount: 5,
+    debtId: loanRequest?.id,
+  });
+  check(
+    (await receiptForPayer) !== null,
+    "a repayment is answered with a receipt naming the debt the room closed, so the payer can apply it on the room's word rather than their own",
+  );
+  check(
+    (await repaidToLender)?.amount === 5,
+    "and the lender is paid the amount the loan was for",
+  );
+
+  // The same press again, against a loan the room no longer holds. This is
+  // the audit's own second file: the loan can be gone (a voyage that
+  // ended, a seat that was written off) while the borrower's own book
+  // still lists the debt, and the press has to be refused rather than
+  // answered with silence.
+  const refusedRepay = waitForEvent<{
+    debtId?: string | null;
+    reason?: string;
+  }>(guestSocket, "aid:repay:fail", (payload) => Boolean(payload?.reason));
+  guestSocket.emit("aid:repay", {
+    roomId: roomId,
+    lenderId: hostId,
+    amount: 5,
+    debtId: loanRequest?.id,
+  });
+  const staleRepay = await refusedRepay;
+  check(
+    staleRepay?.debtId === loanRequest?.id,
+    "a repayment of a loan the room no longer holds is refused rather than left unanswered, so a debt the room has closed cannot cost the Gold it names",
+  );
+  check(
+    Boolean(staleRepay?.reason?.includes("no longer outstanding")),
+    "and the refusal says what the book holds instead",
+  );
+
+  // The client's own half of that pair, read off the files for the reason
+  // the escrow needles above are: the press is a React callback. The press
+  // asks and applies nothing, the receipt is what runs the engine, and the
+  // engine function is not reachable from the press at all, which is the
+  // whole fix: a debt the room has closed cannot be debited twice or
+  // debited for nothing.
+  const aidHook = readFileSync(
+    join(repoRoot, "src", "lib", "use-aid.ts"),
+    "utf8",
+  );
+  const gameRoom = readFileSync(
+    join(repoRoot, "src", "components", "portmasters", "GameRoom.tsx"),
+    "utf8",
+  );
+  check(
+    gameRoom.includes("aid.repay(debt.counterpartyId, debt.amount, debtId)") &&
+      !gameRoom.includes("repayLoan") &&
+      boardsHook.includes("repayLoan(g, settled.debtId, l)") &&
+      aidHook.includes('socket.on("aid:repay:ok"'),
+    "a repayment moves the debt on the receipt the room sends back and nowhere else, so the Gold follows a loan the room is actually holding",
+  );
 
   return { guestId };
 }

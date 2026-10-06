@@ -78,7 +78,8 @@ function WorkerList({
       )}
     >
       <div className="pm-artisan-ink text-xs font-semibold">
-        {icon} {name}s: {list.length}
+        {icon} {name}
+        {list.length === 1 ? "" : "s"}: {list.length}
       </div>
       {list.map((w, i) => (
         <div

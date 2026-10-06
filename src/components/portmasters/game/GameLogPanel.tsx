@@ -28,7 +28,7 @@ export function GameLogPanel({ logs }: { logs: string[] }) {
           📜 Ledger
         </span>
         <span className="text-[10px] text-muted-foreground">
-          {logs.length} entries
+          {logs.length} {logs.length === 1 ? "entry" : "entries"}
         </span>
       </div>
       <div

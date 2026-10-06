@@ -21,6 +21,15 @@ export type RepaidLoan = {
   fromName: string;
 };
 
+// The receipt for a repayment I sent: the room found the loan and closed
+// it, so this client's own debt can move. It carries the debt rather than
+// the Gold because the amounts are this captain's own ledger (the loan
+// was recorded here when it was granted), and the debt id is what says
+// which one of them this closes.
+export type RepaymentSettled = {
+  debtId: string;
+};
+
 // Fires only on the original lender's own client, only for a loan they
 // redirected before it was repaid: the Gold already went to the redirect
 // target via onRepaid on their client instead, this is purely "stop
@@ -44,6 +53,14 @@ export type RedirectedLoanClosed = {
  * the helper (debit my Gold, the request disappears from the board) and
  * as the borrower (credit my Gold, record the debt). The caller tells
  * the two apart from the `role` argument rather than comparing ids itself.
+ *
+ * `onRepaymentSettled` fires on the client that asked to repay, once the
+ * room has closed the loan, and it is the only thing that ever moves a
+ * debt on this side: the press asks, and the loan is the room's to close
+ * (a voyage that ended or a seat that was written off can have taken it
+ * already, in which case the press is refused rather than answered and
+ * nothing here moves). A refusal arrives as this hook's `error`, which is
+ * the sentence the member screens draw.
  */
 export function useAid(
   socket: Socket | null,
@@ -52,6 +69,7 @@ export function useAid(
   onGranted: (loan: GrantedLoan, role: "borrower" | "helper") => void,
   onRepaid: (loan: RepaidLoan) => void,
   onRedirectedClosed?: (closed: RedirectedLoanClosed) => void,
+  onRepaymentSettled?: (settled: RepaymentSettled) => void,
 ) {
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +86,10 @@ export function useAid(
   useEffect(() => {
     onRedirectedClosedRef.current = onRedirectedClosed;
   }, [onRedirectedClosed]);
+  const onRepaymentSettledRef = useRef(onRepaymentSettled);
+  useEffect(() => {
+    onRepaymentSettledRef.current = onRepaymentSettled;
+  }, [onRepaymentSettled]);
 
   useEffect(() => {
     if (!socket) return;
@@ -108,6 +130,23 @@ export function useAid(
       if (data.roomId !== roomId) return;
       setError(data.error);
     };
+    // The two answers a repayment gets. Both are spoken, because the
+    // borrower's client applies nothing on its own: the receipt is what
+    // moves the debt, and the refusal is what says the room has none to
+    // close rather than leaving the press waiting on an answer that is
+    // never coming.
+    const onRepaySettled = (data: RepaymentSettled & { roomId: string }) => {
+      if (data.roomId !== roomId) return;
+      onRepaymentSettledRef.current?.(data);
+    };
+    const onRepayFail = (data: {
+      roomId: string;
+      debtId: string | null;
+      reason: string;
+    }) => {
+      if (data.roomId !== roomId) return;
+      setError(data.reason);
+    };
 
     socket.on("aid:update", onUpdate);
     socket.on("aid:granted", onGrantedEvent);
@@ -115,6 +154,8 @@ export function useAid(
     socket.on("aid:redirected", onRedirectedEvent);
     socket.on("aid:help:fail", onHelpFail);
     socket.on("aid:error", onPostError);
+    socket.on("aid:repay:ok", onRepaySettled);
+    socket.on("aid:repay:fail", onRepayFail);
     socket.emit("aid:state:request", { roomId });
 
     return () => {
@@ -124,6 +165,8 @@ export function useAid(
       socket.off("aid:redirected", onRedirectedEvent);
       socket.off("aid:help:fail", onHelpFail);
       socket.off("aid:error", onPostError);
+      socket.off("aid:repay:ok", onRepaySettled);
+      socket.off("aid:repay:fail", onRepayFail);
     };
   }, [socket, roomId, myUserId]);
 
@@ -149,6 +192,12 @@ export function useAid(
     [socket, roomId],
   );
 
+  // Repaying only asks, the same way helping does. The room holds the
+  // loan, so it is the room that says whether it can be closed, and the
+  // caller applies nothing until the receipt arrives. The forced
+  // settlement at the end of a voyage reports through this same call,
+  // where the local debts were already closed and a receipt finds
+  // nothing left to move.
   const repay = useCallback(
     (lenderId: string, amount: number, debtId: string) => {
       if (!socket) return;

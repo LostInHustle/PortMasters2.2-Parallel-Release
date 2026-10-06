@@ -81,7 +81,6 @@ import {
   coverFromBoard,
   leavePhase,
   purchaseIntel,
-  repayLoan,
 } from "@/lib/game/engine";
 
 // Browser scoped: the onboarding guide is a "you have played this before"
@@ -470,14 +469,23 @@ export function GameRoom({
     };
   }, [socket, room.id, act, notifications.push]);
 
+  // Paying a loan back is the room's to close first and this captain's to
+  // record second. The loan is the server's own book, and it can be gone
+  // by the time the press lands (a voyage that ended, a seat that was
+  // written off), in which case a local debit here would take the Gold
+  // for a debt nobody is holding, with the lender paid on nothing and no
+  // frame to say so. So the press only asks, and the engine runs on the
+  // receipt instead (the same ask first shape the aid board's help press
+  // has always had): see the onAidRepaySettled relay in
+  // use-harbor-boards, and aid:repay in src/server/realtime/wiring/aid
+  // for the two answers a repayment can get.
   const handleRepayLoan = useCallback(
     (debtId: string) => {
       const debt = state.game.debts.find((d) => d.id === debtId);
       if (!debt) return;
-      act((g, l) => repayLoan(g, debtId, l));
       aid.repay(debt.counterpartyId, debt.amount, debtId);
     },
-    [act, aid, state.game.debts],
+    [aid, state.game.debts],
   );
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);

@@ -287,7 +287,7 @@ export function RefitBench({
         <MarketEmpty className="py-2">
           {canSell
             ? "Nothing on the bench yet. Your offer is the first."
-            : "No refit work on offer this leg."}
+            : "No refit work on offer this leg. A refit on the bench is gone when this Market closes, and a captain takes on one refit a leg."}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">

@@ -58,6 +58,29 @@ export function wireBarter(io: Server, socket: Socket): void {
       const { roomId } = s;
       const { offerItem, offerAmount, requestItem, requestAmount } =
         payload ?? {};
+      // Every refusal this handler sends names the post it refused. The
+      // poster's own client took the offered goods out of its hold before
+      // the frame went out (posting escrows on the spot, see the engine's
+      // postBarterOffer), so this echo is what tells it which escrow to
+      // hand back. A refusal that named nothing would leave the goods out
+      // of the hold and off the board for the rest of the voyage, which
+      // is exactly what a press made as the leg turns used to do. The
+      // fields are the poster's own, echoed rather than judged: the
+      // branch below is what judges them.
+      const refuse = (error: string): void => {
+        socket.emit("barter:error", {
+          roomId,
+          error,
+          offerItem,
+          offerAmount,
+          requestItem,
+          requestAmount,
+          ...(typeof payload?.targetUserId === "string" && payload.targetUserId
+            ? { targetUserId: payload.targetUserId }
+            : {}),
+          flexible: payload?.flexible === true,
+        });
+      };
       if (
         typeof offerItem !== "string" ||
         !offerItem ||
@@ -69,20 +92,14 @@ export function wireBarter(io: Server, socket: Socket): void {
         !Number.isInteger(requestAmount) ||
         (requestAmount as number) < 1
       ) {
-        socket.emit("barter:error", {
-          roomId,
-          error: "Invalid barter offer",
-        });
+        refuse("Invalid barter offer");
         return;
       }
       let targetUserId: string | undefined;
       let targetName: string | undefined;
       if (payload?.targetUserId) {
         if (payload.targetUserId === s.userId) {
-          socket.emit("barter:error", {
-            roomId,
-            error: "You can't direct an offer to yourself.",
-          });
+          refuse("You can't direct an offer to yourself.");
           return;
         }
         const targetMember = await db.roomMember.findUnique({
@@ -92,10 +109,7 @@ export function wireBarter(io: Server, socket: Socket): void {
           include: { user: { select: { displayName: true } } },
         });
         if (!targetMember) {
-          socket.emit("barter:error", {
-            roomId,
-            error: TARGET_NOT_IN_HARBOR,
-          });
+          refuse(TARGET_NOT_IN_HARBOR);
           return;
         }
         targetUserId = payload.targetUserId;
@@ -118,11 +132,9 @@ export function wireBarter(io: Server, socket: Socket): void {
       if (!flexible) {
         const cp = await getCheckpoint(roomId);
         if (cp.phase !== "parley") {
-          socket.emit("barter:error", {
-            roomId,
-            error:
-              "The Captain's Exchange is only open during the Parley phase.",
-          });
+          refuse(
+            "The Captain's Exchange is only open during the Parley phase.",
+          );
           return;
         }
         // The audit's price is the rest of that leg's Parley, so the
@@ -131,10 +143,7 @@ export function wireBarter(io: Server, socket: Socket): void {
         // offers are not gated on the phase and are not gated here: they
         // travel the chat road, and no parley clock ever priced them.
         if (auditSpentLeg(roomId, cp.round)) {
-          socket.emit("barter:error", {
-            roomId,
-            error: auditSpentReason("The exchange opens"),
-          });
+          refuse(auditSpentReason("The exchange opens"));
           return;
         }
       }
@@ -149,17 +158,11 @@ export function wireBarter(io: Server, socket: Socket): void {
       if (flexible) {
         const myLevel = await authoritativeRenownLevel(s.userId);
         if (myLevel === null) {
-          socket.emit("barter:error", {
-            roomId,
-            error: renownUnavailableReason(),
-          });
+          refuse(renownUnavailableReason());
           return;
         }
         if (!flexibleBarterUnlocked(myLevel)) {
-          socket.emit("barter:error", {
-            roomId,
-            error: flexibleLockedReason(),
-          });
+          refuse(flexibleLockedReason());
           return;
         }
         // Posting is free and always allowed while there is something
@@ -175,26 +178,17 @@ export function wireBarter(io: Server, socket: Socket): void {
             flexibleOffersAccepted(roomId, s.userId),
           ) === 0
         ) {
-          socket.emit("barter:error", {
-            roomId,
-            error: flexibleSpentReason(),
-          });
+          refuse(flexibleSpentReason());
           return;
         }
         if (targetUserId) {
           const theirLevel = await authoritativeRenownLevel(targetUserId);
           if (theirLevel === null) {
-            socket.emit("barter:error", {
-              roomId,
-              error: renownUnavailableReason(),
-            });
+            refuse(renownUnavailableReason());
             return;
           }
           if (!bothFlexibleBarterUnlocked(myLevel, theirLevel)) {
-            socket.emit("barter:error", {
-              roomId,
-              error: otherCaptainLockedReason(),
-            });
+            refuse(otherCaptainLockedReason());
             return;
           }
         }

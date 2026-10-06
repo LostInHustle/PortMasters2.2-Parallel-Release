@@ -730,6 +730,68 @@ export async function powerBudgetSuite(): Promise<void> {
     "a swap on a hull that has seen most of the pool tops up rather than dealing short: two seats come from the cards this hull has never been shown and one from the batch being replaced, so even the swap that cannot fill three seats from the unseen cards hands back a different batch of three real modules",
   );
 
+  // [field report: the batch that would not change] The promise the three
+  // checks above pin on named hulls, held over two hundred hulls a hand
+  // would not think to build: both modes, every level, hulls carrying
+  // nothing and hulls carrying most of the pool, so wherever the ladder
+  // and the cap leave the candidates the press is held to its three rules.
+  // The hulls and levels come from a local LCG seeded here rather than
+  // from Math.random, so the run is the same run every time the battery
+  // reads it, while the swap's own draw stays the live draw the game runs.
+  let fuzzSeed = 0x2f6e2b1;
+  const fuzzNext = (): number => {
+    fuzzSeed = (fuzzSeed * 1103515245 + 12345) & 0x7fffffff;
+    return fuzzSeed / 0x7fffffff;
+  };
+  const fuzzFailures: string[] = [];
+  for (let trial = 0; trial < 200; trial++) {
+    const randomHull = voyageState({
+      mode: trial % 2 === 0 ? GAMBIT : CLASSIC,
+    });
+    const level = 1 + Math.floor(fuzzNext() * 4);
+    randomHull.shipLevel = level;
+    const hullPool = offerPool("module", randomHull).map(([card]) => card.id);
+    const order = [...hullPool].sort(() => fuzzNext() - 0.5);
+    for (const id of order.slice(0, Math.min(level, order.length))) {
+      randomHull.equippedModules.push(cardOf(id));
+    }
+    startModuleDrafting(randomHull);
+    const replaced = trioOf(randomHull);
+    const dealable = moduleSwapPossible(randomHull);
+    const fuzzLogs: string[] = [];
+    swapModuleChoices(randomHull, fuzzLogs);
+    const dealt = trioOf(randomHull);
+    if (dealable) {
+      if (dealt.length !== CARDS_PER_OFFER)
+        fuzzFailures.push(`trial ${trial}: a batch of ${dealt.length}`);
+      if (new Set(dealt).size !== dealt.length)
+        fuzzFailures.push(`trial ${trial}: one seat dealt twice`);
+      if (!dealt.every((id) => moduleFitsHull(randomHull, cardOf(id))))
+        fuzzFailures.push(`trial ${trial}: a seat this hull cannot take`);
+      if (sortedTrio(randomHull) === [...replaced].sort().join("|"))
+        fuzzFailures.push(`trial ${trial}: the trio the press replaced`);
+    } else {
+      if (
+        !fuzzLogs.some(
+          (line) =>
+            line.includes("nothing new to deal") ||
+            line.includes("Nothing to swap"),
+        )
+      )
+        fuzzFailures.push(`trial ${trial}: a refusal that said nothing`);
+      if (randomHull.moduleSwapUsed)
+        fuzzFailures.push(`trial ${trial}: a refusal that spent the use`);
+      if (sortedTrio(randomHull) !== [...replaced].sort().join("|"))
+        fuzzFailures.push(`trial ${trial}: a refusal that moved the table`);
+    }
+  }
+  if (fuzzFailures.length > 0)
+    console.log(`    [swap fuzz] ${fuzzFailures.slice(0, 3).join("; ")}`);
+  check(
+    fuzzFailures.length === 0,
+    "and the swap keeps that promise over two hundred random hulls: wherever the button is dealable the press hands back a whole batch of three distinct seats that all fit this hull and never the trio it replaced, and wherever it is not the press is refused in words with the table and the round's one use left standing",
+  );
+
   // The same press at the two rungs of the ladder a hull can still have
   // room on: the level one hull carries nothing and the level two hull
   // carries one five power module beside its open slot. Both read the

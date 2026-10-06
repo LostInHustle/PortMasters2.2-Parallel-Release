@@ -133,7 +133,8 @@ export function EscortMarket({
           seller&apos;s cannons that answer the raid: {beatenOff} of it is
           beaten off, and the remaining {eaten} is deducted from the
           seller&apos;s Gold. The cover lasts the leg it was sold for and no
-          other, and a raid that never comes costs the seller nothing.
+          other, and a raid that never comes costs the seller nothing. An offer
+          nobody takes before the Parley closes is gone.
         </>
       }
     >
@@ -154,7 +155,7 @@ export function EscortMarket({
             onTarget={setTargetId}
             others={others}
             audienceLabel="Offer this contract to a specific captain"
-            deadline="in this Parley."
+            deadline="before the Parley closes."
             action={
               <Button
                 className={cn("rounded-lg pm-grad-parley")}
@@ -172,7 +173,6 @@ export function EscortMarket({
             to {CONSENT_FEE_MAX}. An open offer is any captain&apos;s to take,
             while a named one waits on the captain you named, and one open offer
             plus one per captain named is the most this market holds from you.
-            An offer nobody takes before the Parley closes is gone.
           </p>
         </MarketBlock>
       )}
@@ -191,7 +191,7 @@ export function EscortMarket({
         <MarketEmpty>
           {canSell
             ? "Nothing is on the market yet. Name a price and post the first offer, or wait and let a buyer come to you."
-            : "No protection is on offer this Parley. Only a Convoy captain at this table can sell one leg of cover, so a Convoy captain's offer is what you are waiting for. An offer aimed at one captain is theirs to read, and an offer aimed at the table is any captain's to take. If no Convoy captain sits here, nobody can cover you this leg."}
+            : "No protection is on offer this Parley. Only a Convoy captain at this table can sell one leg of cover, so their offer is what you are waiting for. An offer aimed at one captain waits on that captain, and an offer aimed at the table is any captain's to take. Every offer dies when this Parley closes."}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">

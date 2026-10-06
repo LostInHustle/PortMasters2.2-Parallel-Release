@@ -24,11 +24,12 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Socket } from "socket.io-client";
 import { toast } from "sonner";
 
-import { useBarter, type BarterOffer } from "./use-barter";
+import { useBarter, type BarterOffer, type PostedOffer } from "./use-barter";
 import {
   useAid,
   type GrantedLoan,
   type RepaidLoan,
+  type RepaymentSettled,
   type RedirectedLoanClosed,
 } from "./use-aid";
 import {
@@ -65,6 +66,7 @@ import {
   receiveRepayment,
   receiveVentureSettlement,
   refundBarterOffer,
+  repayLoan,
   settleBarterTrade,
 } from "./game/engine";
 
@@ -142,12 +144,26 @@ export function useHarborBoards({
     },
     [act, loaded],
   );
+  // A post the room turned away. The composer had already escrowed the
+  // offered goods on its own side (the engine's post takes them, which is
+  // what stops one stock from being promised twice), so the refusal is
+  // the one thing that can give them back, and the post it names is where
+  // the amounts come from (see use-barter). The goods come home through
+  // the same refund a withdrawal and a sweep take, so there is one route
+  // back to a hold and one log line for all three.
+  const onBarterPostRefused = useCallback(
+    (post: PostedOffer) => {
+      act((g, l) => refundBarterOffer(g, post.offerItem, post.offerAmount, l));
+    },
+    [act],
+  );
   const barter = useBarter(
     socket,
     roomId,
     meId,
     onBarterFulfilled,
     onBarterRefund,
+    onBarterPostRefused,
   );
   useEffect(() => {
     if (!loaded || pendingRefunds.current.length === 0) return;
@@ -207,6 +223,20 @@ export function useHarborBoards({
     },
     [act],
   );
+  // The receipt for a repayment this captain sent. Nothing left the hold
+  // when the press went out, so this is the moment the debt and the Gold
+  // move on this side, and the only moment they do: a repayment the room
+  // has no loan for is refused rather than answered, and a refusal leaves
+  // both exactly where they were (see GameRoom's handleRepayLoan). The
+  // forced settlement at the end of a voyage leaves its own receipts with
+  // nothing to apply, since the debts were settled locally before the
+  // frame went out and the engine finds no debt to close.
+  const onAidRepaySettled = useCallback(
+    (settled: RepaymentSettled) => {
+      act((g, l) => repayLoan(g, settled.debtId, l));
+    },
+    [act],
+  );
   const aid = useAid(
     socket,
     roomId,
@@ -214,6 +244,7 @@ export function useHarborBoards({
     onAidGranted,
     onAidRepaid,
     onAidRedirectedClosed,
+    onAidRepaySettled,
   );
 
   const onBackingAccepted = useCallback(

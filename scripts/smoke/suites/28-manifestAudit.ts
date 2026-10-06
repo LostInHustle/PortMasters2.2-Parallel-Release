@@ -1717,6 +1717,9 @@ export async function manifestAuditSuite(
   );
   const auditHookCode = readSrc("src/lib/use-audit.ts");
   const maroonHookCode = readSrc("src/lib/use-maroon.ts");
+  const maroonPanelCode = readSrc(
+    "src/components/portmasters/game/MaroonPanel.tsx",
+  );
 
   check(
     tallyRowCode.includes("leaderShortfall(rows, census.needed)") &&
@@ -1727,11 +1730,69 @@ export async function manifestAuditSuite(
   );
   check(
     tallyRowCode.includes("count has not arrived yet") &&
-      tallyRowCode.includes("1 name carries it") &&
-      tallyRowCode.includes("names carry it") &&
+      tallyRowCode.includes('"carries" : "carry"') &&
+      tallyRowCode.includes('"has" : "have"') &&
       tallyRowCode.includes("No name is in yet") &&
       tallyRowCode.includes("Your name is not in yet"),
-    "and the block says what it does not have: a room whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote are counted with their word",
+    "and the block says what it does not have: a room whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote and the captains who have named one are both counted and worded for their own number",
+  );
+  check(
+    tallyRowCode.includes("captains ") &&
+      tallyRowCode.includes("nameCount(census.needed)") &&
+      tallyRowCode.includes('"carries" : "carry"') &&
+      !tallyRowCode.includes("names are in"),
+    "the count line states the count and the threshold in one sentence and is worded for its own number, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one",
+  );
+  check(
+    tallyRowCode.includes("nextStep(census.needed)") &&
+      auditPanelCode.includes("closes this leg's trading") &&
+      maroonPanelCode.includes("puts that captain ashore") &&
+      !auditPanelCode.includes("puts that captain ashore") &&
+      !maroonPanelCode.includes("census.needed -") &&
+      !auditPanelCode.includes("census.needed -"),
+    "and the sentence that says what the vote does with the names it needs belongs to the vote rather than to the block: the audit's card names the manifest, the maroon's card names the shore, and neither panel works out a shortfall of its own to say how far off the count is",
+  );
+  check(
+    tallyRowCode.includes("captainCount(waiting.length)") &&
+      tallyRowCode.includes('"has" : "have"') &&
+      tallyRowCode.includes("not named anyone") &&
+      tallyRowCode.includes("nameList(waiting)"),
+    "and the line that says who still has to act names them and counts them, so a captain reads how many of the harbor has yet to name someone rather than a list of names with no length on it",
+  );
+  check(
+    !auditPanelCode.includes("There is nothing else to press") &&
+      !maroonPanelCode.includes("There is nothing else to press") &&
+      tallyRowCode.includes("Your name is in for") &&
+      auditPanelCode.includes("audit.myVote") &&
+      maroonPanelCode.includes("maroon.myVote") &&
+      auditPanelCode.includes('"Your name is in"') &&
+      maroonPanelCode.includes('"Your name is in"'),
+    "the captain's own line belongs to the one block rather than to a paragraph in each card, and the button beside it says which of the two moments the captain is standing in: a name already in reads a press that tells them so",
+  );
+  check(
+    Array.from({ length: 12 }, (_, i) => i + 1).every((roster) => {
+      const needed = auditNamesNeeded(roster);
+      return Array.from({ length: needed + 1 }, (_, k) => k).every((k) => {
+        const rows = shortfallRows(k);
+        const short = leaderShortfall(rows, needed)?.short ?? needed;
+        return (
+          short === needed - k &&
+          rows.reduce((count, row) => count + row.voters.length, 0) === k
+        );
+      });
+    }),
+    "the count the card prints and the shortfall it prints always sum to the threshold the server carries on, at every roster this game deals and every book from empty to one name over the line, and the rows hold exactly the names the book holds",
+  );
+  const pairMembers: PublicUser[] = Object.keys(pairTally?.votes ?? {}).map(
+    (id, i) => ({ id, username: id, displayName: id, avatarHue: i }),
+  );
+  const pairVoters = tallyRows(pairTally?.votes ?? {}, pairMembers).flatMap(
+    (row) => row.voters,
+  );
+  check(
+    pairVoters.length === Object.keys(pairTally?.votes ?? {}).length &&
+      new Set(pairVoters).size === pairVoters.length,
+    "and the rows of the count hold every name in the book exactly once, so the pair of presses that arrived in one tick cannot put the same captain's name under two targets or twice under one",
   );
   check(
     auditHookCode.includes("if (data.votes?.[myUserId]) setPressed(null)") &&

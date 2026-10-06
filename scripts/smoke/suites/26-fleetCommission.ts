@@ -619,6 +619,28 @@ export async function fleetCommissionSuite(
     "and a line that re-reports the standing it already holds moves nothing, by report or by press: one commission is answered once however many frames carry it",
   );
 
+  // And a press that proposes less than the standing the room already holds
+  // for that captain, which is what a client whose own record lags the room
+  // sends. It is still answered, because a press is answered with the
+  // standing the room accepts and a repeat has to land on the number the
+  // first one set (the check above). What it cannot do is lift a raw line
+  // the merge already holds: the acceptance is capped by the standing plus
+  // the remaining, and the remaining here is nothing, so the line and the
+  // board stay exactly where the pair above left them.
+  const belowStanding = await recordObjectiveHandover(
+    quietIo,
+    gambitRoomId,
+    "smoke26-press-a",
+    { [pressGood.type]: 1 },
+  );
+  check(
+    belowStanding !== null &&
+      nextCommission.resources.every(
+        (r) => (linesNow()[r.type] ?? 0) === (rawLines[r.type] ?? 0),
+      ),
+    "a press below the standing the room already holds for that captain is answered but lifts no raw line, so a lagging record cannot move the filled board",
+  );
+
   // The claim itself, which a restart waits on before it clears the board
   // for a new voyage (see the room:restart handler). Held for the length
   // of one settle, and read twice: a press that arrives while it is held
@@ -702,6 +724,30 @@ export async function fleetCommissionSuite(
       pressHook.includes('"objective:granted"') &&
       pressHook.includes("data.granted"),
     "and the client asks before it moves anything: its press goes out as a handover and the granted rows are what reach the hold",
+  );
+  // The panel's own half of the same claim, and the half a captain reads:
+  // the button is not drawn at all once the fleet has met the commission,
+  // and the strip says why in its place, so there is no press left to make
+  // against a board the room would refuse. A needle for the same reason
+  // the hook above is one: the panel is React and this suite has no
+  // browser to press it in.
+  const objectivePanel = readFileSync(
+    join(
+      repoRoot,
+      "src",
+      "components",
+      "portmasters",
+      "game",
+      "ObjectivePanel.tsx",
+    ),
+    "utf8",
+  );
+  check(
+    objectivePanel.includes("{open && deliverable > 0 && (") &&
+      objectivePanel.includes(
+        "The commission is met, and nothing more is owed.",
+      ),
+    "the panel withdraws the button when the commission is met rather than leaving a press the room would refuse",
   );
 
   // ========== Where the commission stops, and what it refuses ==========

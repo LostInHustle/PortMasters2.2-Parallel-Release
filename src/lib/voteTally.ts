@@ -72,6 +72,17 @@ export function nameCount(count: number): string {
   return count === 1 ? "1 name" : `${count} names`;
 }
 
+/**
+ * A count of captains with its word, the same arrangement as the count
+ * above and for the same reason. The two counts are not one helper with a
+ * noun argument: a name is something a captain hands in and a captain is
+ * someone still to hand one in, and the two lines that print them are
+ * about different halves of the same book.
+ */
+export function captainCount(count: number): string {
+  return count === 1 ? "1 captain" : `${count} captains`;
+}
+
 export function tallyRows(
   votes: Record<string, string>,
   members: PublicUser[],

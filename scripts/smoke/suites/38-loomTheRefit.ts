@@ -1533,5 +1533,31 @@ export async function loomTheRefitSuite(
     "the Wardrobe panel prints the module's own figure rather than one it worked out for itself: it reads the score, the print and the part through the three exported readers, and the file carries neither a rounding nor a multiplication of any kind, so the number the panel shows and the number the sea reads are one function of the wardrobe",
   );
 
+  // And the sentence the bench owes a captain who is only ever a buyer. The
+  // two rules of the trade, when an offer leaves the bench and how much of
+  // it one captain may take on, stood in the seller's own block, which is a
+  // place a customer never reads. Read off the drawing for the reason the
+  // panel above is: this run has no browser to mount the bench in, and what
+  // is held here is the side of the switch the sentence stands on.
+  const benchCode = withoutComments(
+    readFileSync(
+      join(
+        repoRoot,
+        "src",
+        "components",
+        "portmasters",
+        "game",
+        "RefitBench.tsx",
+      ),
+      "utf8",
+    ),
+  );
+  check(
+    benchCode.includes(
+      "No refit work on offer this leg. A refit on the bench is gone when this Market closes, and a captain takes on one refit a leg.",
+    ),
+    "the empty bench tells the buyer when a refit leaves it and how many one captain may take on, so a customer who never opens the seller's form still reads the two rules the offers below are bounded by",
+  );
+
   // =====================================================================
 }

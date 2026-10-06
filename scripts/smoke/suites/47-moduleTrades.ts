@@ -1124,6 +1124,31 @@ export async function moduleTradesSuite(
     "the offer row draws its buttons from whether the row is still an offer rather than from whether it was aimed at one captain, and the three desks that sell between captains hand it that reading off the row's own status: the aim draws the chip and the standing draws the press, which is the distinction the field report met as an open listing with no Take for the table and no Cancel for the seller",
   );
 
+  // The rules a captain is held to at this desk, read off the drawing
+  // rather than off a module's memory, and read out of the file the same
+  // way the two checks above read the row: the sentence that states them
+  // stands at the panel's door, above the seller's own block, which is
+  // where a captain who is only ever a buyer reads it (see the hoisted
+  // intro in ModuleMarket). The second check names what takes a listing
+  // off the board, so the empty seat a swept seller meets cannot read as
+  // a board that never held their row.
+  const marketDesk = flatDesk(
+    "src/components/portmasters/game/ModuleMarket.tsx",
+  );
+  check(
+    marketDesk.includes("One listing per module a leg") &&
+      marketDesk.indexOf("One listing per module a leg") <
+        marketDesk.indexOf("{canSell &&"),
+    "the three rules of this market stand above the seller's own block rather than inside it, so the captain who only ever takes an offer reads one listing per module a leg, one open offer per captain named and the Parley close at the desk that asks them to take one",
+  );
+  check(
+    marketDesk.includes("Nothing on the market yet") &&
+      marketDesk.includes("List a module and yours is the first row") &&
+      marketDesk.includes("comes off the board when the leg turns") &&
+      marketDesk.includes("Any captain with a module bolted on can list one"),
+    "and the empty board tells the seller what took a row of theirs off it and the buyer who may list at all, so the invitation to be first cannot be read as a claim that a listing already posted is still standing",
+  );
+
   // The buyer's purse, which is the one condition the settle deliberately
   // does not ask and the desks therefore have to (G1). The rule is stated
   // once, in the engine's core beside the purse reader it folds, and each

@@ -973,6 +973,38 @@ export async function maroonAndTheHarbormasterSuite(
     "a second call in the same leg replaces the first rather than being refused, and both are read by the room",
   );
 
+  // The double press the console's own button can produce: two frames for
+  // the same call in one tick. Both are news and both go out, and the
+  // shift they leave behind is one record rather than two, which is the
+  // property the market below reads: the port is leaned a tenth, once.
+  const callsBeforeThePair = maroonCalls.length;
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: secondCallPort,
+    direction: -1,
+  });
+  maroonSockets[4].emit("maroon:shift", {
+    roomId: maroonRoomId,
+    round: 9,
+    port: secondCallPort,
+    direction: -1,
+  });
+  await maroonSettle();
+  const thePair = maroonCalls.slice(callsBeforeThePair);
+  const callsAfterThePair = maroonCalls.length;
+  check(
+    callsAfterThePair === callsBeforeThePair + maroonSockets.length * 2 &&
+      thePair.every(
+        (call) =>
+          call.round === 9 &&
+          call.port === secondCallPort &&
+          call.direction === -1 &&
+          call.by.userId === maroonTargetId,
+      ),
+    "two presses of the same call in one tick are two notices the room reads and one shift in force: the market below is priced against that port a tenth down, not a fifth",
+  );
+
   // ---- The leg the hand lands on ----
   const maroonReadyAll = (round: number, phase: Phase) => {
     for (const socket of maroonSockets) {
@@ -1021,7 +1053,7 @@ export async function maroonAndTheHarbormasterSuite(
   });
   await maroonSettle();
   check(
-    maroonCalls.length === maroonSockets.length * 2,
+    maroonCalls.length === callsAfterThePair,
     "and the hand itself is a Parley power: a captain away from the table cannot lean the market they are standing in front of",
   );
 
@@ -1080,8 +1112,8 @@ export async function maroonAndTheHarbormasterSuite(
   });
   await maroonSettle();
   check(
-    maroonCalls.length === maroonSockets.length * 3 &&
-      maroonCalls[maroonSockets.length * 2].round === 11,
+    maroonCalls.length === callsAfterThePair + maroonSockets.length &&
+      maroonCalls[callsAfterThePair].round === 11,
     "and every leg after the vote, the Harbormaster may lean one port once more",
   );
 
@@ -1101,7 +1133,7 @@ export async function maroonAndTheHarbormasterSuite(
   });
   await maroonSettle();
   check(
-    maroonCalls.length === maroonSockets.length * 3,
+    maroonCalls.length === callsAfterThePair + maroonSockets.length,
     "where the hand is refused as well, since a market that never opens is not a market to lean",
   );
   check(
@@ -1318,19 +1350,34 @@ export async function maroonAndTheHarbormasterSuite(
     "three of the five still sailing does not carry, so the name the book dropped is the name that would have carried it",
   );
 
+  // The fourth name is two thirds of the five the vote is counted over,
+  // and it arrives in the same tick as a fifth ballot, which is the race
+  // the settle's own guard is written for: two ballots that arrive
+  // together can each read a book that holds both of them and each decide
+  // the same carry. The room is answered once whichever way the two
+  // interleave, and the second ballot either lands in the count or is
+  // refused, never carried a second time.
   maroonSockets[4].emit("maroon:vote", {
     roomId: maroonRoomId,
     round: 9,
     targetUserId: maroonTargetId,
   });
+  maroonSockets[0].emit("maroon:vote", {
+    roomId: maroonRoomId,
+    round: 9,
+    targetUserId: maroonTargetId,
+  });
   await maroonSettle();
+  const racedBook = Object.keys(
+    maroonTallies[maroonTallies.length - 1]?.votes ?? {},
+  ).length;
   check(
     maroonResults.length === resultsBase + maroonSockets.length &&
       maroonResults[maroonResults.length - 1]?.target.userId ===
         maroonTargetId &&
-      Object.keys(maroonTallies[maroonTallies.length - 1]?.votes ?? {})
-        .length === 4,
-    "and the fourth is two thirds of the five the vote is counted over, so the harbor carries it without the captain who left the voyage",
+      racedBook >= 4 &&
+      racedBook <= maroonSockets.length - 1,
+    "and when the name the vote needs and a second ballot arrive in the same tick, the harbor is answered once: one result for the whole room, the carried name unchanged, and the count holding every name that landed and no name twice",
   );
 
   // The answer a state request gets after the vote has carried, which is
@@ -1355,6 +1402,24 @@ export async function maroonAndTheHarbormasterSuite(
       afterTheCarry.carried?.userId === maroonTargetId &&
       afterTheCarry.carried?.name === "Smoke gamb_e",
     "a card that asks for the count after the voyage's vote has carried is told what the voyage already did: the book is empty and the carried record names the captain the harbor put ashore, by id and by the name the table knows them by, rather than reading like a fresh leg",
+  );
+
+  // The two numbers a count line prints are the frame's own rather than
+  // arithmetic on this side, at every frame the room was shown across both
+  // voyages: the names that carry it are the threshold for the roster the
+  // vote is divided by, and the captains still to name someone are that
+  // roster minus the names already in. Both are what the maroon card's
+  // count line prints (see VoteTallyRows), so a card reading the frame
+  // cannot print a count the room is not voting on.
+  check(
+    maroonTallies.length > 0 &&
+      maroonTallies.every(
+        (tally) =>
+          tally.needed === maroonNamesNeeded(tally.roster) &&
+          tally.awaiting.length ===
+            tally.roster - Object.keys(tally.votes).length,
+      ),
+    "and both numbers a count line prints come off the frame itself: the names that carry it are the threshold for the roster it is divided by, and the captains still to name someone are that roster minus the names already in",
   );
 
   return { maroonRoomId, maroonTargetId };

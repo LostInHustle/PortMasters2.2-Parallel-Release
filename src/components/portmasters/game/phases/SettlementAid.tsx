@@ -129,6 +129,10 @@ export function HarborAid({
               );
             })}
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            The loan comes back at Round {game.maxRounds} if it has not been
+            repaid by then.
+          </p>
         </div>
       )}
     </>

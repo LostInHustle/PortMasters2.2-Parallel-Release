@@ -27,9 +27,25 @@
 // line (how many more names the leading target needs) and the captain's
 // own line (whether their name is in) are arithmetic over the same frame
 // the rows come from, so there is no fourth number to keep in step.
+//
+// The last line is the one thing here the count cannot supply: what
+// happens when the names the vote needs land on one captain, and who is
+// still to act. Every word of it is the vote's own rather than the
+// block's, because the audit and the maroon spend different things, so it
+// arrives as a function of the threshold (see nextStep) rather than as
+// copy this file would have to keep two versions of. It reads the
+// threshold the census carries, so the number a line names and the number
+// the server carries on are one rule (see auditNamesNeeded, and the
+// maroon's own count).
+//
+// The count line is worded for its own number: one name is in, five
+// captains have named someone, one name carries it. A block that printed
+// "1 of 5 names are in" was the arithmetic of the old bug in a longer
+// sentence, and the two singular branches below are the whole of the fix.
 // =====================================================================
 
 import {
+  captainCount,
   captainName,
   leaderShortfall,
   nameCount,
@@ -44,6 +60,7 @@ export function VoteTallyRows({
   census,
   members,
   myVote = null,
+  nextStep,
 }: {
   rows: TallyRow[];
   /** The server's count for this leg, or null before its first word. */
@@ -52,6 +69,13 @@ export function VoteTallyRows({
   members: PublicUser[];
   /** This captain's own nomination, so the block can say whose turn it is not. */
   myVote?: string | null;
+  /**
+   * What this vote does with the names it needs, said in the vote's own
+   * words and read off the threshold: the last line of the block. A
+   * function rather than a sentence so the number in it is the census'
+   * own, and not a second copy of the arithmetic kept beside the first.
+   */
+  nextStep: (needed: number) => string;
 }) {
   if (!census || census.roster <= 0) {
     return (
@@ -64,32 +88,28 @@ export function VoteTallyRows({
   const named = rows.reduce((count, row) => count + row.voters.length, 0);
   const waiting = census.awaiting.map((id) => captainName(members, id));
   const leader = leaderShortfall(rows, census.needed);
-  const carryPhrase =
-    census.needed === 1
-      ? "1 name carries it"
-      : `${census.needed} names carry it`;
-  const inPhrase =
-    census.roster === 1
-      ? `${named} of 1 name is in`
-      : `${named} of ${census.roster} names are in`;
+  // The count and the threshold in one line, each half worded for its own
+  // number. Both the verb and the noun move with the count, which is the
+  // one place this block used to read as arithmetic rather than as English.
+  const countLine =
+    `${named} of ${census.roster} captains ` +
+    `${named === 1 ? "has" : "have"} named someone. ` +
+    `${nameCount(census.needed)} ${census.needed === 1 ? "carries" : "carry"} it.`;
 
   return (
     <div className="mt-3 space-y-1">
-      <p className="text-[11px]">
-        {inPhrase}, and {carryPhrase}.
-      </p>
+      <p className="text-[11px]">{countLine}</p>
       {leader === null ? (
         <p className="text-[11px] text-muted-foreground">
-          No name is in yet.{" "}
-          {census.needed === 1
-            ? "One name for one captain carries it."
-            : `${census.needed} names for one captain carry it.`}
+          {`No name is in yet. ${nameCount(census.needed)} on one captain ${
+            census.needed === 1 ? "carries" : "carry"
+          } it.`}
         </p>
       ) : leader.short > 0 ? (
         <p className="text-[11px] text-muted-foreground">
-          {leader.short === 1
-            ? `${leader.name} needs 1 more name. The next name for ${leader.name} carries it.`
-            : `${leader.name} needs ${leader.short} more names to carry it.`}
+          {`${leader.name} needs ${
+            leader.short === 1 ? "1 more name" : `${leader.short} more names`
+          } to carry it.`}
         </p>
       ) : (
         <p className="text-[11px] text-muted-foreground">
@@ -108,15 +128,21 @@ export function VoteTallyRows({
           ))}
         </div>
       )}
-      {myVote === null && (
-        <p className="text-[11px] text-muted-foreground">
-          Your name is not in yet. Pick a captain and press the button.
-        </p>
-      )}
+      <p className="text-[11px] text-muted-foreground">
+        {myVote === null
+          ? "Your name is not in yet. Pick a captain and press the button."
+          : `Your name is in for ${captainName(members, myVote)}. Nothing else is asked of you this leg.`}
+      </p>
+      {/* Who is still to act, said as a count and as names, and then what
+          the vote does with the names it needs. The two are one line
+          because they are one question: the room reads how far the count
+          has to travel and who is still walking it. */}
       <p className="text-[11px] text-muted-foreground">
         {waiting.length > 0
-          ? `Waiting on ${nameList(waiting)} to name a captain.`
-          : "Every captain still sailing has named someone, so this leg's vote has run its course. A later leg can call it again."}
+          ? `${captainCount(waiting.length)} ${
+              waiting.length === 1 ? "has" : "have"
+            } not named anyone: ${nameList(waiting)}. ${nextStep(census.needed)}`
+          : "Every captain still sailing has named someone, so nothing more can land this leg. A later leg can call this vote again."}
       </p>
     </div>
   );

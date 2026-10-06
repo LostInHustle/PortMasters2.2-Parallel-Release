@@ -31,7 +31,8 @@ export function ShipTab({
       </Row>
       <Row label="Modules">
         <b>
-          {modules.length}/{shipLevel}
+          {modules.length} of {shipLevel}{" "}
+          {shipLevel === 1 ? "module slot" : "module slots"}
         </b>
       </Row>
       {modules.length === 0 ? (
