@@ -81,7 +81,7 @@ The engine is client authoritative and deterministic by composition. Every capta
 
 What is seeded: the market card draw, the market's intel rumor pool, the order board's draw. What is not seeded: Salvage Crane refunds, Tax Evasion audits, the pirate raid roll itself, Broker's Favor order generation, Farsight free rumor selection, Boon drafting, Module drafting, the corrupt broker leak roll. This split is intentional. The deterministic stream fixes the shared economy so two captains see the same market. The personal stream keeps each captain's luck private so a lucky Salvage Crane refund on one client never desyncs another.
 
-The engine surface is roughly 8,852 lines across 31 files in `engine/`, plus 17,770 lines across 57 files beside it carrying the shared constants, the types and the pure helpers the modules read from, counted as everything under `src/lib/game` outside `engine/`. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
+The engine surface is roughly 9,057 lines across 31 files in `engine/`, plus 18,344 lines across 58 files beside it carrying the shared constants, the types and the pure helpers the modules read from, counted as everything under `src/lib/game` outside `engine/`. Every function is either pure or takes `GameState` as the first argument and mutates it in place. There are no class instances, no singletons, no hidden state. The only side channel is the `logs: string[]` array every mutating function takes as its last argument.
 
 ## The Realtime Layer
 
@@ -482,4 +482,4 @@ A pledge was stranded when its borrower went bankrupt. The conclusion sweep skip
 
 `restartGame` replaces state with `Object.assign(state, fresh)` rather than swapping the object. The reference has to stay stable, and `createInitialGameState` explicitly initializes the transient fields to `undefined` so nothing leaks across a restart. A captain who changes House between voyages cannot keep the old House's perks by accident.
 
-`completeOrder` is still about 130 lines. It is long, but it is a single rule with a single outcome, and splitting it would spread one decision across several functions without making any of them clearer.
+`completeOrder` is still about 290 lines. It is long, but it is a single rule with a single outcome, and splitting it would spread one decision across several functions without making any of them clearer.

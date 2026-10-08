@@ -13,8 +13,13 @@ import {
   REWEAVE_GOOD,
   REWEAVE_RAGS,
 } from "@/lib/game/constants/garments";
+import { ICONS } from "@/lib/game/constants/brand";
 import { RAGS } from "@/lib/game/constants/goods";
-import { STALE_OFFER } from "@/lib/game/constants/copy";
+import {
+  REFIT_ALREADY_TAKEN,
+  STALE_OFFER,
+  feeShortfallLine,
+} from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
   REFIT_SELLER_PATH,
@@ -197,7 +202,7 @@ export function RefitBench({
               disabled={pile <= 0}
               onClick={() => act((g, l) => buyRag(g, l))}
             >
-              🪡 Buy a Rag ({RAG_SCRAP_VALUE}💰)
+              {ICONS.Rags} Buy a Rag ({RAG_SCRAP_VALUE}💰)
             </Button>
             <Button
               size="sm"
@@ -269,7 +274,7 @@ export function RefitBench({
                 disabled={mendedThisLeg}
                 onClick={() => act((g, l) => mendGarment(g, worn, l))}
               >
-                🪡 Mend {worn} ({left}
+                {ICONS.Rags} Mend {worn} ({left}
                 {spec ? ` of ${spec.durability}` : ""}, {MEND_GOLD_PER_POINT}💰)
               </Button>
             );
@@ -343,9 +348,9 @@ function RefitRow({
     : points < 1
       ? `Nothing left to put right on your ${row.good}.`
       : refitSellerBusy(refit.refits, row.sellerUserId, game.currentRound)
-        ? "That captain has already taken on a refit this leg."
+        ? REFIT_ALREADY_TAKEN
         : !canPayFee(game, row.fee)
-          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${row.fee}.`
+          ? feeShortfallLine(hold, row.fee)
           : null;
 
   return (

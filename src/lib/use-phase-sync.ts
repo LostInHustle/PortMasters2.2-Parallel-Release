@@ -395,9 +395,6 @@ export function usePhaseSync({
       // same way the server pinned it: the seat a dealing Gambit build
       // opens at is the path draft, and every other build opens at the boon
       // draft, and snapToCheckpoint is the one entry that opens either.
-      // This used to call startBoonDrafting by name, with a comment saying
-      // a mode whose lap opened anywhere else would be the change that made
-      // this read the lap; the draft is that mode, so this is that change.
       //
       // This is the same direct entry endRound makes at the top of each later
       // round; both are round openers, not handoffs, so there is no phase

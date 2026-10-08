@@ -7,6 +7,7 @@ import {
   ModalClose,
   ModalOverlay,
 } from "@/components/ui/modal-overlay";
+import { SHORTCUTS, type KeyboardShortcut } from "@/lib/game/constants/copy";
 
 /**
  * Keyboard Shortcut Help overlay. Shows all available keyboard shortcuts
@@ -14,37 +15,12 @@ import {
  * Escape or clicking the backdrop.
  */
 
-type Shortcut = {
-  keys: string[];
-  label: string;
-  group: "Navigation" | "Game Actions" | "Help";
-};
-
-const SHORTCUTS: Shortcut[] = [
-  { keys: ["Ctrl", "S"], label: "Save game state", group: "Game Actions" },
-  {
-    keys: ["Ctrl", "N"],
-    label: "Next phase or continue",
-    group: "Game Actions",
-  },
-  {
-    keys: ["Ctrl", "R"],
-    label: "Restart voyage (host only)",
-    group: "Game Actions",
-  },
-  { keys: ["F1"], label: "Open the full navigation guide", group: "Help" },
-  { keys: ["?"], label: "Open this shortcut help", group: "Help" },
-  { keys: ["F2"], label: "Open this shortcut help", group: "Help" },
-  { keys: ["Esc"], label: "Close this shortcut help", group: "Navigation" },
+const GROUP_ORDER: KeyboardShortcut["group"][] = [
+  "Game Actions",
+  "Navigation",
+  "Help",
 ];
-
-// Every row above names a key the window keydown listener in GameRoom
-// actually acts on: a shortcut that does nothing has no place on a screen
-// whose entire job is to say which keys do something. A row goes in only
-// beside the handler that reads it.
-
-const GROUP_ORDER: Shortcut["group"][] = ["Game Actions", "Navigation", "Help"];
-const GROUP_ICONS: Record<Shortcut["group"], string> = {
+const GROUP_ICONS: Record<KeyboardShortcut["group"], string> = {
   "Game Actions": "🎮",
   Navigation: "🧭",
   Help: "📚",

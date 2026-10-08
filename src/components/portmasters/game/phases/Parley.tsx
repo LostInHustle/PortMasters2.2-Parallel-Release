@@ -5,6 +5,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
+import { SAME_ITEM_OFFER } from "@/lib/game/constants/copy";
 import { leavePhase } from "@/lib/game/engine";
 import {
   bazaarRumorsOn,
@@ -22,6 +23,7 @@ import {
   maroonCardShown,
   maroonVoteOpen,
 } from "../MaroonPanel";
+import { AudienceSelect } from "../AudienceSelect";
 import { OfferCard, useOfferDraft } from "../BarterTrade";
 import { EscortMarket } from "../EscortContracts";
 import { ModuleMarket } from "../ModuleMarket";
@@ -373,18 +375,12 @@ export function Parley({
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm mt-2">
               <span className="text-muted-foreground">With</span>
-              <Select
+              <AudienceSelect
                 value={draft.targetUserId}
-                onChange={(e) => draft.setChosenTargetId(e.target.value)}
-                aria-label="Direct this offer to a specific captain"
-              >
-                <option value="">🌊 Anyone in the harbor</option>
-                {otherMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    🔒 {m.displayName} only
-                  </option>
-                ))}
-              </Select>
+                onChange={(id) => draft.setChosenTargetId(id)}
+                others={otherMembers}
+                label="Direct this offer to a specific captain"
+              />
             </div>
             {draft.targetUserId && (
               <p className="text-center text-[11px] text-muted-foreground mt-1.5">
@@ -399,7 +395,7 @@ export function Parley({
             )}
             {draft.sameItem && (
               <p className="text-center text-[11px] text-alarm mt-2">
-                Pick two different items to barter.
+                {SAME_ITEM_OFFER}
               </p>
             )}
             {!draft.sameItem && draft.offerAmount > draft.owned && (

@@ -651,9 +651,7 @@ export function completeMarket(state: GameState, logs: string[]) {
     if (!state.priceHistory[good]) state.priceHistory[good] = [];
     state.priceHistory[good].push(avg);
   }
-  // This used to end by setting state.phase to the bartering board by name,
-  // which was one of seven copies of the phase order scattered across the
-  // engine's transitions. Where the purchase phase leads is the lap's
-  // business now (see nextPhase in ./lifecycle), and in the experimental mode
-  // it leads somewhere else entirely.
+  // Where the purchase phase leads is the lap's business rather than this
+  // walk's (see nextPhase in ./lifecycle), and in the experimental mode it
+  // leads somewhere else entirely.
 }

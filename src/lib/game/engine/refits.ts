@@ -34,6 +34,7 @@ import {
   REWEAVE_GOOD,
   REWEAVE_RAGS,
 } from "../constants/garments";
+import { ICONS } from "../constants/brand";
 import { RAGS } from "../constants/goods";
 import { flagOnFor } from "../flags";
 import {
@@ -237,7 +238,7 @@ export function buyRag(state: GameState, logs: string[]): boolean {
   }
   state.ragsTaken += 1;
   logs.push(
-    `🪡 Bought a rag off the harbor pile for ${RAG_SCRAP_VALUE} Gold. ${left - 1} left for you this leg.`,
+    `${ICONS.Rags} Bought a rag off the harbor pile for ${RAG_SCRAP_VALUE} Gold. ${left - 1} left for you this leg.`,
   );
   return true;
 }
@@ -327,7 +328,7 @@ export function mendGarment(
   state.mendsMade += 1;
   state.mendRound = state.currentRound;
   logs.push(
-    `🪡 The harbor tailor takes ${MEND_GOLD_PER_POINT} Gold for ${back} point of the ${good}.`,
+    `${ICONS.Rags} The harbor tailor takes ${MEND_GOLD_PER_POINT} Gold for ${back} point of the ${good}.`,
   );
   return true;
 }

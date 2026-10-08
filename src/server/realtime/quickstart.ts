@@ -136,8 +136,6 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     } else {
       // No suitable room: create a fresh one with this captain as host,
       // in the tier they picked in the lobby before pressing the button.
-      // The tier used to be hardcoded to fair_winds here, which quietly
-      // threw away the captain's choice.
       //
       // No mode is written, so the row takes the schema default, which is
       // the founding mode. That is not an omission to fill in later: a

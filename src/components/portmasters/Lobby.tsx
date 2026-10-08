@@ -144,11 +144,9 @@ export function Lobby({
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Which half of the lobby panel is showing. One panel with a switch rather
-  // than two stacked cards, because the create form is the taller of the two
-  // by a wide margin, and stacked it pushes the room list a screen and a half
-  // down on the one screen whose whole job is showing rooms. Opens on browse,
-  // because the list is what a captain arrives wanting to see.
+  // Which half of the lobby panel is showing. Opens on browse, because the
+  // list is what a captain arrives wanting to see (the panel below holds the
+  // full reason it is a switch rather than stacked cards).
   const [view, setView] = useState<"browse" | "create">("browse");
 
   // [MANIFEST: Quick Start Match] While queued, the Quick Start button
@@ -962,13 +960,6 @@ export function Lobby({
                       from the two ways in above, so the list reads as its own
                       band rather than as one more control. */}
                   <div className="space-y-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
-                    {/* Three placeholder rows in the shape of a harbor row,
-                        rather than a spinner on its own. The board is the one
-                        part of the lobby whose contents arrive late, and
-                        holding its layout open means nothing jumps when the
-                        list lands. The rows are hidden from assistive tech and
-                        the sentence they replace is kept, so the wait is
-                        announced once instead of three times. */}
                     <HarborBoard
                       rooms={rooms}
                       loading={loadingRooms}

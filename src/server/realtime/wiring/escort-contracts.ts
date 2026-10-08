@@ -3,7 +3,12 @@
 // from during Parley, ordered over ../contracts' own board.
 // =====================================================================
 
-import { consentFeeRule, STALE_OFFER } from "@/lib/game/constants/copy";
+import {
+  LEG_ALREADY_COVERED,
+  OFFER_FOR_ANOTHER_CAPTAIN,
+  consentFeeRule,
+  STALE_OFFER,
+} from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
 import {
@@ -201,7 +206,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         return;
       }
       if (opening.buyerUserId !== null && opening.buyerUserId !== s.userId) {
-        fail("That offer was addressed to another captain.");
+        fail(OFFER_FOR_ANOTHER_CAPTAIN);
         return;
       }
       if (opening.round !== cp.round) {
@@ -219,7 +224,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         return;
       }
       if (consentPartyBusy(board, "buyer", s.userId, cp.round)) {
-        fail("You are already covered for this leg.");
+        fail(LEG_ALREADY_COVERED);
         return;
       }
       escortContracts.set(
@@ -285,7 +290,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         return;
       }
       if (offer.buyerUserId !== s.userId) {
-        fail("That offer was addressed to another captain.");
+        fail(OFFER_FOR_ANOTHER_CAPTAIN);
         return;
       }
       if (offer.round !== cp.round) {

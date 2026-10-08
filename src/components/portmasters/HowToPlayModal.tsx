@@ -118,7 +118,7 @@ const STEPS: Step[] = [
     // What a failed seat means is the mode's own rule, stated on the
     // mode's page rather than repeated here: the founding mode's ending
     // would be wrong for a Gambit captain, whose voyage carries on.
-    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Round End Obligations panel before you spend anything.",
+    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Dues tab of your captain's rail before you spend anything.",
     tip: "Ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
   {
@@ -175,14 +175,10 @@ function voyagePage(mode: GameMode): Step {
  * than on the manual's summary of both stakes.
  *
  * The page reads the mode the way the mode's own page above does, and
- * it is the close of the deferral W1 recorded: the tip used to compare
- * the two modes' consequences in words of the manual's own ("ends the
- * voyage in Classic and leaves a mark in Ocean Gambit"), a second
- * telling of a rule the mode record already owns, printed a page after
- * the record's own telling of it at the top of the same manual. The
- * last sentence is the record's now (see play.failureRule), so the
- * sentence a captain reads here, on the voyage page and in the room's
- * tutorial is one sentence rather than three paraphrases of one rule.
+ * the stake it closes on is the record's own sentence (see
+ * play.failureRule): the sentence a captain reads here, on the voyage
+ * page and in the room's tutorial is one sentence rather than three
+ * paraphrases of one rule.
  */
 function artisanPage(mode: GameMode): Step {
   const play = modeConfig(mode);
@@ -223,7 +219,7 @@ function pathsPage(mode: GameMode): Step[] {
       icon: Shuffle,
       title: "Draft Your Path",
       gradient: "pm-grad-path-draft",
-      body: "A dealing voyage opens with a card deal rather than a market. Three cards land face down, and at each beat you keep one and pass the rest on: what you hold at the end is your path for the whole voyage. Your path decides your hold, how far your Renown can climb, and which trade orders lock to you.",
+      body: "A dealing voyage opens with a card deal rather than a market. Three cards land face down, and at each beat you keep one and pass the rest on: what you hold at the end is your path for the voyage, and one change of papers is allowed: at a port, for a fee in Gold that grows with your Renown. Your path decides your hold, how far your Renown can climb, and which trade orders lock to you.",
       points: pathGuide().map(
         (entry) =>
           `${entry.crest} ${entry.name}: ${entry.signature} ${entry.facts
@@ -251,9 +247,9 @@ export function HowToPlayModal({
   // mode that opens at the deal: the deck is the first seat of that
   // voyage, so its page stands before the pages about the seats after it,
   // and a mode that deals no paths draws no page (see pathsPage). The
-  // artisan page is drawn from its own function in the slot the step
-  // table used to hold (see artisanPage), so the two pages that state a
-  // mode's own rules read the record rather than the table.
+  // artisan page is its own function in the sequence (see artisanPage),
+  // so the two pages that state a mode's own rules read the record rather
+  // than the table.
   const pages = [
     STEPS[0],
     voyagePage(mode),

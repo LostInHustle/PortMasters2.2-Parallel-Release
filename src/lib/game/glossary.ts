@@ -41,10 +41,9 @@ const ESCORT_MARKET_ENTRY = `A Convoy path market at the Parley on a Gambit voya
   CONVOY_RAID_COVERAGE * 100,
 )}% of a raid in that leg, and the rest comes out of the seller's own Gold. ${ESCORT_OFFER_DEATH}`;
 
-// The pirate odds are a charter dial as well, and the two tiers that raise
-// theirs at the midpoint raise it to a different figure, so the one sentence
-// that used to carry all three was three chances to go stale at once. Built
-// from the same table the escort entry above reads.
+// The pirate odds are a charter dial, and the two tiers that raise theirs at
+// the midpoint raise it to a different figure, so the sentence is built from
+// the same table the escort entry above reads rather than written once.
 const PIRATE_ENTRY = `A roll at Resolve, before wages and maintenance come due, that can take every Gold coin you're carrying. The charter sets the odds: ${Object.values(
   DIFFICULTIES,
 )

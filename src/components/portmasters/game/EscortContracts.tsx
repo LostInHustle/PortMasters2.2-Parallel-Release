@@ -6,8 +6,10 @@ import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import {
   ESCORT_OFFER_DEATH,
+  LEG_ALREADY_COVERED,
   STALE_OFFER,
   consentFeeRule,
+  feeShortfallLine,
 } from "@/lib/game/constants/copy";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
@@ -268,9 +270,9 @@ function ContractRow({
     : stale
       ? STALE_OFFER
       : covered
-        ? "You are already covered for this leg."
+        ? LEG_ALREADY_COVERED
         : !canPayFee(game, contract.fee)
-          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${contract.fee}.`
+          ? feeShortfallLine(hold, contract.fee)
           : null;
 
   return (

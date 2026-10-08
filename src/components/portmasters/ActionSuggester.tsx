@@ -333,18 +333,23 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
     // move every other payroll figure move this one, and this screen quotes
     // the number out loud in both branches below.
     const weaverWage = getHireCost(game, "weaver");
-    if (game.money >= weaverWage * 2 + 20) {
+    // The purse bar both branches below quote, named once: the advice that
+    // hires and the advice that waits both speak about the same number, and
+    // two spellings of one arithmetic claim is how advice starts disagreeing
+    // with itself.
+    const hireBar = weaverWage * 2 + 20;
+    if (game.money >= hireBar) {
       return {
         icon: "👩\u200d🔧",
         title: "Hire a Weaver",
-        body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production starts next round, so hire now to get goods by Resolve.`,
+        body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production runs the same round you assign it, so hire now to get goods by Resolve.`,
         tone: "gain",
       };
     }
     return {
       icon: "⚠️",
       title: "Hold off on hiring",
-      body: `A Weaver needs ${weaverWage} Gold per round in wages. With ${game.money} Gold, you can only cover ${Math.floor(game.money / weaverWage)} rounds. Wait until you have at least ${weaverWage * 2 + 20} Gold before hiring.`,
+      body: `A Weaver needs ${weaverWage} Gold per round in wages. With ${game.money} Gold, you can only cover ${Math.floor(game.money / weaverWage)} rounds. Wait until you have at least ${hireBar} Gold before hiring.`,
       tone: "warn",
     };
   }

@@ -7,6 +7,7 @@ import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
 import { normalizeMode } from "@/lib/game/mode";
+import { NOT_A_ROOM_MEMBER } from "@/lib/game/constants/copy";
 import { aidList, removeUserAidRequest } from "../aid";
 import { auditRevealFor } from "../audit";
 import { requireAuth } from "../auth";
@@ -57,7 +58,7 @@ export function wireRoomJoin(
     if (!member) {
       socket.emit("room:error", {
         roomId,
-        error: "Not a member of that room",
+        error: NOT_A_ROOM_MEMBER,
       });
       return;
     }

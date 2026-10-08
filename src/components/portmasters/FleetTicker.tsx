@@ -79,12 +79,11 @@ export function FleetTicker({
               {/* [C1: the Larder and Short Rations] The hungry crew, in the
                   same red the roster uses and for the same reason: a
                   shortage is a status, and a status draws from the meaning
-                  half of the palette. [W3: the status convention] The mark
-                  used to be an icon whose sentence lived only in a title,
-                  which a touch screen never shows: it now carries the
-                  roster pill's own two clauses visibly, the state and the
-                  way back, with the full sentence in the title beside
-                  them. */}
+                  half of the palette. [W3: the status convention] It
+                  carries the roster pill's own two clauses visibly, the
+                  state and the way back, with the full sentence in the
+                  title beside them: a title alone never shows on a touch
+                  screen. */}
               {st?.shortRations && (
                 <span
                   className="flex items-center gap-1 text-[10px] text-alarm"

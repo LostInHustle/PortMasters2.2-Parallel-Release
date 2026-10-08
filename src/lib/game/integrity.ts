@@ -133,14 +133,9 @@ const STARTING_ALLOWANCE = 500;
 // fifty. Tighten by lowering MODIFIER_STACK_CEILING and WIDEST_ORDER_BOARD
 // once there is real data on what a genuine high scoring round reaches.
 //
-// This comment used to claim the ceiling therefore "cannot produce a false
-// positive". It could, and it did. Being loose at the top says nothing about
-// the other end: the guard also treated any negative figure as impossible,
-// and the game produces those honestly (see the note on checkSave below), so
-// unlucky captains were losing their Renown. The claim is what stopped
-// anyone looking. A high ceiling makes a false positive unlikely from above
-// and says nothing about every other assumption in here, so treat the rules
-// below as the thing to re examine, not this paragraph.
+// The ceiling is not a correctness claim about the rest of the guard: being
+// loose at the top says nothing about any other assumption in here, so treat
+// the rules below as the thing to re examine, not this paragraph.
 function plausibleCeiling(perRound: number, roundsAllowed: number) {
   const rounds = Math.max(1, Math.floor(roundsAllowed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;

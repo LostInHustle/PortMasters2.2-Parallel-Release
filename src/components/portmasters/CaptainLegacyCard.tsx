@@ -69,12 +69,15 @@ export function CaptainLegacyCard({
   // Crowns and best score split by the waters they were earned on. Only tiers
   // this captain has actually sailed appear, so a new account sees nothing
   // extra while a veteran sees where their crowns were really won. Optional
-  // chaining guards a cached response written before this field existed.
-  const perTier = DIFFICULTY_ORDER.map((key) => ({
-    key,
-    cfg: DIFFICULTIES[key],
-    stats: legacy.statsByDifficulty?.[key],
-  })).filter((t) => t.stats && (t.stats.crowns > 0 || t.stats.bestScore > 0));
+  // chaining guards a cached response written before this field existed, and
+  // the flat map drops what it guards, so the rows below hold a stats record
+  // rather than asserting one.
+  const perTier = DIFFICULTY_ORDER.flatMap((key) => {
+    const stats = legacy.statsByDifficulty?.[key];
+    return stats && (stats.crowns > 0 || stats.bestScore > 0)
+      ? [{ key, cfg: DIFFICULTIES[key], stats }]
+      : [];
+  });
 
   return (
     <div
@@ -181,23 +184,23 @@ export function CaptainLegacyCard({
                     <span className="inline-flex cursor-default items-center gap-1 rounded-full bg-background/60 px-2 py-0.5 text-[10px]">
                       <span>{cfg.icon}</span>
                       <span className="text-muted-foreground">{cfg.badge}</span>
-                      {stats!.crowns > 0 && (
+                      {stats.crowns > 0 && (
                         <span className="inline-flex items-center gap-0.5 font-semibold">
                           <Crown className="h-2.5 w-2.5 text-gold-ink" />
-                          {stats!.crowns}
+                          {stats.crowns}
                         </span>
                       )}
                       <span className="font-semibold text-gain">
-                        {stats!.bestScore}
+                        {stats.bestScore}
                       </span>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="font-semibold">{cfg.name}</div>
                     <div className="text-muted-foreground">
-                      {stats!.crowns} Sea Master crown
-                      {stats!.crowns === 1 ? "" : "s"} · best Reputation{" "}
-                      {stats!.bestScore}
+                      {stats.crowns} Sea Master crown
+                      {stats.crowns === 1 ? "" : "s"} · best Reputation{" "}
+                      {stats.bestScore}
                     </div>
                   </TooltipContent>
                 </Tooltip>

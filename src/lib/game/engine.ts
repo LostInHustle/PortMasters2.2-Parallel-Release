@@ -592,11 +592,10 @@ export {
   snapToCheckpoint,
 } from "./engine/lifecycle";
 
-// ========== Cross file lookups hosted in constants/reputation.ts for backwards
-// compatibility. merchantRatingForScore used to live in
-// ./engine/lifecycle.ts; the table it scans (MERCHANT_RATINGS) lives here
-// too, so the lookup moved beside it. Forwarded through the same barrel
-// so the files importing `@/lib/game/engine` keep working. ==========
+// ========== Cross file lookups hosted in constants/reputation.ts ==========
+// merchantRatingForScore and the MERCHANT_RATINGS table it scans live in
+// ./constants/reputation beside each other. Forwarded through the same
+// barrel so the files importing `@/lib/game/engine` keep one entry point.
 export { merchantRatingForScore } from "./constants/reputation";
 
 // ========== Manifest feature modules ==========

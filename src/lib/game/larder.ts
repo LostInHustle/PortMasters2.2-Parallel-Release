@@ -280,6 +280,12 @@ export function provisionAffordable(state: GameState): number {
   return leg === 0 ? 0 : Math.floor(state.money / leg);
 }
 
+// The full-larder refusal, said once because two walks answer it: this
+// module's provisioning walk and the Supply Barge's own purchase (see
+// ./engine/barge). The smoke suites pin the sentence itself, so its words
+// move only with theirs.
+export const LARDER_FULL_LINE = "🧺 The larder is full.";
+
 /**
  * Buys food for the crew, as many legs' worth as the stores have room for
  * and the purse can cover.
@@ -328,7 +334,7 @@ export function provisionFood(
   reconcileLarder(state);
   const room = provisionRoom(state, food);
   if (room <= 0) {
-    logs.push("🧺 The larder is full.");
+    logs.push(LARDER_FULL_LINE);
     return 0;
   }
   const affordable = provisionAffordable(state);

@@ -7,9 +7,7 @@ import { ItemIcon } from "../../shared";
 import { HuePanel, PanelHeading, type PhasePanelProps } from "./PhaseShared";
 
 // One column of the inventory block: a heading and the goods under it, each
-// row a glyph, a name and the count, in the good's own colour. The block
-// above the bench had been written out twice with nothing but the heading
-// and the list differing between the two.
+// row a glyph, a name and the count, in the good's own colour.
 function InventoryColumn({
   title,
   items,

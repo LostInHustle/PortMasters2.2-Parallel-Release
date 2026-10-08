@@ -176,13 +176,11 @@ export function SettingsModal({
                 />
               </Section>
 
-              {/* Notifications. [W3: the status convention] The first
-                  description used to promise join, leave and system
-                  messages, which this switch never gated: the "room"
+              {/* Notifications. [W3: the status convention] The "room"
                   category has exactly one writer, the harbor chat push in
                   GameRoom (see the chat:room handler), so the description
-                  now names that one thing. The label matches the panel
-                  the notification opens. */}
+                  names that one thing. The label matches the panel the
+                  notification opens. */}
               <Section icon={Bell} title="Notifications">
                 <ToggleRow
                   label="Harbor chat"

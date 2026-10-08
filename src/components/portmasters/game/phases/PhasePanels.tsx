@@ -141,9 +141,7 @@ export function HuePanel({
 
 /**
  * The small label a hue panel leads with: the glyph and the name in the
- * panel's own hue, with an optional plain sentence trailing it. Four of
- * them had been written out with the same five classes and a different
- * colour word each.
+ * panel's own hue, with an optional plain sentence trailing it.
  */
 export function PanelLabel({
   tone,
@@ -172,9 +170,6 @@ export function PanelLabel({
 
 /**
  * The heading of a summary block: a glyph and a name in the block's own hue.
- * The three Endgame blocks had been written out with the same five classes
- * and a different colour word each, and the risk box on the settle screen
- * with the same five at a size smaller.
  */
 export function SummaryHeading({
   size = "text-xs",

@@ -3,13 +3,13 @@
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
  * The overlay every dialog in the game sits in: a dimmed, blurred backdrop
- * that closes the dialog when it is clicked, wrapped around a centred column
- * that holds the panel.
+ * that closes the dialog when it is clicked or when Escape is pressed,
+ * wrapped around a centred column that holds the panel.
  *
  * It renders into `document.body` rather than in place, and that is the whole
  * point of it. A `fixed` element is positioned against the nearest ancestor
@@ -36,6 +36,18 @@ export function ModalOverlay({
   onClose: () => void;
   children: ReactNode;
 }) {
+  // Escape closes, the key every Radix dialog under ui/dialog already
+  // answers, so the habit a captain learned there holds in the game's own
+  // sheets too. A press a nested dialog has already handled is left alone,
+  // which keeps one Escape from closing a Radix dialog and the sheet under
+  // it together.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

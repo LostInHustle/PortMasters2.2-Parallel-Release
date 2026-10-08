@@ -67,7 +67,7 @@ import {
 } from "../constants/supplies";
 import { survivalLayerOn } from "../flags";
 import { addLot, foodRoomMeals, reconcileLarder } from "../foods";
-import { crewSize } from "../larder";
+import { LARDER_FULL_LINE, crewSize } from "../larder";
 import { unlockedPorts } from "../pools";
 import { createRng } from "../rng";
 import type { GameState } from "../types";
@@ -269,7 +269,7 @@ export function buyFromBarge(
     if (Math.floor(rations) < 1) {
       logs.push("❌ Name how many rations to buy from the barge.");
     } else if (room < 1) {
-      logs.push("🧺 The larder is full.");
+      logs.push(LARDER_FULL_LINE);
     } else {
       logs.push(
         `❌ The barge charges ${price} Gold a ration, and the purse cannot cover one.`,

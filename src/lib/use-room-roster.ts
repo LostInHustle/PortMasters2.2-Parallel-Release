@@ -12,12 +12,9 @@ type RoomStatusMap = Record<string, GameStatusUpdate>;
  * The room's live roster: who is aboard, each captain's last reported status,
  * and who the host has muted. Both surfaces that show the harbor at a glance
  * (MembersPanel's full roster and FleetTicker's strip) need exactly this, and
- * previously carried their own byte for byte copy of the dedupe and prune
- * logic below, so a fix to one silently missed the other.
- *
- * Every caller still subscribes on its own, exactly as before: this shares the
- * code, not the state, so mounting both panels behaves identically to the two
- * separate copies it replaces.
+ * this shares the code, not the state: every caller still subscribes on its
+ * own, so mounting both panels behaves identically to the two copies it
+ * replaces.
  */
 export function useRoomRoster(
   socket: Socket | null,

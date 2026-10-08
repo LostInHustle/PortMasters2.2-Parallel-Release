@@ -135,14 +135,14 @@ export function hungryRule(): string {
 /** The tooltip the ticker marker, the roster pill and the rail's Larder
     cell all carry: the full sentence, for a pointer. */
 export function hungryTooltip(): string {
-  return `Going hungry: ${HUNGRY_CREW.cause}, working at a slower pace, and ${hungryRule()} ${HUNGRY_CREW.remedy} at the next Market.`;
+  return `Going hungry: ${HUNGRY_CREW.cause}, every artisan working at a slower pace, a quarter of the hold closed, and ${hungryRule()} ${HUNGRY_CREW.remedy} at the next Market.`;
 }
 
 /** The provisions panel's note: the surface that refills the larder
     ends on its own verb, because a captain standing at the fix is told
     the fix rather than sent to the Market. */
 export function hungryProvisionsNote(): string {
-  return `The larder is empty: ${HUNGRY_CREW.cause}, so every artisan produces less, and ${hungryRule()} ${HUNGRY_CREW.remedy} before the next Dawn.`;
+  return `The larder is empty: ${HUNGRY_CREW.cause}, so every artisan produces less, a quarter of the hold is closed, and ${hungryRule()} ${HUNGRY_CREW.remedy} before the next Dawn.`;
 }
 
 /** The engine's production line, said once per hungry leg above the

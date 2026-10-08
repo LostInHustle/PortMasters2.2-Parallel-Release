@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Crown, Star, Ship, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { HOUSES } from "@/lib/game/engine";
 import { Avatar, Pill, RANK_MEDALS } from "./shared";
 import {
   ModalClose,
@@ -12,6 +13,11 @@ import {
   ModalSheet,
 } from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
+
+// The crest beside a captain's Renown, read off the House table the
+// Lobby's own picker draws, so a House that retunes its emblem moves both
+// screens at once rather than leaving a second copy here to drift.
+const HOUSE_ICON = new Map(HOUSES.map((h) => [h.id, h.icon]));
 
 type SortKey =
   "renownXP" | "seaMasterCrowns" | "bestScore" | "voyagesCompleted";
@@ -215,11 +221,7 @@ export function LeaderboardModal({
                         Renown {entry.renownLevel}
                         {entry.houseId && (
                           <span className="ml-1.5">
-                            {entry.houseId === "jade_pavilion"
-                              ? "🪷"
-                              : entry.houseId === "vermilion_gate"
-                                ? "🏮"
-                                : "🏵️"}
+                            {HOUSE_ICON.get(entry.houseId)}
                           </span>
                         )}
                       </div>

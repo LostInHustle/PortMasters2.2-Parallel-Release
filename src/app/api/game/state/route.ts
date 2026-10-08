@@ -18,6 +18,7 @@ import {
   snapshotFromSave,
 } from "@/lib/game/integrity";
 import { readJson } from "@/lib/api-json";
+import { NOT_A_ROOM_MEMBER } from "@/lib/game/constants/copy";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -117,10 +118,7 @@ export async function PUT(req: NextRequest) {
     where: { userId_roomId: { userId: user.id, roomId } },
   });
   if (!member)
-    return NextResponse.json(
-      { error: "Not a member of that room" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: NOT_A_ROOM_MEMBER }, { status: 403 });
 
   // [MANIFEST 13: Ledger Integrity Pass] The one guard on an endpoint
   // that otherwise writes whatever arrives. The save is still accepted

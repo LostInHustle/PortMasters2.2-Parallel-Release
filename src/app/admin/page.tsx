@@ -19,6 +19,7 @@ import { api, type PublicUser } from "@/lib/api";
 import { disconnectSocket, setAuthToken } from "@/lib/realtime";
 import { AdminGate } from "@/components/portmasters/AdminGate";
 import { AdminConsole } from "@/components/portmasters/AdminConsole";
+import { PageSplash } from "@/components/ui/page-splash";
 
 type Status = "loading" | "gate" | "console";
 
@@ -88,13 +89,7 @@ export default function AdminPage() {
   const handleConsoleLost = (message: string) => leave(message);
 
   if (status === "loading") {
-    return (
-      <main className="pm-canvas flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground font-display text-lg">
-          Reading the register...
-        </p>
-      </main>
-    );
+    return <PageSplash line="Reading the register..." />;
   }
 
   if (status === "console" && me) {

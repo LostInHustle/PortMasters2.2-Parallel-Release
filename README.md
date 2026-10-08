@@ -105,7 +105,7 @@ A captain may pledge to one House. The pledge is account level, so it carries ac
 | -------------- | -------------------------------- | -------------------------- |
 | Jade Pavilion  | Patience polishes the stone.     | The artisan economy        |
 | Vermilion Gate | The gate is open to every cargo. | The market and cargo trade |
-| Golden Lotus   | Fortune favours the bold wager.  | The wager economy          |
+| Golden Lotus   | Fortune favors the bold wager.   | The wager economy          |
 
 A pledge is a second identity alongside Renown. Renown measures how long you have sailed; a House says what kind of captain you are while you do it. Every pledge also feeds a harbor wide House standing, so the three Houses compete on crowns, voyages and best Reputation, and the standings board in the lobby ranks them.
 

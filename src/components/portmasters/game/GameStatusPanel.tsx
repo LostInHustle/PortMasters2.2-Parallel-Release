@@ -48,8 +48,7 @@ export type RosterEntry = WorkerType & {
  * funds, reputation, and what is owed at round end) lead the column, and
  * everything else is a tab, so the ledger is a peer tab rather than a
  * footnote below the fold. Five sections stacked in one narrow column
- * (Captain's Log, Vessel Status, Cargo Hold, Outstanding Loans, Round End
- * Obligations) would be an unavoidably long vertical scroll in a rail
+ * (Captain's Log, Vessel Status, Cargo Hold, Outstanding Loans, Dues) would be an unavoidably long vertical scroll in a rail
  * roughly 260px wide, and the ledger, which a captain consults constantly,
  * would sit furthest from the eye.
  *
@@ -82,7 +81,9 @@ export function GameStatusPanel({
   myUserId?: string;
   colorFor?: (item: string) => string | undefined;
 }) {
-  const showObligations = ![0, 5, "endgame", "bankruptcy"].includes(game.phase);
+  const showObligations = !["harbor", "dawn", "endgame", "bankruptcy"].includes(
+    game.phase,
+  );
   // [C1: the Larder and Short Rations] Read once for the two decisions
   // below, since it is the same answer to both: whether the layer is
   // running decides whether the stat exists at all, and if it is running,

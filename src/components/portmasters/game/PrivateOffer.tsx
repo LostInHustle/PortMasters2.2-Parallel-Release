@@ -27,8 +27,8 @@
 import type { ReactNode } from "react";
 import type { PublicUser } from "@/lib/api";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { Select } from "@/components/ui/select";
 import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
+import { AudienceSelect } from "./AudienceSelect";
 
 export function PrivateOffer({
   lead,
@@ -69,18 +69,12 @@ export function PrivateOffer({
           className="w-20 h-9"
         />
         <span className="text-muted-foreground">Gold, offered to</span>
-        <Select
+        <AudienceSelect
           value={targetId}
-          onChange={(e) => onTarget(e.target.value)}
-          aria-label={audienceLabel}
-        >
-          <option value="">🌊 Anyone in the harbor</option>
-          {others.map((m) => (
-            <option key={m.id} value={m.id}>
-              🔒 {m.displayName} only
-            </option>
-          ))}
-        </Select>
+          onChange={onTarget}
+          others={others}
+          label={audienceLabel}
+        />
         {action}
       </div>
       {targetId && (

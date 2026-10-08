@@ -14,13 +14,8 @@ import {
 //
 // Everything else these three surfaces say about a mode comes out of the
 // record itself: its badge, its tagline, its round, the rule for a failed
-// seat and the list of what it changes. The tutorial used to draw the
-// founding mode's four phases by hand over a count read from the mode, and
-// to state the founding mode's bankruptcy rule to every crew, which meant a
-// Gambit captain was taught Classic's lap and told that bankruptcy ends a
-// voyage in a mode built on the opposite pillar. Copy about a mode is only
-// safe beside the mode, so the copy moved to ./mode and these surfaces
-// render it.
+// seat and the list of what it changes. Copy about a mode is only safe
+// beside the mode, so it lives in ./mode and these surfaces render it.
 import { modeConfig, MODES, voyageRoundsFor, type GameMode } from "../mode";
 // The phase faces are what a round is called and drawn with, and they are
 // read here rather than typed: the record names a leg by its phase, and the
@@ -66,6 +61,29 @@ import { pathFactText, pathGuide } from "../paths";
 // press is a second answer to what the press did.
 export const HOST_ONLY_RESTART = "Only the host can restart the voyage.";
 export const STALE_OFFER = "That offer belongs to an earlier leg.";
+// The two refusals the priced wires share when a press arrives against a
+// board that moved: the offer has gone, or it was aimed at another captain.
+// One sentence each, because four copies of one refusal are four chances
+// to drift apart.
+export const OFFER_ALREADY_GONE = "That offer has already gone.";
+export const OFFER_FOR_ANOTHER_CAPTAIN =
+  "That offer was addressed to another captain.";
+// The two busy refusals the consent markets share between their wires and
+// their panels: the seller already at the bench this leg, and the buyer
+// already under cover. One sentence each, because a panel and a wire
+// teaching two phrasings of one rule is how a table learns to distrust
+// the pair.
+export const REFIT_ALREADY_TAKEN =
+  "That captain has already taken on a refit this leg.";
+export const LEG_ALREADY_COVERED = "You are already covered for this leg.";
+// The refusal both doors into a room answer with, the socket's join
+// handler and the REST save route: one sentence, so a stranger knocking
+// at either door hears the same thing.
+export const NOT_A_ROOM_MEMBER = "Not a member of that room";
+// The barter rule both composing surfaces state before a post, the trade
+// form on the boards and the one on a chat: the good offered and the good
+// asked for cannot be the same.
+export const SAME_ITEM_OFFER = "Pick two different items to barter.";
 export const RENOWN_BONUS_LINE =
   "Each Renown level grants a small Gold bonus at the start of your next fresh voyage";
 // The refusal a wire answers when the captain it was aimed at is not
@@ -78,6 +96,13 @@ export const TARGET_NOT_IN_HARBOR = "That captain is not in this harbor.";
 // fee out of them and the one desk that hints at them.
 export function consentFeeRule(): string {
   return `A fee is a whole number of Gold, at least ${CONSENT_FEE_MIN} and at most ${CONSENT_FEE_MAX}.`;
+}
+// The refusal the three priced desks show before the click when the purse
+// cannot cover the fee (the escort board, the refit bench and the module
+// market): one sentence, because three spellings of one shortfall read as
+// three rules.
+export function feeShortfallLine(hold: number, fee: number): string {
+  return `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${fee}.`;
 }
 // The escort desk's offer-death rule: one sentence for the intro that is
 // always drawn, the empty state and the glossary's tooltip.
@@ -125,14 +150,9 @@ type TutorialStep = { title: string; content: string };
  * One round, as the tutorial renders it: the mode's own briefing, in the
  * shape the mode chose to brief in.
  *
- * The step this feeds used to draw the founding mode's phases as cards,
- * by hand, above a count read from the mode. On a Gambit voyage that
- * taught Classic's lap, left one of the six phases out of the grid
- * entirely, and put the manifest after the table on a mode whose whole
- * argument is that it runs before it. Which shape a mode briefs in is the
- * record's own decision (see ModeBriefing), so this renders the record
- * rather than keeping a second copy of the lap for every mode that might
- * move it.
+ * Which shape a mode briefs in is the record's own decision (see
+ * ModeBriefing), so this renders the record rather than keeping a second
+ * copy of the lap for every mode that might move it.
  *
  * The accent is the phase's own CSS variable, named after the phase, which
  * is the pairing the palette already holds for all six of them, so a leg
@@ -234,7 +254,7 @@ function pathSteps(mode: GameMode): TutorialStep[] {
   return [
     {
       title: "🃏 The Path Draft: keep one card",
-      content: `<p>The voyage opens with a deal rather than a market. Three cards land face down in front of you, and at each beat you keep one and pass the rest on. What you hold when the deal ends is your path for the whole voyage.</p>
+      content: `<p>The voyage opens with a deal rather than a market. Three cards land face down in front of you, and at each beat you keep one and pass the rest on. What you hold when the deal ends is your path, and it sails with you to the end of the voyage. One change of papers is allowed: at a port, for a fee in Gold that grows with your Renown, the path chip in your rail offers the switch.</p>
 <p>Your path decides three things about your seat: your hold, how far your Renown can climb, and which trade orders lock to you. An order demanding a locked good can only be filled by the captain holding the path that carries it.</p>
 <ul style="padding-left:18px;line-height:1.7;font-size:14px">
 ${rows}
@@ -271,7 +291,7 @@ export function tutorialSteps(
       title: "🔄 How a round runs",
       content: `<p>A round is one lap of the voyage, and this voyage runs ${rounds} of them. Each round walks the phases below in the order your voyage puts them:</p>
 ${roundStepHtml(mode)}
-<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> moves you between phases without clicking, and a voyage is one whole run of these rounds rather than a round of its own.</p>`,
+<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> readies you for the next phase without clicking (the room sails on once every captain is ready), and a voyage is one whole run of these rounds rather than a round of its own.</p>`,
     },
     ...differenceSteps(mode),
     // The deal the mode opens at, for the mode that opens at it: one page
@@ -279,7 +299,7 @@ ${roundStepHtml(mode)}
     ...pathSteps(mode),
     {
       title: "🏪 Market: Buying",
-      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and the rail across the top of the board always shows the order. That is the core loop.</p>
+      content: `<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain's rail always shows the order. That is the core loop.</p>
 <p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.
@@ -288,7 +308,7 @@ ${roundStepHtml(mode)}
     {
       title: "🤝 Parley: Bartering",
       content: `<p>The Parley is a short window where captains trade directly with each other instead of through the market. Post an offer, like Hemp you don't need for Silk you do, and any other captain in the harbor can take it with one click.</p>
-<p>Where it falls in the round is set by the voyage you are sailing rather than changing from round to round: ${MODES.classic.badge} runs it right after Market, and ${MODES.ocean_gambit.badge} runs it right after Orders, and the rail across the top of the board always shows which. Either way, it is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
+<p>Where it falls in the round is set by the voyage you are sailing rather than changing from round to round: ${MODES.classic.badge} runs it right after Market, and ${MODES.ocean_gambit.badge} runs it right after Orders, and your captain's rail always shows which. Either way, it is the easiest way to recover from a bad draw. All Tea and no Silk, with a Sachet order already on the board? Someone else in the harbor has probably drawn the opposite problem.</p>
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
   A few ground rules: you can't offer an item for itself, both amounts have to be whole numbers of at least one, and you can never offer more than you currently have. The moment you post an offer, that amount is set aside until someone takes it or you cancel it.
 </div>
@@ -335,7 +355,7 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
     <span style="font-size:12px;color:var(--muted-foreground)">${ARTISAN_WAGE_MIN} to ${ARTISAN_WAGE_MAX} Gold per person per round</span>
   </div>
 </div>
-<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Round End Obligations</strong> panel in the sidebar shows exactly what is owed. Check it before spending anything.</p>
+<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Dues</strong> tab of your captain's rail shows exactly what is owed. Check it before spending anything.</p>
 <p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your funds automatically and goes straight to them.</p>`,
     },
     {
@@ -382,6 +402,39 @@ const priceRangeLine = (items: readonly string[]): string =>
       return range ? `${item}(${range[0]} to ${range[1]}💰)` : item;
     })
     .join(", ");
+
+// Every row names a key the window's keydown listener in GameRoom actually
+// acts on, and the guide below and the shortcut help dialog both render this
+// record, so the two surfaces cannot teach different keys. A shortcut that
+// does nothing has no place on a screen whose whole job is to say which
+// keys do something.
+export type KeyboardShortcut = {
+  keys: string[];
+  label: string;
+  group: "Game Actions" | "Navigation" | "Help";
+};
+
+export const SHORTCUTS: KeyboardShortcut[] = [
+  { keys: ["Ctrl", "S"], label: "Save game state", group: "Game Actions" },
+  {
+    keys: ["Ctrl", "N"],
+    label: "Next phase or continue",
+    group: "Game Actions",
+  },
+  {
+    keys: ["Ctrl", "R"],
+    label: "Restart voyage (host only)",
+    group: "Game Actions",
+  },
+  { keys: ["F1"], label: "Open the full navigation guide", group: "Help" },
+  { keys: ["?"], label: "Open this shortcut help", group: "Help" },
+  { keys: ["F2"], label: "Open this shortcut help", group: "Help" },
+  { keys: ["Esc"], label: "Close this shortcut help", group: "Navigation" },
+];
+
+function shortcutLines(): string {
+  return SHORTCUTS.map((s) => `• ${s.keys.join("+")}: ${s.label}`).join("\n");
+}
 
 export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
@@ -490,11 +543,7 @@ Captain's Legacy:
 ${roundLines(mode)}
 
 ⌨️ Shortcuts:
-• Ctrl+S: Save Game
-• Ctrl+N: Next Phase
-• Ctrl+H: Manage Workers
-• Ctrl+R: Restart
-• F1: Instructions
+${shortcutLines()}
 
 ⚓ Bon Voyage and Good Luck!`;
 }

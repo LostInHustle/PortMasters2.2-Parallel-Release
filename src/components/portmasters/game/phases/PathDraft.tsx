@@ -104,12 +104,14 @@ export function PathDraft({ draft }: Pick<PhasePanelProps, "draft">) {
   // landing, which is a socket hop wide. A captain who was not dealt in (a
   // late arrival) never sees a view either, and reads the empty state the
   // identity chip in the rail draws for them; here the stage only has to
-  // keep standing rather than shout.
+  // keep standing rather than shout, which is why the sentence below names
+  // a dealt hand rather than an arrival: for a late arrival no hand was
+  // dealt, and the chip is the surface that says so.
   if (!view) {
     return (
       <div className="flex min-h-[clamp(280px,44dvh,420px)] items-center justify-center px-6 text-center">
         <p className="text-sm text-muted-foreground">
-          The cards are being cut. Your hand lands in a moment.
+          The cards are being cut. If a hand was dealt to you, it lands here.
         </p>
       </div>
     );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { itemColorResolver } from "@/lib/use-color-preference";
 import { Anchor } from "lucide-react";
+import { ICONS } from "@/lib/game/constants/brand";
 import { refitsOn } from "@/lib/game/engine";
 import { FoldRow } from "../FoldRow";
 import { RefitBench } from "../RefitBench";
@@ -108,7 +109,7 @@ export function Purchase({
       {refitsOn(game.mode) && (
         <FoldRow
           tone="refit"
-          icon="🪡"
+          icon={ICONS.Rags}
           title="Refit Bench"
           gist="A Loom captain's work: a garment put right in one leg, at a fee the two of you agree."
           open={benchOpen}

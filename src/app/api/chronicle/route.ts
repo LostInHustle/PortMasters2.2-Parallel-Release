@@ -2,12 +2,9 @@
 // Each chronicle is the prose recap of a finished voyage, written by the
 // realtime layer at voyage conclusion.
 //
-// Read only. This route used to carry a POST as well, a manual opt in save
-// for a checkbox on the Endgame screen that rebuilt a missing chronicle
-// from the saved game state. Nothing ever called it, and it had been
-// redundant since the realtime layer started auto writing a chronicle for
-// every finisher (see maybeConcludeVoyage in src/server/realtime/conclusion.ts),
-// so the write path is gone and that auto write is the only one there is.
+// Read only, and the realtime layer is the only writer: it auto writes a
+// chronicle for every finisher (see maybeConcludeVoyage in
+// src/server/realtime/conclusion.ts).
 import { VoyageChronicle } from "@/types/realtime/voyage";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";

@@ -49,11 +49,11 @@ import { failSeat } from "./seats";
 import { standingBoonId, workStandingOrders } from "./standing";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
-// merchantRatingForScore used to live here. It moved to ../constants/reputation.ts so
-// the MERCHANT_RATINGS table and the lookup that scans it sit beside each
-// other and so the merit in ../merits.ts can read both from the same module
-// without dragging in the engine's lifecycle. The barrel (../engine.ts)
-// still re exports it for backwards compatibility, sourced from constants.
+// merchantRatingForScore lives in ../constants/reputation.ts so the
+// MERCHANT_RATINGS table and the lookup that scans it sit beside each other
+// and so the merit in ../merits.ts can read both from the same module without
+// dragging in the engine's lifecycle. The barrel (../engine.ts) re exports it
+// from there.
 
 function endRound(state: GameState, logs: string[]) {
   logs.push(`\n📊=== Round ${state.currentRound} Settlement ===`);

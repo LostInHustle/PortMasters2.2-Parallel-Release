@@ -3,7 +3,12 @@
 // during Parley, ordered over ../module-trades' own board.
 // =====================================================================
 
-import { consentFeeRule, STALE_OFFER } from "@/lib/game/constants/copy";
+import {
+  OFFER_ALREADY_GONE,
+  OFFER_FOR_ANOTHER_CAPTAIN,
+  consentFeeRule,
+  STALE_OFFER,
+} from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
 import {
@@ -202,7 +207,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
       const board = moduleTrades.list(roomId);
       const opening = board.find((t) => t.id === tradeId);
       if (!opening || opening.status !== "offered") {
-        fail("That offer has already gone.");
+        fail(OFFER_ALREADY_GONE);
         return;
       }
       if (opening.sellerUserId === s.userId) {
@@ -210,7 +215,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
         return;
       }
       if (opening.buyerUserId !== null && opening.buyerUserId !== s.userId) {
-        fail("That offer was addressed to another captain.");
+        fail(OFFER_FOR_ANOTHER_CAPTAIN);
         return;
       }
       if (opening.round !== cp.round) {

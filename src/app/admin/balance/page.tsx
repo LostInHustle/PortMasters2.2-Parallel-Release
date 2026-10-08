@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminGate } from "@/components/portmasters/AdminGate";
 import { BalanceDashboard } from "@/components/portmasters/BalanceDashboard";
+import { PageSplash } from "@/components/ui/page-splash";
 
 type Status = "loading" | "gate" | "dashboard";
 
@@ -52,13 +53,7 @@ export default function AdminBalancePage() {
   }, []);
 
   if (status === "loading") {
-    return (
-      <main className="pm-canvas flex min-h-screen items-center justify-center">
-        <p className="font-display text-lg text-muted-foreground">
-          Reading the balance...
-        </p>
-      </main>
-    );
+    return <PageSplash line="Reading the balance..." />;
   }
 
   if (status === "dashboard") return <BalanceDashboard />;

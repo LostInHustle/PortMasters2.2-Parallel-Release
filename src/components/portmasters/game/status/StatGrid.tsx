@@ -65,11 +65,10 @@ export function StatGrid({
             is running, so a voyage with the switch off shows the same
             three columns at the same width it always had rather than a
             fourth cell reporting a number no rule moves. [W3: the status
-            convention] The cell used to carry the hunger in colour alone,
-            which is a readout only a captain who already knows the rule
-            can read: it now swaps its label to the state's own words and
-            opens the full sentence on a tap, so a touch screen gets the
-            why and the way back rather than a hover. */}
+            convention] The cell swaps its label to the state's own words
+            and opens the full sentence on a tap: colour alone is a
+            readout only a captain who already knows the rule can read,
+            and a hover never shows on a touch screen. */}
         {larderOn &&
           (shortRations ? (
             <button

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Anchor } from "lucide-react";
+import { PageSplash } from "@/components/ui/page-splash";
 import { api } from "@/lib/api";
 import { disconnectSocket, setAuthToken } from "@/lib/realtime";
 import type { PublicUser } from "@/lib/db";
@@ -77,18 +77,7 @@ export default function Home() {
   };
 
   if (status === "loading") {
-    return (
-      <main className="pm-canvas flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="pm-grad-brand flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
-            <Anchor className="h-8 w-8" />
-          </div>
-          <p className="text-brand font-display text-lg">
-            Reading the tide tables...
-          </p>
-        </div>
-      </main>
-    );
+    return <PageSplash line="Reading the tide tables..." badge />;
   }
 
   if (status === "auth" || !user) {

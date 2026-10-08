@@ -301,10 +301,9 @@ export function normalizePhase(value: unknown): Phase {
 /**
  * The face a phase wears, or the pier's when the value is not a phase.
  *
- * The lookup is total on purpose: every caller of this either already
- * holds a Phase or has just passed one through normalizePhase, and the
- * one caller that reads a value off the wire (the rail, from a status
- * frame) should wear something legible rather than crash a render.
+ * The lookup is total on purpose: normalizePhase answers a Phase for any
+ * input, so the face is always one of the table's own rather than
+ * undefined in a render.
  */
 export function phaseFace(value: unknown): PhaseFace {
   return PHASE_FACES[normalizePhase(value)];

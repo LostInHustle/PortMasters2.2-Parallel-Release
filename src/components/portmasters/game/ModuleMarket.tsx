@@ -7,7 +7,7 @@ import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import { cardById, cardName, cardText } from "@/lib/game/cards";
 import { HELD_POWER_CAP } from "@/lib/game/constants/cards";
-import { STALE_OFFER } from "@/lib/game/constants/copy";
+import { STALE_OFFER, feeShortfallLine } from "@/lib/game/constants/copy";
 import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
 import { CONSENT_FEE_MIN } from "@/lib/game/constants/paths";
 import {
@@ -265,7 +265,7 @@ function ModuleRow({
       : card !== null && !powerBudgetAllows(game, card)
         ? `Taking it would put your hull at ${powerAfterTaking(game, card)} power, and a hull carries at most ${HELD_POWER_CAP}.`
         : !canPayFee(game, trade.fee)
-          ? `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${trade.fee}.`
+          ? feeShortfallLine(hold, trade.fee)
           : null;
 
   return (

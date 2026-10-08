@@ -26,6 +26,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
+import { SAME_ITEM_OFFER } from "@/lib/game/constants/copy";
 import {
   BARTER_ITEMS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
@@ -42,6 +43,7 @@ import { itemColorResolver } from "@/lib/use-color-preference";
 import type { BarterOffer } from "@/lib/use-barter";
 import { cn } from "@/lib/utils";
 import { ItemIcon } from "../shared";
+import { AudienceSelect } from "./AudienceSelect";
 import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
 import type { Barter } from "./phases/PhaseShared";
 
@@ -323,26 +325,16 @@ export function TradeComposer({
           Offered to {fixedTarget.displayName} alone.
         </p>
       ) : (
-        <Select
+        <AudienceSelect
           value={draft.targetUserId}
-          onChange={(e) => draft.setChosenTargetId(e.target.value)}
+          onChange={(id) => draft.setChosenTargetId(id)}
+          others={members.filter((m) => m.id !== me.id)}
+          label="Direct this offer to a specific captain"
           className="h-8 px-1.5 text-xs w-full"
-          aria-label="Direct this offer to a specific captain"
-        >
-          <option value="">🌊 Anyone in the harbor</option>
-          {members
-            .filter((m) => m.id !== me.id)
-            .map((m) => (
-              <option key={m.id} value={m.id}>
-                🔒 {m.displayName} only
-              </option>
-            ))}
-        </Select>
+        />
       )}
       {draft.sameItem && (
-        <p className="text-[11px] text-alarm">
-          Pick two different items to barter.
-        </p>
+        <p className="text-[11px] text-alarm">{SAME_ITEM_OFFER}</p>
       )}
       {!draft.sameItem && draft.offerAmount > draft.owned && (
         <p className="text-[11px] text-alarm">
