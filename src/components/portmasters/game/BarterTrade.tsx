@@ -26,7 +26,17 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
-import { SAME_ITEM_OFFER } from "@/lib/game/constants/copy";
+import {
+  OFFER_GIVE_AMOUNT_LABEL,
+  OFFER_GIVE_ITEM_LABEL,
+  OFFER_GIVE_LABEL,
+  OFFER_POST_LABEL,
+  OFFER_TARGET_LABEL,
+  OFFER_WANT_AMOUNT_LABEL,
+  OFFER_WANT_ITEM_LABEL,
+  offerOverdrawLine,
+  SAME_ITEM_OFFER,
+} from "@/lib/game/constants/copy";
 import {
   BARTER_ITEMS,
   FLEXIBLE_BARTER_UNLOCK_LEVEL,
@@ -277,19 +287,21 @@ export function TradeComposer({
   return (
     <div className="w-80 space-y-2 p-3">
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="w-12 shrink-0 text-muted-foreground">I'll give</span>
+        <span className="w-12 shrink-0 text-muted-foreground">
+          {OFFER_GIVE_LABEL}
+        </span>
         <QuantityInput
           value={draft.offerAmount}
           onCommit={draft.setOfferAmount}
           min={1}
-          aria-label="Amount to offer"
+          aria-label={OFFER_GIVE_AMOUNT_LABEL}
           className="h-8 w-14"
         />
         <Select
           value={draft.offerItem}
           onChange={(e) => draft.setOfferItem(e.target.value)}
           className="h-8 px-1.5 text-xs flex-1"
-          aria-label="Item to offer"
+          aria-label={OFFER_GIVE_ITEM_LABEL}
         >
           {draft.items.map((it) => (
             <option key={it} value={it}>
@@ -304,14 +316,14 @@ export function TradeComposer({
           value={draft.requestAmount}
           onCommit={draft.setRequestAmount}
           min={1}
-          aria-label="Amount to request"
+          aria-label={OFFER_WANT_AMOUNT_LABEL}
           className="h-8 w-14"
         />
         <Select
           value={draft.requestItem}
           onChange={(e) => draft.setRequestItem(e.target.value)}
           className="h-8 px-1.5 text-xs flex-1"
-          aria-label="Item to request"
+          aria-label={OFFER_WANT_ITEM_LABEL}
         >
           {draft.items.map((it) => (
             <option key={it} value={it}>
@@ -329,7 +341,7 @@ export function TradeComposer({
           value={draft.targetUserId}
           onChange={(id) => draft.setChosenTargetId(id)}
           others={members.filter((m) => m.id !== me.id)}
-          label="Direct this offer to a specific captain"
+          label={OFFER_TARGET_LABEL}
           className="h-8 px-1.5 text-xs w-full"
         />
       )}
@@ -338,7 +350,7 @@ export function TradeComposer({
       )}
       {!draft.sameItem && draft.offerAmount > draft.owned && (
         <p className="text-[11px] text-alarm">
-          You only have {draft.owned} {draft.offerItem}.
+          {offerOverdrawLine(draft.owned, draft.offerItem)}
         </p>
       )}
       <p className="text-[11px] text-muted-foreground">
@@ -357,7 +369,7 @@ export function TradeComposer({
           if (draft.submit()) onPosted?.();
         }}
       >
-        🤝 Post Offer
+        {OFFER_POST_LABEL}
       </Button>
     </div>
   );

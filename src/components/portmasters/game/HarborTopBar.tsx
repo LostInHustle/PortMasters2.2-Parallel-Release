@@ -114,6 +114,11 @@ export function HarborTopBar({
                 ? "Colorblind safe palette on, click to use the default colors"
                 : "Use a colorblind safe palette for goods"
             }
+            aria-label={
+              colorblindSafe
+                ? "Turn off the colorblind safe palette"
+                : "Use the colorblind safe palette"
+            }
           >
             <Palette className="h-4 w-4" />
           </Button>
@@ -153,6 +158,11 @@ export function HarborTopBar({
             className="rounded-lg relative"
             onClick={onToggleNotifications}
             title="Notifications"
+            aria-label={
+              unreadCount > 0
+                ? `Notifications, ${unreadCount} unread`
+                : "Notifications"
+            }
           >
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (

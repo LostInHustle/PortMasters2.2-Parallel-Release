@@ -109,12 +109,12 @@ export async function legClockSuite(): Promise<void> {
   );
 
   // Every phase value this engine has ever persisted, and where a voyage
-  // that is already sailing is placed when it loads one. The six landed
-  // together with [B1] and renamed the whole vocabulary, so a save written
-  // the day before holds one of these, and a save that cannot be placed is
-  // a voyage that cannot be resumed. This is the release's rollback
-  // clause read forwards: the engine may run the new names, but it has to
-  // keep understanding the old ones.
+  // that is already sailing is placed when it loads one. The six renamed
+  // the whole vocabulary, so a save written before the rename holds one of
+  // these, and a save that cannot be placed is a voyage that cannot be
+  // resumed. This is the release's rollback clause read forwards: the
+  // engine may run the new names, but it has to keep understanding the old
+  // ones.
   const persistedBefore: [string, Phase][] = [
     ["0", "harbor"],
     ["5", "dawn"],

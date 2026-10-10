@@ -144,7 +144,7 @@ The reader applies both module lines now (`explainExpectedPrice`, `src/lib/game/
 
 ### A load timeout and a load error both drop the Renown bonus
 
-The two fallback loads, for a saved voyage that cannot be fetched, are `applyTimedOutLoad` and `applyFailedLoad` in `src/lib/session/use-voyage-load.ts` (`:154` and `:252`). Both used to reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 fell from 160 Gold to 100, and the Broker's Favor unlock relocked for the rest of that voyage.
+The two fallback loads, for a saved voyage that cannot be fetched, are the two call sites of `applyUnreachableLoad` in `src/lib/session/use-voyage-load.ts` (`:145` and `:158`). Both used to reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 fell from 160 Gold to 100, and the Broker's Favor unlock relocked for the rest of that voyage.
 
 A network timeout should not demote a captain, and it no longer does: both paths read the level remembered across loads (`env.renownRef.current`), so a failed fetch leaves the captain exactly where they were.
 

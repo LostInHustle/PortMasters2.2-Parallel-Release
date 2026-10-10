@@ -302,7 +302,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
   // one captain in the room is the one standing in the draft below.
   const clockY = await openClockRoom("Y", "clky", 1, GAMBIT);
   // The mode boundary, on the same server and inside the same window: a
-  // founding-mode harbor whose seat is walked by hand. Nothing is closed
+  // harbor of the founding mode whose seat is walked by hand. Nothing is closed
   // on it below, because there is nothing to wait for.
   const clockC = await openClockRoom("C", "clkc", 1, CLASSIC);
 

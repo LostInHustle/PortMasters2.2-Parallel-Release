@@ -31,7 +31,7 @@ import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { leaveRoomForUser } from "@/lib/rooms";
 import type { SocketState } from "./types";
-import { forgetStatusIfLastSocket } from "./status";
+import { forgetStatus } from "./status";
 import { closeVoyageTelemetry, noteCaptainLeft } from "./telemetry";
 import { noteVoyageLogDeparture } from "./voyage-log";
 
@@ -426,14 +426,18 @@ export function emptyRoom(io: Server, roomId: string): void {
     if (state.roomId !== roomId) continue;
     io.sockets.sockets.get(socketId)?.leave(`room:${roomId}`);
     state.roomId = null;
-    const set = userSockets.get(state.userId);
-    if (set) {
-      set.delete(socketId);
-      if (set.size === 0) userSockets.delete(state.userId);
-    }
-    // Only forgets the status if no other socket of theirs is still in
-    // this room, which is the same rule the disconnect path applies.
-    forgetStatusIfLastSocket(roomId, state.userId, userSockets);
+    // The account keeps its place in userSockets. The sockets here are
+    // still connected and still registered: the map's documented meaning
+    // is every live socket an account holds. This used to edit the set as
+    // if the socket had gone away, which left a captain sitting in an
+    // emptied room absent from their own account's entry, so a later ban
+    // or purge of them found no ids at detachUser and closed nothing
+    // while the socket went on acting on its cached session. The status
+    // row goes outright, the same rule room:join and room:leave apply: a
+    // captain who is no longer in this room sends a fresh status if they
+    // ever come back, and until then the roster must not read them as
+    // present.
+    forgetStatus(roomId, state.userId);
   }
 }
 
@@ -488,8 +492,8 @@ function scheduleBootDeparture(
 // The fix mirrors the disconnect grace period: arm the same departure
 // timer for every current member of every room as soon as the process
 // comes up. A captain whose browser tab is still genuinely open
-// reconnects within a couple of seconds (the client re auths and re
-// emits room:join automatically), which cancels this. Anyone who
+// reconnects within a couple of seconds (the client authenticates again
+// and resends room:join automatically), which cancels this. Anyone who
 // doesn't reconnect within the window is reaped the same way.
 //
 // It arms the boot variant of that timer, so a harbor whose whole crew

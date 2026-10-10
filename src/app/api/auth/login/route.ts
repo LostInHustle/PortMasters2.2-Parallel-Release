@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth";
 import { signedInResponse } from "@/lib/api-auth";
 import { readJson } from "@/lib/api-json";
+import { noteDoorAttempt, spendDoorBudget } from "@/lib/auth-limit";
 
 const Schema = z.object({
   username: z.string().min(1).max(20),
@@ -25,8 +26,16 @@ export async function POST(req: NextRequest) {
   if (!body.ok) return body.response;
   const { username, password } = body.data;
 
+  // The door's budget, spent before anything is looked up or stretched:
+  // this is the route that pays a synchronous scrypt per attempt on the
+  // event loop serving every live socket, and the one a password guess
+  // arrives at first (see the two counters in lib/auth-limit.ts).
+  const budget = spendDoorBudget(req, username);
+  if (!budget.ok) return budget.response;
+
   const user = await db.user.findUnique({ where: { username } });
   if (!user) {
+    noteDoorAttempt(username, false);
     return NextResponse.json(
       {
         error:
@@ -36,11 +45,16 @@ export async function POST(req: NextRequest) {
     );
   }
   if (!verifyPassword(password, user.passwordHash)) {
+    noteDoorAttempt(username, false);
     return NextResponse.json(
       { error: "The password you entered is incorrect." },
       { status: 401 },
     );
   }
+  // The password was right, so the name's misses are cleared before the
+  // ban is consulted: a pause is about guessing, and this captain has
+  // just proven the guessing was theirs to end.
+  noteDoorAttempt(username, true);
   // Checked after the password, not before it, so a ban is only ever
   // confirmed to someone who has proven the account is theirs. Anyone else
   // gets the same answer as a wrong password.
@@ -54,5 +68,5 @@ export async function POST(req: NextRequest) {
     .catch(() => {});
 
   const { token, expiresAt } = await createSession(user.id);
-  return signedInResponse({ user: publicUser(user), token, expiresAt });
+  return signedInResponse({ user: publicUser(user), token, expiresAt }, req);
 }

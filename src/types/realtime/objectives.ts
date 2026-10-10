@@ -14,7 +14,7 @@
 // =====================================================================
 
 /** What one captain reports to the harbor: their own running total. */
-export type ObjectiveReport = {
+export type ObjectiveReportPayload = {
   roomId: string;
   delivered: Record<string, number>;
 };
@@ -134,7 +134,7 @@ export type LegReport = {
  * server never has to know what the commission pays, only what it asked
  * for, which is what lets it clamp a report without the deck's prices.
  */
-export type ObjectiveProgress = {
+export type ObjectiveProgressPayload = {
   roomId: string;
   total: Record<string, number>;
 };

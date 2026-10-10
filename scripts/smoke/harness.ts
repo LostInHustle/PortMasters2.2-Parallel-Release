@@ -12,10 +12,11 @@ import { createInitialGameState } from "@/lib/game/types";
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { UNLOCKS } from "@/lib/unlock";
 import type { Captain, WireAccount, WireRoster } from "./wire";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Socket } from "socket.io-client";
 import { connect } from "socket.io-client";
+import { walkSrc } from "../walk-src";
 
 export const BASE =
   process.env.SMOKE_BASE_URL ?? `http://localhost:${loadServerConfig().port}`;
@@ -59,27 +60,10 @@ export const CARRIES_A_HYPHEN = new RegExp(
   `[-${String.fromCharCode(0x2013, 0x2014)}]|-{2}`,
 );
 
-/**
- * Every source file under a directory, for a check whose claim is about
- * the tree rather than about a file.
- *
- * Here rather than inside the check that first needed it, because a second
- * feature needed one too and a second copy of a directory walk is how two
- * scans of the same tree end up reading different files. Read only, and
- * only .ts and .tsx: the claim every caller makes is about source.
- */
-export function walkSrc(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walkSrc(full));
-      continue;
-    }
-    if (/\.tsx?$/.test(entry)) out.push(full);
-  }
-  return out;
-}
+// The tree walk lives in ../walk-src: one implementation for the suites,
+// the harness, and the build gates, exported again here so a suite that
+// already imports its helpers from this file keeps one import.
+export { walkSrc };
 
 /**
  * The same rule, read off a file rather than off a claim about it. Whole

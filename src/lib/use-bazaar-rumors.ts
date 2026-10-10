@@ -7,12 +7,7 @@ import {
   type PublicRumor,
   type RumorDirection,
 } from "@/lib/game/engine";
-
-// Forwarded so the Parley panel can import the row shape from the same
-// place it imports the hook. The canonical home is the game layer, which
-// is what both ends of the wire import (see the note on BazaarBoard in
-// @/types/realtime).
-export type { PublicRumor };
+import { refusedForRoom } from "@/lib/refusals";
 
 // The events this desk speaks on, named in one place for the reason the
 // escort's and the bench's own channels are (see ./use-consent-board).
@@ -72,8 +67,9 @@ export function useBazaarRumors(socket: Socket | null, roomId: string) {
       setRumors(next);
     };
     const onBoardError = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId || typeof data.error !== "string") return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (err === null) return;
+      setError(err);
     };
 
     socket.on(CHANNEL.update, onUpdate);

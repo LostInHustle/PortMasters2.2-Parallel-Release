@@ -65,6 +65,15 @@ model Room {
   hostId    String
   isPublic  Boolean  @default(true)
   createdAt DateTime @default(now())
+  // [I1: the telemetry spine] When the lobby opened for the voyage that is
+  // next to sail. createdAt above is the harbor's birthday and never moves,
+  // which is the wrong end of the fill time for a table that replays in the
+  // same room: a restart reopens the lobby without touching the birthday,
+  // so a second voyage's fill time measured from it counts every hour
+  // since the room was first chartered. This column is stamped at creation
+  // and bumped by the restart (see wiring/restart-voyage.ts), and it is
+  // what the telemetry record's openedAt reads at departure.
+  lobbyOpenedAt DateTime @default(now())
 
   currentRound Int    @default(1)
   currentPhase String @default("0")
@@ -110,7 +119,9 @@ model Room {
   voyageRoles    VoyageRole[]
   convoyVentures ConvoyVenture[]
   loans          Loan[]
-  chronicles     VoyageChronicle[]
+  // No back-reference to VoyageChronicle or VoyageTelemetry: both carry
+  // roomId as a bare column so their rows outlive the room, and Prisma
+  // relations cascade or dangle. See the writeups on each of those models.
   rivals         CaptainRival[]
 
   @@index([hostId])
@@ -160,10 +171,10 @@ model GameState {
 // Integrity Pass subject either: that pass guards the one save endpoint
 // that trusts a client, and this table is never written by one.
 //
-// The row is the record rather than a seed to re-derive from. A seed
-// would have to be kept for the whole voyage, and re-running it over a
-// roster that gained a captain mid voyage would move every card at the
-// table, including the ones already read.
+// The row is the record rather than a seed to derive from again. A seed
+// would have to be kept for the whole voyage, and running it again over
+// a roster that gained a captain mid voyage would move every card at
+// the table, including the ones already read.
 model VoyageRole {
   id       String   @id @default(cuid())
   roomId   String
@@ -313,7 +324,11 @@ model VoyageChronicle {
   // [H2: the fleet commission] The measurement half of Ocean Gambit's
   // objective, recorded where every other voyage outcome already is.
   // objectiveTrace is JSON text for the same reason GameState.data is: the
-  // per leg detail is read by analysis scripts, never by a query.
+  // per leg detail is one document, walked rather than joined, and nothing
+  // reads it by query. Its consumer today is the smoke run's fleet
+  // commission suite, which asserts a finished voyage's counters; the H2
+  // launch gate's evaluation is the reader these columns were built for
+  // and it has not landed yet, so no report script parses the trace.
   // A row is per captain, so the total in it is the harbor's as that one
   // client last saw it, and a later pass takes the room's max rather than
   // trusting any single row. Empty in Classic, where no objective is drawn.
@@ -354,7 +369,14 @@ model VoyageChronicle {
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  // roomId is a bare string with no relation on it, for the reason
+  // VoyageTelemetry's is written up with below: a harbor is deleted the
+  // moment its last member leaves, which is the ordinary end of an
+  // ordinary voyage, and a cascade would erase the very chronicles this
+  // table exists to keep. The row belongs to the captain (the user
+  // relation above still cascades, so erasing an account takes its own
+  // rows), and the room is only the harbor the voyage was sailed in.
 
   @@index([userId, createdAt])
   @@index([roomId])

@@ -28,6 +28,11 @@ import {
 } from "@/lib/game/constants/drafts";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { INTEL_COST } from "@/lib/game/engine";
+import {
+  bazaarRumorsOn,
+  escortContractsOn,
+  moduleTradesOn,
+} from "@/lib/game/flags";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { openingPhase } from "@/lib/game/checkpoint";
 import { pathFactText, pathGuide } from "@/lib/game/paths";
@@ -95,14 +100,7 @@ const STEPS: Step[] = [
     title: "Buy at Port",
     gradient: "pm-grad-market",
     body: `Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay ${INTEL_COST} Gold for a Broker's Rumor that guarantees a matching order appears when Orders opens.`,
-    tip: "The harbor remembers what everyone bought. A good the room leans into gets pricier next round, while one nobody touches softens.",
-  },
-  {
-    icon: Handshake,
-    title: "Barter with Captains",
-    gradient: "pm-grad-parley",
-    body: "At the Parley you can trade goods and Gold directly with the other captains, whether your voyage runs it before the orders or after them. Post an offer of what you have and what you want, or accept an offer someone else posted. Offered goods are escrowed the moment you post.",
-    tip: "You can target a specific captain with a Direct Barter Offer if you want to trade with only them. The Markets station of the Parley holds the escort market, the module market and the bazaar window.",
+    tip: "The harbor remembers what everyone bought. A good the harbor leans into gets pricier next round, while one nobody touches softens.",
   },
   {
     icon: TrendingUp,
@@ -119,7 +117,7 @@ const STEPS: Step[] = [
     // mode's page rather than repeated here: the founding mode's ending
     // would be wrong for a Gambit captain, whose voyage carries on.
     body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Dues tab of your captain's rail before you spend anything.",
-    tip: "Ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
+    tip: "When other captains are aboard, ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
   {
     icon: Hammer,
@@ -195,6 +193,37 @@ function artisanPage(mode: GameMode): Step {
 }
 
 /**
+ * The barter page, whose tip is the one piece of advice that depends on
+ * which markets the mode draws.
+ *
+ * The escort market, the module market and the bazaar window all sell
+ * from the Parley's Markets station, and that station is drawn only when
+ * at least one of them is running. The three flags read here are the
+ * ones Parley.tsx draws its strip from, so the tip names exactly the
+ * markets this voyage's station holds, and a Classic harbor, which draws
+ * no station at all, keeps the one sentence that is true of every mode.
+ */
+function barterPage(mode: GameMode): Step {
+  const markets = [
+    escortContractsOn(mode) ? "the escort market" : null,
+    moduleTradesOn(mode) ? "the module market" : null,
+    bazaarRumorsOn(mode) ? "the bazaar window" : null,
+  ].filter((market): market is string => market !== null);
+  const held = markets.length
+    ? `${markets.slice(0, -1).join(", ")}${markets.length > 1 ? " and " : ""}${markets[markets.length - 1]}`
+    : "";
+  return {
+    icon: Handshake,
+    title: "Barter with Captains",
+    gradient: "pm-grad-parley",
+    body: "At the Parley you can trade goods and Gold directly with the other captains, whether your voyage runs it before the orders or after them. Post an offer of what you have and what you want, or accept an offer someone else posted. Offered goods are escrowed the moment you post.",
+    tip: markets.length
+      ? `You can target a specific captain with a Direct Barter Offer if you want to trade with only them. The Markets station of the Parley holds ${held}.`
+      : "You can target a specific captain with a Direct Barter Offer if you want to trade with only them.",
+  };
+}
+
+/**
  * The paths page: the deal a dealing voyage opens with, and the five cards
  * it can hand a captain.
  *
@@ -247,15 +276,17 @@ export function HowToPlayModal({
   // mode that opens at the deal: the deck is the first seat of that
   // voyage, so its page stands before the pages about the seats after it,
   // and a mode that deals no paths draws no page (see pathsPage). The
-  // artisan page is its own function in the sequence (see artisanPage),
-  // so the two pages that state a mode's own rules read the record rather
-  // than the table.
+  // artisan and barter pages are their own functions in the sequence as
+  // well (see artisanPage and barterPage): what those two pages advise
+  // depends on the voyage, and a step that depends on the voyage is built
+  // where the mode is known rather than tabled where it is not.
   const pages = [
     STEPS[0],
     voyagePage(mode),
     ...pathsPage(mode),
     ...STEPS.slice(1, 3),
     artisanPage(mode),
+    barterPage(mode),
     ...STEPS.slice(3),
   ];
   // The mode can change while this manual is closed, and a shorter list
@@ -274,7 +305,7 @@ export function HowToPlayModal({
   return (
     <AnimatePresence>
       {open && (
-        <ModalOverlay onClose={() => onOpenChange(false)}>
+        <ModalOverlay label="How to Play" onClose={() => onOpenChange(false)}>
           <ModalSheet maxW="max-w-2xl">
             {/* Header */}
             <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">

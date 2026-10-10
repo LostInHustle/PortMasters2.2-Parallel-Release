@@ -2,6 +2,7 @@
 
 import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
 import { motion, AnimatePresence } from "framer-motion";
+import { Anchor } from "lucide-react";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { phaseFace } from "@/lib/game/phases";
 import { Welcome } from "./phases/Welcome";
@@ -23,7 +24,7 @@ import type { PhasePanelProps } from "./phases/PhaseShared";
 /**
  * The dispatcher for every phase screen. Every phase is its own module
  * under ./phases and a module level export, so a stable component
- * identity holds across renders and React re renders a phase in place on
+ * identity holds across renders and React renders the phase in place on
  * every game state update instead of unmounting and remounting the whole
  * subtree, which would reset local useState mid interaction (see the
  * ReadyFooter comment in PhaseShared.tsx for the failure this avoids).
@@ -139,7 +140,7 @@ export function GamePhasePanel(props: Props) {
 // Each case destructures only the subset of props that panel needs:
 // explicit prop picking keeps the contract between dispatcher and panel
 // documented at the call site, so adding a new prop to a panel is a one
-// line change here rather than a silent re build of the panel's whole
+// line change here rather than a silent rebuild of the panel's whole
 // prop surface.
 function ActivePhase(props: Props) {
   const {
@@ -373,7 +374,7 @@ function ActivePhase(props: Props) {
       return (
         <div className="flex min-h-[clamp(320px,52dvh,480px)] flex-col items-center justify-center text-center px-6">
           <div className="pm-grad-brand mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
-            <span className="font-display text-xl">水</span>
+            <Anchor className="h-6 w-6" />
           </div>
           <h2 className="font-display text-2xl text-brand mb-1.5 pm-brush">
             Round {game.currentRound}

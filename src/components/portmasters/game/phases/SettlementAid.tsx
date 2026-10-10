@@ -24,6 +24,11 @@ export function loanSettleLine(maxRounds: number): string {
  * beyond the purse, and the asks the rest of the harbor has posted. It owns
  * the amount being asked for, which follows the shortfall until the captain
  * names a figure of their own; the bills station owns the shortfall itself.
+ *
+ * A one-captain harbor (a Solo Practice Voyage, or a table nobody else
+ * joined) has no one who could answer the ask: the lending side of the
+ * desk would be a button that can only fail, so the desk is replaced by
+ * the one sentence that is true alone (see the `alone` prop).
  */
 export function HarborAid({
   game,
@@ -31,6 +36,7 @@ export function HarborAid({
   myUserId,
   shortfall,
   canAfford,
+  alone,
 }: Pick<PhasePanelProps, "game" | "aid"> & {
   myUserId: string;
   /** What the bills come to beyond the purse, never below one Gold, read
@@ -39,6 +45,9 @@ export function HarborAid({
   /** Whether the captain can cover the round at all. The ask draws only
       when they cannot. */
   canAfford: boolean;
+  /** Whether every other seat in the harbor is empty. The ask is not
+      drawn at all when it is: there is no captain to answer it. */
+  alone: boolean;
 }) {
   const myRequest = aid.requests.find((r) => r.fromUserId === myUserId);
   const otherRequests = aid.requests.filter((r) => r.fromUserId !== myUserId);
@@ -58,50 +67,62 @@ export function HarborAid({
       {!canAfford && (
         <div className="rounded-xl border border-alarm/30 bg-alarm/[0.04] p-3.5 my-3.5">
           <h3 className="font-semibold text-alarm mb-2 flex items-center gap-1.5">
-            <HandCoins className="h-4 w-4" /> Short on Gold? Ask the Harbor for
-            Help
+            <HandCoins className="h-4 w-4" />
+            {alone
+              ? "Short on Gold?"
+              : "Short on Gold? Ask the Harbor for Help"}
           </h3>
-          {myRequest ? (
-            <div className="flex items-center justify-between text-sm bg-background/50 rounded-lg px-3 py-2">
-              <span>
-                🆘 Waiting for a captain to lend you{" "}
-                <b>{myRequest.amount} Gold</b>…
-              </span>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="h-7 px-2.5 text-[10px] rounded shrink-0"
-                onClick={() => aid.cancel()}
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Request</span>
-              <QuantityInput
-                value={requestAmount}
-                onCommit={commitRequestAmount}
-                min={1}
-                aria-label="Loan amount to request"
-                className="w-20 h-9"
-              />
-              <span className="text-muted-foreground">
-                Gold from another captain
-              </span>
-              <Button
-                size="sm"
-                className="pm-grad-resolve rounded-lg"
-                onClick={() => aid.post(requestAmount)}
-              >
-                🆘 Request Help
-              </Button>
-            </div>
+          {alone && (
+            <p className="text-sm text-muted-foreground">
+              No other captain is aboard, so there is no one to lend. The bills
+              must be settled alone: Force Payment below covers what the purse
+              holds, and the shortfall is the risk it names.
+            </p>
           )}
-          <p className="text-[11px] text-muted-foreground mt-2">
-            A loan transfers instantly if someone helps. Repay it any time
-            before the voyage ends. {loanSettleLine(game.maxRounds)}
-          </p>
+          {!alone &&
+            (myRequest ? (
+              <div className="flex items-center justify-between text-sm bg-background/50 rounded-lg px-3 py-2">
+                <span>
+                  🆘 Waiting for a captain to lend you{" "}
+                  <b>{myRequest.amount} Gold</b>…
+                </span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 px-2.5 text-[10px] rounded shrink-0"
+                  onClick={() => aid.cancel()}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Request</span>
+                <QuantityInput
+                  value={requestAmount}
+                  onCommit={commitRequestAmount}
+                  min={1}
+                  aria-label="Loan amount to request"
+                  className="w-20 h-9"
+                />
+                <span className="text-muted-foreground">
+                  Gold from another captain
+                </span>
+                <Button
+                  size="sm"
+                  className="pm-grad-resolve rounded-lg"
+                  onClick={() => aid.post(requestAmount)}
+                >
+                  🆘 Request Help
+                </Button>
+              </div>
+            ))}
+          {!alone && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              A loan transfers instantly if someone helps. Repay it any time
+              before the voyage ends. {loanSettleLine(game.maxRounds)}
+            </p>
+          )}
         </div>
       )}
 

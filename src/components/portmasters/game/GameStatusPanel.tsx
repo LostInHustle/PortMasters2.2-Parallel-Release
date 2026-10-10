@@ -1,6 +1,6 @@
 "use client";
 
-import { wageBill } from "@/lib/game/engine";
+import { maintenanceDue, payrollIndex } from "@/lib/game/engine";
 import { onShortRations } from "@/lib/game/larder";
 import { survivalLayerOn } from "@/lib/game/flags";
 import {
@@ -102,14 +102,14 @@ export function GameStatusPanel({
   const shortWarmth = shortOfWarmth(game);
 
   // Summed across the whole unlocked roster, not the three founding types,
-  // and priced off the engine's own bill (see wageBill) rather than a hand
-  // count multiplied here: the multiplication this replaces billed a Jade
-  // Pavilion captain one wage too many, which inflated the obligations
+  // and priced off the engine's own bill (see payrollIndex) rather than a
+  // hand count multiplied here: the multiplication this replaces billed a
+  // Jade Pavilion captain one wage too many, which inflated the obligations
   // figure this rail exists to show and could paint a solvent captain's
   // rail in the alarm tone. A type outside the engine's roster is one
   // payWages does not charge either, so a missing row reads as no wages
   // due rather than as a second opinion about the same absence.
-  const payroll = new Map(wageBill(game).map((b) => [b.id, b]));
+  const payroll = payrollIndex(game);
   const roster = unlockedWorkerTypes(game.difficulty, game.currentRound).map(
     (w) => {
       const list = game.workers[w.id] ?? [];
@@ -117,7 +117,7 @@ export function GameStatusPanel({
     },
   );
   const pendWages = roster.reduce((sum, r) => sum + r.due, 0);
-  const pendMaint = game.fixedCost + game.maintenancePenalty;
+  const pendMaint = maintenanceDue(game);
   const pendTotal = pendWages + pendMaint;
   const safe = game.money >= pendTotal;
   const nW = roster.reduce((sum, r) => sum + r.list.length, 0);

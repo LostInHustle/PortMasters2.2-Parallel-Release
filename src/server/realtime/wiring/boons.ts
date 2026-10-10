@@ -2,7 +2,7 @@
 // [F5: public offers] The boon report frame, over ../boon-ledger's rules.
 //
 // One handler, shaped like the leg report's: the claim is bound to the
-// seat (seated), and every field is re-read here rather than trusted,
+// seat (seated), and every field is read again here rather than trusted,
 // because the ledger's one claim is the plan's sentence above and a
 // report that cannot make it truthfully has nothing to add to the table.
 // The reader bounds the round to a real leg, the shown list to the size

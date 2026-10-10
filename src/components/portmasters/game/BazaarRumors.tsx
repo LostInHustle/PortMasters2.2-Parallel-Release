@@ -7,7 +7,7 @@ import type { PublicUser } from "@/lib/api";
 import { ICONS } from "@/lib/game/constants/brand";
 import {
   RUMOR_COOLDOWN_ROUNDS,
-  RUMOR_SHIFT_FRACTION,
+  RUMOR_SHIFT_PERCENT,
 } from "@/lib/game/constants/paths";
 import {
   BAZAAR_SELLER_PATH,
@@ -35,12 +35,8 @@ import { bazaarRumorsOn } from "@/lib/game/flags";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import {
-  MarketBlock,
-  MarketEmpty,
-  MarketError,
-  MarketPanel,
-} from "./OfferBoard";
+import { RefusalLine } from "../shared";
+import { MarketBlock, MarketEmpty, MarketPanel } from "./OfferBoard";
 import type { Bazaar } from "./phases/PhaseShared";
 
 // The speaking path's own record, resolved once at module load rather than
@@ -173,11 +169,11 @@ export function BazaarRumors({
         <>
           Once every {RUMOR_COOLDOWN_ROUNDS} legs, each {SELLER_PATH.name}{" "}
           captain may spread a word about one commodity, here at the Parley. The
-          next port prices that good against it, by up to{" "}
-          {Math.round(RUMOR_SHIFT_FRACTION * 100)} percent, which is the same
-          hand the Harbormaster leans a port with. The whole harbor is told who
-          spoke and which good they named, and only the speaker knows which way
-          they leaned until the port they named has priced it.
+          next port prices that good against it, by up to {RUMOR_SHIFT_PERCENT}{" "}
+          percent, which is the same hand the Harbormaster leans a port with.
+          The whole harbor is told who spoke and which good they named, and only
+          the speaker knows which way they leaned until the port they named has
+          priced it.
         </>
       }
     >
@@ -293,7 +289,11 @@ export function BazaarRumors({
         )}
       </MarketBlock>
 
-      <MarketError error={bazaar.error} onDismiss={bazaar.clearError} />
+      <RefusalLine
+        className="text-center mb-2"
+        error={bazaar.error}
+        onDismiss={bazaar.clearError}
+      />
 
       <RumorList rumors={bazaar.rumors} me={me} game={game} />
     </MarketPanel>

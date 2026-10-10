@@ -251,7 +251,7 @@
      These rules name the raw --w- tokens on purpose. A name declared in
      @theme inline is an input to class generation only; Tailwind inlines
      its value into the utility it generates and never emits a runtime
-     property called --color-something. So var(--color-houses-fill) here
+     property called --color-something. So var(--color-houses) here
      would resolve to nothing, and the whole background-image declaration
      would be dropped. Always reach for --w- in hand written CSS.
 

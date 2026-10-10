@@ -84,7 +84,7 @@ export function useRealtime(
     socket.on("presence:update", onPresence);
 
     // If already connected, sync the connected flag (deferred to avoid a
-    // synchronous setState inside the effect body) and re trigger auth.
+    // synchronous setState inside the effect body) and retrigger auth.
     if (socket.connected) {
       Promise.resolve().then(() => {
         if (alive.current) setConnected(true);

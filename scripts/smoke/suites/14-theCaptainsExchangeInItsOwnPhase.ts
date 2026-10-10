@@ -7,7 +7,7 @@ import { check, waitForEvent } from "../harness";
 import type { WireOffer } from "../wire";
 import type { Socket } from "socket.io-client";
 
-export async function captainSExchangeInSuite(inputs: {
+export async function theCaptainsExchangeInItsOwnPhaseSuite(inputs: {
   guest: {
     id: string;
     token: string;

@@ -35,30 +35,3 @@ export function VoteCardShell({
     </div>
   );
 }
-
-/**
- * Where a vote's refusal lands: the server's own sentence and a dismiss
- * press, one block for both votes so a refused nomination reads the same
- * whichever vote it came back from. It is the market desks' block (see
- * MarketError in ./OfferBoard) rather than a second look for the same kind
- * of line, and it is drawn only where there is something to read: a
- * refusal is per captain and is never the room's news, so it is not a
- * strip and not a toast.
- */
-export function VoteRefusal({
-  error,
-  onDismiss,
-}: {
-  error: string | null;
-  onDismiss: () => void;
-}) {
-  if (!error) return null;
-  return (
-    <p className="text-[11px] text-alarm mt-2">
-      {error}{" "}
-      <button type="button" onClick={onDismiss} className="underline">
-        Dismiss
-      </button>
-    </p>
-  );
-}

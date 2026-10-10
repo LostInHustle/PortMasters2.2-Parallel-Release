@@ -525,9 +525,36 @@ export function purchaseCard(state: GameState, cardId: number, logs: string[]) {
   logs.push(`📊 Purchased ${state.purchaseCount} cargo batches`);
 }
 
-// Named for the phase it opens rather than for its old place in the
-// numbering, which the leg dropped in [B1]. See its counterpart
-// completeMarket below for the other half of the phase.
+/**
+ * One rumor revealed: a demanded good taken off the pool, a port picked
+ * from the ones this captain has open, the pair pushed onto the intel
+ * every board prints from, and the one line a captain reads about it.
+ *
+ * Two callers draw from the same pool with the same dice and differ only
+ * in the sentence's lead: the free Farsight intel this phase opens with
+ * (below) and the paid Broker's Whisper (see purchaseIntel in ./orders).
+ * Whichever a captain holds, the promise is one promise, word from a port
+ * about a good in demand, and this is the one place it is kept.
+ *
+ * The caller guards the pool being empty; this reads the pool straight.
+ */
+export function revealRumor(
+  state: GameState,
+  logs: string[],
+  lead: string,
+  suffix = "",
+): void {
+  const tags = state.marketDemandTags;
+  const idx = Math.floor(Math.random() * tags.length);
+  const item = tags.splice(idx, 1)[0];
+  const openPorts = unlockedPorts(state.difficulty, state.currentRound);
+  const port = openPorts[Math.floor(Math.random() * openPorts.length)];
+  state.revealedIntel.push({ item, port });
+  logs.push(`${lead}: 'Word from ${port}: High demand for ${item}!'${suffix}`);
+}
+
+// Named for the phase it opens rather than for its position in the leg. See
+// its counterpart completeMarket below for the other half of the phase.
 export function startMarket(
   state: GameState,
   ctx: GameContext,
@@ -556,14 +583,7 @@ export function startMarket(
   const freeIntel = state.modifierFlags.free_intel ?? 0;
   for (let i = 0; i < freeIntel; i++) {
     if (!state.marketDemandTags.length) break;
-    const idx = Math.floor(Math.random() * state.marketDemandTags.length);
-    const item = state.marketDemandTags.splice(idx, 1)[0];
-    const openPorts = unlockedPorts(state.difficulty, state.currentRound);
-    const port = openPorts[Math.floor(Math.random() * openPorts.length)];
-    state.revealedIntel.push({ item, port });
-    logs.push(
-      `${cardLead("farsight")}: 'Word from ${port}: High demand for ${item}!' (free)`,
-    );
+    revealRumor(state, logs, cardLead("farsight"), " (free)");
   }
   logs.push(`\n⚓=== Round ${state.currentRound} · Market: Port Purchase ===`);
   logs.push(`💰 Current Funds: ${state.money} Gold`);

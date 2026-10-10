@@ -22,7 +22,7 @@
 // where a phase leads, and it asks the lap.
 // =====================================================================
 import { APP_NAME } from "../constants/brand";
-import { merchantRatingForScore } from "../constants/reputation";
+import { endgameRatingFor } from "../constants/reputation";
 import { closesRound, isGatedPhase, lapSuccessor } from "../checkpoint";
 import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
@@ -52,7 +52,7 @@ import { payMaintenance, payWages, processProduction } from "./workers";
 // merchantRatingForScore lives in ../constants/reputation.ts so the
 // MERCHANT_RATINGS table and the lookup that scans it sit beside each other
 // and so the merit in ../merits.ts can read both from the same module without
-// dragging in the engine's lifecycle. The barrel (../engine.ts) re exports it
+// dragging in the engine's lifecycle. The barrel (../engine.ts) exports it
 // from there.
 
 function endRound(state: GameState, logs: string[]) {
@@ -126,9 +126,8 @@ function endRound(state: GameState, logs: string[]) {
 // The work of leaving Orders, which is a log line and nothing
 // else. Where that leads is the lap's business, not this function's.
 //
-// Private since the lap refactor. It used to be exported because the trade
-// panel called it directly, which is exactly the second code path that would
-// have kept its own opinion about what comes next.
+// Private so the lap stays the only caller: a second caller is exactly the
+// second code path that would keep its own opinion about what comes next.
 function completeOrders(state: GameState, logs: string[]) {
   if (state.orderCount === 0) logs.push("⏭️ Trading skipped");
   else logs.push(`✅ Trading ended, completed ${state.orderCount} trades`);
@@ -139,9 +138,9 @@ function completeOrders(state: GameState, logs: string[]) {
 // for their own press of the same phase (see nextPhase above, which walks
 // them in that order).
 //
-// Named for the phase it opens rather than for its old place in the
-// numbering, which is what the whole leg dropped in [B1]: a function called
-// startPhase3 that opens Resolve is a name a reader has to translate.
+// Named for the phase it opens rather than for its position in the leg: a
+// function called startPhase3 that opens Resolve is a name a reader has to
+// translate.
 function startResolve(state: GameState, logs: string[]) {
   state.phase = "resolve";
   logs.push("\n👥=== Processing Worker Production ===");
@@ -231,14 +230,7 @@ function endGame(state: GameState, logs: string[]) {
   logs.push(`💰 Final Funds: ${state.money} Gold`);
   logs.push(`🏆 Final Reputation: ${state.score}`);
   logs.push(`🧾 Total Taxes Paid: ${state.vatPaid + state.incomeTaxPaid} Gold`);
-  let rating: string;
-  if (state.defaultedDebt) {
-    rating = "💥 Bankrupt: Defaulted on a Loan";
-  } else {
-    const r = merchantRatingForScore(state.score);
-    rating = `${r.icon} ${r.label}`;
-  }
-  logs.push(`📈 Rank: ${rating}`);
+  logs.push(`📈 Rank: ${endgameRatingFor(state.score, state.defaultedDebt)}`);
   logs.push("=".repeat(50));
 }
 
@@ -499,8 +491,8 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
   // [B3: standing orders] The captain's own instructions, or null when they
   // switched them off. Read once, here, rather than at each seat below, so
   // the rollback the plan asks for is one decision in one place: with the
-  // switch off, every branch here behaves exactly as [B2] shipped and the
-  // written set is left on the record untouched.
+  // switch off, every branch here behaves exactly as the engine's own
+  // defaults and the written set is left on the record untouched.
   //
   // The mode is asked in front of the captain's own switch rather than
   // beside it, and the two are different questions: the switch is the
@@ -564,7 +556,7 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
 // to be sure of that is for both to run this.
 //
 // The value comes off a wire or out of a save, so it is normalized before it
-// is read: a room that still holds one of the pre [B1] checkpoint names, or a
+// is read: a room that still holds one of the older checkpoint names, or a
 // save written by an older build, opens the phase that name means rather than
 // falling through to nothing and leaving the captain where they were. The pier
 // falls through on purpose, because the pier is where a voyage waits: nothing

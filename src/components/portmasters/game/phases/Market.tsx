@@ -32,10 +32,13 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { Purchase } from "./Purchase";
 import { WorkerMgmt } from "./WorkerMgmt";
-import { PhaseClockBar, type PhasePanelProps } from "./PhaseShared";
+import {
+  PhaseClockBar,
+  StationStrip,
+  type PhasePanelProps,
+} from "./PhaseShared";
 
 type Station = "port" | "bench";
 
@@ -73,32 +76,13 @@ export function Market({
 
   return (
     <div>
-      {/* Which board of the phase is in front of the captain. A station the
-          captain has finished stays reachable, so a captain who spent their
-          gold at the board can go back and look at what they bought; the
-          strip locks while the ready vote is in flight, because at that
-          point the harbor is being told this captain is done. */}
-      <div className="mb-3.5 flex items-center gap-1.5">
-        {STATIONS.map((s, i) => {
-          const here = s.id === station;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              disabled={phaseSync.waiting}
-              onClick={() => setStation(s.id)}
-              className={cn(
-                "flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60",
-                here
-                  ? "border-market/40 bg-market/[0.12] text-market"
-                  : "border-transparent bg-muted/30 text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {s.icon} {i + 1} · {s.label}
-            </button>
-          );
-        })}
-      </div>
+      <StationStrip
+        stations={STATIONS}
+        active={station}
+        onSelect={setStation}
+        waiting={phaseSync.waiting}
+        tone="market"
+      />
 
       {station === "port" ? (
         <>

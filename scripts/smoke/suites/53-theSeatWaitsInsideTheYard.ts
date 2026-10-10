@@ -1,4 +1,4 @@
-// PortMasters 2.2 Parallel Release, smoke run: the seat that waits inside
+// PortMasters 2.2 Parallel Release, smoke run: The seat that waits inside
 // the yard.
 //
 // The field report this article is for: upgrading the ship or changing

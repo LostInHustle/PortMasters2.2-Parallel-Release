@@ -111,7 +111,7 @@ export type VoyageReveal = {
   roomId: string;
   // The commission this harbor was working on, resolved rather than
   // seeded, because the ledger draws the board at the size the voyage
-  // sailed at and a client re drawing it would have to know the rung.
+  // sailed at and a client redrawing it would have to know the rung.
   // Drawn by the server from the room's own epoch and pinned seats, which
   // is what keeps it the board the fleet was actually working against.
   objective: Objective;

@@ -73,6 +73,27 @@ export async function pathDraftSuite(
     }>;
   },
 ): Promise<void> {
+  // =====================================================================
+  // [D7: the draft, and switching] The plan's clause for this feature, and
+  // the whole of it: "Deal each captain three path cards face down from a
+  // deck seeded so at least two Quartermaster cards are in circulation.
+  // Keep one, pass two to the left, keep one of the two received, pass
+  // one, discard the last. Then switching: once per voyage, at a port,
+  // legs three through nine, forfeiting unfulfilled pathbound orders and
+  // paying a Refit fee scaled to Renown, and the switch is published to
+  // the fleet log where everyone sees it."
+  //
+  // The checks are split the way the feature is. The deal's arithmetic is
+  // read here without a server, because the rule module holds no state and
+  // nothing about a deck needs a room. The deal itself is then played on a
+  // real harbor, because the privacy of a hand is the wire half of this
+  // feature and no reading of a rule module can observe it: two captains
+  // sit down, the voyage sets sail, and every frame both sockets receive
+  // is kept. The switch is read in both halves, the engine's own guard
+  // over a save and the room's publication over the wire, because the
+  // plan's "everyone knows" is a claim about the fleet rather than about
+  // the captain who changed their papers.
+  // =====================================================================
   const { telWaitForOne } = inputs;
 
   // ---- the deal's arithmetic ----
@@ -972,7 +993,7 @@ export async function pathDraftSuite(
   // already been written, and the request is answered from that book with
   // the view the seat was sent, the same answer every time it is asked.
   // The fleet's own count is read before either question, because a
-  // re-settle would show up as a second pair of log lines before it showed
+  // settling twice would show up as a second pair of log lines before it showed
   // up anywhere else.
   const linesHeard = takenLines.length;
   const settledKeep = waitForEvent<{ roomId?: string; error?: string }>(

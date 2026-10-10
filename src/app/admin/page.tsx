@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { api, type PublicUser } from "@/lib/api";
 import { disconnectSocket, setAuthToken } from "@/lib/realtime";
+import { READING_THE_REGISTER } from "@/lib/use-admin";
 import { AdminGate } from "@/components/portmasters/AdminGate";
 import { AdminConsole } from "@/components/portmasters/AdminConsole";
 import { PageSplash } from "@/components/ui/page-splash";
@@ -89,7 +90,7 @@ export default function AdminPage() {
   const handleConsoleLost = (message: string) => leave(message);
 
   if (status === "loading") {
-    return <PageSplash line="Reading the register..." />;
+    return <PageSplash line={READING_THE_REGISTER} />;
   }
 
   if (status === "console" && me) {

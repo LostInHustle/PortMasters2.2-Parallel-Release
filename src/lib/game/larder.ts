@@ -280,11 +280,33 @@ export function provisionAffordable(state: GameState): number {
   return leg === 0 ? 0 : Math.floor(state.money / leg);
 }
 
-// The full-larder refusal, said once because two walks answer it: this
+// The full larder refusal, said once because two walks answer it: this
 // module's provisioning walk and the Supply Barge's own purchase (see
 // ./engine/barge). The smoke suites pin the sentence itself, so its words
 // move only with theirs.
 export const LARDER_FULL_LINE = "🧺 The larder is full.";
+// The empty deck refusal, said once for the same reason: both provisioning
+// walks open with it, this module's walk and the Supply Barge's own
+// purchase, and the smoke suites pin the sentence itself.
+const NO_CREW_LINE = "⚓ No crew aboard, so there is nothing to provision.";
+
+/**
+ * The guard both provisioning walks open with: nobody aboard means there is
+ * nothing to provision, and one sentence says so. Returns the crew size, or
+ * null once it has pushed the refusal, so neither walk carries its own copy
+ * of the check or its own spelling of the line.
+ */
+export function provisioningCrew(
+  state: GameState,
+  logs: string[],
+): number | null {
+  const crew = crewSize(state);
+  if (crew === 0) {
+    logs.push(NO_CREW_LINE);
+    return null;
+  }
+  return crew;
+}
 
 /**
  * Buys food for the crew, as many legs' worth as the stores have room for
@@ -326,11 +348,8 @@ export function provisionFood(
   logs: string[],
 ): number {
   if (!survivalLayerOn(state.mode)) return 0;
-  const crew = crewSize(state);
-  if (crew === 0) {
-    logs.push("⚓ No crew aboard, so there is nothing to provision.");
-    return 0;
-  }
+  const crew = provisioningCrew(state, logs);
+  if (crew === null) return 0;
   reconcileLarder(state);
   const room = provisionRoom(state, food);
   if (room <= 0) {

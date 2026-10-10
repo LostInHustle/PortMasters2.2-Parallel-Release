@@ -82,7 +82,10 @@ export function CaptainProfileModal({
   return (
     <AnimatePresence>
       {open && (
-        <ModalOverlay onClose={() => onOpenChange(false)}>
+        <ModalOverlay
+          label={`${me.displayName}'s profile`}
+          onClose={() => onOpenChange(false)}
+        >
           <ModalSheet maxW="max-w-3xl">
             {/* Header with avatar and title */}
             <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-4 sm:p-6">

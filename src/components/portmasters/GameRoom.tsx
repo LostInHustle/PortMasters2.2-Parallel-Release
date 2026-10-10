@@ -268,7 +268,7 @@ export function GameRoom({
   //
   // Cleared before it is sent rather than after: a claim that the server
   // refuses, because the leg moved on or the contract is already claimed,
-  // is still a raid that happened, and re-sending it every render would only
+  // is still a raid that happened, and resending it every render would only
   // be a way to keep asking.
   useEffect(() => {
     const pending = state.game.pendingEscortClaim;
@@ -502,7 +502,6 @@ export function GameRoom({
       shipLevel: state.game.shipLevel,
       round: state.game.currentRound,
       phase: state.game.phase,
-      gameOver: state.game.gameOver,
       inventory: state.game.inventory,
       workers: state.game.workers,
       equippedModules: state.game.equippedModules,
@@ -923,7 +922,7 @@ export function GameRoom({
 
   function copyCode() {
     navigator.clipboard?.writeText(room.code).then(
-      () => toast.success("Room code copied", { description: room.code }),
+      () => toast.success("Harbor code copied", { description: room.code }),
       () => {},
     );
   }
@@ -1225,7 +1224,7 @@ export function GameRoom({
                 is the difference between a bubble over the captain's
                 rail and a bubble over the table. It wraps the scroller
                 rather than positioning the column itself, because a
-                relative column would re-anchor every absolutely placed
+                relative column would reanchor every absolutely placed
                 board inside it. */}
             <div className="lg:relative lg:order-1 lg:flex lg:flex-col lg:flex-1 lg:min-h-0">
               <div className="@container space-y-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pm-scroll lg:pr-1">
@@ -1416,7 +1415,7 @@ export function GameRoom({
                     looking at the other one, and switching back would show
                     the log as it stood when the voyage started. The room's
                     history reaches this panel once, on join, so there is
-                    nothing to re seed it from. */}
+                    nothing to reseed it from. */}
                 <TabsContent
                   value="room"
                   forceMount

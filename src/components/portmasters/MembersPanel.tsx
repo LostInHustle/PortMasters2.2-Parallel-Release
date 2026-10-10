@@ -91,7 +91,7 @@ export function MembersPanel({
   // zeros.
   const { detail, loading, requestDetail } = usePlayerDetail(socket, roomId);
 
-  // The room channel itself is joined (and re joined on every reconnect)
+  // The room channel itself is joined (and rejoined on every reconnect)
   // from GameRoom.tsx, since that needs to happen exactly once per
   // connection regardless of which panels happen to be mounted.
   useEffect(() => {

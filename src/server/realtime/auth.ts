@@ -75,7 +75,7 @@ export async function authenticate(
   const state = sockets.get(socket.id);
   if (!state) return null;
 
-  // If re authenticating as a different user, clean up old presence first.
+  // If authenticating again as a different user, clean up old presence first.
   if (state.authed && state.userId && state.userId !== user.id) {
     const oldSet = userSockets.get(state.userId);
     if (oldSet) {

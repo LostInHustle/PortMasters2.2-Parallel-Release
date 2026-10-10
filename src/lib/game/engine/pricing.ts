@@ -598,7 +598,7 @@ export function explainExpectedPrice(
 // the number this returns is what Resolve actually charges for that
 // worker, so every place that shows or charges a wage, this function,
 // payWages, and the Pending Payroll preview in phases/WorkerMgmt.tsx,
-// must all read from here rather than re deriving the formula themselves.
+// must all read from here rather than derive the formula again themselves.
 // Root cause of the Master's Apprentice bug: payWages and that preview
 // used to hardcode WAGES[type] with only the Artisan's Workshop
 // surcharge, so hire_discount silently never reduced the actual wage

@@ -1,6 +1,6 @@
 {
   "name": "portmasters-2-2-parallel-release",
-  "version": "0.2.1",
+  "version": "0.4.2",
   "private": true,
   "description": "PortMasters 2.2 Parallel Release: a browser based multiplayer trading game on the maritime Silk Road. One npm project serves the site, the API and the realtime channel on a single port.",
   "engines": {
@@ -26,9 +26,7 @@
     "report:pairs": "tsx scripts/pairs.ts",
     "test:smoke": "tsx scripts/smoke/index.ts",
     "db:push": "prisma db push",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.11.1",

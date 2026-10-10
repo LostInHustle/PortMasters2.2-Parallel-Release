@@ -111,22 +111,41 @@ export function MarketPriceReference({
                         {Array.from({ length: maxRound }, (_, i) => {
                           const price = history[i];
                           if (price === undefined) {
+                            // The same footprint as a filled cell, so a
+                            // row of missing rounds reads as a row of
+                            // empty slots rather than shifting the
+                            // columns beside it.
                             return (
                               <td key={i} className="px-0.5 text-center">
-                                <span className="inline-block h-3 w-3 rounded-sm bg-black/5 dark:bg-white/5" />
+                                <span className="inline-block h-4 w-7 rounded-sm bg-black/5 dark:bg-white/5" />
                               </td>
                             );
                           }
                           const [min, max] = range;
                           const clamped = priceRatio(price, range);
                           const hue = clamped < 0.5 ? 150 : 25;
+                          // Where the price sits in its range is carried
+                          // by the fill's own lightness, and the fill is
+                          // opaque so the ink can be picked against it
+                          // rather than against a tint of whatever the
+                          // panel's background happens to be. White reads
+                          // on the deep half and black on the pale half,
+                          // switching where the two inks' contrast is
+                          // equal: around Y 0.18, which is lightness 0.56
+                          // on these fills. The old cell set white ink on
+                          // a half-transparent tint at seven pixels, which
+                          // is the one combination a reader can neither
+                          // resolve nor select, and the number is the
+                          // whole point of the cell.
+                          const lightness = 0.45 + clamped * 0.35;
                           return (
                             <td key={i} className="px-0.5 text-center">
                               <span
-                                className="inline-block h-3 w-5 rounded-sm font-bold text-white leading-3"
+                                className={`inline-block h-4 w-7 rounded-sm text-center text-[10px] font-bold leading-4 ${
+                                  lightness < 0.56 ? "text-white" : "text-black"
+                                }`}
                                 style={{
-                                  backgroundColor: `oklch(0.55 0.12 ${hue} / ${0.4 + clamped * 0.5})`,
-                                  fontSize: "7px",
+                                  backgroundColor: `oklch(${lightness.toFixed(3)} 0.12 ${hue})`,
                                 }}
                                 title={`R${i + 1}: ${price} Gold (range ${min} to ${max})`}
                               >

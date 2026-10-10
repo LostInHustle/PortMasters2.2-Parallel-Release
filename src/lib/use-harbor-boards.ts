@@ -463,7 +463,7 @@ export function useHarborBoards({
   // above take nothing, because the two frames it listens for are writes to
   // this captain's own save: the settled view is the path they sail on, and
   // the room's published switch is applied to their own purse and manifest,
-  // which is the same shape useMaroon's result hand-out takes.
+  // which is the same shape useMaroon's result handoff takes.
   const draft = usePathDraft(socket, roomId, meId, act);
 
   return {

@@ -7,9 +7,9 @@
 //
 // The plan names none of these. It says the crew eats, that the Larder is a
 // plain number, and that a shortage costs cargo capacity and slows crafting,
-// and it leaves every magnitude to the build. So these are the opening tune,
-// which is exactly the shape [B2] left its own clocks in: one place to edit,
-// and a comment saying so rather than a number pretending to be derived.
+// and it leaves every magnitude to the build. So these are the opening tune:
+// one place to edit, and a comment saying so rather than a number pretending
+// to be derived.
 //
 // They are set against the ladder the rest of the economy already runs on.
 // An easy voyage is eight legs with a fifteen Gold maintenance fee a leg and

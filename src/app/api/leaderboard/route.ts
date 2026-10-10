@@ -29,9 +29,7 @@ export async function GET() {
     take: 100,
   });
 
-  // Every column the board prints, and nothing else. A `totalCrowns` used
-  // to be summed here from parseStatsByDifficulty and then left out of the
-  // entry, so the route paid for a parse whose result nothing ever sent.
+  // Every column the board prints, and nothing else.
   const entries = rows.map((r) => ({
     userId: r.userId,
     displayName: r.user.displayName,

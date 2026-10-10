@@ -258,15 +258,15 @@ export const LEG_PHASE_ORDER: readonly LegPhase[] = (
 ).filter((phase) => PHASE_FACES[phase].leg) as LegPhase[];
 
 // Every phase value the engine has ever persisted, mapped to what it is
-// called now. The six above landed with [B1], which renamed the whole
-// vocabulary, so a save or a room row written before it holds one of these
-// and has to keep sailing: a captain in the middle of a voyage when the
-// release lands is reading a save with a phase of `3` in it, and a save
-// that cannot be placed is a voyage that cannot be resumed.
+// called now. The six above renamed the whole vocabulary, so a save or a
+// room row written before the rename holds one of these and has to keep
+// sailing: a captain in the middle of a voyage when the release lands is
+// reading a save with a phase of `3` in it, and a save that cannot be
+// placed is a voyage that cannot be resumed.
 //
 // The numbers are the engine's original stations, kept in the order they
 // were numbered so the table reads as its own history. The two strings are
-// the checkpoints B1 folded into the phases they now happen inside:
+// the checkpoints folded into the phases they now happen inside:
 // bartering happens in Parley, artisan management happens in Market.
 const LEGACY_PHASES: Record<string, Phase> = {
   "0": "harbor",

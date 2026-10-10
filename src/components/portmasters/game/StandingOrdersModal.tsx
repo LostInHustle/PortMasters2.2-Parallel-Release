@@ -325,7 +325,7 @@ export function StandingOrdersModal({
             Standing orders
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Instructions your seat follows when the room&apos;s clock plays it
+            Instructions your seat follows when the harbor&apos;s clock plays it
             while you are not standing at it.
           </DialogDescription>
         </DialogHeader>
@@ -333,7 +333,7 @@ export function StandingOrdersModal({
         <div className="max-h-[62vh] space-y-4 overflow-y-auto pm-scroll pr-1">
           <OrderRow
             title="Follow these orders"
-            hint="When the room's clock runs a phase out and you have not acted, your seat is played by what is written here instead of by the engine's own defaults. Turn this off and every seat goes back to being played the way it was before this panel existed. Nothing written below is lost either way."
+            hint="When the harbor's clock runs a phase out and you have not acted, your seat is played by what is written here instead of by the engine's own defaults. Turn this off and every seat goes back to being played the way it was before this panel existed. Nothing written below is lost either way."
             checked={orders.enabled}
             onChange={(next) => set({ enabled: next })}
           />

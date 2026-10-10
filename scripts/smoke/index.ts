@@ -9,11 +9,17 @@
 //
 // Start the app first, then in another terminal:
 //
-//   npm run dev
-//   npm run test:smoke
+//   PHASE_CLOCK=1 npm run dev
+//   PHASE_CLOCK=1 npm run test:smoke
 //
-// Point it somewhere else with SMOKE_BASE_URL, for example
-// SMOKE_BASE_URL=http://localhost:8099 npm run test:smoke
+// PHASE_CLOCK=1 is set on both lines on purpose: the clock suites need
+// the server under test to be timing its legs, and the run reads the
+// same variable to know which clock it is checking, so one shell
+// exports it for both.
+//
+// Point it somewhere else with SMOKE_BASE_URL, keeping the clock
+// variable on the run, for example
+// PHASE_CLOCK=1 SMOKE_BASE_URL=http://localhost:8099 npm run test:smoke
 //
 // This file is the order, the setup and the teardown, and nothing else.
 // Each article of the run lives in ./suites, which is handed what it reads
@@ -36,17 +42,17 @@ import type { SmokeRun } from "./run";
 import { signedInCaptainSuite } from "./suites/01-signedInCaptain";
 import { lobbyKeepsItsMessagesSuite } from "./suites/02-lobbyKeepsItsMessages";
 import { harborSquareSuite } from "./suites/03-harborSquare";
-import { openingAndJoiningASuite } from "./suites/04-openingAndJoiningA";
+import { openingAndJoiningAHarborSuite } from "./suites/04-openingAndJoiningAHarbor";
 import { realtimeChannelSuite } from "./suites/05-realtimeChannel";
-import { seeingEachOtherSSuite } from "./suites/06-seeingEachOtherS";
-import { detailPopupSQuestionSuite } from "./suites/07-detailPopupSQuestion";
-import { recoveringASessionAfterSuite } from "./suites/08-recoveringASessionAfter";
+import { seeingEachOthersLiveDataSuite } from "./suites/06-seeingEachOthersLiveData";
+import { detailPopupsQuestionSuite } from "./suites/07-detailPopupsQuestion";
+import { recoveringASessionAfterAReloadSuite } from "./suites/08-recoveringASessionAfterAReload";
 import { quickStartPairingSuite } from "./suites/09-quickStartPairing";
 import { conversationTheVoyageKeepsSuite } from "./suites/10-conversationTheVoyageKeeps";
 import { muteAndTheReportSuite } from "./suites/11-muteAndTheReport";
 import { inboundBudgetSuite } from "./suites/12-inboundBudget";
 import { barteringFromAnywhereSuite } from "./suites/13-barteringFromAnywhere";
-import { captainSExchangeInSuite } from "./suites/14-captainSExchangeIn";
+import { theCaptainsExchangeInItsOwnPhaseSuite } from "./suites/14-theCaptainsExchangeInItsOwnPhase";
 import { wipingTheVoyageSuite } from "./suites/15-wipingTheVoyage";
 import { operatorConsoleSuite } from "./suites/16-operatorConsole";
 import { actingOnASelectionSuite } from "./suites/17-actingOnASelection";
@@ -97,6 +103,8 @@ import { theStatusConventionSuite } from "./suites/61-theStatusConvention";
 import { theMutesAndTheKeysSuite } from "./suites/62-theMutesAndTheKeys";
 import { theWayOutSuite } from "./suites/63-theWayOut";
 import { theFirstVoyageSuite } from "./suites/64-theFirstVoyage";
+import { theHousesAndTheAgesSuite } from "./suites/65-theHousesAndTheAges";
+import { theCrewAndTheLarderSuite } from "./suites/66-theCrewAndTheLarder";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -179,14 +187,17 @@ async function main(): Promise<void> {
       quaySocket,
     });
     console.log("\nOpening and joining a harbor");
-    const openingAndJoiningA = await openingAndJoiningASuite({ guest, host });
-    roomId = openingAndJoiningA.roomId;
-    const { code } = openingAndJoiningA;
+    const openingAndJoiningAHarbor = await openingAndJoiningAHarborSuite({
+      guest,
+      host,
+    });
+    roomId = openingAndJoiningAHarbor.roomId;
+    const { code } = openingAndJoiningAHarbor;
     console.log("\nThe realtime channel");
     const realtimeChannel = await realtimeChannelSuite(run, { guest, host });
     const { guestSocket, hostSocket } = realtimeChannel;
     console.log("\nSeeing each other's live data");
-    const seeingEachOtherS = await seeingEachOtherSSuite({
+    const seeingEachOthersLiveData = await seeingEachOthersLiveDataSuite({
       ashoreSocket,
       guest,
       guestSocket,
@@ -195,9 +206,9 @@ async function main(): Promise<void> {
       quaySocket,
       roomId,
     });
-    const { guestToken, hostId } = seeingEachOtherS;
+    const { guestToken, hostId } = seeingEachOthersLiveData;
     console.log("\nThe detail popup's question and answer");
-    await detailPopupSQuestionSuite(run, {
+    await detailPopupsQuestionSuite(run, {
       guest,
       guestSocket,
       guestToken,
@@ -206,7 +217,7 @@ async function main(): Promise<void> {
       roomId,
     });
     console.log("\nRecovering a session after a reload");
-    await recoveringASessionAfterSuite({ guest, roomId });
+    await recoveringASessionAfterAReloadSuite({ guest, roomId });
     console.log("\nQuick Start pairing");
     const quickStartPairing = await quickStartPairingSuite({
       guestSocket,
@@ -244,7 +255,7 @@ async function main(): Promise<void> {
     });
     const { guestId } = barteringFromAnywhere;
     console.log("\nThe Captain's Exchange in its own phase");
-    await captainSExchangeInSuite({
+    await theCaptainsExchangeInItsOwnPhaseSuite({
       guest,
       guestId,
       guestSocket,
@@ -510,6 +521,20 @@ async function main(): Promise<void> {
     // either and sits with them ahead of the ready check.
     console.log("\nThe first voyage");
     await theFirstVoyageSuite();
+    // [HYG-5] The houses' article is the first of the two coverage
+    // articles the audit's hygiene finding asked for: it signs up one
+    // captain of its own for the account level pledge and reads the two
+    // boards through their routes, so it sits apart from the pure cluster
+    // above, and the ready check stays last.
+    console.log("\nThe Houses and the Ages");
+    await theHousesAndTheAgesSuite(run);
+    // [HYG-5] The crew and the Larder's article is the finding's second
+    // half and the wage article's sibling: one state walked in process
+    // from its first hire to its last dismissal, so it opens no harbor
+    // either, and it sits beside the houses because the two close the one
+    // finding together ahead of the ready check.
+    console.log("\nThe crew and the Larder");
+    await theCrewAndTheLarderSuite();
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the room has to be
     // watched through, so it is the last thing the run does and it opens a

@@ -264,7 +264,7 @@ export function resetEscortLeg(state: GameState): void {
  * "id:fee" or "id:claim" and a second call with the same key does nothing.
  *
  * Returns whether the state changed, which is what the React layer uses to
- * decide whether it owes the captain a re-render rather than to read the
+ * decide whether it owes the captain a fresh render rather than to read the
  * ledger itself.
  */
 export function applyEscortSide(

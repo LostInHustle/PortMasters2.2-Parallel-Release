@@ -47,24 +47,30 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 | `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                    |
 | `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                   |
 | `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file          |
+| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice       |
 | `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size             |
 | `npm run report:gates`      | Prints the plan's sixteen launch gates over the last three hundred voyages, with the ship decision  |
 | `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                     |
+| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save               |
+| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close              |
+| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                  |
 | `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                            |
 | `npm run db:generate`       | Regenerates the database client after a schema change                                               |
-| `npm run db:migrate`        | Creates a versioned migration instead of pushing straight to the file                               |
-| `npm run db:reset`          | Drops the database and rebuilds it from scratch                                                     |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
+
+Schema changes travel through `db:push` alone. There is no `prisma/migrations` history in this repository, and a versioned migration would not be applied by the host either; `docs/RELEASE_NOTES.md` says why under Where the two repositories differ outside the game.
 
 The smoke test needs a server that is already running. To check a production build instead of a development one:
 
 ```bash
 npm run build
-npm start
+PHASE_CLOCK=1 npm start
 # in a second terminal
-npm run test:smoke
+PHASE_CLOCK=1 npm run test:smoke
 ```
+
+Both lines carry `PHASE_CLOCK=1` on purpose, and it is the same value on both rather than only on the server: the clock suites need the server under test to be timing its legs, and the run reads the same variable to know which clock it is checking, so it is set on the run as well. A server you simply play on leaves it unset.
 
 Point it elsewhere with `SMOKE_BASE_URL`, which is how it checks a server that is not sitting on 8080.
 
@@ -115,7 +121,7 @@ Each House carries one small passive perk, applied when a fresh voyage starts an
 
 Captains trade goods and Gold directly, on two surfaces that share one board. An offer can be open to the whole harbor or aimed at one named captain, and it is real room state rather than a message, so the goods behind it are escrowed the moment it is posted and come back to the poster if it is withdrawn or swept.
 
-The Captain's Exchange is the first surface, and it stands open for the whole Bartering phase of every round, to every captain aboard, from their first voyage. The harbor chat carries the second one, which is where flexible bartering lives, and that is the surface that is earned rather than given.
+The Captain's Exchange is the first surface, and it stands open for the whole Parley of every round, to every captain aboard, from their first voyage. The harbor chat carries the second one, which is where flexible bartering lives, and that is the surface that is earned rather than given.
 
 Flexible bartering opens at Renown level 10. Both captains have to be at that level, because a trade is only ever as good as what the other side can put up, and the allowance is one completed trade a voyage. At level 15 it becomes two. Posting is free and unlimited while any of the allowance is left, so a captain can advertise the same intent on the shared board and in a private thread at once and take whichever answer arrives first. Only a completed trade spends anything.
 
@@ -181,7 +187,7 @@ Solo practice is built in as well. A captain can set sail alone, which is the ea
 
 This is PortMasters 2.2 Parallel Release, a build of its own rather than a patched copy of the one before it. That earlier build is [PortMasters 2 Parallel Release](https://github.com/LostInHustle/PortMasters2-Parallel-Release), which is where the multiplayer game as it exists today was designed. If you have sailed that one, nothing you learned there is wrong here.
 
-Every system of the earlier build is still here and still working the same way, and six more are built on top of it. The release notes open with the side by side table of the two builds, from the shipped harbor systems to the measured module counts, and state the rule those counts are re-measured under whenever a pass adds or removes a file.
+Every system of the earlier build is still here and still working the same way, and six more are built on top of it. The release notes open with the side by side table of the two builds, from the shipped harbor systems to the measured module counts, and state the rule those counts are measured again under whenever a pass adds or removes a file.
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
 
@@ -272,7 +278,7 @@ The shared HTTP surface is deliberately narrow. Cross origin socket access is sw
 | `src/lib`                    | The client hooks, the REST helpers and the session and realtime plumbing    |
 | `src/server`                 | The realtime layer and the environment bootstrap                            |
 | `prisma`                     | The database schema                                                         |
-| `scripts`                    | The end to end smoke test                                                   |
+| `scripts`                    | The build gates and the end to end smoke battery                            |
 | `docs`                       | The release notes for 2.2 plus the design notes and the analysis            |
 | `next.config.ts`             | The Next.js settings, including which hosts may load development resources  |
 | `railway.json`               | The host configuration: build, start, healthcheck and the volume guard      |

@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
  * The previous value and the editing flag are stored as state (not refs) so
  * the draft can be adjusted during render via the React documented pattern
  * for "reset state when a prop changes" (see
- * https://react.dev/learn/you-might-not-need-an-effect#resetting all state when a prop changes).
+ * https://react.dev/learn/you-might-not-need-an-effect#resetting-state-when-a-prop-changes).
  * That keeps the field from yanking itself out from under someone mid edit
  * without either a setState in effect (cascading renders) or a ref read in
  * render (forbidden by the react-hooks/refs rule).

@@ -653,7 +653,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
       const ordered = settled.milestoneOffers.join() === "cold_leg,renown_rung";
       // The two tables can overlap on a card (a moment deals from the
       // family, not from a private shelf), so the count that proves the
-      // re-entry is quiet is the whole tally held still rather than any
+      // second entry is quiet is the whole tally held still rather than any
       // one card's number.
       const talliedOnce = JSON.stringify(settled.cardTally);
       noteSettlementMilestones(settled, settleLogs);

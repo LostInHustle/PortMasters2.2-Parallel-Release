@@ -31,7 +31,6 @@ export function statusFrame(roomId: string, game: GameState) {
     phaseLabel: phaseLabel(game),
     gold: game.money,
     reputation: game.score,
-    shipLevel: game.shipLevel,
     gameOver: game.gameOver,
     renownLevel: game.renownLevel,
     bankrupt: game.bankrupt,

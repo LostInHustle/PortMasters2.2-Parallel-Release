@@ -36,7 +36,7 @@ export function CargoHold({
   const cargoResources = unlockedResources(game.difficulty, game.currentRound);
   const cargoProducts = unlockedProducts(game.difficulty, game.currentRound);
   // Only what is aboard is drawn. A good a captain does not hold is a row
-  // their eye re-reads to learn nothing, and printing every unlocked good
+  // their eye reads again to learn nothing, and printing every unlocked good
   // at zero would be a column of nothing said eleven times on a rail that
   // counts its rows. The Hold Value estimator and the composition bar below
   // draw nothing at zero too, which is the same reading applied to the rows.

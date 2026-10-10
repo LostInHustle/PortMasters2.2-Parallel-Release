@@ -26,7 +26,7 @@ import { PUBLIC_USER_SELECT, type PublicUser } from "./db";
 // The parameter is structural rather than a Prisma type, so a caller whose
 // row came back with a select projection or with extra columns is not
 // turned away for it.
-export type MessageRow = {
+type MessageRow = {
   id: string;
   content: string;
   createdAt: string;

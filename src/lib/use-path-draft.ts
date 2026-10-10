@@ -37,6 +37,7 @@ import type { Socket } from "socket.io-client";
 import { applyDraftPath, applyPathSwitch } from "@/lib/game/engine";
 import { normalizePath, type PathId } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
+import { refusedForRoom } from "@/lib/refusals";
 
 // The events this feature speaks on, named in one place for the reason the
 // bazaar's and the two consent boards' own channels are.
@@ -150,8 +151,9 @@ export function usePathDraft(
       }
     };
     const onDraftError = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId || typeof data.error !== "string") return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (err === null) return;
+      setError(err);
     };
     // The room's one publication, read for the one name that is this
     // captain's. The path is read through normalizePath rather than asserted
@@ -169,8 +171,9 @@ export function usePathDraft(
       act((g, l) => applyPathSwitch(g, path, l));
     };
     const onSwitchError = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId || typeof data.error !== "string") return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (err === null) return;
+      setError(err);
     };
     // The hand lives in the server's process and nowhere else, so a socket
     // that drops mid draft and comes back has to ask again: the reconnect is

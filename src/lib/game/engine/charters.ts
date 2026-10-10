@@ -9,7 +9,7 @@
 // queued:
 //
 //   - The guards come first, and both of them are refusals rather than
-//     quiet no-ops: the moment has to be pending (the switch on, a path
+//     quietly doing nothing: the moment must be pending (the switch on, a path
 //     held, the leg reached, no answer given) and the card has to be one
 //     of the three the moment is dealing, so a stale click or a hand
 //     made frame is refused rather than trusted. Idempotence falls out
@@ -26,7 +26,7 @@
 //
 //   - The tally is the deviation from F4 worth writing down. A
 //     milestone's table is counted where it is armed, because arming
-//     happens once and the screen re-renders; a charter's trio is
+//     happens once and the screen renders again; a charter's trio is
 //     derived rather than armed, so there is no arm moment to count at,
 //     and the three offers are counted here, at the answer. What the
 //     counter therefore reads is answered trios rather than trios

@@ -13,7 +13,7 @@ import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
  * state and the same offer row four times over: eighteen shared JSX and
  * class lines pairwise between the escort, module and refit panels alone,
  * with the wrapper, the heading, the form block, the error block, the
- * empty state and the row button cluster byte-identical. Three copies of
+ * empty state and the row button cluster byte for byte. Three copies of
  * a row is three chances for one desk's accept button, blocked note or
  * cancel press to drift from the next, which is the same defect
  * PathDeskRow was extracted to end one layer down.
@@ -80,29 +80,6 @@ export function MarketBlock({
     >
       {children}
     </div>
-  );
-}
-
-/**
- * Where a desk's socket refusals land: the message and the Dismiss press,
- * one block for all four markets, so a refusal reads the same at every
- * desk it can arrive at.
- */
-export function MarketError({
-  error,
-  onDismiss,
-}: {
-  error: string | null | undefined;
-  onDismiss: () => void;
-}) {
-  if (!error) return null;
-  return (
-    <p className="text-center text-[11px] text-alarm mb-2">
-      {error}{" "}
-      <button type="button" onClick={onDismiss} className="underline">
-        Dismiss
-      </button>
-    </p>
   );
 }
 

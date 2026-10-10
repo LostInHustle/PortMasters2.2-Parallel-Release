@@ -216,7 +216,7 @@ export type Worker = {
 // members faster than they can provision is losing them sooner in the
 // voyage, and the two numbers together say so. Exported because the
 // voyage's end reads the list back out of the save blob, and a reader that
-// re declared the shape would be reading a different shape the first time
+// redeclared the shape would be reading a different shape the first time
 // this one gained a field.
 export type CrewLoss = { name: string; round: number };
 
@@ -340,7 +340,7 @@ export function normalizeLoans(raw: unknown): Loan[] {
 // [H2: the fleet commission] One leg's worth of the harbor's objective
 // total, as a captain's own client last watched it. Exported because the
 // voyage's end reads these back out of the save blob and writes them onto
-// the Chronicle row, and a reader that re-declared the shape would be
+// the Chronicle row, and a reader that declared it again would be
 // reading a different shape the first time this one gained a field.
 export type ObjectiveTraceEntry = {
   round: number;
@@ -654,7 +654,7 @@ export type GameState = {
   // voyage's public objective so far, by good, cumulative for the voyage.
   // This is the captain's own contribution and not the harbor's total: the
   // total is transient server state (see src/server/realtime/objective.ts)
-  // and this is the record a reload or a server restart re-reports from.
+  // and this is the record a reload or a server restart reports from.
   // Ocean Gambit only, and empty in Classic, where no objective is drawn.
   objectiveDelivered: Record<string, number>;
   // [H2: the fleet commission] The harbor's total as this captain watched
@@ -676,6 +676,13 @@ export type GameState = {
   // records the same lines harmlessly: nothing reads them and no client
   // broadcasts them.
   orderFills: OrderFill[];
+  // The largest reward a single order has paid this captain, kept as a
+  // running maximum at the moment an order settles (see fillOrder in
+  // ./engine/orders) rather than derived later, because the net reward is a
+  // local the settlement has already spent. Read back by the voyage
+  // Chronicle's "largest single trade" line (see ./chronicle and the extras
+  // reader in the conclusion finishers), which is its only reader.
+  largestTrade: number;
   // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
   // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
   // game:status handler in src/server/realtime/wiring/status-heartbeat.ts,
@@ -710,7 +717,7 @@ export type GameState = {
   equippedModules: CardRecord[];
   // Each round's boon and module draft pools, fixed once rolled (see
   // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
-  // draft screen, backing out, or reloading the page never re rolls them.
+  // draft screen, backing out, or reloading the page never rerolls them.
   // The only way to get a new pool mid round is the corresponding swap
   // action below, each capped at one use per round.
   boonChoices: CardRecord[];
@@ -730,7 +737,7 @@ export type GameState = {
   // [F4: boons at milestone moments] The voyage's held boons, the moments
   // waiting for an answer, and the marks of what has been answered, all
   // three personal to this captain and none of them crossing a wire. The
-  // held list is the cards themselves, by id, so a reload re-reads their
+  // held list is the cards themselves, by id, so a reload reads their
   // flags off the pool rather than trusting a saved map (see
   // heldFlagsOf in ./held-cards), which is exactly the rollback path the
   // plan asks for: a card the pool no longer knows drops out at load and
@@ -747,7 +754,7 @@ export type GameState = {
   milestonesAnswered: Partial<Record<MilestoneTrigger, number>>;
   // [F6: charters at leg four] The one charter this voyage chose, or null
   // before the moment is answered. An id rather than a record, for the
-  // reason heldBoons is a list of ids: a reload re-reads its flags off
+  // reason heldBoons is a list of ids: a reload reads its flags off
   // the pool rather than trusting a saved map (see heldCharterCard in
   // ./held-cards), so the content revert the plan names for the rollback
   // ("a charter is a modifier set on the captain for the voyage, so it
@@ -940,7 +947,7 @@ function initialInventory(): Record<string, number> {
 // lands on "this has not happened yet" rather than on a lap that reads as
 // already spent.
 //
-// Every save-healing reader that turns a stored stamp into a round uses this
+// Every reader that heals a stored stamp into a round uses this
 // one function: the Larder's fed and spoil rounds, the crew's hungry legs,
 // the wardrobe's tick round, the refit leg stamp (itself written once for
 // two fields), and the opportunist's borrow count. Each reader keeps its own
@@ -1181,6 +1188,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     objectiveDelivered: {},
     objectiveTrace: [],
     orderFills: [],
+    largestTrade: 0,
     tidewatchSurge: false,
     equippedModules: [],
     boonChoices: [],

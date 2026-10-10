@@ -90,7 +90,7 @@ reader because a suite reading rows back is a test of the module rather than
 a second production reader, the rules were narrowed to `src/` where they are
 about what the product ships, and word matching was replaced with shape
 matching after the first draft reported four clean broadcasts as leaks
-because "ally" appears inside "finally". It was then proved non-vacuous: a
+because "ally" appears inside "finally". It was then proved not to be vacuous: a
 probe file violating all five rules was written, the scan reported 9 findings
 and exited 1, and the probe was deleted in the same command.
 
@@ -99,7 +99,7 @@ first pass's proof: a probe file that delivered the roster frame to a room was
 written, the scan named the file and the line, reported 1 finding, exited 1,
 and the probe was deleted in the same command, after which the scan read the
 tree clean again. The rule keys on the event name at an emit statement plus an
-allow list of per-recipient emitters, rather than on the mute field riding
+allow list of emitters that reach one recipient, rather than on the mute field riding
 beside it, because the defect it guards is not a payload that mentions the
 list: it is the frame losing the captain it was addressed to.
 
@@ -111,7 +111,7 @@ which the scan read the tree clean again. The rule is deliberately the sixth
 rule's shape, because the thing being sent is the same kind of thing: a
 frame whose audience is its privacy. It keys on the emit statement rather
 than on the event name alone so that the four allowed delivery sites (the two
-named per-recipient emitters, a reply on the asking socket, and a
+named emitters that reach one recipient, a reply on the asking socket, and a
 `to(socket.id)` send, which is the same single recipient spelled the long
 way) pass on their spelling rather than on their intent.
 
@@ -341,7 +341,7 @@ These are not defects and were not fixed. Each has a reason, and the reason
 is what a later reviewer should test rather than the fix.
 
 **The engine is client authoritative.** A captain's own voyage is theirs to
-compute, and the server does not re simulate it. The consequence is that a
+compute, and the server does not resimulate it. The consequence is that a
 modified client can play a voyage it could not have played, and the answer in
 this tree is not prevention but consequence: the integrity pass marks the
 row, the voyage conclusion reads the mark, and features that later read
@@ -349,7 +349,12 @@ standings can decline to trust it.
 
 **The `game:status` allow list.** The heartbeat accepts a named set of
 fields, so a client cannot write arbitrary JSON into a broadcast. The list is
-the boundary: everything else a client sends on that event is dropped.
+the boundary: everything else a client sends on that event is dropped. The
+round inside it is bounded as well as typed: it is read against the voyage's
+own length before a report can move the checkpoint (`namesALegOfTheVoyage`,
+`src/server/realtime/wiring/status-heartbeat.ts`), so a frame naming a leg
+the voyage does not have, whether from a stale build or a modified client,
+leaves the room where it stands.
 
 **Two room wide carriers of a secret, both deliberate.**
 `voyage:reveal` (`src/server/realtime/reveal.ts:40`) publishes every card at
@@ -481,7 +486,7 @@ tables and the windows in which those tables are watched. A third mode with
 its own private channel would need its own table.
 
 **The sixth rule reads an event name.** It matches `"room:members"` at an emit
-statement and allows an explicit list of per-recipient emitters, so an event
+statement and allows an explicit list of emitters that reach one recipient, so an event
 name reached through a variable holding it passes, and so would a roster frame
 sent through some other addressed emitter nobody has written yet. It guards
 the regression it was written for rather than proving no second path exists,
@@ -489,7 +494,7 @@ which is the same gap rule 4 has and is written down for the same reason.
 
 **The eighth rule reads an event name, and its gap is the sixth rule's.** It
 matches `"bazaar:update"` at an emit statement and allows an explicit list of
-per-recipient emitters, one spelling wider than the seventh rule's because two
+emitters that reach one recipient, one spelling wider than the seventh rule's because two
 files deliver this frame rather than one, so an event name reached through a
 variable holding it passes, which is how the client's own hook names it, and
 so would a board sent through some other addressed emitter nobody has written

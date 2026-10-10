@@ -210,7 +210,7 @@ export {
 // pathSwitchBlocked is exported because two callers ask it the same
 // question and they have to agree: the panel that offers the switch, and
 // the frame handler that applies it when the room publishes one, so a
-// switch that arrives twice is a no-op rather than a second fee.
+// switch that arrives twice costs nothing rather than a second fee.
 // pathSwitchOpenLine is the "when" half of that same guard, exported on
 // its own because the third caller is across the wire: the room refuses a
 // switch outside the window before it publishes one (see the path:switch
@@ -265,9 +265,12 @@ export {
   assignTask,
   fireWorker,
   hireWorker,
+  maintenanceDue,
   payMaintenance,
   payWages,
+  payrollIndex,
   wageBill,
+  wagesDue,
 } from "./engine/workers";
 
 // ========== A seat that failed ==========
@@ -284,12 +287,12 @@ export {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
-  // [F7: the power budget] The yard's draft-or-not question, forwarded
+  // [F7: the power budget] Whether the yard can draft at all, forwarded
   // for the reason the rest of this block is: the Shipyard panel asks it
   // before the Draft button, and the answer has to be the roll's own
   // predicate rather than a second guess written at the button.
   moduleDraftPossible,
-  // The draft's swap-or-not question, forwarded for the same reason: the
+  // Whether the draft can swap at all, forwarded for the same reason: the
   // swap button asks it before the press, and the answer has to be the
   // reroll's own predicate rather than a second guess written at the
   // button.
@@ -329,8 +332,8 @@ export {
 // is exported for the three callers that judge a status rather than carry
 // one: the busy rule, the escort's cover mirror and the client relay that
 // reports a settled row. The client layer reads consentFeeFor for the form a
-// seller types into, and floorTallies, movementApplied and
-// normalizeConsentLedger at the load site, where a save is healed.
+// seller types into, and normalizeConsentLedger at the load site, where a
+// save is healed.
 //
 // The type is the other half of the export and the more important one: both
 // ends of the wire import ConsentTerms from here rather than each declaring
@@ -342,9 +345,6 @@ export {
   consentPartyBusy,
   consentSettled,
   expireConsent,
-  floorTallies,
-  markMovement,
-  movementApplied,
   normalizeConsentLedger,
   resetConsentLedger,
   visibleConsent,
@@ -386,7 +386,7 @@ export {
 // what a path looks like.
 //
 // canPayEscortFee was here as well and is now ./core's canPayFee, forwarded
-// from the core re-export above: the escort asked the purse question first,
+// from the core export above: the escort asked the purse question first,
 // the module market and the refit bench asked it again in their own words,
 // and one comparison in one place is worth more than three beside their own
 // fees.
@@ -448,7 +448,7 @@ export {
 // a module id is the one thing about a listing it can check without
 // reading anybody's save; the client layer that owns a captain's side of
 // an agreement reads applyModuleTradeSide, which is both the seller's
-// automatic unequip the plan asked for and the buyer's pay-then-bolt-on.
+// automatic unequip the plan asked for and the buyer's pay, then bolt on.
 //
 // normalizeModuleTradeState is the load site's, healing the tally this
 // build added, and the two traffic readers are the plan's second
@@ -555,14 +555,14 @@ export {
 // The departures are deliberately not forwarded: completeOrders,
 // finishSettlement and skipUpgrade are private to ./engine/lifecycle.ts.
 // Every panel reaches the spine through nextPhase or lockInBoon, and
-// re-exporting one of the three would give the engine a second route
+// exporting one of the three again would give the engine a second route
 // around the lap.
 //
 // The same goes for the per phase enter and complete steps further up
 // this file: completeMarket, startOrders, completeParley and selectBoon
 // are each called by ./engine/lifecycle.ts and nothing else, and it
 // reaches them through their own submodules rather than through here.
-// Re-exporting a step whose only caller is the spine is what made the
+// A second export of a step whose only caller is the spine is what made the
 // second route possible in the first place, so they stay off the public
 // surface. A caller outside ./engine/ advances a voyage with nextPhase
 // and never by naming a step.
@@ -593,10 +593,14 @@ export {
 } from "./engine/lifecycle";
 
 // ========== Cross file lookups hosted in constants/reputation.ts ==========
-// merchantRatingForScore and the MERCHANT_RATINGS table it scans live in
-// ./constants/reputation beside each other. Forwarded through the same
-// barrel so the files importing `@/lib/game/engine` keep one entry point.
-export { merchantRatingForScore } from "./constants/reputation";
+// merchantRatingForScore, endgameRatingFor and the MERCHANT_RATINGS table
+// they scan live in ./constants/reputation beside each other. Forwarded
+// through the same barrel so the files importing `@/lib/game/engine` keep
+// one entry point.
+export {
+  merchantRatingForScore,
+  endgameRatingFor,
+} from "./constants/reputation";
 
 // ========== Manifest feature modules ==========
 // New engine modules layered on top of the faithful port, each owned by

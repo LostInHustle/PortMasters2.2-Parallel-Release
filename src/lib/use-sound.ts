@@ -190,7 +190,7 @@ export function useSound() {
       }
     };
     // volumeScale is derived from volume, so we depend on volume here
-    // to re ramp the gain when the slider moves. But we do NOT want to
+    // to ramp the gain again when the slider moves. But we do NOT want to
     // tear down and rebuild the whole ambient bed on every volume
     // change, so we handle volume changes in a separate effect below.
   }, [enabled]);

@@ -84,6 +84,34 @@ export const NOT_A_ROOM_MEMBER = "Not a member of that room";
 // form on the boards and the one on a chat: the good offered and the good
 // asked for cannot be the same.
 export const SAME_ITEM_OFFER = "Pick two different items to barter.";
+// The barter composer's own parts, shared by the same two surfaces for the
+// same reason: the four fields of the form on the boards and the one on a
+// chat carry one set of labels, and a label that drifted would name one
+// control two things depending on where the form was opened.
+export const OFFER_GIVE_LABEL = "I'll give";
+export const OFFER_POST_LABEL = "🤝 Post Offer";
+export const OFFER_TARGET_LABEL = "Direct this offer to a specific captain";
+export const OFFER_GIVE_AMOUNT_LABEL = "Amount to offer";
+export const OFFER_GIVE_ITEM_LABEL = "Item to offer";
+export const OFFER_WANT_AMOUNT_LABEL = "Amount to request";
+export const OFFER_WANT_ITEM_LABEL = "Item to request";
+// The warning the composer shows over a draft that offers more of a good
+// than the hold carries, written as a sentence rather than assembled at
+// each call site so the two surfaces cannot quote different figures.
+export function offerOverdrawLine(owned: number, item: string): string {
+  return `You only have ${owned} ${item}.`;
+}
+// The sentence a muted captain reads, once for both surfaces that carry it:
+// the composer that swaps its input for it, and the toast that answers a
+// stale tab's press after the mute has landed.
+export const MUTED_NOTICE =
+  "The host has muted you in the harbor chat for the rest of this voyage.";
+// The departure button's label, shared by the control bar and the harbor
+// screen's own start button: two spellings of one action on two screens of
+// one room is how a table learns to distrust the pair. The solo labels
+// stay distinct on purpose, because a harbor of one is practicing rather
+// than racing, and both screens say so.
+export const START_VOYAGE = "Start the Voyage";
 export const RENOWN_BONUS_LINE =
   "Each Renown level grants a small Gold bonus at the start of your next fresh voyage";
 // The refusal a wire answers when the captain it was aimed at is not
@@ -104,7 +132,7 @@ export function consentFeeRule(): string {
 export function feeShortfallLine(hold: number, fee: number): string {
   return `A fee is paid at the handshake and you hold ${hold} Gold: this offer costs ${fee}.`;
 }
-// The escort desk's offer-death rule: one sentence for the intro that is
+// The escort desk's rule for dead offers: one sentence for the intro that is
 // always drawn, the empty state and the glossary's tooltip.
 export const ESCORT_OFFER_DEATH =
   "An offer nobody takes before the Parley closes is gone.";
@@ -283,7 +311,7 @@ export function tutorialSteps(
     },
     {
       title: "🏆 What you're playing for",
-      content: `<p>After ${rounds} rounds, the captain with the highest score wins the title of <strong>Sea Master</strong>. Score comes from trade profits and fulfilled orders.</p>
+      content: `<p>After ${rounds} rounds, the captain with the highest Reputation wins the title of <strong>Sea Master</strong>. Reputation comes from trade profits and fulfilled orders.</p>
 <p>${play.failureRule}</p>
 <p>Starting gold is <strong>${cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>`,
     },
@@ -333,7 +361,7 @@ ${mandates.length ? `<p style="font-size:13px;margin-top:10px">📜 On round${ma
     },
     {
       title: "🏴‍☠️ Pirates at Resolve",
-      content: `<p>Before the bills below come due each round, ${raidCopy(cfg).toLowerCase()} Pirates find your ship and take every coin you're carrying.</p>
+      content: `<p>Before the bills below come due each round, the pirates roll for your ship. ${raidCopy(cfg)} A raid takes every coin you're carrying.</p>
 <p>You get one choice before that roll happens: hire an escort for ${escortPct(cfg)} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>
 ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.</p>` : ""}
 <div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">
@@ -366,9 +394,9 @@ ${cfg.brokerCorruption ? `<p>In these waters a broker can be corrupt. The rumor 
   <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>
   <li>Hire artisans only when you can cover <strong>two full rounds of wages</strong>.</li>
   <li>Dusk ship upgrades compound quickly. Do not skip them.</li>
-  <li>Caught short by pirates or a bad round? Ask the harbor for a loan before you assume the voyage is over.</li>
+  <li>Caught short by pirates or a bad round? When other captains are aboard, ask the harbor for a loan before you assume the voyage is over.</li>
   <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>
-  <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your run &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
+  <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your voyage &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>
 </ul>
 <div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border:2px solid var(--gain);color:var(--foreground);border-radius:8px;padding:12px;text-align:center;margin-top:14px">
   <strong style="font-size:15px">Good winds and good margins, Captain. ⚓</strong>
@@ -457,7 +485,7 @@ ${cfg.summary}
 ${play.tagline}
 ${changes}
 🚢 Objective:
-Sail one voyage of ${rounds} rounds, and finish it with the most wealth and reputation in the harbor.
+Sail one voyage of ${rounds} rounds, and finish it with the highest Reputation in the harbor.
 
 ⚖️ If Your Books Fail:
 ${play.failureRule}
@@ -488,10 +516,10 @@ ${workerLine("sachet_maker", "Sachets")}
 • You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it
 • Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it
 
-🔧 Ship Modules (NEW!):
+🔧 Ship Modules:
 • Dusk: Upgrade your ship to unlock Module Slots
 • Draft powerful modules to create unique synergies
-• Swap modules to adapt to your current run!
+• Swap modules to adapt to your current voyage!
 
 🏴‍☠️ Pirates and Escorts:
 • Resolve: ${raidCopy(cfg)} Pirates take every Gold coin you carry.
@@ -519,7 +547,7 @@ ${workerLine("sachet_maker", "Sachets")}
 • No single captain can ever fund more than ${Math.round(CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE * 100)}% of a venture's target alone: it always needs at least one other captain to fund the rest before it can fill
 
 🆘 Financial Aid:
-• Can't cover this round's wages or maintenance? Ask the harbor for a loan, right on the settlement screen
+• Can't cover this round's wages or maintenance? When other captains are aboard, ask the harbor for a loan, right on the settlement screen
 • Any captain with enough Gold can lend it to you on the spot; it's in your hands immediately
 • Repay it any time before the voyage's last round ends, or it's taken from your funds automatically and handed to your lender
 • Still short when the voyage finishes? That unpaid loan is what bankrupts you, not the round it was borrowed in

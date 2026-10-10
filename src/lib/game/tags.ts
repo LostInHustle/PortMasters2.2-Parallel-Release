@@ -90,7 +90,7 @@ export type TaggedEntry = {
 
 /**
  * Everything the rule is read against: the entries themselves, and the
- * three facts the cross-checks need, each of which is a number the tree
+ * three facts the cross checks need, each of which is a number the tree
  * already keeps somewhere other than in a tag table.
  */
 export type TaggingSubject = {
@@ -100,7 +100,7 @@ export type TaggingSubject = {
   garments: readonly string[];
   /** How many legs each pantry food stays food for, null meaning never. */
   keepings: Record<string, number | null>;
-  /** Each difficulty's raid step-up and its corrupt broker, off its record. */
+  /** Each difficulty's raid escalation and corrupt broker, off its record. */
   difficulties: Record<string, { stepsUp: boolean; corrupt: boolean }>;
 };
 

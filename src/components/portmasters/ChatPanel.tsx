@@ -7,6 +7,7 @@ import { Search, X } from "lucide-react";
 import type { GameState } from "@/lib/game/types";
 import type { BarterOffer } from "@/lib/use-barter";
 import { toast } from "sonner";
+import { MUTED_NOTICE } from "@/lib/game/constants/copy";
 import type { Barter } from "./game/phases/PhaseShared";
 import { MessageList, type StreamItem } from "./chat/MessageList";
 import { Composer } from "./chat/Composer";
@@ -142,7 +143,7 @@ export function ChatPanel({
   // Seed with initial messages if they change (e.g. switching DM target, or
   // the parent's history fetch resolving after this already mounted). Done as
   // a render time adjustment rather than in an effect: React throws away the
-  // in progress render and immediately re renders with the new state, instead
+  // render in progress, then immediately renders again with the new state, instead
   // of committing one pass and then cascading a second one, which is what an
   // effect calling setState synchronously does (react-hooks/set-state-in-effect).
   // The trigger is the conversation identity and the incoming history: a
@@ -162,7 +163,7 @@ export function ChatPanel({
     if (!socket) return;
     // Dedupe against the list itself rather than a separate ref of seen ids.
     // Returning `prev` untouched for a message already present means React
-    // bails out on the identical reference, so a duplicate costs no re render,
+    // bails out on the identical reference, so a duplicate costs no extra render,
     // and there is no parallel bookkeeping to keep in sync when the seeded
     // history changes underneath it.
     const onRoom = (data: { roomId: string; message: ChatMessage }) => {
@@ -225,7 +226,7 @@ export function ChatPanel({
     const onMuted = (data: { roomId: string }) => {
       if (mode !== "room" || data.roomId !== roomId) return;
       toast.error("You're muted", {
-        description: "The host has muted you in room chat this voyage.",
+        description: MUTED_NOTICE,
       });
     };
     socket.on("chat:room", onRoom);
@@ -245,7 +246,7 @@ export function ChatPanel({
   // Auto scroll to bottom on new messages and on a change in how many
   // offers the board holds. The count is tracked rather than the array so
   // that this only runs when the stream actually grew: depending on the
-  // board's own identity would re scroll on every broadcast and yank a
+  // board's own identity would scroll again on every broadcast and yank a
   // captain back down while they were reading further up.
   useEffect(() => {
     const el = scrollRef.current;

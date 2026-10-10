@@ -20,7 +20,7 @@ export function hasModule(state: GameState, id: string): boolean {
 // in ../constants/ships), so the top of the ladder is three slots.
 //
 // It was three copies of the same comparison before F3 needed a fourth
-// (the shipyard's own slot line, the draft's install-or-swap label and the
+// (the shipyard's own slot line, the draft's install or swap label and the
 // nudge that points a captain at an empty slot), and the reason it is a
 // reader rather than a fourth copy is what the copies already disagreed
 // about: a hull can read as over its slots, because a module trade settles

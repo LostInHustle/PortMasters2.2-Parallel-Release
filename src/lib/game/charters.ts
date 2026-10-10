@@ -88,7 +88,7 @@ export function charterDue(state: GameState): boolean {
  *
  * [F7: the power budget] The budget filter rides after the draw for the
  * reason the milestone table's does (see milestoneChoices in
- * ./milestones): this reader re-derives on every render, a peer can
+ * ./milestones): this reader derives again on every render, a peer can
  * settle a sale onto this captain's hull while the overlay is open, and
  * a filter inside the draw would land the same seed on a different card
  * the moment power moved. Drawn first and filtered second, the wildcard

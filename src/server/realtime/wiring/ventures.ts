@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import {
   computeAcceptedContribution,
   computeVentureDeadlineBounds,
+  contributorShareCap,
   parseVentureContributions,
   ventureAlreadySpentReason,
   ventureTotal,
@@ -188,10 +189,7 @@ export function wireVentures(io: Server, socket: Socket): void {
       if (accepted <= 0) {
         const atOwnShareCap =
           currentTotal < venture.targetGold &&
-          (existing?.amount ?? 0) >=
-            Math.ceil(
-              venture.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
-            );
+          (existing?.amount ?? 0) >= contributorShareCap(venture.targetGold);
         socket.emit("venture:error", {
           roomId,
           error: atOwnShareCap

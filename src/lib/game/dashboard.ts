@@ -24,9 +24,9 @@
 // dashboard can only ever be read only.
 //
 // The second is what the page owes a reader when a gate has no source.
-// Sixteen numbers are launch gates (goal I4) and most of them belong to
-// epics this tree has not read yet: the card gates are F and the
-// market gates are G. Every one of those appears below as a reading with no
+// Sixteen numbers are launch gates (goal I4) and most of them read what the
+// record does not carry yet: the card gates are F and the market gates are
+// G. Every one of those appears below as a reading with no
 // source and the epic it waits on beside it, never as a zero, because a
 // dashboard that prints 0.0% for something nobody has measured is the
 // instrument the plan warns about. What the record can already answer, it
@@ -349,7 +349,18 @@ function readBarge(records: readonly TelemetryRecord[]): BargeReadings {
 export function readDashboard(input: DashboardInput): DashboardReading {
   const { records, outcomes } = input;
 
-  const captains = records.reduce((total, r) => total + r.captains.length, 0);
+  // Distinct captains, not captain lines: the same fleet sitting through
+  // the whole window would otherwise be counted once per voyage, and a
+  // page saying eighteen hundred captains over a three hundred voyage
+  // window is counting seats rather than people. The set is built from
+  // the lines the records already carry, so a fleet that changes between
+  // voyages reads at its true size while one captain sailing twice reads
+  // once.
+  const captains = new Set(
+    records.flatMap((record) =>
+      record.captains.map((captain) => captain.userId),
+    ),
+  ).size;
   const window: DashboardWindow = {
     voyages: records.length,
     captains,
@@ -633,11 +644,11 @@ function staplesPanel(records: readonly TelemetryRecord[]): DashboardPanel {
     state: stateOf(readings),
     answer: summarize(
       readings,
-      "No gate yet: the card gates are Epic F's and the goods and Bourse gates are Epic G's, so four slots stand, and the charter gate has no path past its floor yet.",
+      "No gate yet: the card gates and the goods and Bourse gates have no source on the record, so four slots stand, and the charter gate has no path past its floor yet.",
     ),
     readings,
     gaps: [
-      "The card gates are Epic F's and the goods and Bourse gates are Epic G's, so the four gates above are slots until those epics ship.",
+      "The card gates and the goods and Bourse gates have no source on the record, so the four gates above stand as slots rather than readings.",
       "The record keeps the count of goods a leg dealt and a hold closed with, never their names, so the share of goods traded the plan asks for has no source until an event carries the identity rather than the count.",
       // [F6] How the two charter rows were read, for whoever is on balance
       // duty when one of them moves: what the split is grouped by and why

@@ -35,7 +35,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
     // database calls below, and both go on to move the room, open its
     // records and deal its table: a voyage announced twice, with the two
     // deals colliding on the alignment table's own key (see
-    // dealAlignments, whose re-read is the second line of defense here).
+    // dealAlignments, whose fresh read is the second line of defense here).
     // A claim is only a claim if it is taken before the first await, so
     // it is taken here, and everything it guards, the refusals included,
     // is answered inside the finally that releases it.
@@ -51,7 +51,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
           mode: true,
           difficulty: true,
           voyageEpoch: true,
-          createdAt: true,
+          lobbyOpenedAt: true,
         },
       });
       if (!room) return;
@@ -119,7 +119,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // this update just pinned, and synchronous so nothing a captain
       // hears below can arrive before the voyage it belongs to is being
       // recorded. A room the sampler passes over opens nothing, and
-      // every note below is then a no-op.
+      // every note below then does nothing.
       openVoyageTelemetry(room, roster);
       const cp = await getCheckpoint(roomId);
       cp.round = 1;
@@ -182,7 +182,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // voyage that did not open. It is dealt against the roster this
       // departure pinned rather than against the members as they stand a
       // minute later, because membership can change mid voyage and a deck
-      // cannot be re dealt around it: a captain who joins a voyage under
+      // cannot be redealt around it: a captain who joins a voyage under
       // way sails pathless, which the harbor already has a reading for.
       const dealt = await dealPaths(io, roomId, roster, room.mode);
       // [W2: the path draft] A departure whose deal declined to seat

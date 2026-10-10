@@ -13,6 +13,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useId } from "react";
 import type { MeritId } from "@/lib/game/merits";
 import { ICONS } from "@/lib/game/constants/brand";
 import { Label } from "@/components/ui/label";
@@ -96,7 +97,7 @@ export function OnlineDot({
   );
 }
 
-/* The wash a meaning-tone wears, read by name.
+/* The wash a meaning tone wears, read by name.
  *
  * Every entry is a soft wash of its own token, so the thing wearing it
  * and the words inside it are the same colour in both modes and neither
@@ -264,16 +265,20 @@ export function Th({
 function Field({
   label,
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between">
-        <Label className="text-sm font-medium">{label}</Label>
+        <Label htmlFor={htmlFor} className="text-sm font-medium">
+          {label}
+        </Label>
         {hint && (
           <span className="text-[10px] text-muted-foreground">{hint}</span>
         )}
@@ -288,18 +293,28 @@ function Field({
  * height, and then whatever the caller's own placeholder, type and
  * autocomplete are. Six of these sit across the two cards, which is what
  * this exists to stop them drifting apart one attribute at a time.
+ *
+ * The label and the input are tied together here rather than left as two
+ * neighbours: without the pair of them naming the same id, clicking the
+ * word "Password" lands on nothing and a screen reader announces the
+ * field as an unnamed edit box. The id comes from useId, so two cards
+ * stacked on one screen cannot mint the same one, and a caller that
+ * passes its own id keeps it.
  */
 export function CredentialField({
   label,
   hint,
+  id,
   ...input
 }: {
   label: string;
   hint?: string;
 } & React.ComponentProps<typeof Input>) {
+  const generated = useId();
+  const fieldId = id ?? generated;
   return (
-    <Field label={label} hint={hint}>
-      <Input className="h-11" {...input} />
+    <Field label={label} hint={hint} htmlFor={fieldId}>
+      <Input id={fieldId} className="h-11" {...input} />
     </Field>
   );
 }
@@ -342,5 +357,34 @@ export function Notice({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * Where a refusal lands: the server's own sentence and a Dismiss press,
+ * one block for every desk a refusal can arrive at, the four markets and
+ * both votes, so it reads the same wherever it lands.
+ *
+ * The alignment and the margin are the call site's, because each desk
+ * sits the line at its own spot in its layout; what is shared is the
+ * sentence, the press and the tone rather than the room around them.
+ */
+export function RefusalLine({
+  error,
+  onDismiss,
+  className,
+}: {
+  error: string | null | undefined;
+  onDismiss: () => void;
+  className: string;
+}) {
+  if (!error) return null;
+  return (
+    <p className={cn("text-[11px] text-alarm", className)}>
+      {error}{" "}
+      <button type="button" onClick={onDismiss} className="underline">
+        Dismiss
+      </button>
+    </p>
   );
 }

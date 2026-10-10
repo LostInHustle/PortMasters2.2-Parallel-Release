@@ -38,7 +38,7 @@
 
 import { difficultyConfig } from "./difficulty";
 import { AUDIT_FROM_ROUND, AUDIT_REVEAL_COUNT, AUDIT_WINDOW } from "./audit";
-import { PORT_SHIFT_FRACTION, MAROON_VOTE_SHARE } from "./maroon";
+import { PORT_SHIFT_PERCENT, MAROON_VOTE_SHARE } from "./maroon";
 import type { LegPhase, Phase } from "./types";
 
 export type GameMode = "classic" | "ocean_gambit";
@@ -469,8 +469,8 @@ export const MODES: Record<GameMode, ModeConfig> = {
     //
     // Two rows read differently from Classic's line, and both are the
     // mode's argument rather than decoration. The exchange is a leg of both
-    // modes since [B1], so its row names the captains on the other side of
-    // the trade, because they are who this mode moved the leg to reach. And
+    // modes, so its row names the captains on the other side of the
+    // trade, because they are who this mode moved the leg to reach. And
     // the orders wear the verb the mode is built on rather than the one
     // Classic uses (see the tagline above): the manifest is filled and
     // closed before the room starts talking, so nothing in it can be
@@ -553,7 +553,7 @@ export const MODES: Record<GameMode, ModeConfig> = {
       `Every voyage here runs ${GAMBIT_LEGS} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.`,
       "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
       `From round ${AUDIT_FROM_ROUND}, a simple majority of the fleet can open one captain's manifest at a Parley. The room is shown ${AUDIT_REVEAL_COUNT} of that captain's last ${AUDIT_WINDOW} fills, and calling the vote spends the rest of that Parley's trading.`,
-      `From round ${GAMBIT_MAROON_FROM}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${Math.round(PORT_SHIFT_FRACTION * 100)} percent either way.`,
+      `From round ${GAMBIT_MAROON_FROM}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${PORT_SHIFT_PERCENT} percent either way.`,
     ],
     // The one structural change this mode makes on day one, and it is the
     // center of the whole design argument: the trade manifest moves ahead of

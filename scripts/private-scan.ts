@@ -63,8 +63,9 @@
  * Run with npm run check:private.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { walkSrc } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -176,20 +177,7 @@ const SELF = "scripts/private-scan.ts";
 type Problem = { file: string; line: number; message: string };
 
 const problems: Problem[] = [];
-const files = walk(SRC).concat(walk(join(ROOT, "scripts")));
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walk(full));
-      continue;
-    }
-    if (/\.tsx?$/.test(entry)) out.push(full);
-  }
-  return out;
-}
+const files = walkSrc(SRC).concat(walkSrc(join(ROOT, "scripts")));
 
 function rel(file: string): string {
   return relative(ROOT, file);

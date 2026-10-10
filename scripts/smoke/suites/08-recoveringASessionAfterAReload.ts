@@ -2,7 +2,7 @@
 
 import { call, check } from "../harness";
 
-export async function recoveringASessionAfterSuite(inputs: {
+export async function recoveringASessionAfterAReloadSuite(inputs: {
   guest: {
     id: string;
     token: string;

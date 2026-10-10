@@ -1148,7 +1148,7 @@ export async function moduleTradesSuite(
   );
   // The two sentences the escort desk shares with the rooms that refuse the
   // same things: the fee's bounds, which the wires quote and this desk
-  // hints at, and the offer-death rule, which the glossary tooltip prints
+  // hints at, and the rule that an offer dies, which the glossary tooltip prints
   // as well. Both are the copy module's own spelling, read here the same
   // way the desks above are, because a sentence two surfaces state is a
   // sentence two surfaces can drift apart on.

@@ -10,14 +10,14 @@
 // be a settlement that never comes.
 //
 // The shift is the same tenth the Harbormaster's hand is (see
-// PORT_SHIFT_FRACTION in ./maroon), and that agreement is the point rather
+// PORT_SHIFT_FRACTION in ../maroon), and that agreement is the point rather
 // than a coincidence: the plan's Iteration note for this slice reads
 // "adjusted against the Launched guard on how swingy prices may become",
 // so the largest honest lean in this game is one tenth, and a rumor that
 // moved a band further than the mode's own declared hand would be the
 // balance change the guard is there to catch. Both are multipliers on the
 // same rolled price, which is why they add before the one rounding rather
-// than compounding after it (see genResourceCard in ./engine/market).
+// than compounding after it (see genResourceCard in ../engine/market).
 //
 // Where the two hands differ is coverage and secrecy: a port lean is one
 // port and is called in front of the table, and a rumor is one good, is
@@ -25,6 +25,12 @@
 // server alone until the market it moves has been drawn.
 export const RUMOR_COOLDOWN_ROUNDS = 3;
 export const RUMOR_SHIFT_FRACTION = 0.1;
+
+// The same tenth as the whole number the bazaar's copy prints, derived
+// beside the fraction for the reason PORT_SHIFT_PERCENT gives in
+// ../maroon: the sentence a captain reads and the arithmetic the rumor
+// runs are one number, so they cannot come apart.
+export const RUMOR_SHIFT_PERCENT = Math.round(RUMOR_SHIFT_FRACTION * 100);
 
 // [D1: the path configuration module] The two path dials that are hold
 // arithmetic rather than prose, kept beside the hold's own numbers for the

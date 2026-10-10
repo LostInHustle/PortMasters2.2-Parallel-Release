@@ -18,7 +18,7 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 ## Adding a game system
 
 1. **Decide what is durable and what is transient.** If the state must survive a restart, it belongs in a table. If it only matters while the harbor is open, it belongs in the realtime layer's memory.
-2. **Write the rules as pure functions** in `src/lib/game` or `src/lib/game/engine`. Take plain data in, return plain data out. No clock reads, no randomness except through the seeded generator.
+2. **Write the rules as pure functions** in `src/lib/game` or `src/lib/game/engine`. Take plain data in, return plain data out. No clock reads, and no randomness except through the seeded generator or the one deliberate seam the rules below describe.
 3. **Add the table** to `prisma/schema.prisma` if you needed one, then run `npm run db:push`.
 4. **Expose it.** A REST route under `src/app/api` for anything a page loads or saves. A socket event in `src/server/realtime` for anything that must reach the other captains immediately.
 5. **Share the wire shape.** Put it in `src/types/realtime/` so the client and the server are described by one definition rather than two that drift.
@@ -26,7 +26,7 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 ## Rules that must not be broken
 
-**The engine stays pure.** No `Date.now()`, no `Math.random()`, no `fetch`, no database handle anywhere under `src/lib/game`. Randomness goes through the seeded generator so a voyage replays identically.
+**The engine stays pure, with one deliberate seam.** No `Date.now()`, no `fetch`, no database handle anywhere under `src/lib/game`. Randomness goes through the seeded generator so a voyage replays identically, with one exception kept on purpose: a roll that decides only the rolling captain's own luck, and writes nothing the other seats read, draws from `Math.random` instead. The Salvage Crane's refund and the pirate raid roll are the shape of it, `docs/SYSTEM_ANALYSIS.md` keeps the full list under The Deterministic Engine beside the reason the split exists, and a new roll belongs to the seeded stream unless it is one captain's private luck.
 
 **The lap is single sourced, and it belongs to the mode.** A voyage's synchronized order is `checkpointPhaseOrder` on the mode record in `src/lib/game/mode.ts`, because the two modes walk the same six phases in different orders and an order is a property of a voyage. `src/lib/game/checkpoint.ts` is the only place it is read (`lapPhases`, `lapSuccessor`, `openingPhase`, `isGatedPhase`, `checkpointRank`, `closesRound`), and both the ready check and the interface read it from there. A second copy will drift, and one already did: the phase after whichever phase a captain was on used to be written into the engine once per transition, which is seven copies of one order and seven chances for a mode to stop being a mode.
 
@@ -65,11 +65,12 @@ npm run typecheck        # every type error, including the ones a build would sk
 npm run lint
 npm run check:private    # no second path to a secret the game hides
 npm run build            # type errors fail the build on purpose
-npm run dev              # then, in a second terminal:
-npm run test:smoke
+# then, in a second terminal, with the clock on for both lines:
+PHASE_CLOCK=1 npm run dev
+PHASE_CLOCK=1 npm run test:smoke
 ```
 
-The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
+The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its legs, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 
 Before a run that involves players who are not the authors, `npm run check:closed-test` is the first command: it refuses to bless anything but a local SQLite file whose name begins with `closed-test`, so the invitations go out from somebody who has just read the database's name and a count of what is already inside it.
 

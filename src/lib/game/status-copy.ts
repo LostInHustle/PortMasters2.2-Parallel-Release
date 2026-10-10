@@ -18,7 +18,7 @@
 // A family's clauses are read back two ways. The validator holds every
 // sentence to the clauses it declares, and holds every family to all
 // three; the check script additionally sweeps the tree, because a
-// sentence may be phrased around a clause and never re-author one. What
+// sentence may be phrased around a clause and never author one again. What
 // neither can hold is meaning: the clauses are guarded by their words,
 // not their sense, which is why the sweep's comment says so out loud.
 
@@ -69,7 +69,7 @@ export const IDLE_HAND: StatusFamily = {
   remedy: "Assign a task to put them to work",
 };
 
-// ---- The cold, as its surfaces say it ----
+// ==== The cold, as its surfaces say it ====
 
 /** The bench row and the peek modal, through one function: a hand seen
     from either surface reads the same reason and the same promise. */
@@ -96,7 +96,7 @@ export function frozenFrostbiteLog(name: string, label: string): string {
   return `🥶 Frostbite: ${name} the ${label} ${FROZEN_CREW.cause}, and is out of action next leg. ${FROZEN_CREW.remedy}.`;
 }
 
-// ---- The cold leg chip, as the rail says it ----
+// ==== The cold leg chip, as the rail says it ====
 
 /**
  * The rail's cold leg chip: the weather read before the leg settles,
@@ -118,7 +118,7 @@ export function coldLegChipLine(warmth: string, shortWarmth: boolean): string {
     : `${reading}, and the crew is dressed for it.`;
 }
 
-// ---- Short rations, as its surfaces say it ----
+// ==== Short rations, as its surfaces say it ====
 
 // The tail of the rule, split from the count so the sweep can guard the
 // wording while the count stays the engine's. A surface that retyped the
@@ -165,7 +165,7 @@ export function hungryMarkerLabel(): string {
   return HUNGRY_CREW.state;
 }
 
-// ---- An idle hand, as the bench and the peek modal say it ----
+// ==== An idle hand, as the bench and the peek modal say it ====
 
 /** The bench row and the peek modal. The mark is kept where it was and
     explained by the legend beside the rows rather than in each one. */
@@ -180,7 +180,7 @@ export function idleBenchLine(skilled: boolean): string {
 export const SKILLED_LEGEND =
   "⭐ Skilled: a trained hand makes 2 goods a round where an untrained one makes 1.";
 
-// ---- The registry, and the validator that holds it ----
+// ==== The registry, and the validator that holds it ====
 
 /** One sentence a surface renders, and the clauses it is held to. A
     surface is free to phrase around its clauses; it is not free to drop

@@ -1,5 +1,5 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: the draft, and switching.
+// PortMasters 2.2 Parallel Release: the draft's writes into a save.
 //
 // [D7: the draft, and switching] The engine half of the plan's clause. The
 // rule half (the deck, the pass, the window and the fee) lives in

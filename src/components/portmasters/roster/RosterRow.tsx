@@ -82,8 +82,19 @@ export function RosterRow({
       whileHover={{ scale: 1.01, y: -1 }}
       whileTap={{ scale: 0.97 }}
       transition={{ duration: 0.12, ease: "easeOut" }}
-      onClick={() => onSelectPlayer(member.id)}
+      onClick={(e) => {
+        // The row's own surface only. The action buttons and the peek
+        // popover already stop their clicks, and this guard is the same
+        // rule stated where the row is: a press that landed on a control
+        // inside the row is the control's, not the row's. Enter on a
+        // focused mute button otherwise opened this captain's detail
+        // popup on top of the mute it had just sent, because the click
+        // stops at the button and the keydown does not.
+        if (e.target !== e.currentTarget) return;
+        onSelectPlayer(member.id);
+      }}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelectPlayer(member.id);
@@ -214,6 +225,11 @@ export function RosterRow({
                 targetUserId: member.id,
               });
             }}
+            label={
+              isMuted
+                ? `Unmute ${member.displayName}`
+                : `Mute ${member.displayName}`
+            }
             title={isMuted ? "Unmute this captain" : "Mute this captain"}
           >
             {isMuted ? (

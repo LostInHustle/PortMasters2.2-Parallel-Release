@@ -135,6 +135,11 @@ export function Lobby({
   // asking its table to keep two different clocks. Starts on the founding
   // mode, which is the one a captain who never touches this control gets.
   const [mode, setMode] = useState<GameMode>(DEFAULT_MODE);
+  // Whether the captain has picked a mode of their own rather than leaving
+  // the Voyage cards untouched. The How to Play manual reads it: a captain
+  // who has chosen a voyage is answered by their choice, while one who has
+  // not is answered by the harbor they are browsing (see browsedMode).
+  const [modeChosen, setModeChosen] = useState(false);
   // [H9: the unlock code] What the host typed to open a sealed voyage, sent
   // only when the mode they picked takes a phrase. Cleared once a harbor is
   // opened with it, because a phrase that has already worked is not one the
@@ -290,7 +295,7 @@ export function Lobby({
 
   // True between asking for a seat in the queue and hearing back. Held in
   // a ref rather than state because the socket listener and the unmount
-  // cleanup both read it, and neither should re run when it changes.
+  // cleanup both read it, and neither should rerun when it changes.
   const queuedForMatch = useRef(false);
 
   // [MANIFEST: Quick Start Match] Join the queue and wait to be paired.
@@ -430,7 +435,7 @@ export function Lobby({
 
   async function joinByCode() {
     if (joinCode.trim().length !== 6) {
-      setError("Room codes are 6 characters.");
+      setError("Harbor codes are 6 characters.");
       return;
     }
     setBusy(true);
@@ -482,7 +487,7 @@ export function Lobby({
   // the clear, the loading flag and the request all belong to that one
   // click that changes the target, and the thread is fetched once.
 
-  // The square's backlog, read once on landing. Nothing re seeds it later,
+  // The square's backlog, read once on landing. Nothing reseeds it later,
   // and nothing needs to: this channel is written down rather than held in
   // the room's session log, so whatever was said while this captain was at
   // sea is simply part of the backlog they read on their next landing.
@@ -511,7 +516,7 @@ export function Lobby({
 
   // [MANIFEST: Great Houses] Fetch harbor wide standings plus the
   // captain's current pledge when the House dialog opens. myHouseId is
-  // re synced after a successful pledge so the chosen row stays marked.
+  // resynced after a successful pledge so the chosen row stays marked.
   const openHouse = useCallback(() => {
     setHouseOpen(true);
     setHouseLoading(true);
@@ -546,6 +551,25 @@ export function Lobby({
   }, []);
 
   const totalOnline = onlineUsers.length;
+
+  // What the How to Play manual describes from this lobby. A captain who
+  // has picked a mode of their own is answered by their choice, because
+  // the pages they want next are the ones about the voyage they are
+  // charting. A captain who has chosen nothing is answered by the harbor
+  // they are browsing: on a board whose harbors all sail one voyage, that
+  // voyage is the only table they can enter from the page the guide
+  // button sits on, so the pages describe it rather than the founding
+  // voyage they are not about to play. A mixed board (or an empty one)
+  // names no single harbor being browsed, and the pages then fall to the
+  // founding voyage, whose own page is the manual every other mode is
+  // measured against (see voyagePage in ./HowToPlayModal).
+  const boardMode = rooms[0]?.mode;
+  const browsedMode: GameMode =
+    modeChosen ||
+    boardMode === undefined ||
+    !rooms.every((r) => r.mode === boardMode)
+      ? mode
+      : boardMode;
 
   return (
     <div className="pm-canvas min-h-screen w-full">
@@ -992,13 +1016,13 @@ export function Lobby({
                   className="space-y-3"
                 >
                   <p className="text-[11px] leading-snug text-muted-foreground">
-                    Name a room, pick its waters, and open it to the fleet.
+                    Name a harbor, pick its waters, and open it to the fleet.
                   </p>
 
                   <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">
-                        Room name
+                        Harbor name
                       </Label>
                       <Input
                         value={newName}
@@ -1051,7 +1075,10 @@ export function Lobby({
                       sealed: MODES[key].sealed,
                     }))}
                     value={mode}
-                    onChange={setMode}
+                    onChange={(m) => {
+                      setMode(m);
+                      setModeChosen(true);
+                    }}
                   />
 
                   {/* [H9: the unlock code] The phrase, drawn under the cards
@@ -1183,7 +1210,7 @@ export function Lobby({
       <HowToPlayModal
         open={howToPlayOpen}
         onOpenChange={setHowToPlayOpen}
-        mode={mode}
+        mode={browsedMode}
       />
       <SettingsModal
         open={settingsOpen}

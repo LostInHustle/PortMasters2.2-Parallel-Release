@@ -30,7 +30,7 @@ export type { RoomDetail };
 //
 // The parameters are structural rather than Prisma types on purpose. Three of
 // the five callers hand over a room whose members came back on the row, and
-// the other two have already re read the seats into a separate list after
+// the other two have already read the seats into a separate list after
 // writing one, so the members are passed in beside the room rather than dug
 // out of it.
 //
@@ -151,7 +151,7 @@ export async function admitToRoom(
     };
   }
 
-  // A returning member just re affirms their seat.
+  // A returning member just reaffirms their seat.
   await db.roomMember.upsert({
     where: { userId_roomId: { userId, roomId: room.id } },
     create: { userId, roomId: room.id },

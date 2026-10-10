@@ -5,7 +5,17 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ICONS } from "@/lib/game/constants/brand";
-import { SAME_ITEM_OFFER } from "@/lib/game/constants/copy";
+import {
+  OFFER_GIVE_AMOUNT_LABEL,
+  OFFER_GIVE_ITEM_LABEL,
+  OFFER_GIVE_LABEL,
+  OFFER_POST_LABEL,
+  OFFER_TARGET_LABEL,
+  OFFER_WANT_AMOUNT_LABEL,
+  OFFER_WANT_ITEM_LABEL,
+  offerOverdrawLine,
+  SAME_ITEM_OFFER,
+} from "@/lib/game/constants/copy";
 import { leavePhase } from "@/lib/game/engine";
 import {
   bazaarRumorsOn,
@@ -37,6 +47,7 @@ import {
   PanelTitle,
   PhaseError,
   ReadyFooter,
+  StationStrip,
   type PhasePanelProps,
 } from "./PhaseShared";
 
@@ -54,7 +65,7 @@ import {
 // Market.tsx uses and for the reasons written there: the station is local
 // state rather than a phase value or a saved field, so a captain who
 // switches stations has told the room nothing, and the wait a ready vote
-// opened does not re-split.
+// opened does not split again.
 //
 // What is traded splits; what belongs to the whole table does not. The
 // Harbormaster's console, the two votes and the fleet's ledger draw under
@@ -121,7 +132,7 @@ export function Parley({
   const otherMembers = members.filter((m) => m.id !== me.id);
   const [station, setStation] = useState<Station>("exchange");
 
-  // The harbor's business, behind one fold. The override is a tri-state
+  // The harbor's business, behind one fold. The override has three states
   // on purpose: null means "however the table stands", so the fold leads
   // open the moment a vote is live and closes itself when the last one is
   // spent, while a captain who has pressed the row keeps the answer they
@@ -210,32 +221,14 @@ export function Parley({
         <Term term="Barter">Captain's Exchange</Term>
       </PanelTitle>
 
-      {/* The station strip, the same shape and the same reasons as the
-          one Market.tsx wears: the strip locks while the ready vote is
-          in flight, because at that point the harbor is being told this
-          captain is done. */}
       {marketsOn && (
-        <div className="mb-3.5 flex items-center gap-1.5">
-          {STATIONS.map((s, i) => {
-            const here = s.id === station;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                disabled={phaseSync.waiting}
-                onClick={() => setStation(s.id)}
-                className={cn(
-                  "flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60",
-                  here
-                    ? "border-parley/40 bg-parley/[0.12] text-parley"
-                    : "border-transparent bg-muted/30 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {s.icon} {i + 1} · {s.label}
-              </button>
-            );
-          })}
-        </div>
+        <StationStrip
+          stations={STATIONS}
+          active={station}
+          onSelect={setStation}
+          waiting={phaseSync.waiting}
+          tone="parley"
+        />
       )}
 
       {/* [H7: Maroon and the Harbormaster] The console sits above the fold
@@ -326,18 +319,18 @@ export function Parley({
               📤 Post an Offer
             </PanelHeading>
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-              <span className="text-muted-foreground">I'll give</span>
+              <span className="text-muted-foreground">{OFFER_GIVE_LABEL}</span>
               <QuantityInput
                 value={draft.offerAmount}
                 onCommit={draft.setOfferAmount}
                 min={1}
-                aria-label="Amount to offer"
+                aria-label={OFFER_GIVE_AMOUNT_LABEL}
                 className="w-16 h-9"
               />
               <Select
                 value={draft.offerItem}
                 onChange={(e) => draft.setOfferItem(e.target.value)}
-                aria-label="Item to offer"
+                aria-label={OFFER_GIVE_ITEM_LABEL}
               >
                 {draft.items.map((it) => (
                   <option key={it} value={it}>
@@ -350,13 +343,13 @@ export function Parley({
                 value={draft.requestAmount}
                 onCommit={draft.setRequestAmount}
                 min={1}
-                aria-label="Amount to request"
+                aria-label={OFFER_WANT_AMOUNT_LABEL}
                 className="w-16 h-9"
               />
               <Select
                 value={draft.requestItem}
                 onChange={(e) => draft.setRequestItem(e.target.value)}
-                aria-label="Item to request"
+                aria-label={OFFER_WANT_ITEM_LABEL}
               >
                 {draft.items.map((it) => (
                   <option key={it} value={it}>
@@ -370,7 +363,7 @@ export function Parley({
                 disabled={!draft.canPost}
                 onClick={() => draft.submit()}
               >
-                🤝 Post Offer
+                {OFFER_POST_LABEL}
               </Button>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm mt-2">
@@ -379,7 +372,7 @@ export function Parley({
                 value={draft.targetUserId}
                 onChange={(id) => draft.setChosenTargetId(id)}
                 others={otherMembers}
-                label="Direct this offer to a specific captain"
+                label={OFFER_TARGET_LABEL}
               />
             </div>
             {draft.targetUserId && (
@@ -400,7 +393,7 @@ export function Parley({
             )}
             {!draft.sameItem && draft.offerAmount > draft.owned && (
               <p className="text-center text-[11px] text-alarm mt-2">
-                You only have {draft.owned} {draft.offerItem}.
+                {offerOverdrawLine(draft.owned, draft.offerItem)}
               </p>
             )}
           </HuePanel>

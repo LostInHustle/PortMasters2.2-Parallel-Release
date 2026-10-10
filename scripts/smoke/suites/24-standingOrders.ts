@@ -95,7 +95,7 @@ export async function standingOrdersSuite(): Promise<void> {
     return state;
   };
   // The same purse over an empty hold, which is what the three price
-  // checks below need: [C4] gave the cargo a size, and a voyage ships
+  // checks below need: the cargo has a size, and a voyage ships
   // the tree's own opening stock, so a board whose lots happen to run
   // large would measure the hold's room as well as the price list. The
   // line those checks hold is that the list reaches every lot, not that
@@ -545,8 +545,8 @@ export async function standingOrdersSuite(): Promise<void> {
   );
 
   // The seat itself, through the clock's own entry point, which is where
-  // the switch has to be read: with it off the whole seat is the seat
-  // [B2] shipped, and with it on the written work happens before the
+  // the switch has to be read: with it off the whole seat is the engine's
+  // own default, and with it on the written work happens before the
   // departure that would have happened anyway.
   const absent = deepPurse(deal("market"));
   autoCommit(absent, standingCtx, []);
@@ -613,20 +613,4 @@ export async function standingOrdersSuite(): Promise<void> {
       !carriesADash("src/components/portmasters/game/GameControlPanel.tsx"),
     "and none of the words a captain reads about standing orders, nor the comments that explain them, carries an en dash, an em dash or a doubled hyphen",
   );
-
-  // =====================================================================
-  // [B4: the log surfaces]
-  //
-  // The plan asks for two logs at Dusk, one the whole room reads and one
-  // each captain holds, and what is held below is the contract between
-  // them rather than the screen they are drawn on: the room's log carries
-  // what the table already saw and never a hidden thing, and the private
-  // channel carries what one captain was told and reaches no other
-  // socket. That is the plan's own evaluation, a two client assertion
-  // that no private entry appears in the other captain's transcript, read
-  // here against the surface this slice adds.
-  //
-  // The vocabulary is checked first and without a server, so a failure
-  // further down is never read as a server that declined to write a line.
-  // =====================================================================
 }

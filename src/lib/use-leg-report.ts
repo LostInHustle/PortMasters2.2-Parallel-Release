@@ -43,6 +43,7 @@
 // =====================================================================
 
 import { LegReport } from "@/types/realtime/objectives";
+import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
 import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
@@ -63,11 +64,6 @@ import {
   opportunistBorrowsTaken,
   refitsOn,
 } from "@/lib/game/engine";
-
-// The same cadence the captain's own status rides on (see
-// use-game-session.ts): enough to feel immediate, sparse enough that a
-// captain filling four orders in a row files one report rather than four.
-const REPORT_DEBOUNCE_MS = 120;
 
 /**
  * Reports what this captain's leg dealt, filled and closed carrying.
@@ -239,7 +235,11 @@ export function useLegReport(
         charter,
       };
       socket.emit("telemetry:leg", payload);
-    }, REPORT_DEBOUNCE_MS);
+      // The debounce is the cadence every live channel rides on (see
+      // STATUS_BROADCAST_MS in @/lib/session/use-status-beacon): enough to
+      // feel immediate, sparse enough that a captain filling four orders in
+      // a row files one report rather than four.
+    }, STATUS_BROADCAST_MS);
     return () => clearTimeout(timer);
   }, [
     socket,

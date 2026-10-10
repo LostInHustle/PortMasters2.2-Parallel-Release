@@ -21,13 +21,8 @@ import {
 import { moduleTradesOn } from "@/lib/game/flags";
 import { powerAfterTaking, powerBudgetAllows } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
-import {
-  MarketBlock,
-  MarketEmpty,
-  MarketError,
-  MarketPanel,
-  OfferRow,
-} from "./OfferBoard";
+import { RefusalLine } from "../shared";
+import { MarketBlock, MarketEmpty, MarketPanel, OfferRow } from "./OfferBoard";
 import type { ModuleTrades } from "./phases/PhaseShared";
 
 // The fallback crest for a row whose module the pool cannot resolve, which
@@ -181,7 +176,11 @@ export function ModuleMarket({
         </MarketBlock>
       )}
 
-      <MarketError error={modules.error} onDismiss={modules.clearError} />
+      <RefusalLine
+        className="text-center mb-2"
+        error={modules.error}
+        onDismiss={modules.clearError}
+      />
 
       {modules.moduleTrades.length === 0 ? (
         <MarketEmpty>

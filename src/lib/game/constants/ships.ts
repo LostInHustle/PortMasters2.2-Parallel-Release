@@ -17,11 +17,9 @@ export const MAX_SHIP_LEVEL = 3;
 export const SHIP_UPGRADE_LADDER: readonly number[] = [15, 25, 40];
 
 // Voyage length, raid odds, the escort fee, and how many cards each board
-// rolls all used to be flat constants in this file. They vary by difficulty
-// tier now, so they live in ./difficulty instead; the fair_winds tier carries
-// the exact values this file used to hold. The starting fixed cost still
+// rolls vary by difficulty tier, so they live in ./difficulty; the
+// fair_winds tier carries the founding values. The starting fixed cost
 // lives directly on the initial GameState (see createInitialGameState in
 // ../types.ts), and the upgrade ladder above is seeded onto it from here;
-// the intel cost per Broker rumor is
-// derived on the fly from whether the Broker's Network module is equipped
-// (see getIntelCost in ./engine/pricing.ts).
+// the intel cost per Broker rumor is derived on the fly from whether the
+// Broker's Network module is equipped (see getIntelCost in ./engine/pricing.ts).

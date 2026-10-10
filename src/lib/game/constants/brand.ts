@@ -11,6 +11,15 @@
 // only has to happen in one place.
 export const APP_NAME = "PortMasters 2.2 Parallel Release";
 
+// The one sentence the game says about itself when it is asked what it
+// is: the browser's metadata, the link preview a shared address unfolds
+// into, and the social card's own art. Written without the name, because
+// the callers that show it put the name beside it, and a sentence that
+// begins with its own title reads as boilerplate in exactly the places
+// this one is read.
+export const APP_DESCRIPTION =
+  "A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.";
+
 export const ICONS: Record<string, string> = {
   Gold: "💰",
   Hemp: "🧶",

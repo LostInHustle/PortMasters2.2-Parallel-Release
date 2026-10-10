@@ -14,7 +14,6 @@ export type PlayerDetailData = {
   shipLevel: number;
   round: number;
   phase: GameState["phase"];
-  gameOver: boolean;
   inventory: GameState["inventory"];
   workers: GameState["workers"];
   equippedModules: CardRecord[];
@@ -56,7 +55,7 @@ export function usePlayerDetail(
     myDetailRef.current = myDetail;
   }, [myDetail]);
 
-  // One timer per captain being asked about, so a second press re-arms the
+  // One timer per captain being asked about, so a second press resets the
   // wait rather than stacking a second clock on the same row.
   const peekTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),

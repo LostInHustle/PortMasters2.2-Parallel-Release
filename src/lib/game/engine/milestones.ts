@@ -31,10 +31,10 @@
 //
 // Every path into here is idempotent, which matters because every one of
 // them can be entered twice: the dawn and the settlement both run again
-// when a captain catches up to the room (the same re-entry the ticks'
+// when a captain catches up to the room (the same second entry the ticks'
 // own round stamps exist for), the queue guard keeps a waiting moment
 // from being armed again, and the marks only move forward, so the worst
-// a second entry does is arm the next un-answered moment of a repeatable
+// a second entry does is arm the next unanswered moment of a repeatable
 // trigger when its terms already hold.
 // =====================================================================
 import { cardLead, noteCardOffer, noteCardPick } from "../cards";
@@ -58,7 +58,7 @@ import type { GameState } from "../types";
  * the offer last, because drawing cards is the only work here.
  *
  * The tally is written at the arm rather than at the screen, because the
- * screen re-renders (a socket frame, a phase tick) and an offer count
+ * screen renders again (a socket frame, a phase tick) and an offer count
  * has to count offers. The choices are derived by the same call the
  * screen will make, so the cards counted are exactly the cards dealt.
  */
@@ -75,15 +75,15 @@ export function queueMilestoneMoment(
     // [F7: the power budget] Two empty tables, and the second is new. If
     // the family's pool itself is dry (every card held or out of this
     // mode's pool) there is no decline and no second table, so the moment
-    // is spent rather than left to re-fire at every settlement for the
+    // is spent rather than left to fire again at every settlement for the
     // rest of the voyage: the mark moves and nothing is drawn. But a
     // table the budget emptied is not that: the captain can lighten
     // their hull at the yard and the same moment is answerable then, so
     // spending it would eat a moment the cap only meant to defer. The
-    // two are told apart by re-reading the same draw with the one filter
+    // two are told apart by reading the same draw twice with the one filter
     // lifted (see the ignoreBudget arm in ../milestones), and the
-    // deferral costs nothing to leave: this function re-runs at every
-    // settlement sweep and re-reads the budget each time.
+    // deferral costs nothing to leave: this function runs again at every
+    // settlement sweep and reads the budget anew each time.
     if (milestoneChoices(state, trigger, { ignoreBudget: true }).length > 0) {
       return;
     }
@@ -178,7 +178,7 @@ export function answerMilestone(
  *
  * The units are what make a repeatable moment answerable more than once
  * and a latch answerable only once, and they are also what makes the
- * arms idempotent under a re-entered sweep: the loss count and the round
+ * arms idempotent under a repeated sweep: the loss count and the round
  * stamp can never go backwards, and the rung mark is bumped rather than
  * set from the ladder, so a sweep that runs twice can at most arm the
  * next crossing, never the one just answered.

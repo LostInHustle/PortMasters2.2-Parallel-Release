@@ -56,7 +56,7 @@ export function Bankruptcy({
       member: m,
       status: statuses[m.id],
     }))
-    // Stated as a type predicate rather than left to be re asserted at
+    // Stated as a type predicate rather than left to be reasserted at
     // every read below, so the standings can trust the status the filter
     // kept. The terminal test itself is the shared reader (see
     // leftTheVoyage in @/lib/seatMarks), the same question the roster

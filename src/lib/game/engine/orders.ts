@@ -46,7 +46,6 @@ import {
   isCharterGood,
   isTier1CharterProduct,
   isTier2CharterProduct,
-  unlockedPorts,
 } from "../pools";
 import { createRng, type Rng } from "../rng";
 import type { GameContext, GameState, OrderCard } from "../types";
@@ -62,6 +61,7 @@ import {
   genProductOrder,
   genRawOrder,
   poolsFor,
+  revealRumor,
 } from "./market";
 import { queueMilestoneMoment } from "./milestones";
 import {
@@ -92,6 +92,18 @@ function orderShortfall(
     if ((state.inventory[r.type] || 0) < (r.required ?? 0)) return r;
   }
   return null;
+}
+
+/**
+ * The next free id off the board itself: one past the highest any card
+ * carries, and 0 on an empty board. Three sites mint a card into a board
+ * that has already been dealt (the Broker's Favor, the Imperial Mandate,
+ * and the pathbound draw), so the mint lives here once; the seeded draw
+ * in startOrders below mints its own contiguous run instead, since it
+ * deals a fresh board and already knows how many cards it wrote.
+ */
+function nextCardId(state: GameState): number {
+  return state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
 }
 
 /**
@@ -403,6 +415,10 @@ export function completeOrder(
   state.roundRevenue += reward;
   state.totalRevenue += reward;
   state.score += Math.floor(reward - transport);
+  // The Chronicle's "largest single trade" figure, folded from the reward
+  // that was actually credited so it matches the log line the captain just
+  // read rather than the card's face value.
+  state.largestTrade = Math.max(state.largestTrade, reward);
   state.completedOrders.push(order.id);
   state.orderCount++;
   state.totalOrdersCompleted++;
@@ -519,8 +535,7 @@ export function callBrokersFavor(
   const order = isRaw
     ? genRawOrder(localRng, poolsFor(state), item, qty)
     : genProductOrder(localRng, poolsFor(state), item, qty);
-  const nextId =
-    state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+  const nextId = nextCardId(state);
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
   state.brokersFavorUsed = true;
   const txt = order.resources
@@ -567,17 +582,7 @@ export function purchaseIntel(state: GameState, logs: string[]) {
   state.money -= cost;
   for (let i = 0; i < count; i++) {
     if (!state.marketDemandTags.length) break;
-    const item =
-      state.marketDemandTags[
-        Math.floor(Math.random() * state.marketDemandTags.length)
-      ];
-    state.marketDemandTags.splice(state.marketDemandTags.indexOf(item), 1);
-    const openPorts = unlockedPorts(state.difficulty, state.currentRound);
-    const port = openPorts[Math.floor(Math.random() * openPorts.length)];
-    state.revealedIntel.push({ item, port });
-    logs.push(
-      `🗣️ Broker's Whisper: 'Word from ${port}: High demand for ${item}!'`,
-    );
+    revealRumor(state, logs, "🗣️ Broker's Whisper");
     // [DIFFICULTY] Corrupt broker (Monsoon only). The rumor above is always
     // delivered and always true, on every tier: the intel guarantee is never
     // touched. What a corrupt broker does instead is also sell word of this
@@ -680,8 +685,7 @@ export function startOrders(
   const mandate =
     mandateIdx === undefined ? undefined : MANDATE_TEMPLATES[mandateIdx];
   if (mandate) {
-    const nextId =
-      state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+    const nextId = nextCardId(state);
     // Placed first rather than appended. It is the round's headline commission
     // and should read that way regardless of how wide the charter has grown
     // the board. Inserted after the intel guarantee loop above, which writes
@@ -727,8 +731,7 @@ export function startOrders(
     for (let i = 0; i < PATH_ORDER_SLOTS; i++) {
       const order = genPathOrder(pathOrderRng, orderPools);
       if (!order) break;
-      const nextId =
-        state.customerCards.reduce((m, c) => Math.max(m, c.id), -1) + 1;
+      const nextId = nextCardId(state);
       state.customerCards.push({ id: nextId, ...order });
     }
   }

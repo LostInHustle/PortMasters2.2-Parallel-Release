@@ -38,7 +38,7 @@
 //   read this: the durable copy arrives on the phase advance (see
 //   applyPortShift), and this notice is what the room reads.
 //
-// The local rules for whether this captain may vote or lean are re-derived
+// The local rules for whether this captain may vote or lean are derived
 // rather than asked for, the same way the audit's are, because every part
 // of them is already on this side of the wire. The server applies the same
 // rules again and it is the server's answer that counts.
@@ -57,6 +57,7 @@ import { maroonSeat } from "@/lib/game/engine";
 import { modeConfig } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
 import type { GameState } from "@/lib/game/types";
+import { refusedForRoom } from "@/lib/refusals";
 import type { VoteCensus } from "@/lib/voteTally";
 
 export function useMaroon(
@@ -122,17 +123,17 @@ export function useMaroon(
       setShift(data);
     };
     const onRefused = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId) return;
-      if (typeof data.error !== "string" || !data.error) return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (!err) return;
+      setError(err);
       setPressed(null);
     };
     // The lever's own refusal, read the same way and held apart from the
     // vote's: the console is the only surface that prints it.
     const onShiftRefused = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId) return;
-      if (typeof data.error !== "string" || !data.error) return;
-      setShiftError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (!err) return;
+      setShiftError(err);
     };
     // A new voyage has no vote, no result and no leaning port, which is
     // also the signal a client gets for the room it is already sitting in.
@@ -165,10 +166,10 @@ export function useMaroon(
   // The vote that carried, applied to the books it took.
   //
   // This is the one place a captain's client runs a rule on somebody
-  // else's say-so, so it is written to be safe to run twice: the engine
+  // else's word, so it is written to be safe to run twice: the engine
   // function returns immediately if the mark is already on the state (see
   // maroonSeat), which is what a development build's doubled effect and a
-  // reconnect's replayed hand-out both need, and which matters because
+  // reconnect's replayed handoff both need, and which matters because
   // there is half a captain's Gold in the arithmetic.
   const applied = result?.roomId === roomId ? result : null;
   useEffect(() => {
@@ -227,7 +228,7 @@ export function useMaroon(
   // state request answered after the carry would read exactly like a
   // fresh leg: an empty book, a full waiting list and a button offering
   // a press the server would refuse. Held off the frame rather than
-  // re-derived, because the server's record is what the ask is about.
+  // derived, because the server's record is what the ask is about.
   const carried = live?.carried ?? null;
 
   const atTable =

@@ -157,7 +157,7 @@ const OVERDRIVE_PENALTY = 10;
 // The tally rides here rather than at the park: the draft's swap flow parks
 // a choice in _newModule and a captain can still back out of it, so
 // counting at the park would count cards that were never taken. It runs for
-// the swap branch and the install branch both, so a swapped-in module joins
+// the swap branch and the install branch both, so a module swapped in joins
 // the hull the same as a fresh one, and a module the trade delivered is
 // counted the same way because its branch calls this function too.
 export function installModuleAccounting(
@@ -299,10 +299,9 @@ export function swapBoonChoices(state: GameState, logs: string[]) {
 // It used to end by starting the market phase by name, which both pinned the
 // draft to one voyage's leg and made the choice and the advance impossible
 // to separate.
-// The advance belongs to lockInBoon in ./lifecycle now, which is the one place
-// allowed to name where a phase leads. The GameContext it used to take went
-// with that call, since opening a phase is the only thing here that ever
-// needed one.
+// The advance belongs to lockInBoon in ./lifecycle, which is the one place
+// allowed to name where a phase leads. Opening a phase is the only thing
+// here that ever needed a GameContext, and the advance carries it.
 export function selectBoon(
   state: GameState,
   boonId: string,
@@ -342,9 +341,9 @@ export function selectBoon(
 // taken: a card that only the cap refuses is a card this yard does not
 // offer, which is what keeps the screen whole without a blocked row on
 // it. Unlike the two moments' tables, this draw is stored rather than
-// re-derived (see startModuleDrafting), so filtering inside it cannot
+// derived again (see startModuleDrafting), so filtering inside it cannot
 // reshape a trio under a captain's eyes: the hull cannot change between
-// the roll and the pick except by a budget-guarded swap below, which
+// the roll and the pick except by a swap the budget guards below, which
 // never raises the held power.
 function rollModuleChoices(state: GameState): CardRecord[] {
   const pool = offerPool("module", state).filter(([card]) =>
@@ -367,7 +366,7 @@ function rollModuleChoices(state: GameState): CardRecord[] {
 // A reroll is a swap, so what it deals is what the round has not already
 // shown. Reading the candidates as the fitting pool less what the hull
 // already carries would give a full hull in a six module mode exactly
-// three cards and one possible draw: the swap would re-serve the batch it
+// three cards and one possible draw: the swap would serve the batch it
 // was pressed to replace, and the screen would promise a fresh batch while
 // the same three cards stayed on it. So the unheld cards the table does
 // not hold come first, drawn at the pool's own weights; where those
@@ -595,7 +594,7 @@ export function handleModuleSelect(
   // would pass the cap is refused with a sentence rather than installed,
   // and the phase is left where it stands so the captain can take
   // another seat or back out. The panel blocks these picks before the
-  // click, so this is the same defense in depth the no-empty-slots
+  // click, so this is the same defense in depth the full hull refusal
   // refusal below has always been.
   if (!moduleFitsHull(state, mod)) {
     logs.push(powerRefusal(state, mod, null));
@@ -649,7 +648,7 @@ export function finalizeModuleSwap(
     );
     return;
   }
-  // [F7: the power budget] The per-slot half of the yard's gate: the roll
+  // [F7: the power budget] The half of the yard's gate for one slot: the roll
   // only promised this card fits over SOME equipped module, and this is
   // the slot the captain chose, so the arithmetic runs against what that
   // slot frees. A refused row leaves the flow where it is (the picker
@@ -675,10 +674,10 @@ export function finalizeModuleSwap(
 // the half chosen swap target (`_newModule`).
 //
 // The round's table is kept, not cleared. The draw is stored rather than
-// re-derived precisely so that reopening the draft screen, including
+// derived again precisely so that reopening the draft screen, including
 // through this Back and then Draft again loop, reshows whatever the round
 // already has on offer (see startModuleDrafting above); clearing it here
-// would re-enable the unlimited free reroll that the once a round swap cap
+// would bring back the unlimited free reroll that the once a round swap cap
 // below exists to close, since startModuleDrafting rolls a fresh pool
 // whenever the table is empty. The half chosen swap target still goes,
 // because a captain who left the yard has not chosen anything, and the

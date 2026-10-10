@@ -19,8 +19,10 @@
 // =====================================================================
 import {
   CONVOY_VENTURE_FAILURE_REFUND_RATE,
+  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_PAYOUT_MULTIPLIER,
 } from "./constants/world";
+import { parseJsonObject } from "./json";
 
 type VentureContribution = { name: string; amount: number };
 type VentureContributions = Record<string, VentureContribution>;
@@ -45,7 +47,7 @@ type VentureContributions = Record<string, VentureContribution>;
 export type VentureOutcome = "filled" | "failed" | "destroyed";
 
 // One contributor's share of however a venture ended, as the settlement
-// event carries it. The hook that relays that event re exports this rather
+// event carries it. The hook that relays that event exports this rather
 // than declaring its own copy: two identical declarations in two files
 // drift the moment either one is edited, and nothing would catch it.
 export type VentureSettlement = {
@@ -54,28 +56,22 @@ export type VentureSettlement = {
   amount: number;
 };
 
-// Deliberately defensive: this parses a JSON column written by this same
-// server, but a malformed or hand edited row should degrade to "nobody
-// contributed" rather than throw inside a socket handler every other
-// captain in the room is waiting on.
+// Deliberately defensive: a malformed or hand edited row should degrade
+// to "nobody contributed" rather than throw inside a socket handler every
+// other captain in the room is waiting on. The parse itself is the shared
+// one (see parseJsonObject in ./json); what follows is this column's own
+// field checks.
 export function parseVentureContributions(raw: string): VentureContributions {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-      return {};
-    const out: VentureContributions = {};
-    for (const [userId, value] of Object.entries(
-      parsed as Record<string, unknown>,
-    )) {
-      if (!value || typeof value !== "object") continue;
-      const v = value as { name?: unknown; amount?: unknown };
-      if (typeof v.name !== "string" || typeof v.amount !== "number") continue;
-      out[userId] = { name: v.name, amount: v.amount };
-    }
-    return out;
-  } catch {
-    return {};
+  const parsed = parseJsonObject(raw);
+  if (!parsed) return {};
+  const out: VentureContributions = {};
+  for (const [userId, value] of Object.entries(parsed)) {
+    if (!value || typeof value !== "object") continue;
+    const v = value as { name?: unknown; amount?: unknown };
+    if (typeof v.name !== "string" || typeof v.amount !== "number") continue;
+    out[userId] = { name: v.name, amount: v.amount };
   }
+  return out;
 }
 
 export function ventureTotal(contributions: VentureContributions): number {
@@ -100,10 +96,26 @@ export function ventureTotal(contributions: VentureContributions): number {
 // which both prints free Gold and burns the room's one shared chance for
 // personal gain instead of the room's; requiring real headroom to remain
 // for someone else is what actually forces genuine multi captain
-// participation before a venture can ever fill. Rounded up (not down) so
-// two contributors splitting an odd targetGold in half still have exactly
-// enough combined room to reach it; rounding down would occasionally leave
-// a venture mathematically impossible to ever fill at all.
+// participation before a venture can ever fill.
+//
+// That cap is a Gold figure, and the same one is read in three places: the
+// accept decision below, the refusal the venture:contribute handler words
+// (src/server/realtime/wiring/ventures.ts), and the board that swaps a
+// captain's own form for a note once they reach it
+// (src/components/portmasters/game/status/ConvoyVentures.tsx). All three
+// call contributorShareCap, because a cap printed one Gold off from the
+// cap actually enforced is a button lit for an amount the server refuses.
+export function contributorShareCap(
+  targetGold: number,
+  maxContributorShare: number = CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
+): number {
+  // Rounded up (not down) so two contributors splitting an odd targetGold
+  // in half still have exactly enough combined room to reach it; rounding
+  // down would occasionally leave a venture mathematically impossible to
+  // ever fill at all.
+  return Math.ceil(targetGold * maxContributorShare);
+}
+
 export function computeAcceptedContribution(
   currentTotal: number,
   targetGold: number,
@@ -113,7 +125,10 @@ export function computeAcceptedContribution(
 ): number {
   const remainingInTarget = targetGold - currentTotal;
   if (remainingInTarget <= 0) return 0;
-  const maxPerContributor = Math.ceil(targetGold * maxContributorShare);
+  const maxPerContributor = contributorShareCap(
+    targetGold,
+    maxContributorShare,
+  );
   const remainingForContributor =
     maxPerContributor - contributorAlreadyContributed;
   if (remainingForContributor <= 0) return 0;

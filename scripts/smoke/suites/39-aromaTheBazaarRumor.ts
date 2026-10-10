@@ -1373,21 +1373,4 @@ export async function aromaTheBazaarRumorSuite(run: SmokeRun): Promise<void> {
       !carriesADash("src/server/realtime/wiring/bazaar.ts"),
     "every file the bazaar's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
   );
-
-  // =====================================================================
-  // [D6: Free Captain: Opportunist] The plan's clause for this feature,
-  // and the whole of it: "Once per voyage, fulfill any one pathbound
-  // order without joining that path, at a forty percent payout penalty."
-  //
-  // The checks are split the way the feature is. The allowance is
-  // arithmetic and is read here without a server, because nothing in this
-  // feature travels: the borrow is a permission the captain's own client
-  // holds, the fill is the fill the manifest already ran, and the one
-  // wire fact it adds is the counter the leg report files, which is read
-  // where every leg report is read (see the telemetry spine above). The
-  // board a captain meets is dealt through the engine's own lifecycle
-  // rather than assembled by hand, the same way the pathbound board above
-  // is dealt, so what is read here is the board a Free Captain really
-  // meets in the Orders phase.
-  // =====================================================================
 }

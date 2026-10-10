@@ -428,7 +428,7 @@ function answerFor(input: {
     : `No verdict yet: ${first.short}.`;
 }
 
-// The gates as a reader-facing list, used by the answer and the gaps: each
+// The gates as a list meant to be read, used by the answer and the gaps: each
 // gate as its label and its reading, which is what an operator has to look
 // up rather than a slug.
 function lines(gates: readonly LaunchGate[]): string {

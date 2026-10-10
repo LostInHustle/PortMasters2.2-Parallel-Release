@@ -23,7 +23,7 @@ import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameMode } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import { getIntelCost } from "@/lib/game/engine";
-import { cn } from "@/lib/utils";
+import { cn, formatTime } from "@/lib/utils";
 import { CloseFooter } from "./CloseFooter";
 import {
   Sparkles,
@@ -200,10 +200,7 @@ export function NotificationHistoryModal({
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
                     <span className="text-base">{n.icon}</span> {n.title}
                     <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {new Date(n.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatTime(new Date(n.at))}
                     </span>
                   </div>
                   <div className="space-y-0.5">
@@ -307,7 +304,7 @@ export function RumorBoardModal({
 /**
  * Host only confirmation before a restart goes out over the wire. A
  * restart resets every captain currently in the harbor back to round one,
- * not just whoever clicks the button, and re opens the room to new joins,
+ * not just whoever clicks the button, and reopens the room to new joins,
  * so it's worth one extra click to make sure that's actually intended.
  *
  * Wears the vermilion gradient so the consequence reads at a glance: a

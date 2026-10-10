@@ -212,7 +212,7 @@ export async function theFirstVoyageSuite(): Promise<void> {
   // parked on: the artisan page's advice used to end on the manual's own
   // comparison of the two modes' stakes, a second telling of a rule the
   // mode record owns and prints a page earlier. The page is a function of
-  // the mode now (the third of the manual's record-reading pages), and
+  // the mode now (the third of the manual's pages that read the record), and
   // the retyped sentence has nowhere left to sit. Read as source like
   // the checks above, with the comments stripped, so the note that
   // records the old sentence does not read as the sentence itself.

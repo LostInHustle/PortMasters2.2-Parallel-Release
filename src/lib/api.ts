@@ -83,6 +83,13 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+// The two 404 answers more than one route gives, each said once: a room
+// the caller named that is not there, and a captain the caller named that
+// is not there. Two routes answering one absence with two spellings is
+// how a caller learns to match on prose instead of on the absence.
+export const ROOM_NOT_FOUND = "Room not found";
+export const CAPTAIN_NOT_FOUND = "Captain not found";
+
 export const api = {
   // Auth
   // The signed in account plus the role the operator console gates on. The
@@ -225,7 +232,7 @@ export const api = {
     ),
 
   // Daily Check In: claim today's reward. Returns claimed:false (not an
-  // error) when today was already claimed, so the caller can just re render.
+  // error) when today was already claimed, so the caller can just render as usual.
   checkIn: () =>
     jfetch<{
       claimed: boolean;

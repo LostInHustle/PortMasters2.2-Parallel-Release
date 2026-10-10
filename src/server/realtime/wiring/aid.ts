@@ -23,6 +23,12 @@ import {
 } from "../loans";
 import { emitToUser, roomMembers } from "../presence";
 
+// Both books answer with this when the loan a press named is already gone:
+// the repayment handler below and the backing handler under it look the
+// same list up for two different presses, so the sentence is said once
+// here rather than spelled twice and drifting.
+const LOAN_GONE = "That loan is no longer outstanding.";
+
 export function wireAid(io: Server, socket: Socket): void {
   socket.on("aid:state:request", (payload: { roomId?: string }) => {
     const s = seated(socket, payload);
@@ -129,7 +135,7 @@ export function wireAid(io: Server, socket: Socket): void {
       }
       const loan = loanList(roomId).find((l) => l.debtId === debtId);
       if (!loan) {
-        refuse("That loan is no longer outstanding.");
+        refuse(LOAN_GONE);
         return;
       }
       if (loan.borrowerId !== s.userId) {
@@ -222,7 +228,7 @@ export function wireAid(io: Server, socket: Socket): void {
         socket.emit("backing:fail", {
           roomId,
           debtId,
-          reason: "That loan is no longer outstanding.",
+          reason: LOAN_GONE,
         });
         return;
       }

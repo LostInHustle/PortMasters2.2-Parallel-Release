@@ -20,9 +20,9 @@
 // The map is a room's for the voyage and is cleared the way the audit's
 // is: on a restart and when a room is deleted, beside clearAudits (see
 // the clear block in ./index). A joiner is handed the ledger directly
-// (see the hand-out in ./wiring/room-join), exactly as a joiner is handed
+// (see the handoff in ./wiring/room-join), exactly as a joiner is handed
 // the audit's reveal, because public state a reload can miss is state the
-// table has to re-say.
+// table has to say again.
 //
 // Nothing here trusts a report's shape: the fields are read and bounded
 // in ./wiring/boons before this module is ever reached, and what arrives

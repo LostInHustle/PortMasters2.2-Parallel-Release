@@ -58,7 +58,7 @@ export function standingBoonId(
  * The seat's work, done the way the captain wrote it, for the three seats
  * whose work is a set of presses rather than the departure itself.
  *
- * A no-op for every other phase, and that is not an omission: Parley's
+ * It does nothing for every other phase, and that is not an omission: Parley's
  * work happens over the offer board rather than in the engine, so there
  * is no pure path for an instruction to take (a gap ../standing's header
  * names), the module draft rolls a fresh board every round so there is

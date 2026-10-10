@@ -30,6 +30,12 @@ import { offerStandingRefusal, resolveNamedBuyer } from "./consent-shared";
 // off, said once so its four handlers cannot drift apart.
 const MARKET_OFF = "The escort market is not running in this harbor.";
 
+// The refusal a handler answers with when the offer it was handed is gone:
+// turned down, taken back, or settled out from under the press. Three
+// handlers race the same board and a captain can meet any of them, so the
+// sentence is said once here for the same reason MARKET_OFF is.
+const OFFER_GONE = "That offer is no longer on the board.";
+
 export function wireEscortContracts(io: Server, socket: Socket): void {
   //
   // [D3: Convoy: the Escort Contract] The market a Convoy captain sells
@@ -186,7 +192,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const board = escortContracts.list(roomId);
       const opening = board.find((c) => c.id === contractId);
       if (!opening) {
-        fail("That offer is no longer on the board.");
+        fail(OFFER_GONE);
         return;
       }
       if (opening.status === "agreed") {
@@ -265,7 +271,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const board = escortContracts.list(roomId);
       const offer = board.find((c) => c.id === contractId);
       if (!offer) {
-        fail("That offer is no longer on the board.");
+        fail(OFFER_GONE);
         return;
       }
       if (offer.status === "declined") {
@@ -335,7 +341,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       // them pressing again: each case is refused in the words the two
       // handlers above use for the same two states rather than dropped.
       if (!mine) {
-        fail("That offer is no longer on the board.");
+        fail(OFFER_GONE);
         return;
       }
       if (mine.sellerUserId !== s.userId) {

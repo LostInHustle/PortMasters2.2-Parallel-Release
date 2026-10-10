@@ -93,7 +93,7 @@ export const AUDIT_VOTE_RULE =
  * has to take on faith.
  *
  * The target's id is in the seed rather than the round alone so that two
- * votes in one leg (which the once-per-voyage rule forbids, and which this
+ * votes in one leg (which the once per voyage rule forbids, and which this
  * seed would otherwise make interchangeable) cannot sample the same way.
  */
 export function auditSeed(
@@ -320,7 +320,7 @@ export function auditNamesNeeded(roster: number): number {
 }
 
 /**
- * The nominations a majority may still count, re-derived against the room
+ * The nominations a majority may still count, derived again against the room
  * that exists now.
  *
  * The vote map outlives the voters: a captain nominates and then goes
@@ -328,7 +328,7 @@ export function auditNamesNeeded(roster: number): number {
  * while the roster below it shrinks. Counting that vote would let a
  * captain the room has stopped counting carry a majority with nobody
  * behind it, which is the one thing the roster denominator above exists
- * to prevent, so every nomination is re-judged the way a fresh one is at
+ * to prevent, so every nomination is judged again the way a fresh one is at
  * the door: both the voter and the captain they named must still be on
  * the active roster. A vote either of them has left behind is dropped
  * rather than frozen, and the room is free to nominate again in the same

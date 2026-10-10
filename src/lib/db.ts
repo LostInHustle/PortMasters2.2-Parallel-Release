@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+import type { PublicUser } from "@/types/realtime/presence";
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
@@ -38,12 +40,11 @@ export const ROOM_WITH_MEMBERS = {
   },
 } as const;
 
-export type PublicUser = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-};
+// Forwarded so the lobby page keeps the import path it has. The
+// canonical home is the wire directory, which is what both halves of the
+// app read (see PublicUser in @/types/realtime/presence), and a second
+// declaration here was only ever a way for the two to drift apart.
+export type { PublicUser };
 
 /**
  * The four fields every wire user carries, picked off a row that holds

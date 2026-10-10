@@ -15,6 +15,7 @@ import { TIDEWATCH_SURGE_THRESHOLD } from "@/lib/game/constants/world";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
+import { voyageRoundsFor } from "@/lib/game/mode";
 import { normalizePhase, seatOf } from "@/lib/game/phases";
 import { type Phase } from "@/lib/game/types";
 import { clearAid } from "../aid";
@@ -49,7 +50,6 @@ type GameStatusReport = {
   phaseLabel?: string;
   gold?: number;
   reputation?: number;
-  shipLevel?: number;
   gameOver?: boolean;
   renownLevel?: number;
   // [H7: Maroon and the Harbormaster] The two marks a failed voyage
@@ -85,7 +85,12 @@ export function wireStatusHeartbeat(io: Server, socket: Socket): void {
     // report puts someone further along, and recheck readiness.
     const room = await db.room.findUnique({
       where: { id: roomId },
-      select: { started: true, voyageEpoch: true, mode: true },
+      select: {
+        started: true,
+        voyageEpoch: true,
+        mode: true,
+        difficulty: true,
+      },
     });
     if (room) {
       await resolveExpiredVentures(
@@ -109,6 +114,7 @@ export function wireStatusHeartbeat(io: Server, socket: Socket): void {
     const curRank = checkpointRank(room?.mode, cp.round, cp.phase);
     if (
       room?.started &&
+      namesALegOfTheVoyage(broadcast.round, room.mode, room.difficulty) &&
       newRank !== null &&
       (curRank === null || newRank > curRank)
     ) {
@@ -124,7 +130,7 @@ export function wireStatusHeartbeat(io: Server, socket: Socket): void {
     // that says somebody is there to be moved. A seat with no budget of
     // its own (the pier, the phases that are not steps of the leg) and a
     // server with the clock switched off both come back with the
-    // deadline still null, which is what keeps this a no-op for them.
+    // deadline still null, which is what keeps this doing nothing for them.
     if (room?.started && cp.endsAt === null) armPhaseClock(io, roomId, cp);
     withdrawVoteForAScreen(cp, broadcast.phase, s.userId);
     await broadcastReadyState(io, roomId, cp);
@@ -167,6 +173,38 @@ function withdrawVoteForAScreen(
   const seat = seatOf(named);
   if (seat === named || seat !== cp.phase) return;
   cp.readyUserIds.delete(userId);
+}
+
+// Whether the round a report names is one the voyage actually has. The
+// rank comparison the caller makes is only meaningful between two rounds
+// of the same voyage, and a report is free to name any number at all.
+// The engine never sends one past the end (the round close hands off to
+// the endgame before a round the lap does not have can exist), so a frame
+// naming one was not written by the game, whether it came from a stale
+// build, a modified client, or a replay of another voyage's frame.
+// Admitting it would hand this report the top rank there is, and the
+// whole room would follow the checkpoint to a leg that does not exist:
+// the room's row is written there, the leg clock arms on it, every honest
+// client's catch up fires to stay with the room, and the voyage the
+// captains are actually playing is behind them.
+//
+// The bound is the voyage's own length read from the room's row, which is
+// the same record the conclusion judges finishers against (see
+// voyageRoundsFor), so the guard cannot disagree with the lap under way.
+// A whole number of at least one, because a round is what the engine
+// counts with: maxRounds legs from one. A fractional or zero round is the
+// same kind of frame as one past the end and is refused for the same
+// reason.
+function namesALegOfTheVoyage(
+  round: number,
+  mode: unknown,
+  difficulty: unknown,
+): boolean {
+  return (
+    Number.isInteger(round) &&
+    round >= 1 &&
+    round <= voyageRoundsFor(mode, difficulty)
+  );
 }
 
 // Only the newest socket for a user is allowed to update the
@@ -215,7 +253,6 @@ function buildStatusFrame(
     phaseLabel: payload?.phaseLabel ?? "",
     gold: payload?.gold ?? 0,
     reputation: payload?.reputation ?? 0,
-    shipLevel: payload?.shipLevel ?? 0,
     gameOver: Boolean(payload?.gameOver),
     // Passed through rather than defaulted, so a captain whose
     // client did not report a level is simply unknown to the roster
@@ -241,7 +278,6 @@ function buildStatusFrame(
     // an explicit true is a hungry crew and anything else reads as a
     // fed one at every reader.
     shortRations: reportedMark(payload?.shortRations),
-    at: Date.now(),
   };
 }
 
@@ -312,7 +348,7 @@ async function advanceCheckpointFromReport(
   // moves, so the one place the spine is told about it: every
   // event it stamps afterwards belongs to this leg. Recorded only
   // when the leg moved forward, which the note decides, so a
-  // captain re reporting the checkpoint they are already standing
+  // a repeated report of the checkpoint they are already standing
   // at cannot fill a record with the same leg twice.
   noteLegAdvanced(roomId, cp.round);
   // [B4: the log surfaces] And the same move, into the room's log,

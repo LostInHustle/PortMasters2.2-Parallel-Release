@@ -15,12 +15,12 @@
 //
 //   What this captain has handed over is their own, lives in the voyage
 //   state, is persisted with it, and is what a reload or a server restart
-//   re-reports from.
+//   reports from again.
 //
 //   The harbor's total arrives on the broadcast. It is the only one of the
 //   three that can be stale, so nothing is ever *shown* from it alone: the
 //   screen reads the higher of the total and this captain's own record, so
-//   a delivery is visible the instant it happens and an in-flight
+//   a delivery is visible the instant it happens and a stale
 //   broadcast can never take one away. That one read is also what a
 //   handover is capped by, which is the half a full commission turns on:
 //   the goods a press would take are what the commission still has room
@@ -48,13 +48,13 @@
 //
 // The report is cumulative and the server merges by max, which is what
 // makes all of this idempotent: reporting twice changes nothing, reporting
-// late changes nothing, and a reconnect that re-reports everything is the
+// late changes nothing, and a reconnect that reports everything is the
 // repair path rather than a hazard.
 // =====================================================================
 
 import {
-  ObjectiveProgress as ObjectiveProgressPayload,
-  ObjectiveReport as ObjectiveReportPayload,
+  ObjectiveProgressPayload,
+  ObjectiveReportPayload,
 } from "@/types/realtime/objectives";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
@@ -74,13 +74,9 @@ import {
 } from "@/lib/game/engine";
 import { normalizeMode } from "@/lib/game/mode";
 import type { GameContext, GameState } from "@/lib/game/types";
+import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
 
-// The same cadence the captain's own status rides on (see
-// use-game-session.ts): enough to feel immediate, sparse enough that a
-// captain emptying a hold of six goods sends one report rather than six.
-const REPORT_DEBOUNCE_MS = 120;
-
-// How often a captain re-reports what they have handed over. This is the
+// How often a captain sends their report again. This is the
 // heal for a server restart: the tally is transient by design, so the
 // clients are the record, and one report every few seconds costs nothing
 // and rebuilds the harbor's board from nothing.
@@ -206,16 +202,19 @@ export function useObjective(
     socket.emit("objective:report", payload);
   }, [socket, roomId, objective]);
 
-  // Every change to the hold's contribution goes out, debounced, so a
-  // delivery and the goods it took travel in one frame.
+  // Every change to the hold's contribution goes out, debounced on the
+  // cadence every live channel rides on (see STATUS_BROADCAST_MS in
+  // @/lib/session/use-status-beacon), so a delivery and the goods it took
+  // travel in one frame and a captain emptying a hold of six goods sends
+  // one report rather than six.
   const contribution = JSON.stringify(delivered);
   useEffect(() => {
     if (!socket || !roomId || !objective) return;
-    const timer = setTimeout(report, REPORT_DEBOUNCE_MS);
+    const timer = setTimeout(report, STATUS_BROADCAST_MS);
     return () => clearTimeout(timer);
   }, [socket, roomId, objective, contribution, report]);
 
-  // The heal. Also re reports on a new connection, which is the same
+  // The heal. Also reports again on a new connection, which is the same
   // repair for a socket that dropped rather than a server that restarted.
   useEffect(() => {
     if (!socket || !roomId || !objective) return;

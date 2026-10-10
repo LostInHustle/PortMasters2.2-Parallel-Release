@@ -58,7 +58,7 @@ export function forgetStatus(roomId: string, userId: string): void {
 // not while another tab or a just reconnected socket is still around
 // to keep it current.
 // Every writer of userSockets drops the whole entry the moment its last
-// socket goes (presence.ts reaping, auth.ts re authenticating as somebody
+// socket goes (presence.ts reaping, auth.ts authenticating again as somebody
 // else), so a missing entry and an empty one are the same fact here and
 // there is no separate size test to write.
 export function forgetStatusIfLastSocket(

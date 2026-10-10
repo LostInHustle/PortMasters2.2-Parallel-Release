@@ -19,12 +19,6 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// A card's head: one icon, one title, and whatever controls belong to that
-// card on the right. The icon takes its colour from the call site, because
-// colour is how a card says which part of the harbor it is.
-//
-// No second line of explanation sits under the title, and no prop sits
-// here unread for one: no card wants a subtitle, so there is none.
 export function CardHead({
   icon: Icon,
   tone,

@@ -25,7 +25,7 @@ import type { PhasePanelProps } from "./PhaseShared";
  * An overlay rather than a phase, and both halves of that are the plan's
  * reading. A moment lands at a seat the captain already stands at (one
  * fixed leg for the charter, up to five triggers at three different
- * seats for the milestones), so a phase would have to be re-entered from
+ * seats for the milestones), so a phase would have to be restarted from
  * each of them and every other captain's screen would have to move for
  * one captain's moment: the overlay is drawn over that seat, and the
  * fleet's lap is untouched. And answering is a local act, the same shape
@@ -47,7 +47,7 @@ import type { PhasePanelProps } from "./PhaseShared";
  * passes the same guard and the same card table its own answer path
  * validates against (see answerMilestone and answerCharter in
  * @/lib/game/engine), so the cards a captain presses are exactly the
- * cards a press may take, and both tables are derived off a round-less
+ * cards a press may take, and both tables are derived off the voyage's
  * seed, so a reload between the moment becoming due and the answer
  * cannot reshuffle the cards under the captain's eyes.
  *
@@ -91,7 +91,7 @@ export function MomentOverlay({
   // moment names its own act.
   actionLabel: string;
   // The answer a press writes: the card's id goes to the engine, which
-  // re-derives the trio and refuses a stale click.
+  // derives the trio again and refuses a stale click.
   answer: (game: GameState, cardId: string, logs: string[]) => void;
 }) {
   // Nothing at all rather than an empty frame: a question that is not

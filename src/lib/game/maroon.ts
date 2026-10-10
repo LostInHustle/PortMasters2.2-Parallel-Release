@@ -44,6 +44,15 @@ export const MAROON_SHARE = 0.5;
 // work in (see the Harbor Pulse's own per good nudge).
 export const PORT_SHIFT_FRACTION = 0.1;
 
+// The same tenth as the whole number every line of copy prints, derived
+// rather than written beside the fraction so the figure a captain reads
+// and the figure the engine leans prices by cannot drift apart. The
+// rounding is what makes the derived value whole: a tenth of a hundred is
+// not arithmetically a whole number in this language, and
+// "10.000000000000002 percent" is a number no captain should ever be
+// shown.
+export const PORT_SHIFT_PERCENT = Math.round(PORT_SHIFT_FRACTION * 100);
+
 // The share of the roster a maroon vote carries, in the words the vote
 // card and the Harbormaster's hand state it in. It lives here, beside the
 // threshold in maroonCarried, because that threshold is the arithmetic
@@ -175,12 +184,11 @@ export function portShiftMultiplier(
  * landed yet, and a call made last leg is the one the market on screen was
  * priced against.
  *
- * The percent is rounded because a tenth of a hundred is not
- * arithmetically a whole number in this language, and "10.000000000000002
- * percent" is a clause no captain should ever be shown.
+ * The percent is read from PORT_SHIFT_PERCENT above, which is where its
+ * rounding is accounted for.
  */
 export function portShiftLine(shift: PortShift): string {
-  const percent = Math.round(PORT_SHIFT_FRACTION * 100);
+  const percent = PORT_SHIFT_PERCENT;
   const way = shift.direction > 0 ? "higher" : "lower";
   return `${shift.port}: every price ${percent} percent ${way}`;
 }

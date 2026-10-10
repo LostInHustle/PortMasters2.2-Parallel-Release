@@ -258,7 +258,7 @@ export async function escortContractSuite(
     "and a claimed contract is public while the figure it carries is not: the seller reads what the raid would have taken, and everyone else reads that it was claimed",
   );
 
-  // The fourth state, and the three readers it moved. A turn-down is the
+  // The fourth state, and the three readers it moved. A declined row is the
   // one row that is past the offer stage without settling anything, which
   // is the shape every reader that asked "is this still an offer" rather
   // than "is this an agreement" got wrong the moment the state existed:

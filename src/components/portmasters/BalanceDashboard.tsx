@@ -13,7 +13,7 @@
 // and this file prints what it was handed without deciding anything of its
 // own. That is what keeps the page and the command line report from ever
 // disagreeing about a number: both ask the same reader, and neither
-// re-derives what the reader already said.
+// recomputes what the reader already said.
 //
 // The front page is the strip at the top: the plan's front page number,
 // the Barge revenue share, and then the three questions, each with the

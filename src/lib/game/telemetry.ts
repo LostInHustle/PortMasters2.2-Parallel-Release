@@ -74,7 +74,7 @@ type TelemetryFamily = "loop" | "market" | "social" | "business";
 // family: two events for one accept would have a reader adding the same
 // goods up twice.
 export interface TelemetryPayloads {
-  // ---- loop ----
+  // ==== loop ====
   // A round closed and the next one opened. This is the spine's clock:
   // every other event is placed by the leg it happened in, and this is
   // what says which legs a voyage actually reached.
@@ -310,7 +310,7 @@ export interface TelemetryPayloads {
     path: string;
     role: string;
   };
-  // ---- market ----
+  // ==== market ====
   // The barter board's three outcomes. All three count the same side of an
   // offer, the units its poster put up, so the three add up: what was
   // posted, less what was filled and what expired, is what is still
@@ -320,7 +320,7 @@ export interface TelemetryPayloads {
   offer_posted: { leg: number; actor: string; goods: number };
   offer_filled: { leg: number; actor: string; goods: number };
   offer_expired: { leg: number; goods: number };
-  // ---- social ----
+  // ==== social ====
   // One message in the harbor's own room chat. The lobby square and the
   // direct threads are account level rather than voyage level, so they
   // are not events in a voyage record.
@@ -351,7 +351,7 @@ export interface TelemetryPayloads {
   // to the table because a record that says a voyage was played with a
   // report in it has to be readable without the database that holds it.
   report_filed: { leg: number; actor: string; target: string };
-  // ---- business ----
+  // ==== business ====
   // A captain left a voyage that had started. The leg is the abandon
   // point the plan asks for, and it is recorded even when somebody else
   // finishes the voyage, because "abandon rate by leg" counts captains

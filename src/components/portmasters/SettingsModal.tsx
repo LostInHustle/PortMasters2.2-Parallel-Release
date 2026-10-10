@@ -90,7 +90,7 @@ export function SettingsModal({
   return (
     <AnimatePresence>
       {open && (
-        <ModalOverlay onClose={() => onOpenChange(false)}>
+        <ModalOverlay label="Settings" onClose={() => onOpenChange(false)}>
           <ModalSheet>
             {/* Header */}
             <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-6">
@@ -197,7 +197,7 @@ export function SettingsModal({
                   }
                 />
                 <ToggleRow
-                  label="Tidewatch Surge"
+                  label="Tidewatch Alerts"
                   description={`The harbor crossing ${TIDEWATCH_SURGE_THRESHOLD} combined Reputation`}
                   checked={notifTidewatch}
                   onChange={() =>

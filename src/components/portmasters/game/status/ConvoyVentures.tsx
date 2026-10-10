@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
   CONVOY_VENTURE_MAX_ROUNDS_AHEAD,
   CONVOY_VENTURE_MAX_TARGET,
   CONVOY_VENTURE_MIN_ROUNDS_AHEAD,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/game/constants/world";
 import {
   computeVentureDeadlineBounds,
+  contributorShareCap,
   ventureAlreadySpentReason,
 } from "@/lib/game/convoy";
 import type { GameState } from "@/lib/game/types";
@@ -181,9 +181,7 @@ export function ConvoyVentures({
               Math.round((v.total / v.targetGold) * 100),
             );
             const mine = v.contributions.find((c) => c.userId === myUserId);
-            const myShareCap = Math.ceil(
-              v.targetGold * CONVOY_VENTURE_MAX_CONTRIBUTOR_SHARE,
-            );
+            const myShareCap = contributorShareCap(v.targetGold);
             const myRemainingShare = myShareCap - (mine?.amount ?? 0);
             const atMyShareCap = myRemainingShare <= 0;
             return (

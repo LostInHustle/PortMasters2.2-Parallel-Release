@@ -2,7 +2,7 @@
 // Room join and leave: taking a seat at a table, and giving it up.
 // =====================================================================
 
-import { type ObjectiveProgress } from "@/types/realtime/objectives";
+import { type ObjectiveProgressPayload } from "@/types/realtime/objectives";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
@@ -198,7 +198,7 @@ export function wireRoomJoin(
     if (roomObjectiveTallies.has(roomId)) {
       const objective = await objectiveForRoom(roomId);
       if (objective) {
-        const board: ObjectiveProgress = {
+        const board: ObjectiveProgressPayload = {
           roomId,
           total: objectiveTotalFor(roomId, objective),
         };
@@ -214,7 +214,7 @@ export function wireRoomJoin(
     // hand over: a harbor that has not audited anyone costs no frame.
     const audit = auditRevealFor(roomId);
     if (audit) io.to(socket.id).emit("audit:reveal", audit);
-    // [F5: public offers] The fleet's ledger rides the same hand-out and
+    // [F5: public offers] The fleet's ledger rides the same handoff and
     // is public for the plainer reason: the plan's own sentence, every
     // offer is public. A captain who reloads into the middle of a draft
     // has to see what the table has already kept, or the argument the

@@ -47,9 +47,7 @@ export type GameStatusUpdate = {
   phaseLabel: string;
   gold: number;
   reputation: number;
-  shipLevel: number;
   gameOver: boolean;
-  at: number;
   renownLevel?: number;
   bankrupt?: boolean;
   marooned?: boolean;

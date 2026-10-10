@@ -166,7 +166,7 @@ async function maroonRoomFacts(roomId: string): Promise<MaroonRoom | null> {
  * count after a nomination, and the count a card is answered with when it
  * opens. One builder because the numbers have to agree whichever way a
  * captain hears them, and because this vote reached the count later than
- * the audit did: the book is re-derived against the room that exists now,
+ * the audit did: the book is derived again against the room that exists now,
  * exactly as the audit's is (see pruneStaleVotes, which lives with the
  * audit's arithmetic and is read here rather than copied, since both
  * books are divided by the same roster), and the captains still to speak
@@ -205,7 +205,7 @@ function maroonTallyFrame(
  * a shared function because the two votes differ in exactly the three
  * places this file already differs from that one: the majority, the frame
  * and the fact written when it carries. What happens before that commit is
- * shared rather than copied (the re-derived book and the walk that decides
+ * shared rather than copied (the book derived again and the walk that decides
  * it, see pruneStaleVotes and carriedTarget in @/lib/game/audit), and what
  * a shared settle would have to take as parameters is everything after it:
  * a reveal read out of the target's own save against a display name read
@@ -218,35 +218,35 @@ function maroonTallyFrame(
  * saying plainly what that race is, since this is the vote that costs a
  * captain their ship:
  *
- * The book is re-derived against the room that exists now, which is a
+ * The book is derived again against the room that exists now, which is a
  * second read rather than the door's, so a captain who leaves the harbor
  * in the gap between the carry being decided and the result's own read of
  * the membership row cannot lose the carry. Returning there would leave
  * the harbor having been shown the tally that carried and never having
  * been shown the result, which is the worst shape this vote can fail in: a
  * majority visibly voted a captain ashore and nothing happened. The loop
- * re-derives instead, which takes the departed captain's nominations out of
+ * derives it again instead, which takes the departed captain's nominations out of
  * the book and decides the carry again on what is left, and the room is
  * told whenever the count it is reading moves. It turns at most once per
  * nomination dropped, so it cannot spin.
  *
- * The other half is the same-tick pair: two ballots that arrive together
+ * The other half is the pair in the same tick: two ballots that arrive together
  * can both decide the same carry, and the second to resume finds the room
  * already answered here and stops, so one carry is one result, one mark on
  * the target's line, one log line and one frame.
  *
- * `tell` is the caller's answer to whether the room is owed a frame for
- * this pass: true for an accepted nomination, which is always news, and
- * false for the re-derive a refusal was made of, which tells the room only
- * when the book actually moved under it.
+ * The first pass is always told, because it follows an accepted
+ * nomination, which is always news; every pass after it is a recount a
+ * refusal prompted, and those tell the room only when the book actually
+ * moved under it.
  */
 async function settleMaroon(
   io: Server,
   roomId: string,
   round: number,
   state: RoomMaroon,
-  tell: boolean,
 ): Promise<void> {
+  let tell = true;
   for (;;) {
     const roster = await activeRosterSet(roomId);
     const book = pruneStaleVotes(state.votes, roster);
@@ -264,7 +264,7 @@ async function settleMaroon(
         ),
       );
     }
-    // Every pass after this one is a re-derive rather than a nomination, so
+    // Every pass after this one recounts rather than nominates, so
     // only a count that actually moved is worth a second frame.
     tell = false;
     const carried = maroonCarried(book, roster.size);
@@ -324,7 +324,7 @@ async function settleMaroon(
  * arrives for a captain the room has stopped counting is refused rather
  * than counted, because the arithmetic below divides by that roster and a
  * vote outside it would move a majority with nobody behind it, and the
- * same roster re-judges the votes already in the book, so a nomination
+ * same roster recounts the votes already in the book, so a nomination
  * the room has stopped counting is out of the tally whether it was cast
  * before or after its captain left.
  *
@@ -343,7 +343,7 @@ async function settleMaroon(
  * result only ever goes out once. The carry itself is the walk in
  * settleMaroon above, which is also where the two ways a carry could be
  * lost or doubled are closed, and which runs for a refusal as well: a
- * refusal tells the room nothing unless the re-derive behind it moved the
+ * refusal tells the room nothing unless the recount behind it moved the
  * book, so a captain pressing twice cannot move the count the table is
  * arguing over.
  */
@@ -365,14 +365,14 @@ export async function recordMaroonVote(
   if (state.result)
     return "The harbor has already voted one of its own ashore this voyage.";
   const roster = await activeRosterSet(roomId);
-  // The book is re-derived before the door rather than after it, for the
+  // The book is derived again before the door rather than after it, for the
   // reason the audit's is: a nomination the prune drops is the room's news
   // rather than this ballot's, and a refusal made because a captain left
   // still leaves the room with the count that captain's leaving produced.
   const book = pruneStaleVotes(state.votes, roster);
   const moved = book.size !== state.votes.size;
   state.votes = book;
-  // The room's count, owed only where the re-derive moved it: a refused
+  // The room's count, owed only where the recount moved it: a refused
   // ballot leaves the book alone otherwise, and the count the room is
   // already reading is still the count.
   const refuse = (sentence: string): string => {
@@ -419,7 +419,7 @@ export async function recordMaroonVote(
     actor: voterId,
     target: targetUserId,
   });
-  await settleMaroon(io, roomId, round, state, true);
+  await settleMaroon(io, roomId, round, state);
   return null;
 }
 

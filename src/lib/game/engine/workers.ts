@@ -270,7 +270,7 @@ export function processProduction(state: GameState, logs: string[]) {
  * the two are one reader for a reason. Four surfaces used to walk the
  * roster themselves, and none of them knew about the Jade Pavilion
  * pledge: a sponsored hand's first wage is waived, so every surface that
- * counted hands and multiplied by the trade's wage over-billed a pledged
+ * counted hands and multiplied by the trade's wage overbilled a pledged
  * captain by exactly one wage. The button on the settle screen warned of
  * a bankruptcy the run would never deliver, the harbor aid request was
  * seeded with a shortfall that did not exist (it gates on affordability),
@@ -309,6 +309,33 @@ export function wageBill(state: GameState): WageBillRow[] {
   });
 }
 
+/**
+ * The bill keyed by worker type, for the two screens that join it against
+ * the unlocked roster rather than printing it straight (the status rail
+ * and Worker Management). The key is the engine's own id, which is also
+ * what WORKER_TYPES and the roster share, so a missing row reads as a
+ * type the roster does not know rather than a type with an unpaid wage.
+ */
+export function payrollIndex(state: GameState): Map<WorkerTypeId, WageBillRow> {
+  return new Map(wageBill(state).map((b) => [b.id, b]));
+}
+
+/**
+ * The Gold a payroll run is about to charge: the rows above, added up.
+ * payWages reads this beside its own copy of the bill, and the three
+ * screens that warn a captain before the charge lands (the settle sheet,
+ * the status rail's obligations figure and the advisor's settlement
+ * advice) read the same total, so what is billed and what is warned of
+ * are one walk of one roster.
+ *
+ * It has to be read BEFORE payWages clears any Jade Pavilion waiver: the
+ * flag promises to cover exactly one wage and is spent in that clearing
+ * pass, so the same roster read after the pass bills nothing.
+ */
+export function wagesDue(state: GameState): number {
+  return wageBill(state).reduce((sum, b) => sum + b.due, 0);
+}
+
 export function payWages(
   state: GameState,
   logs: string[],
@@ -318,13 +345,18 @@ export function payWages(
   // roster rather than five. A type whose only artisan is sponsored owes
   // nothing but is kept, because it still has a pledge to report below.
   const bills = wageBill(state).filter((b) => b.count > 0 || b.sponsored > 0);
+  // The total is read here, beside the bill and before the pass below,
+  // for the same reason the bill is: wagesDue reads this roster again, and
+  // once the pass below has spent the waivers a sponsored hand's first
+  // wage reads as owed again.
+  const total = wagesDue(state);
   // This is also where a Jade Pavilion pledge is spent. The waiver is
   // cleared before any early return below, because it covers exactly one
   // payroll run whether or not a bill follows from it: leaving it set
   // would quietly excuse that artisan every round for the rest of the
-  // voyage instead of only the round they joined. The bill above was
-  // read before this line, which is what lets one pass both print the
-  // pledge and charge the wage it replaced.
+  // voyage instead of only the round they joined. The bill and its
+  // total above were read before this line, which is what lets one pass
+  // both print the pledge and charge the wage it replaced.
   for (const w of WORKER_TYPES) {
     for (const worker of state.workers[w.id] ?? []) {
       if (!worker.freeFirstWage) continue;
@@ -337,7 +369,6 @@ export function payWages(
         `🪷 Jade Pavilion covers the wage for ${b.sponsored} ${b.sponsored === 1 ? b.label : b.plural} this round.`,
       );
   }
-  const total = bills.reduce((sum, b) => sum + b.due, 0);
   if (total === 0) return true;
   if (state.money >= total) {
     state.money -= total;
@@ -371,11 +402,24 @@ export function payWages(
   return "bankruptcy";
 }
 
+/**
+ * The maintenance fee a round is about to charge: the flat fee every
+ * voyage carries plus whatever an installed module has added to it (the
+ * overdrive engine's surcharge, reconciled against the hull on load by
+ * ./boons). payMaintenance below charges exactly this, and the three
+ * screens that quote the bill before it lands (the settle sheet, the
+ * status rail's obligations figure and the advisor's settlement advice)
+ * read their maintenance line from here.
+ */
+export function maintenanceDue(state: GameState): number {
+  return state.fixedCost + state.maintenancePenalty;
+}
+
 export function payMaintenance(
   state: GameState,
   logs: string[],
 ): true | "bankruptcy" {
-  const cost = state.fixedCost + state.maintenancePenalty;
+  const cost = maintenanceDue(state);
   // Maintenance is its own expense line on both payment paths below, and the
   // same double count the wage note above describes applied to it: the fee
   // was added to roundCosts and totalCosts as well, while the settlement

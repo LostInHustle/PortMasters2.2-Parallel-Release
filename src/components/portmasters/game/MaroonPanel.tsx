@@ -25,7 +25,7 @@ import { useState } from "react";
 import type { PublicUser } from "@/lib/api";
 import {
   MAROON_VOTE_SHARE,
-  PORT_SHIFT_FRACTION,
+  PORT_SHIFT_PERCENT,
   portShiftLine,
 } from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
@@ -39,7 +39,8 @@ import {
   VoteSeatPicker,
   type Marks,
 } from "@/components/portmasters/game/VoteSeatPicker";
-import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
+import { VoteCardShell } from "./VoteCardShell";
+import { RefusalLine } from "../shared";
 
 type Maroon = ReturnType<typeof useMaroon>;
 
@@ -132,7 +133,11 @@ export function MaroonVoteCard({
               callLabel="Call the vote"
               pickLabel={(name) => `Put ${name} ashore`}
             />
-            <VoteRefusal error={maroon.error} onDismiss={maroon.clearError} />
+            <RefusalLine
+              className="mt-2"
+              error={maroon.error}
+              onDismiss={maroon.clearError}
+            />
             {/* The block below owns every word of the count, the captain's
                 own name and what the vote does with the names it needs:
                 a panel's own half of that reading would be a second
@@ -278,9 +283,9 @@ export function HarbormasterConsole({
       </h3>
       <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
         The harbor put you ashore and left you its own lever: once a leg, name a
-        port and lean every price at it by{" "}
-        {Math.round(PORT_SHIFT_FRACTION * 100)} percent, up or down. The call is
-        public, and the market that opens next leg is the one that answers it.
+        port and lean every price at it by {PORT_SHIFT_PERCENT} percent, up or
+        down. The call is public, and the market that opens next leg is the one
+        that answers it.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
         <Select
@@ -310,7 +315,8 @@ export function HarbormasterConsole({
           Lean prices down
         </Button>
       </div>
-      <VoteRefusal
+      <RefusalLine
+        className="mt-2"
         error={maroon.shiftError}
         onDismiss={maroon.clearShiftError}
       />

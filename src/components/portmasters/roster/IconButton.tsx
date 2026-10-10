@@ -7,14 +7,20 @@ import { cn } from "@/lib/utils";
    than three copies of the same padding, hover and resting colour, so a
    change to how a row action looks lands on all of them at once. A caller
    brings only what is its own: the label read out to a screen reader, the
-   tooltip, and whatever extra classes its own state needs. */
+   tooltip, and whatever extra classes its own state needs.
+
+   The label is required rather than optional, because a button whose only
+   content is an icon is a button with no name: the tooltip is not read
+   out, so an optional label is one a new call site forgets and nobody
+   sees it until a screen reader user does. The type asks for it, so the
+   compiler asks for it. */
 export function IconButton({
   label,
   title,
   className,
   children,
   ...button
-}: React.ComponentProps<"button"> & { label?: string }) {
+}: React.ComponentProps<"button"> & { label: string }) {
   return (
     <button
       type="button"

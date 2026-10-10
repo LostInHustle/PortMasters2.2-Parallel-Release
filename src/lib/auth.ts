@@ -3,7 +3,7 @@
 // Uses Node's built in scrypt for password hashing (zero extra deps)
 // and cryptographically random session tokens stored in the DB.
 // =====================================================================
-import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { db, type PublicUser } from "./db";
 import {
@@ -43,21 +43,47 @@ function newSessionToken(): string {
 export const BANNED_ACCOUNT_ERROR =
   "This account has been banned. Contact the harbor operator if you believe this is a mistake.";
 
-// The setup code that admits an operator account through the /admin
-// register form. Compared the same way a password is, so the answer takes
-// the same time whatever the caller guessed.
+// The one wording for a door that has had too much, shared by the three
+// routes that read a credential (see the budget in ./auth-limit). It is
+// deliberately about the door rather than about the field, because the
+// routes answer it for a spent address as well as for a paused account,
+// and naming either half would tell a guesser which half they met.
+export const TOO_MANY_ATTEMPTS_ERROR =
+  "Too many attempts at once. Give it a moment, then try again.";
+
+// The shortest setup code the operator door will open for.
 //
-// An unset or empty code refuses every attempt rather than accepting an
-// empty guess. That is the direction this check has to fail in: a machine
-// that never configured one simply has no way in, which is recoverable by
-// setting the value, where the other direction hands the console to
-// whoever asks first.
+// A setup code is the only gate on operator account creation, and unlike
+// a password it is compared once per attempt rather than stretched by
+// scrypt first (see verifySetupCode below), so a short code is guessable
+// at line rate by anyone who reaches the form. Twelve characters is the
+// floor from which the door's own budget (see the account pause in
+// ./auth-limit) can hold a guesser to a rate a strong code outlives.
+const ADMIN_SETUP_CODE_MIN = 12;
+
+// The setup code that admits an operator account through the /admin
+// register form.
+//
+// Compared by fixed width digest rather than byte by byte, so the answer
+// takes the same time whatever the caller guessed and no path through
+// this function is shorter for a wrong length than for a wrong character.
+// Comparing the raw strings made both claims false: the length check
+// returned early, which leaked the configured code's length to an
+// unauthenticated caller and took a different time for every guess of a
+// different size. Hashing both sides first makes the two buffers equal in
+// length by construction, which is what timingSafeEqual needs to be
+// meaningful at all.
+//
+// An unset code, an empty one and one shorter than ADMIN_SETUP_CODE_MIN
+// all refuse every attempt rather than admitting a guess. That is the
+// direction this check has to fail in: a machine with no usable code
+// simply has no way in, which is recoverable by setting one, where the
+// other direction hands the console to whoever asks first.
 export function verifySetupCode(input: string): boolean {
   const expected = process.env.ADMIN_SETUP_CODE;
-  if (!expected) return false;
-  const given = Buffer.from(input);
-  const target = Buffer.from(expected);
-  if (given.length !== target.length) return false;
+  if (!expected || expected.length < ADMIN_SETUP_CODE_MIN) return false;
+  const given = createHash("sha256").update(input).digest();
+  const target = createHash("sha256").update(expected).digest();
   return timingSafeEqual(given, target);
 }
 

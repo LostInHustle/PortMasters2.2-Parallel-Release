@@ -385,7 +385,7 @@ export function normalizeLarderLots(
       // survived an in check, and the reads after it walked
       // FOODS["toString"].mealsPerSlot, which is undefined, into NaN and
       // out through the provisioning arithmetic into the captain's purse.
-      // The same own-property guard the wardrobe's reader takes (see
+      // The same own property guard the wardrobe's reader takes (see
       // garmentSpec in ./garments).
       if (
         typeof food !== "string" ||

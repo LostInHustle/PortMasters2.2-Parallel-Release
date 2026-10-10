@@ -26,14 +26,8 @@ import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../Term";
-import { Pill } from "../shared";
-import {
-  MarketBlock,
-  MarketEmpty,
-  MarketError,
-  MarketPanel,
-  OfferRow,
-} from "./OfferBoard";
+import { Pill, RefusalLine } from "../shared";
+import { MarketBlock, MarketEmpty, MarketPanel, OfferRow } from "./OfferBoard";
 import type { Escort } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than
@@ -183,7 +177,11 @@ export function EscortMarket({
         </MarketBlock>
       )}
 
-      <MarketError error={escort.error} onDismiss={escort.clearError} />
+      <RefusalLine
+        className="text-center mb-2"
+        error={escort.error}
+        onDismiss={escort.clearError}
+      />
 
       {/* This captain's own seat at the market, which is the answer to
           "did my press land" as well as to "what am I waiting on": both are

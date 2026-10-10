@@ -167,7 +167,7 @@ export function moduleListedThisLeg(
  * must not move the module again either.
  *
  * Returns whether the state changed, which is what the React layer reads to
- * decide whether it owes the captain a re-render.
+ * decide whether it owes the captain a fresh render.
  */
 export function applyModuleTradeSide(
   state: GameState,
@@ -213,7 +213,7 @@ export function applyModuleTradeSide(
     const card = cardById(trade.module);
     if (card !== null && card.kind === "module") {
       state.equippedModules.push(card);
-      // The bolt-on is the one door onto a hull that does not pass through
+      // Bolting a module on is the one door onto a hull that bypasses
       // equipModule (its slot guard must not stand between an agreed trade
       // and its settle), so it calls the same install accounting every
       // other landing site calls. Without it the card landed bare: the

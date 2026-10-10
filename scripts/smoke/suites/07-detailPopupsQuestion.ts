@@ -8,7 +8,7 @@ import type { Socket } from "socket.io-client";
 import { connect } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
-export async function detailPopupSQuestionSuite(
+export async function detailPopupsQuestionSuite(
   run: SmokeRun,
   inputs: {
     guest: {

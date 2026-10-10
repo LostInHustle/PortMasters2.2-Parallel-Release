@@ -27,7 +27,7 @@ import {
   portShiftLine,
   portShiftMultiplier,
 } from "@/lib/game/maroon";
-import { modeConfig } from "@/lib/game/mode";
+import { modeConfig, voyageRoundsFor } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
 import type { GameState, Phase } from "@/lib/game/types";
 import { createInitialGameState } from "@/lib/game/types";
@@ -1119,15 +1119,25 @@ export async function maroonAndTheHarbormasterSuite(
 
   // The one leg the console is hidden on. A call leans the market that
   // opens after the leg it was made in, so the closing leg of a voyage is
-  // a call that would lean nothing.
-  const closingLeg = await parkMaroonCheckpoint(16, "parley", "Parley");
+  // a call that would lean nothing. The leg is read from the voyage's own
+  // length rather than from the tier's: a Monsoon charter names sixteen
+  // rounds, and the Gambit pins every voyage it sails at twelve whatever
+  // tier it was opened under (see voyageRoundsFor), which is the same
+  // record the room's own guards and the hand's refusal both read.
+  const closingLegRound = voyageRoundsFor("ocean_gambit", "monsoon");
+  const closingLeg = await parkMaroonCheckpoint(
+    closingLegRound,
+    "parley",
+    "Parley",
+  );
   check(
-    closingLeg?.currentRound === 16 && closingLeg?.currentPhase === "parley",
-    "the voyage can be walked to its closing leg, the sixteenth of a Monsoon charter",
+    closingLeg?.currentRound === closingLegRound &&
+      closingLeg?.currentPhase === "parley",
+    "the voyage can be walked to its closing leg, the twelfth the mode pins whatever tier the charter names",
   );
   maroonSockets[4].emit("maroon:shift", {
     roomId: maroonRoomId,
-    round: 16,
+    round: closingLegRound,
     port: firstCallPort,
     direction: 1,
   });
@@ -1143,6 +1153,33 @@ export async function maroonAndTheHarbormasterSuite(
         "A call in the closing leg would lean a market this voyage never opens." &&
       !CARRIES_A_DASH.test(maroonShiftRefusals[6].error),
     "and the captain still holding the hand is told exactly that, on their own socket, rather than watching a lever that has gone quiet",
+  );
+
+  // And a report past the last leg is not a report the room acts on. The
+  // voyage's own length is the ceiling a report's round is read against,
+  // so a frame naming a round the lap never reaches (a stale build, a
+  // doctored client, a replay of a longer voyage) leaves the room where
+  // it stands rather than carrying the table onto a leg that would exist
+  // only on the room's own row. Until this guard existed the walk above
+  // was made at sixteen, past the end of a twelve leg voyage, and the
+  // refusal above was read off a leg the voyage had never had.
+  maroonSockets[1].emit("game:status", {
+    roomId: maroonRoomId,
+    round: closingLegRound + 1,
+    phase: "parley",
+    phaseLabel: "Parley",
+    gold: 120,
+    reputation: 12,
+    shipLevel: 0,
+    gameOver: false,
+    renownLevel: 3,
+  });
+  await maroonSettle();
+  const heldAtTheClose = await maroonRoomRow();
+  check(
+    heldAtTheClose?.currentRound === closingLegRound &&
+      heldAtTheClose?.currentPhase === "parley",
+    "and a report naming a leg the voyage does not have leaves the room standing where it is, so the checkpoint never carries the table to a leg no lap lists",
   );
 
   // A restarted voyage has marooned nobody, which is the load bearing half
@@ -1264,7 +1301,7 @@ export async function maroonAndTheHarbormasterSuite(
 
   // Then they stop sailing, which the room reads off the phase the status
   // carries rather than off the mark. Nothing about the ballot they cast
-  // changes yet: the book is re-read when the next nomination lands, which
+  // changes yet: the book is read again when the next nomination lands, which
   // is the same moment the audit's book is.
   maroonSockets[5].emit("game:status", {
     roomId: maroonRoomId,

@@ -21,6 +21,11 @@ import {
 } from "@/lib/auth";
 import { signedInResponse } from "@/lib/api-auth";
 import { readJson } from "@/lib/api-json";
+import {
+  noteDoorAttempt,
+  SETUP_CODE_DOOR,
+  spendDoorBudget,
+} from "@/lib/auth-limit";
 
 // The captain's rule with the operator door's own field added to it, so
 // an operator account is held to exactly the name and password a captain
@@ -34,14 +39,23 @@ export async function POST(req: NextRequest) {
   if (!body.ok) return body.response;
   const { username, password, displayName, setupCode } = body.data;
 
+  // The door's budget, counted against the code itself rather than
+  // against the name in the body: the code is one secret for the whole
+  // process, so its misses are held under one key and cannot be rotated
+  // away by picking new names (see SETUP_CODE_DOOR in lib/auth-limit.ts).
+  const budget = spendDoorBudget(req, SETUP_CODE_DOOR);
+  if (!budget.ok) return budget.response;
+
   // Asked first, before any account is looked up: nothing about this route
   // answers to anyone who is not holding the code.
   if (!verifySetupCode(setupCode)) {
+    noteDoorAttempt(SETUP_CODE_DOOR, false);
     return NextResponse.json(
       { error: "That setup code is not correct." },
       { status: 403 },
     );
   }
+  noteDoorAttempt(SETUP_CODE_DOOR, true);
 
   // The whole point of this route. Every other account is a captain.
   const account = await createAccountAndSession({
@@ -54,9 +68,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: USERNAME_TAKEN_ERROR }, { status: 409 });
   }
 
-  return signedInResponse({
-    user: { ...publicUser(account.user), role: account.user.role },
-    token: account.token,
-    expiresAt: account.expiresAt,
-  });
+  return signedInResponse(
+    {
+      user: { ...publicUser(account.user), role: account.user.role },
+      token: account.token,
+      expiresAt: account.expiresAt,
+    },
+    req,
+  );
 }

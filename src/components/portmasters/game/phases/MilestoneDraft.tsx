@@ -28,7 +28,7 @@ import type { PhasePanelProps } from "./PhaseShared";
  * The three cards are milestoneChoices, the same table the engine's
  * answer path validates against (see answerMilestone), so the cards a
  * captain presses are exactly the cards a press may take. The trio is
- * derived off a round-less seed, so a reload between the moment becoming
+ * derived off the voyage's seed, so a reload between the moment becoming
  * due and the answer cannot reshuffle the cards under the captain's
  * eyes.
  *

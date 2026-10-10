@@ -4,6 +4,7 @@
 // chat panel can render them straight into the timeline. Each row carries
 // a `mine` flag the renderer uses to right align the bubbles.
 import { NextRequest, NextResponse } from "next/server";
+import { CAPTAIN_NOT_FOUND } from "@/lib/api";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { MESSAGE_PAGE, messageRows } from "@/lib/messages";
@@ -25,7 +26,7 @@ export async function GET(
     select: PUBLIC_USER_SELECT,
   });
   if (!other)
-    return NextResponse.json({ error: "Captain not found" }, { status: 404 });
+    return NextResponse.json({ error: CAPTAIN_NOT_FOUND }, { status: 404 });
 
   const msgs = await db.message.findMany({
     where: {

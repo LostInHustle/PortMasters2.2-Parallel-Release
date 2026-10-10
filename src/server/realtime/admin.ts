@@ -93,9 +93,9 @@ const HARBOR_CLOSED = "This harbor was closed by the harbor operator.";
 // is the last thing it will hear, and there is no way back in to describe.
 const PURGED_ACCOUNT = "This account was deleted by the harbor operator.";
 
-// ---------------------------------------------------------------------
+// =====================================================================
 // Guard
-// ---------------------------------------------------------------------
+// =====================================================================
 
 // The first question every admin handler asks, answered from the database
 // rather than from the socket's cached state. Emits admin:error and
@@ -154,9 +154,9 @@ async function isLastAdministrator(target: TargetAccount): Promise<boolean> {
   return admins <= 1;
 }
 
-// ---------------------------------------------------------------------
+// =====================================================================
 // Reading the roster
-// ---------------------------------------------------------------------
+// =====================================================================
 
 export async function listAccounts(): Promise<AdminRoster> {
   const users = await db.user.findMany({
@@ -187,9 +187,9 @@ export async function listAccounts(): Promise<AdminRoster> {
   return { accounts };
 }
 
-// ---------------------------------------------------------------------
+// =====================================================================
 // Ending an account's session
-// ---------------------------------------------------------------------
+// =====================================================================
 
 // Everything a ban or a purge does to an account before the row itself is
 // touched: every socket it holds is detached from the room bookkeeping,
@@ -243,9 +243,9 @@ async function hostedRoomIds(userId: string): Promise<string[]> {
   return rooms.map((r) => r.id);
 }
 
-// ---------------------------------------------------------------------
+// =====================================================================
 // Actions
-// ---------------------------------------------------------------------
+// =====================================================================
 
 export async function banAccount(
   io: Server,
@@ -404,10 +404,12 @@ async function purgeResolved(
   }
 
   // Told before the delete, because the delete is what takes their harbors
-  // away: the room rows cascade, and so does every save, membership and
-  // chronicle hanging off those rooms. A captain who is sitting in one of
-  // them has to be handed back to the Lobby rather than left in a harbor
-  // that no longer exists.
+  // away: the room rows cascade, and so does every save and membership
+  // hanging off those rooms. (Chronicles ride the account rather than the
+  // room, so a purged host's harbors keep the other captains' chronicles;
+  // see VoyageChronicle in prisma/schema.prisma.) A captain who is sitting
+  // in one of them has to be handed back to the Lobby rather than left in
+  // a harbor that no longer exists.
   const hosted = await hostedRoomIds(target.id);
   const socketIds = detachUser(io, target.id);
   // [I1: the telemetry spine] The records of the harbors this account
@@ -460,6 +462,17 @@ async function purgeResolved(
     });
   }
 
+  // [I1: the telemetry spine] The rest of the records that name this
+  // account: the delete above covers the harbors it hosted, but a record
+  // in any other harbor it sailed in is room keyed, not user keyed, and
+  // would otherwise survive the purge while naming somebody who no longer
+  // exists. The rule is the same one the report delete below states, and
+  // the account id appears only inside the record's JSON body, so a LIKE
+  // over that column matches exactly the rows the rule covers. The seats
+  // loop above runs first on purpose: reaping a seat writes fresh 'left'
+  // records that name the account, and this sweep is what takes those too.
+  await db.$executeRaw`DELETE FROM "VoyageTelemetry" WHERE "record" LIKE ${"%" + target.id + "%"}`;
+
   await db.user.delete({ where: { id: target.id } });
 
   for (const socketId of socketIds) {
@@ -471,9 +484,9 @@ async function purgeResolved(
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------
+// =====================================================================
 // Acting on a selection
-// ---------------------------------------------------------------------
+// =====================================================================
 
 // What a bulk event carries: which of the four actions, the accounts it is
 // aimed at as the console holds them, and, for the delete, how many of them

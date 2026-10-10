@@ -420,9 +420,8 @@ export function readForgedUsers(
     if (verdict.severity === "impossible") forgedUsers.add(f.userId);
   }
   // The marks themselves were read with the rest of the harbor's saves
-  // above, which is the same query this used to run a second time: one
-  // read of the room's rows, and this is the reader that turns them into
-  // disqualifications.
+  // above: one read of the room's rows, and this is the reader that turns
+  // them into disqualifications.
   for (const row of marked) {
     if (!forgedUsers.has(row.userId)) {
       console.warn(

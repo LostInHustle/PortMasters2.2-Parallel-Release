@@ -26,7 +26,7 @@ import type { BoonRecord } from "@/lib/game/types";
  * One captain's claim about their own last boon decision, sent to the
  * server. The record rides whole; the room id is the seat check every
  * claim carries (see seated in src/server/realtime/auth.ts). The server
- * re-reads every field against the public catalogue before believing any
+ * rechecks every field against the public catalogue before believing any
  * of it (see readBoonReport in src/server/realtime/wiring/boons.ts).
  */
 export type BoonReport = BoonRecord & {

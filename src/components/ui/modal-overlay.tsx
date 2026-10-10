@@ -3,8 +3,14 @@
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+
+// What counts as reachable by Tab inside a dialog. Disabled controls are
+// out because they cannot take focus, and the -1 tabindex is out because
+// it is exactly how the wrapper itself opts out after it takes focus once.
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * The overlay every dialog in the game sits in: a dimmed, blurred backdrop
@@ -25,32 +31,98 @@ import { cn } from "@/lib/utils";
  * the portal would bring the whole fault back, because the reasons above
  * are still true.
  *
+ * The wrapper is the dialog: it carries the role, the label a screen
+ * reader announces on open, and the three behaviours that make the modal
+ * claim true rather than decorative. Focus moves in when the dialog opens
+ * and back to whatever held it when the dialog closes, so a captain who
+ * opened the settings with the keyboard is returned to the settings
+ * button rather than to the top of the page. Tab cycles within the dialog
+ * instead of walking out into the room behind it, because a dimmed
+ * backdrop is a promise that the page behind will not be reached, and a
+ * promise focus does not keep is a lie told to the readers who need the
+ * promise most. Escape closes, as before.
+ *
+ * The label is required: a dialog with no name is announced as "dialog",
+ * which tells the person who just opened it nothing about where they are.
+ *
  * Every call site mounts this behind state that starts false, so it only ever
  * renders in the browser. The guard below covers the server pass, where
  * `document` does not exist yet.
  */
 export function ModalOverlay({
+  label,
   onClose,
   children,
 }: {
+  /** The dialog's name, announced when it opens. Match the heading it draws. */
+  label: string;
   onClose: () => void;
   children: ReactNode;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus in on open, out on close. The element that held focus at mount
+  // is captured first, because by cleanup time it may no longer be
+  // focused, and the captain's place is where they pressed rather than
+  // wherever the dialog itself last put the caret. An element that has
+  // left the document by then, a button on a screen the dialog closed
+  // past, fails focus silently, which is the right amount of fuss for a
+  // restore that has nothing to restore to.
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => {
+      previous?.focus();
+    };
+  }, []);
+
   // Escape closes, the key every Radix dialog under ui/dialog already
   // answers, so the habit a captain learned there holds in the game's own
   // sheets too. A press a nested dialog has already handled is left alone,
   // which keeps one Escape from closing a Radix dialog and the sheet under
-  // it together.
+  // it together, and the same rule guards the Tab trap below: a nested
+  // focus scope that has claimed a Tab keeps it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) onClose();
+      if (e.defaultPrevented) return;
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root || !root.contains(document.activeElement)) return;
+      const focusable = Array.from(
+        root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => el.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === root)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 outline-none"
+    >
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}

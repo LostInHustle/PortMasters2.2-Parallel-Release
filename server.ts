@@ -52,7 +52,19 @@ async function main(): Promise<void> {
   await app.prepare();
 
   const handleRequest = app.getRequestHandler();
-  const httpServer = createServer((req, res) => handleRequest(req, res));
+  // The account doors' budget reads the caller's address off this header
+  // (see lib/auth-limit.ts). Behind a tunnel or a platform proxy the
+  // header is already set by that proxy and names the real captain; a
+  // direct connection arrives without one, and this callback is the last
+  // place that still holds the socket it came in on, so it is the place
+  // that fills the header in. Stamped only when absent, so a proxy's
+  // reading is never overwritten with the proxy's own address.
+  const httpServer = createServer((req, res) => {
+    if (!req.headers["x-forwarded-for"] && req.socket.remoteAddress) {
+      req.headers["x-forwarded-for"] = req.socket.remoteAddress;
+    }
+    handleRequest(req, res);
+  });
 
   // In development Next serves its hot reload channel over a WebSocket on
   // this same server, and a custom server has to wire that up by hand.

@@ -2,7 +2,7 @@
  * The card content check.
  *
  * [F2: the card record, and the mode weighting field] The plan's F2 puts a
- * record shape under every card, and its F1 neighbour puts the item-key scan
+ * record shape under every card, and its F1 neighbour puts the scan of item keys
  * that belongs with it in the content validator: this is that validator. It
  * reads the pool the tree ships, through the record's own walk, and exits
  * nonzero if any card breaks a clause.

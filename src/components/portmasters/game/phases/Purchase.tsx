@@ -46,7 +46,7 @@ export function Purchase({
       <div className="flex items-center justify-between mb-4">
         <PanelTitle>
           <Anchor className="h-5 w-5 text-market" />
-          Port Merchant Exchange
+          Port Board
         </PanelTitle>
         <Button
           variant="secondary"

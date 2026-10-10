@@ -67,7 +67,7 @@ import {
 } from "../constants/supplies";
 import { survivalLayerOn } from "../flags";
 import { addLot, foodRoomMeals, reconcileLarder } from "../foods";
-import { LARDER_FULL_LINE, crewSize } from "../larder";
+import { LARDER_FULL_LINE, provisioningCrew } from "../larder";
 import { unlockedPorts } from "../pools";
 import { createRng } from "../rng";
 import type { GameState } from "../types";
@@ -250,11 +250,7 @@ export function buyFromBarge(
   logs: string[],
 ): number {
   if (!bargeOn(state.mode)) return 0;
-  const crew = crewSize(state);
-  if (crew === 0) {
-    logs.push("⚓ No crew aboard, so there is nothing to provision.");
-    return 0;
-  }
+  if (provisioningCrew(state, logs) === null) return 0;
   const left = bargeLeftAtPort(state);
   if (left < 1) {
     logs.push("⛵ The barge has nothing left for you this leg.");

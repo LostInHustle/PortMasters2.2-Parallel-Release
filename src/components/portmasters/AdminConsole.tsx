@@ -75,7 +75,7 @@ import { toast } from "sonner";
 import type { PublicUser } from "@/lib/api";
 import { NO_LONGER_AN_ADMINISTRATOR } from "@/lib/game/constants/copy";
 import { useRealtime } from "@/lib/use-realtime";
-import { useAdmin } from "@/lib/use-admin";
+import { READING_THE_REGISTER, useAdmin } from "@/lib/use-admin";
 import { Avatar, Notice, OnlineDot, Th } from "@/components/portmasters/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,7 +121,7 @@ const CHECKBOX =
 // chip buttons with icons and words that alone held the widest column on
 // the register. Drawing those actions as quiet words took the floor down
 // to 817 and the threshold down with it, which is what let the table into
-// widths the chips never fit. The width probe re-measures this at every
+// widths the chips never fit. The width probe measures it again at every
 // pass: it draws the table at each size and reads the drag to the last
 // column, which must be zero. Below the threshold the register is a card
 // per account, which is the right shape for the widths the table cannot
@@ -135,7 +135,7 @@ const CHECKBOX =
 // `hidden @min-[52rem]:flex` and the card list is `@min-[52rem]:hidden`.
 
 // The register's header cells, held to the top of the frame that scrolls
-// under them. A see-through header cell would let the rows show through it
+// under them. A transparent header cell would let the rows show through it
 // as they pass beneath, so the cells wear the glass shell's own fill, read
 // from --pm-glass-fill, which .pm-glass publishes for each theme (see
 // globals.css). The dark value rides along with the property, so a theme
@@ -357,7 +357,7 @@ export function AdminConsole({
                 </h1>
                 <p className="text-[11px] leading-tight text-muted-foreground">
                   {accounts === null ? (
-                    "Reading the register..."
+                    READING_THE_REGISTER
                   ) : (
                     <>
                       {accounts.length} accounts, {onlineCount} online
@@ -531,7 +531,7 @@ export function AdminConsole({
               <div className="flex flex-1 items-center justify-center px-4 py-12 text-center">
                 <p className="text-xs text-muted-foreground">
                   <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
-                  Reading the register...
+                  {READING_THE_REGISTER}
                 </p>
               </div>
             ) : accounts.length === 0 ? (

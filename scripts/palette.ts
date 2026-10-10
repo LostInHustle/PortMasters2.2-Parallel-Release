@@ -33,8 +33,9 @@
  * Run with npm run check:palette.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { walkSrc } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const PALETTE = join(ROOT, "src/app/palette.css");
@@ -211,8 +212,8 @@ const WIDGETS: Widget[] = [
      several of them lean on that.
 
      Named for the six phases of the leg plus the pier and the four
-     personal and terminal states, which is the vocabulary [B1] put in
-     place. There is no artisan entry: the bench is the second station of
+     personal and terminal states, which is the vocabulary the engine
+     runs. There is no artisan entry: the bench is the second station of
      the market rather than a phase of its own, so it wears the market's
      hue and needs no hue that could collide with the panels it opens
      beside. */
@@ -535,18 +536,6 @@ function checkTokens() {
 
 /* === 4: every pm-grad- class has a fill === */
 
-function walk(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      walk(full, out);
-    } else if (/\.(ts|tsx)$/.test(entry)) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
 function checkGradients(files: string[]) {
   const globals = readFileSync(GLOBALS, "utf8");
 
@@ -652,7 +641,7 @@ function checkRawPalette(files: string[]) {
 
 /* === Run === */
 
-const files = walk(SRC);
+const files = walkSrc(SRC);
 checkDistances();
 checkTokens();
 checkGradients(files);

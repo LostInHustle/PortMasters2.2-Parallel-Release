@@ -93,7 +93,7 @@ interface VoyageAccumulator {
   // neither can say something the other does not. It is a set of its own
   // rather than a reading joined out of the leg reports at the reading
   // end, because the plan's question is a cohort comparison (the report
-  // script's retention table) and re-deriving a voyage long fact from a
+  // script's retention table) and deriving a fact that covers the whole voyage again from a
   // capped event list is exactly the shape the cap can cut.
   crewLost: Set<string>;
   events: TelemetryEvent[];
@@ -131,13 +131,33 @@ function isSampledVoyage(roomId: string, voyageEpoch: number): boolean {
 }
 
 /**
+ * When the lobby a voyage was dealt out of opened, from whichever stamp
+ * the caller holds.
+ *
+ * A room row carries the lobby's own clock (lobbyOpenedAt, stamped at
+ * creation and bumped by every restart; see prisma/schema.prisma and
+ * wiring/restart-voyage.ts). A caller driving this function with
+ * hand-built facts instead of a row, which is how the smoke run exercises
+ * the spine in process, names the room's own creation, and for a room
+ * that has never replayed a voyage the two are the same moment: the first
+ * lobby is the room's birth. The record's fill time is measured from
+ * whichever of the two arrives, and the restart bump is what keeps the
+ * second voyage out of the first voyage's waiting room.
+ */
+function lobbyOpenedAtOf(
+  room: { lobbyOpenedAt: Date } | { createdAt: Date },
+): Date {
+  return "lobbyOpenedAt" in room ? room.lobbyOpenedAt : room.createdAt;
+}
+
+/**
  * A voyage left the dock. Opens the accumulator, or leaves the room
  * unrecorded when the sampler says so.
  *
  * Called from the one place a voyage starts, after the room row has been
  * written, so the header it captures is the voyage's own: the seats it
  * pinned, the mode and difficulty it was chartered with, and the moment
- * the harbor was charted, which is the other end of the lobby fill time.
+ * this lobby opened, which is the other end of the lobby fill time.
  * The roster comes in the same call because it is the same fact the
  * departure just pinned, and the seats the voyage is judged on and the
  * captains it began with should not be able to disagree.
@@ -148,8 +168,7 @@ export function openVoyageTelemetry(
     mode: string;
     difficulty: string;
     voyageEpoch: number;
-    createdAt: Date;
-  },
+  } & ({ lobbyOpenedAt: Date } | { createdAt: Date }),
   roster: readonly string[],
 ): void {
   const startedAt = Date.now();
@@ -162,7 +181,7 @@ export function openVoyageTelemetry(
     mode: room.mode,
     difficulty: room.difficulty,
     seats: roster.length,
-    openedAt: room.createdAt.getTime(),
+    openedAt: lobbyOpenedAtOf(room).getTime(),
     startedAt,
     leg: 1,
     captains: new Set(roster),
@@ -258,28 +277,7 @@ export function noteLegReport(
   roomId: string,
   actor: string,
   leg: number,
-  figures: {
-    ordersDealt: number;
-    ordersFilled: number;
-    distinctGoods: number;
-    holdSlots?: number;
-    grainMeals?: number;
-    saltFishMeals?: number;
-    produceMeals?: number;
-    escortSold?: number;
-    escortFeesEarned?: number;
-    escortAbsorbed?: number;
-    refitsSold?: number;
-    refitFeesEarned?: number;
-    ragsRewoven?: number;
-    coldLeg?: boolean;
-    modulesSold?: number;
-    moduleFeesEarned?: number;
-    opportunistBorrows?: number;
-    foodSpend?: number;
-    bargeSpend?: number;
-    crewLosses?: number;
-  },
+  figures: Omit<TelemetryPayloads["leg_report"], "leg" | "actor">,
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;

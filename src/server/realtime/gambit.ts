@@ -139,7 +139,7 @@ async function sendCards(
 /**
  * Deals every card at the table, on the moment a voyage sets sail.
  *
- * A no-op in any mode but Ocean Gambit, so the caller does not have to
+ * Does nothing in any mode but Ocean Gambit, so the caller does not have to
  * ask which game it is holding before calling this. It is idempotent too:
  * a voyage that already holds rows is sent what it holds rather than
  * dealt a second hand, which is what keeps a double start from moving
@@ -279,7 +279,7 @@ type HeldCard = {
  * it belongs to can read.
  *
  * [F6: charters at leg four] The charter take is the second. The leg
- * report's one non-figure claim is a card a captain holds, and the
+ * report's one claim that is not a figure is a card a captain holds, and the
  * alignment that take is recorded with has to come off this table rather
  * than off the wire (see charter_taken in @/lib/game/telemetry), so an
  * operator measurement says what the voyage dealt a captain and never

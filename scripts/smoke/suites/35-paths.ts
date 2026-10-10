@@ -21,6 +21,26 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export async function pathsSuite(): Promise<void> {
+  // =====================================================================
+  // [D1: the path configuration module, and the naming change]
+  //
+  // The plan asks for one record per path carrying crest, signature
+  // ability, goods, order pool, cargo modifier and Renown ceiling, in the
+  // shape the difficulty ladder already uses, so that adding or retuning
+  // a path is one entry and no other server code to touch. What is held
+  // below is that record read as a record: the facts it claims, the
+  // properties that make it one source of truth, and the naming change it
+  // carried, which is the half of this slice a later reader is likeliest
+  // to undo by accident.
+  //
+  // Nothing here talks to the server, because there is no server side to
+  // this feature: a path is content, and the module holding it reads no
+  // clock, no database and no socket. Every check is also written to
+  // survive the day a sixth path is added, because the plan's own
+  // evaluation adds one to prove that no other module has to move, and a
+  // suite that failed on that edit would itself be the second place the
+  // paths are listed.
+  // =====================================================================
   // The plan's five, with the names the plan gives them, read through
   // pathConfig rather than off the record behind it, so the check
   // exercises the door every other module reads them through.
@@ -230,15 +250,4 @@ export async function pathsSuite(): Promise<void> {
       !carriesADash("src/lib/game/gambit.ts"),
     "and the record itself, and the alignment module whose hidden card the sweep renamed, hold it in their comments as well as in their copy",
   );
-
-  // =================================================================
-  // [D2: the nine slot order board] The manifest's pathbound slots, read
-  // against the plan's own clause for the feature: "Six basic orders open,
-  // three pathbound orders greyed out, each stamped with the crest of the
-  // path that would unlock it and labeled in plain language."
-  //
-  // The boards below are dealt through the real lifecycle rather than
-  // assembled by hand: snapToCheckpoint runs the engine's own startOrders,
-  // so what is read here is the board a captain meets in the Orders phase.
-  // =================================================================
 }

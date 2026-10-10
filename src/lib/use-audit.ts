@@ -18,7 +18,7 @@
 //
 //   The reveal is the finding, and it is the one thing here that outlives
 //   the leg it happened in. It arrives either as the vote carrying or as
-//   the join hand-out when a captain reloads into a harbor that has
+//   the join handoff when a captain reloads into a harbor that has
 //   already audited someone (see the room:join handler in
 //   src/server/realtime/wiring/room-join.ts), and the two paths carry the
 //   identical frame so nothing here has to know which one it was.
@@ -28,10 +28,10 @@
 //   dismiss or by the next press: a sentence about a vote that has since
 //   moved is a sentence about nothing.
 //
-// The local rule for whether this captain may vote is re-derived rather
+// The local rule for whether this captain may vote is derived rather
 // than asked for, because every part of it is already on this side of the
 // wire: the mode, the phase, the leg and whether the audit is spent. What
-// is NOT re-derived is the count: how many names carry the vote is the
+// is NOT derived is the count: how many names carry the vote is the
 // server's arithmetic over a roster this side cannot see, so it rides the
 // tally frame (see AuditTally) and this hook hands it on as it arrived.
 //
@@ -50,6 +50,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
+import { refusedForRoom } from "@/lib/refusals";
 import type { VoteCensus } from "@/lib/voteTally";
 
 export function useAudit(
@@ -92,7 +93,7 @@ export function useAudit(
       // broadcast for every ballot in the room, and one raised by another
       // captain's ballot is not this captain's press coming home. Clearing
       // on it would put the button back while the first press is still in
-      // flight, and the follow-up press would come back refused for a
+      // flight, and the press that follows would come back refused for a
       // press the captain does not remember making. The frame that carries
       // this captain's own name is the count their press was answered by,
       // and the refusal frame is the other answer.
@@ -103,9 +104,9 @@ export function useAudit(
       setReveal(data);
     };
     const onRefused = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId) return;
-      if (typeof data.error !== "string" || !data.error) return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (!err) return;
+      setError(err);
       setPressed(null);
     };
     // A new voyage has no audit and no nominations, which is also the

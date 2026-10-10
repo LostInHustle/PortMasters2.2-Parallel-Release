@@ -16,8 +16,8 @@ export function ChroniclesTab({
     return (
       <div className="py-12 text-center text-muted-foreground">
         <BookOpen className="mx-auto mb-3 h-10 w-10 opacity-30" />
-        No chronicles saved yet. Opt in to save a chronicle at the end of your
-        next voyage.
+        No chronicles saved yet. A chronicle is written when your voyage
+        concludes.
       </div>
     );
   }

@@ -35,9 +35,9 @@
  * DATABASE_URL names at the time. It only reads.
  */
 
-import { db } from "@/lib/db";
 import type { TelemetryCaptain, TelemetryRecord } from "@/lib/game/telemetry";
 import { readOperatorWindow } from "@/server/telemetry-window";
+import { runReport } from "./report";
 
 // One cohort's retention: how many lines it holds and how many of those
 // were still standing at the close. The same pass the dashboard's maroon
@@ -115,11 +115,4 @@ async function main(): Promise<void> {
   );
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    void db.$disconnect();
-  });
+runReport("The milestone boons report could not be read.", main);

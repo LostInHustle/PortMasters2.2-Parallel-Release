@@ -117,7 +117,7 @@ export const CHARTERS: readonly CardRecord[] = [
       },
       zh: {
         name: "大宗契",
-        desc: "大批装运，本航程每批运费降低 1 金。",
+        desc: "大批装运，本航程每批运费降低 1 金币。",
       },
     },
   },

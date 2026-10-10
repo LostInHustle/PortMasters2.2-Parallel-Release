@@ -64,6 +64,21 @@ export async function telemetrySpineSuite(
     record: TelemetryRecord | null;
   }>;
 }> {
+  // =====================================================================
+  // [I1: the telemetry spine]
+  //
+  // The plan's evaluation for this slice has two halves: a full voyage
+  // leaves a complete record with no gaps, and a deliberately broken
+  // voyage, one abandoned mid leg, leaves a record that explains where it
+  // stopped. Both are read back off the server below, from the row it
+  // actually wrote rather than from anything this file assembled.
+  //
+  // Three harbors do the work. The first sails to its end with every kind
+  // of event the spine knows fired at least once, the second is abandoned
+  // by its only captain and proves a record outlives the harbor it
+  // describes, and the third is wiped by its host mid leg and proves the
+  // spine forgets a voyage it has already closed.
+  // =====================================================================
   const {
     maroonRoomId,
     maroonTargetId,

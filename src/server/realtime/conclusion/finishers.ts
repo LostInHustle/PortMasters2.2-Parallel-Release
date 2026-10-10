@@ -124,11 +124,14 @@ type CaptainRecord = {
 
 // Defensively extracts the chronicle's extras from a save blob already
 // parsed by parseSave. The score field IS the reputation, so it's used as
-// the peak figure (the heartbeat doesn't carry a separate peak). The
-// loansGiven and debts arrays are outstanding counts at save time,
-// which at endgame should be near zero after settleOutstandingDebts,
-// but they're the best lending indicator available without a new
-// schema field. Forged finishers get zeros across the board.
+// the peak figure (the heartbeat doesn't carry a separate peak), and the
+// largestTrade field is the captain's own running maximum, read as a
+// checked number for the same reason: it is the blob's to claim and the
+// chronicle's line prints it verbatim. The loansGiven and debts arrays are
+// outstanding counts at save time, which at endgame should be near zero
+// after settleOutstandingDebts, but they're the best lending indicator
+// available without a new schema field. Forged finishers get zeros across
+// the board.
 function extractChronicleExtras(
   data: Record<string, unknown> | null,
   forged: boolean,
@@ -163,7 +166,11 @@ function extractChronicleExtras(
       typeof data.score === "number" && Number.isFinite(data.score)
         ? data.score
         : fallbackReputation,
-    largestTrade: 0,
+    largestTrade:
+      typeof data.largestTrade === "number" &&
+      Number.isFinite(data.largestTrade)
+        ? data.largestTrade
+        : 0,
     lendCount: Array.isArray(data.loansGiven) ? data.loansGiven.length : 0,
     borrowCount: Array.isArray(data.debts) ? data.debts.length : 0,
     objectiveTrace: readObjectiveTrace(data.objectiveTrace),
@@ -681,7 +688,7 @@ type FinisherTally = {
 //
 // The fact this answers is about the fleet rather than about any one
 // client, so it is read the way the reveal ledger below reads it: every
-// non-forged finisher's own record of how the board stood, merged by max
+// honest finisher's own record of how the board stood, merged by max
 // per good per leg. A captain whose client missed the last leg is the one
 // this merge exists for. Read per captain, their row would have read
 // short while the ledger under it painted the commission filled, and the

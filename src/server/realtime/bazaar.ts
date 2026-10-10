@@ -27,7 +27,7 @@
 // contracts. A rumor is not a promise to anyone. It was published in the
 // open, the harbor heard it, and the market it moves prices it whether or
 // not the captain who said it is still ashore. Dropping the row when they
-// leave would re price every good for the captains still sailing, which
+// leave would reprice every good for the captains still sailing, which
 // is the half applied settlement the plan's rollback note warns about
 // dressed as a cleanup. The row goes when the voyage does.
 //

@@ -19,7 +19,7 @@ import type { PhasePanelProps } from "./PhaseShared";
  * The three cards are charterChoices and nothing else, the same table
  * the engine's answer path validates against (see answerCharter), so the
  * cards a captain presses are exactly the cards a press may take. The
- * trio is derived off a round-less seed, so a reload between the moment
+ * trio is derived off the voyage's seed, so a reload between the moment
  * becoming due and the answer cannot reshuffle the cards under the
  * captain's eyes.
  *

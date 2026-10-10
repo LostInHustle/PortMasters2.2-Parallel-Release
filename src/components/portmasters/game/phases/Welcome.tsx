@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/game/constants/brand";
+import { START_VOYAGE } from "@/lib/game/constants/copy";
 import { STARTING_STOCK } from "@/lib/game/constants/goods";
 import { INCOME_TAX_RATE, VAT_RATE } from "@/lib/game/engine";
 import { openingPhase } from "@/lib/game/checkpoint";
-import { difficultyConfig, pirateChanceFor } from "@/lib/game/difficulty";
+import { difficultyConfig, pirateOddsLabel } from "@/lib/game/difficulty";
 import { modeConfig } from "@/lib/game/mode";
 import { phaseFace } from "@/lib/game/phases";
 import { cn } from "@/lib/utils";
@@ -139,9 +140,6 @@ export function Welcome({
   const stockLine = ["Hemp", "Silk", "Tea"]
     .map((r) => `${r}×${STARTING_STOCK[r]}`)
     .join(", ");
-  const raidPct = Math.round(
-    pirateChanceFor(game.difficulty, 1, game.maxRounds) * 100,
-  );
   // income tax is not yet a DifficultyConfig dial: every charter still
   // uses the founding 10%, which is what calcIncomeTax charges.
   const taxRate = INCOME_TAX_RATE;
@@ -181,7 +179,7 @@ export function Welcome({
               {canStart
                 ? harborIds.length === 1
                   ? "Start Solo Practice Voyage"
-                  : "Start the Voyage"
+                  : START_VOYAGE
                 : `Need at least one captain in the harbor`}
             </Button>
             {phaseSync.startError && (
@@ -313,7 +311,7 @@ export function Welcome({
               tone="warn"
               title="🏴‍☠️ Pirates & Borrowing"
               rows={[
-                `${raidPct}% chance of losing all Gold on hand`,
+                `${pirateOddsLabel(cfg)} chance of losing all Gold on hand`,
                 "Hire an escort, or ask the harbor for a loan",
               ]}
             />

@@ -4,7 +4,7 @@
 // The operator console.
 //
 // One row per account with the two counts that say how much of the live game it
-// holds, the roster the console re reads after every change it makes, and the
+// holds, the roster the console reads again after every change it makes, and the
 // bulk action with its account by account report.
 // =====================================================================
 

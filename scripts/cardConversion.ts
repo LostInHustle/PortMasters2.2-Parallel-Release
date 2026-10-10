@@ -23,19 +23,16 @@ import {
   readCardConversion,
   type CardTally,
 } from "@/lib/game/cards";
+import { parseJsonObject } from "@/lib/game/json";
 import { db } from "@/lib/db";
+import { runReport } from "./report";
 
 // One voyage's tally, read back the way the save heals it. A row whose blob
 // will not parse, or that carries no tally at all, contributes nothing
 // rather than stopping the report: a database holds saves written by every
 // build that ever ran against it.
 function tallyOf(data: string): CardTally {
-  try {
-    const parsed = JSON.parse(data) as { cardTally?: unknown };
-    return normalizeCardTally(parsed.cardTally);
-  } catch {
-    return {};
-  }
+  return normalizeCardTally(parseJsonObject(data)?.cardTally);
 }
 
 async function main(): Promise<void> {
@@ -77,9 +74,4 @@ async function main(): Promise<void> {
   console.log("");
 }
 
-main()
-  .catch((err) => {
-    console.error("The card conversion report could not be read.", err);
-    process.exitCode = 1;
-  })
-  .finally(() => db.$disconnect());
+runReport("The card conversion report could not be read.", main);

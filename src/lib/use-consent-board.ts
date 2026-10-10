@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { consentSettled, type ConsentTerms } from "@/lib/game/engine";
+import { refusedForRoom } from "@/lib/refusals";
 
 /**
  * The channel one kind of agreement speaks on, which is the whole of what
@@ -65,7 +66,7 @@ type ConsentChannel = {
  * Written once for both kinds rather than twice, on the same reasoning as
  * the server's board factory: the relay is fifty lines of React that has
  * nothing to do with what a contract is for, and the second copy of it
- * would be the one that forgot the stale-broadcast guard.
+ * would be the one that forgot the stale broadcast guard.
  */
 export function useConsentBoard<T extends ConsentTerms>(
   socket: Socket | null,
@@ -128,8 +129,9 @@ export function useConsentBoard<T extends ConsentTerms>(
       report(next);
     };
     const onBoardError = (data: { roomId?: string; error?: string }) => {
-      if (data?.roomId !== roomId || typeof data.error !== "string") return;
-      setError(data.error);
+      const err = refusedForRoom(data, roomId);
+      if (err === null) return;
+      setError(err);
     };
 
     socket.on(channel.update, onUpdate);

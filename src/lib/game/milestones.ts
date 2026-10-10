@@ -10,7 +10,7 @@
 //   - milestoneOffers is the queue of moments waiting to be answered.
 //     A queue rather than a phase, because the five moments land at
 //     three different seats of the lap and a phase would have to be
-//     re-entered from each of them; an offer is a local act, answered
+//     entered again from each of them; an offer is a local act, answered
 //     where the captain stands, with no ready vote and no phase gate.
 //     Nothing here takes an offer off the queue: that is ./engine's
 //     answerMilestone, which is the only writer the queue has.
@@ -193,11 +193,11 @@ export function milestoneDue(
  *
  * [F7: the power budget] The budget filters the table after the draw
  * rather than before it, and that placement is load bearing: this reader
- * is re-derived on every render, a peer can settle a trade onto this
+ * is derived again on every render, a peer can settle a trade onto this
  * captain's hull while a moment is queued, and a filter inside the draw
  * would hand the same seed a different pool the moment power moved, which
  * is the reshuffle the paragraph above forbids. Filtering the drawn trio
- * keeps the draw power-blind, so a power drop can only put a card back on
+ * keeps the draw blind to power, so a power drop can only put a card back on
  * a table the captain is looking at, never take one away, and a click
  * already made can never be invalidated. What the filter can leave is an
  * empty table for a captain whose hull is too heavy, which every caller

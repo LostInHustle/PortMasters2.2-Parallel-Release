@@ -4,7 +4,7 @@ import { check, waitForEvent } from "../harness";
 import type { WireMessage } from "../wire";
 import type { Socket } from "socket.io-client";
 
-export async function seeingEachOtherSSuite(inputs: {
+export async function seeingEachOthersLiveDataSuite(inputs: {
   ashoreSocket: Socket;
   guest: {
     id: string;

@@ -38,15 +38,11 @@
   --color-renown: var(--w-renown);
   --color-checkin: var(--w-checkin);
   --color-quickstart: var(--w-quickstart);
-  --color-quickstart-fill: var(--w-quickstart-fill);
-  --color-checkin-fill: var(--w-checkin-fill);
-  --color-sailing-fill: var(--w-sailing-fill);
   --color-sailing: var(--w-sailing);
   --color-voyage: var(--w-voyage);
   --color-ship: var(--w-ship);
   --color-members: var(--w-members);
   --color-chat: var(--w-chat);
-  --color-ledger: var(--w-ledger);
   --color-harbor: var(--w-harbor);
   --color-path-draft: var(--w-path-draft);
   --color-market: var(--w-market);
@@ -55,7 +51,6 @@
   --color-dusk: var(--w-dusk);
   --color-resolve: var(--w-resolve);
   --color-endgame: var(--w-endgame);
-  --color-bankruptcy: var(--w-bankruptcy);
   --color-module-draft: var(--w-module-draft);
   --color-module-swap: var(--w-module-swap);
   --color-advisor: var(--w-advisor);
@@ -71,45 +66,6 @@
   --color-shortcuts: var(--w-shortcuts);
   --color-rumors: var(--w-rumors);
   --color-standing: var(--w-standing);
-  --color-charter-fill: var(--w-charter-fill);
-  --color-harbors-fill: var(--w-harbors-fill);
-  --color-captains-fill: var(--w-captains-fill);
-  --color-messages-fill: var(--w-messages-fill);
-  --color-houses-fill: var(--w-houses-fill);
-  --color-leaderboard-fill: var(--w-leaderboard-fill);
-  --color-chronicles-fill: var(--w-chronicles-fill);
-  --color-settings-fill: var(--w-settings-fill);
-  --color-guide-fill: var(--w-guide-fill);
-  --color-profile-fill: var(--w-profile-fill);
-  --color-legacy-fill: var(--w-legacy-fill);
-  --color-notifications-fill: var(--w-notifications-fill);
-  --color-renown-fill: var(--w-renown-fill);
-  --color-voyage-fill: var(--w-voyage-fill);
-  --color-ship-fill: var(--w-ship-fill);
-  --color-members-fill: var(--w-members-fill);
-  --color-chat-fill: var(--w-chat-fill);
-  --color-ledger-fill: var(--w-ledger-fill);
-  --color-harbor-fill: var(--w-harbor-fill);
-  --color-path-draft-fill: var(--w-path-draft-fill);
-  --color-market-fill: var(--w-market-fill);
-  --color-orders-fill: var(--w-orders-fill);
-  --color-parley-fill: var(--w-parley-fill);
-  --color-dusk-fill: var(--w-dusk-fill);
-  --color-resolve-fill: var(--w-resolve-fill);
-  --color-endgame-fill: var(--w-endgame-fill);
-  --color-bankruptcy-fill: var(--w-bankruptcy-fill);
-  --color-module-draft-fill: var(--w-module-draft-fill);
-  --color-module-swap-fill: var(--w-module-swap-fill);
-  --color-advisor-fill: var(--w-advisor-fill);
-  --color-depth-fill: var(--w-depth-fill);
-  --color-pulse-fill: var(--w-pulse-fill);
-  --color-planner-fill: var(--w-planner-fill);
-  --color-dawn-fill: var(--w-dawn-fill);
-  --color-modules-fill: var(--w-modules-fill);
-  --color-brand-fill: var(--w-brand-fill);
-  --color-shortcuts-fill: var(--w-shortcuts-fill);
-  --color-rumors-fill: var(--w-rumors-fill);
-  --color-standing-fill: var(--w-standing-fill);
   --color-gain: var(--gain);
   --color-alarm: var(--alarm);
   --color-warn: var(--warn);
@@ -119,27 +75,13 @@
   --color-sea: var(--sea);
   --color-gold: var(--gold);
   --color-gold-ink: var(--gold-ink);
-  --color-medal-gold: var(--medal-gold);
-  --color-medal-silver: var(--medal-silver);
-  --color-medal-bronze: var(--medal-bronze);
-  --color-gold-fill: var(--w-gold-fill);
-  --color-medal-gold-fill: var(--w-medal-gold-fill);
-  --color-medal-silver-fill: var(--w-medal-silver-fill);
-  --color-medal-bronze-fill: var(--w-medal-bronze-fill);
   --color-house-jade: var(--house-jade);
   --color-house-vermilion: var(--house-vermilion);
   --color-house-lotus: var(--house-lotus);
-  --color-house-jade-fill: var(--w-house-jade-fill);
-  --color-house-vermilion-fill: var(--w-house-vermilion-fill);
-  --color-house-lotus-fill: var(--w-house-lotus-fill);
   --color-age-lender: var(--age-lender);
   --color-age-trader: var(--age-trader);
   --color-age-broker: var(--age-broker);
-  --color-age-lender-fill: var(--w-age-lender-fill);
-  --color-age-trader-fill: var(--w-age-trader-fill);
-  --color-age-broker-fill: var(--w-age-broker-fill);
   --color-admin: var(--w-admin);
-  --color-admin-fill: var(--w-admin-fill);
 }
 
 :root {
@@ -191,20 +133,15 @@
 
   --w-charter-fill: oklch(0.55 0.15 210.4);
   --w-harbors-fill: oklch(0.55 0.15 129.9);
-  --w-captains-fill: oklch(0.55 0.15 317.8);
-  --w-messages-fill: oklch(0.55 0.15 156.8);
   --w-houses-fill: oklch(0.55 0.15 253.8);
   --w-leaderboard-fill: oklch(0.55 0.15 64.4);
-  --w-chronicles-fill: oklch(0.55 0.15 197);
   --w-settings-fill: oklch(0.55 0.15 140.2);
   --w-guide-fill: oklch(0.55 0.15 103.1);
   --w-profile-fill: oklch(0.55 0.15 83.3);
   --w-legacy-fill: oklch(0.55 0.15 215.9);
-  --w-notifications-fill: oklch(0.55 0.15 237.3);
   --w-renown-fill: oklch(0.55 0.15 76.3);
   --w-checkin-fill: oklch(0.55 0.15 183.6);
   --w-quickstart-fill: oklch(0.55 0.15 344.6);
-  --w-sailing-fill: oklch(0.55 0.15 264.1);
 
   /* === The game session === */
 
@@ -224,10 +161,7 @@
   --w-ledger: oklch(0.53 0.13 304);
 
   --w-voyage-fill: oklch(0.55 0.15 47);
-  --w-ship-fill: oklch(0.55 0.15 111);
-  --w-members-fill: oklch(0.55 0.15 175);
   --w-chat-fill: oklch(0.55 0.15 240);
-  --w-ledger-fill: oklch(0.55 0.15 304);
 
   /* === The phases === */
 
@@ -320,10 +254,6 @@
   --w-standing: oklch(0.53 0.13 208);
 
   --w-advisor-fill: oklch(0.55 0.15 197);
-  --w-depth-fill: oklch(0.55 0.15 347);
-  --w-pulse-fill: oklch(0.55 0.15 90);
-  --w-planner-fill: oklch(0.55 0.15 132);
-  --w-modules-fill: oklch(0.55 0.15 261);
   --w-brand-fill: oklch(0.55 0.15 49.4);
   --w-shortcuts-fill: oklch(0.55 0.15 218);
   --w-rumors-fill: oklch(0.55 0.15 218);
@@ -349,9 +279,6 @@
   */
   --gold: oklch(0.8 0.13 85);
   --gold-ink: oklch(0.52 0.11 75);
-  --medal-gold: oklch(0.8 0.14 85);
-  --medal-silver: oklch(0.82 0.02 265);
-  --medal-bronze: oklch(0.7 0.13 55);
   --w-gold-fill: oklch(0.78 0.14 85);
   --w-medal-gold-fill: oklch(0.78 0.15 85);
   --w-medal-silver-fill: oklch(0.74 0.03 265);

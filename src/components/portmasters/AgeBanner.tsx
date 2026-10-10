@@ -152,7 +152,7 @@ function AgeDetailDialog({
 }) {
   const Icon = visual.icon;
   return (
-    <ModalOverlay onClose={onClose}>
+    <ModalOverlay label={`Age details: ${age.name}`} onClose={onClose}>
       <ModalCard>
         <div className="mb-4 flex items-start justify-between">
           <div className="flex items-center gap-3">

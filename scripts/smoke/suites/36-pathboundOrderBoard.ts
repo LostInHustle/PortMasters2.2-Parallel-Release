@@ -34,6 +34,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export async function pathboundOrderBoardSuite(): Promise<void> {
+  // =================================================================
+  // [D2: the nine slot order board] The manifest's pathbound slots, read
+  // against the plan's own clause for the feature: "Six basic orders open,
+  // three pathbound orders greyed out, each stamped with the crest of the
+  // path that would unlock it and labeled in plain language."
+  //
+  // The boards below are dealt through the real lifecycle rather than
+  // assembled by hand: snapToCheckpoint runs the engine's own startOrders,
+  // so what is read here is the board a captain meets in the Orders phase.
+  // =================================================================
   const dealOrders = (suffix: string) => {
     const state = voyageState();
     snapToCheckpoint(

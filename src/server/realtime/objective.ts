@@ -13,12 +13,12 @@
 // In memory and never persisted, like the Harbor Pulse tallies. The
 // difference is that losing these on a restart costs more than a neutral
 // market, so the clients are the record: every captain holds their own
-// contribution in their voyage state, and each one re-reports it on a
+// contribution in their voyage state, and each one reports it again on a
 // heartbeat, which rebuilds the whole board from nothing within seconds.
 //
 // Reports are cumulative totals and are merged by max rather than summed,
 // which is what makes all of that safe. A reload, a reconnect, a
-// duplicated emit and a re-report after a restart all land on the same
+// duplicated emit and a report sent again after a restart all land on the same
 // number, and a report that arrives out of order cannot walk the board
 // backwards.
 //
@@ -47,7 +47,7 @@
 // captains pressing in the same instant settle one after the other.
 // =====================================================================
 
-import { ObjectiveProgress } from "@/types/realtime/objectives";
+import { ObjectiveProgressPayload } from "@/types/realtime/objectives";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { normalizeMode } from "@/lib/game/mode";
@@ -146,7 +146,7 @@ function objectiveRemainingFor(
  * Everything the honesty of the board rests on is the same shape it was:
  * the goods the deck does not name are dropped, counts that are not whole
  * numbers are dropped, and a report below what is already merged is merged
- * by max like any other, so a re-report, a duplicate emit and an out of
+ * by max like any other, so a report sent again, a duplicate emit and an out of
  * order frame all still land on the number already standing.
  */
 function acceptAgainstRemaining(
@@ -242,7 +242,7 @@ function settleObjective(
   // fact about the room and the room is entitled to hear it, and the
   // broadcast is also how the captain whose handover was refused finds out
   // what the commission actually holds rather than only what they claim.
-  const payload: ObjectiveProgress = {
+  const payload: ObjectiveProgressPayload = {
     roomId,
     total: objectiveTotalFor(roomId, objective),
   };

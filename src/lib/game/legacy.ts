@@ -13,6 +13,8 @@
 // Prisma specific.
 // =====================================================================
 
+import { parseJsonObject } from "./json";
+
 // Triangular growth: level 2 needs 100 XP, level 3 needs 300, level 4
 // needs 600, level 5 needs 1000, and so on, each level asking for one
 // more 100 XP "step" than the last. One strong voyage (Successful
@@ -106,39 +108,34 @@ export function renownStartingGoldBonus(level: number): number {
 type DifficultyStats = { crowns: number; bestScore: number };
 type StatsByDifficulty = Record<string, DifficultyStats>;
 
-// Deliberately defensive: this parses a free form JSON column that rows written
-// before the column existed never populated, so anything missing or malformed
-// degrades to "no record yet" instead of throwing inside the voyage conclusion
-// write, which runs for every finisher at once.
+// Deliberately defensive: this parses a free form JSON column that rows
+// written before the column existed never populated, so anything missing or
+// malformed degrades to "no record yet" instead of throwing inside the
+// voyage conclusion write, which runs for every finisher at once. The parse
+// itself is the shared one (see parseJsonObject in ./json); what follows is
+// this column's own field checks.
 export function parseStatsByDifficulty(
   raw: string | null | undefined,
 ): StatsByDifficulty {
   if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-      return {};
-    const out: StatsByDifficulty = {};
-    for (const [key, value] of Object.entries(
-      parsed as Record<string, unknown>,
-    )) {
-      if (!value || typeof value !== "object") continue;
-      const v = value as { crowns?: unknown; bestScore?: unknown };
-      out[key] = {
-        crowns:
-          typeof v.crowns === "number" && Number.isFinite(v.crowns)
-            ? v.crowns
-            : 0,
-        bestScore:
-          typeof v.bestScore === "number" && Number.isFinite(v.bestScore)
-            ? v.bestScore
-            : 0,
-      };
-    }
-    return out;
-  } catch {
-    return {};
+  const parsed = parseJsonObject(raw);
+  if (!parsed) return {};
+  const out: StatsByDifficulty = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!value || typeof value !== "object") continue;
+    const v = value as { crowns?: unknown; bestScore?: unknown };
+    out[key] = {
+      crowns:
+        typeof v.crowns === "number" && Number.isFinite(v.crowns)
+          ? v.crowns
+          : 0,
+      bestScore:
+        typeof v.bestScore === "number" && Number.isFinite(v.bestScore)
+          ? v.bestScore
+          : 0,
+    };
   }
+  return out;
 }
 
 // Folds one finished voyage into the breakdown, returning a new map rather than

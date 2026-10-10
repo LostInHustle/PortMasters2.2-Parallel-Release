@@ -1,7 +1,12 @@
 "use client";
 
 import { cardName } from "@/lib/game/cards";
-import { leavePhase, wageBill } from "@/lib/game/engine";
+import {
+  leavePhase,
+  maintenanceDue,
+  wageBill,
+  wagesDue,
+} from "@/lib/game/engine";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -65,11 +70,11 @@ export function SettlementBills({
   // charter's Coppersmith or Potter for less than the engine charges a
   // breath later.
   const bill = wageBill(game);
-  const wagesDue = bill.reduce((sum, b) => sum + b.due, 0);
+  const wages = wagesDue(game);
   const nWorkers = bill.reduce((sum, b) => sum + b.count + b.sponsored, 0);
   const sponsored = bill.reduce((sum, b) => sum + b.sponsored, 0);
-  const maintCost = game.fixedCost + game.maintenancePenalty;
-  const totalDue = wagesDue + maintCost;
+  const maintCost = maintenanceDue(game);
+  const totalDue = wages + maintCost;
   const canAfford = game.money >= totalDue;
   const balanceAfter = game.money - totalDue;
   const shortfall = Math.max(1, totalDue - game.money);
@@ -121,7 +126,7 @@ export function SettlementBills({
             </>
           }
         >
-          <span className="font-bold">{wagesDue} Gold</span>
+          <span className="font-bold">{wages} Gold</span>
         </BillRow>
         {sponsored > 0 && (
           // Why the figure above is lower than the roster times the trades'
@@ -184,6 +189,7 @@ export function SettlementBills({
         myUserId={myUserId}
         shortfall={shortfall}
         canAfford={canAfford}
+        alone={members.length <= 1}
       />
 
       <LoanBacking game={game} backing={backing} myUserId={myUserId} />

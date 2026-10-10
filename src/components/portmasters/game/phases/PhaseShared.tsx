@@ -319,7 +319,7 @@ export function PhaseError({
 
 // The fittings the panel bodies are built from and the two card frames the
 // boards and the drafts are drawn on live beside this file, and are
-// re-exported here, which is the path every phase panel imports them from.
+// passed on here, which is the path every phase panel imports them from.
 // Two module splits rather than one file because a single shared file had
 // grown past what any one of its readers was looking for: the chrome a
 // screen waits behind stays here, and the pieces a screen is drawn from
@@ -336,6 +336,7 @@ export {
   PanelStat,
   PanelTotal,
   StatTile,
+  StationStrip,
   IntelBanner,
   PathDeskRow,
   JustForChip,

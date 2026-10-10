@@ -2,7 +2,7 @@
 
 import { call, check, suffix } from "../harness";
 
-export async function openingAndJoiningASuite(inputs: {
+export async function openingAndJoiningAHarborSuite(inputs: {
   guest: {
     id: string;
     token: string;

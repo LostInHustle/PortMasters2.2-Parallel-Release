@@ -35,7 +35,8 @@ import {
   VoteSeatPicker,
   type Marks,
 } from "@/components/portmasters/game/VoteSeatPicker";
-import { VoteCardShell, VoteRefusal } from "./VoteCardShell";
+import { VoteCardShell } from "./VoteCardShell";
+import { RefusalLine } from "../shared";
 import { Utensils } from "lucide-react";
 
 type Audit = ReturnType<typeof useAudit>;
@@ -131,7 +132,11 @@ export function AuditVoteCard({
             pickLabel={(name) => `Open ${name}'s manifest`}
             note="A captain the harbor has written off cannot be audited."
           />
-          <VoteRefusal error={audit.error} onDismiss={audit.clearError} />
+          <RefusalLine
+            className="mt-2"
+            error={audit.error}
+            onDismiss={audit.clearError}
+          />
           {/* The block below owns every word of what this captain said,
               whose turn it is, and what the vote does with the names it
               needs: a panel's own half of that count would be a second

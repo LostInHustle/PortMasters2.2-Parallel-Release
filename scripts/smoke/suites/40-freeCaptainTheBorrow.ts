@@ -37,6 +37,22 @@ import {
 } from "../harness";
 
 export async function freeCaptainTheBorrowSuite(): Promise<void> {
+  // =====================================================================
+  // [D6: Free Captain: Opportunist] The plan's clause for this feature,
+  // and the whole of it: "Once per voyage, fulfill any one pathbound
+  // order without joining that path, at a forty percent payout penalty."
+  //
+  // The checks are split the way the feature is. The allowance is
+  // arithmetic and is read here without a server, because nothing in this
+  // feature travels: the borrow is a permission the captain's own client
+  // holds, the fill is the fill the manifest already ran, and the one
+  // wire fact it adds is the counter the leg report files, which is read
+  // where every leg report is read (see the telemetry spine). The board
+  // a captain meets is dealt through the engine's own lifecycle rather
+  // than assembled by hand, the same way the pathbound board is dealt,
+  // so what is read here is the board a Free Captain really meets in
+  // the Orders phase.
+  // =====================================================================
   // ---- the allowance ----
   // The two numbers the plan sets, and the payout they make. The penalty
   // is read off the constant rather than typed here, and the empty flag
@@ -397,26 +413,4 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       !carriesADash("src/lib/game/engine/orders.ts"),
     "every file the borrow's copy lives in reads free of en dashes, em dashes and doubled hyphens, which is the house rule for every string a captain reads",
   );
-
-  // =====================================================================
-  // [D7: the draft, and switching] The plan's clause for this feature, and
-  // the whole of it: "Deal each captain three path cards face down from a
-  // deck seeded so at least two Quartermaster cards are in circulation.
-  // Keep one, pass two to the left, keep one of the two received, pass
-  // one, discard the last. Then switching: once per voyage, at a port,
-  // legs three through nine, forfeiting unfulfilled pathbound orders and
-  // paying a Refit fee scaled to Renown, and the switch is published to
-  // the fleet log where everyone sees it."
-  //
-  // The checks are split the way the feature is. The deal's arithmetic is
-  // read here without a server, because the rule module holds no state and
-  // nothing about a deck needs a room. The deal itself is then played on a
-  // real harbor, because the privacy of a hand is the wire half of this
-  // feature and no reading of a rule module can observe it: two captains
-  // sit down, the voyage sets sail, and every frame both sockets receive
-  // is kept. The switch is read in both halves, the engine's own guard
-  // over a save and the room's publication over the wire, because the
-  // plan's "everyone knows" is a claim about the fleet rather than about
-  // the captain who changed their papers.
-  // =====================================================================
 }

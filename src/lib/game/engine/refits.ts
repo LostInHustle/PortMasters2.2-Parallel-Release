@@ -349,7 +349,7 @@ export function mendGarment(
  * charge the same fee twice.
  *
  * Returns whether the state changed, which is what the React layer reads to
- * decide whether it owes the captain a re-render.
+ * decide whether it owes the captain a fresh render.
  */
 export function applyRefitSide(
   state: GameState,

@@ -293,6 +293,58 @@ export function StatTile({
   );
 }
 
+/**
+ * The station strip, shared by the two panels that hold more than one
+ * board: Market's port board and artisan bench, and Parley's exchange and
+ * markets. One strip serves both because both wear it for the same
+ * reasons: a station the captain has finished stays reachable, so a
+ * captain who spent their gold at the board can go back and look at what
+ * they bought, and the strip locks while the ready vote is in flight,
+ * because at that point the harbor is being told this captain is done.
+ * The tone is the hue the panel's own header wears, so the strip and the
+ * board below it agree about which screen is open; the reasons the
+ * station is local state rather than a phase value or a saved field are
+ * written at the head of Market.tsx.
+ */
+export function StationStrip<T extends string>({
+  stations,
+  active,
+  onSelect,
+  waiting,
+  tone,
+}: {
+  stations: { id: T; label: string; icon: string }[];
+  active: T;
+  onSelect: (id: T) => void;
+  waiting: boolean;
+  tone: "market" | "parley";
+}) {
+  const here = {
+    market: "border-market/40 bg-market/[0.12] text-market",
+    parley: "border-parley/40 bg-parley/[0.12] text-parley",
+  }[tone];
+  return (
+    <div className="mb-3.5 flex items-center gap-1.5">
+      {stations.map((s, i) => (
+        <button
+          key={s.id}
+          type="button"
+          disabled={waiting}
+          onClick={() => onSelect(s.id)}
+          className={cn(
+            "flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60",
+            s.id === active
+              ? here
+              : "border-transparent bg-muted/30 text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {s.icon} {i + 1} · {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // The broker's whispers wear the trade manifest's hue and the port board's,
 // read by name. It is the same banner either way and the sentence that
 // trails it is the only thing that differs, which is the one part each

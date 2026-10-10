@@ -34,6 +34,7 @@ import { COMMODITIES } from "../constants/goods";
 import {
   RUMOR_COOLDOWN_ROUNDS,
   RUMOR_SHIFT_FRACTION,
+  RUMOR_SHIFT_PERCENT,
 } from "../constants/paths";
 import { bazaarRumorsOn } from "../flags";
 import type { PathId } from "../paths";
@@ -524,15 +525,15 @@ export function rumorLean(
  * A clause rather than a sentence, exactly as the Harbormaster's own call
  * is (see portShiftLine in ../maroon), and for the same reason: whoever
  * shows it frames it with the leg and the captain who spoke, and the
- * clause then reads the same in every frame. The percent is rounded for
- * the reason that clause gives, and it is read from the constant rather
- * than written as a number, so the sentence a captain reads and the
- * arithmetic the market runs cannot come apart.
+ * clause then reads the same in every frame. The percent is read from
+ * RUMOR_SHIFT_PERCENT, which is where its rounding is accounted for, so
+ * the sentence a captain reads and the arithmetic the market runs cannot
+ * come apart.
  */
 export function rumorDirectionLine(
   row: Pick<BazaarRumor, "good" | "direction">,
 ): string {
-  const percent = Math.round(RUMOR_SHIFT_FRACTION * 100);
+  const percent = RUMOR_SHIFT_PERCENT;
   const way = row.direction > 0 ? "higher" : "lower";
   return `${row.good}: every price ${percent} percent ${way} at the next port`;
 }

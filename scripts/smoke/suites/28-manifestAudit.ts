@@ -324,7 +324,7 @@ export async function manifestAuditSuite(
     "which at a five seat harbor is four votes against three and at seven is five against four, so the maroon stays the deliberately harder of the two to call",
   );
 
-  // The book of nominations, re-judged against the room that exists now.
+  // The book of nominations, judged again against the room that exists now.
   // A nomination is cast by one captain and for another, so both ends are
   // the roster's: a vote either of them has left behind is dropped rather
   // than counted under a shrunken roster, which is the same flaw the door
@@ -994,7 +994,7 @@ export async function manifestAuditSuite(
   // arguing about an audit one of them cannot see is a table arguing
   // past each other.
   //
-  // The reload is the path this hand-out actually serves, and the check
+  // The reload is the path this handoff actually serves, and the check
   // is written as one because a voyage in flight is closed to new seats
   // (see roomLockedFor): the same captain, a fresh socket, which is
   // what a client that comes back mid voyage opens.
@@ -1042,7 +1042,7 @@ export async function manifestAuditSuite(
     "restarting the voyage reopens the harbor at its first checkpoint",
   );
   // The captain asking is one of the harbor's own, so the absence below
-  // is the hand-out declining rather than the server refusing a stranger
+  // is the handoff declining rather than the server refusing a stranger
   // the door: a captain who is not a member is turned away before any of
   // this and would prove nothing about the reveal.
   const auditRejoin = await openAuthedSocket(gambitFifth);
@@ -1136,7 +1136,7 @@ export async function manifestAuditSuite(
   await auditSettle();
   // The second captain goes bankrupt mid leg. The room stops counting
   // them there and then, and the nomination they already cast stays in
-  // the book until the next one forces the book to be re-read.
+  // the book until the next one forces the book to be read again.
   auditSockets[1].emit("game:status", {
     roomId: auditRoomId,
     round: AUDIT_FROM_ROUND,
@@ -1571,7 +1571,7 @@ export async function manifestAuditSuite(
     "and the module market refuses its listing into the spent parley the same way",
   );
 
-  // And the standing offer from the still-open parley above is not a door
+  // And the standing offer from the parley above, still open, is not a door
   // either: accepting it is trading this leg the same as posting one, so
   // the accept wire reads auditSpentLeg as well, and the offer stays where
   // it stands rather than settling into the very leg the room voted to

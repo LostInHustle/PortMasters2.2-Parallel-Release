@@ -14,6 +14,12 @@ import type { SessionState } from "./reducer";
 // disagree about what a captain is doing.
 // =====================================================================
 
+// The cadence every live channel rides on, exported because the leg report
+// (see ../use-leg-report) and the objective report (see ../use-objective)
+// debounce on this same number: the three answer one change together, and
+// three separate literals are three chances for one of them to drift.
+export const STATUS_BROADCAST_MS = 120;
+
 export function useStatusBeacon({
   roomId,
   socket,
@@ -37,13 +43,13 @@ export function useStatusBeacon({
     if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
     broadcastTimer.current = setTimeout(() => {
       socket.emit("game:status", buildStatus());
-    }, 120);
+    }, STATUS_BROADCAST_MS);
     return () => {
       if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
     };
   }, [buildStatus, state.loaded, socket, enabled]);
 
-  // Heartbeat: re broadcast status every 8s so the server side cache stays
+  // Heartbeat: rebroadcast status every 8s so the server side cache stays
   // fresh and late joiners (or reconnects after a realtime restart) hydrate.
   useEffect(() => {
     if (!enabled || !state.loaded || !socket) return;

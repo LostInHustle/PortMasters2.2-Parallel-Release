@@ -341,7 +341,7 @@ export function floorTallies(
  * shape every other heal in this tree takes.
  *
  * The list is filtered to strings because it is compared by value: a number
- * in it would never match a key and would silently re-apply a movement.
+ * in it would never match a key and would silently apply a movement again.
  */
 export function normalizeConsentLedger(
   state: GameState,

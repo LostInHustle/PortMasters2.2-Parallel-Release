@@ -28,7 +28,7 @@ const CHANNEL = {
  * The board itself, the per captain filtering and the report that fires
  * when a contract this captain is party to moves past the offer stage are
  * the shared relay's (see ./use-consent-board, which is where the
- * stale-broadcast guard and the reload story are written). What is left
+ * stale broadcast guard and the reload story are written). What is left
  * here is what only the escort can say: the five actions a captain takes
  * against this market (post, accept, decline, withdraw, and the claim,
  * which no other kind has because it is about a raid).

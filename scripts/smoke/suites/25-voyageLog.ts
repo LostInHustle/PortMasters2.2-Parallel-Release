@@ -36,6 +36,21 @@ import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
 export async function voyageLogSuite(run: SmokeRun): Promise<void> {
+  // =====================================================================
+  // [B4: the log surfaces]
+  //
+  // The plan asks for two logs at Dusk, one the whole room reads and one
+  // each captain holds, and what is held below is the contract between
+  // them rather than the screen they are drawn on: the room's log carries
+  // what the table already saw and never a hidden thing, and the private
+  // channel carries what one captain was told and reaches no other
+  // socket. That is the plan's own evaluation, a two client assertion
+  // that no private entry appears in the other captain's transcript, read
+  // here against the surface this slice adds.
+  //
+  // The vocabulary is checked first and without a server, so a failure
+  // further down is never read as a server that declined to write a line.
+  // =====================================================================
   // Every kind, and the sentence a captain reads for it. The table is
   // typed by the union, so a tenth kind is a compile error here as well
   // as in the line writer, and the checks below walk the vocabulary

@@ -23,8 +23,9 @@ import {
   getIntelCost,
   INCOME_TAX_RATE,
   lockedBehind,
+  maintenanceDue,
   moduleSlotsOpen,
-  wageBill,
+  wagesDue,
 } from "@/lib/game/engine";
 import { RECIPES } from "@/lib/game/constants/goods";
 import { SHIP_DISCOUNT_PER_LEVEL } from "@/lib/game/constants/ships";
@@ -271,10 +272,15 @@ function analyzePurchase(game: GameState): Suggestion | null {
   const unpurchased = cards.filter((c) => !game.purchasedCards.includes(c.id));
   if (unpurchased.length === 0) return null;
 
-  // Find the best deal (lowest unit price relative to range)
+  // Find the best deal (lowest unit price relative to range). The winning
+  // resource's own price is kept beside its name, because the two bodies
+  // below quote both: reading resources[0] instead would quote whichever
+  // good the card happens to list first, which is not always the one the
+  // score picked.
   let bestCard = null as (typeof unpurchased)[0] | null;
   let bestScore = -1;
   let bestGoodName = "";
+  let bestGoodPrice = 0;
   for (const card of unpurchased) {
     for (const r of card.resources) {
       const range = basePriceRange(r.type) ?? [0, 100];
@@ -284,6 +290,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
         bestScore = score;
         bestCard = card;
         bestGoodName = r.type;
+        bestGoodPrice = unit;
       }
     }
   }
@@ -310,7 +317,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
     return {
       icon: "🔮",
       title: "Buy a Broker's Rumor",
-      body: `You have ${game.money} Gold. Spending ${intelCost} Gold on a rumor guarantees a matching order in Orders, then buying the ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit sets up a profitable trade.`,
+      body: `You have ${game.money} Gold. Spending ${intelCost} Gold on a rumor guarantees a matching order in Orders, then buying the ${bestGoodName} at ${bestGoodPrice} Gold per unit sets up a profitable trade.`,
       tone: "intel",
     };
   }
@@ -318,7 +325,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
   return {
     icon: "🛒",
     title: `Buy ${bestGoodName}`,
-    body: `Best deal this round: ${bestGoodName} at ${bestCard.resources[0]?.price} Gold per unit from ${bestCard.port}. This is ${Math.round(bestScore * 100)}% of the typical price range, making it a good value.`,
+    body: `Best deal this round: ${bestGoodName} at ${bestGoodPrice} Gold per unit from ${bestCard.port}. This is ${Math.round(bestScore * 100)}% of the typical price range, making it a good value.`,
     tone: "gain",
   };
 }
@@ -340,7 +347,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
     const hireBar = weaverWage * 2 + 20;
     if (game.money >= hireBar) {
       return {
-        icon: "👩\u200d🔧",
+        icon: "👩‍🔧",
         title: "Hire a Weaver",
         body: `A Weaver costs ${weaverWage} Gold per round and can make Linen Clothes from Hemp. You have ${game.money} Gold, enough for ${Math.floor(game.money / weaverWage)} rounds of wages. Production runs the same round you assign it, so hire now to get goods by Resolve.`,
         tone: "gain",
@@ -382,7 +389,7 @@ function analyzeWorkerMgmt(game: GameState): Suggestion | null {
             return {
               icon: "🔨",
               title: `Assign task: ${product}`,
-              body: `Your ${type} is idle and you have the materials to make ${product}. Assign the task now so production lands at Resolve next round. Materials: ${Object.entries(
+              body: `Your ${type} is idle and you have the materials to make ${product}. Assign the task now so production lands at this round's Resolve. Materials: ${Object.entries(
                 recipe.materials,
               )
                 .map(([m, q]) => `${m} x${q}`)
@@ -517,7 +524,7 @@ function analyzeOrders(game: GameState): Suggestion | null {
     return {
       icon: "⏳",
       title: `Almost ready for order #${close.id}`,
-      body: `You are only missing ${missing?.type} (have ${game.inventory[missing?.type ?? ""] || 0}, need ${missing?.required}). Try bartering for it, or wait to buy it next round.`,
+      body: `You are only missing ${missing?.type} (have ${game.inventory[missing?.type ?? ""] || 0}, need ${missing?.required}). Try bartering for it now; a fresh order board is dealt each round.`,
       tone: "warn",
     };
   }
@@ -529,16 +536,16 @@ function analyzeSettlement(game: GameState): Suggestion | null {
   if (game.pirateAttackResolved) {
     // Already resolved the pirate attack, now it is about bills.
     //
-    // The engine's own bill (see wageBill), so the advice quotes the figure
-    // payWages is about to charge rather than a second opinion about the
-    // same roster: a sum counted off the raw roster would include the wage
-    // a Jade Pavilion pledge waives and could warn a captain about to
-    // settle cleanly that they were going bankrupt, and a flat per artisan
-    // multiple would be wrong twice over (the trades do not share a wage,
-    // and every wage carries the captain's own modifiers), which could
-    // call a captain solvent on the round they went bankrupt.
-    const wagesDue = wageBill(game).reduce((sum, b) => sum + b.due, 0);
-    const totalDue = game.fixedCost + game.maintenancePenalty + wagesDue;
+    // The engine's own bills (see wagesDue and maintenanceDue), so the
+    // advice quotes the figures payWages and payMaintenance are about to
+    // charge rather than a second opinion about the same roster: a sum
+    // counted off the raw roster would include the wage a Jade Pavilion
+    // pledge waives and could warn a captain about to settle cleanly that
+    // they were going bankrupt, and a flat per artisan multiple would be
+    // wrong twice over (the trades do not share a wage, and every wage
+    // carries the captain's own modifiers), which could call a captain
+    // solvent on the round they went bankrupt.
+    const totalDue = wagesDue(game) + maintenanceDue(game);
 
     if (game.money < totalDue) {
       return {

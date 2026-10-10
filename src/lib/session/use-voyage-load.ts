@@ -42,15 +42,15 @@ function useFallbackMemory(): {
   houseIdRef: { current: HouseId | null };
   renownRef: { current: number };
 } {
-  // The captain's pledged Great House, remembered across loads. The two
-  // fallback paths below fire precisely when the captain's own data could
+  // The captain's pledged Great House, remembered across loads. The
+  // fallback path below fires precisely when the captain's own data could
   // not be read, and a voyage seeded Houseless would quietly cost them a
-  // perk they had already chosen, so they fall back to this rather than to
+  // perk they had already chosen, so it falls back to this rather than to
   // null. It starts null, which is correct for a captain who has not
   // pledged yet and for a first load that never reached the server.
   const houseIdRef = useRef<HouseId | null>(null);
   // The captain's Renown, remembered across loads for the same reason and
-  // on the same two paths as the House above. A fallback load that seeded
+  // on the same path as the House above. A fallback load that seeded
   // Renown at the base level would quietly demote the captain: Renown gates
   // the Broker's Favor, the harbor peek, and the starting Gold a new voyage
   // opens with, so losing it costs unlocks they had already earned rather
@@ -111,6 +111,28 @@ export function useVoyageLoad({
     if (!enabled) return;
     let alive = true;
 
+    // One background retry for the two unreachable paths below, and the
+    // reason this hook asks a second time at all: a transport hiccup that
+    // costs the first request must not cost the voyage. The retry repeats
+    // the same two reads and lands whatever the room really holds, its
+    // save first and its checkpoint second, through the loaded path
+    // below. A retry that fails too leaves the fresh fallback standing
+    // and stops asking.
+    const LOAD_RETRY_MS = 6_000;
+    let retryId: ReturnType<typeof setTimeout> | null = null;
+    const retryUnreachableLoad = () => {
+      if (!alive || retryId !== null) return;
+      retryId = setTimeout(async () => {
+        try {
+          const [loaded, legacyResult] = await fetchVoyage(roomId);
+          if (!alive) return;
+          applyLoadedAnswer(env, loaded, legacyResult);
+        } catch {
+          // Still unreachable. The fresh fallback already in place stands.
+        }
+      }, LOAD_RETRY_MS);
+    };
+
     // Safety net: if the API call hangs (network hiccup, server spinning up),
     // fall back to a fresh game after 12 s instead of showing the loading
     // screen forever. This is the root cause fix for the loading freeze
@@ -120,7 +142,8 @@ export function useVoyageLoad({
     const timeoutId = setTimeout(() => {
       if (!alive) return;
       loadTimedOut = true;
-      applyTimedOutLoad(env);
+      applyUnreachableLoad(env);
+      retryUnreachableLoad();
     }, LOAD_TIMEOUT_MS);
 
     (async () => {
@@ -132,7 +155,8 @@ export function useVoyageLoad({
       } catch {
         if (alive && !loadTimedOut) {
           clearTimeout(timeoutId);
-          applyFailedLoad(env);
+          applyUnreachableLoad(env);
+          retryUnreachableLoad();
         }
       }
     })();
@@ -140,18 +164,25 @@ export function useVoyageLoad({
     return () => {
       alive = false;
       clearTimeout(timeoutId);
+      if (retryId !== null) clearTimeout(retryId);
     };
   }, [roomId, enabled, ctx, roomMode]);
 }
 
-// A room that never answered tells this captain nothing about the
-// fleet's size, and the reading that keeps them playing is the one
-// every client had before the rung existed: no pin, the founding
-// board. Leaving it unknown instead would shut the delivery button
-// for the rest of the voyage, and a captain handing over what a four
-// seat commission asks for has still contributed something to a
-// wider one.
-function applyTimedOutLoad(env: LoadEnv): void {
+// The reading for the two loads that never reached the room, whether the
+// request hung past its safety net or answered with an error. Both carry
+// the same facts, so both leave the same state: no pin, because a request
+// that never landed knows nothing about the fleet's size and this captain
+// draws the founding board and keeps a working hand rather than holding a
+// commission they are forbidden to touch, and no checkpoint, because the
+// room never said where it was standing. The seed still carries the
+// room's deterministic economy through ctx, and the House and Renown
+// remembered across loads ride along, so an unreachable server never
+// turns a pledge into no pledge or a captain into a first voyage
+// beginner. What closes the checkpoint gap is the retry the caller
+// schedules beside this call: an answer on that second ask lands the
+// room's real voyage through the loaded path beside this one.
+function applyUnreachableLoad(env: LoadEnv): void {
   env.setSeatPin({ roomId: env.roomId, seats: 0 });
   env.dispatch({
     type: "START_FRESH",
@@ -235,29 +266,4 @@ function applyLoadedAnswer(
       houseId,
     });
   }
-}
-
-// Same reading as the timeout above, for the same reason: a
-// request that failed carries no fleet size, so this captain
-// draws the founding board and keeps a working hand rather than
-// holding a commission they are forbidden to touch.
-//
-// Include ctx so a fresh game is still seeded with the room's
-// deterministic economy, and include the room's last known
-// checkpoint so a captain who had a network error doesn't land
-// back at round 1 while everyone else is mid voyage. The
-// remembered House and Renown ride along too, so a failed fetch
-// never turns a pledge into no pledge or a captain into a
-// first voyage beginner.
-function applyFailedLoad(env: LoadEnv): void {
-  env.setSeatPin({ roomId: env.roomId, seats: 0 });
-  env.dispatch({
-    type: "START_FRESH",
-    checkpoint: null,
-    ctx: env.ctx,
-    houseId: env.houseIdRef.current,
-    renownLevel: env.renownRef.current,
-    startingGoldBonus: renownStartingGoldBonus(env.renownRef.current),
-    mode: env.roomMode,
-  });
 }

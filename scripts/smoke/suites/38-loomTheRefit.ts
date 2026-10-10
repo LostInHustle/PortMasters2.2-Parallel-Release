@@ -1535,7 +1535,7 @@ export async function loomTheRefitSuite(
 
   // And the sentences the bench owes a captain who is only ever a buyer. The
   // two rules of the trade, when an offer leaves the bench and how much of
-  // it one captain may take on, stand in the always-drawn paragraph at the
+  // it one captain may take on, stand in the paragraph that is always drawn at the
   // top of the bench rather than in the seller's own block, which is a place
   // a customer never reads: the same side of the switch the module market
   // hoists its own three rules to (see the hoisted intro in ModuleMarket).
@@ -1566,7 +1566,7 @@ export async function loomTheRefitSuite(
       benchFlat.indexOf("One open offer per captain you name") <
         benchFlat.indexOf("{canSell &&") &&
       benchFlat.includes("No refit work on offer this leg."),
-    "the two rules of the trade stand in the always-drawn paragraph above the seller's block, so a customer who never opens the seller's form still reads when an offer leaves the bench and how much of it one captain may take on, and the empty bench keeps only the claim that nothing is on it",
+    "the two rules of the trade stand in the paragraph above the seller's block that is always drawn, so a customer who never opens the seller's form still reads when an offer leaves the bench and how much of it one captain may take on, and the empty bench keeps only the claim that nothing is on it",
   );
 
   // =====================================================================

@@ -157,7 +157,7 @@ function healSaveCollections(game: GameState): void {
   game.completedOrders = game.completedOrders ?? [];
   game.resourceCards = game.resourceCards ?? [];
   game.customerCards = game.customerCards ?? [];
-  // The hull is the one held-card collection stored as whole records
+  // The hull is the one collection of held cards stored as whole records
   // rather than resolved by id at each read, and the one whose elements
   // the old bare coalesce never looked at. A save written before the card
   // record existed carries elements of the old module shape, which has no
@@ -333,6 +333,15 @@ function healVoyageTallies(game: GameState): void {
   // damaged would carry NaN into the purse rather than merely look wrong.
   game.debts = normalizeLoans(game.debts);
   game.loansGiven = normalizeLoans(game.loansGiven);
+  // The largest single trade, a running maximum the engine folds with
+  // Math.max, which reads a missing key as NaN and would then hold NaN for
+  // the rest of the voyage. Healed with a strict number check, so a save
+  // written before the field existed reads as a voyage with no trade
+  // recorded rather than poisoning every later settle.
+  game.largestTrade =
+    typeof game.largestTrade === "number" && Number.isFinite(game.largestTrade)
+      ? game.largestTrade
+      : 0;
 }
 
 // The marks a failed voyage leaves and the leans a failed or a bribed
@@ -501,7 +510,7 @@ function healShipLedger(game: GameState): void {
     game.fixedCost = difficultyConfig(game.difficulty).maintenance;
   }
   // The ladder is healed index by index against the canonical one: a
-  // missing entry or a non-number lands on the fee this build charges for
+  // missing entry or one that is not a number lands on this build's fee for
   // that step, and entries past the top a damaged file grew are dropped
   // rather than read, since the yard never asks for them.
   game.shipUpgradeCost = SHIP_UPGRADE_LADDER.map((fee, i) => {

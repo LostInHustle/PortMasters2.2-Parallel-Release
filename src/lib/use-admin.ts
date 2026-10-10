@@ -41,6 +41,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { api } from "@/lib/api";
 
+// The console's loading line, said once for the two surfaces that print
+// it: the page's splash while the session is checked (see app/admin), and
+// the console's own register panel while the roster is read.
+export const READING_THE_REGISTER = "Reading the register…";
+
 // The five things an operator can do to one account. The four of them a
 // selection can take ride the same socket event, admin:bulk, and are named
 // by the action rather than the event.

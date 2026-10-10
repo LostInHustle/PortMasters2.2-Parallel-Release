@@ -64,25 +64,33 @@ export const MERCHANT_RATINGS: MerchantRating[] = [
   { minScore: 0, icon: "🌊", label: "Novice Merchant" },
 ];
 
-// The single lookup behind both the Endgame log line (see endGame in
-// ./engine/lifecycle.ts) and the Endgame screen's rating badge (see
-// GamePhasePanel.tsx), so the two never drift the way they briefly did
-// before this was pulled out: the screen was missing the "defaulted on a
-// loan" case entirely, still showing a captain's score tier as if nothing
-// had happened.
-//
-// Lives here in constants rather than in the engine, since it is a pure
-// lookup over MERCHANT_RATINGS above with no dependency on any engine
-// state, and MERCHANT_RATINGS is the table the top entry also doubles as
-// the threshold for the "king_of_silk_road" merit in ./merits.ts, so
-// retuning it here moves both places at once instead of drifting apart.
-// MERCHANT_RATINGS is ordered highest threshold first, so the first match
-// scanning down the list is always the correct tier.
+// A score's rating tier, the first match scanning down MERCHANT_RATINGS
+// above. Lives here in constants rather than in the engine, since it is a
+// pure lookup with no dependency on any engine state. The rank the endgame
+// surfaces wrong is not this lookup on its own, because a captain who
+// defaulted on a loan reads as bankrupt whatever their score spells (see
+// endgameRatingFor below).
 export function merchantRatingForScore(score: number): MerchantRating {
   return (
     MERCHANT_RATINGS.find((r) => score >= r.minScore) ??
     MERCHANT_RATINGS[MERCHANT_RATINGS.length - 1]
   );
+}
+
+// The rank line both Endgame surfaces print: the log line endGame writes
+// (see ./engine/lifecycle.ts) and the Endgame screen's badge (see
+// Endgame.tsx). The pair used to be hand written in both places, and they
+// drifted exactly the way a duplicated branch does: the screen was missing
+// the "defaulted on a loan" case entirely, still showing a captain's score
+// tier as if nothing had happened. One lookup now, so the ledger and the
+// screen can never name two ranks for one voyage.
+export function endgameRatingFor(
+  score: number,
+  defaultedDebt: boolean,
+): string {
+  if (defaultedDebt) return "💥 Bankrupt: Defaulted on a Loan";
+  const r = merchantRatingForScore(score);
+  return `${r.icon} ${r.label}`;
 }
 
 // [MANIFEST 05: Backing] A third captain can co sign part of an existing

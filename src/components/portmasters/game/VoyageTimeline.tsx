@@ -75,7 +75,7 @@ export function VoyageTimeline({
   // The two phases that end the voyage, read through the shared reader
   // (see leftTheVoyage in @/lib/seatMarks) rather than spelled here: the
   // rail reads "no step is lit" for the pier as well, and the pier is not
-  // a voyage ending. Terminal-ness belongs to the phase, not to the rail.
+  // a voyage ending. Being terminal belongs to the phase, not to the rail.
   const isTerminal = leftTheVoyage({ phase });
   // The closing banner wears the terminal phase's own face, drawn above
   // rather than on a step, since a terminal phase has no step to sit on.

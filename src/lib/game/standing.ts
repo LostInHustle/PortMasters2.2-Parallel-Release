@@ -3,9 +3,8 @@
 // them.
 //
 // [B3: standing orders] The room's clock already protects a table from the
-// captain who walked away: [B2] gave the server the timer, and a seat the
-// room has run out is left by its own defaults rather than held open
-// forever. What that leaves is the other half of the problem. The
+// captain who walked away: the server holds the timer, and a seat the room
+// has run out is left by its own defaults rather than held open forever. What that leaves is the other half of the problem. The
 // defaults are the engine's opinion, not the captain's, so the leg a
 // slow player never got to play is played for them by a stranger.
 //
@@ -47,8 +46,8 @@ type StandingBuy = { good: string; maxPrice: number };
  * plays a seat they were not standing at.
  *
  * `enabled` is the captain's own switch and the whole of the rollback the
- * plan asks for: with it off, every seat is left exactly the way [B2]
- * left it, by the engine's own defaults, and the written set below stays
+ * plan asks for: with it off, every seat is left exactly the way the
+ * engine's own defaults leave it, and the written set below stays
  * on the record rather than being deleted, because a switch that erased
  * the captain's work would punish them for trying it.
  *
@@ -56,7 +55,8 @@ type StandingBuy = { good: string; maxPrice: number };
  * absence is spelled as the value the engine already uses: a null boon is
  * the board's first offer, an empty list buys nothing, and the two words
  * that name the seats are the quieter of the pair. A voyage whose captain
- * never opens the panel is therefore byte for byte the voyage [B2] sailed.
+ * never opens the panel is therefore byte for byte the voyage the clock
+ * alone would sail.
  */
 export type StandingOrders = {
   enabled: boolean;
@@ -126,8 +126,8 @@ export function defaultStandingOrders(): StandingOrders {
  *
  * A save written before this field existed carries none of it, and lands
  * on the default above. That is deliberate and it is exact: the default
- * record behaves identically to the seat defaults [B2] shipped, so an old
- * save loads into the voyage it was already sailing.
+ * record behaves identically to the seat defaults the engine carries, so
+ * an old save loads into the voyage it was already sailing.
  *
  * A boon id is kept as written rather than resolved here. It names a
  * catalogue entry, and the catalogue is not this module's business at the
@@ -196,13 +196,13 @@ export function standingBoon(orders: StandingOrders): CardRecord | null {
  * seat right now.
  *
  * The switch alone does not answer that: a captain who turned it on and
- * wrote nothing below it is sailing exactly the voyage [B2] shipped, and
- * a control panel that lit up for them would be claiming the seat is
- * being played by orders that do not exist. So this is the switch and at
- * least one written instruction, kept here rather than at the call site
- * because it is a statement about the shape of the record: a field added
- * to StandingOrders above is a field this function has to be told about,
- * and one place to remember is better than a screen full of them.
+ * wrote nothing below it is sailing exactly the voyage an empty record
+ * plays, and a control panel that lit up for them would be claiming the
+ * seat is being played by orders that do not exist. So this is the switch
+ * and at least one written instruction, kept here rather than at the call
+ * site because it is a statement about the shape of the record: a field
+ * added to StandingOrders above is a field this function has to be told
+ * about, and one place to remember is better than a screen full of them.
  */
 export function standingOrdersLive(orders: StandingOrders): boolean {
   return (

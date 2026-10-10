@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Trophy, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { merchantRatingForScore } from "@/lib/game/engine";
+import { endgameRatingFor } from "@/lib/game/engine";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 import { FinancialSummary, PeerEconomySummary } from "./EndgameSummaries";
@@ -87,16 +87,9 @@ export function Endgame({
 }: EndgameProps) {
   const myUserId = me.id;
   const isHost = me.id === room.hostId;
-  // Mirrors the same rank shown in the Captain's Ledger (see
-  // merchantRatingForScore in engine.ts). Checks defaultedDebt first, the
-  // one case a plain score lookup can't capture on its own.
-  let rating: string;
-  if (game.defaultedDebt) {
-    rating = "💥 Bankrupt: Defaulted on a Loan";
-  } else {
-    const r = merchantRatingForScore(game.score);
-    rating = `${r.icon} ${r.label}`;
-  }
+  // The same rank the Captain's Ledger's Game Over line prints, from the
+  // one lookup the two surfaces share (see endgameRatingFor).
+  const rating = endgameRatingFor(game.score, game.defaultedDebt);
   const mine = voyageResult?.standings.find((s) => s.userId === myUserId);
   const rival = useRivalHere(myUserId, voyageResult);
   return (

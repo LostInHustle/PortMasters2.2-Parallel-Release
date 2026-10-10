@@ -29,6 +29,7 @@ import {
   readPairs,
 } from "@/lib/game/combinations";
 import { db } from "@/lib/db";
+import { runReport } from "./report";
 
 async function main(): Promise<void> {
   const rows = await db.voyageChronicle.findMany({
@@ -75,9 +76,4 @@ async function main(): Promise<void> {
   console.log("");
 }
 
-main()
-  .catch((err) => {
-    console.error("The combination report could not be read.", err);
-    process.exitCode = 1;
-  })
-  .finally(() => db.$disconnect());
+runReport("The combination report could not be read.", main);

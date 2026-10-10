@@ -36,7 +36,10 @@ export function KeyboardShortcutHelp({
   return (
     <AnimatePresence>
       {open && (
-        <ModalOverlay onClose={() => onOpenChange(false)}>
+        <ModalOverlay
+          label="Keyboard Shortcuts"
+          onClose={() => onOpenChange(false)}
+        >
           <ModalCard>
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-3">

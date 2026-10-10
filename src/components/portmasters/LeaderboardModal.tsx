@@ -107,7 +107,10 @@ export function LeaderboardModal({
   });
 
   return (
-    <ModalOverlay onClose={() => onOpenChange(false)}>
+    <ModalOverlay
+      label="Harbor Leaderboard"
+      onClose={() => onOpenChange(false)}
+    >
       <ModalSheet maxW="max-w-lg" maxH="max-h-[85vh]">
         {/* Header */}
         <div className="relative shrink-0 overflow-hidden border-b border-border/40 p-5">

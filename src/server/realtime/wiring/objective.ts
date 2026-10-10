@@ -10,7 +10,7 @@
 // thing said at two different moments.
 // =====================================================================
 
-import { type ObjectiveReport } from "@/types/realtime/objectives";
+import { type ObjectiveReportPayload } from "@/types/realtime/objectives";
 import type { Server, Socket } from "socket.io";
 
 import { seated } from "../auth";
@@ -22,7 +22,7 @@ export function wireObjective(io: Server, socket: Socket): void {
   // what the room hears is a sum. The room's mode and epoch are read
   // server side, never from the payload, which is what keeps a Classic
   // room from ever carrying a board.
-  socket.on("objective:report", (payload: Partial<ObjectiveReport>) => {
+  socket.on("objective:report", (payload: Partial<ObjectiveReportPayload>) => {
     const s = seated(socket, payload);
     if (!s) return;
     const { roomId } = s;
@@ -36,23 +36,26 @@ export function wireObjective(io: Server, socket: Socket): void {
   // shape their report carries: they are the same number, and the room
   // resolves it the same way for both, so no second reading of what a
   // commission has left exists anywhere but in ../objective.
-  socket.on("objective:handover", (payload: Partial<ObjectiveReport>) => {
-    const s = seated(socket, payload);
-    if (!s) return;
-    const { roomId } = s;
-    const delivered = payload?.delivered;
-    if (!delivered || typeof delivered !== "object") return;
-    void recordObjectiveHandover(io, roomId, s.userId, delivered).then(
-      (granted) => {
-        // A room with no commission answers nothing here, which is the
-        // silence a report gets there for the same reason: the press could
-        // not have been offered in a harbor that draws no board.
-        if (!granted) return;
-        // To this socket and to no other. The grant is what the commission
-        // accepted of one captain's press, so it is theirs to read; the
-        // public frame above is the room's and stays the room's.
-        socket.emit("objective:granted", { roomId, granted });
-      },
-    );
-  });
+  socket.on(
+    "objective:handover",
+    (payload: Partial<ObjectiveReportPayload>) => {
+      const s = seated(socket, payload);
+      if (!s) return;
+      const { roomId } = s;
+      const delivered = payload?.delivered;
+      if (!delivered || typeof delivered !== "object") return;
+      void recordObjectiveHandover(io, roomId, s.userId, delivered).then(
+        (granted) => {
+          // A room with no commission answers nothing here, which is the
+          // silence a report gets there for the same reason: the press could
+          // not have been offered in a harbor that draws no board.
+          if (!granted) return;
+          // To this socket and to no other. The grant is what the commission
+          // accepted of one captain's press, so it is theirs to read; the
+          // public frame above is the room's and stays the room's.
+          socket.emit("objective:granted", { roomId, granted });
+        },
+      );
+    },
+  );
 }

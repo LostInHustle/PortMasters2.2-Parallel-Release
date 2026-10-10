@@ -27,34 +27,30 @@ import {
   shippedModuleTraffic,
   type ModuleTrafficSave,
 } from "@/lib/game/engine";
+import { parseJsonObject } from "@/lib/game/json";
 import { db } from "@/lib/db";
+import { runReport } from "./report";
 
 // One voyage's contribution, read back the way the save heals it. A row
 // whose blob will not parse, or that carries neither a hull nor a ledger,
 // contributes an empty save rather than stopping the report.
 function trafficOf(data: string): ModuleTrafficSave {
-  try {
-    const parsed = JSON.parse(data) as {
-      equippedModules?: unknown;
-      modulesTraded?: unknown;
-    };
-    const equipped = Array.isArray(parsed.equippedModules)
-      ? parsed.equippedModules
-          .map((card) =>
-            card !== null && typeof card === "object"
-              ? (card as { id?: unknown }).id
-              : null,
-          )
-          .filter((id): id is string => typeof id === "string")
-      : [];
-    // The ledger goes through the module's own heal, the reader the save
-    // itself heals through, held apart for exactly this caller: the
-    // counters the state heal also floors are not read here, and a save's
-    // own hull is read as written.
-    return { equipped, traded: normalizeModulesTraded(parsed.modulesTraded) };
-  } catch {
-    return { equipped: [], traded: {} };
-  }
+  const parsed = parseJsonObject(data);
+  const stored = parsed?.equippedModules;
+  const equipped = Array.isArray(stored)
+    ? stored
+        .map((card) =>
+          card !== null && typeof card === "object"
+            ? (card as { id?: unknown }).id
+            : null,
+        )
+        .filter((id): id is string => typeof id === "string")
+    : [];
+  // The ledger goes through the module's own heal, the reader the save
+  // itself heals through, held apart for exactly this caller: the
+  // counters the state heal also floors are not read here, and a save's
+  // own hull is read as written.
+  return { equipped, traded: normalizeModulesTraded(parsed?.modulesTraded) };
 }
 
 async function main(): Promise<void> {
@@ -77,11 +73,4 @@ async function main(): Promise<void> {
   );
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    void db.$disconnect();
-  });
+runReport("The module trade report could not be read.", main);

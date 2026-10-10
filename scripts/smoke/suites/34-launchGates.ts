@@ -2318,25 +2318,4 @@ export async function launchGatesSuite(
       survivalLines.every((line) => !CARRIES_A_DASH.test(line)),
     "and every line the survival layer writes for a captain, the Larder's shortage, the crew's own losses and the wardrobe's wear alike, is free of dashes, the same rule every other string in the game is held to",
   );
-
-  // =====================================================================
-  // [D1: the path configuration module, and the naming change]
-  //
-  // The plan asks for one record per path carrying crest, signature
-  // ability, goods, order pool, cargo modifier and Renown ceiling, in the
-  // shape the difficulty ladder already uses, so that adding or retuning
-  // a path is one entry and no other server code to touch. What is held
-  // below is that record read as a record: the facts it claims, the
-  // properties that make it one source of truth, and the naming change it
-  // carried, which is the half of this slice a later reader is likeliest
-  // to undo by accident.
-  //
-  // Nothing here talks to the server, because there is no server side to
-  // this feature: a path is content, and the module holding it reads no
-  // clock, no database and no socket. Every check is also written to
-  // survive the day a sixth path is added, because the plan's own
-  // evaluation adds one to prove that no other module has to move, and a
-  // suite that failed on that edit would itself be the second place the
-  // paths are listed.
-  // =====================================================================
 }

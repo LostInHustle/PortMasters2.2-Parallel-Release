@@ -13,12 +13,11 @@
 // captain's seeded market and orders keep their own personal draw while the
 // structure (how many cards, how likely a raid) stays consistent room wide.
 //
-// The "fair_winds" tier is calibrated to the game exactly as it played before
-// difficulty existed: 8 rounds, a flat 0.2 raid chance, a 0.1 escort fee, 6
-// cards on each board, no mandates and no corrupt brokers. Those numbers used
-// to be flat constants in ./constants; moving them here changed nothing for
-// the existing mode, and it is what lets the two richer tiers vary them. The
-// three tiers sit side by side in the README, under Difficulty tiers.
+// The "fair_winds" tier is the founding game: 8 rounds, a flat 0.2 raid
+// chance, a 0.1 escort fee, 6 cards on each board, no mandates and no
+// corrupt brokers. The two richer tiers vary those dials, which is why
+// they live in a record rather than as flat constants. The three tiers
+// sit side by side in the README, under Difficulty tiers.
 // =====================================================================
 
 import type { TagList } from "./constants/tags";

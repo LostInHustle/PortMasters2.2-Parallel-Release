@@ -51,7 +51,7 @@ export function useBoonLedger(
   } | null>(null);
   // The identity of the last report this client sent, room stamped. A
   // ref rather than state because it is a memory of the wire rather than
-  // anything a render reads: changing it must not re-render the room.
+  // anything a render reads: changing it must not render the room again.
   const sent = useRef<string | null>(null);
   const record = game.boonRecord;
   const mode = game.mode;

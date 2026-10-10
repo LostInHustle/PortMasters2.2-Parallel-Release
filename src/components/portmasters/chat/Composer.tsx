@@ -5,6 +5,7 @@ import type { PublicUser } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CHAT_MESSAGE_MAX } from "@/lib/realtime-endpoint";
+import { MUTED_NOTICE } from "@/lib/game/constants/copy";
 import {
   Popover,
   PopoverContent,
@@ -95,6 +96,18 @@ export function Composer({
   // than in a panel they may never open. The sentence is the frame's own,
   // carried through the hook and never rebuilt, and the dismissal is the
   // hook's own clearError.
+  //
+  // One name for the message field, worn twice: as the placeholder and as
+  // the name a screen reader reads it by. A placeholder is not an
+  // accessible name, and a field whose only description is placeholder
+  // text is announced as an empty box. The dm's name names the captain
+  // once there is one, and falls back to a plain noun before that rather
+  // than leaving the slot blank.
+  const fieldName = {
+    room: "Message the harbor",
+    lobby: "Message the lobby",
+    dm: `Message ${otherName ?? "this captain"}`,
+  }[mode];
   return (
     <div className="border-t border-black/5 dark:border-white/10">
       {trade?.barter.error && (
@@ -113,7 +126,7 @@ export function Composer({
       <div className="p-2.5 flex items-center justify-center gap-2">
         {disabled ? (
           <p className="text-center text-xs text-muted-foreground">
-            The host has muted you in room chat for the rest of this voyage.
+            {MUTED_NOTICE}
           </p>
         ) : (
           <>
@@ -139,13 +152,8 @@ export function Composer({
                   onSend();
                 }
               }}
-              placeholder={
-                {
-                  room: "Message the harbor…",
-                  lobby: "Message the lobby…",
-                  dm: `Message ${otherName ?? ""}…`,
-                }[mode]
-              }
+              placeholder={`${fieldName}…`}
+              aria-label={fieldName}
               className="h-9 rounded-full bg-black/5 dark:bg-white/10 border-0 text-sm"
               maxLength={CHAT_MESSAGE_MAX}
             />
@@ -153,6 +161,7 @@ export function Composer({
               size="icon"
               onClick={onSend}
               disabled={!input.trim()}
+              aria-label="Send message"
               className="h-9 w-9 rounded-full pm-grad-chat shrink-0"
             >
               <SendHorizontal className="h-4 w-4" />

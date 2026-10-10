@@ -90,7 +90,7 @@ export async function fleetCommissionSuite(
   // Ocean Gambit's one public surface, and the contrast with the section
   // above is the point of both: the alignment is a secret defended all
   // the way to the wire, and this is a shared number that only has to be
-  // un-inflatable. So these checks are about the deck holding its own
+  // impossible to inflate. So these checks are about the deck holding its own
   // authoring rule, about every captain hearing the same board, and about
   // a doctored report not moving it.
 
@@ -355,7 +355,7 @@ export async function fleetCommissionSuite(
   );
 
   // A restarted voyage starts the board empty, and this is the one check
-  // in the section that cannot be satisfied by a client re-reporting: a
+  // in the section that cannot be satisfied by a client reporting again: a
   // report of zero cannot clear a max merged tally, because max(old, 0)
   // is old. Without the clear in room:restart, the dead voyage's numbers
   // are still there and this report lands on top of them.
@@ -597,7 +597,7 @@ export async function fleetCommissionSuite(
   );
 
   // The report path behind the same lines, for the reason it exists: a
-  // reload, a reconnect and a heartbeat all re-report a standing this
+  // reload, a reconnect and a heartbeat all repeat a standing this
   // captain already holds, and a line is a standing rather than a sum.
   await recordObjectiveReport(
     quietIo,

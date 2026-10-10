@@ -12,14 +12,14 @@
 // key. The one writer (recordRivalOutcomes in src/server/realtime/rival.ts)
 // sorts the two ids and then has to map each side back to the captain it
 // belongs to, so it needs them separately, and the one reader
-// (src/app/api/rivals/route.ts) re orders the pair so the viewer is always
+// (src/app/api/rivals/route.ts) reorders the pair so the viewer is always
 // "a". A merged key would have to be taken apart again at both ends.
 // =====================================================================
 
 // One recorded meeting. Exactly one of aWon / bWon / tie is true per
 // outcome. The labels "a" and "b" are positional only and mean nothing on
 // their own: each side is whichever id the caller put there. The writer
-// sorts by id, the reader re sorts so the viewer is "a", and a caller that
+// sorts by id, the reader re-sorts so the viewer is "a", and a caller that
 // cares about names keeps its own mapping rather than trying to recover
 // them from here.
 export type RivalOutcome = {

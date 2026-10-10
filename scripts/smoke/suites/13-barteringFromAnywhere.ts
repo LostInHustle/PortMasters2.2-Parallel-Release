@@ -412,7 +412,7 @@ export async function barteringFromAnywhereSuite(inputs: {
       ),
     "a refused post's own escrow goes back to the hold, so a press the room turned away returns the goods it escrowed",
   );
-  // The other half of that hand-back, and the one a refusal can lose on its
+  // The other half of that return, and the one a refusal can lose on its
   // own: a refund that lands while this captain's voyage is still loading
   // would be applied to a save the real one then replaces, which destroys
   // the goods exactly as quietly as a refusal with no refund at all. So the

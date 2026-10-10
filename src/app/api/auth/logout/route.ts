@@ -3,14 +3,14 @@
 // just ending the browser session. Otherwise a player who logs out
 // without first clicking Leave stays a permanent member, and a room
 // they were the only one left in never gets cleaned up.
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE_NAME } from "@/lib/auth";
 import { clearSessionCookie, getCurrentUser } from "@/lib/api-auth";
 import { leaveRoomForUser, roomIdsForUser } from "@/lib/rooms";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE_NAME)?.value;
 
@@ -26,6 +26,6 @@ export async function POST() {
     await db.session.deleteMany({ where: { token } }).catch(() => {});
   }
   const res = NextResponse.json({ ok: true });
-  res.headers.set("Set-Cookie", clearSessionCookie());
+  res.headers.set("Set-Cookie", clearSessionCookie(req));
   return res;
 }

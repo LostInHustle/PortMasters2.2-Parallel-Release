@@ -2,6 +2,7 @@
 // Returns the room plus the last 100 public room chat messages. DMs are
 // scoped to recipientId not null and never appear here.
 import { NextResponse } from "next/server";
+import { ROOM_NOT_FOUND } from "@/lib/api";
 import { db, ROOM_WITH_MEMBERS, PUBLIC_USER_SELECT } from "@/lib/db";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { messageRows } from "@/lib/messages";
@@ -34,7 +35,7 @@ export async function GET(
     },
   });
   if (!room)
-    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    return NextResponse.json({ error: ROOM_NOT_FOUND }, { status: 404 });
 
   const isMember = room.members.some((m) => m.userId === user.id);
 

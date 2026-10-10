@@ -8,7 +8,7 @@ import { isGatedPhase } from "@/lib/game/checkpoint";
 import { modeConfig } from "@/lib/game/mode";
 import { standingOrdersLive } from "@/lib/game/standing";
 import { readyLine } from "@/lib/use-phase-sync";
-import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
+import { HOST_ONLY_RESTART, START_VOYAGE } from "@/lib/game/constants/copy";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
@@ -125,7 +125,7 @@ export function GameControlPanel({
       startText = "Start Solo Practice";
       startDisabled = false;
     } else {
-      startText = "Start the Voyage";
+      startText = START_VOYAGE;
       startDisabled = false;
     }
     nextDisabled = true;

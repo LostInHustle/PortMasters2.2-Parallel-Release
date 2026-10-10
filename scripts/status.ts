@@ -25,14 +25,14 @@
  * and anything outside src, so the docs may quote a sentence and are left
  * alone on purpose. It strips comments before reading, so a note that
  * explains a repair may quote the sentence it repaired, and it reads case
- * insensitively, so a re-spelling in lower case is still a finding.
+ * insensitively, so the same sentence in lower case is still a finding.
  *
  * Run with npm run check:status. The build runs it too, beside the tag
  * and card checks, because a convention is only one if the build refuses
  * to ship without it.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   STATUS_FAMILIES,
@@ -40,23 +40,11 @@ import {
   statusGuardedFragments,
   validateStatusCopy,
 } from "@/lib/game/status-copy";
+import { walkSrc } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
 const MODULE = join(SRC, "lib", "game", "status-copy.ts");
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walk(full));
-      continue;
-    }
-    if (/\.tsx?$/.test(entry)) out.push(full);
-  }
-  return out;
-}
 
 /* The three comment shapes stripped before the sweep reads a file, the
    same three the smoke harness's withoutComments strips. It is kept here
@@ -72,7 +60,7 @@ function withoutComments(source: string): string {
 
 const findings: string[] = validateStatusCopy();
 
-const files = walk(SRC);
+const files = walkSrc(SRC);
 const guarded = statusGuardedFragments();
 for (const file of files) {
   if (file === MODULE) continue;

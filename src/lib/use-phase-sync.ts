@@ -12,9 +12,8 @@ import {
   tallyPurchasesByResource,
 } from "@/lib/game/engine";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
-import type { PortShift } from "@/lib/game/maroon";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
-import { normalizeMode, type GameMode } from "@/lib/game/mode";
+import { normalizeMode } from "@/lib/game/mode";
 import {
   checkpointRank,
   isGatedPhase,
@@ -27,27 +26,17 @@ import {
   type PhaseClock,
 } from "@/lib/phase-clock";
 import { api } from "@/lib/api";
+import type {
+  PhaseAdvanceFrame,
+  PhaseReadyFrame,
+} from "@/types/realtime/phase";
 
-export type ReadyState = {
-  round: number;
-  phase: string;
-  // The lap the room is keeping, so a captain can be sure the round and the
-  // phase they just read are being compared in the mode they are playing.
-  // Optional because a client can meet a server one build behind during a
-  // rolling restart, and a frame that carries no mode says nothing about the
-  // lap rather than saying the lap is the founding mode.
-  mode?: GameMode;
-  // [B2: hard timers, the server as timekeeper] The room's clock as the
-  // server publishes it: the epoch millisecond this seat runs out, and the
-  // number of seconds the seat was given. Both are null on a seat with no
-  // clock of its own, which is the pier, a harbor that has not set sail, and
-  // a server running with the clock switched off, so a client never has to
-  // tell "no clock" apart from "not reported".
-  phaseEndsAt: number | null;
-  phaseSeconds: number | null;
-  readyUserIds: string[];
-  requiredUserIds: string[];
-};
+// The ready frame's shape lives with the protocol rather than here (see
+// PhaseReadyFrame in @/types/realtime/phase): the server builds this frame
+// and this hook reads it, and a frame written out at both ends is a frame
+// that can drift. The alias keeps this module's consumers on the same name
+// they have always read.
+export type ReadyState = PhaseReadyFrame;
 
 /**
  * The room's ready count as a sentence, so the rail and the control bar
@@ -66,10 +55,6 @@ export function readyLine(readyCount: number, requiredCount: number): string {
 // used to sit beside each other in the list as bare strings (authed and
 // the caller's own captain id) can no longer be handed over the wrong way
 // round by a reader who did not count the commas.
-//
-// The hook's signature is otherwise exactly what it was: the same eight
-// values, the same defaults, and the same return shape. Only the shape of
-// the call changed.
 type PhaseSyncOptions = {
   roomId: string;
   socket: Socket | null;
@@ -129,7 +114,7 @@ export function usePhaseSync({
   );
 
   // Keep the latest game snapshot available to the listeners below
-  // without re subscribing them on every change.
+  // without subscribing them again on every change.
   const gameRef = useRef(game);
   useEffect(() => {
     gameRef.current = game;
@@ -150,7 +135,7 @@ export function usePhaseSync({
   // The reading is state rather than a Date.now() taken inside the render,
   // because a render has to happen for a number to change: this is what makes
   // the countdown tick, and a clock whose ticker stopped would leave a stale
-  // number standing rather than quietly re-reading itself into correctness on
+  // number standing rather than quietly reading its way to correctness on
   // some unrelated render.
   //
   // The ticker runs only while the room has a clock. A lobby, a harbor that
@@ -170,7 +155,7 @@ export function usePhaseSync({
   useEffect(() => {
     if (!socket) return;
 
-    const onReadyUpdate = (data: ReadyState & { roomId: string }) => {
+    const onReadyUpdate = (data: PhaseReadyFrame) => {
       if (data.roomId !== roomId) return;
       setReady(data);
       // The clock's reading is stamped in the same batch as the deadline it
@@ -283,7 +268,7 @@ export function usePhaseSync({
       // whenever the server hands us the authoritative roster: if we still
       // intend to be ready for the checkpoint the room is actually on, but
       // we aren't in it, assert it again. phase:ready is idempotent (a Set
-      // add), so re sending when we're already counted is harmless.
+      // add), so sending it again when we're already counted is harmless.
       if (
         pendingFn.current &&
         myUserId &&
@@ -298,28 +283,11 @@ export function usePhaseSync({
         });
       }
     };
-    const onAdvance = (data: {
-      roomId: string;
-      round: number;
-      phase: string;
-      // [D5: Aroma: the Bazaar Rumor] The market's three hands, all of them
-      // present only on the advance that opens a port market, because that
-      // is the only seat any of them is about: the harbor's pulse (this
-      // comment's own field, computed from last round's room wide purchase
-      // tally), the Harbormaster's shift, and the bazaar's lean. Each lands
-      // on the client's state before the market is drawn so that
-      // genResourceCard prices the cards the server's numbers say, rather
-      // than on a second round trip that could arrive after the draw.
-      //
-      // They are named as three fields of one frame rather than read one at
-      // a time, which is what the engine's own MarketLeans type is for: the
-      // port shift used to be carried on this frame and read by nobody, and
-      // a frame whose fields are enumerated in one place is the shape in
-      // which that cannot happen quietly again.
-      harborPulse?: Record<string, number>;
-      portShift?: PortShift | null;
-      bazaarLean?: Record<string, number>;
-    }) => {
+    // The advance frame lives with the protocol beside the ready frame
+    // (see PhaseAdvanceFrame in @/types/realtime/phase), and its three
+    // market hands are applied below before the market is drawn, so
+    // genResourceCard prices the cards the server's numbers say.
+    const onAdvance = (data: PhaseAdvanceFrame) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
       const advanceRank = checkpointRank(
@@ -410,7 +378,7 @@ export function usePhaseSync({
     // the room, not just whoever clicked it, drops back to a fresh run, and
     // any ready vote in flight no longer means anything.
     //
-    // Re fetch the captain's legacy before restarting so the starting gold
+    // Refetch the captain's legacy before restarting so the starting gold
     // bonus reflects any Renown gained from the voyage that just concluded.
     // Without this, goldBonusRef (set once on mount from useGameSession)
     // carries the pre voyage Renown level and the bonus never updates until

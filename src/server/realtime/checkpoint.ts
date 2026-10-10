@@ -50,6 +50,10 @@ import { unlockedResources } from "@/lib/game/pools";
 import type { Phase } from "@/lib/game/types";
 import { leftTheVoyage } from "@/lib/seatMarks";
 import type { Checkpoint } from "./types";
+import type {
+  PhaseAdvanceFrame,
+  PhaseReadyFrame,
+} from "@/types/realtime/phase";
 import { bazaarList, broadcastBazaar } from "./bazaar";
 import { portShiftFor } from "./maroon";
 import { roomMembers } from "./presence";
@@ -68,8 +72,8 @@ export const roomCheckpoints = new Map<string, Checkpoint>();
 // picks up where it left off.
 //
 // The stored phase goes through normalizePhase on the way in, for the same
-// reason a save does: a room row written before [B1] holds one of the older
-// checkpoint values, and a server that hydrated it verbatim would hold a
+// reason a save does: a room row can hold one of the older checkpoint
+// values, and a server that hydrated it verbatim would hold a
 // checkpoint no lap contains. Every rank read against it would then be null,
 // which the reporter below reads as "not a checkpoint", so the room would
 // sit at that value and never advance again.
@@ -231,7 +235,10 @@ async function waitingRosterSet(roomId: string): Promise<Set<string>> {
 // is the same shape the phase field has, a value or the absence of one,
 // rather than a zero a client would draw as a countdown that ran out before
 // it started.
-export async function readyStatePayload(roomId: string, cp: Checkpoint) {
+export async function readyStatePayload(
+  roomId: string,
+  cp: Checkpoint,
+): Promise<PhaseReadyFrame> {
   const roster = Array.from(await waitingRosterSet(roomId));
   return {
     roomId,
@@ -316,7 +323,7 @@ async function announceGuarded(
 // depend on which of them it was: all three name the seat being left and
 // carry the same harbor pulse and port shift. A second emit naming
 // the same seat would be a second place the room's transitions were
-// described, which is the shape [B1] spent its whole refactor undoing.
+// described.
 //
 // Reached only through announceGuarded, which is what arms the watch this
 // frame's report is owed and repairs the lock if the work below throws. The
@@ -383,14 +390,15 @@ async function announceAdvance(
       ? rumorLean(bazaarList(roomId), from.round)
       : undefined;
   }
-  io.to(`room:${roomId}`).emit("phase:advance", {
+  const frame: PhaseAdvanceFrame = {
     roomId,
     round: from.round,
     phase: from.phase,
     ...(harborPulse ? { harborPulse } : {}),
     ...(portShift !== undefined ? { portShift } : {}),
     ...(bazaarLean !== undefined ? { bazaarLean } : {}),
-  });
+  };
+  io.to(`room:${roomId}`).emit("phase:advance", frame);
   // [D5: Aroma: the Bazaar Rumor] And the reveal, at the one instant it
   // is honest: the market that just opened on every client is the market
   // the standing rumors moved, so this is the leg the directions become
@@ -402,7 +410,7 @@ async function announceAdvance(
   }
 }
 
-// ---
+// ===
 //
 // The report an announcement is owed.
 //
@@ -426,7 +434,7 @@ async function announceAdvance(
 // pressing ready can free it.
 //
 // The client's own heartbeat is the first cure and it is not enough. It
-// re-sends a captain's status every eight seconds, which lands a report that
+// sends a captain's status again every eight seconds, which lands a report that
 // never left, and that is why the grace below is longer than one heartbeat
 // rather than shorter: an honest but slow client gets its own retry in before
 // the room decides anything. What the heartbeat cannot do is anything about a
@@ -491,14 +499,14 @@ async function reportNeverArrived(
   // below is the wrong repair here: there is no button to press. What the
   // table needs is the same announcement again, because the clients that
   // never heard it are the ones still standing at a seat whose deal is
-  // already gone (the ones that did hear it are at Dawn, and a re-sent
+  // already gone (the ones that did hear it are at Dawn, and a repeated
   // frame is stale to them by the ordinary rank guard). The frame is sent
   // plainly rather than through announceDraftComplete, because this fire
-  // is that function's own guard firing: a repair that re-armed its own
-  // guard would be a loop, and one re-send per fire is the whole of what
-  // the seat needs. A table where even the re-send draws no report is
+  // is that function's own guard firing: a repair that arms the same
+  // guard would be a loop, and one more frame per fire is the whole of what
+  // the seat needs. A table where even that frame draws no report is
   // carried by the one thing that never stopped: every client's own
-  // heartbeat re-sends its status every eight seconds, and the first of
+  // heartbeat sends its status again every eight seconds, and the first of
   // those to speak for a client at Dawn moves the checkpoint.
   if (cp.phase === "path_draft") {
     cp.advancing = false;
@@ -672,7 +680,7 @@ export async function announceDraftComplete(
   );
 }
 
-// ---
+// ===
 //
 // The room's clock.
 //
@@ -722,12 +730,23 @@ function phaseBudgetSeconds(phase: Phase, mode: unknown): number | null {
   return Math.max(1, Math.round(authored * scale));
 }
 
-function clearPhaseTimer(roomId: string): void {
-  const armed = phaseClocks.get(roomId);
+// A timer's map read and cleared in one place: every entry armed in this
+// module, and the draft's own watch, is disarmed the same way, and a
+// site that forgot the delete would leave a room's slot behind for the
+// life of the process.
+export function disarmTimer(
+  timers: Map<string, NodeJS.Timeout>,
+  roomId: string,
+): void {
+  const armed = timers.get(roomId);
   if (armed !== undefined) {
     clearTimeout(armed);
-    phaseClocks.delete(roomId);
+    timers.delete(roomId);
   }
+}
+
+function clearPhaseTimer(roomId: string): void {
+  disarmTimer(phaseClocks, roomId);
 }
 
 /**
@@ -796,11 +815,7 @@ export function disarmPhaseClock(roomId: string): void {
  * rooms that are actually waiting on a report.
  */
 export function clearAdvanceWatch(roomId: string): void {
-  const armed = advanceWatches.get(roomId);
-  if (armed !== undefined) {
-    clearTimeout(armed);
-    advanceWatches.delete(roomId);
-  }
+  disarmTimer(advanceWatches, roomId);
 }
 
 // Whether any captain with a live socket is standing in the yard: the
@@ -810,7 +825,7 @@ export function clearAdvanceWatch(roomId: string): void {
 // live sockets rather than the roster, because the hold below exists to
 // protect work in front of somebody: a captain who has been away for the
 // whole budget is the case the clock already answers, the same way the
-// empty-room guard above reads sockets rather than the roster.
+// guard for an empty room above reads sockets rather than the roster.
 function yardOccupied(roomId: string): boolean {
   const statuses = roomStatuses.get(roomId);
   if (!statuses) return false;
@@ -851,7 +866,7 @@ async function firePhaseClock(
   // A captain in the module draft is at Dusk, and their pick is a second
   // thing Dusk owes: a fire that moves the room through while they are
   // choosing cancels the draft under them (their client's autoCommit
-  // walks them out mid-pick; see use-phase-sync). So a fire that finds
+  // walks them out in the middle of their pick; see use-phase-sync). So a fire that finds
   // the yard occupied spends the seat's hold instead: the deadline moves
   // out one more budget and the room is told the new one, and nothing
   // else happens, because nothing else has. The hold is not a veto and

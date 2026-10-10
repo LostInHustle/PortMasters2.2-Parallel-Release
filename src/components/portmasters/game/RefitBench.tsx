@@ -38,7 +38,8 @@ import {
 import { garmentRoom, garmentSpec } from "@/lib/game/garments";
 import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
-import { MarketBlock, MarketEmpty, MarketError, OfferRow } from "./OfferBoard";
+import { MarketBlock, MarketEmpty, OfferRow } from "./OfferBoard";
+import { RefusalLine } from "../shared";
 import type { Refit } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than on
@@ -282,7 +283,11 @@ export function RefitBench({
         </div>
       </MarketBlock>
 
-      <MarketError error={refit.error} onDismiss={refit.clearError} />
+      <RefusalLine
+        className="text-center mb-2"
+        error={refit.error}
+        onDismiss={refit.clearError}
+      />
 
       {refit.refits.length === 0 ? (
         <MarketEmpty className="py-2">

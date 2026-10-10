@@ -135,7 +135,7 @@ const STARTING_ALLOWANCE = 500;
 //
 // The ceiling is not a correctness claim about the rest of the guard: being
 // loose at the top says nothing about any other assumption in here, so treat
-// the rules below as the thing to re examine, not this paragraph.
+// the rules below as the thing to reexamine, not this paragraph.
 function plausibleCeiling(perRound: number, roundsAllowed: number) {
   const rounds = Math.max(1, Math.floor(roundsAllowed));
   return perRound * (rounds + 1) + STARTING_ALLOWANCE;
