@@ -11,8 +11,8 @@ import { PanelHeading, artisanTint } from "./PhaseShared";
  * The wage bill the bench has run up: one line per artisan type owed money,
  * the total, and what the crew turned out against it.
  *
- * Payroll is money leaving the purse, so this box keeps the colour that
- * means a cost rather than wearing the Worker Management colour the rest
+ * Payroll is money leaving the purse, so this box keeps the color that
+ * means a cost rather than wearing the Artisan Management color the rest
  * of the screen wears.
  */
 export function BenchPayroll({
@@ -24,7 +24,11 @@ export function BenchPayroll({
     id: string;
     icon: string;
     label: string;
-    cost: number;
+    /** Hands whose wage is due, and hands the Jade Pavilion covers. The
+        two halves come off the engine's bill rather than off list.length,
+        because a sponsored hand is on the roster and owes nothing. */
+    count: number;
+    sponsored: number;
     due: number;
     list: Worker[];
   }[];
@@ -51,10 +55,13 @@ export function BenchPayroll({
               <span>
                 {r.icon}{" "}
                 <span className="pm-artisan-ink font-medium">
-                  {r.list.length}× {t(r.label)}
-                </span>{" "}
-                @ {r.cost}
-                {t("g")}
+                  {r.count}× {t(r.label)}
+                </span>
+                {r.sponsored > 0 && (
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    🪷 {r.sponsored}
+                  </span>
+                )}
               </span>
               <b>{t("{r.due} Gold", { "r.due": r.due })}</b>
             </div>
@@ -110,7 +117,7 @@ export function BenchPayroll({
             >
               {t("{efficiency}x return", { efficiency })}
               <span className="font-normal text-muted-foreground ml-1">
-                {t("({produced}g value / {wages}g wages)", {
+                {t("({produced} Gold value / {wages} Gold wages)", {
                   produced: totalProducedValue,
                   wages: totalWages,
                 })}

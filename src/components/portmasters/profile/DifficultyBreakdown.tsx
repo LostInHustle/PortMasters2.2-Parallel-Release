@@ -1,17 +1,29 @@
 "use client";
 
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
+import {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  type Difficulty,
+} from "@/lib/game/difficulty";
 import { t } from "@/lib/game/i18n";
 import { SectionHeading } from "./SectionHeading";
 
-// The tier names stay English here; each is read through the pack where the
-// tile prints it. The map parameter is named tier rather than t so the
-// reader stays reachable inside it.
-const TIERS = [
-  { id: "fair_winds", name: "Fair Winds", icon: "🌤️" },
-  { id: "open_waters", name: "Open Waters", icon: "🌊" },
-  { id: "monsoon", name: "Monsoon", icon: "⛈️" },
-];
+// The tiers, taken from the difficulty record itself: the list of them is
+// the lobby's own order, and each tile wears the name the game gives that
+// tier, which is the tier's own name rather than the short badge the
+// lobby chip carries. The names stay English here; each is read through
+// the pack where the tile prints it. The map parameter is named tier
+// rather than t so the reader stays reachable inside it.
+const TIERS: {
+  id: Difficulty;
+  name: string;
+  icon: string;
+}[] = DIFFICULTY_ORDER.map((id) => ({
+  id,
+  name: DIFFICULTIES[id].name,
+  icon: DIFFICULTIES[id].icon,
+}));
 
 export function DifficultyBreakdown({
   statsByDifficulty,
@@ -27,7 +39,7 @@ export function DifficultyBreakdown({
             statsByDifficulty as
               | Record<
                   string,
-                  { crowns: number; bestScore: number } | undefined
+                  { crowns: number; bestReputation: number } | undefined
                 >
               | undefined
           )?.[tier.id];
@@ -47,7 +59,9 @@ export function DifficultyBreakdown({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t("Best Rep")}</span>
-                  <span className="font-semibold">{s?.bestScore ?? 0}</span>
+                  <span className="font-semibold">
+                    {s?.bestReputation ?? 0}
+                  </span>
                 </div>
               </div>
             </div>

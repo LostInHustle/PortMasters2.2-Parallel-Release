@@ -4,20 +4,22 @@
 // The Manifest Audit, client side.
 //
 // Four pieces of state, three of them broadcast and every one of them
-// stamped with the room it belongs to for the same reason the private log
+// stamped with the harbor it belongs to for the same reason the private log
 // and the commission board are: a captain who sails straight out of one
 // harbor into another must never see the last harbor's business on the
 // new one's screen.
 //
-//   The tally is the nominations for one leg, and it is the whole frame
+//   The tally is the nominations for one round, and it is the whole frame
 //   the server sent rather than the map out of it. It arrives after every
 //   vote, including the one that carries, it is answered to this captain
 //   when their card opens and nobody has voted yet (see the state request
 //   below), and it is replaced rather than merged, because the server
 //   sends the whole count every time and the whole count is the truth.
+//   The tally, the press in flight and the refusal are the shared board's
+//   (see ./use-vote-board), which the maroon vote is read through too.
 //
 //   The reveal is the finding, and it is the one thing here that outlives
-//   the leg it happened in. It arrives either as the vote carrying or as
+//   the round it happened in. It arrives either as the vote carrying or as
 //   the join handoff when a captain reloads into a harbor that has
 //   already audited someone (see the room:join handler in
 //   src/server/realtime/wiring/room-join.ts), and the two paths carry the
@@ -30,7 +32,7 @@
 //
 // The local rule for whether this captain may vote is derived rather
 // than asked for, because every part of it is already on this side of the
-// wire: the mode, the phase, the leg and whether the audit is spent. What
+// wire: the mode, the phase, the round and whether the audit is spent. What
 // is NOT derived is the count: how many names carry the vote is the
 // server's arithmetic over a roster this side cannot see, so it rides the
 // tally frame (see AuditTally) and this hook hands it on as it arrived.
@@ -46,12 +48,24 @@ import {
   AuditTally as AuditTallyPayload,
   AuditVote as AuditVotePayload,
 } from "@/types/realtime/audit";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
-import { refusedForRoom } from "@/lib/refusals";
+import { useVoteBoard, type VoteChannel } from "@/lib/use-vote-board";
 import type { VoteCensus } from "@/lib/voteTally";
+
+// The events this vote speaks on, named in one place for the reason the
+// bazaar's and the two consent boards' own channels are. The press is
+// built here so that the payload this client sends is typed by the wire's
+// own shape.
+const CHANNEL: VoteChannel<AuditVotePayload> = {
+  tally: "audit:tally",
+  error: "audit:error",
+  stateRequest: "audit:state:request",
+  vote: "audit:vote",
+  press: (roomId, round, targetUserId) => ({ roomId, round, targetUserId }),
+};
 
 export function useAudit(
   socket: Socket | null,
@@ -72,16 +86,30 @@ export function useAudit(
   clearError: () => void;
   vote: (targetUserId: string) => void;
 } {
-  const [held, setHeld] = useState<AuditTallyPayload | null>(null);
-  // Deliberately not stamped with a leg the way the tally is: one voyage
-  // has one reveal, so a reveal with the right room is this voyage's.
+  // Deliberately not stamped with a round the way the tally is: one voyage
+  // has one reveal, so a reveal with the right harbor is this voyage's.
   const [reveal, setReveal] = useState<AuditRevealPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // The leg this captain has pressed in and not yet been answered about.
-  // The guard is a number rather than a boolean so a press can never wedge
-  // the button past the leg it belongs to: the leg turning clears it, the
-  // same way the leg turning is what changes the button's other terms.
-  const [pressed, setPressed] = useState<number | null>(null);
+
+  const opensAt = auditOpensAt(game.mode);
+  const {
+    setHeld,
+    setPressed,
+    onRefused,
+    reset,
+    votes,
+    census,
+    atTable,
+    pressed,
+    error,
+    clearError,
+    vote,
+  } = useVoteBoard<AuditTallyPayload, AuditVotePayload>(
+    socket,
+    roomId,
+    game,
+    opensAt,
+    CHANNEL,
+  );
 
   useEffect(() => {
     if (!socket || !roomId) return;
@@ -90,7 +118,7 @@ export function useAudit(
       if (data?.roomId !== roomId) return;
       setHeld(data);
       // Answered, but only the press this frame answers: a tally is
-      // broadcast for every ballot in the room, and one raised by another
+      // broadcast for every ballot in the harbor, and one raised by another
       // captain's ballot is not this captain's press coming home. Clearing
       // on it would put the button back while the first press is still in
       // flight, and the press that follows would come back refused for a
@@ -103,20 +131,12 @@ export function useAudit(
       if (data?.roomId !== roomId) return;
       setReveal(data);
     };
-    const onRefused = (data: { roomId?: string; error?: string }) => {
-      const err = refusedForRoom(data, roomId);
-      if (!err) return;
-      setError(err);
-      setPressed(null);
-    };
     // A new voyage has no audit and no nominations, which is also the
-    // signal a client gets for the room it is already sitting in.
+    // signal a client gets for the harbor it is already sitting in.
     const onRestarted = (data: { roomId?: string }) => {
       if (data?.roomId !== roomId) return;
-      setHeld(null);
+      reset();
       setReveal(null);
-      setError(null);
-      setPressed(null);
     };
 
     socket.on("audit:tally", onTally);
@@ -129,66 +149,16 @@ export function useAudit(
       socket.off("audit:error", onRefused);
       socket.off("room:restarted", onRestarted);
     };
-  }, [socket, roomId, myUserId]);
+  }, [socket, roomId, myUserId, setHeld, setPressed, onRefused, reset]);
 
-  const opensAt = auditOpensAt(game.mode);
-
-  // The count as it stands, asked for when this captain's screen turns to
-  // a checkpoint the card is drawn in. A leg's book is built by the
-  // captains in it and the empty one is never broadcast, so without this a
-  // card opened before anyone has voted has nothing to show: no count, no
-  // threshold and no list of who the room is waiting on. The ask is a
-  // read, so asking again costs nothing, and the answer arrives as the
-  // ordinary tally frame rather than as a shape of its own.
-  //
-  // Asked again on a reconnect, the way the path draft asks for its hand:
-  // a socket that dropped mid Parley and came back was sent no frames
-  // while it was gone, so the count it is holding is the count from
-  // before, and the checkpoint it is standing at is the one worth asking
-  // about.
-  useEffect(() => {
-    if (!socket || !roomId) return;
-    if (opensAt === null) return;
-    const ask = () => {
-      if (game.phase !== "parley") return;
-      if (game.currentRound < opensAt) return;
-      socket.emit("audit:state:request", {
-        roomId,
-        round: game.currentRound,
-      });
-    };
-    ask();
-    socket.on("connect", ask);
-    return () => {
-      socket.off("connect", ask);
-    };
-  }, [socket, roomId, opensAt, game.phase, game.currentRound]);
-
-  // The nominations of the leg this client is standing in, or an empty
-  // board. A tally from an older leg is not shown, for the reason the
-  // objective's board is clamped: what is on screen should be what is
-  // true now, and a stale tally would name captains the room is no longer
-  // voting on.
-  const live =
-    held && held.roomId === roomId && held.round === game.currentRound
-      ? held
-      : null;
-  const votes = live?.votes ?? {};
-  const census: VoteCensus | null = live
-    ? {
-        roster: live.roster ?? 0,
-        needed: live.needed ?? 0,
-        awaiting: live.awaiting ?? [],
-      }
-    : null;
   const thisReveal = reveal?.roomId === roomId ? reveal : null;
   // The captain's own nomination, so the panel can show what they said
   // and stop offering the button.
   const myVote = thisReveal ? null : (votes[myUserId] ?? null);
 
   // Parley is half of the audit's price and not just its moment: a carried
-  // audit spends the rest of that leg's trading, so the button is offered
-  // only where the room is standing at the checkpoint the vote is called
+  // audit spends the rest of that round's trading, so the button is offered
+  // only where the harbor is standing at the checkpoint the vote is called
   // from.
   //
   // The rung is read off the mode record rather than off a constant, for
@@ -202,40 +172,23 @@ export function useAudit(
   // cannot be made again by a bounce on the same button, which is the way
   // a captain would otherwise watch their own count move.
   const canVote =
-    !!socket &&
-    !!roomId &&
-    opensAt !== null &&
-    game.phase === "parley" &&
-    game.currentRound >= opensAt &&
-    !thisReveal &&
-    !myVote &&
-    pressed !== game.currentRound;
+    atTable && !thisReveal && !myVote && pressed !== game.currentRound;
 
-  const vote = useCallback(
-    (targetUserId: string) => {
-      if (!socket || !roomId) return;
-      setError(null);
-      setPressed(game.currentRound);
-      const payload: AuditVotePayload = {
-        roomId,
-        round: game.currentRound,
-        targetUserId,
-      };
-      socket.emit("audit:vote", payload);
-    },
-    [socket, roomId, game.currentRound],
+  // The answer, held to one identity until something inside it changes.
+  // The panel that draws the audit takes this whole object as a prop, so
+  // an object rebuilt every render is a panel that draws itself again
+  // every time anything above it does.
+  return useMemo(
+    () => ({
+      canVote,
+      myVote,
+      votes,
+      census,
+      reveal: thisReveal,
+      error,
+      clearError,
+      vote,
+    }),
+    [canVote, myVote, votes, census, thisReveal, error, clearError, vote],
   );
-
-  const clearError = useCallback(() => setError(null), []);
-
-  return {
-    canVote,
-    myVote,
-    votes,
-    census,
-    reveal: thisReveal,
-    error,
-    clearError,
-    vote,
-  };
 }

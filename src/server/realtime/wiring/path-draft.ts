@@ -1,6 +1,6 @@
 // =====================================================================
 // The path draft, and switching: the two opposite kinds of frame the
-// plan gives the fleet at departure.
+// design gives the fleet at departure.
 // =====================================================================
 
 import type { Server, Socket } from "socket.io";
@@ -12,13 +12,11 @@ import { normalizePath } from "@/lib/game/paths";
 import { seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
 import { draftViewFor, recordPathSwitch, takeDraftPick } from "../draft";
-
-// The refusal the draft answers with when the switch is off.
-const DRAFT_OFF = "The path draft is not running in this harbor.";
+import { makeFail, marketOffRefusal } from "./fail";
 
 export function wirePathDraft(io: Server, socket: Socket): void {
   //
-  // [D7: the draft, and switching] The two surfaces the plan's clause
+  // The two surfaces the design's clause
   // gives the fleet, and they are opposite kinds of frame, which is the
   // whole design of the feature.
   //
@@ -27,12 +25,12 @@ export function wirePathDraft(io: Server, socket: Socket): void {
   // nobody else's, because "a hand of cards is private information and
   // the client cannot be trusted to deal it" (see the header of ./draft,
   // which is where the deal itself lives). Nothing below broadcasts a
-  // card, and no frame that reaches the room carries one.
+  // card, and no frame that reaches the harbor carries one.
   //
   // A switch is the opposite, and that is its price: "the switch is
   // published to the fleet log where everyone sees it... the price of
   // changing your identity is that everyone knows." So the handler below
-  // refuses what the room can check about a switch, and then hands the
+  // refuses what the harbor can check about a switch, and then hands the
   // publication to the module, which writes the frame, the log line and
   // the measurement as one act.
   //
@@ -84,16 +82,16 @@ export function wirePathDraft(io: Server, socket: Socket): void {
 
   // One captain's change of papers.
   //
-  // Everything the room can check about a switch is checked here, and the
+  // Everything the harbor can check about a switch is checked here, and the
   // list is short for a reason worth stating: the fee, the forfeiture and
   // the window are about the captain's own purse, manifest and save, and
   // this server has never read any of them. What is left is what only a
-  // room can know, and it is not nothing: whether the build deals paths at
+  // harbor can know, and it is not nothing: whether the build deals paths at
   // all, whether the destination is a path this build has, whether the
   // voyage is in the season and the seat a switch may happen in, and
   // whether this captain has already spent their one switch. That last one
-  // is kept in the room's own book rather than trusted to a client,
-  // because the plan's clause is "once per voyage" and a rule only a
+  // is kept in the harbor's own book rather than trusted to a client,
+  // because the design's clause is "once per voyage" and a rule only a
   // client enforces is a rule a doctored client can spend twice.
   socket.on(
     "path:switch",
@@ -101,13 +99,9 @@ export function wirePathDraft(io: Server, socket: Socket): void {
       const s = seated(socket, payload);
       if (!s) return;
       const { roomId } = s;
-      const fail = (error: string): void => {
-        socket.emit("path:error", { roomId, error });
-      };
+      const fail = makeFail(socket, roomId, "path:error");
       if (!pathDraftOn(s.mode)) {
-        // The constant keeps its English value; the read is the caller's
-        // own language, off the socket this refusal answers.
-        fail(tFor(s.locale, DRAFT_OFF));
+        fail(marketOffRefusal("pathDraft", s.locale));
         return;
       }
       // The destination is read off the wire and answered as a path this

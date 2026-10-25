@@ -34,12 +34,18 @@ export function Orders({
       </PanelTitle>
       <OrderFulfillmentPlanner game={game} />
       {/* The banner prints the note it is given, so the read happens
-          here, where the manifest names its own pointer. */}
-      <IntelBanner
-        game={game}
-        tone="intel"
-        note={t("(look for the 🔮 badge below).")}
-      />
+          here, where the manifest names its own pointer. It only shows
+          on a round with a whisper revealed: the label promises active
+          whispers and the note a guaranteed match, and the engine grants
+          neither when the list is empty (see the guarantee loop in
+          engine/orders). */}
+      {game.revealedIntel.length > 0 && (
+        <IntelBanner
+          game={game}
+          tone="intel"
+          note={t("(look for the 🔮 badge below).")}
+        />
+      )}
       <BrokerFavor game={game} act={act} />
       <OrdersBoard game={game} act={act} colorFor={resolveColor} />
       <ReadyFooter

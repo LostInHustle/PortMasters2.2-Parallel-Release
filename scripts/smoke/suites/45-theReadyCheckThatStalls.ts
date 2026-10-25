@@ -5,25 +5,25 @@
 // protocol answers that sentence with one shape, and this article holds
 // both halves of it down.
 //
-// The first half is the vote. A room advances when every captain in the
+// The first half is the vote. A harbor advances when every captain in the
 // active roster has said ready, and what each vote promises is a
-// departure: the client hears the room move, runs its transition and
+// departure: the client hears the harbor move, runs its transition and
 // reports the seat it landed on, and that report is what moves the
 // checkpoint. A vote whose departure cannot leave the seat it is cast
-// from, or a departure whose report never lands, leaves the room holding
+// from, or a departure whose report never lands, leaves the harbor holding
 // a full ready set and a lock nobody can lift: the bar reads ready on
 // every screen and nothing moves. So the engine's answer to "can this
 // press leave this seat" is checked here seat by seat, against both laps,
 // because that answer is what the bar and every panel's own button now
 // gate their press on.
 //
-// The second half is the room's own cure, and it is the half that has to
+// The second half is the harbor's own cure, and it is the half that has to
 // be watched over a live harbor rather than read: an announcement the
-// room never hears answered is handed back to the table after a grace
+// harbor never hears answered is handed back to the table after a grace
 // longer than the client's own heartbeat, with the honest votes kept and
 // the lock cleared, so the next report can announce the same seat again.
 // Both directions are checked, because the cure that fired on a healthy
-// table would be a second bug: a room whose report lands is never spoken
+// table would be a second bug: a harbor whose report lands is never spoken
 // to at all.
 //
 // What this article deliberately does not check is the press sites
@@ -48,6 +48,7 @@ import {
 import type { Captain } from "../wire";
 import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 // The two laps this release sails. Classic is here because the guard is
 // the engine's and both modes read it, and because the seats are the same
@@ -72,7 +73,7 @@ const NOT_A_DEPARTURE = [
 
 // And the seats a press cannot leave that are nonetheless seats of the
 // lap, which is the distinction this whole article turns on: the pier
-// is not a step of the leg, the path draft is a step a captain leaves by
+// is not a step of the round, the path draft is a step a captain leaves by
 // laying their cards, and Dawn is a step a captain leaves by choosing a
 // card rather than by pressing the bar. Everything else the lap walks is
 // a departure by press.
@@ -80,9 +81,9 @@ const LEFT_BY_CHOOSING = ["harbor", "path_draft", "dawn"] as const;
 
 // The cure's own sentence, read off the wire. Held as a fragment rather
 // than as the whole line, so the article is checking that the harbor named
-// the leg it did not hear move, which is the part a captain acts on, and
+// the round it did not hear move, which is the part a captain acts on, and
 // not that somebody once wrote a particular sentence.
-const THE_CURE = "did not hear that leg move";
+const THE_CURE = "did not hear that round move";
 
 type Seat = { round: number; phase: Phase };
 type ReadyFrame = {
@@ -95,7 +96,7 @@ type ReadyFrame = {
 
 export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   const ctx = { seedBase: "smoke:ready-check", harborId: "smoke-ready-check" };
-  const logs: string[] = [];
+  const logs: LedgerLine[] = [];
   const fresh = (mode: GameMode) =>
     createInitialGameState({ mode, difficulty: "fair_winds" });
 
@@ -110,7 +111,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
     for (const phase of pressable) {
       check(
         canLeavePhase({ mode, phase, gameOver: false }) === true,
-        `${mode} sails out of ${phase} by pressing, since it is a seat the leg walks through`,
+        `${mode} sails out of ${phase} by pressing, since it is a seat the round walks through`,
       );
     }
     for (const phase of NOT_A_DEPARTURE) {
@@ -152,19 +153,19 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   }
 
   // And the auto path, which is what a captain who missed the announcement
-  // runs: it takes the seat's defaults and leaves in one call, so a room
+  // runs: it takes the seat's defaults and leaves in one call, so a harbor
   // that moves without a vote is not left standing where it was.
   const auto = fresh(GAMBIT);
   auto.phase = "market";
   autoCommit(auto, ctx, logs);
   check(
     auto.phase === lapSuccessor(GAMBIT, "market"),
-    "a captain who never voted still leaves the seat when the room moves on without them",
+    "a captain who never voted still leaves the seat when the harbor moves on without them",
   );
 
   // The live half. Two captains, a private Gambit harbor, and two sockets
   // that are raw on purpose: nothing in this article runs a client, so the
-  // room's own grace is the only thing that can answer an announcement
+  // harbor's own grace is the only thing that can answer an announcement
   // here.
   const tag = "rchk";
   const opening = await signUp(`${tag}a`);
@@ -200,15 +201,15 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
     "the second captain joins the harbor this article stalls",
   );
 
-  // What each socket heard, kept apart. Every frame below is the room's,
+  // What each socket heard, kept apart. Every frame below is the harbor's,
   // so both captains in the harbor hear the same one, and the checks read
   // both lists: a frame that reached one socket and not the other is a
   // difference this article exists to see rather than to average away.
   //
-  // Only the cure's own lines are collected. The harbor talks to its room
+  // Only the cure's own lines are collected. The harbor talks to its harbor
   // about other things on this channel, a captain walking in being the
   // loudest of them, and a list that held those would count a hello as a
-  // stalled leg.
+  // stalled round.
   const heard: Array<{
     advances: Seat[];
     rescues: string[];
@@ -277,7 +278,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   const standing = (step: Seat) =>
     heard[0].standing?.round === step.round &&
     heard[0].standing?.phase === step.phase;
-  // Both captains stand where the article says they stand, and the room
+  // Both captains stand where the article says they stand, and the harbor
   // says so back before anything else happens: a vote is judged against
   // the checkpoint the server is holding, so a vote that overtook the
   // report behind it would stall this article on its own haste rather
@@ -314,7 +315,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   const stood = await stand({ round: 1, phase: "dawn" });
   check(
     stood,
-    "both captains stand at the first seat of the leg in the harbor this article opened",
+    "both captains stand at the first seat of the round in the harbor this article opened",
   );
   ready({ round: 1, phase: "dawn" });
   await settled(() => bothHeard((mine) => mine.advances.length, 1), 8000);
@@ -329,20 +330,20 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   );
 
   // The healthy direction: one captain reports the seat the announcement
-  // was about, the checkpoint moves, and the room must then say nothing at
-  // all. The wait is longer than the room's own grace, so a watch left
+  // was about, the checkpoint moves, and the harbor must then say nothing at
+  // all. The wait is longer than the harbor's own grace, so a watch left
   // armed by a report that landed would be caught here as a harbor
   // talking to itself.
   report(crew[0], { round: 1, phase: "market" });
   await settled(() => standing({ round: 1, phase: "market" }), 8000);
   check(
     standing({ round: 1, phase: "market" }),
-    "the room stands at the seat that report named, so the departure was answered",
+    "the harbor stands at the seat that report named, so the departure was answered",
   );
   await new Promise((r) => setTimeout(r, 14000));
   check(
     heard.every((mine) => mine.rescues.length === 0),
-    "a room whose departure was reported is never told the harbor did not hear it, since a cure that fired on a healthy table would be its own bug",
+    "a harbor whose departure was reported is never told the harbor did not hear it, since a cure that fired on a healthy table would be its own bug",
   );
 
   // The stalled direction: both captains ready at the Market and then
@@ -360,17 +361,17 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   await settled(() => bothHeard((mine) => mine.rescues.length, 1), 20000);
   check(
     bothHeard((mine) => mine.rescues.length, 1),
-    "and an announcement nobody answers is handed back to the room after its grace, which is the cure for the stall the field report describes",
+    "and an announcement nobody answers is handed back to the harbor after its grace, which is the cure for the stall the field report describes",
   );
   check(
     heard[0].rescues[0] === heard[1].rescues[0] &&
       String(heard[0].rescues[0]).includes("ready check is open again"),
-    "and it is one line said to the room rather than one per socket in it, naming the ready check rather than a leg the harbor moved",
+    "and it is one line said to the harbor rather than one per socket in it, naming the ready check rather than a round the harbor moved",
   );
 
   // The cure with its two halves held apart: the votes that were cast are
   // still counted, and the lock is gone. The first is read off the ready
-  // state the room rebroadcasts, and the second can only be read off the
+  // state the harbor rebroadcasts, and the second can only be read off the
   // behavior it exists for, so a captain reports the seat again and the
   // harbor has to announce it a second time.
   check(
@@ -388,12 +389,12 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   );
 
   // And the voyage lands: the other side of the same promise, which is a
-  // report naming somewhere further along moving the room there.
+  // report naming somewhere further along moving the harbor there.
   report(crew[1], { round: 1, phase: "orders" });
   await settled(() => standing({ round: 1, phase: "orders" }), 8000);
   check(
     standing({ round: 1, phase: "orders" }),
-    "and the harbor stands where that report put it, with the leg behind it settled rather than re opened",
+    "and the harbor stands where that report put it, with the round behind it settled rather than re opened",
   );
   check(
     heard.every((mine) => mine.errors.length === 0),

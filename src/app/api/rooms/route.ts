@@ -1,5 +1,5 @@
-// GET /api/rooms: list public rooms (with member counts)
-// POST /api/rooms: create a room
+// GET /api/rooms: list public harbors (with member counts)
+// POST /api/rooms: create a harbor
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
@@ -42,10 +42,10 @@ const CreateSchema = z.object({
   // coerced to the entry tier by normalizeDifficulty below.
   difficulty: z.string().optional(),
   // Optional for the same reason, and coerced the same way. A caller that
-  // does not name a mode gets the founding one, which is what every room
+  // does not name a mode gets the founding one, which is what every harbor
   // created before modes existed is already playing.
   mode: z.string().optional(),
-  // [H9: the unlock code] The phrase a host types to open a sealed mode.
+  // The phrase a host types to open a sealed mode.
   // Bounded rather than free, because it is normalized and compared after
   // it arrives and nothing but a phrase is ever that long.
   unlock: z.string().max(200).optional(),
@@ -60,13 +60,13 @@ export async function POST(req: NextRequest) {
   const { name, isPublic } = body.data;
   const difficulty = normalizeDifficulty(body.data.difficulty);
   const mode = normalizeMode(body.data.mode);
-  // The three refusals below are sentences the host reads on the room
+  // The three refusals below are sentences the host reads on the harbor
   // form, so the language is read once, here.
   const locale = await requestLocale();
 
-  // [H9: the unlock code] The gate. A sealed mode opens with the phrase
+  // The gate. A sealed mode opens with the phrase
   // and with nothing else: not with the host's own record, which is the
-  // whole point of the entitlement being a room setting, and not with a
+  // whole point of the entitlement being a harbor setting, and not with a
   // phrase that answers to some other door.
   //
   // The three refusals are worded separately because they are three
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       difficulty,
       mode,
       // The door this harbor was opened through, or nothing for a harbor
-      // that never had one. The phrase itself is never stored: what a room
+      // that never had one. The phrase itself is never stored: what a harbor
       // remembers is which code opened it.
       unlock: unlock ?? "",
       members: { create: [{ userId: user.id }] },

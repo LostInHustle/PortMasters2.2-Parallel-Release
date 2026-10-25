@@ -2,12 +2,13 @@
 
 import { lapPhases } from "@/lib/game/checkpoint";
 import { t } from "@/lib/game/i18n";
-import { isLegPhase, phaseFace } from "@/lib/game/phases";
-import type { GameState, LegPhase } from "@/lib/game/types";
+import { isRoundPhase, phaseFace } from "@/lib/game/phases";
+import type { GameState, RoundPhase } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
+import { RichText } from "../../RichText";
 
 // What the round does with what this bench sets going, in the words this
-// panel uses for it. One note per phase of the leg rather than one per tile,
+// panel uses for it. One note per phase of the round rather than one per tile,
 // because the strip below draws whichever phases this voyage still has in
 // front of it and both modes dock here: a map written for one mode's four
 // would leave the fifth a tile a captain has to guess at.
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 // These are not the phase's face. A face says what a phase is called; this
 // says what the phase does to a hold, and it belongs to the bench that
 // promised the work rather than to the phase.
-const CYCLE_NOTE: Record<LegPhase, string> = {
+const CYCLE_NOTE: Record<RoundPhase, string> = {
   dawn: "Draft a boon",
   market: "Assign tasks, consume materials",
   orders: "Trade orders",
@@ -27,7 +28,7 @@ const CYCLE_NOTE: Record<LegPhase, string> = {
 /**
  * The production cycle strip: one tile per phase the round still has in
  * front of it, and the sentence that says when the work lands. It reads the
- * room's own lap rather than a list of its own, because the two modes run
+ * harbor's own lap rather than a list of its own, because the two modes run
  * the round in different orders.
  */
 export function BenchCycle({
@@ -38,18 +39,18 @@ export function BenchCycle({
   duePhase: string;
 }) {
   // The rest of this voyage's round, from this phase to the one that closes
-  // it, off the room's own lap (see src/lib/game/checkpoint.ts and
+  // it, off the harbor's own lap (see src/lib/game/checkpoint.ts and
   // src/lib/game/mode.ts). The two modes run Market, Orders and Parley in
   // different orders, so a strip written out here would walk one mode
   // through the other mode's round.
-  const lap = lapPhases(game.mode).filter(isLegPhase);
+  const lap = lapPhases(game.mode).filter(isRoundPhase);
   const seat = lap.indexOf("market");
   const cycle = seat === -1 ? lap : lap.slice(seat);
   return (
     <div className="rounded-xl bg-market/[0.06] border border-market/20 p-3.5 mb-4 text-xs">
       <strong>{t("⏱️ Production Cycle: What Happens When")}</strong>
       {/* One tile per phase the round still has in front of it, each
-          wearing the colour of the phase it names, so the strip is a map
+          wearing the color of the phase it names, so the strip is a map
           of this voyage's round rather than four unrelated swatches in
           one mode's order. */}
       <div className="flex gap-1.5 mt-2 text-center">
@@ -81,14 +82,12 @@ export function BenchCycle({
           the sentence whole, its <strong> runs and all, so the wiring hands
           it over in one piece and the token takes the phase the composer
           already named in this language. */}
-      <div
+      <RichText
         className="mt-2 text-gain"
-        dangerouslySetInnerHTML={{
-          __html: t(
-            "💡 Materials consumed <strong>now</strong>. Finished goods and wage deductions happen at <strong>{duePhase}</strong>, not instantly.",
-            { duePhase },
-          ),
-        }}
+        html={t(
+          "💡 Materials consumed <strong>now</strong>. Finished goods and wage deductions happen at <strong>{duePhase}</strong>, not instantly.",
+          { duePhase },
+        )}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import { LoanRecord } from "@/types/realtime/loans";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
+import { refusalHandler } from "@/lib/refusals";
 
 // The wire shape for an outstanding loan lives in @/types/realtime as
 // LoanRecord. The hook keeps the original OutstandingLoan alias for
@@ -23,7 +24,7 @@ export type BackingCovered = {
 };
 
 /**
- * Backing: room wide visibility into every outstanding loan (see aid:help
+ * Backing: harbor wide visibility into every outstanding loan (see aid:help
  * in the realtime layer, the moment a request becomes a real debt),
  * and the one action a third captain can take on one: pledge part of
  * their own Gold as a safety net for the lender. The same thin relay
@@ -75,14 +76,11 @@ export function useBacking(
       if (data.roomId !== roomId) return;
       onCoveredRef.current(data);
     };
-    const onFail = (data: {
-      roomId: string;
-      debtId: string;
-      reason: string;
-    }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.reason);
-    };
+    const onFail = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; debtId: string; reason: string }) => data.reason,
+    );
 
     socket.on("loans:update", onUpdate);
     socket.on("backing:accepted", onAcceptedEvent);

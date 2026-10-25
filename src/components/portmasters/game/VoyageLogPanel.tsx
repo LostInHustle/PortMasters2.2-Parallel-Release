@@ -6,11 +6,11 @@ import { dealtCardLine } from "@/lib/game/gambit";
 import { t } from "@/lib/game/i18n";
 import type { VoyageLog } from "@/lib/use-voyage-log";
 
-// [B4: the log surfaces] Dusk's two logs, side by side.
+// Dusk's two logs, side by side.
 //
-// The plan asks for one surface holding a public log and a private one,
+// The design asks for one surface holding a public log and a private one,
 // and the pair is the whole point: the column on the left is what the
-// room said out loud, written by the server and sent to every socket in
+// harbor said out loud, written by the server and sent to every socket in
 // the harbor, and the column on the right is what was addressed to this
 // captain alone. Reading them together is what tells a captain who stepped
 // away what happened while they were gone and what happened to them in
@@ -21,7 +21,7 @@ import type { VoyageLog } from "@/lib/use-voyage-log";
 // full under the controls, where it can be read at any phase rather than
 // only at Dusk, and this column is the record of what arrived rather than
 // a place to play from. It carries whatever the channel delivers, so the
-// reveal material the plan's own iteration note adds later lands here
+// reveal material the design's own iteration note adds later lands here
 // without this component learning a second shape. A dealt card's line is
 // read from the role the entry carries, the same read the card under the
 // controls makes, so the column follows the reader's language; an entry
@@ -30,7 +30,7 @@ import type { VoyageLog } from "@/lib/use-voyage-log";
 // The request goes out from this component for the same reason: the log is
 // drawn on one screen, so it is asked for on one screen. A captain who
 // never stands at Dusk never asks, and a captain who reloads mid voyage
-// gets the legs they were not listening to.
+// gets the rounds they were not listening to.
 export function VoyageLogPanel({
   log,
   privateLog,
@@ -75,17 +75,16 @@ export function VoyageLogPanel({
       </div>
       {/* The two columns split once the stage is wide enough to hold them
           side by side, and stack before that. Read off the window instead,
-          the split would happen on a screen where the room's middle column
+          the split would happen on a screen where the harbor's middle column
           is narrower than the window and leave two columns of four words. */}
       <div
         ref={scrollRef}
         className="pm-scroll mt-2 max-h-64 overflow-y-auto pr-1 grid grid-cols-1 @2xl:grid-cols-2 gap-x-4 gap-y-3"
       >
         <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1"
-            dangerouslySetInnerHTML={{ __html: t("The harbor&apos;s log") }}
-          />
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+            {t("The harbor's log")}
+          </div>
           {entries.length === 0 ? (
             <p className="text-[11px] italic text-muted-foreground">
               {t("The harbor has recorded nothing on this voyage yet.")}
@@ -93,13 +92,13 @@ export function VoyageLogPanel({
           ) : (
             entries.map((entry, index) => (
               <div key={`${entry.round}:${index}`}>
-                {/* The leg the lines under it belong to, printed where the
-                    leg changes and nowhere else. A voyage that reaches
-                    Dusk has more than one leg behind it, and the headings
+                {/* The round the lines under it belong to, printed where the
+                    round changes and nowhere else. A voyage that reaches
+                    Dusk has more than one round behind it, and the headings
                     are what turn one long list into a voyage. */}
                 {(index === 0 || entries[index - 1].round !== entry.round) && (
                   <div className="mt-1.5 mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-dusk/70">
-                    {t("Leg {leg}", { leg: entry.round })}
+                    {t("Round {round}", { round: entry.round })}
                   </div>
                 )}
                 <div className="text-[11px] leading-relaxed text-foreground break-words">

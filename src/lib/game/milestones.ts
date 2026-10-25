@@ -1,13 +1,13 @@
 // =====================================================================
-// [F4: boons at milestone moments] The five moments, read off the voyage
+// The five moments, read off the voyage
 // and answered one card at a time.
 //
 // ./constants/milestones holds the vocabulary: the five triggers and the
 // words a captain meets when one arrives. This module is the walk, the
-// same split F1 took with the tags and F2 with the card shape. What it
+// same split the tag vocabulary keeps and the card record takes. What it
 // walks is two fields on the state (see the field notes in ./types):
 //
-//   - milestoneOffers is the queue of moments waiting to be answered.
+//   * milestoneOffers is the queue of moments waiting to be answered.
 //     A queue rather than a phase, because the five moments land at
 //     three different seats of the lap and a phase would have to be
 //     entered again from each of them; an offer is a local act, answered
@@ -15,12 +15,12 @@
 //     Nothing here takes an offer off the queue: that is ./engine's
 //     answerMilestone, which is the only writer the queue has.
 //
-//   - milestonesAnswered carries the mark each trigger is answered to,
+//   * milestonesAnswered carries the mark each trigger is answered to,
 //     in that trigger's own units, so a moment that can honestly happen
 //     twice is answered twice and one that cannot stays answered. The
 //     units are: crew loss counts the losses answered, the pathbound
 //     order and the mandate are latches, the rung counts rungs, and the
-//     cold leg carries the round it was answered in.
+//     cold round carries the round it was answered in.
 //
 // The cards those moments hand out are held cards, and their half of the
 // story (the ids a captain carries and the flags they write) lives in
@@ -41,6 +41,8 @@ import { MERCHANT_RATINGS } from "./constants/reputation";
 import { milestoneBoonsOn } from "./flags";
 import { garmentsLayerOn, legIsCold } from "./garments";
 import { powerBudgetAllows } from "./held-cards";
+import { normalizeIdList } from "./id-list";
+import { pathDealsBoardOrders } from "./paths";
 import { createRng } from "./rng";
 import { flatWorkerRoster, type GameState } from "./types";
 
@@ -54,13 +56,17 @@ import { flatWorkerRoster, type GameState } from "./types";
  * normalizeMilestoneTrigger documents. A trigger queued twice is read
  * once, because the queue is a set of moments waiting rather than a
  * count of them.
+ *
+ * What a list is, and what an entry of it may be, is read by the one
+ * reader every list of ids shares (see normalizeIdList in ./id-list), so
+ * this healing and the boons a captain is holding cannot drift on what a
+ * save is allowed to say.
  */
 export function normalizeMilestoneOffers(raw: unknown): MilestoneTrigger[] {
-  if (!Array.isArray(raw)) return [];
   const offers: MilestoneTrigger[] = [];
-  for (const value of raw) {
-    const trigger = normalizeMilestoneTrigger(value);
-    if (trigger === null || offers.includes(trigger)) continue;
+  for (const id of normalizeIdList(raw)) {
+    const trigger = normalizeMilestoneTrigger(id);
+    if (trigger === null) continue;
     offers.push(trigger);
   }
   return offers;
@@ -101,7 +107,7 @@ export function normalizeMilestonesAnswered(
  * The ladder is the one the game already prints to a captain (see
  * MERCHANT_RATINGS), and a rung is an entry with a threshold above zero:
  * the last entry's zero is the catch all floor rather than a rung
- * anybody crosses. The plan's word for this trigger is Renown, which the
+ * anybody crosses. The design's word for this trigger is Renown, which the
  * tree grants only when the books close, so the voyage's own Reputation
  * crossing a rung is the reading taken in its place; that deviation is
  * named in ./constants/milestones beside the trigger.
@@ -116,11 +122,11 @@ export function rungsOf(score: number): number {
  * Whether a moment is waiting to happen for this captain.
  *
  * One arm per trigger, and the arm reads the same event the trigger is
- * named for rather than a second copy of it: the losses list C2 writes,
- * the completed order's own mark (the caller knows the order, so the
- * latch arm is asked by the site that has one), the score against the
- * printed ladder, the settlement tick's own stamps, and the shared
- * commission's deliveries. Each arm is also answered to, which is what
+ * named for rather than a second copy of it: the crew loss list, the
+ * completed order's own mark (the caller knows the order, so the latch
+ * arm is asked by the site that has one), the score against the printed
+ * ladder, the settlement tick's own stamps, and the shared commission's
+ * deliveries. Each arm is also answered to, which is what
  * the marks are for: a moment the captain has already met in the same
  * terms does not arrive again until the terms move.
  */
@@ -143,15 +149,15 @@ export function milestoneDue(
       return mark < 1;
     case "renown_rung":
       return rungsOf(state.score) > mark;
-    case "cold_leg":
-      // The leg was cold, the settlement tick ran for it, and no hand
-      // carries a frostbite written for the leg after this one, which is
-      // exactly "a cold leg survived with zero frostbite": the one mark
+    case "cold_round":
+      // The round was cold, the settlement tick ran for it, and no hand
+      // carries a frostbite written for the round after this one, which is
+      // exactly "a cold round survived with zero frostbite": the one mark
       // the frostbite rule writes is currentRound + 1 (see
       // frostbiteNewest in ./garments), so a hand carrying it was bitten
-      // by this leg and no hand carrying it means nobody was. The mark
-      // stores the round last answered in, so one cold leg buys one
-      // moment and the next cold leg buys the next. The order is by
+      // by this round and no hand carrying it means nobody was. The mark
+      // stores the round last answered in, so one cold round buys one
+      // moment and the next cold round buys the next. The order is by
       // cost: the marks and the stamps are reads, the roster walk is
       // short, and the weather draw is last because it is the only
       // clause here that runs a generator.
@@ -177,21 +183,21 @@ export function milestoneDue(
  * answer can change what the second one should offer (a card taken is a
  * card no longer offered), so the honest set is the one derived at the
  * moment it is shown. And the seed leaves the round out on purpose: a
- * room advance, a checkpoint, a reload and a host start can all land
+ * harbor advance, a checkpoint, a reload and a host start can all land
  * between the offer being armed and the captain answering, and none of
  * them may reshuffle the three cards under a captain's eyes. The
  * trigger's own card is anchored first, because the moment and the card
  * written for it are one sentence; the rest are a weighted draw from the
- * pool this moment's family shares, through F2's own draw, so a card
- * taken from one moment is never offered at the next (held ids are out
- * of the pool) and the pool running dry is answered by the caller rather
- * than here.
+ * pool this moment's family shares, through the pool's own draw, so a
+ * card taken from one moment is never offered at the next (held ids are
+ * out of the pool) and the pool running dry is answered by the caller
+ * rather than here.
  *
  * The mark rides in the seed so that a trigger which fires twice deals a
  * second distinct hand where the shrinking pool allows one, which is
- * what the plan's own cadence asks of a repeat.
+ * what the design's own cadence asks of a repeat.
  *
- * [F7: the power budget] The budget filters the table after the draw
+ * The budget filters the table after the draw
  * rather than before it, and that placement is load bearing: this reader
  * is derived again on every render, a peer can settle a trade onto this
  * captain's hull while a moment is queued, and a filter inside the draw
@@ -209,6 +215,24 @@ export function milestoneDue(
  * a second reading of the table: same seed, same pool, the one filter
  * lifted.
  */
+/**
+ * Whether a moment card can pay for the captain it would be offered to.
+ *
+ * Mode is the first gate every milestone card answers (see cardWeight),
+ * but a trigger can carry a second one: Route Mastery rides a pathbound
+ * order, and the board only deals those to a path whose pool reaches the
+ * manifest. A Convoy, Free Captain or Quartermaster who drew it would hold
+ * a promise no order of theirs could ever keep, so the draw asks the same
+ * question its trigger does rather than leaving the card as dead weight
+ * on the table. A trigger with no such reachability question is open.
+ */
+function milestoneReachable(card: CardRecord, state: GameState): boolean {
+  if (card.trigger === "pathbound_order") {
+    return pathDealsBoardOrders(state.path);
+  }
+  return true;
+}
+
 export function milestoneChoices(
   state: GameState,
   trigger: MilestoneTrigger,
@@ -223,13 +247,17 @@ export function milestoneChoices(
   if (
     anchored !== undefined &&
     !held.has(anchored.id) &&
-    cardWeight(anchored, state) > 0
+    cardWeight(anchored, state) > 0 &&
+    milestoneReachable(anchored, state)
   ) {
     picks.push(anchored);
   }
   const taken = new Set(picks.map((card) => card.id));
   const pool = MILESTONE_BOONS.filter(
-    (card) => !held.has(card.id) && !taken.has(card.id),
+    (card) =>
+      !held.has(card.id) &&
+      !taken.has(card.id) &&
+      milestoneReachable(card, state),
   )
     .map((card) => [card, cardWeight(card, state)] as [CardRecord, number])
     .filter(([, weight]) => weight > 0);
@@ -243,14 +271,14 @@ export function milestoneChoices(
  *
  * Three readings and every one is load bearing. The queue has to be non
  * empty, because that is what a moment waiting means. The switch has to be
- * on, because the plan's rollback is "boons are additive and rare, so a
+ * on, because the design's rollback is "boons are additive and rare, so a
  * content revert is clean": with the switch off no moment is queued (the
  * arming path reads the same switch, see ./engine/milestones), a queue
  * left over from a save written while it was on is simply not drawn, and
  * the boons already held keep their effects for the voyage, which is
- * F3's reading of an off switch rather than a new one: the data stays,
- * the moment does not arrive. The save's own healing is the unwinding
- * path either way (see normalizeHeldBoons in ./held-cards).
+ * the module market's off-switch reading rather than a new one: the
+ * data stays, the moment does not arrive. The save's own healing is
+ * the unwinding path either way (see normalizeHeldBoons in ./held-cards).
  *
  * And the head of the queue has to still have a card on its table. The
  * arm path spends a moment whose pool has run dry rather than queueing
@@ -259,7 +287,7 @@ export function milestoneChoices(
  * waiting behind another can see its last available card taken by the
  * answer ahead of it. Reading the pool at the head is enough because the
  * five moments share one, so an empty table at the head is an empty
- * table everywhere. [F7: the power budget] One exception rides on the
+ * table everywhere. One exception rides on the
  * budget and it is the safe direction: a table emptied by the cap can
  * refill if the captain's power later drops, because a module sold or
  * swapped down frees weight (see powerBudgetAllows in ./held-cards), so

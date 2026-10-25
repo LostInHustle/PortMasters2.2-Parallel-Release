@@ -17,7 +17,7 @@
 // in reads a button that says so instead of one that offers the press a
 // second time.
 //
-// The seat this vote is aimed at is held by the caller with the leg it was
+// The seat this vote is aimed at is held by the caller with the round it was
 // chosen in (see the pick state on each card), so the picker takes the
 // target it should show and hands back every change rather than keeping a
 // choice of its own that a phase change would have to clear.
@@ -27,11 +27,11 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { t } from "@/lib/game/i18n";
-import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
+import { writtenOff, type SeatStatus } from "@/lib/seatMarks";
 import { captainName } from "@/lib/voteTally";
 
 /**
- * The room's live statuses, read for the mark a vote may not be aimed at.
+ * The harbor's live statuses, read for the mark a vote may not be aimed at.
  * Structural rather than the roster hook's whole record, the same shape
  * the two cards take, so a card cannot reach for anything it has no
  * business reading.
@@ -54,7 +54,7 @@ export function VoteSeatPicker({
 }: {
   /** The select's own label, which names the vote it picks for. */
   selectLabel: string;
-  /** The captain picked this leg, or an empty string for none. */
+  /** The captain picked this round, or an empty string for none. */
   target: string;
   onPick: (targetId: string) => void;
   /** The roster the list is drawn from. */
@@ -74,7 +74,7 @@ export function VoteSeatPicker({
   /** The vote's own sentence under the row, drawn once a seat is spent. */
   note?: ReactNode;
 }) {
-  const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
+  const marked = (id: string) => writtenOff(statuses?.[id]);
   const nameOf = (id: string) => captainName(members, id);
 
   return (

@@ -32,7 +32,7 @@ export async function muteAndTheReportSuite(inputs: {
     inputs;
   // The moderation surface, and the one part of this suite that is read
   // adversarially rather than happily. Both claims under test are about
-  // what a captain is NOT told: the room is not told who the host
+  // what a captain is NOT told: the harbor is not told who the host
   // silenced, and the captain a report names is told nothing at all.
   // Neither can be checked by waiting for a frame that arrives, so every
   // socket records everything it hears from here on and the claims are
@@ -87,7 +87,7 @@ export async function muteAndTheReportSuite(inputs: {
   const guestHears = await guestTold;
   check(
     (guestHears?.mutedUserIds ?? []).length === 0,
-    "and a captain who is neither is handed nothing: a mute is not the room's news",
+    "and a captain who is neither is handed nothing: a mute is not the harbor's news",
   );
 
   const heardMuted = waitForEvent<{ roomId: string }>(
@@ -130,7 +130,7 @@ export async function muteAndTheReportSuite(inputs: {
   thirdSocket.emit("chat:room", { roomId: roomId, content: liftedLine });
   check(
     (await hostHearsAgain) !== null,
-    "and their next line reaches the room",
+    "and their next line reaches the harbor",
   );
 
   const strangerMute = waitForEvent<{ roomId: string; error: string }>(

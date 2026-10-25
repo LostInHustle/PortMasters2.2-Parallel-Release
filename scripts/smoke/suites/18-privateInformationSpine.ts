@@ -65,8 +65,8 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
   // frame every socket in the harbor receives is kept below and read
   // back afterwards, which is the only way a leak would be seen at all.
 
-  // The counting rule first, which needs no sockets. The sizes are the
-  // plan's: four or five captains deal one hidden card, six deal two, and
+  // The counting rule first, which needs no sockets. The sizes are
+  // fixed: four or five captains deal one hidden card, six deal two, and
   // a larger harbor is capped rather than dealt a third.
   const rosterOf = (n: number) =>
     Array.from({ length: n }, (_, i) => `captain-${i}`);
@@ -242,10 +242,10 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
       name: `Smoke gambit harbor ${suffix}`,
       isPublic: false,
       mode: "ocean_gambit",
-      // [H9: the unlock code] The phrase, on every sealed harbor this
-      // file charters. It reads it out of the table for the reason
-      // LEDGER_PHRASE gives, and the H9 section at the end of the suite
-      // is where the gate over it is proved.
+      // The phrase, on every sealed harbor this file charters. It reads it
+      // out of the table for the reason LEDGER_PHRASE gives, and the
+      // unlock section at the end of the suite is where the gate over it
+      // is proved.
       unlock: LEDGER_PHRASE,
     }),
   });

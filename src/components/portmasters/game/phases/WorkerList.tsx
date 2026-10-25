@@ -11,7 +11,8 @@ import {
   frozenBenchLine,
   idleBenchLine,
 } from "@/lib/game/status-copy";
-import type { GameState, Worker } from "@/lib/game/types";
+import type { LedgerAct } from "@/lib/game/ledger";
+import type { Worker } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import {
   HuePanel,
@@ -24,9 +25,9 @@ import {
  * The line one hand's row carries: what they are doing, or why they are
  * not doing it. Exported because the peek modal draws the same roster, and
  * a hand seen from either surface should read the same reason and the same
- * promise: the cold holds a hand for the leg, not the voyage.
+ * promise: the cold holds a hand for the round, not the voyage.
  *
- * [W3: the status convention] The two troubled lines are composed in
+ * The two troubled lines are composed in
  * @/lib/game/status-copy rather than here, where the frozen family's
  * remedy and the idle family's wage note are authored once for every
  * surface that carries them. This row is the surface that had lost the
@@ -66,11 +67,11 @@ function WorkerList({
       Passed in rather than looked up here, so the number displayed and the
       one fireWorker charges cannot come from different tables. */
   cost: number;
-  /** [C3: garments and the cold] The leg in progress, read here so the row
+  /** The round in progress, read here so the row
       can say which hand the cold has taken. Passed in rather than pulled off
       a state this component does not hold, the same as cost above. */
   round: number;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  act: LedgerAct;
 }) {
   if (!list.length) return null;
   return (
@@ -90,7 +91,11 @@ function WorkerList({
       </div>
       {list.map((w, i) => (
         <div
-          key={i}
+          // The hand's own name, which is what tells one hand from another
+          // and what the row prints. A hand leaves the list when it is
+          // dismissed and another takes its place, so a row keyed by its
+          // place would be a different hand every time the list changed.
+          key={w.name}
           className="flex items-center justify-between bg-background/70 rounded-md px-3 py-1.5 my-1 text-xs border border-black/5 dark:border-white/10"
         >
           {/* The row leads with the person rather than with their trade:
@@ -99,19 +104,20 @@ function WorkerList({
               says something a number cannot, which it can only do if the
               name was on it.
 
-              [C3: garments and the cold] A hand the cold has taken says so
+              A hand the cold has taken says so
               where their work would have been, because that is the one
               thing that changed about them: they are still aboard, still
               eating and still on the payroll. The sentence carries the
               why and the way back as well as the state, because a row
               that only said "out of action" left the captain with no way
               to know it was the wardrobe that owed them a coat rather
-              than the sea owing them a funeral. [W3: the status
-              convention] The sentence is composed in the status module,
+              than the sea owing them a funeral. The sentence is composed in the status module,
               so this row and the voyage log give one account of the
               cold rather than two that can drift. */}
           <span>
-            {w.name}: {workerStatusLine(w, round)}
+            {w.name}
+            {t(": ")}
+            {workerStatusLine(w, round)}
           </span>
           {!w.task && (
             // Quiet until you reach for it, but still edged so it reads as a
@@ -177,8 +183,8 @@ export function WorkerStatus({
 }) {
   return (
     <HuePanel tone="market" className="p-4 mb-4">
-      <PanelHeading>{t("👥 Worker Status & Tasks")}</PanelHeading>
-      {/* [W3: the status convention] The star the idle rows carry is
+      <PanelHeading>{t("👥 Artisan Status & Tasks")}</PanelHeading>
+      {/* The star the idle rows carry is
           explained once above them rather than in each row, and only
           while a star is on the board: the legend is a definition of a
           mark, so it belongs beside the marks rather than on every

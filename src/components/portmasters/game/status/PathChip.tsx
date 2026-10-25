@@ -19,13 +19,13 @@ import { PATH_IDS, pathConfig } from "@/lib/game/paths";
 import type { PathId } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { Repeat } from "lucide-react";
-import { PhaseError } from "../phases/PhaseShared";
+import { Notice } from "../../shared";
 
 /**
- * [D7: the draft, and switching] What this captain sails as.
+ * What this captain sails as.
  *
  * The identity is a line on the captain's own rail rather than a card in
- * the stage, and the reason is the company it keeps: round, waters, funds,
+ * the stage, and the reason is the company it keeps: round, waters, Gold,
  * reputation and what round end will take are all readings about this
  * captain, and what they sail as is the sixth. In the stage it was a card
  * about a person standing in a column of cards about the table, and it cost
@@ -52,15 +52,15 @@ import { PhaseError } from "../phases/PhaseShared";
  * third of a rail that has to hold a hold, a ship and a ledger. What the
  * chip opens says the whole price before the click, including the half of
  * it that is not a number: the forfeiture and the publication. That is the
- * plan's own design point read as a screen: "the price of changing your
+ * design's own point read as a screen: "the price of changing your
  * identity is that everyone knows."
  *
  * What the popover prints of a refusal is the engine's own sentence
  * wherever the engine has one: the line above the buttons is the same
  * guard the press runs (see pathSwitchBlocked), so the reason a destination
  * is refused and the reason the engine would refuse it are one sentence
- * rather than two that could drift. The error under the chip is the room's,
- * and it carries the room's own two for the cases the engine is never
+ * rather than two that could drift. The error under the chip is the harbor's,
+ * and it carries the harbor's own two for the cases the engine is never
  * handed, a frame naming a path this build does not have and a build with
  * the switch off (see the path:switch handler).
  */
@@ -74,7 +74,7 @@ export function PathChip({
   game: GameState;
   /** Whether the path deal is open to this captain right now (a live
       draft view). Passed in rather than read off the game, because the
-      deal is the room's record rather than the save's. */
+      deal is the harbor's record rather than the save's. */
   inDeal: boolean;
   error: string | null;
   onSwitch: (path: PathId) => void;
@@ -108,13 +108,13 @@ export function PathChip({
   // Read through pathConfig off the save's own id, which the load heal has
   // already answered as a path this build has (see normalizePath), so the
   // lookup always answers.
-  const card = pathConfig(game.path)!;
+  const card = pathConfig(game.path);
   const fee = pathSwitchFee(game.renownLevel);
   const others = PATH_IDS.filter((id) => id !== game.path);
 
   // One call for every destination the popover offers, because the guard's
   // answer is the same for all of them: the window, the seat, the once a
-  // voyage stamp and the price are facts about this captain and this leg
+  // voyage stamp and the price are facts about this captain and this round
   // rather than about where they are going. The one per destination answer
   // ("you already hold that path") is the path this captain is on, which is
   // the one the list below does not offer.
@@ -153,7 +153,7 @@ export function PathChip({
           </p>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             {t(
-              "Once a voyage, at a port in legs {PATH_SWITCH_FROM_ROUND} through {PATH_SWITCH_TO_ROUND}, for {fee} Gold at your Renown. Unfulfilled pathbound orders are forfeited, and the whole fleet sees the change written into the voyage log.",
+              "Once a voyage, at a port in rounds {PATH_SWITCH_FROM_ROUND} through {PATH_SWITCH_TO_ROUND}, for {fee} Gold at your Renown. Unfulfilled pathbound orders are forfeited, and the whole fleet sees the change written into the voyage log.",
               { PATH_SWITCH_FROM_ROUND, PATH_SWITCH_TO_ROUND, fee },
             )}
           </p>
@@ -162,7 +162,7 @@ export function PathChip({
           )}
           <div className="grid grid-cols-2 gap-2">
             {others.map((id) => {
-              const other = pathConfig(id)!;
+              const other = pathConfig(id);
               return (
                 <Button
                   key={id}
@@ -185,10 +185,11 @@ export function PathChip({
       </Popover>
 
       {error && (
-        <PhaseError
+        <Notice
           message={error}
           onDismiss={onDismissError}
           className="mt-1.5"
+          size="sm"
         />
       )}
     </div>

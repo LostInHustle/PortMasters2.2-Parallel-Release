@@ -20,32 +20,32 @@ import type { VoyageLog } from "@/lib/use-voyage-log";
 import type { GameState, GameContext } from "@/lib/game/types";
 import { t } from "@/lib/game/i18n";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import type { LedgerAct } from "@/lib/game/ledger";
 import { ReadyBar } from "../ReadyBar";
+import { usePhaseClock } from "@/lib/use-phase-clock";
 
 type PhaseSync = ReturnType<typeof usePhaseSync>;
 export type Barter = ReturnType<typeof useBarter>;
-// [D3: Convoy: the Escort Contract] The escort market's board, threaded the
+// The escort market's board, threaded the
 // same way the barter board is and for the same reason: the sockets live in
-// the room and no phase panel is handed one. Exported because the Parley
+// the harbor and no phase panel is handed one. Exported because the Parley
 // screen's market panel takes it as its own prop.
 export type Escort = ReturnType<typeof useEscortContracts>;
-// [D4: Loom: the Refit] The bench's board, threaded the same way and for the
+// The bench's board, threaded the same way and for the
 // same reason. Exported because the port screen's bench panel takes it as
 // its own prop, which is the one difference between the two markets at this
 // layer: the escort's market is a whole phase screen's, and this one is a
 // station of the Market.
 export type Refit = ReturnType<typeof useRefitContracts>;
-// [F3: modules in the shipyard ladder, and trading them between captains]
 // The module market's board, threaded the same way and for the same reason.
 // Exported because the Parley screen's market panel takes it as its own
-// prop, which is where this one sits: the market the plan puts at the
+// prop, which is where this one sits: the market the design puts at the
 // table, beside the exchange, the protection market and the rumor desk.
 export type ModuleTrades = ReturnType<typeof useModuleTrades>;
-// [D5: Aroma: the Bazaar Rumor] The bazaar's board, threaded the same way
+// The bazaar's board, threaded the same way
 // and for the same reason. Exported because the Parley screen's desk panel
 // takes it as its own prop, which is where this one sits: the market the
-// plan puts at the table, beside the exchange and the protection market.
+// design puts at the table, beside the exchange and the protection market.
 export type Bazaar = ReturnType<typeof useBazaarRumors>;
 type Aid = ReturnType<typeof useAid>;
 type Backing = ReturnType<typeof useBacking>;
@@ -56,8 +56,8 @@ export type Audit = ReturnType<typeof useAudit>;
 export type Maroon = ReturnType<typeof useMaroon>;
 type Boons = ReturnType<typeof useBoonLedger>;
 type Roster = ReturnType<typeof useRoomRoster>;
-// [W2: the path draft] The deal's own board, threaded like every market
-// above and for the same reason: the socket lives in the room and no phase
+// The deal's own board, threaded like every market
+// above and for the same reason: the socket lives in the harbor and no phase
 // panel is handed one. The hand it holds is this captain's own, which is
 // what makes it the one board here that is drawn on exactly one seat: the
 // draft's screen is where the cards are, and every other screen draws
@@ -66,11 +66,11 @@ type Draft = ReturnType<typeof usePathDraft>;
 
 export type PhasePanelProps = {
   game: GameState;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  act: LedgerAct;
   ctx: GameContext;
   phaseSync: PhaseSync;
   barter: Barter;
-  // [D3: Convoy: the Escort Contract] The market a Convoy captain sells
+  // The market a Convoy captain sells
   // protection from, opened at the Parley table beside the exchange. It is
   // threaded like the board above and draws nothing at all in a build with
   // the switch off, which is the only condition under which any phase pays
@@ -78,22 +78,21 @@ export type PhasePanelProps = {
   // the market, because buying cover is what everyone else at the table is
   // there for.
   escort: Escort;
-  // [D4: Loom: the Refit] The bench a Loom captain sells repair work from,
+  // The bench a Loom captain sells repair work from,
   // opened at the port station of the Market phase. Threaded like the
   // market above and drawn in exactly the same circumstances: a captain who
   // holds no path of their own still reads it, because buying a refit is
   // what the bench is for, and a build with the switch off draws nothing at
   // all of it.
   refit: Refit;
-  // [F3: modules in the shipyard ladder, and trading them between
-  // captains] The market a captain lists a hull's module from, opened at
+  // The market a captain lists a hull's module from, opened at
   // the Parley table beside the protection market. Threaded like the two
   // markets above and drawn in the same circumstances: a captain with an
   // empty hull still reads the board, because buying a module is what the
   // market is for, and a build with the switch off draws nothing at all
   // of it.
   modules: ModuleTrades;
-  // [D5: Aroma: the Bazaar Rumor] The desk an Aroma captain speaks from at
+  // The desk an Aroma captain speaks from at
   // the Parley table, and the board the whole fleet reads there. Threaded
   // like the two markets above and drawn in the same circumstances: a
   // captain who holds no path of their own still reads the board, because
@@ -104,31 +103,31 @@ export type PhasePanelProps = {
   backing: Backing;
   // The Manifest Audit, threaded like the hooks above rather than called
   // inside the one phase that reads it, because the finding outlives the
-  // phase it was made in and the room level strip reads the same state.
+  // phase it was made in and the harbor level strip reads the same state.
   audit: Audit;
-  // [F5: public offers] The fleet's ledger, threaded the same way and for
+  // The fleet's ledger, threaded the same way and for
   // the same reason: the picks are made at Dawn and read at Parley, so
   // the state cannot belong to either phase's own hook. The panels draw
   // nothing at all of it in a Classic harbor, and the hook itself is
   // inert there (see @/lib/use-boon-ledger).
   boons: Boons;
-  // [H7: Maroon and the Harbormaster] The heavier vote, threaded the same
+  // The heavier vote, threaded the same
   // way and for the same reason: the vote is called at the Parley table,
-  // and the result it leaves behind is read by the room. The roster comes
+  // and the result it leaves behind is read by the harbor. The roster comes
   // with it rather than being called again, because the card has to know
-  // which captains the harbor may still name, and the room already has an
+  // which captains the harbor may still name, and the harbor already has an
   // answer to that on this screen.
   maroon: Maroon;
-  // [B4: the log surfaces] The room's own log. Threaded rather than read
-  // inside the Dusk panel because the socket lives in the room and no
+  // The harbor's own log. Threaded rather than read
+  // inside the Dusk panel because the socket lives in the harbor and no
   // phase panel is handed one, but the request for the voyage's lines is
   // not made here: the hook waits to be asked, and the Dusk screen is what
   // asks, so a captain who never stands there costs the server no frame.
   voyageLog: VoyageLog;
-  // The other half of the same pair, which the room already holds: the
+  // The other half of the same pair, which the harbor already holds: the
   // private channel's entries are this captain's own and are drawn under
   // the controls at every phase, so the Dusk screen reads the copy the
-  // room made rather than subscribing to the channel a second time.
+  // harbor made rather than subscribing to the channel a second time.
   privateLog: PrivateEntry[];
   me: PublicUser;
   members: PublicUser[];
@@ -139,8 +138,8 @@ export type PhasePanelProps = {
   // phases do not need it; Bankruptcy and Endgame use it to show a live
   // standings board of the captains still sailing.
   roster?: Roster;
-  // [W2: the path draft] The room's deal, as this captain meets it. The
-  // one board here that the room does not share: what it holds is this
+  // The harbor's deal, as this captain meets it. The
+  // one board here that the harbor does not share: what it holds is this
   // captain's own hand while the draft runs, the count of the table still
   // choosing, and the path it settled on. Required, because the seat it is
   // drawn on is a seat of every dealing Gambit lap rather than a screen
@@ -150,14 +149,14 @@ export type PhasePanelProps = {
 
 // The two boards of the Market (the port's purchase board and the
 // manifest's order board) take exactly this much of the phase panel: the
-// game, the act, and the cargo colour reader. Named once so the two board
+// game, the act, and the cargo color reader. Named once so the two board
 // signatures cannot drift apart.
 export type MarketBoardProps = Pick<PhasePanelProps, "game" | "act"> & {
   colorFor: (item: string) => string | undefined;
 };
 
 /**
- * [B2: hard timers, the server as timekeeper] The room's clock, drawn on a
+ * The harbor's clock, drawn on a
  * screen a captain has not acted on yet: the tally, the countdown, and the
  * bar that runs down beside it.
  *
@@ -170,7 +169,7 @@ export type MarketBoardProps = Pick<PhasePanelProps, "game" | "act"> & {
  * there.
  *
  * It draws nothing at all when there is nothing to draw: ReadyBar returns
- * null for a room with no ready state, and a screen with no clock in hand
+ * null for a harbor with no ready state, and a screen with no clock in hand
  * (the pier, a server with the clock switched off, a panel that drew before
  * the first frame arrived) passes none, so every one of those reads as the
  * absence it is rather than as a countdown of zero.
@@ -184,11 +183,16 @@ export function PhaseClockBar({
   members: PublicUser[];
   className?: string;
 }) {
+  // The clock, ticked here rather than in the harbor's own hook. The hook
+  // carries the deadline, and the countdown is composed from it by the one
+  // panel that draws it, so the second that passes costs this bar a redraw
+  // and not the whole harbor one.
+  const clock = usePhaseClock(phaseSync.phaseDeadline);
   return (
     <ReadyBar
       ready={phaseSync.ready}
       members={members}
-      clock={phaseSync.phaseClock}
+      clock={clock}
       className={cn("justify-center", className)}
     />
   );
@@ -196,7 +200,7 @@ export function PhaseClockBar({
 
 /**
  * The button that takes a ready vote back. Every waiting screen on the
- * harbour carries one, and the three that do (the phase footer, the
+ * harbor carries one, and the three that do (the phase footer, the
  * shipyard and the boon draft) had grown a copy each of the same variant,
  * the same radius and the same cancel call.
  */
@@ -222,7 +226,7 @@ export function CancelReadyButton({
 
 /**
  * The body of a screen whose captain has voted and is waiting on the rest
- * of the harbour: the line, the clock, and the way back out of the vote.
+ * of the harbor: the line, the clock, and the way back out of the vote.
  *
  * One component because the three screens that wait (a phase footer, the
  * shipyard, the boon draft) were drawing the same three elements, and the
@@ -283,7 +287,7 @@ export function ReadyFooter({
   }
   return (
     <div className="mt-5 space-y-3 text-center">
-      {/* [B2: hard timers, the server as timekeeper] The clock belongs on
+      {/* The clock belongs on
           the screen a captain has not acted on at least as much as on the
           one they are waiting on. */}
       <PhaseClockBar phaseSync={phaseSync} members={members} />
@@ -293,40 +297,6 @@ export function ReadyFooter({
       >
         {idleLabel}
       </Button>
-    </div>
-  );
-}
-
-/**
- * An action on this screen that did not go through: a pledge the purse
- * could not cover, a hire that fell through, an offer the market refused.
- * Smaller than the shared Notice because it sits inside the panel rather
- * than above it, and carrying the warning glyph because the captain should
- * see at a glance that nothing happened.
- *
- * No outer spacing of its own, for the same reason Notice has none: each
- * screen knows what it is sitting next to.
- */
-export function PhaseError({
-  message,
-  onDismiss,
-  className,
-}: {
-  message: string;
-  onDismiss: () => void;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between rounded-lg border border-alarm/25 bg-alarm/5 px-3.5 py-2 text-xs text-alarm",
-        className,
-      )}
-    >
-      <span>⚠️ {message}</span>
-      <button type="button" onClick={onDismiss} aria-label={t("Dismiss error")}>
-        <X className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }
@@ -344,12 +314,11 @@ export {
   PanelTitle,
   PanelHeading,
   HuePanel,
-  PanelLabel,
   SummaryHeading,
   PanelNote,
   PanelStat,
   PanelTotal,
-  StatTile,
+  FigureTile,
   StationStrip,
   IntelBanner,
   PathDeskRow,

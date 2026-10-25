@@ -6,12 +6,12 @@
 // commission, from the first phase through the last, because it is owed
 // by the whole harbor and a fact the whole harbor shares does not belong
 // in one captain's column. Which mode the harbor runs is a fact about
-// the room, written on the room's card before entry and worn by the
+// the harbor, written on the harbor's card before entry and worn by the
 // boards themselves, so this strip does not say it beside its own title:
 // the title is what a captain needs here.
 //
 // It wears gold, and gold specifically. The commission is an imperial
-// one, so it wears the colour the Imperial Mandate already wears on the
+// one, so it wears the color the Imperial Mandate already wears on the
 // orders board, and it shares that card's classes rather than its own so
 // the two read as the same kind of object. It is not a widget in the
 // palette's table and takes no hue of its own: gold is a meaning token,

@@ -24,23 +24,23 @@ export async function GET() {
       houseId: true,
       voyagesCompleted: true,
       seaMasterCrowns: true,
-      bestScore: true,
+      bestReputation: true,
     },
   });
 
   const totals = new Map<
     HouseId,
-    { voyages: number; crowns: number; bestScore: number }
+    { voyages: number; crowns: number; bestReputation: number }
   >();
   for (const id of HOUSE_IDS)
-    totals.set(id, { voyages: 0, crowns: 0, bestScore: 0 });
+    totals.set(id, { voyages: 0, crowns: 0, bestReputation: 0 });
   for (const row of rows) {
     const id = normalizeHouseId(row.houseId);
     if (!id) continue;
     const t = totals.get(id)!;
     t.voyages += row.voyagesCompleted;
     t.crowns += row.seaMasterCrowns;
-    t.bestScore = Math.max(t.bestScore, row.bestScore);
+    t.bestReputation = Math.max(t.bestReputation, row.bestReputation);
   }
 
   const standings: HouseStanding[] = HOUSES.map((h) => {
@@ -53,7 +53,7 @@ export async function GET() {
       perk: h.perk,
       crowns: t.crowns,
       voyages: t.voyages,
-      bestScore: t.bestScore,
+      bestReputation: t.bestReputation,
     };
   });
 

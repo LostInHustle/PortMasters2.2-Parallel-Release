@@ -49,8 +49,8 @@ export async function balanceDashboardSuite(inputs: {
   liveReading: DashboardReading | undefined;
 }> {
   const { host, operator, telHome } = inputs;
-  // Goal I3's evaluation is that somebody on balance duty can answer three
-  // questions off one page in under a minute, and the arithmetic behind
+  // The page has to let somebody on balance duty answer three questions
+  // off one page in under a minute, and the arithmetic behind
   // that page is pure, so most of what is checked here is the reduction
   // itself rather than the screen: a window in, and the reading the page
   // prints out. The two ends of it are checked over the wire at the
@@ -76,7 +76,7 @@ export async function balanceDashboardSuite(inputs: {
     startedAt: 60_000,
     endedAt: 70 * 60_000,
     outcome: "concluded",
-    endedAtLeg: 12,
+    endedAtRound: 12,
     captains: [],
     events: [],
     truncated: false,
@@ -122,11 +122,11 @@ export async function balanceDashboardSuite(inputs: {
     })),
   ];
 
-  // ---- An empty window ----
+  // ========== An empty window ==========
   // The state the page opens in before the mode has been played, which is
   // the one a fresh database would show. Every gate is still named and
   // still answered for: a page that printed nothing, or a zero, for a
-  // gate nobody has measured is the instrument the plan warns about.
+  // gate nobody has measured reports a result it does not have.
   const emptyReading = readDashboard({
     records: [],
     outcomes: [],
@@ -143,7 +143,7 @@ export async function balanceDashboardSuite(inputs: {
   check(
     emptyReading.panels.map((panel) => panel.id).join(",") ===
       "seat,staples,variance,floor",
-    "and the page still carries its four panels, in the plan's order",
+    "and the page still carries its four panels, in the design's order",
   );
   check(
     emptyReading.panels.every(
@@ -165,7 +165,7 @@ export async function balanceDashboardSuite(inputs: {
     "and the front page number is the Barge revenue share, held in the seat panel as its own first reading so the two cannot drift apart",
   );
 
-  // Every gate goal I4 lists, matched by the label the page gives it and
+  // Every launch gate, matched by the label the page gives it and
   // the target it is judged against, which is the one check that would
   // catch a gate dropped from a panel rather than only a panel dropped
   // from the page. The empty window is where the set is complete: a
@@ -208,13 +208,14 @@ export async function balanceDashboardSuite(inputs: {
   check(
     emptyReading.frontPage.label ===
       "Barge revenue share of all food spending" &&
-      emptyReading.frontPage.target === "no threshold in the plan" &&
+      emptyReading.frontPage.target === "no threshold in the design" &&
       emptyReading.frontPage.verdict === "unplayed" &&
-      emptyReading.frontPage.value === "no leg report from a provisions harbor",
-    "and the front page number is named as the share of all food spending the proposal identifies, reading as no report rather than as a share of zero until a voyage files what it spent",
+      emptyReading.frontPage.value ===
+        "no round report from a provisions harbor",
+    "and the front page number is named as the share of all food spending the design identifies, reading as no report rather than as a share of zero until a voyage files what it spent",
   );
 
-  // ---- The window ----
+  // ========== The window ==========
   // What the page is reading, counted from the records rather than asked
   // for: two voyages and three captains between them, one voyage recorded
   // under a rate below one, one truncated, and two rows the route could
@@ -243,7 +244,7 @@ export async function balanceDashboardSuite(inputs: {
     "and reports the lowest rate its records were sampled at, so a window that spans a config change is never read as the whole run",
   );
 
-  // ---- The variance panel, over the rows the report reads ----
+  // ========== The variance panel, over the rows the report reads ==========
   // Three rated bands, every one of them inside its target: four won of
   // seven at the five seat Honest table, one won of five Pirates at six,
   // and two won of five Brokers at four. The page does not compute a rate
@@ -288,7 +289,7 @@ export async function balanceDashboardSuite(inputs: {
 
   // The same page with one band under its target. The panel has to say
   // which band and what it read, not only that something is out: a state
-  // chip on its own is the data dump the plan's evaluation warns about.
+  // chip on its own is a data dump rather than an answer.
   const underBand = readDashboard({
     records: [dashRecord("dash-v2")],
     outcomes: [...inBandOutcomes, ...dashRows("broker", 0, 4, 6)],
@@ -308,7 +309,7 @@ export async function balanceDashboardSuite(inputs: {
     "and one band under its target moves the panel to watching and names the band in the answer",
   );
 
-  // ---- The three readings the spine can already answer ----
+  // ========== The three readings the spine can already answer ==========
   // Session length is a clock the record carries: charted to closed, at
   // the five captain tune target, and only over the voyages that
   // concluded. The three hour harbor is in the window to be sat beside
@@ -317,9 +318,9 @@ export async function balanceDashboardSuite(inputs: {
   // emptied voyage are in it to be left out.
   //
   // The lobby fill time is the other clock a record carries, and it is
-  // read one table size band at a time because the plan asks whether six
-  // seats are worth supporting at all rather than how long a lobby takes
-  // on average.
+  // read one table size band at a time because the question is whether
+  // six seats are worth supporting at all rather than how long a lobby
+  // takes on average.
   const clockReading = readDashboard({
     records: [
       dashRecord("dash-c1", { endedAt: 60 * 60_000 }),
@@ -329,7 +330,7 @@ export async function balanceDashboardSuite(inputs: {
       dashRecord("dash-c5", {
         outcome: "emptied",
         endedAt: 400 * 60_000,
-        endedAtLeg: 3,
+        endedAtRound: 3,
       }),
     ],
     outcomes: [],
@@ -352,9 +353,9 @@ export async function balanceDashboardSuite(inputs: {
   );
   check(
     stopLine !== undefined &&
-      stopLine.value === "1 of 5, stopping at leg 3 on the median" &&
+      stopLine.value === "1 of 5, stopping at round 3 on the median" &&
       stopLine.verdict === "ungated",
-    "and where the voyages that stopped early stopped is measured without being judged, since the plan sets no line on it",
+    "and where the voyages that stopped early stopped is measured without being judged, since the design sets no line on it",
   );
 
   // The lobby fill time, one band at a time. The four seat band holds two
@@ -401,7 +402,7 @@ export async function balanceDashboardSuite(inputs: {
     fillLine !== undefined &&
       fillLine.value ===
         "4 or fewer seats 30 min of 2; 5 seats none in the window; 6 or more seats 5 min of 1" &&
-      fillLine.target === "no threshold in the plan" &&
+      fillLine.target === "no threshold in the design" &&
       fillLine.verdict === "ungated",
     "the lobby fill time reads one band at a time under the deck's own band names, a band that saw no voyage says so rather than reading as a zero, and the row is measured without being judged",
   );
@@ -409,8 +410,8 @@ export async function balanceDashboardSuite(inputs: {
     fillPanel !== undefined &&
       fillPanel.state === "no reading" &&
       !fillPanel.answer.includes("Lobby fill time") &&
-      fillPanel.gaps.some((gap) => gap.includes("voyageLegs")),
-    "and a panel whose only measured row is the fill time still says it has nothing to judge, while naming the voyage length as the knob the plan shortens when a session runs long, because a comparison between bands is not one of the sixteen gates",
+      fillPanel.gaps.some((gap) => gap.includes("voyageRounds")),
+    "and a panel whose only measured row is the fill time still says it has nothing to judge, while naming the voyage length as the knob the design shortens when a session runs long, because a comparison between bands is not one of the sixteen gates",
   );
   const emptyFill = emptyReading.panels
     .flatMap((panel) => panel.readings)
@@ -422,8 +423,9 @@ export async function balanceDashboardSuite(inputs: {
     "while a window with no voyage in it says as much, rather than printing three bands of nothing",
   );
 
-  // ---- The floor ----
-  // Retention is read off the two fields goal I2 added to a captain line,
+  // ========== The floor ==========
+  // Retention is read off the two fields the reading added to a captain
+  // line,
   // and only over the voyages that closed with somebody standing: a
   // harbor that emptied has nobody left to be standing, so its lines
   // cannot answer the question and are left out of the denominator rather
@@ -463,7 +465,7 @@ export async function balanceDashboardSuite(inputs: {
     retentionLine !== undefined &&
       retentionLine.value === "66.7% of 3" &&
       retentionLine.verdict === "under",
-    "retention is the share of the captains put ashore who were still standing at the close, over the voyages that had a close, and it is judged against the plan's ninety percent",
+    "retention is the share of the captains put ashore who were still standing at the close, over the voyages that had a close, and it is judged against the design's ninety percent",
   );
   const bankruptcyLine = floorPanel?.readings.find((line) =>
     line.label.includes("bankrupt"),
@@ -487,7 +489,7 @@ export async function balanceDashboardSuite(inputs: {
     "and nothing in the reading names a captain, since the page is about the mode rather than about who sailed it",
   );
 
-  // ---- The route the page reads ----
+  // ========== The route the page reads ==========
   // The page's own check is a convenience that keeps a captain from being
   // shown a dashboard, so the gate is checked here the way the console's
   // is: the server is what has to refuse, against the account row.
@@ -524,13 +526,13 @@ export async function balanceDashboardSuite(inputs: {
       liveReading.panels.map((panel) => panel.id).join(",") ===
         "seat,staples,variance,floor" &&
       // The front page number is read now rather than held as a slot, and
-      // the plan sets no band on it: what a reader must never see is a
-      // share judged inside or outside a threshold nobody wrote, so the
-      // verdict is the absence of a report or a measured number left
-      // unjudged, and never a band verdict.
+      // no band is set on it: what a reader must never see is a share
+      // judged inside or outside a threshold nobody wrote, so the verdict
+      // is the absence of a report or a measured number left unjudged, and
+      // never a band verdict.
       (liveReading.frontPage.verdict === "unplayed" ||
         liveReading.frontPage.verdict === "ungated"),
-    "carrying the four panels in the plan's order, with the front page number read from the record and judged against no invented band",
+    "carrying the four panels in the design's order, with the front page number read from the record and judged against no invented band",
   );
   check(
     liveReading !== undefined &&
@@ -538,7 +540,7 @@ export async function balanceDashboardSuite(inputs: {
     "and naming no captain on the wire, exactly as on the page",
   );
 
-  // ---- The page itself ----
+  // ========== The page itself ==========
   // The route above is the page's only wire, so the last thing to check
   // is that the page is served at all. It is a client component, so what
   // the server sends is the sentence it waits on, which is the one string

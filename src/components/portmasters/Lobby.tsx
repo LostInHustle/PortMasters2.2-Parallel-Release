@@ -2,7 +2,7 @@
 
 import { VoyageChronicle } from "@/types/realtime/voyage";
 import { HouseStanding } from "@/types/realtime/standings";
-import { APP_NAME } from "@/lib/game/constants/brand";
+import { APP_NAME, APP_TAGLINE } from "@/lib/game/constants/brand";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -136,7 +136,7 @@ export function Lobby({
   const [difficulty, setDifficulty] = useState<Difficulty>("fair_winds");
   // Which voyage the harbor is playing (see src/lib/game/mode.ts). Fixed at
   // creation for the same reason the tier is: it decides the order every
-  // captain's phases run in, so a room that changed it mid voyage would be
+  // captain's phases run in, so a harbor that changed it mid voyage would be
   // asking its table to keep two different clocks. Starts on the founding
   // mode, which is the one a captain who never touches this control gets.
   const [mode, setMode] = useState<GameMode>(DEFAULT_MODE);
@@ -145,7 +145,7 @@ export function Lobby({
   // who has chosen a voyage is answered by their choice, while one who has
   // not is answered by the harbor they are browsing (see browsedMode).
   const [modeChosen, setModeChosen] = useState(false);
-  // [H9: the unlock code] What the host typed to open a sealed voyage, sent
+  // What the host typed to open a sealed voyage, sent
   // only when the mode they picked takes a phrase. Cleared once a harbor is
   // opened with it, because a phrase that has already worked is not one the
   // next form needs to hand over again.
@@ -159,17 +159,17 @@ export function Lobby({
   // full reason it is a switch rather than stacked cards).
   const [view, setView] = useState<"browse" | "create">("browse");
 
-  // [MANIFEST: Quick Start Match] While queued, the Quick Start button
+  // While queued, the Quick Start button
   // stays in a loading state and waits for the quickstart:matched socket
-  // event before routing the captain into the matched room.
+  // event before routing the captain into the matched harbor.
   const [quickStarting, setQuickStarting] = useState(false);
 
-  // [MANIFEST: Voyage Chronicle] Dialog state. Fetched on open.
+  // Dialog state. Fetched on open.
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [chronicles, setChronicles] = useState<VoyageChronicle[]>([]);
   const [chronicleLoading, setChronicleLoading] = useState(false);
 
-  // [MANIFEST: Great Houses] Dialog state. Standings are fetched on open,
+  // Dialog state. Standings are fetched on open,
   // and myHouseId tracks the captain's current pledge so the row that is
   // already pledged shows as such.
   const [houseOpen, setHouseOpen] = useState(false);
@@ -216,7 +216,7 @@ export function Lobby({
 
   // A captain's Renown only ever changes when a voyage concludes, which
   // never happens while sitting in the lobby, so a plain fetch on mount is
-  // enough; no polling needed like the room list above. The same fetch
+  // enough; no polling needed like the harbor list above. The same fetch
   // carries the captain's current House pledge so the House dialog can mark
   // the pledged row without an extra round trip.
   useEffect(() => {
@@ -281,7 +281,7 @@ export function Lobby({
   // of the UTC day is the one thing that makes it true again. The day math
   // is pure and shared with the route that serves it (see
   // src/lib/game/checkin), so the reading is taken again here on every
-  // render from the two persisted fields. The room list already redraws
+  // render from the two persisted fields. The harbor list already redraws
   // this panel every eight seconds, so a lobby left open across midnight
   // lights the gift again on its own, where before it stayed dark until a
   // reload.
@@ -295,7 +295,7 @@ export function Lobby({
   // POST /api/legacy/batch). Keyed on the *set* of online ids, not the
   // onlineUsers array itself, since that array gets a new reference on
   // every presence:update broadcast (anyone, anywhere, connecting or
-  // switching rooms), most of which don't actually add or remove anyone
+  // switching harbors), most of which don't actually add or remove anyone
   // from this list.
   const [otherLegacies, setOtherLegacies] = useState<
     Record<string, CaptainLegacySummary>
@@ -328,7 +328,20 @@ export function Lobby({
   // cleanup both read it, and neither should rerun when it changes.
   const queuedForMatch = useRef(false);
 
-  // [MANIFEST: Quick Start Match] Join the queue and wait to be paired.
+  // The silence the button waits on, held so it can be called off when
+  // the harbor closes under the captain rather than firing into a tree
+  // that is no longer there.
+  const quickStartTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (quickStartTimer.current !== null) {
+        window.clearTimeout(quickStartTimer.current);
+      }
+    },
+    [],
+  );
+
+  // Join the queue and wait to be paired.
   //
   // The emit below is what actually enqueues this captain. The queue is a
   // Set in the realtime layer's memory, and the REST route runs in a
@@ -357,7 +370,7 @@ export function Lobby({
     }
 
     queuedForMatch.current = true;
-    // The tier goes with the request. It decides the room when this
+    // The tier goes with the request. It decides the harbor when this
     // captain is the one who opens it; a captain seated into a harbor
     // that already exists sails at that harbor's tier instead.
     socket.emit("quickstart:join", { difficulty });
@@ -367,7 +380,11 @@ export function Lobby({
 
     // A match is answered within a round trip, so a long silence means the
     // reply went missing. Give up gracefully instead of spinning.
-    window.setTimeout(() => {
+    if (quickStartTimer.current !== null) {
+      window.clearTimeout(quickStartTimer.current);
+    }
+    quickStartTimer.current = window.setTimeout(() => {
+      quickStartTimer.current = null;
       if (!queuedForMatch.current) return;
       queuedForMatch.current = false;
       socket.emit("quickstart:leave");
@@ -376,13 +393,13 @@ export function Lobby({
     }, 15000);
   }, [difficulty, socket, authed]);
 
-  // [MANIFEST: Quick Start Match] The queue resolves here.
+  // The queue resolves here.
   //
   // The first captain to ask is seated straight away: if no open public
   // harbor is waiting, the realtime layer opens one and makes them the
   // host. The next captain to ask is seated into that same harbor, because
   // it is public and has not set sail. So both callers get a match, and
-  // they end up in the same room. We fetch the full room detail and enter,
+  // they end up in the same harbor. We fetch the full harbor detail and enter,
   // exactly as if the captain had typed the code in by hand.
   useEffect(() => {
     // The live socket off the hook, not a second one fetched from the
@@ -443,7 +460,7 @@ export function Lobby({
         isPublic,
         difficulty,
         mode,
-        // [H9: the unlock code] The phrase rides only with the voyage that
+        // The phrase rides only with the voyage that
         // asks for one. The route refuses a phrase whose door is not the
         // mode requested, which is the right answer for a request that
         // names a phrase and an open mode together, so the open modes
@@ -457,7 +474,7 @@ export function Lobby({
       // A refused phrase is the route's answer to a bad phrase rather than
       // a failure of the form, and its message already says which of the
       // two mistakes it was: nothing typed, or the wrong words.
-      setError(e instanceof Error ? e.message : t("Failed to create room"));
+      setError(e instanceof Error ? e.message : t("Failed to create harbor"));
     } finally {
       setBusy(false);
     }
@@ -475,7 +492,7 @@ export function Lobby({
       setJoinCode("");
       onEnterRoom(room);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("Failed to join room"));
+      setError(e instanceof Error ? e.message : t("Failed to join harbor"));
     } finally {
       setBusy(false);
     }
@@ -488,7 +505,7 @@ export function Lobby({
       const { room: joined } = await api.joinRoomById(room.id);
       onEnterRoom(joined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("Failed to enter room"));
+      setError(e instanceof Error ? e.message : t("Failed to enter harbor"));
     } finally {
       setJoining(null);
     }
@@ -519,7 +536,7 @@ export function Lobby({
 
   // The square's backlog, read once on landing. Nothing reseeds it later,
   // and nothing needs to: this channel is written down rather than held in
-  // the room's session log, so whatever was said while this captain was at
+  // the harbor's session log, so whatever was said while this captain was at
   // sea is simply part of the backlog they read on their next landing.
   useEffect(() => {
     api
@@ -530,7 +547,7 @@ export function Lobby({
       });
   }, []);
 
-  // [MANIFEST: Voyage Chronicle] Fetch the captain's chronicles when the
+  // Fetch the captain's chronicles when the
   // dialog opens. Newest first as returned by /api/chronicle.
   const openChronicle = useCallback(() => {
     setChronicleOpen(true);
@@ -544,7 +561,7 @@ export function Lobby({
       .finally(() => setChronicleLoading(false));
   }, []);
 
-  // [MANIFEST: Great Houses] Fetch harbor wide standings plus the
+  // Fetch harbor wide standings plus the
   // captain's current pledge when the House dialog opens. myHouseId is
   // resynced after a successful pledge so the chosen row stays marked.
   const openHouse = useCallback(() => {
@@ -615,7 +632,7 @@ export function Lobby({
           One card, answering one question in two rows: what can I reach
           from here, and what is the harbor doing. The tools sit on a
           single shelf, all of them the same height and the same shape,
-          quiet by default, with colour spent on the one thing actually
+          quiet by default, with color spent on the one thing actually
           waiting for the captain, so a row of controls doing the same
           kind of job reads as one instrument. The harbor's numbers sit
           under a hairline as a gauge row, and the figure that also opens
@@ -646,14 +663,14 @@ export function Lobby({
                 <span className="text-brand pm-truncate block">{APP_NAME}</span>
               </h1>
               <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
-                {t("Maritime trade on the ancient Silk Road")}
+                {t(APP_TAGLINE)}
               </p>
             </div>
 
             {/* The shelf. One height, one shape, one quiet skin for every
                 tool on it, because the tools all do the same kind of job
                 and a row of different tints reads as a row of unrelated
-                widgets; colour is kept for Check In, the only tool that is
+                widgets; color is kept for Check In, the only tool that is
                 ever waiting. */}
             <div className="flex basis-full items-center gap-1.5 sm:basis-auto">
               <button
@@ -783,7 +800,7 @@ export function Lobby({
                 </span>
               </span>
               <div className="hidden md:block">
-                <AgeBanner variant="pill" className="pm-tool" />
+                <AgeBanner className="pm-tool" />
               </div>
             </div>
           </div>
@@ -813,13 +830,13 @@ export function Lobby({
           </div>
         )}
         <section className="space-y-3">
-          {/* [MANIFEST: Quick Start Match] One tap joins the queue and routes
+          {/* One tap joins the queue and routes
               the captain into the first available room. It sits above the
               panel rather than down among the room rows, because the rows
               carry the harbor green and this carries the quickstart hue, and
               two saturated gradients a row apart in one column read as a
               clash rather than as two ways in. */}
-          {/* One ring of the quickstart hue is the only colour on the tile,
+          {/* One ring of the quickstart hue is the only color on the tile,
               and it is what gives the column an entry point: rows of equal
               weight leave the eye with nowhere to land, and this is the one a
               captain with no preference should reach for first. It stays a
@@ -839,7 +856,7 @@ export function Lobby({
                 )}
               </p>
             </div>
-            {/* The vermilion seal, the same colour the harbor uses for a
+            {/* The vermilion seal, the same color the harbor uses for a
                 thing that must not be missed: the button wears the
                 quickstart hue, so no two unrelated controls share a
                 skin. */}
@@ -882,7 +899,7 @@ export function Lobby({
             >
               {/* The switch is a recessed well with the live view raised
                   inside it, which is the pairing the tool shelf already uses.
-                  Colour is spent on the two icons, one per view, in the hue
+                  Color is spent on the two icons, one per view, in the hue
                   that view already wears below: harbors dresses the board,
                   charter dresses the create form. Both hues are already on
                   this screen and they sit far enough apart on the ladder to
@@ -992,7 +1009,7 @@ export function Lobby({
                   {/* Join by code is the other half of "get into a room I did
                       not make", so it belongs here in the browse view, beside
                       Quick Start, rather than at the foot of the create form.
-                      One line rather than a labelled stack, because a captain
+                      One line rather than a labeled stack, because a captain
                       who has a code has exactly one thing to do with it. */}
                   <div className="flex items-center gap-2">
                     <Label
@@ -1064,10 +1081,14 @@ export function Lobby({
 
                   <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">
+                      <Label
+                        htmlFor="harbor-name"
+                        className="text-xs text-muted-foreground"
+                      >
                         {t("Harbor name")}
                       </Label>
                       <Input
+                        id="harbor-name"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         placeholder={t("e.g. Silk Run · Voyage 1")}
@@ -1129,7 +1150,7 @@ export function Lobby({
                     }}
                   />
 
-                  {/* [H9: the unlock code] The phrase, drawn under the cards
+                  {/* The phrase, drawn under the cards
                       rather than inside one because it is an answer to the
                       choice rather than a third thing to choose, and it is
                       drawn only while the card above it is sealed. The
@@ -1155,18 +1176,11 @@ export function Lobby({
                         className="pm-field"
                         onKeyDown={(e) => e.key === "Enter" && createRoom()}
                       />
-                      {/* The row carries the apostrophe as the entity the
-                          source spelled it with, so the read hands it over
-                          whole and the paragraph renders the answer as HTML:
-                          a text node would print "&apos;" on the screen. */}
-                      <p
-                        className="text-[11px] leading-relaxed text-muted-foreground"
-                        dangerouslySetInnerHTML={{
-                          __html: t(
-                            "A captain&apos;s tenth completed voyage hands them this phrase, and the guide keeps a copy for whoever goes looking. Anyone who has it can open the table, and every seat at that table sails the voyage it opens.",
-                          ),
-                        }}
-                      />
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        {t(
+                          "A captain's tenth completed voyage hands them this phrase, and the guide keeps a copy for whoever goes looking. Anyone who has it can open the table, and every seat at that table sails the voyage it opens.",
+                        )}
+                      </p>
                     </div>
                   )}
 
@@ -1195,7 +1209,7 @@ export function Lobby({
                       mode={mode}
                       renownLevel={renownProgress(legacy.renownXP).level}
                       voyagesCompleted={legacy.voyagesCompleted}
-                      bestScore={legacy.bestScore}
+                      bestReputation={legacy.bestReputation}
                       solventStreak={legacy.consecutiveSolventVoyages}
                     />
                   </div>

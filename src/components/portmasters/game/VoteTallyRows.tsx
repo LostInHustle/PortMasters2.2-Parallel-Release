@@ -4,7 +4,7 @@
 // The count, and who named whom, drawn once for the harbor's two votes.
 //
 // The Manifest Audit and the maroon vote both put a target to the table
-// and both show the room the nominations as they come in. The rows are
+// and both show the harbor the nominations as they come in. The rows are
 // tallyRows' (see lib/voteTally.ts, which is where the two votes already
 // share what a row is); this is the other half of that arrangement: the
 // same paragraph, the same two spans, the same muted count, in two
@@ -15,9 +15,9 @@
 // active roster, which is not the member list a client can see (see
 // AuditTally). How many captains have named someone of how many the vote
 // is divided by, how many names carry it, each target with the names
-// behind them, and who the room is still waiting on.
+// behind them, and who the harbor is still waiting on.
 //
-// Nothing is counted without a census. A room whose count has not arrived
+// Nothing is counted without a census. A harbor whose count has not arrived
 // yet is told exactly that, because a count block guessing at its own
 // denominator would be a wrong count in a longer sentence. The shortfall
 // line (how many more names the leading target needs) and the captain's
@@ -61,7 +61,7 @@ export function VoteTallyRows({
   nextStep,
 }: {
   rows: TallyRow[];
-  /** The server's count for this leg, or null before its first word. */
+  /** The server's count for this round, or null before its first word. */
   census: VoteCensus | null;
   /** The roster a name is read out of, for the captains still to speak. */
   members: PublicUser[];
@@ -78,16 +78,9 @@ export function VoteTallyRows({
   if (!census || census.roster <= 0) {
     return (
       <p className="mt-3 text-[11px] text-muted-foreground">
-        {/* The pack carries this row with the source's &apos; entities, so
-            it is read as HTML and the browser decodes them to the same
-            apostrophes JSX used to print. */}
-        <span
-          dangerouslySetInnerHTML={{
-            __html: t(
-              "The room&apos;s count has not arrived yet. It comes with this leg&apos;s vote.",
-            ),
-          }}
-        />
+        {t(
+          "The harbor's count has not arrived yet. It comes with this round's vote.",
+        )}
       </p>
     );
   }
@@ -153,7 +146,7 @@ export function VoteTallyRows({
         {myVote === null
           ? t("Your name is not in yet. Pick a captain and press the button.")
           : t(
-              "Your name is in for {votedName}. Nothing else is asked of you this leg.",
+              "Your name is in for {votedName}. Nothing else is asked of you this round.",
               { votedName: captainName(members, myVote) },
             )}
       </p>
@@ -173,7 +166,7 @@ export function VoteTallyRows({
               },
             )
           : t(
-              "Every captain still sailing has named someone, so nothing more can land this leg. A later leg can call this vote again.",
+              "Every captain still sailing has named someone, so nothing more can land this round. A later round can call this vote again.",
             )}
       </p>
     </div>

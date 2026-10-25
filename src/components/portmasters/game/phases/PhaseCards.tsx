@@ -55,7 +55,7 @@ export function TradeCard({
  * single column before that, because a draft is a comparison and three
  * choices cut down to a third of a narrow stage compare worse than three
  * read one after another. The stage is the container this reads (see the
- * room's own note), so the width it wants is the one it is drawn in.
+ * harbor's own note), so the width it wants is the one it is drawn in.
  */
 export function DraftGrid({ children }: { children: React.ReactNode }) {
   return (

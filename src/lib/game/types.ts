@@ -1,6 +1,3 @@
-// =====================================================================
-// PortMasters 2.2 Parallel Release: game state types
-// =====================================================================
 import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
 import type { CardTally } from "./cards";
 import type { CardRecord } from "./constants/cards";
@@ -18,42 +15,23 @@ import type { PortShift } from "./maroon";
 import type { PathId } from "./paths";
 import type { HouseId } from "./legacy";
 import { defaultStandingOrders, type StandingOrders } from "./standing";
-// The two runtime imports this module takes from the engine, and
-// deliberately narrow ones: ./engine/houses.ts imports nothing but types, so
-// the two cannot form a cycle. Both live at the one place a voyage is born,
-// so a caller cannot create one and forget the captain's House, and the
-// empty perk set has a single definition rather than a copy per call site.
+// Narrow runtime imports from the engine: ./engine/houses imports only types,
+// so there is no cycle, and a voyage's House is applied where the voyage is born.
 import { applyHousePerkAtStart, noHousePerks } from "./engine/houses";
 
-// The six phases of a leg, and the states beside it.
-//
-// [B1: the six phase leg, as data] These were numbers for most of the
-// engine's life (`0` welcome, `1` purchase, `2` orders, `3` settlement,
-// `4` shipyard, `5` boon draft) with two string checkpoints bolted on
-// afterwards (`barter`, `worker_mgmt`), and the two modes put them in
-// different orders. The design asks for a six phase leg instead, so the
-// stations the numbers named became the phases they belong to, the two
-// bolted on checkpoints became work inside Parley and Market, and the
-// vocabulary is now words throughout: a phase is named for what it is.
-//
-// See ../game/phases.ts, which is where a phase's face lives and where a
-// value written by an older build is placed on load.
-export type LegPhase =
+// The six phases of a round. Older builds stored these as numbers with two extra
+// string checkpoints; ./phases maps those saved values onto these names and
+// owns each phase's display details.
+export type RoundPhase =
   "dawn" | "market" | "orders" | "parley" | "resolve" | "dusk";
 
 export type Phase =
   | "harbor"
-  // [W2: the path draft] The seat a Gambit voyage opens its round at,
-  // between the pier and Dawn: the hands are dealt at departure and the
-  // room stops here while every captain keeps their cards. It is a seat
-  // the room waits on but not one of the leg's six, because the leg's
-  // phases are the work a round is made of and this is the deal that
-  // precedes the first of them; the lap still carries it (see ./mode.ts)
-  // so the rank, the gate and the catch up all read one order.
+  // Gambit's opening seat, between the pier and Dawn, where cards are dealt.
+  // It is not one of the round's six phases but is part of the mode's lap.
   | "path_draft"
-  | LegPhase
-  // Personal sub states: a captain drafting or swapping a module is
-  // standing in Dusk, and the room is not waiting on them.
+  | RoundPhase
+  // Personal sub-states: the captain is still in Dusk and the room does not wait.
   | "module_draft"
   | "module_swap"
   | "bankruptcy"
@@ -65,6 +43,11 @@ type ResourceRef = {
   quantity?: number;
   price?: number;
   materialCost?: number;
+  // A product card authors its recipe as a list rather than as a sentence,
+  // so the board can name each good in the reader's language.
+  materialList?: { type: string; amount: number }[];
+  // The rendered recipe list older saves carry. A card with the list above
+  // reads the list; this is only the fallback for those saves.
   materialDetails?: string;
 };
 
@@ -83,63 +66,27 @@ export type OrderCard = {
   reward: number;
   totalItems: number;
   isProductOrder: boolean;
-  // Set only on the extra order a captain conjures with Broker's Favor (see
-  // callBrokersFavor in engine.ts). completeOrder reads it to take the
-  // Broker's commission off this order's reward; every other order leaves it
-  // undefined and is unaffected.
+  // Set only on a Broker's Favor order; completeOrder reads it to deduct the
+  // commission. Every other order leaves it undefined.
   isBrokerFavor?: boolean;
-  // Set only on the Emperor's scheduled commission (see the mandate injection
-  // in startOrders and MANDATE_TEMPLATES in ./difficulty). Purely a marker for
-  // the trade board's styling; the order settles like any other, except that it
-  // carries isProductOrder: false so no VAT is charged on an imperial levy.
+  // Marks the Emperor's scheduled commission so the trade board can style it.
+  // It settles normally, but is not a product order, so no VAT applies.
   isMandate?: boolean;
-  // Set only on the orders the paths post to the manifest (see genPathOrder in
-  // ./engine/market and the slots startOrders fills). A marker and never a
-  // label: which path a marked card waits on is computed from the good it
-  // demands rather than written here (see pathOrderOf and lockedBehind in
-  // ./engine/orders), so a retuned pool cannot leave a card stamped for one
-  // path and locked to another.
+  // Marks an order posted by a path. The owning path is derived from the good
+  // demanded (see pathOrderOf), never stored, so retuning pools cannot desync.
   isPathOrder?: boolean;
 };
 
 type IntelItem = { item: string; port: string };
 
-// A finished good a captain can produce. Valid values mirror the PRODUCTS
-// array in ./constants (Linen Clothes, Cotton Clothes, Brocade, Sachet,
-// Bronze Mirror, Celadon Ware, Foreign Balm, Pearl String). Kept as a
-// plain string alias so the engine stays decoupled from the catalogue and
-// a charter that adds a new good needs no type change here, only an entry
-// in PRODUCTS.
+// A finished good a captain can produce. Names must exist in PRODUCTS
+// (./constants); kept as a plain string so new goods need no type change.
 type Product = string;
 
-// The known keys a boon can write into GameState.modifierFlags.
-// Each maps 1:1 to a balance effect the engine reads during a round (see
-// the flags on each card in ./constants/drafts for which card writes which
-// key, and the pricing / market / workers / pirates modules for where each
-// is read). A Partial<Record<ModifierKey, number>> is what the field
-// carries, so a key present without a value reads as undefined and falls
-// back to its default, exactly the way the untyped Record<string, number>
-// did before, just with the universe of legal keys pinned in one place.
-//
-// Exported because the card record is the other half of this union's
-// contract: a card's effect is written in these keys (see CardEffect in
-// ./constants/cards), so the record needs to name the universe the field
-// here pins.
-//
-// [F4: boons at milestone moments] The list is a real array now rather
-// than only a type, and the type is derived from it, for the reason
-// ./paths derives PathId from its record: the content check asks the
-// pool a question about every key (that exactly one card writes each,
-// see the clause in ./cards), and a question about every key needs the
-// keys at run time. Deriving the union from the array keeps the one
-// place a key is added, which was the whole point of pinning them here.
-// The keys from steady_rations on are the held cards' own: the five
-// milestone boons' moments, then F6's eleven charter keys, which write
-// for the rest of a voyage rather than for a round. Both groups are
-// deliberately keys no round drafted card writes: a held card and a
-// round card can then never be in force on the same key at the same
-// time, which is what keeps cardByFlag's answer, and therefore the
-// pricing breakdown's source line, true without a second rule.
+// Known keys a boon can write into GameState.modifierFlags. Exported as a
+// runtime array so the content check can verify exactly one card writes each;
+// ModifierKey is derived from it. Keys from "steady_rations" on belong to held
+// cards (milestone boons and charters) and are disjoint from round-card keys.
 export const MODIFIER_KEYS = [
   "transport_flat_discount",
   "transport_silk_discount",
@@ -180,90 +127,37 @@ export type Worker = {
   task: Product | null;
   producedCount: number;
   isSkilled: boolean;
-  // [C2: crew loss by name] Who this artisan is, and when they came
-  // aboard. Required rather than optional, which is the opposite of the
-  // pledge flag below and deliberate: the pledge is a rule a missing value
-  // can honestly answer (an artisan hired without one is an artisan with
-  // no waiver), while a member's identity is the roster's own shape, and a
-  // half shaped member would spread fallbacks through every screen the way
-  // the roster's own fallback once did. A name is drawn once at hire and
-  // stored rather than derived, because the pool is content and a derived
-  // name would rename the crew the day the content moved. seq is the order
-  // aboard: higher is newer, which is the one thing the loss rule asks of
-  // it (see ./crew).
+  // Identity is drawn once at hire and stored, because names come from content
+  // and must not change when it does. seq is order aboard; higher is newer.
   name: string;
   seq: number;
-  // [C3: garments and the cold] The leg this hand is out of action for,
-  // written by the settlement that frostbit them and read by the bench and
-  // by assignTask. Optional rather than required, on the criterion the
-  // pledge flag below states: a missing value honestly answers "this hand
-  // has never frozen", where a missing name would have answered nothing.
-  // The mark is compared to the round rather than cleared by a timer, so a
-  // mark whose leg has passed is inert rather than wrong, and the tick that
-  // reads it clears the spent ones as it goes.
+  // The round this hand is out of action for. Compared against the round rather
+  // than cleared by a timer, so a stale mark is inert.
   frostbittenRound?: number;
-  // Set on the one artisan a Jade Pavilion captain takes aboard under their
-  // pledge, and spent by payWages on the first payroll run that sees them.
-  // Optional rather than required so every save written before the pledge
-  // existed still loads: a missing flag reads as false, which is exactly
-  // what an artisan hired without a pledge is.
+  // Set on a Jade Pavilion captain's pledged artisan; spent by the first payroll.
   freeFirstWage?: boolean;
 };
 
-// [C2: crew loss by name] One hand the voyage lost, and the leg it
-// happened in. The name is what the plan calls the point of the mechanic,
-// and the leg is what its evaluation reads a spiral from: a captain losing
-// members faster than they can provision is losing them sooner in the
-// voyage, and the two numbers together say so. Exported because the
-// voyage's end reads the list back out of the save blob, and a reader that
-// redeclared the shape would be reading a different shape the first time
-// this one gained a field.
+// One hand lost and the round it happened in. Exported because the voyage's end
+// reads this list from the save blob.
 export type CrewLoss = { name: string; round: number };
 
-// [C3: garments and the cold] One garment the crew is wearing, and how much
-// of it is left. The good names the row in the GARMENTS table that carries
-// the warmth rating and the maximum, so a garment stores only what is its
-// own: which good it is and how far along the sea has worn it. The
-// durability is the whole of what the check reads it for, since the warmth
-// it gives is its rating times this fraction of the maximum, and the plan's
-// "durability as a multiplier" is exactly that arithmetic rather than a bar
-// somewhere for a captain to watch. Declared here rather than in ./garments
-// so the saved shape and the rules that read it stay one file apart in the
-// direction the roster already runs: the type module names what a voyage
-// carries, and the rule module reads it.
+// One garment the crew is wearing. good names the GARMENTS row; durability is
+// the fraction left, and warmth is the garment's rating times that fraction.
 export type WornGarment = { good: string; durability: number };
 
-// [C4: three foods, spoilage and the split hold] One purchase of food, and
-// the leg it came aboard in. The food names the row in the FOODS table that
-// carries how many meals a slot of it holds and how long it stays food, so a
-// lot stores only what is its own: which food it is, how many meals of it are
-// left, and the leg whose Dusk will spoil it. Declared here for the reason
-// ./garments' own shape is declared two paragraphs up: the saved shape and
-// the rules that read it stay one file apart, and the type module names what
-// a voyage carries while ./foods reads it.
-//
-// Meals rather than whole slots, because the crew eats a mouth at a time and
-// a mouth can come out of the middle of a purchase: a lot is drawn down by
-// the meal it feeds and the space it holds is its meals over the density of
-// its food, worked out where the space is read (see ./hold) rather than
-// stored as a second number that could drift from the first.
+// One food purchase and the round it came aboard in. Meals are stored rather
+// than slots because a lot is eaten a mouth at a time; the hold space a lot
+// takes is computed from its meals and food density (see ./hold).
 export type LarderLot = {
   food: FoodId;
   meals: number;
   boughtRound: number;
 };
 
-// The per voyage flags a Great House lights up, one entry per effect rather
-// than one per House, so a reader never has to know which House owns which.
-// Every flag is read somewhere in the engine, and the list of readers is
-// worth keeping straight:
-//
-//   jadeFreeHireAvailable  hireWorker (waives the first wage, and clears the
-//                          waiver the moment it is spent)
-//   vermilionExtraCard     startMarket (one more cargo lot on the board)
-//   goldenWageDiscount     getHireCost (a fifth off every wage, which
-//                          reaches hiring, payroll and severance alike)
-//   goldenPirateBump       resolvePirateAttack (five percent more raids)
+// Per-voyage flags lit by a Great House, one per effect. Readers:
+// jadeFreeHireAvailable in hireWorker, vermilionExtraCard in startMarket,
+// goldenWageDiscount in getHireCost, goldenPirateBump in resolvePirateAttack.
 export type HousePerks = {
   jadeFreeHireAvailable: boolean;
   vermilionExtraCard: boolean;
@@ -271,13 +165,8 @@ export type HousePerks = {
   goldenPirateBump: boolean;
 };
 
-// A loan between two captains. The same shape is used on both sides: the
-// borrower's `debts` list and the lender's `loansGiven` list each hold one
-// of these per outstanding loan, kept in sync through the aid:* socket
-// events (see src/lib/use-aid.ts) rather than any shared server record,
-// the same trust model bartering already uses for cross player state.
-// Local to this file: the two fields above are the only readers, and no
-// module outside ever imports the shape by name.
+// A loan between two captains. The borrower's debts and the lender's loansGiven
+// mirror each other, kept in sync by aid:* socket events.
 type Loan = {
   id: string;
   counterpartyId: string;
@@ -286,24 +175,13 @@ type Loan = {
   roundBorrowed: number;
 };
 
-// The cap a healed loan list is read under. One voyage's table is small
-// and a captain cannot lend more than once a leg to each of its seats, so
-// a list past this is not something this game could have written.
+// Caps for a healed loan list; an honest voyage cannot exceed them.
 const LOANS_MAX = 64;
-// The longest counterparty name a saved loan may carry, read the way the
-// crew's own stored names are: a display name on the accounts this build
-// makes is far shorter, so anything longer is damage rather than a name.
+// Longest saved counterparty name this game could have written.
 const LOAN_NAME_MAX = 64;
 
-// The two loan lists read back into records every reader can trust.
-//
-// The bug audit's finding, closed at the load line the same way the
-// crew's names and the manifest's fills are: an entry missing its amount
-// would carry NaN through settleOutstandingDebts into the purse at the
-// end of the last round, and an entry with no counterparty could never be
-// repaid to anyone or closed on the server's ledger, so both are dropped
-// rather than repaired. The engine writes every entry with the full shape
-// above, so nothing this game wrote is ever dropped here.
+// Heals saved loan lists. Entries missing a field needed to settle or repay
+// are dropped rather than repaired; the engine always writes complete entries.
 export function normalizeLoans(raw: unknown): Loan[] {
   if (!Array.isArray(raw)) return [];
   const out: Loan[] = [];
@@ -337,29 +215,17 @@ export function normalizeLoans(raw: unknown): Loan[] {
   return out;
 }
 
-// [H2: the fleet commission] One leg's worth of the harbor's objective
-// total, as a captain's own client last watched it. Exported because the
-// voyage's end reads these back out of the save blob and writes them onto
-// the Chronicle row, and a reader that declared it again would be
-// reading a different shape the first time this one gained a field.
+// One round's harbor objective total as this captain last saw it. Exported
+// because the voyage's end writes these into the Chronicle.
 export type ObjectiveTraceEntry = {
   round: number;
   at: number;
   delivered: Record<string, number>;
 };
 
-// [H6: the Manifest Audit] What one order fulfillment left behind: the
-// port it was filled at, the goods that went into it, what it paid, and
-// the leg it happened in. Exported because the audit's sample is drawn
-// from these server side, out of a save blob, and the reveal puts them on
-// the wire.
-//
-// The shape is the allow list, which is why it is this short. An
-// alignment, a hold, a purse or a card would each need a field here to
-// reach the room, and there is no field for any of them, so no version of
-// the reveal can carry one. Widening this type is the only way to widen
-// what the audit can show, and it should be a deliberate change with the
-// smoke suite's sweep updated on the same commit.
+// What one settled order left behind. This shape is the allow list for what
+// the manifest audit can reveal; widening it widens the reveal, and the smoke
+// suite's sweep should change in the same commit.
 export type OrderFill = {
   round: number;
   port: string;
@@ -367,13 +233,9 @@ export type OrderFill = {
   reward: number;
 };
 
-// [D3: the escort contract] The two small shapes the covered leg needs on
-// the state. A cover is a contract this captain bought, as their own engine
-// needs to read it at the raid roll: the contract's id, for the ledger that
-// keeps one movement from being applied twice, and the seller's name, for
-// the line the log prints and the panel shows. A claim is what
-// resolvePirateAttack leaves behind when a covered raid finds the hold: the
-// Gold the raid would have taken, carried to the seller through the room.
+// A cover is a contract this captain bought, read at the raid roll; contractId
+// prevents double application and sellerName feeds the log. A claim is what a
+// covered raid leaves for the seller: the Gold the raid would have taken.
 export type EscortCover = {
   contractId: string;
   sellerName: string;
@@ -384,19 +246,9 @@ export type EscortClaim = {
   raidGold: number;
 };
 
-// [F5: public offers] What one captain kept, and what they were shown when
-// they kept it: the last boon decision this captain made, written by the
-// decision itself (see selectBoon in ./engine/boons and answerMilestone in
-// ./engine/milestones) and read back out to the whole fleet by the ledger's
-// claim hook. It is a record of a choice rather than a rule: no engine
-// branch reads it, and losing it costs the table the last thing it saw
-// rather than a mechanic. `round` is the leg the choice was made in,
-// `shown` the cards that were on the table at that moment (the trio of a
-// compass draw, or the cards a milestone offered), `kept` the one taken,
-// and `moment` names the milestone the answer belonged to, absent for a
-// compass draw. Every id here is a boon the public catalogue knows, which
-// is what lets the server bound a report against the same catalogue the
-// room reads (see readBoonReport in src/server/realtime/wiring/boons).
+// The last boon choice this captain made, shown to the fleet. A record rather
+// than a rule: round is the round, shown the cards offered, kept the one taken,
+// and moment names the milestone if the choice came from one.
 export type BoonRecord = {
   round: number;
   shown: string[];
@@ -407,117 +259,60 @@ export type BoonRecord = {
 export type GameState = {
   inventory: Record<string, number>;
   money: number;
+  // The captain's Reputation. The name is kept for save, wire, and integrity
+  // compatibility and must not be renamed. The account best is bestReputation.
   score: number;
   currentRound: number;
   maxRounds: number;
-  // The room's difficulty tier (see src/lib/game/difficulty.ts), stamped onto
-  // this state when the voyage is created and refreshed from the room on every
-  // load, so the engine derives voyage length, market breadth, and raid odds
-  // from a single room wide source. Every captain in a room carries their own
-  // copy of the same room value, which is what keeps their conclusion aligned.
+  // Harbor difficulty tier, stamped at creation and refreshed on every load.
+  // Every captain carries the same value, which keeps the conclusion aligned.
   difficulty: Difficulty;
-  // The room's game mode (see src/lib/game/mode.ts), stamped onto this state
-  // when the voyage is created and refreshed from the room on every load, the
-  // same way difficulty is. Difficulty says how hard the voyage is; mode says
-  // which voyage it is, which is what decides the order this captain's phases
-  // run in. Every captain in a room carries the same value, so they agree on
-  // the lap without the server ever having to name a phase.
+  // Harbor game mode, stamped at creation and refreshed on every load. It
+  // decides this captain's phase order and is shared by the whole harbor.
   mode: GameMode;
-  // The room's voyage epoch (see Room.voyageEpoch in prisma/schema.prisma),
-  // stamped onto this state when the voyage is created and folded into the
-  // deterministic seed so a restart (which bumps the epoch) rerolls every
-  // captain's market, orders, and Broker intel into a brand new voyage.
+  // Harbor voyage epoch, folded into the deterministic seed so a restart (which
+  // bumps the epoch) rerolls every captain's market, orders, and Broker intel.
   voyageEpoch: number;
-  // The path this captain sails, or null for a captain who has not drawn one
-  // (see ./paths). Read by the manifest's lock rule, which is the first rule
-  // in this tree to ask who a captain is: a marked card is open to the captain
-  // holding its path and locked to everyone else (see lockedBehind in
-  // ./engine/orders), and every other card is open to all five paths alike.
-  //
-  // Null is the ordinary value rather than a broken one: every voyage
-  // leaves the dock pathless and D7's draft is what deals this field its
-  // value, so the captains who read null are the ones who arrived after the
-  // deal rather than ones the tree failed to fill. It is healed on load
-  // through normalizePath (see use-game-session) rather than trusted, so a
-  // save written by hand, or by a build that spelled a path differently,
-  // reads as a captain who never drew rather than as one holding a path
-  // nobody knows.
+  // The path this captain sails, or null before the draft. Read by the manifest
+  // lock: a path-marked card is open only to the matching captain. Null is normal
+  // for an un-drafted voyage and is healed on load by normalizePath.
   path: PathId | null;
-  // [D7: the draft, and switching] The leg this captain changed their papers
-  // on, or 0 for a captain who has not changed them (see ./draft and
-  // ./engine/draft). Written by applyPathSwitch and read by
-  // pathSwitchBlocked, which is the guard and the record in one field: a
-  // switch cannot be recorded without being spent, and the plan's "once per
-  // voyage" is what the pair of them means.
-  //
-  // It is a stamp rather than a boolean because the leg is the fact and
-  // "spent" is one reading of it: the guard above asks whether there is a
-  // leg at all, while the leg itself is the when, which a save carried
-  // through a voyage is the right place to keep and a flag would throw
-  // away. Zero is the absence of a switch rather than a leg, the same
-  // reading every counter in this build takes, and it is healed through
-  // normalizePathSwitchLeg on load for the same reason path above is.
-  pathSwitchLeg: number;
+  // The round the captain changed papers on, or 0 if never. Also serves as the
+  // once-per-voyage guard; healed on load by normalizePathSwitchRound.
+  pathSwitchRound: number;
   totalRevenue: number;
   totalCosts: number;
+  // Per-round wage and maintenance bills, zeroed by endRound after settlement.
   workerWages: number;
   maintenanceCosts: number;
+  // Voyage totals for wages, maintenance, and fines. Never zeroed, because
+  // the closing sheet reads them after the per-round fields reset.
+  wagesPaid: number;
+  maintenancePaid: number;
+  finesPaid: number;
   vatPaid: number;
   incomeTaxPaid: number;
   roundRevenue: number;
   roundCosts: number;
-  // Every artisan the captain employs, keyed by type (see WORKER_TYPES in
-  // ./constants). One record rather than a field per type, so a charter that
-  // brings new artisans needs no new state field and no new migration: the
-  // roster normalizer below fills in whatever key a save predates. This
-  // replaced the three separate weavers / masterWeavers / sachetMakers arrays.
+  // Artisans keyed by type. One record rather than a field per type so new
+  // artisan types need no state migration; the normalizer fills missing keys.
   workers: Record<WorkerTypeId, Worker[]>;
-  // [C1: the Larder and Short Rations] The rations aboard, and the leg the
-  // crew was last fed in. Both live on the voyage beside the roster whose
-  // mouths they feed, because they are the same kind of fact: a number about
-  // this voyage rather than about the captain, healed on load by the same
-  // pair of readers every other saved field has (see ./larder). A Larder of
-  // zero aboard a ship with a crew aboard is the shortage, and the stamp is
-  // what makes the eating once a leg rather than once per path into Dawn.
+  // Rations aboard and the round the crew was last fed. The stamp makes eating
+  // happen once per round; a larder of zero with a crew aboard is the shortage.
   larder: number;
   larderFedRound: number;
-  // [C4: three foods, spoilage and the split hold] What the rations aboard
-  // are, one lot per purchase, and the leg the settlement last let them
-  // spoil in. The count above stays the game's number and every reader of it
-  // is unchanged; these two are the account that number is the sum of, and
-  // they live on the voyage beside it because they are the same fact in more
-  // detail. A save from before this layer existed carries neither, and both
-  // heal to the shape C1 shipped: one lot of grain, the food that never
-  // turns, for exactly the meals the Larder was holding (see ./foods for the
-  // reader and ./larder for the door it is read at).
-  //
-  // The stamp is what makes the spoiling once a leg through every path into
-  // settlement, exactly as the Larder's own stamp makes the meal once a
-  // Dawn.
+  // The lots the larder count sums, and the round spoilage last ran. Older saves
+  // heal to one grain lot for the same meal count. The stamp makes spoiling
+  // happen once per round regardless of which path reaches settlement.
   larderLots: LarderLot[];
   larderSpoilRound: number;
-  // [C2: crew loss by name] The run of legs the crew has gone hungry, and
-  // the hands this voyage has lost. Both live on the voyage beside the
-  // roster they are about, healed on load by the same reader every other
-  // saved field has (see ./crew).
-  //
-  // The run is counted rather than reconstructed, because a purchase in the
-  // market phase can refill the larder after the meal, so the Larder's own
-  // number at the next Dawn cannot say what the leg before it ate. Two legs
-  // on it cost the newest hand aboard, which is the plan's rule, and the
-  // count resets when it fires rather than staying at the bound: the
-  // proposal expects the mechanics to be self limiting, and a captain who
-  // stays hungry pays two legs a head rather than one.
-  hungryLegs: number;
+  // Consecutive rounds the crew has gone hungry, and the hands lost. The run is
+  // counted rather than reconstructed because a market purchase can refill the
+  // larder before the next Dawn. Two hungry rounds cost the newest hand, then reset.
+  hungryRounds: number;
   crewLost: CrewLoss[];
-  // [C3: garments and the cold] The clothes the crew is wearing and the leg
-  // the settlement last read them in, healed on load by the same pair of
-  // readers every other saved field has (see ./garments). The wardrobe is a
-  // list rather than a count because durability is per garment, which is the
-  // one thing the plan's sum across worn garments cannot be computed from a
-  // number of them. The stamp is what makes the tick once a leg through
-  // every path into settlement, exactly as the Larder's own stamp makes the
-  // meal once a Dawn.
+  // Garments worn and the round the cold last ticked. A list rather than a count
+  // because durability is per garment; the stamp makes the tick once per round.
   garments: WornGarment[];
   garmentsTickRound: number;
   fixedCost: number;
@@ -532,320 +327,120 @@ export type GameState = {
   completedOrders: number[];
   purchaseCount: number;
   orderCount: number;
-  // Reputation already earned this voyage from lending and backing, kept
-  // so both can share one ceiling (see helperReputationCapFor in
-  // ./constants, read through ./engine/aid).
+  // Reputation earned from lending and backing, so both share one ceiling.
   helperReputationEarned: number;
-  // [H4: the Broker] Coin this captain has taken from other captains in
-  // trade, net of coin paid to them, across the whole voyage. The one
-  // number a Broker's card is measured on (see evaluateVictory in
-  // ./victory), accumulated at the two barter settlement paths and never
-  // by a port sale, which is the distinction the role is made of. Durable
-  // rather than per round because the design has to track it from leg one
-  // and cannot reconstruct it later.
+  // Net Gold taken from other captains in trade, never from a port sale. This
+  // is what a Broker is measured on and cannot be reconstructed later.
   peerTradeProfit: number;
-  // The boon Gold this voyage has been granted, tallied across every round
-  // it was granted in. The Emergency Loan's grant is the only one today,
-  // and the tally is written at the same line as the credit (see applyBoon
-  // in ./engine/boons) rather than read back off the round's flag: the
-  // flag is rebuilt at every round's end (see endRound in
-  // ./engine/lifecycle), and the Financial Summary that prints this figure
-  // renders once, at the voyage's end, when every round flag is already
-  // gone. Durable for the same reason peerTradeProfit above is: the design
-  // tracks it from the leg it lands on and cannot reconstruct it later.
+  // Boon Gold granted this voyage, tallied when credited because round flags
+  // are gone by the time the closing summary prints. Not reconstructable later.
   boonGoldEarned: number;
-  // [MANIFEST 02: Word on the Docks] Trade orders completed across the whole
-  // voyage, never reset per round the way orderCount is, only by a fresh
-  // voyage (createInitialGameState). completeOrder increments this alongside
-  // orderCount; it's what the milestone race below actually watches.
+  // Orders completed across the voyage, never reset per round.
   totalOrdersCompleted: number;
-  // [MANIFEST 02: Word on the Docks] Set once, by completeOrder, the instant
-  // totalOrdersCompleted crosses WORD_ON_THE_DOCKS_THRESHOLD, since the pure
-  // engine has no way to call socket.emit itself. GameRoom.tsx relays it as
-  // a docks:claim report and clears it, the same convention
-  // _pendingDebtSettlements/_draftChoices/_newModule already use for an
-  // engine function that needs the React layer to act on its behalf.
+  // Transient signal for the React layer to relay as docks:claim and clear,
+  // following the same convention as _pendingDebtSettlements.
   _pendingDocksClaim?: { total: number };
-  // [B3: standing orders] The same convention, for the other thing a
-  // market can produce without a hand on it. A market this captain's
-  // orders played buys lots after the round's own pulse report has already
-  // gone out, so the delta rides here and the phase sync hook relays it as
-  // a second report for the same round (see workStandingOrders in
-  // ./engine/standing and addPulseReport in src/server/realtime/pulse.ts,
-  // which accumulates rather than replaces). Empty is nothing to say, and
-  // the field is cleared by whoever relays it.
+  // Transient tally of lots a standing order bought after the round's pulse
+  // report; the phase sync hook relays it as a second report for the round.
   _pendingPulseTally?: Record<string, number>;
   gameOver: boolean;
-  // [H7: Maroon and the Harbormaster] The two marks a failed voyage leaves
-  // on a seat that is still sailing, and the reason they are flags on the
-  // state rather than phases. In the mode that treats insolvency as final
-  // (see ModeConfig.bankruptcyIsFinal) a bankrupt captain leaves the lap
-  // and the phase says so; in the mode that keeps the seat, the phase goes
-  // on describing where they are in the round, and these two say what the
-  // harbor has decided about them.
-  //
-  // They are read in three places and nowhere else: the verdict, which
-  // will not crown either of them, the status a captain broadcasts, which
-  // is how the roster badges them, and the Harbormaster's power, which is
-  // the only thing marooned unlocks. Nothing else in the engine branches
-  // on them, which is what keeps a failed seat playable rather than a
-  // half state with rules of its own.
+  // Marks a failed voyage leaves on a seat that keeps sailing. Read only by
+  // the verdict, the status broadcast, and the Harbormaster's power, so a
+  // failed seat stays playable without rules of its own.
   bankrupt: boolean;
   marooned: boolean;
   modifierFlags: Partial<Record<ModifierKey, number>>;
-  // The round's demand tags: drawn at Market from this harbor's own
-  // pools, spent one per Broker's Whisper, and the good half of what a
-  // whisper promises. The name says when they exist and where they are
-  // read rather than the seat number an older lap gave the market.
+  // This round's demand tags, drawn at Market and spent by Broker's Whisper.
   marketDemandTags: string[];
   revealedIntel: IntelItem[];
-  // [MANIFEST 01: The Harbor Pulse] A per resource price nudge for this
-  // round's Market, keyed by resource name (Hemp, Silk, Tea), derived room
-  // wide from what the whole harbor bought last round (see
-  // computeHarborPulse in src/lib/game/harborPulse.ts) and delivered on the same
-  // phase:advance broadcast that already carries every captain into Market
-  // together. Read by genResourceCard in engine.ts as one more multiplier
-  // alongside Boons and modules; never persisted beyond the round it was
-  // delivered for, and empty on round 1 since there is no prior round to
-  // react to. A captain who buys nothing never changes anyone's pulse but
-  // their own report still contributes a zero tally, exactly like everyone
-  // else's.
+  // Per-resource price nudge for this round's Market, derived harbor-wide from
+  // last round's purchases. Empty on round 1 and never persisted.
   harborPulse: Record<string, number>;
-  // [H7: Maroon and the Harbormaster] The other hand on a port's prices,
-  // and the one that is a captain rather than a room. A marooned captain
-  // names one port and a direction at the Parley of each leg, and every
-  // price at that port is read against this from the next port market
-  // until the one after it (see genResourceCard in engine/market.ts, which
-  // multiplies by portShiftMultiplier). It arrives on the same advance
-  // broadcast the pulse above does, and a leg the Harbormaster said
-  // nothing in arrives as null and clears it.
-  //
-  // Public by design rather than by accident: the record of who leaned
-  // what is broadcast to the room the moment it is called, and this field
-  // is only the market's copy of it. Null on every voyage with no
-  // Harbormaster, which is every Classic voyage and most Gambit ones.
+  // A marooned captain's port and direction lean, applied to that port's next
+  // market. Public by design: the call is broadcast, and this is the market's
+  // copy. Null when the voyage has no Harbormaster.
   portShift: PortShift | null;
-  // [D5: Aroma: the Bazaar Rumor] The third hand on a price, and the one
-  // that is a good rather than a port or a room. A rumor published at the
-  // Parley of one leg leans one commodity's band in the market of the
-  // next, keyed by good and signed in the direction the publisher named
-  // (see rumorLean in src/lib/game/engine/bazaar.ts, which sums the
-  // room's rows per good and clamps them to one tenth before multiplying).
-  // Read by genResourceCard in engine/market.ts alongside the pulse and
-  // the shift, and summed with the pulse before the one rounding.
-  //
-  // What travels here is the aggregate and not the rows: the direction a
-  // named captain leaned is theirs until the market they moved has been
-  // drawn, and this field is the number every client has to agree on to
-  // draw the same prices rather than a record of who said what. An empty
-  // object is the bazaar being silent, which is most legs, and it arrives
-  // on the same advance broadcast the pulse above does.
+  // Aggregate rumor lean per good from the Bazaar, applied to the next market.
+  // Only the summed lean travels; who leaned which good is not broadcast. An
+  // empty object means the bazaar was silent.
   bazaarLean: Record<string, number>;
-  // [B3: standing orders] What this captain wants done at the seats they
-  // are not standing at, written once and read by the engine when the
-  // room's clock plays a seat out from under them. The vocabulary, the
-  // default and the normalizer live in ../game/standing, and the
-  // evaluation that reads it lives in ./engine/standing; this field is
-  // only the record.
-  //
-  // On the voyage rather than on the account, and therefore reset by
-  // everything that resets a voyage except one thing: restartGame carries
-  // it forward across a host's restart, because a captain configured it
-  // once and a restart is not the captain changing their mind. It is part
-  // of the save, so it rides the existing PUT /api/game/state with no new
-  // column, no new route and no new frame.
+  // What this captain wants done at seats they are not standing at. Voyage
+  // scoped, but restartGame carries it forward rather than resetting it.
   standingOrders: StandingOrders;
-  // Price history: for each good, the average unit price paid across
-  // all purchases in each prior round. Used by the Market station to
-  // render a sparkline showing price trends. Seeded empty on a fresh
-  // voyage and appended once per round at the end of Market.
+  // Average unit price paid per good per prior round, used for the sparkline.
   priceHistory: Record<string, number[]>;
-  // [H2: the fleet commission] What this captain has handed to the
-  // voyage's public objective so far, by good, cumulative for the voyage.
-  // This is the captain's own contribution and not the harbor's total: the
-  // total is transient server state (see src/server/realtime/objective.ts)
-  // and this is the record a reload or a server restart reports from.
-  // Ocean Gambit only, and empty in Classic, where no objective is drawn.
+  // This captain's cumulative contribution to the voyage objective, by good.
+  // The harbor total is transient server state; this is what a reload reports.
   objectiveDelivered: Record<string, number>;
-  // [H2: the fleet commission] The harbor's total as this captain watched
-  // it move, stamped once per round with the clock time it was observed.
-  // Nothing reads this to play the game. It exists because the epic's
-  // evaluation is message volume in the legs where the objective is close
-  // to being met, and no round boundaries are recorded anywhere else, so
-  // without these stamps the conversations cannot be attributed to the legs
-  // they happened in. Copied into the Chronicle when the voyage concludes.
+  // The harbor objective total as this captain watched it, stamped once per
+  // round. Used only to attribute messages to rounds in the Chronicle.
   objectiveTrace: ObjectiveTraceEntry[];
-  // [H6: the Manifest Audit] This captain's most recent order
-  // fulfillments, oldest first, capped at AUDIT_WINDOW (see
-  // ../game/audit for the cap, the sample drawn from it and the reason
-  // nothing older is kept). The one piece of evidence in the mode, and it
-  // is here rather than in a table of its own because it is written by the
-  // pure engine at the moment an order settles, which is a place no server
-  // code can see. Ocean Gambit only in practice, since that is the only
-  // mode with an audit to run, though a Classic voyage filling orders
-  // records the same lines harmlessly: nothing reads them and no client
-  // broadcasts them.
+  // Recent order fills, oldest first, capped at AUDIT_WINDOW. Written by the
+  // engine at settlement and read only by the manifest audit.
   orderFills: OrderFill[];
-  // The largest reward a single order has paid this captain, kept as a
-  // running maximum at the moment an order settles (see fillOrder in
-  // ./engine/orders) rather than derived later, because the net reward is a
-  // local the settlement has already spent. Read back by the voyage
-  // Chronicle's "largest single trade" line (see ./chronicle and the extras
-  // reader in the conclusion finishers), which is its only reader.
+  // Largest single-order reward, kept as a running maximum at settlement.
   largestTrade: number;
-  // [MANIFEST 03: Tidewatch Alerts] Flips true, once, the moment the whole
-  // room's combined Reputation crosses TIDEWATCH_SURGE_THRESHOLD (see the
-  // game:status handler in src/server/realtime/wiring/status-heartbeat.ts,
-  // which is where every captain's Reputation is already visible). Read by
-  // startMarket to add one extra card to this captain's board from the next
-  // round onward; never flips back, and never touches maxRounds,
-  // difficulty, or which tier's content is visible, all of which stay the
-  // host's own choice.
+  // Flips true once when the harbor's combined Reputation crosses the Tidewatch
+  // threshold; from then on startMarket adds one card per board.
   tidewatchSurge: boolean;
-  // The captain's persistent Renown level (see src/lib/game/legacy.ts),
-  // copied onto the voyage state so the engine can gate Renown locked skills
-  // like Broker's Favor without reaching back into account data. Personal to
-  // each captain, exactly like money, so it never touches the shared room
-  // seed. Refreshed from the captain's legacy on every load / restart.
+  // The captain's persistent Renown level, used to gate Renown-locked skills.
   renownLevel: number;
-  // Broker's Favor is a once per voyage skill (unlocks at Renown Level 5, see
-  // BROKERS_FAVOR_UNLOCK_LEVEL). Flipped true the moment it is used and reset
-  // only by starting a fresh voyage (createInitialGameState / restartGame),
-  // never in endRound, which is what keeps it to one use per game rather than
-  // one per round.
+  // Once per voyage; reset only by a fresh voyage, never by endRound.
   brokersFavorUsed: boolean;
-  // [D6: Free Captain: Opportunist] How many borrows this voyage has spent,
-  // counted rather than flagged so the plan's iteration note is a constant
-  // away ("The Factor charter in F6 turns this into three uses at a sixty
-  // percent penalty, so the counter should be a configurable number from
-  // the start"). Like Broker's Favor above it is a once a voyage
-  // allowance: reset only by starting a fresh voyage (createInitialGameState
-  // / restartGame), never in endRound, and it lives beside the skill's own
-  // flag rather than in the round's bookkeeping so a reader looking for the
-  // voyage's one shot limits finds them together.
+  // Borrows spent this voyage. Counted rather than flagged so the Factor
+  // charter can raise the limit; reset only by a fresh voyage.
   opportunistBorrows: number;
   equippedModules: CardRecord[];
-  // Each round's boon and module draft pools, fixed once rolled (see
-  // startBoonDrafting / startModuleDrafting in engine.ts) so reopening the
-  // draft screen, backing out, or reloading the page never rerolls them.
-  // The only way to get a new pool mid round is the corresponding swap
-  // action below, each capped at one use per round.
+  // Per-round draft pools, fixed once rolled so reopening or reloading never
+  // rerolls them. Each swap is capped at one use per round.
   boonChoices: CardRecord[];
   boonSwapUsed: boolean;
   _draftChoices?: CardRecord[];
   moduleSwapUsed: boolean;
   _newModule?: CardRecord;
-  // [F2: the card record, and the mode weighting field] How often each card
-  // has been offered to this captain and how often one was taken, which is
-  // the appearance count and the numerator behind the plan's own measure of
-  // the pool ("Offer to pick conversion per card, with the appearance count
-  // beside it"). It rides the save rather than the telemetry stream, which
-  // is I2's precedent for data that must not fight the event cap: a voyage
-  // offers a dozen cards, a season of voyages offers thousands, and the
-  // event stream has a ceiling of its own (see TELEMETRY_EVENT_CAP).
+  // How often each card was offered and taken. Rides the save rather than
+  // telemetry, which has its own event cap.
   cardTally: CardTally;
-  // [F4: boons at milestone moments] The voyage's held boons, the moments
-  // waiting for an answer, and the marks of what has been answered, all
-  // three personal to this captain and none of them crossing a wire. The
-  // held list is the cards themselves, by id, so a reload reads their
-  // flags off the pool rather than trusting a saved map (see
-  // heldFlagsOf in ./held-cards), which is exactly the rollback path the
-  // plan asks for: a card the pool no longer knows drops out at load and
-  // its effect unwinds at the next rollover through endRound's rebuild.
-  //
-  // The queue is a list of triggers rather than of drawn cards, because
-  // the draw is a pure function of the state (see milestoneChoices), so
-  // storing it would be a second thing to heal that cannot disagree with
-  // the first. The marks are one number per trigger, each in that
-  // trigger's own units, documented where they are written (./engine
-  // holds the writer, ./milestones the due rule that reads them).
+  // Held boons by id, milestones awaiting an answer, and the marks of answered
+  // ones. Ids rather than saved flags so a reload reads flags from the pool and
+  // a card the pool no longer knows drops out at load. The offer queue is
+  // derived from state; each mark is one number in that trigger's own units.
   heldBoons: string[];
   milestoneOffers: MilestoneTrigger[];
   milestonesAnswered: Partial<Record<MilestoneTrigger, number>>;
-  // [F6: charters at leg four] The one charter this voyage chose, or null
-  // before the moment is answered. An id rather than a record, for the
-  // reason heldBoons is a list of ids: a reload reads its flags off
-  // the pool rather than trusting a saved map (see heldCharterCard in
-  // ./held-cards), so the content revert the plan names for the rollback
-  // ("a charter is a modifier set on the captain for the voyage, so it
-  // reverts with the pool") is a pool edit and a load, with nothing
-  // durable left behind to unwind.
+  // The one charter chosen this voyage, or null before it is answered. Stored
+  // by id, so its flags are read from the pool rather than from the save.
   charter: string | null;
-  // [F5: public offers] The last boon decision this captain made, or null
-  // before the voyage's first pick. Written by the two pick sites only
-  // (selectBoon and answerMilestone, per the shape's note above), and not
-  // cleared by a new leg: the record is what the table most recently saw,
-  // so a captain who has not yet picked this leg still shows the last card
-  // they kept rather than a blank, which is the truth of the table.
+  // The last boon decision this captain made, or null before the first pick.
+  // Not cleared by a new round: the table keeps seeing the last card kept.
   boonRecord: BoonRecord | null;
-  // Reset every round in startBoonDrafting, same as boonSwapUsed/
-  // moduleSwapUsed above. Resolved once per round, in Resolve, before the
-  // wages and maintenance settlement: either a 20% chance of losing every
-  // Gold on hand, or a guaranteed safe escort for 10% of it.
+  // Reset in startBoonDrafting. Resolved once per round in Resolve, before
+  // wages and maintenance settle.
   pirateAttackResolved: boolean;
   escortHired: boolean;
-  // Set when a corrupt broker leaked this captain's position (Monsoon only,
-  // see purchaseIntel). The rumor itself is always delivered and always true;
-  // the leak only raises this round's raid chance, once, and is announced in
-  // the log rather than hidden. Reset every round in startBoonDrafting.
+  // Set when a corrupt broker leaks this captain's position (Monsoon only).
+  // The intel is always true; the leak only raises this round's raid chance once.
   brokerTippedPirates: boolean;
-  // [D3: the escort contract] The leg's cover as this captain's own engine
-  // reads it: set from the room's contract board when this captain is the
-  // buyer of an agreed contract for the round, cleared with the rest of the
-  // round's facts in startBoonDrafting. The board is the contract's home
-  // (room state, see src/server/realtime/contracts) and this is the mirror
-  // the raid roll consults, so the engine never reaches for the network and
-  // a captain whose seller left the room sails unprotected rather than
-  // protected by a contract nobody is on the other end of.
+  // The round's escort cover, mirrored from the harbor contract board and
+  // cleared with the round's other facts in startBoonDrafting.
   escortCover: EscortCover | null;
-  // The claim a covered raid raises, left on the state for the React layer
-  // to relay over contract:claim and then clear, the same shape the pulse
-  // tally relays over harbor:pulse:report (see _pendingPulseTally below).
-  // Set by resolvePirateAttack, flushed by use-escort-contracts.
+  // Claim for the React layer to relay over contract:claim and then clear.
   pendingEscortClaim: EscortClaim | null;
-  // The money movements this captain has already applied, keyed "id:fee" or
-  // "id:claim". The ledger that makes a reload between a fee and its claim
-  // harmless: the side that already moved is never moved twice.
-  //
-  // [D4: Loom: the Refit] One ledger for every agreement, not one for each
-  // kind. The keys are agreement ids, so the two kinds cannot collide, and
-  // the question a ledger answers is the same question for both: has this
-  // movement already been applied to my purse. It was named for the escort
-  // when the escort was the only agreement there was, which is the name a
-  // save written by that build still carries (see normalizeConsentLedger in
-  // ./engine/consent, which reads it).
-  //
-  // Both movements of an agreement land in the leg it was agreed in, the
-  // fee when the two captains shook hands and the claim when the raid that
-  // leg went looking for the buyer, so the ledger never has to outlive a leg
-  // and the stamp below is what says which leg it belongs to. See
-  // resetConsentLedger, which empties it at the Dawn it is stale for, and
-  // movementApplied, which reads the stamp before it reads the list.
+  // Money movements already applied, keyed "id:fee" or "id:claim". Makes a
+  // reload between a fee and its claim harmless. Both movements land in the round
+  // they were agreed in, and the stamp is read before the list.
   settledMovements: string[];
   settledRound: number;
-  // The voyage's contract tally, seller side and buyer side. Read by the leg
-  // report (contracts sold, fees earned, gold absorbed) and by the two panels
-  // that quote a captain's own record back to them.
+  // Voyage contract tally, read by the round report and the contract panels.
   escortSold: number;
   escortBought: number;
   escortFeesEarned: number;
   escortFeesPaid: number;
   escortClaims: number;
   escortAbsorbed: number;
-  // [D4: Loom: the Refit] The voyage's refit and scrap tally, seller side
-  // and buyer side, plus the two halves of the bench. Read by the leg report
-  // (refits sold, fees earned, rags rewoven) and by the bench panel, which
-  // quotes a captain's own record of the trade back to them.
-  //
-  // The mend stamp is a round rather than a boolean, and it is compared
-  // rather than cleared, the same shape garmentsTickRound and frostbittenRound
-  // take: a stamp whose leg has passed is inert rather than wrong, so a
-  // voyage saved mid leg needs no heal to be read correctly at the next Dawn.
-  //
-  // The pile's stamp and count are the same idea with a number attached,
-  // because how much scrap came ashore is a quantity rather than a yes: the
-  // harbor lets one Loom captain take so many rags a leg, and what bounds
-  // that is this pair, read against the pile the leg drew.
+  // Voyage refit and scrap tallies, plus the two bench limits. The mend stamp
+  // is compared rather than cleared, so a stale stamp is inert. The rags pair
+  // bounds how many rags one Loom captain may take in a round.
   refitsSold: number;
   refitsBought: number;
   refitFeesEarned: number;
@@ -856,123 +451,57 @@ export type GameState = {
   ragsRewoven: number;
   ragsTaken: number;
   ragsRound: number;
-  // [F3: modules in the shipyard ladder, and trading them between captains]
-  // The voyage's module trade tally, seller side and buyer side, and the
-  // per module ledger the plan's second reading is taken from.
-  //
-  // The four counters are the escort's and the bench's shape, one captain's
-  // own record of their own side of every trade they settled: what left
-  // their hull and what it earned, and what joined their hull and what it
-  // cost. The leg report carries the seller's two, because "module trade
-  // volume between captains" is a number about sales, and a buyer is on the
-  // other side of the same trade.
-  //
-  // `modulesTraded` is the one field here with no sibling in either market,
-  // and it is what makes the plan's second reading ("track which modules
-  // are equipped against which are traded away, since a module that is
-  // always equipped is a tax rather than a choice") a report rather than a
-  // guess: the equipped half of the comparison is already in every save as
-  // the hull itself, and this is the other half, keyed by module card id and
-  // counting the times this captain sold each one. It is a voyage record
-  // rather than a leg's, because a module that moves once a voyage and one
-  // that moves every leg are different readings and only the total tells
-  // them apart.
+  // Voyage module trade tallies and a per-module sales count. modulesTraded is
+  // keyed by module card id so equipped versus traded can be compared; it is
+  // voyage scoped because one sale and many sales read differently.
   modulesSold: number;
   modulesBought: number;
   moduleFeesEarned: number;
   moduleFeesPaid: number;
   modulesTraded: Record<string, number>;
-  // [E1: the Supply Barge] The vendor's per leg tally, and the voyage's
-  // two food counters. The tally is the shape the harbor's pile uses and
-  // reads the same way: the leg the captain last bought in and how many
-  // rations they took off the vendor in it, so a stamp from an earlier leg
-  // subtracts nothing from this one's. It is the one piece of state this
-  // feature adds, and the plan's "no new state" is what it is a deviation
-  // from rather than a violation of: what the plan rules out is a vendor
-  // the server has to hold, and a captain's own record of their own
-  // spending is a field on their own save, healed at the load site like
-  // every other one this build has added (see engine/barge).
-  //
-  // The two counters are the voyage's, not the leg's, and they are the
-  // whole of the measurement the plan asks for: what the table spent on
-  // food at ports, and how much of that went to the Barge. The share of
-  // one in the other is the mode's front page number, and both halves of
-  // it are counted where the Gold actually leaves the purse: the ports'
-  // rations and the preserve in ./larder, and the Barge's own sale in
-  // engine/barge. Neither is ever reset inside a voyage, because a share
-  // of a voyage's spending is not a share of a leg's.
+  // Supply Barge tally for the round and the voyage's food spend counters. The
+  // share of barge spend in food spend is the mode's headline number, so both
+  // are counted where Gold leaves the purse and neither resets within a voyage.
   bargeTaken: number;
   bargeRound: number;
   foodSpend: number;
   bargeSpend: number;
-  // Loans currently owed to other captains (debts) and by other captains
-  // to this one (loansGiven). Settled voluntarily at any time, or forced
-  // at the voyage's final round (see settleOutstandingDebts in
-  // src/lib/game/engine/aid.ts).
+  // Loans owed to other captains and by them to this one.
   debts: Loan[];
   loansGiven: Loan[];
-  // Set only by settleOutstandingDebts, when a forced repayment at the
-  // voyage's final round still couldn't fully cover what was owed. Drives
-  // the endgame screen's outcome instead of the normal merchant rank.
+  // Set when a forced final-round repayment still could not cover the debt.
   defaultedDebt: boolean;
-  // Transient: a signal for the React layer to relay over the aid:repay
-  // socket event and then clear, since the pure engine functions that
-  // populate it (settleOutstandingDebts) have no way to call socket.emit
-  // themselves. Same convention as _draftChoices/_newModule above.
+  // Transient signal for the React layer to relay over aid:repay and clear.
   _pendingDebtSettlements?: {
     amount: number;
     debtId: string;
   }[];
-  // The captain's chosen Great House for this voyage (see
-  // ./engine/houses.ts), copied from the captain's CaptainLegacy row at
-  // voyage start so the engine can read it without reaching back into
-  // account data. null means the captain hasn't picked a House yet; the
-  // perk simply doesn't apply until they do. Personal to each captain,
-  // exactly like renownLevel, so it never touches the shared room seed.
+  // The chosen Great House, copied from the captain's legacy at voyage start.
   houseId: HouseId | null;
-  // [MANIFEST: Great Houses] The per voyage flags the House perks flip on.
-  // Kept separate from modifierFlags so the ModifierKey union stays pinned
-  // to the Boon and module set, and so endRound's wholesale reset of
-  // modifierFlags doesn't sweep these away mid voyage. Reset only by a
-  // fresh voyage (createInitialGameState). See HousePerks above for what
-  // reads each flag.
+  // House perk flags. Kept out of modifierFlags so endRound's wholesale reset
+  // does not clear them; only a fresh voyage resets these.
   housePerks: HousePerks;
 };
 
-// The hold every voyage starts with: a key for every good in the catalogue,
-// carrying the founding stock where there is any and zero otherwise. Built
-// rather than hand written, because a hand written literal is what let charter
-// goods start life absent, and an absent key is what turned a purchase into
-// NaN (see normalizeInventory below and addOwnedAmount in ./engine).
+// The hold every voyage starts with: every catalogue good present, carrying
+// its starting stock or zero. Built rather than written by hand so no key is
+// ever absent, since an absent key once turned a purchase into NaN.
 function initialInventory(): Record<string, number> {
   const inv: Record<string, number> = {};
   for (const item of ITEMS) inv[item] = STARTING_STOCK[item] ?? 0;
   return inv;
 }
 
-// Repairs a round stamp read back from a save: the whole number of laps the
-// field counts, floored, with anything unreadable healing to zero. Zero is
-// deliberately a round no voyage has (the first round is one), which is the
-// direction every stamp heals in: a save written before a field existed
-// lands on "this has not happened yet" rather than on a lap that reads as
-// already spent.
-//
-// Every reader that heals a stored stamp into a round uses this
-// one function: the Larder's fed and spoil rounds, the crew's hungry legs,
-// the wardrobe's tick round, the refit leg stamp (itself written once for
-// two fields), and the opportunist's borrow count. Each reader keeps its own
-// paragraph about its own field; the arithmetic lives here once.
+// Heals a stored round stamp: a finite number is floored, anything unreadable
+// becomes 0. Zero is a round no voyage has, so it reads as "not yet happened"
+// rather than as a spent lap. All saved stamps are healed through this.
 export function wholeStamp(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
   return Math.max(0, Math.floor(raw));
 }
 
-// Repairs a hold read back from a save. Guarantees a key for every catalogued
-// good, and coerces anything non numeric to zero: a hold damaged before the
-// catalogue existed stored NaN, which JSON writes as null and which would
-// otherwise stay poisoned for the life of the account. Unknown but valid
-// entries are preserved rather than dropped, so a good retired from the
-// catalogue never silently deletes a captain's cargo.
+// Heals a saved hold: every catalogued good gets a finite number, and unknown
+// but valid entries are preserved so a retired good never deletes cargo.
 export function normalizeInventory(raw: unknown): Record<string, number> {
   const src = (raw ?? {}) as Record<string, unknown>;
   const out: Record<string, number> = {};
@@ -994,31 +523,27 @@ function emptyWorkerRoster(): Record<WorkerTypeId, Worker[]> {
 }
 
 /**
- * Every artisan a captain employs, across all types, as one flat list.
- *
- * A saved voyage may predate the workers field, so every reader needs the
- * same tolerant fallback, and three screens had each written their own
- * copy of it. Keeping it here means the fallback and the shape of the
- * result are decided once.
+ * Every artisan across all types as one flat list. Saves may predate the
+ * workers field, and three screens had each written their own fallback, so
+ * the tolerance and result shape are decided here once.
  */
 export function flatWorkerRoster(game: Pick<GameState, "workers">): Worker[] {
   const roster = game.workers ?? emptyWorkerRoster();
   return Object.values(roster).flat();
 }
 
-// Accepts whatever a save actually holds and returns a complete roster: any
-// artisan type the save predates comes back empty rather than undefined, and
-// the older shape that keeps the roster as three separate arrays is read as
-// well. Deliberately tolerant, since this runs on every
-// load and a malformed roster should cost a captain their artisans, not their
-// whole voyage.
-//
-// [C2: crew loss by name] The members' identity, their names and their order
-// aboard, is healed by ./crew's healCrewIdentity at the same load site rather
-// than here, and the split is forced rather than chosen: drawing a name needs
-// the voyage's own losses, and the draw lives in ./crew, which reads this
-// module, so this normalizer could not reach it without a cycle. The two run
-// in sequence, and every reader of a name sits after both.
+/**
+ * The crew, counted from the artisan roster. Shared so every screen counting
+ * hands, and the wage sheet counting the bill, walk the same list.
+ */
+export function crewSize(game: Pick<GameState, "workers">): number {
+  return flatWorkerRoster(game).length;
+}
+
+// Heals a saved roster: missing artisan types come back empty, and the older
+// three-array shape is read too. Tolerant by design since it runs on every
+// load. Names and order aboard are healed by healCrewIdentity in ./crew,
+// which reads this module, so that split avoids a cycle.
 export function normalizeWorkerRoster(
   raw: unknown,
   legacy?: {
@@ -1044,55 +569,29 @@ export function normalizeWorkerRoster(
 }
 
 export type GameContext = {
-  // Per captain deterministic seed identity, "roomId:userId" (see
-  // src/lib/use-game-session.ts). Combined with the per voyage epoch on
-  // GameState, this gives every captain their own market, orders, and Broker
-  // intel, reproducible on reload but different from every other captain and
-  // rerolled whenever the host restarts the voyage.
+  // "roomId:userId". Combined with voyageEpoch, this gives each captain a
+  // deterministic, reload-stable market, orders, and intel distinct from peers.
   seedBase: string;
-  // The room's own identity, without the captain's. The one draw that has
-  // to come out the same for everybody in the harbor rather than differ per
-  // captain is the public objective, so it seeds from this instead of from
-  // seedBase. Derived from the room id rather than by stripping the captain
-  // off seedBase, because a string that is only ever split back apart is a
-  // promise about a format rather than a value.
+  // The harbor's identity. The public objective must draw the same for every
+  // captain, so it seeds from this instead of seedBase.
   harborId: string;
 };
 
-// Everything a fresh voyage needs beyond its own defaults. An options
-// object rather than the positional list this used to take: that list had
-// already reached five entries a caller had to supply in the right order
-// and could only skip by counting commas, and the House would have made six.
+// Everything a fresh voyage needs beyond its defaults.
 export type VoyageSetup = {
-  // The captain's persistent Renown level (see src/lib/game/legacy.ts and
-  // use-game-session.ts's START_FRESH handling) translates to a small
-  // starting Gold bonus, so a captain with a long track record starts every
-  // fresh voyage a little ahead, never behind. Omitted, the captain starts
-  // on the tier's plain stake.
+  // Renown translates to a small starting Gold bonus. Omitted, the captain
+  // starts on the tier's plain stake.
   startingGoldBonus?: number;
-  // Defaults to 1, which leaves Broker's Favor locked, for any caller that
-  // does not yet know the captain's Renown.
+  // Defaults to 1, which leaves Broker's Favor locked.
   renownLevel?: number;
-  // Defaults to 0, the room's first voyage. Callers that know the room's
-  // current epoch pass it so a fresh voyage is seeded distinctly from the
-  // ones before it.
+  // Defaults to 0, the harbor's first voyage.
   voyageEpoch?: number;
-  // Defaults to the entry tier (see DEFAULT_DIFFICULTY) so any caller that
-  // does not yet know the room's tier still produces a valid state. Callers
-  // that know it pass it so maxRounds, starting Gold, and maintenance all
-  // follow the room's chosen tier.
+  // Defaults to the entry tier; callers that know the harbor's tier pass it.
   difficulty?: Difficulty;
-  // Defaults to the founding mode (see DEFAULT_MODE) so any caller that does
-  // not yet know the room's mode still produces a valid, shippable voyage
-  // rather than accidentally landing a captain in an experimental one.
-  // Callers that know it pass it so the phase lap matches the room's.
+  // Defaults to the founding mode; callers that know the harbor's mode pass it.
   mode?: GameMode;
-  // The captain's pledged Great House, read from their CaptainLegacy row.
-  // Defaults to null, which is the honest answer for a captain who has not
-  // pledged yet: no House, and no perk flags lit. The House is applied
-  // inside the one function that creates a voyage rather than by each
-  // caller, because a caller that forgets is a pledge that silently does
-  // nothing.
+  // The captain's pledged House, or null. Applied inside the voyage creator
+  // so a caller that forgets cannot silently drop the pledge.
   houseId?: HouseId | null;
 };
 
@@ -1113,47 +612,32 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     mode,
     renownLevel,
     brokersFavorUsed: false,
-    // [D6: Free Captain: Opportunist] No borrow has been spent, and the
-    // plan's allowance is what this voyage has to spend.
     opportunistBorrows: 0,
     voyageEpoch,
     score: 0,
     currentRound: 1,
-    // [I5: session length, and table size] The voyage's length, pinned here
-    // at departure and never recomputed: the mode's own number where it has
-    // one, the tier's ladder where it does not. Everything downstream reads
-    // this field rather than either record, which is what keeps the lap, the
-    // chronicle row and the integrity ceiling one length.
+    // Voyage length, pinned at departure from the mode or the tier. Everything
+    // downstream reads this field, so lap, chronicle, and integrity agree.
     maxRounds: voyageRoundsFor(mode, difficulty),
     totalRevenue: 0,
     totalCosts: 0,
     workerWages: 0,
     maintenanceCosts: 0,
+    wagesPaid: 0,
+    maintenancePaid: 0,
+    finesPaid: 0,
     vatPaid: 0,
     incomeTaxPaid: 0,
     roundRevenue: 0,
     roundCosts: 0,
     workers: emptyWorkerRoster(),
-    // A voyage leaves the pier provisioned and has fed nobody yet, so the
-    // first Dawn after it sets sail is the crew's first meal. See ./larder
-    // for why the stamp starts at a leg no voyage has rather than at one.
     larder: LARDER_START,
     larderFedRound: 0,
-    // The opening hold of twelve is grain, and it is written out rather than
-    // left for the reader in ./foods to account for: grain is the food that
-    // never turns, which is what a plain number of rations always was, and a
-    // voyage that opened with an empty account over a full Larder would show
-    // a pantry with nothing in it until something wrote one.
+    // The opening hold of twelve is grain, the food that never spoils.
     larderLots: [{ food: "Grain", meals: LARDER_START, boughtRound: 0 }],
     larderSpoilRound: 0,
-    // Nobody has gone hungry yet and nobody has been lost: see ./crew for
-    // what a leg without a meal costs once one has.
-    hungryLegs: 0,
+    hungryRounds: 0,
     crewLost: [],
-    // A voyage leaves the pier with nothing on the crew's backs and with no
-    // leg settled yet, so the first cold leg it meets is one it can only
-    // meet with the clothes its own artisans have finished by then: see
-    // ./garments for why nobody dresses straight out of the starting stock.
     garments: [],
     garmentsTickRound: 0,
     fixedCost: cfg.maintenance,
@@ -1161,16 +645,11 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     shipUpgradeCost: [...SHIP_UPGRADE_LADDER],
     shipUpgradePenalty: 0,
     maintenancePenalty: 0,
-    // A voyage is born at the pier, before its first leg. See
-    // ../game/phases.ts for why the harbor is not one of the six.
+    // A voyage is born at the pier, before its first round.
     phase: "harbor",
-    // Every captain leaves the pier pathless, which is D7's draft to change
-    // and nobody else's: see the field's own note for why null is the
-    // ordinary value rather than a missing one. The stamp beside it is the
-    // same reading: a voyage that has not been sailed has had no papers
-    // changed in it.
+    // Every voyage leaves the pier pathless; only the draft changes this.
     path: null,
-    pathSwitchLeg: 0,
+    pathSwitchRound: 0,
     resourceCards: [],
     customerCards: [],
     purchasedCards: [],
@@ -1182,8 +661,6 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     boonGoldEarned: 0,
     totalOrdersCompleted: 0,
     gameOver: false,
-    // [H7: Maroon and the Harbormaster] A fresh voyage owes nobody
-    // anything and no port leans anywhere.
     bankrupt: false,
     marooned: false,
     modifierFlags: {},
@@ -1191,8 +668,6 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     revealedIntel: [],
     harborPulse: {},
     portShift: null,
-    // [D5: Aroma: the Bazaar Rumor] Nothing has been said at the bazaar
-    // yet, so nothing leans.
     bazaarLean: {},
     standingOrders: defaultStandingOrders(),
     priceHistory: {},
@@ -1204,17 +679,10 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     equippedModules: [],
     boonChoices: [],
     cardTally: {},
-    // [F4: boons at milestone moments] A fresh voyage holds no boons,
-    // waits on no moments and has answered none: every mark starts
-    // absent, which the due rules read as zero in the trigger's own
-    // units (see ./milestones).
+    // A fresh voyage holds no boons, waits on no milestones, and has answered none.
     heldBoons: [],
     milestoneOffers: [],
     milestonesAnswered: {},
-    // [F6: charters at leg four] No charter yet: the moment at leg four
-    // is where one is first offered, and null is the honest reading of
-    // "the question has not been asked" (see charterPending in
-    // ./charters).
     charter: null,
     boonRecord: null,
     boonSwapUsed: false,
@@ -1242,22 +710,12 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     ragsRewoven: 0,
     ragsTaken: 0,
     ragsRound: 0,
-    // [F3: modules in the shipyard ladder, and trading them between
-    // captains] A voyage leaves the pier having traded no module in either
-    // direction and with nothing sold of anything, which is a save that
-    // reads back as a captain who has never moved a module rather than as
-    // one whose ledger the heal had to rescue.
     modulesSold: 0,
     modulesBought: 0,
     moduleFeesEarned: 0,
     moduleFeesPaid: 0,
     modulesTraded: {},
-    // [E1: the Supply Barge] A voyage leaves the pier having bought
-    // nothing from the vendor and with the leg stamp at zero, which is a
-    // leg no voyage has: the first leg after departure is one the vendor
-    // is full for, exactly as the harbor's pile is. Both spend counters
-    // start at nothing and are never reset inside the voyage they belong
-    // to.
+    // No barge purchase yet; both spend counters are voyage scoped.
     bargeTaken: 0,
     bargeRound: 0,
     foodSpend: 0,
@@ -1265,31 +723,21 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     debts: [],
     loansGiven: [],
     defaultedDebt: false,
-    // House identity and per voyage perk flags. houseId defaults to null
-    // (no House chosen) and applyHousePerkAtStart in ./engine/houses.ts is
-    // what flips the per voyage flags on once the captain's House is known.
-    // Explicitly initialised here, not simply omitted, so restartGame's
-    // Object.assign(state, fresh) carries a clean slate forward: a
-    // captain switching Houses between voyages can't keep the old House's
-    // perks by accident.
+    // Explicitly initialized so restartGame's Object.assign(state, fresh)
+    // carries a clean slate forward and a captain switching Houses cannot keep
+    // the old House's perks by accident.
     houseId: null,
     housePerks: noHousePerks(),
-    // Explicitly undefined, not simply omitted: restartGame resets a voyage
-    // via Object.assign(state, fresh), which only overwrites keys fresh
-    // actually has. An omitted key isn't one of those, so a transient
-    // signal left set from the voyage just abandoned (mid module draft,
-    // say) would otherwise survive the restart untouched and misread by
-    // the new voyage (startModuleDrafting treats a non undefined
-    // _draftChoices as "already rolled" and skips rolling a fresh pool).
+    // Explicitly undefined so restartGame's Object.assign clears stale transients.
+    // An omitted key would survive, and startModuleDrafting would treat a stale
+    // _draftChoices as an already-rolled pool.
     _pendingDocksClaim: undefined,
     _pendingPulseTally: undefined,
     _draftChoices: undefined,
     _newModule: undefined,
     _pendingDebtSettlements: undefined,
   };
-  // A captain's Great House is stamped on here, at the one place a voyage is
-  // born. Passing null (the default) leaves the literal's own values
-  // standing: no House chosen, and every perk flag off.
+  // Apply the captain's House at the one place a voyage is born.
   if (houseId) applyHousePerkAtStart(state, houseId);
   return state;
 }

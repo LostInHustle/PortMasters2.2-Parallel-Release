@@ -1,5 +1,5 @@
 // =====================================================================
-// Chat: the room's conversation, held in this process and never written
+// Chat: the harbor's conversation, held in this process and never written
 // to the database, so nothing said in a voyage outlives it.
 // =====================================================================
 
@@ -31,9 +31,9 @@ import {
 import { noteCaptainMuted, noteTelemetry } from "../telemetry";
 
 export function wireChat(io: Server, socket: Socket): void {
-  // Harbor chat is a session conversation, so it lives in the room's
+  // Harbor chat is a session conversation, so it lives in the harbor's
   // own log in this process and is never written to the database. The
-  // log dies with the room, which is the whole guarantee: nothing said
+  // log dies with the harbor, which is the whole guarantee: nothing said
   // during a voyage outlives the voyage.
   socket.on("chat:room", (payload: { roomId?: string; content?: string }) => {
     const s = seated(socket, payload);
@@ -48,8 +48,8 @@ export function wireChat(io: Server, socket: Socket): void {
     }
     const message = buildSessionMessage(content, s.user);
     recordHarborMessage(roomId, message);
-    // [I1: the telemetry spine] One message in the harbor's own room,
-    // which is what the plan counts for messages per captain per leg.
+    // One message in the harbor's own chat,
+    // which is what the design counts for messages per captain per round.
     // The lobby square and the direct threads are not voyage talk and
     // are deliberately not counted; see the note on the event itself.
     noteTelemetry(roomId, "message_sent", { actor: s.userId });
@@ -96,7 +96,7 @@ export function wireChat(io: Server, socket: Socket): void {
   // A direct message is a session conversation the moment either
   // captain is at sea, and it is held against whichever harbor is
   // involved, the sender's own when they are the one at sea. That log
-  // dies with the room, so nothing said during a voyage outlives the
+  // dies with the harbor, so nothing said during a voyage outlives the
   // voyage. Only two captains who are both in the lobby reach the
   // database, which is the lobby's own Direct Messages thread, and that
   // one is meant to still be there tomorrow.
@@ -144,11 +144,11 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "chat:mute",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
         select: { hostId: true },
@@ -161,9 +161,9 @@ export function wireChat(io: Server, socket: Socket): void {
         return;
       }
       if (targetUserId === room.hostId) return;
-      // [J2: the mute and the report] The target has to be a captain
+      // The target has to be a captain
       // actually standing in this harbor. Without this the host could
-      // name any account in the tree and silence it in a room it is not
+      // name any account in the tree and silence it in a harbor it is not
       // in, which is a mute that does nothing visible to the captain it
       // was aimed at and a mute list that grows an entry per stranger.
       // Read off live presence rather than the membership table, because
@@ -177,8 +177,8 @@ export function wireChat(io: Server, socket: Socket): void {
         return;
       }
       muteUser(roomId, targetUserId);
-      // [J2] The record of the act, written where the mute is applied and
-      // before the room is handed the new list, so the record and the
+      // The record of the act, written where the mute is applied and
+      // before the harbor is handed the new list, so the record and the
       // harbor cannot disagree about whether it happened.
       noteTelemetry(roomId, "mute_set", {
         actor: s.userId,
@@ -192,18 +192,18 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "chat:unmute",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
         select: { hostId: true },
       });
       if (!room || room.hostId !== s.userId) return;
       if (!unmuteUser(roomId, targetUserId)) return;
-      // [J2] The other half of the pair, and the reason both halves are
+      // The other half of the pair, and the reason both halves are
       // recorded: a reader asking whether a muted captain was still
       // silenced when the voyage ended reads the last of these two for
       // them, which the sticky mark on their line cannot answer.
@@ -215,14 +215,14 @@ export function wireChat(io: Server, socket: Socket): void {
     },
   );
 
-  // [J2: the mute and the report] A captain's report of another, filed
+  // A captain's report of another, filed
   // from the harbor roster and answered to the captain who filed it.
   //
   // It sits beside the mute because it is the same surface with a longer
   // reach: the mute is the host's own remedy for a harbor they are
   // running, and this is any captain's remedy for a harbor they are only
   // sitting in, which is what a mode that seats strangers needs. What it
-  // leaves behind is a row rather than a state: the plan puts a
+  // leaves behind is a row rather than a state: the design puts a
   // moderation console after this feature, so the reading half of this
   // arrives later, and until it does the record is the whole of it.
   //
@@ -236,11 +236,11 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "player:report",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       if (targetUserId === s.userId) {
         socket.emit("room:error", {
           roomId,
@@ -281,7 +281,7 @@ export function wireChat(io: Server, socket: Socket): void {
         // dressed up as a duplicate.
         if (!isUniqueViolation(error)) {
           console.warn(
-            `[report] could not file a report for room ${roomId}:`,
+            `[report] could not file a report for harbor ${roomId}:`,
             error,
           );
           socket.emit("room:error", {
@@ -300,7 +300,7 @@ export function wireChat(io: Server, socket: Socket): void {
         });
         return;
       }
-      // [J2] Recorded after the row is written rather than before, which
+      // Recorded after the row is written rather than before, which
       // is the other way round from the mute: the mute is a state the
       // record annotates, and this is a row the record accounts for, so
       // an event for a report that failed to store would be the record

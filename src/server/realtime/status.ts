@@ -1,7 +1,7 @@
 // =====================================================================
-// Realtime layer: the per room game:status cache.
+// Realtime layer: the per harbor game:status cache.
 //
-// Last known game status per (room, user) so late joiners can hydrate
+// Last known game status per (harbor, user) so late joiners can hydrate
 // the roster immediately instead of seeing "loading" until the next
 // broadcast. Split out of presence.ts because the status cache is
 // read by several modules (presence for the dedupe, checkpoint for
@@ -27,7 +27,7 @@ export function rememberStatus(
   m.set(payload.user.id, payload);
 }
 
-// Sends every cached status for a room to one socket, so a freshly
+// Sends every cached status for a harbor to one socket, so a freshly
 // joined captain sees the full roster's last known phase/gold/reputation
 // without waiting for each member's next heartbeat.
 export function sendStatusBatchTo(
@@ -42,7 +42,7 @@ export function sendStatusBatchTo(
   }
 }
 
-// Drops a user's cached status when they leave a room (or disconnect),
+// Drops a user's cached status when they leave a harbor (or disconnect),
 // so a later joiner doesn't get hydrated with stale data for someone
 // who isn't actually there anymore. Also reclaims empty room entries.
 export function forgetStatus(roomId: string, userId: string): void {
@@ -69,8 +69,8 @@ export function forgetStatusIfLastSocket(
   if (!userSockets.get(userId)) forgetStatus(roomId, userId);
 }
 
-// Wipes the entire status cache for a room. Called on room:restart and
-// when a room is deleted after its last member departs.
+// Wipes the entire status cache for a harbor. Called on room:restart and
+// when a harbor is deleted after its last member departs.
 export function clearRoomStatuses(roomId: string): void {
   roomStatuses.delete(roomId);
 }

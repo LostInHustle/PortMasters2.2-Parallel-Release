@@ -12,13 +12,13 @@ import { t } from "@/lib/game/i18n";
 import { phaseLabel } from "@/lib/game/engine";
 
 /**
- * [MANIFEST 18: Fleet Ticker] A glance at the whole harbor without opening
- * anyone's detail popup. MembersPanel already shows the same round, phase,
- * gold, and reputation for every captain, but it sits in the right column
+ * A glance at the whole harbor without opening anyone's detail popup.
+ * MembersPanel already shows the same round, phase, gold, and reputation
+ * for every captain, but it sits in the right column
  * of the desktop layout and, on any screen under the lg breakpoint, stacks
  * to the very bottom of the page behind the phase panel and the roster's
  * own scroll. This strip sits directly under the header instead, full
- * width, on every screen size, so the room's state is visible without
+ * width, on every screen size, so the harbor's state is visible without
  * scrolling past anything. The live roster comes from useRoomRoster, the
  * same hook MembersPanel uses, rather than threading a second copy of that
  * state down from GameRoom.
@@ -52,7 +52,7 @@ export function FleetTicker({
         {sorted.map((m) => {
           const st = statuses[m.id];
           const isMe = m.id === me.id;
-          // [H7: Maroon and the Harbormaster] Both marks come off the one
+          // Both marks come off the one
           // rule in seatMarks, which is what stops this strip and the
           // roster panel spelling the same captain two different ways.
           const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
@@ -76,10 +76,9 @@ export function FleetTicker({
                   <Anchor className="h-3 w-3" />
                 </span>
               )}
-              {/* [C1: the Larder and Short Rations] The hungry crew, in the
-                  same red the roster uses and for the same reason: a
-                  shortage is a status, and a status draws from the meaning
-                  half of the palette. [W3: the status convention] It
+              {/* The hungry crew, in the same red the roster uses and
+                  for the same reason: a shortage is a status, and a
+                  status draws from the meaning half of the palette. It
                   carries the roster pill's own two clauses visibly, the
                   state and the way back, with the full sentence in the
                   title beside them: a title alone never shows on a touch

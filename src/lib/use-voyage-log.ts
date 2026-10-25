@@ -3,12 +3,12 @@
 // =====================================================================
 // The voyage log, client side.
 //
-// Holds the lines the room has written for the voyage this captain is
+// Holds the lines the harbor has written for the voyage this captain is
 // sitting in, and asks the server for the ones written before they were
 // listening. The public half of the pair: the captain's own channel is
 // src/lib/use-private-log.ts, and the two are read side by side at Dusk.
 //
-// The list is stamped with the room it arrived in, the same discipline the
+// The list is stamped with the harbor it arrived in, the same discipline the
 // private channel keeps and for the same reason: a captain who sails from
 // one harbor straight into another is never shown a line from the voyage
 // they just left. It is emptied on room:restarted, because a restarted
@@ -17,7 +17,7 @@
 // The history is asked for rather than sent on arrival, and that is a
 // decision about the socket rather than about the log. A captain carries
 // five other subscriptions that ask the server for their state the moment
-// the room mounts, and this is not a sixth: the only screen that draws a
+// the harbor mounts, and this is not a sixth: the only screen that draws a
 // log is Dusk, so the request goes out when a captain stands there, and a
 // captain who never does costs the server nothing.
 //
@@ -38,6 +38,7 @@ import {
   normalizeVoyageLogEntry,
   type VoyageLogEntry,
 } from "@/lib/game/voyage-log";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 
 export type VoyageLog = {
   /** The voyage so far, oldest line first. */
@@ -45,7 +46,7 @@ export type VoyageLog = {
   /**
    * Asks the server for the whole log. Called by the surface that draws it
    * rather than by this hook on mount, which is what keeps the request off
-   * a captain's first frame in a room.
+   * a captain's first frame in a harbor.
    */
   pull: () => void;
 };
@@ -54,7 +55,7 @@ export function useVoyageLog(
   socket: Socket | null,
   roomId: string | null,
 ): VoyageLog {
-  // One state object rather than two: the lines and the room they belong
+  // One state object rather than two: the lines and the harbor they belong
   // to are a single fact, and separating them is how the two get out of
   // step while a socket is being replaced.
   const [held, setHeld] = useState<{
@@ -84,20 +85,22 @@ export function useVoyageLog(
       if (data?.roomId !== roomId) return;
       setHeld({ roomId, entries: normalizeVoyageLog(data.entries) });
     };
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      setHeld(null);
-    };
 
     socket.on("voyage:log", onEntry);
     socket.on("voyage:log:history", onHistory);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("voyage:log", onEntry);
       socket.off("voyage:log:history", onHistory);
-      socket.off("room:restarted", onRestarted);
     };
   }, [socket, roomId]);
+
+  // A restarted voyage is a new voyage, and the server's own log starts
+  // empty with it. The reading of the harbor's restart is the shared one
+  // (see useRoomRestarted), which is where the event's name lives.
+  const onRestarted = useCallback(() => {
+    setHeld(null);
+  }, []);
+  useRoomRestarted(socket, roomId, onRestarted);
 
   const pull = useCallback(() => {
     if (!socket || !roomId) return;

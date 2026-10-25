@@ -26,7 +26,7 @@ export function useAutoSave({
   state: SessionState;
   dispatch: Dispatch<Action>;
 }): () => Promise<void> {
-  const { game, loaded, lastSavedAt } = state;
+  const { game, loaded } = state;
 
   // Autosave (debounced) to the server.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,27 +40,23 @@ export function useAutoSave({
     latestGameRef.current = game;
     dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    dispatch({ type: "SET_SAVING", saving: true, at: lastSavedAt ?? 0 });
+    dispatch({ type: "SET_SAVING", saving: true });
     saveTimer.current = setTimeout(async () => {
       try {
         await api.saveGameState(roomId, latestGameRef.current);
         dirtyRef.current = false;
         dispatch({ type: "SET_SAVING", saving: false, at: Date.now() });
       } catch {
-        dispatch({
-          type: "SET_SAVING",
-          saving: false,
-          at: lastSavedAt ?? 0,
-        });
+        dispatch({ type: "SET_SAVING", saving: false });
       }
     }, 700);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [game, loaded, roomId, enabled]);
+  }, [game, loaded, roomId, enabled, dispatch]);
 
   // Flush any unsaved changes immediately. Call this before deliberately
-  // leaving a room so the debounce window above can't silently drop the
+  // leaving a harbor so the debounce window above can't silently drop the
   // player's last action.
   const flush = useCallback(async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -72,9 +68,9 @@ export function useAutoSave({
     } catch {
       // Leave dirtyRef set so the unmount safety net below still tries once more.
     }
-  }, [roomId]);
+  }, [roomId, dispatch]);
 
-  // Safety net: if the component unmounts (or the room changes) while a save
+  // Safety net: if the component unmounts (or the harbor changes) while a save
   // is still pending, flush it instead of silently losing the player's most
   // recent action. Covers any future unmount path that doesn't call flush().
   useEffect(() => {

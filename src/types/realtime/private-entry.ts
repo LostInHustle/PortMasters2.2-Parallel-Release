@@ -8,7 +8,7 @@
 // game travels this way and nothing hidden travels any other way: no
 // broadcast payload carries a secret, which is a rule the realtime layer
 // holds rather than a habit, and the smoke test asserts it by keeping
-// every frame every socket in a room receives and reading them back.
+// every frame every socket in a harbor receives and reading them back.
 //
 // An entry is a line for a captain's own log rather than a state change,
 // which is why it carries its own text: the server writes the line, and

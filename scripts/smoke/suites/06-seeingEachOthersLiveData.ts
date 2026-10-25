@@ -36,7 +36,7 @@ export async function seeingEachOthersLiveDataSuite(inputs: {
   const guestToken = guest.token;
 
   // Both captains take a seat in the harbor's socket channel. The
-  // server only relays room traffic to sockets that have joined one.
+  // server only relays harbor traffic to sockets that have joined one.
   const joinedHost = waitForEvent(hostSocket, "room:members");
   const joinedGuest = waitForEvent(guestSocket, "room:members");
   hostSocket.emit("room:join", { roomId: roomId });
@@ -99,12 +99,12 @@ export async function seeingEachOthersLiveDataSuite(inputs: {
   }>(guestSocket, "game:status", (payload) => payload?.user?.id === hostId);
 
   // The phase is sent in the numbering this engine used before the six
-  // phase leg landed, which is what a client still running the older
-  // build reports, and it is sent on purpose: the room caches and
+  // phase round landed, which is what a client still running the older
+  // build reports, and it is sent on purpose: the harbor caches and
   // rebroadcasts this frame to every captain, so the value it holds is
   // read by the roster, by the active roster the ready check waits on and
   // by the phase report. Placed rather than passed through, it reaches the
-  // room as the market; passed through, it would be a roster disagreeing
+  // harbor as the market; passed through, it would be a roster disagreeing
   // with the voyage for every captain looking at it.
   hostSocket.emit("game:status", {
     roomId: roomId,
@@ -120,13 +120,13 @@ export async function seeingEachOthersLiveDataSuite(inputs: {
 
   const status = await seenStatus;
   check(status !== null, "the other captain receives the status broadcast");
-  check(status?.user?.id === hostId, "the status is labelled with its captain");
+  check(status?.user?.id === hostId, "the status is labeled with its captain");
   check(status?.gold === 777, "the gold travels intact");
   check(status?.reputation === 42, "the reputation travels intact");
   check(status?.round === 3, "the round travels intact");
   check(
     status?.phase === "market",
-    "and a phase reported in the older numbering reaches the room under its name",
+    "and a phase reported in the older numbering reaches the harbor under its name",
   );
   check(
     status?.phaseLabel === "Purchase",

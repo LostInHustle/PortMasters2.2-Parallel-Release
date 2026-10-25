@@ -1,9 +1,8 @@
 /**
  * The module trade report.
  *
- * [F3: modules in the shipyard ladder, and trading them between captains]
- * The plan's second evaluation, read as a table: "Track which modules are
- * equipped against which are traded away, since a module that is always
+ * The reading is a table: "Track which modules are equipped against
+ * which are traded away, since a module that is always
  * equipped is a tax rather than a choice." The comparison is produced by
  * the game layer's own reader (see readModuleTraffic in
  * src/lib/game/engine/modules), which both ends of the wire share; what is

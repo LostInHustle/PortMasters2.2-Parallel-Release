@@ -1,31 +1,10 @@
-// =====================================================================
-// Realtime layer: the telemetry spine's accumulator.
+// The realtime telemetry accumulator: decides whether a voyage is recorded,
+// holds its events in memory, and writes the record once when the voyage stops.
+// The pure vocabulary and record shape live in src/lib/game/telemetry.ts.
 //
-// The pure half of the spine is src/lib/game/telemetry.ts, which owns the
-// event vocabulary and the shape of a record. This is the half that
-// touches the world: it decides whether a voyage is recorded at all, it
-// holds the events for one voyage in memory while that voyage runs, and
-// it writes the record once, when the voyage stops.
-//
-// Three rules shape every function below.
-//
-// It never blocks a voyage. Nothing here awaits before it appends, nothing
-// here throws into a socket handler, and the one database write happens at
-// the end and is logged rather than thrown if it fails. A harbor that
-// cannot record itself must still be able to sail.
-//
-// It is opened by a departure and closed by an ending. A voyage that
-// concludes, a voyage the host wipes and a harbor that empties all leave
-// a record, which is what the plan means by a broken voyage producing a
-// record that explains where it stopped. The outcome is the record's own
-// word for which of the three happened.
-//
-// It samples per voyage, not per event, and the draw is deterministic off
-// the voyage's own identity. One number decides whether a table is
-// recorded, every event from that table follows the decision, and a
-// decision that had to be reproducible is reproducible: the same seed
-// gives the same answer on a reload, on another process, and in a test.
-// =====================================================================
+// Nothing here blocks a voyage: no awaits before an append, no throws into a
+// socket handler, and the one database write at the end logs its failure.
+// Sampling is per voyage from a deterministic seed, so it stays stable for life.
 
 import { db } from "@/lib/db";
 import { loadServerConfig } from "@/lib/config";
@@ -43,11 +22,9 @@ import {
   type TelemetryRecord,
 } from "@/lib/game/telemetry";
 
-// One voyage in flight, as the spine sees it. The fields above the events
-// are the record's header, read from the room once at departure rather
-// than looked up again at the end: a room can be renamed, and the seats a
-// voyage sailed with are the rung it was judged on, which must not follow
-// the roster as captains come and go.
+// One voyage in flight. The header fields are captured at departure rather than
+// read back at the end: the seats judged must not follow the roster, and a
+// renamed harbor must not rewrite the record.
 interface VoyageAccumulator {
   voyageId: string;
   roomId: string;
@@ -57,56 +34,35 @@ interface VoyageAccumulator {
   seats: number;
   openedAt: number;
   startedAt: number;
-  leg: number;
-  // Every captain this voyage has seen: the roster it was dealt at
-  // departure, anyone who joined a seat mid voyage, and anyone who gave
-  // one up. A captain who leaves is the reason this is a set of its own
-  // rather than a read of the room's roster at the end, since the roster
-  // that closes a voyage no longer names the captains who left it.
+  round: number;
+  // Every captain the voyage saw, including one who left: the closing roster
+  // no longer names them, so this cannot be a read of the harbor at the end.
   captains: Set<string>;
-  // The captains already recorded as gone. A set of its own rather than a
-  // consequence of the one above, because the roster above is seeded with
-  // everyone the voyage began with and a captain's own departure must not
-  // be told twice: the Leave button and the grace timer's reap can both
-  // see the same seat given up, and the second one to look is not a
-  // second abandonment.
+  // Captains already recorded as gone. Empty at the start because the roster
+  // above holds the departure crew. The Leave button and the grace timer's reap
+  // can both see one seat given up; the second look is not a second abandonment.
   left: Set<string>;
-  // The captains the harbor's carried vote put ashore. Held here rather
-  // than worked out at the close from the maroon_carried events, because
-  // this is the server's own fact and a voyage that ends by a wipe or by
-  // the harbor emptying has no conclusion to read it from: the mark rides
-  // the line the way the event rides the record, and the two are written
-  // from the same call so neither can say something the other does not.
+  // Captains the carried vote put ashore, kept here rather than derived from
+  // maroon_carried events: a wiped or emptied voyage has no conclusion to read
+  // them from, and the mark and the event are written from the same call.
   marooned: Set<string>;
-  // [J2: the mute and the report] The captains the host has silenced at
-  // any point in this voyage, held as a mark for the same reason the
-  // maroon is: a voyage that ends by a wipe or by the harbor emptying has
-  // no conclusion to read a mute count from, and the plan's question
-  // about a muted captain is answered against the captains the record
-  // closes with. The set is never emptied by an unmute, because the mark
-  // means "was muted", and the two events beside it say when.
+  // Captains muted at any point. Never emptied by an unmute: the mark means
+  // "was muted", and the mute_set events say when. Written with the maroon for
+  // the same reason.
   muted: Set<string>;
-  // [F4: boons at milestone moments] The captains whose voyage has lost a
-  // hand, held as a mark for the maroon's own two reasons: a voyage whose
-  // record was truncated still says who lost one, and the line and the
-  // leg_report that carries the count are written from the same call, so
-  // neither can say something the other does not. It is a set of its own
-  // rather than a reading joined out of the leg reports at the reading
-  // end, because the plan's question is a cohort comparison (the report
-  // script's retention table) and deriving a fact that covers the whole voyage again from a
-  // capped event list is exactly the shape the cap can cut.
+  // Captains who lost a hand. A set rather than a reading of round reports because
+  // the event list is capped and a truncated record still needs the mark. Written
+  // in the same call as the round report that carries it.
   crewLost: Set<string>;
   events: TelemetryEvent[];
   truncated: boolean;
 }
 
-// room -> the voyage that room is sailing. Cleared when the voyage closes,
-// which is every ending this module knows about.
+// Harbor -> the voyage it is sailing. Cleared at every ending this module knows.
 const voyageTelemetry = new Map<string, VoyageAccumulator>();
 
-// The share of voyages to record, read once. The whole environment is
-// already validated at boot (src/lib/config.ts), so this cannot fail in a
-// running process; caching it keeps a zod parse off the departure path.
+// Read once. Config is validated at boot, so this cannot fail in a running
+// process; caching keeps the zod parse off the departure path.
 let cachedSampleRate: number | null = null;
 function sampleRate(): number {
   if (cachedSampleRate === null) {
@@ -116,12 +72,10 @@ function sampleRate(): number {
 }
 
 /**
- * Whether this voyage is one of the sampled ones.
- *
- * Deterministic on purpose, and seeded with a name of its own so it can
- * never draw the same stream as the market or the commission: a voyage
- * that was recorded is recorded for its whole life, and a voyage that was
- * not is not recorded halfway through because a retry landed elsewhere.
+ * Whether this voyage is one of the sampled ones. Seeded with its own name so it
+ * can never share a stream with the market or the commission: a voyage that was
+ * recorded is recorded for its whole life. The same seed gives the same answer on
+ * a reload, in another process, and in a test.
  */
 function isSampledVoyage(roomId: string, voyageEpoch: number): boolean {
   const rate = sampleRate();
@@ -131,18 +85,11 @@ function isSampledVoyage(roomId: string, voyageEpoch: number): boolean {
 }
 
 /**
- * When the lobby a voyage was dealt out of opened, from whichever stamp
- * the caller holds.
- *
- * A room row carries the lobby's own clock (lobbyOpenedAt, stamped at
- * creation and bumped by every restart; see prisma/schema.prisma and
- * wiring/restart-voyage.ts). A caller driving this function with
- * hand-built facts instead of a row, which is how the smoke run exercises
- * the spine in process, names the room's own creation, and for a room
- * that has never replayed a voyage the two are the same moment: the first
- * lobby is the room's birth. The record's fill time is measured from
- * whichever of the two arrives, and the restart bump is what keeps the
- * second voyage out of the first voyage's waiting room.
+ * When the lobby a voyage was dealt out of opened. A room row carries the lobby's
+ * own clock (lobbyOpenedAt, bumped by every restart); a caller with hand-built
+ * facts names the harbor's creation, which is the same moment for a harbor that
+ * has never replayed a voyage. The restart bump keeps the second voyage out of
+ * the first voyage's waiting harbor.
  */
 function lobbyOpenedAtOf(
   room: { lobbyOpenedAt: Date } | { createdAt: Date },
@@ -151,16 +98,10 @@ function lobbyOpenedAtOf(
 }
 
 /**
- * A voyage left the dock. Opens the accumulator, or leaves the room
- * unrecorded when the sampler says so.
- *
- * Called from the one place a voyage starts, after the room row has been
- * written, so the header it captures is the voyage's own: the seats it
- * pinned, the mode and difficulty it was chartered with, and the moment
- * this lobby opened, which is the other end of the lobby fill time.
- * The roster comes in the same call because it is the same fact the
- * departure just pinned, and the seats the voyage is judged on and the
- * captains it began with should not be able to disagree.
+ * A voyage left the dock: open the accumulator, or leave the harbor unrecorded
+ * when the sampler says so. Called after the room row is written, so the header
+ * captures the voyage's own seats, mode, difficulty and lobby opening. The roster
+ * arrives in the same call so it cannot disagree with the departure.
  */
 export function openVoyageTelemetry(
   room: {
@@ -183,7 +124,7 @@ export function openVoyageTelemetry(
     seats: roster.length,
     openedAt: lobbyOpenedAtOf(room).getTime(),
     startedAt,
-    leg: 1,
+    round: 1,
     captains: new Set(roster),
     left: new Set(),
     marooned: new Set(),
@@ -195,11 +136,8 @@ export function openVoyageTelemetry(
 }
 
 /**
- * Room for one more line, or the voyage is marked truncated.
- *
- * Every note below asks this before it appends, so the cap is one rule in
- * one place rather than the same comparison at four call sites, where a
- * later change to one of them could not be told from the others.
+ * Room for one more line, or the voyage is marked truncated. Every note asks this
+ * before appending, so the cap is one rule in one place.
  */
 function admitsMore(voyage: VoyageAccumulator): boolean {
   if (voyage.truncated) return false;
@@ -211,18 +149,14 @@ function admitsMore(voyage: VoyageAccumulator): boolean {
 }
 
 /**
- * One happening, stamped with the leg the voyage is on.
- *
- * The leg comes from the accumulator rather than from the caller, because
- * the accumulator is the one thing that knows how far the voyage has
- * actually got: a socket handler fires whenever it fires, and an event
- * that placed itself on a leg the harbor had not reached would be a
- * measurement of nothing.
+ * One happening, stamped with the round the voyage is on. The round comes from the
+ * accumulator because a socket handler fires whenever it fires, and an event
+ * placed on a round the harbor has not reached would measure nothing.
  */
 export function noteTelemetry<N extends TelemetryName>(
   roomId: string,
   name: N,
-  payload: Omit<TelemetryPayloads[N], "leg">,
+  payload: Omit<TelemetryPayloads[N], "round">,
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
@@ -230,131 +164,89 @@ export function noteTelemetry<N extends TelemetryName>(
   voyage.events.push(
     telemetryEvent(name, voyage.voyageId, Date.now(), {
       ...payload,
-      leg: voyage.leg,
+      round: voyage.round,
     } as TelemetryPayloads[N]),
   );
 }
 
 /**
- * A round closed and the next one opened.
- *
- * Recorded only when the leg actually moves forward, so a repeated
- * advance frame cannot fill a record with the same leg twice, and the
- * accumulator's own leg follows the harbor rather than the other way
- * round.
+ * A round closed and the next one opened. Recorded only when the round moves
+ * forward, so a repeated advance frame cannot record the same round twice.
  */
-export function noteLegAdvanced(roomId: string, leg: number): void {
+export function noteRoundAdvanced(roomId: string, round: number): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
-  if (leg <= voyage.leg) return;
+  if (round <= voyage.round) return;
   if (!admitsMore(voyage)) return;
   voyage.events.push(
-    telemetryEvent("leg_advanced", voyage.voyageId, Date.now(), { leg }),
+    telemetryEvent("round_advanced", voyage.voyageId, Date.now(), { round }),
   );
-  voyage.leg = leg;
+  voyage.round = round;
 }
 
 /**
- * The leg report, the one event a client sends.
+ * The round report, the one event a client sends. The round is the client's because
+ * only it knows what it was playing when it counted.
  *
- * The leg is the client's, because only the client knows which leg it was
- * playing when it counted its orders. It is bounded rather than taken on
- * trust: a report about a leg this voyage never reached is dropped, and
- * the bound allows exactly one leg of slack, because a captain who has
- * just finished counting a leg is routinely one ahead of the harbor's
- * checkpoint: the checkpoint moves when a captain reports standing at it,
- * and the fastest captain at the table is the one who got there first.
+ * Bounded rather than trusted: a report about a round this voyage never reached is
+ * dropped. The bound allows one round of slack, since a captain who finished
+ * counting a round is routinely one ahead of the harbor's checkpoint.
  *
- * One report per captain per leg, the last one winning, because the
- * client sends its figures whenever they change and again on a reconnect,
- * and a record with nine copies of one captain's leg would be a record of
- * the network rather than of the voyage. Everything else in the report is
- * the captain's own reading of their own screen, which is what the plan
- * wants from the loop family, and it is kept as a claim rather than
- * treated as a fact.
+ * One report per captain per round, last winning: the client resends on change and
+ * on reconnect, and a record with nine copies would be a record of the network.
+ * Its figures are the captain's own reading, kept as a claim rather than a fact.
  */
-export function noteLegReport(
+export function noteRoundReport(
   roomId: string,
   actor: string,
-  leg: number,
-  figures: Omit<TelemetryPayloads["leg_report"], "leg" | "actor">,
+  round: number,
+  figures: Omit<TelemetryPayloads["round_report"], "round" | "actor">,
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
-  if (!Number.isInteger(leg) || leg < 1 || leg > voyage.leg + 1) return;
-  // [C4: three foods, spoilage and the split hold] The hold's four figures
-  // are carried only when the client sent them, which is only when the
-  // switch that gives them meaning was on (see LegReport). The record keeps
-  // the shape the wire had rather than filling the gaps, so a reader
-  // counting voyage food can tell a base game leg from a survival one, and
-  // a field that arrived unreadable stays absent instead of landing as a
-  // zero that would read as an empty hold.
+  if (!Number.isInteger(round) || round < 1 || round > voyage.round + 1) return;
+  // Optional hold fields stay absent when the client did not send them, so a
+  // reader can tell a base game round from a survival one and an unreadable field
+  // does not land as a zero that reads as an empty hold.
   const held = (value: number | undefined): number | undefined =>
     value === undefined ? undefined : Math.max(0, Math.floor(value));
   const holdSlots = held(figures.holdSlots);
   const grainMeals = held(figures.grainMeals);
   const saltFishMeals = held(figures.saltFishMeals);
   const produceMeals = held(figures.produceMeals);
-  // [D3: Convoy: the Escort Contract] The market's three figures ride the
-  // same rule, and "held" is the right reader for all three: a fee is Gold
-  // and an absorbed raid is Gold, so neither can be negative, and a count of
-  // contracts is a count. The buyer's side is not here and is not merely
-  // unrecorded: nothing on the wire carries it, since the plan's evaluation
-  // is about what the seller's market did.
+  // The escort figures ride the same rule: fees and counts cannot be negative,
+  // and the buyer's side is not on the wire.
   const escortSold = held(figures.escortSold);
   const escortFeesEarned = held(figures.escortFeesEarned);
   const escortAbsorbed = held(figures.escortAbsorbed);
-  // [D4: Loom: the Refit] The bench's three ride the same rule, and `held`
-  // reads all three for the reason it reads the escort's: a fee is Gold, a
-  // reweave is a count, and neither can be negative. The leg's weather is not
-  // a count and is deliberately not read through it. A cold leg is a truth
-  // rather than a tally, so false is a reading and not an absence, and
-  // flooring it would turn every fair leg in the record into a leg nobody
-  // measured: the reader below keeps the answer the client gave, either way,
-  // and drops only what arrived as something other than a boolean.
+  // The bench's three ride the same rule. The round's weather is a boolean rather
+  // than a count, so false is a reading, not an absence, and is not floored.
   const refitsSold = held(figures.refitsSold);
   const refitFeesEarned = held(figures.refitFeesEarned);
   const ragsRewoven = held(figures.ragsRewoven);
-  const coldLeg =
-    typeof figures.coldLeg === "boolean" ? figures.coldLeg : undefined;
-  // [F3: modules in the shipyard ladder, and trading them between captains]
-  // The market's two ride the same rule, and `held` reads both for the
-  // reason it reads the two markets above: a count of modules cannot be
-  // negative and a fee is Gold. The buyer's side is not here for the same
-  // reason the two markets' buyers are not: the plan asks what the market
-  // sold.
+  const coldRound =
+    typeof figures.coldRound === "boolean" ? figures.coldRound : undefined;
+  // The module market's two: a count and a Gold fee, so `held` applies; the
+  // buyer's side is not on the wire.
   const modulesSold = held(figures.modulesSold);
   const moduleFeesEarned = held(figures.moduleFeesEarned);
-  // [D6: Free Captain: Opportunist] One count, and `held` is the right
-  // reader for it for the reason it reads the escort's and the bench's: a
-  // borrow is a count and cannot be negative. The tally is the voyage's
-  // rather than the leg's, which the field's own note explains.
+  // A borrow is a count, so `held` applies. The tally is the voyage's, not the round's.
   const opportunistBorrows = held(figures.opportunistBorrows);
-  // [E1: the Supply Barge] The voyage's two food counters, and they are the
-  // one pair in this report that is kept or dropped together. They are the
-  // two halves of a division rather than two readings: what a voyage spent
-  // on food, and how much of it went to the vendor. A report carrying one
-  // without the other cannot be read at all, so a lone half is dropped
-  // rather than kept, which is what makes the record's own shape the
-  // invariant the dashboard reads it by. `held` reads both for the reason
-  // it reads every count above: Gold spent cannot be negative.
+  // Food spend and barge spend are kept or dropped together: a lone half cannot
+  // be read, so the record's shape enforces the pair. Gold spent cannot be negative.
   const foodSpend = held(figures.foodSpend);
   const bargeSpend = held(figures.bargeSpend);
   const bargeFigures =
     foodSpend === undefined || bargeSpend === undefined
       ? {}
       : { foodSpend, bargeSpend };
-  // [F4: boons at milestone moments] The voyage's crew losses, read with
-  // `held` for the reason every count above is: a loss count cannot be
-  // negative. The mark is written here, at the same call that keeps the
-  // report, so a captain's line and the count on the wire cannot
-  // disagree, and it is written before the replacement walk below rather
-  // than after it, because the report that first carries a loss is
-  // routinely the later copy of a leg already on the record.
+  // Written before the replacement walk below: the report that first carries a
+  // loss is routinely the later copy of a round already on the record, so the mark
+  // must not depend on the append.
   const crewLosses = held(figures.crewLosses);
   if (crewLosses !== undefined && crewLosses > 0) voyage.crewLost.add(actor);
-  const event = telemetryEvent("leg_report", voyage.voyageId, Date.now(), {
-    leg,
+  const event = telemetryEvent("round_report", voyage.voyageId, Date.now(), {
+    round,
     actor,
     ordersDealt: Math.max(0, Math.floor(figures.ordersDealt)),
     ordersFilled: Math.max(0, Math.floor(figures.ordersFilled)),
@@ -369,58 +261,38 @@ export function noteLegReport(
     ...(refitsSold === undefined ? {} : { refitsSold }),
     ...(refitFeesEarned === undefined ? {} : { refitFeesEarned }),
     ...(ragsRewoven === undefined ? {} : { ragsRewoven }),
-    ...(coldLeg === undefined ? {} : { coldLeg }),
+    ...(coldRound === undefined ? {} : { coldRound }),
     ...(modulesSold === undefined ? {} : { modulesSold }),
     ...(moduleFeesEarned === undefined ? {} : { moduleFeesEarned }),
     ...(opportunistBorrows === undefined ? {} : { opportunistBorrows }),
     ...bargeFigures,
     ...(crewLosses === undefined ? {} : { crewLosses }),
   });
-  // Walking backwards because the report being replaced is almost always
-  // the one this captain filed a moment ago, and replacing in place rather
-  // than appending keeps the record in the order things happened.
+  // Walk backwards because the report being replaced is almost always the one
+  // this captain just filed. Replacing in place keeps event order.
   for (let i = voyage.events.length - 1; i >= 0; i--) {
     const seen = voyage.events[i];
     if (
-      seen.name === "leg_report" &&
+      seen.name === "round_report" &&
       seen.actor === actor &&
-      seen.leg === leg
+      seen.round === round
     ) {
       voyage.events[i] = event;
       return;
     }
   }
-  // Asked after the replacement above rather than before it: a report that
-  // replaces a line does not grow the record, so a voyage at its cap still
-  // closes a leg with the later figures instead of losing them.
+  // Asked after the replacement: a replacing report does not grow the record,
+  // so a voyage at its cap still keeps the later figures.
   if (!admitsMore(voyage)) return;
   voyage.captains.add(actor);
   voyage.events.push(event);
 }
 
 /**
- * [F6: charters at leg four] The voyage's one charter, written when the
- * server can attribute it and never twice.
- *
- * It is not noteTelemetry, and the difference is the dedup. The client
- * sends its claim on every leg report once the moment is answered,
- * because that report is also the frame a reload files, so the once per
- * voyage rule has to live in the one writer rather than in the caller.
- * The scan below is that rule: a captain who already has a charter_taken
- * line in this voyage's events is answered with silence, which makes the
- * whole note idempotent and lets a captain keep saying what they hold
- * without the record growing a line per leg.
- *
- * The path and the alignment are the caller's to attach and are read
- * before this is called, off the room's own books, never off the wire:
- * this writer records what it is handed, for the reason every note above
- * takes the accumulator's own numbers. It follows that there is no
- * reader here of the alignment table, and check:private's rule about how
- * thin that reader set stays is untouched by this function.
- *
- * The leg is the accumulator's, like every event, so the claim's own leg
- * number cannot place it anywhere, and the append counts the captain for
- * the same reason a kept report does: the voyage saw them take a card.
+ * The voyage's one charter, written when the server can attribute it and never
+ * twice. The client repeats its claim on every round report, so the rule lives
+ * here: a captain who already has a charter_taken line is answered with silence.
+ * Path and alignment come from the caller's harbor books, never off the wire.
  */
 export function noteCharterTaken(
   roomId: string,
@@ -431,13 +303,8 @@ export function noteCharterTaken(
 ): void {
   const voyage = voyageTelemetry.get(roomId);
   if (!voyage) return;
-  // The dedup walks the voyage's own events rather than keeping a mark
-  // beside them, and the walk is the honest shape for it: a second book
-  // of what happened is a second thing that can disagree with the record,
-  // and this list is capped, in memory, and read once per leg by at most
-  // one captain. The one writer owning the scan is also what keeps the
-  // rule true from every caller rather than from the one that remembers
-  // it.
+  // The scan uses the record rather than a second book that could disagree with
+  // it. The list is capped, in memory, and read once per round.
   for (const seen of voyage.events) {
     if (seen.name === "charter_taken" && seen.actor === actor) return;
   }
@@ -445,7 +312,7 @@ export function noteCharterTaken(
   voyage.captains.add(actor);
   voyage.events.push(
     telemetryEvent("charter_taken", voyage.voyageId, Date.now(), {
-      leg: voyage.leg,
+      round: voyage.round,
       actor,
       charter,
       path,
@@ -455,32 +322,14 @@ export function noteCharterTaken(
 }
 
 /**
- * A captain gave up their seat while the voyage was under way.
+ * A captain gave up their seat mid voyage. Called from every place a seat is
+ * actually given up: Leave, a dropped connection reaped, and an operator ban.
  *
- * The leg stamped on it is where the plan counts the abandonment, and the
- * captain's own line was already in the record, since only a captain the
- * voyage has counted can leave it. What the departure changes is how that
- * line reads when the voyage closes: a captain who walked out is gone
- * from a voyage that ends with the harbor full, and the record says so
- * without anyone having to remember it.
+ * Only a captain the voyage already counted can leave. A spectator who wandered
+ * into the channel must not appear as abandoning the voyage.
  *
- * It is called from both places a seat is actually given up, so the
- * captain who presses Leave, the captain whose connection drops for good,
- * and the captain an operator bans are all recorded the same way.
- *
- * Only a captain the voyage has already counted can leave it. The voyage
- * counts the roster it was dealt at departure and anyone who reported a
- * leg, and this guard is what keeps a spectator who wandered into the
- * room's channel and wandered back out from appearing in the record as a
- * captain who abandoned the voyage. A seat held by someone who never
- * sailed a leg and never reports one is, from the voyage's own point of
- * view, indistinguishable from a spectator, and the record stays silent
- * about them rather than guessing.
- *
- * A captain leaves once. The Leave button gives up the seat and tells the
- * server so, and the seat is gone by the time the grace timer would have
- * reaped it, but a client that says it left without the seat actually
- * going anywhere would otherwise be recorded as leaving twice.
+ * A captain leaves once: a client can say it left without the seat going, and the
+ * grace timer may reap the same seat later.
  */
 export function noteCaptainLeft(roomId: string, actor: string): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -491,29 +340,20 @@ export function noteCaptainLeft(roomId: string, actor: string): void {
   if (!admitsMore(voyage)) return;
   voyage.events.push(
     telemetryEvent("captain_left", voyage.voyageId, Date.now(), {
-      leg: voyage.leg,
+      round: voyage.round,
       actor,
     }),
   );
 }
 
 /**
- * The harbor put a captain ashore.
+ * The harbor put a captain ashore. Called beside the carried vote so the mark
+ * and maroon_carried cannot disagree. Writes no event, so it is not subject to
+ * the event cap: a truncated record still says who was put ashore.
  *
- * Called from the same place the carried vote is recorded, so the mark and
- * the maroon_carried event are the same observation written twice: a
- * record cannot say the harbor voted a captain out while that captain's
- * own line reads as though the voyage treated them like everyone else.
- * It follows that this is also the one note that does not go through the
- * event cap, because it writes no event: a truncated record still says who
- * was put ashore, since the cap is about how much happened rather than
- * about how the voyage stands when it ends.
- *
- * It marks a captain the voyage may not have counted yet, and that is
- * deliberate where noteCaptainLeft refuses to. A carried vote names a room
- * member the harbor sits in judgement of, which is a fact about the voyage
- * even when the captain never filed a leg report, and the close folds
- * anyone marked here into the lines it writes.
+ * Unlike noteCaptainLeft it marks a captain the voyage may not have counted: a
+ * carried vote is a fact about the voyage even without a round report, and the
+ * close folds them into the captain lines.
  */
 export function noteCaptainMarooned(roomId: string, actor: string): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -522,20 +362,9 @@ export function noteCaptainMarooned(roomId: string, actor: string): void {
 }
 
 /**
- * [J2: the mute and the report] The host silenced a captain.
- *
- * The same mark the maroon writes, written the same way and for the same
- * reason: it is the server's own fact, it is written from the one place
- * the mute is applied, and it goes onto the captain's own line rather than
- * being joined out of the mute_set event at the reading end. Like the
- * maroon it writes no event and so does not go through the event cap: a
- * truncated record still says who was silenced, because the cap bounds how
- * much happened rather than how the voyage stood when it ended.
- *
- * An unmute does not take the mark back. The mark reads "was muted", which
- * is the thing a reader cannot recover from the record otherwise, and
- * whether the mute stood to the end is read from the pair of events, the
- * last of which decides it.
+ * The host silenced a captain. The same mark as the maroon and likewise not
+ * subject to the event cap. An unmute does not clear it: the mark means "was
+ * muted", and the mute_set events say when.
  */
 export function noteCaptainMuted(roomId: string, actor: string): void {
   const voyage = voyageTelemetry.get(roomId);
@@ -544,30 +373,17 @@ export function noteCaptainMuted(roomId: string, actor: string): void {
 }
 
 /**
- * The voyage stopped. Writes the record and forgets the voyage.
+ * The voyage stopped: write the record and forget it.
  *
- * The list handed in is the whole truth about the end: the captains still
- * standing in the harbor at this moment, which is the room's live sockets
- * in every caller. A captain in it was there, and every other captain
- * this voyage saw reads as gone from it, whether they gave up their seat
- * a leg ago or were simply not looking at the screen when the voyage
- * closed.
+ * `present` is the harbor's live sockets at this moment, so every other captain
+ * reads as gone, whether they left a round ago or merely were not looking.
  *
- * The peer ledger is handed in rather than looked up here, because the
- * accumulator never sees a save and the one place one is read is the
- * conclusion, which is already holding every save in the harbor open to
- * decide the verdicts. A captain it was read for carries the number their
- * own save held, and a captain it was not carries the zero an unreadable
- * save gives. The two outcomes that are not a conclusion hand it nothing,
- * for a reason of their own rather than a shared one: a harbor that
- * empties takes its saves with it when the room row goes, and a voyage
- * its host wipes closes at a moment when no conclusion is reading
- * anything. Both say which outcome they are rather than pretending to a
- * reading nobody took.
+ * Peer profits are handed in because the accumulator never reads saves; the
+ * conclusion already holds them. The two non-concluding endings pass nothing: an
+ * emptied harbor takes its saves when the room row goes, and a wiped voyage
+ * closes with no conclusion reading anything.
  *
- * The write is the last thing that happens and it is allowed to fail: a
- * record that could not be stored is a lost measurement, and a voyage
- * that could not be closed is a stuck harbor.
+ * The write is last and may fail: a lost measurement is better than a stuck harbor.
  */
 export async function closeVoyageTelemetry(
   roomId: string,
@@ -583,25 +399,18 @@ export async function closeVoyageTelemetry(
   for (const userId of stillThere) {
     voyage.captains.add(userId);
   }
-  // A captain the harbor voted ashore is a captain this voyage saw, even
-  // if they never filed a leg report, so the mark carries its own line
-  // rather than being dropped for want of one. The mute mark gets the same
-  // treatment for the same reason, and the reason is not hypothetical on
-  // this one: a captain who takes a seat mid voyage, is silenced, and
-  // gives the seat up again before reporting a leg is counted by nothing
-  // else, since noteCaptainLeft refuses a captain the voyage never counted.
+  // A marooned or muted captain is one this voyage saw even without a round report,
+  // so each mark carries its own line. The mute case is real: a captain who takes
+  // a seat, is silenced, and leaves before reporting is counted by nothing else,
+  // since noteCaptainLeft refuses a captain never counted.
   for (const userId of voyage.marooned) {
     voyage.captains.add(userId);
   }
   for (const userId of voyage.muted) {
     voyage.captains.add(userId);
   }
-  // [F4: boons at milestone moments] The crew loss mark gets the same
-  // fold, for the one edge where a report can carry a loss and still
-  // leave no line of its own: a voyage whose events have filled to the
-  // cap keeps the mark and drops the append. Everywhere else the mark's
-  // captain already has a line, because the report that wrote the mark
-  // is the same call that counted them.
+  // The crew loss mark needs the same fold for one edge: a report that writes the
+  // mark can still be dropped by the event cap.
   for (const userId of voyage.crewLost) {
     voyage.captains.add(userId);
   }
@@ -630,7 +439,7 @@ export async function closeVoyageTelemetry(
     startedAt: voyage.startedAt,
     endedAt: Date.now(),
     outcome,
-    endedAtLeg: voyage.leg,
+    endedAtRound: voyage.round,
     captains,
     events: voyage.events,
     truncated: voyage.truncated,
@@ -647,7 +456,7 @@ export async function closeVoyageTelemetry(
         version: record.version,
         sampleRate: record.sampleRate,
         outcome: record.outcome,
-        leg: record.endedAtLeg,
+        round: record.endedAtRound,
         startedAt: new Date(record.startedAt),
         endedAt: new Date(record.endedAt),
         record: JSON.stringify(record),
@@ -655,16 +464,14 @@ export async function closeVoyageTelemetry(
     });
   } catch (error) {
     console.warn(
-      `[telemetry] could not store the record for room ${roomId}:`,
+      `[telemetry] could not store the record for harbor ${roomId}:`,
       error,
     );
   }
 }
 
-/** Forget a room without writing anything. For the paths where a voyage
- *  did not happen at all: a room deleted before it sailed, or a harbor
- *  the operator closed down. Their absence is not a voyage that stopped,
- *  so it is not a record. */
+/** Forget a harbor without writing anything: a harbor deleted before it sailed,
+ *  or one the operator closed. Its absence is not a voyage that stopped. */
 export function dropVoyageTelemetry(roomId: string): void {
   voyageTelemetry.delete(roomId);
 }

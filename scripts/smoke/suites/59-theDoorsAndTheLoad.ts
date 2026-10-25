@@ -18,7 +18,8 @@ import {
 } from "@/lib/game/constants/ships";
 import { healLoadedVoyage } from "@/lib/session/heal-save";
 import type { GameState } from "@/lib/game/types";
-import { check, voyageState, withEnv } from "../harness";
+import { check, ledgerSentences, voyageState, withEnv } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 /**
  * The bug cycle's engine reconciliations, held in one article because
@@ -53,7 +54,7 @@ import { check, voyageState, withEnv } from "../harness";
  * under check is the arithmetic the engine's own doors run on.
  */
 export async function theDoorsAndTheLoadSuite(): Promise<void> {
-  const logs: string[] = [];
+  const logs: LedgerLine[] = [];
 
   const overdrive = cardById("overdrive_engine");
   const hauler = cardById("bulk_hauler");
@@ -87,10 +88,10 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     ...over,
   });
 
-  // ---- A. The third door charges what the unwind expects ----
+  // ========== A. The third door charges what the unwind expects ==========
   withEnv("NEXT_PUBLIC_MODULE_TRADES", "1", () => {
     const bought = hullState({ currentRound: 3 });
-    const buyLogs: string[] = [];
+    const buyLogs: LedgerLine[] = [];
     check(
       applyModuleTradeSide(
         bought,
@@ -108,11 +109,13 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
         bought.maintenancePenalty === 10 &&
         bought.cardTally.overdrive_engine?.picked === 1 &&
         bought.money === 460 &&
-        buyLogs.some((line) => line.includes("is bolted to the hull")),
+        ledgerSentences(buyLogs).some((line) =>
+          line.includes("is bolted to the hull"),
+        ),
       "a module bought at the Parley lands with the accounting every other landing site charges: the overdrive's surcharge rides the hull and the pick is written to the tally, where the buyer branch used to push the card bare, which left the surcharge uncharged and the tally missing the one module this captain actually took",
     );
 
-    const soldLogs: string[] = [];
+    const soldLogs: LedgerLine[] = [];
     check(
       applyModuleTradeSide(
         bought,
@@ -135,7 +138,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     );
 
     const beforeBill = bought.money;
-    const billLogs: string[] = [];
+    const billLogs: LedgerLine[] = [];
     const paid = payMaintenance(bought, billLogs);
     check(
       paid === true &&
@@ -146,7 +149,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     );
   });
 
-  // ---- B. The load reconciles what the doors wrote ----
+  // ========== B. The load reconciles what the doors wrote ==========
   const damaged = voyageState({ voyageEpoch: 7 });
   damaged.currentRound = 3;
   damaged.fixedCost = Number.NaN;
@@ -168,7 +171,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     "a save the doors left disagreed with its own hull heals at the load to the bill the hull actually owes: the purse of a captain who bought a surcharge module that was never charged reads the surcharge back, the minus ten the old unwind wrote reads as nothing rather than as a negative fee, a fee that is not a number falls back to the canonical ladder, a level past the top clamps to the last rung of it, and the fixed cost falls back to the tier's own maintenance, so no door's arithmetic can reach a damaged save's purse again",
   );
 
-  // ---- C. The hull and the whispers heal through their pools ----
+  // ========== C. The hull and the whispers heal through their pools ==========
   // The two collections whose heal was a bare coalesce: the hull's whole
   // card records, of which a pre card record save carries the old module
   // shape (no strings table at all), and the whisper board's entries, of
@@ -197,7 +200,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     "the hull heals through the same pool every reader resolves a held card through: both copies of the old shape land as this build's own record, so the yard's cardText reads a strings table that exists and the two copies still count their surcharge twice, an id the pool cannot answer for and a null are dropped rather than drawn, and the whisper board keeps only entries carrying the item and port its readers index",
   );
 
-  // ---- D. The pantry's reader asks for its own keys ----
+  // ========== D. The pantry's reader asks for its own keys ==========
   const lots = normalizeLarderLots(
     [
       { food: "toString", meals: 5, boughtRound: 1 },
@@ -211,7 +214,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     "the pantry's reader admits only the foods its own table holds: the in operator it used to ask with answered true for every member of Object.prototype, so a doctored lot of toString survived the heal and walked an undefined mealsPerSlot into NaN and out through the provisioning arithmetic into the captain's purse",
   );
 
-  // ---- E. The purse's reader floors like its sibling ----
+  // ========== E. The purse's reader floors like its sibling ==========
   const purse = voyageState({ voyageEpoch: 7 });
   (purse as unknown as { money: unknown }).money = null;
   check(
@@ -220,7 +223,7 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     "an unreadable purse reads as empty rather than as NaN: the Gold branch was the one without the fallback its inventory sibling always had, so a save carrying a null purse made a trade settle its fee at zero while the seller was still credited the agreed price, and the difference was minted",
   );
 
-  // ---- F. The meal line says what the floor does ----
+  // ========== F. The meal line says what the floor does ==========
   withEnv("NEXT_PUBLIC_SURVIVAL", "1", () => {
     const hungry = voyageState({ voyageEpoch: 7 });
     hungry.currentRound = 3;
@@ -228,29 +231,35 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
     hungry.larder = 0;
     hungry.larderLots = [];
     hireWorker(hungry, "weaver", logs);
-    const mealLogs: string[] = [];
+    const mealLogs: LedgerLine[] = [];
     const fed = feedCrew(hungry, mealLogs);
     check(
       fed === true &&
-        mealLogs.some((line) =>
+        ledgerSentences(mealLogs).some((line) =>
           line.includes("every line still brings home at least one item"),
         ) &&
-        !mealLogs.some((line) => line.includes("pace, and the fleet")),
+        !ledgerSentences(mealLogs).some((line) =>
+          line.includes("pace, and the fleet"),
+        ),
       "the short rations line tells the captain what the engine actually does: the yield halves a line and lifts any line under one item back to one, so the sentence claims both halves of that rule rather than the constant alone, which promised a flat percentage the floor never fully took",
     );
   });
 
-  // ---- G. The wear line names the unit the engine took ----
+  // ========== G. The wear line names the unit the engine took ==========
   withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
     const clothed = voyageState({ voyageEpoch: 7 });
     clothed.currentRound = 3;
     clothed.garmentsTickRound = 2;
     clothed.garments = [{ good: "Brocade", durability: 10 }];
-    const wearLogs: string[] = [];
+    const wearLogs: LedgerLine[] = [];
     tickGarments(clothed, wearLogs);
     check(
-      wearLogs.some((line) => line.includes("point of wear to the sea")) &&
-        !wearLogs.some((line) => line.includes("of their warmth")),
+      ledgerSentences(wearLogs).some((line) =>
+        line.includes("point of wear to the sea"),
+      ) &&
+        !ledgerSentences(wearLogs).some((line) =>
+          line.includes("of their warmth"),
+        ),
       "the wear line names the unit the engine took: durability points rather than warmth, which is the garment's rating scaled by the fraction of itself that is left, so the sentence and the numbers the wardrobe prints can be reconciled by the captain reading both",
     );
   });

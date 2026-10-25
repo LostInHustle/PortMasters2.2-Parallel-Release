@@ -1,9 +1,9 @@
 // PortMasters 2.2 Parallel Release, smoke run: the mutes and the keys.
 //
-// [W3, NOT-5] The audit asked for an article driving the notification
-// center's rules and found none written down; reading the code settled
-// which rules exist. There is no dedupe rule and no below the breakpoint
-// suppression rule; the rules that are real are these. A captain who has
+// This article drives the notification center's rules. Reading the code
+// settled which rules exist. There is no dedupe rule and no below the
+// breakpoint suppression rule; the rules that are real are these. A
+// captain who has
 // never opened Settings hears every category, because an absent
 // preference answers enabled. The three switches are three keys, so
 // muting one category leaves the others alone. Storage that is blocked
@@ -19,9 +19,9 @@
 // live socket, and the replacement rule is a property of the hook's one
 // push rather than of anything a socket surface can observe without a
 // page. This article reads the half that is reachable from here, the
-// preference functions and the keys, which is the half the audit's own
-// defect was about: the screen once saved under its own copy of the key
-// names while the hook read a set nothing wrote to.
+// preference functions and the keys, which is the half the defect was
+// about: the screen once saved under its own copy of the key names while
+// the hook read a set nothing wrote to.
 //
 // The preference functions answer out of localStorage, so the first half
 // swaps a stub in and puts the host's own storage back in the finally

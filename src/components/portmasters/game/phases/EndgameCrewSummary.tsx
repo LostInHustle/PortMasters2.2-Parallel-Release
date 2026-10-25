@@ -3,13 +3,13 @@
 import { Users } from "lucide-react";
 import { listJoiner, t } from "@/lib/game/i18n";
 import { flatWorkerRoster, type GameState } from "@/lib/game/types";
-import { PanelTotal, StatTile, SummaryHeading } from "./PhaseShared";
+import { FigureTile, PanelTotal, SummaryHeading } from "./PhaseShared";
 
 /**
  * Crew Management Summary. Shows worker productivity stats at voyage
  * end: the crew still aboard, how many reached skilled status, total
- * items produced, and the wages paid. [C2: crew loss by name] The first
- * tile says "Crew Aboard" rather than "Workers Hired" because the two
+ * items produced, and the wages paid. The first
+ * tile says "Crew Aboard" rather than "Artisans Hired" because the two
  * stopped being the same number the moment a hand could be lost or
  * dismissed, and the line under the tiles is where the names of the lost
  * are read back: the log said each one as it happened, and a summary that
@@ -24,7 +24,7 @@ export function CrewSummary({ game }: { game: GameState }) {
   // this one is where that shows.
   const crewAboard = allWorkers.length;
   const skilledCount = allWorkers.filter((w) => w.isSkilled).length;
-  const totalWages = game.workerWages;
+  const totalWages = game.wagesPaid;
   const lost = game.crewLost ?? [];
 
   // Estimate total items produced from worker producedCount
@@ -35,12 +35,12 @@ export function CrewSummary({ game }: { game: GameState }) {
 
   if (crewAboard === 0) return null;
 
-  // The hands the voyage took, each named with the leg it happened on. The
+  // The hands the voyage took, each named with the round it happened on. The
   // join is the language's own, so a Mandarin list separates the way its
   // sentences do.
   const lostList = lost
     .map((loss) =>
-      t("{loss.name} (leg {loss.round})", {
+      t("{loss.name} (round {loss.round})", {
         "loss.name": loss.name,
         "loss.round": loss.round,
       }),
@@ -54,17 +54,20 @@ export function CrewSummary({ game }: { game: GameState }) {
         {t("Crew Summary")}
       </SummaryHeading>
       <div className="grid grid-cols-3 gap-2">
-        <StatTile
+        <FigureTile
+          size="figure"
           value={crewAboard}
           valueClassName="text-due"
           label={t("Crew Aboard")}
         />
-        <StatTile
+        <FigureTile
+          size="figure"
           value={skilledCount}
           valueClassName="text-gain"
           label={t("Skilled")}
         />
-        <StatTile
+        <FigureTile
+          size="figure"
           value={totalProduced}
           valueClassName="text-sea"
           label={t("Items Made")}
@@ -72,11 +75,14 @@ export function CrewSummary({ game }: { game: GameState }) {
       </div>
       <PanelTotal
         tone="border-due/10"
+        className="mt-2"
         label={
-          <span className="text-muted-foreground">{t("Total Wages Paid")}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {t("Total Wages Paid")}
+          </span>
         }
       >
-        <span className="font-bold text-due">
+        <span className="text-[11px] font-bold text-due">
           {t("{contract.fee} Gold", { "contract.fee": totalWages })}
         </span>
       </PanelTotal>

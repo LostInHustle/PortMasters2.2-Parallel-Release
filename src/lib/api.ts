@@ -32,16 +32,16 @@ export type RoomSummary = {
   isPublic: boolean;
   started: boolean;
   difficulty: Difficulty;
-  // Which voyage this harbor is playing. The lobby reads it to badge the room
+  // Which voyage this harbor is playing. The lobby reads it to badge the harbor
   // card and to draw the host's mode switch on the right setting, and a
-  // captain who joins reads it to know which lap the room is keeping before
+  // captain who joins reads it to know which lap the harbor is keeping before
   // their own state ever loads. See src/lib/game/mode.ts.
   mode: GameMode;
-  // [H9: the unlock code] Which phrase opened this harbor, or null for one
-  // that was never sealed. The lobby reads it to name the door on the room
-  // card, so a captain joining a table can see it was opened rather than
-  // found. The phrase itself is not on the wire and is not what this is:
-  // see src/lib/unlock.ts, where the label lives beside it.
+  // Which phrase opened this harbor, or null for one that was never
+  // sealed. The lobby reads it to name the door on the harbor card, so a
+  // captain joining a table can see it was opened rather than found. The
+  // phrase itself is not on the wire and is not what this is: see
+  // src/lib/unlock.ts, where the label lives beside it.
   unlock: UnlockId | null;
   createdAt: string;
   host: PublicUser;
@@ -89,11 +89,11 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-// The two 404 answers more than one route gives, each said once: a room
+// The two 404 answers more than one route gives, each said once: a harbor
 // the caller named that is not there, and a captain the caller named that
 // is not there. Two routes answering one absence with two spellings is
 // how a caller learns to match on prose instead of on the absence.
-export const ROOM_NOT_FOUND = "Room not found";
+export const HARBOR_NOT_FOUND = "Harbor not found";
 export const CAPTAIN_NOT_FOUND = "Captain not found";
 
 export const api = {
@@ -144,7 +144,7 @@ export const api = {
     ),
   logout: () => jfetch<{ ok: true }>("/api/auth/logout", { method: "POST" }),
 
-  // Rooms
+  // Harbors
   listRooms: () => jfetch<{ rooms: RoomSummary[] }>("/api/rooms"),
   createRoom: (body: {
     name: string;
@@ -154,7 +154,7 @@ export const api = {
     // schema defaults it to the founding mode. Only the lobby's create form
     // sends it, and only when the host has picked the experimental one.
     mode?: GameMode;
-    // [H9: the unlock code] The phrase a host typed for a sealed mode, sent
+    // The phrase a host typed for a sealed mode, sent
     // only when the mode they picked takes one. The route is what decides
     // whether it opens anything: this client never checks it, so the form
     // cannot refuse a phrase the harbor would have taken.
@@ -166,7 +166,7 @@ export const api = {
     }),
   getRoom: (id: string) =>
     jfetch<{ room: RoomDetail; messages: ChatMessage[] }>(`/api/rooms/${id}`),
-  // The room this captain is still seated in, or null. Used on page load to
+  // The harbor this captain is still seated in, or null. Used on page load to
   // put a captain who merely reloaded back aboard instead of stranding them
   // in the Lobby while the harbor waits on their ready vote.
   getActiveRoom: () => jfetch<{ room: RoomDetail | null }>("/api/rooms/active"),
@@ -190,16 +190,16 @@ export const api = {
         voyageEpoch: number;
       } | null;
       difficulty: Difficulty;
-      // The room's mode, which decides the phase order this captain's lap
+      // The harbor's mode, which decides the phase order this captain's lap
       // runs in. Loaded with the save rather than read from anywhere the
-      // client already holds, because the room is the single source of truth
+      // client already holds, because the harbor is the single source of truth
       // for it exactly as it is for difficulty.
       mode: GameMode;
-      // [H5: the quota rung] How many captains this voyage was dealt to, as
-      // the room pinned it at departure. The commission's quotas scale with
+      // How many captains this voyage was dealt to, as
+      // the harbor pinned it at departure. The commission's quotas scale with
       // it, so a captain who reloads mid voyage draws the board the fleet is
       // actually working on from this rather than from the roster they can
-      // see. 0 means the room has no voyage pinned.
+      // see. 0 means the harbor has no voyage pinned.
       seats: number;
     }>(`/api/game/state?roomId=${roomId}`),
   saveGameState: (roomId: string, data: unknown) =>
@@ -249,7 +249,7 @@ export const api = {
       checkIn: CheckInStatus;
     }>("/api/check-in", { method: "POST" }),
 
-  // [MANIFEST] Voyage Chronicle: the prose recap of a finished voyage.
+  // Voyage Chronicle: the prose recap of a finished voyage.
   // Returns the current user's chronicles, newest first. This is the only
   // chronicle call there is: the rows are written by the realtime layer as
   // each voyage concludes (see maybeConcludeVoyage), so there is nothing
@@ -259,7 +259,7 @@ export const api = {
   listChronicles: () =>
     jfetch<{ chronicles: VoyageChronicle[] }>("/api/chronicle"),
 
-  // [MANIFEST] Quick Start Match: asks to be seated with the next captain
+  // Quick Start Match: asks to be seated with the next captain
   // who asks. The queue lives in the realtime layer's memory, so the real
   // request goes over the socket as `quickstart:join` and the answer comes
   // back as `quickstart:matched` or `quickstart:error` (see the Lobby).
@@ -271,14 +271,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // [MANIFEST] Captain's Rival: head to head lines for the current user,
+  // Captain's Rival: head to head lines for the current user,
   // read by the Captain's Legacy card on the Endgame screen and by the
   // profile modal. Every rivalry the account has is in this one list, so
-  // the card picks the entry for whoever else is in the room rather than
+  // the card picks the entry for whoever else is in the harbor rather than
   // asking for that partner by name.
   listRivals: () => jfetch<{ rivals: RivalEntry[] }>("/api/rivals"),
 
-  // [MANIFEST] Great Houses: pledge allegiance to one House, and read the
+  // Great Houses: pledge allegiance to one House, and read the
   // harbor wide standings so the Lobby's House picker shows crowns and best
   // scores per House. Pledging is account level, persists across voyages,
   // and only takes effect on the next fresh voyage start.
@@ -299,7 +299,7 @@ export const api = {
   getLeaderboard: () =>
     jfetch<{ leaderboard: LeaderboardEntry[] }>("/api/leaderboard"),
 
-  // [I3: the dashboard, and the front page number] The balance reading:
+  // The balance reading:
   // every launch gate the window can answer, and the reason beside every
   // gate it cannot. The route is gated on the account row (401 for a
   // stranger, 403 for a captain), so this call is only ever made by the

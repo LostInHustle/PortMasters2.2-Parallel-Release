@@ -10,7 +10,7 @@
 // around that: goods are always in exactly one place, never promised
 // twice.
 //
-// The offer board itself is shared room state and lives on the server
+// The offer board itself is shared harbor state and lives on the server
 // (see the barter:* handlers in src/server/realtime/wiring/barter.ts), and
 // the board outlives any single phase now that a captain can post from a
 // chat at any point in the voyage. So the release of escrow cannot be decided
@@ -19,27 +19,27 @@
 // the board stops listing it. These functions are only the local half,
 // moving goods on whichever client they run on.
 // =====================================================================
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 import type { GameState } from "../types";
 import { ageBarterReputation } from "./ages";
 import { addOwnedAmount, getOwnedAmount } from "./core";
 
-// [MANIFEST 10: Ages of the Ledger] The Trader's Age lands Reputation on
+// The Trader's Age lands Reputation on
 // every completed trade, and a trade has two completing sides. Both call
 // this so the Age pays them the same: it is the trade that earns it, not
 // whichever captain happened to be the one posting the offer.
-function awardBarterReputation(state: GameState, logs: string[]) {
+function awardBarterReputation(state: GameState, logs: LedgerLine[]) {
   const gain = ageBarterReputation();
   if (gain <= 0) return;
   state.score += gain;
   logs.push(
-    t("⚖️ Age of the Trader: +{gain} Reputation for the completed trade.", {
+    line("⚖️ Age of the Trader: +{gain} Reputation for the completed trade.", {
       gain,
     }),
   );
 }
 
-// [H4: the Broker] The peer ledger: coin that changed hands with another
+// The peer ledger: coin that changed hands with another
 // captain, net of coin paid to them. The Broker's card is measured on this
 // and nothing else, which is why it is counted here rather than where the
 // trade is reported. Both sides of every completed trade run through
@@ -52,7 +52,7 @@ function awardBarterReputation(state: GameState, logs: string[]) {
 // refunded moves Gold and is not a trade, so only settlement counts, and
 // the two counted sides read their amounts off the same trade: whatever
 // one captain counts as profit the other counts as loss. That zero sum
-// property is what the epic's evaluation leans on, and the smoke suite
+// property is what the evaluation leans on, and the smoke suite
 // asserts it rather than trusting this comment.
 //
 // Nothing is logged. A line naming this figure would put a Broker's
@@ -83,10 +83,10 @@ export function postBarterOffer(
   offerAmount: number,
   requestItem: string,
   requestAmount: number,
-  logs: string[],
+  logs: LedgerLine[],
 ): boolean {
   if (offerItem === requestItem) {
-    logs.push(t("❌ Can't barter an item for itself"));
+    logs.push(line("❌ Can't barter an item for itself"));
     return false;
   }
   if (
@@ -95,13 +95,13 @@ export function postBarterOffer(
     offerAmount < 1 ||
     requestAmount < 1
   ) {
-    logs.push(t("❌ Barter amounts must be whole numbers of at least 1"));
+    logs.push(line("❌ Barter amounts must be whole numbers of at least 1"));
     return false;
   }
   const owned = getOwnedAmount(state, offerItem);
   if (offerAmount > owned) {
     logs.push(
-      t("❌ Can't offer {offerAmount} {offerItem}, only have {owned}", {
+      line("❌ Can't offer {offerAmount} {offerItem}, only have {owned}", {
         offerAmount,
         offerItem,
         owned,
@@ -111,7 +111,7 @@ export function postBarterOffer(
   }
   addOwnedAmount(state, offerItem, -offerAmount);
   logs.push(
-    t(
+    line(
       "🤝 Posted a barter offer: {offerAmount} {offerItem} for {requestAmount} {requestItem}",
       {
         offerAmount,
@@ -126,7 +126,7 @@ export function postBarterOffer(
 
 // Why an escrowed offer's goods are coming home. A withdrawal is the
 // departure the captain asked the board for, a sweep is the board dropping
-// an offer on its own when the leg moves on, a refusal is the room turning
+// an offer on its own when the round moves on, a refusal is the harbor turning
 // a post away, and a pre-load refund is one that arrived before this
 // captain's voyage had loaded and came home with it.
 type BarterRefundCause = "withdrawal" | "sweep" | "refusal" | "pre-load";
@@ -134,28 +134,28 @@ type BarterRefundCause = "withdrawal" | "sweep" | "refusal" | "pre-load";
 const REFUND_PHRASE: Record<BarterRefundCause, string> = {
   withdrawal: "withdrawn",
   sweep: "swept when the voyage moved on",
-  refusal: "refused by the room",
+  refusal: "refused by the harbor",
   "pre-load": "returned as the voyage loaded",
 };
 
 // Returns an escrowed offer to its owner. Called for a withdrawal the
 // captain made, for an offer the server swept off the board when the
-// voyage moved on without anyone taking it, and for a post the room
+// voyage moved on without anyone taking it, and for a post the harbor
 // refused. The cause is what the ledger line says, and it defaults to the
 // withdrawal: the route that needs no context beyond the press.
 export function refundBarterOffer(
   state: GameState,
   offerItem: string,
   offerAmount: number,
-  logs: string[],
+  logs: LedgerLine[],
   cause: BarterRefundCause = "withdrawal",
 ) {
   addOwnedAmount(state, offerItem, offerAmount);
   logs.push(
-    t("↩️ Barter offer {cause}, {offerAmount} {offerItem} returned", {
+    line("↩️ Barter offer {cause}, {offerAmount} {offerItem} returned", {
       // The cause fragment is read here rather than at the constant, which
       // is module scope and would freeze at the process's first language.
-      cause: t(REFUND_PHRASE[cause]),
+      cause: line(REFUND_PHRASE[cause]),
       offerAmount,
       offerItem,
     }),
@@ -172,12 +172,12 @@ export function acceptBarterOffer(
   requestAmount: number,
   offerItem: string,
   offerAmount: number,
-  logs: string[],
+  logs: LedgerLine[],
 ): boolean {
   const owned = getOwnedAmount(state, requestItem);
   if (requestAmount > owned) {
     logs.push(
-      t("❌ Can't pay {requestAmount} {requestItem}, only have {owned}", {
+      line("❌ Can't pay {requestAmount} {requestItem}, only have {owned}", {
         requestAmount,
         requestItem,
         owned,
@@ -188,12 +188,15 @@ export function acceptBarterOffer(
   addOwnedAmount(state, requestItem, -requestAmount);
   addOwnedAmount(state, offerItem, offerAmount);
   logs.push(
-    t("🤝 Traded {requestAmount} {requestItem} for {offerAmount} {offerItem}", {
-      requestAmount,
-      requestItem,
-      offerAmount,
-      offerItem,
-    }),
+    line(
+      "🤝 Traded {requestAmount} {requestItem} for {offerAmount} {offerItem}",
+      {
+        requestAmount,
+        requestItem,
+        offerAmount,
+        offerItem,
+      },
+    ),
   );
   awardBarterReputation(state, logs);
   awardPeerTradeProfit(
@@ -221,11 +224,11 @@ export function settleBarterTrade(
   requestAmount: number,
   offerItem: string,
   offerAmount: number,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   addOwnedAmount(state, requestItem, requestAmount);
   logs.push(
-    t("🤝 Barter offer accepted, received {requestAmount} {requestItem}", {
+    line("🤝 Barter offer accepted, received {requestAmount} {requestItem}", {
       requestAmount,
       requestItem,
     }),
@@ -243,11 +246,11 @@ export function settleBarterTrade(
 // Takes the ledger and nothing else, because that is all the work this
 // departure does: settling the board is not part of it, and where the phase
 // leads belongs to the lap, so no game state is read here.
-export function completeParley(logs: string[]) {
-  logs.push(t("⏭️ Bartering ended"));
+export function completeParley(logs: LedgerLine[]) {
+  logs.push(line("⏭️ Bartering ended"));
   // The successor is not named here on purpose. The trade board sits between
   // the same two phases in the founding mode, but the experimental one runs
   // it after the manifest instead of before, so a hardcoded next phase would
   // be the one line in the engine that quietly pinned this board to one
-  // voyage's leg. See nextPhase in ./lifecycle.
+  // voyage's round. See nextPhase in ./lifecycle.
 }

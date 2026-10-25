@@ -1,59 +1,56 @@
-// =====================================================================
-// [F2: the card record, and the mode weighting field] The shape every
-// offered card is written in, and the vocabulary the shape is spelled
-// with. One record for boons, modules and charters alike, carrying the
-// plan's ten fields: identifier, kind, power, tags, path weight, trigger,
-// condition, effect, mode list, and both language strings (see Epic F of
-// docs/OCEAN_GAMBIT_AGILE_PLAN.md).
+// The shape every offered card is written in, and the vocabulary the
+// shape is spelled with. One record for boons, modules and charters
+// alike, carrying ten fields: identifier, kind, power, tags, path weight,
+// trigger, condition, effect, mode list, and both language strings.
 //
-// This file is the vocabulary and nothing else, the same split F1 took
-// with the tags: the words live here and the walk that reads them lives
-// in ./cards, so a module that wants to ask a question about a card
+// This file is the vocabulary and nothing else, the same split the tag
+// vocabulary keeps: the words live here and the walk that reads them
+// lives in ./cards, so a module that wants to ask a question about a card
 // imports this one and a module that wants to answer one imports that
 // one. Nothing here reads a game state, a world fact or a clock.
 //
-//   - The identifier is a string rather than a literal union. A tag list
+//   * The identifier is a string rather than a literal union. A tag list
 //     is a closed twelve and a path is a closed five, so both derive their
 //     id types from their own record; a card pool is not closed, it is
-//     widened in waves (F2's own iteration says to ship it small and widen
-//     it), and a union of literals would be a union that every wave edits
-//     by hand. What holds a card id to the pool is the registry in ./cards
-//     and the clause that no two records share one, both checkable at load
-//     rather than at review.
+//     widened in waves (the card pool's own iteration says to ship it
+//     small and widen it), and a union of literals would be a union that
+//     every wave edits by hand. What holds a card id to the pool is the
+//     registry in ./cards and the clause that no two records share one,
+//     both checkable at load rather than at review.
 //
-//   - The kind names where a card can come from, and the trigger names the
-//     draft that offers it. The three kinds are the plan's three, and the
+//   * The kind names where a card can come from, and the trigger names the
+//     draft that offers it. The three kinds are the design's three, and the
 //     trigger for each is written once in CARD_TRIGGER rather than beside
 //     every card: a card that arrives at the boon draft and says so in its
 //     own words is a card that can disagree with its own kind.
 //
-//   - Power is a card's weight in the balance ledger, authored rather than
-//     derived, because F7 spends it as a budget ("Every card carries a
-//     power budget and a captain's total is capped") and a derived number
-//     is one nobody can retune without moving a rule. The mode list is
-//     what turns it into a ceiling: a mode runs a ceiling and a card above
-//     that ceiling is absent from that mode's pool, which is the plan's
-//     own reading of the variance problem ("the base competitive mode
-//     should run lower ceilings, since there your good luck is somebody
-//     else's bad evening, while Ocean Gambit can run the wild pool,
-//     because the headline objective is shared").
+//   * Power is a card's weight in the balance ledger, authored rather than
+//     derived, because the power cap spends it as a budget ("Every
+//     card carries a power budget and a captain's total is capped") and
+//     a derived number is one nobody can retune without moving a rule.
+//     The mode list is what turns it into a ceiling: a mode runs a
+//     ceiling and a card above that ceiling is absent from that mode's
+//     pool, which is the design's own reading of the variance problem
+//     ("the base competitive mode should run lower ceilings, since there
+//     your good luck is somebody else's bad evening, while Ocean Gambit
+//     can run the wild pool, because the headline objective is shared").
 //
-//   - Both language strings are carried from the beginning, which is what
-//     makes the translation pass a pass rather than a rebuild (J3: "The
-//     card record in F2 carries both strings from the beginning, so this
-//     goal is a translation pass rather than a structural change"). The
-//     shipped language is named rather than assumed, so the day a captain
-//     picks one, the pick is one value and not a second copy of the pool.
+//   * Both language strings are carried from the beginning, which is what
+//     makes the translation pass a pass rather than a rebuild: the card
+//     record carries both strings from the beginning, so translation is a
+//     pass rather than a structural change. The shipped language is named
+//     rather than assumed, so the day a captain picks one, the pick is one
+//     value and not a second copy of the pool.
 //
-//   - The condition is what makes an offer fit the captain it is offered
+//   * The condition is what makes an offer fit the captain it is offered
 //     to, and it is a closed list of questions the engine already knows
 //     how to ask. It deliberately reads tags and roles rather than goods
-//     and ids, which is F1's rule ("No effect ever names an item key")
+//     and ids, which is the tag rule ("No effect ever names an item key")
 //     applied to the offer gate as well as to the effect: a card that
 //     gates on a good named in its own record is a card the tag system
 //     cannot widen later.
 //
-//   - Path weight is the lean, not the filter, and the plan is explicit
+//   * Path weight is the lean, not the filter, and the design is explicit
 //     that this is the point: "Path weighting is what makes an offer feel
 //     like it belongs to you without locking you out of the rest of the
 //     pool, so the three presented cards are drawn from a weighted pool
@@ -70,18 +67,18 @@ import { MILESTONE_TRIGGERS, type MilestoneTrigger } from "./milestones";
 
 // The three things a captain can hold that are not goods, a position or a
 // crew member. The two the engine drafts are the boons and the modules; a
-// charter is a card a voyage offers once at leg four, ten of them since
-// F6, two for each of the five paths.
+// charter is a card a voyage offers once at round four, ten of them, two
+// for each of the five paths.
 export type CardKind = "boon" | "module" | "charter";
 export const CARD_KINDS: readonly CardKind[] = ["boon", "module", "charter"];
 
 // Where a card arrives. The draft that offers it is the only moment the
-// tree offered a card at all until F4, which widens this list with the
-// milestone moments a boon can be drafted at ("the first pathbound
-// order, crossing a Renown threshold, surviving a cold leg with zero
+// tree offered a card at all until the milestone moments widened this
+// list with the triggers a boon can be drafted at ("the first pathbound
+// order, crossing a Renown threshold, surviving a cold round with zero
 // frostbite, contributing to a Joint Mandate, and losing a crew member",
 // see ./milestones for the five and for the one reading taken in place
-// of the plan's word Renown), as the comment here promised it would: a
+// of the design's word Renown), as the comment here promised it would: a
 // value added to this union rather than a new field.
 export type CardTrigger =
   "boon_draft" | "shipyard_draft" | "charter_draft" | MilestoneTrigger;
@@ -92,11 +89,11 @@ export type CardTrigger =
 // that a failed build rather than a card nobody can explain.
 //
 // The boon entry is the round draft's trigger, and it is a default rather
-// than the only one a boon may carry, which is exactly what F4 changed:
-// the map answers which trigger a kind arrives at when the kind decides
-// it, and a boon's trigger is the card's own field because a milestone
-// boon arrives at a moment rather than at a draft. The validator reads
-// the two cases apart (see the pair of clauses in ../cards).
+// than the only one a boon may carry, which is exactly what the five moments
+// changed: the map answers which trigger a kind arrives at when the kind
+// decides it, and a boon's trigger is the card's own field because a
+// milestone boon arrives at a moment rather than at a draft. The validator
+// reads the two cases apart (see the pair of clauses in ../cards).
 export const CARD_TRIGGER: Record<CardKind, CardTrigger> = {
   boon: "boon_draft",
   module: "shipyard_draft",
@@ -161,14 +158,14 @@ type ModeWeights = Record<GameMode, number>;
 // The ceiling each mode runs. Classic is the competitive table, so it runs
 // the tight one; Ocean Gambit shares its headline objective across the
 // table, so it runs the wide one. Both are authored here from the start,
-// which is the plan's rollback ("Keep both mode weightings authored from
+// which is the design's rollback ("Keep both mode weightings authored from
 // the start so switching between them is a config change").
 export const MODE_POWER_CEILING: Record<GameMode, number> = {
   classic: 3,
   ocean_gambit: 5,
 };
 
-// [F7: the power budget] The ceiling on one captain's held cards, which is
+// The ceiling on one captain's held cards, which is
 // a different question from the one above: that one bounds a single card
 // as the pool admits it, this one bounds the durable set a voyage has
 // handed one captain (the milestone boons, the bolted on modules and the
@@ -176,7 +173,7 @@ export const MODE_POWER_CEILING: Record<GameMode, number> = {
 // purpose: it sits above Classic's whole reachable ladder, whose ceiling
 // three pool already tames it, and below Ocean Gambit's stacked maximum,
 // so the only lines it ever binds are the greediest Gambit ones. The
-// plan's own rollback is this constant ("The budget cap is a validation
+// design's own rollback is this constant ("The budget cap is a validation
 // constant, so raising it is the rollback and it needs no migration"), so
 // every gate reads it live and one edit is the whole unwind.
 export const HELD_POWER_CAP = 26;
@@ -193,7 +190,7 @@ export const BOTH_MODES: ModeWeights = { classic: 1, ocean_gambit: 1 };
 // rather than inlined because a reader should be able to tell which pool
 // a card is in by reading the name rather than by comparing two numbers,
 // and shared from here since it acquired its second family: the pool's
-// own cards above Classic's ceiling, and F6's ten charters.
+// own cards above Classic's ceiling, and the ten charters.
 export const GAMBIT_ONLY: ModeWeights = { classic: 0, ocean_gambit: 1 };
 
 // The card's two faces, per language. The name is what a captain reads on
@@ -216,7 +213,7 @@ export const LANGUAGES: readonly Language[] = LOCALES;
 export const SHIPPED_LANGUAGE: Language = DEFAULT_LOCALE;
 type CardStrings = Record<Language, CardText>;
 
-// The record itself. Every field the plan's F2 names, in the plan's order.
+// The record itself. Every field the design names, in the design's order.
 export interface CardRecord {
   // The handle the engine and the save hold. Stable across a retune: a
   // card renamed for its captain keeps its id, because a standing order
@@ -232,8 +229,8 @@ export interface CardRecord {
   // rather than inside them.
   icon: string;
 
-  // The two tags F1 allows, and the reason an effect can say what it does
-  // without naming a good.
+  // The two tags the tag rule allows, and the reason an effect can say
+  // what it does without naming a good.
   tags: TagList;
 
   // The lean toward each path, and nothing at all for a card that leans

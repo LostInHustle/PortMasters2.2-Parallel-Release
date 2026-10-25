@@ -30,7 +30,7 @@ import {
 import { usePrivateLog } from "@/lib/use-private-log";
 import { useVoyageLog } from "@/lib/use-voyage-log";
 import { useObjective } from "@/lib/use-objective";
-import { useLegReport } from "@/lib/use-leg-report";
+import { useRoundReport } from "@/lib/use-round-report";
 import { useAudit } from "@/lib/use-audit";
 import { useBoonLedger } from "@/lib/use-boon-ledger";
 import { useMaroon } from "@/lib/use-maroon";
@@ -78,6 +78,7 @@ import { useSound } from "@/lib/use-sound";
 import { useRoomRoster } from "@/lib/use-room-roster";
 import { renownProgress } from "@/lib/game/legacy";
 import { t } from "@/lib/game/i18n";
+import { renderLedger } from "@/lib/game/ledger";
 import {
   applyTidewatchSurge,
   claimWordOnTheDocksReward,
@@ -87,10 +88,10 @@ import {
 } from "@/lib/game/engine";
 
 // Browser scoped: the onboarding guide is a "you have played this before"
-// signal, not per room state, so joining a second harbor does not replay it.
+// signal, not per harbor state, so joining a second harbor does not replay it.
 const TUTORIAL_SEEN_KEY = "portmasters_tutorial_seen";
 
-// The four ways the room's three columns can stand: both rails open, either
+// The four ways the harbor's three columns can stand: both rails open, either
 // folded to its stub, both folded. Each is a whole literal rather than a
 // string built from parts, so the class scan sees every template it has to
 // keep, and the grid lerps between them (the transition on the grid
@@ -117,12 +118,47 @@ const RAIL_COLS = {
 const RAIL_STUB =
   "pm-glass hidden rounded-2xl p-1.5 flex-col items-center gap-1";
 
+const RAIL_STUB_ACTIONS = {
+  roster: {
+    label: "Open the Harbor Roster",
+    tone: "text-members",
+    Icon: Ship,
+  },
+  chat: {
+    label: "Open the chat",
+    tone: "text-chat",
+    Icon: MessageCircle,
+  },
+} as const;
+
+function RailStubButton({
+  panel,
+  onOpen,
+}: {
+  panel: keyof typeof RAIL_STUB_ACTIONS;
+  onOpen: () => void;
+}) {
+  const { label, tone, Icon } = RAIL_STUB_ACTIONS[panel];
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={`h-8 w-8 rounded-lg ${tone}`}
+      aria-label={t(label)}
+      title={t(label)}
+      onClick={onOpen}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
+}
+
 // Why a Next Phase press was refused, in the words of the seat the captain is
 // standing in. Every case here is a seat the engine's canLeavePhase says no
 // to, and every one of them has a way out that is not this button: the host
 // sets sail, a boon is picked, the module draft is finished or skipped. The
 // press is refused rather than sent, so the captain who pressed it is owed the
-// reason: the room would otherwise hold a ready set no departure could carry
+// reason: the harbor would otherwise hold a ready set no departure could carry
 // out, and the bar would say "ready" while the voyage stood still.
 //
 // The answers stay plain English the way the copy constants do; the press
@@ -133,7 +169,7 @@ function leaveRefusal(phase: GameState["phase"]): string {
   switch (phase) {
     case "harbor":
       return "A voyage leaves the pier when the host sets sail, not by readying up.";
-    // [W2: the path draft] The deal's own seat. It is left by the table
+    // The deal's own seat. It is left by the table
     // rather than by any one captain, so the refusal says what actually
     // turns the step over instead of pointing at a button that never
     // existed: see canLeavePhase, which refuses this seat, and the panel
@@ -146,7 +182,7 @@ function leaveRefusal(phase: GameState["phase"]): string {
     case "endgame":
       return "This voyage is over for you, so there is no seat left to leave.";
     default:
-      return "Your own screen has work open on it. Finish or close it and the room moves on.";
+      return "Your own screen has work open on it. Finish or close it and the harbor moves on.";
   }
 }
 
@@ -157,7 +193,7 @@ export function GameRoom({
   onSessionLost,
 }: {
   me: PublicUser;
-  // The room's own record, which is what the page already holds by the time
+  // The harbor's own record, which is what the page already holds by the time
   // this renders. Typed as the page's real RoomDetail rather than a local
   // shape, so the one record carries every field the session below needs and
   // the mode this harbor is playing cannot be left off a second copy.
@@ -196,18 +232,25 @@ export function GameRoom({
     game: state.game,
     act,
     // The voyage's own seed identity, which the engine's autoCommit needs to
-    // leave a seat on the clock's behalf (see [B2] in @/lib/use-phase-sync).
+    // leave a seat on the clock's behalf (see the `ctx` note in
+    // @/lib/use-phase-sync).
     ctx,
     authed,
     myUserId: me.id,
     startingGoldBonus,
   });
   // Notification center needs to be initialized before the effects that
-  // call notifications.push, otherwise the lint rule flags it as accessed
+  // call pushNotification, otherwise the lint rule flags it as accessed
   // before declaration.
   const notifications = useNotificationCenter();
+  // The push on its own, for the effects below. An effect that reaches
+  // into the center through its object asks the lint rule for that whole
+  // object in its dependency list, and the object is a heavier thing to
+  // depend on than the one function it wants. The center holds its answer
+  // to one identity, so this is the same function every render.
+  const pushNotification = notifications.push;
 
-  // The nine boards this room runs outside a save file, and the ten
+  // The nine boards this harbor runs outside a save file, and the ten
   // relays that close them into this captain's own voyage. They live in
   // one hook because they are one kind of thing: see ./use-harbor-boards
   // for the boards themselves and for what each relay is watching for.
@@ -229,6 +272,11 @@ export function GameRoom({
     loaded: state.loaded,
     playSound,
   });
+
+  // The two callbacks the effects below depend on directly. Depending on the
+  // whole board object would re-run them on every render.
+  const escortClaim = escort.claim;
+  const aidRepay = aid.repay;
 
   // The cover the raid roll consults, mirrored from the board this captain
   // can see. The engine asks one field and never the network (see
@@ -267,14 +315,14 @@ export function GameRoom({
     act,
   ]);
 
-  // The claim a covered raid leaves behind, relayed to the room and cleared.
+  // The claim a covered raid leaves behind, relayed to the harbor and cleared.
   // The raid itself stays a pure engine mutation (it sets the field rather
   // than reaching for a socket it does not have), so this is the one place
   // the covered captain's own report of what the pirates would have taken
   // becomes a frame, which is also the one place it can be.
   //
   // Cleared before it is sent rather than after: a claim that the server
-  // refuses, because the leg moved on or the contract is already claimed,
+  // refuses, because the round moved on or the contract is already claimed,
   // is still a raid that happened, and resending it every render would only
   // be a way to keep asking.
   useEffect(() => {
@@ -283,14 +331,14 @@ export function GameRoom({
     act((g) => {
       g.pendingEscortClaim = null;
     });
-    escort.claim(pending.contractId, pending.raidGold);
-  }, [state.game.pendingEscortClaim, socket, act, escort.claim]);
+    escortClaim(pending.contractId, pending.raidGold);
+  }, [state.game.pendingEscortClaim, socket, act, escortClaim]);
 
-  // The seven effects: join the room channel on every reconnect, watch for
+  // The seven effects: join the harbor channel on every reconnect, watch for
   // voyage conclusion, relay the engine's pending debt settlements, relay
   // the Word on the Docks claim, watch for the docks race resolution,
   // watch for the Tidewatch surge flip, and hand a captain back to the
-  // Lobby when the room closes.
+  // Lobby when the harbor closes.
 
   useEffect(() => {
     if (!socket || !authed) return;
@@ -298,13 +346,21 @@ export function GameRoom({
   }, [socket, authed, room.id]);
 
   const [voyageResult, setVoyageResult] = useState<VoyageResult | null>(null);
-  // [H8: the reveal and the replay ledger] The harbor's cards, face up.
+  // The harbor's cards, face up.
   // It arrives once, when the voyage concludes, and again for a captain
   // who reloads onto a finished table: the server hands the same payload
   // to a joining socket, which is the only way a browser that was not
   // there for the reveal can be given one.
   const [reveal, setReveal] = useState<VoyageReveal | null>(null);
   const [myLegacy, setMyLegacy] = useState<CaptainLegacySummary | null>(null);
+  // The sound the conclusion plays, held in a ref for the reason the leave
+  // handler below is: the play function is rebuilt when the volume or the
+  // mute changes, and a handler written against the older one would keep
+  // playing at a volume the captain has already turned away from.
+  const playSoundRef = useRef(playSound);
+  useEffect(() => {
+    playSoundRef.current = playSound;
+  }, [playSound]);
   useEffect(() => {
     if (!socket) return;
     const onVoyageComplete = (data: VoyageResult) => {
@@ -324,7 +380,7 @@ export function GameRoom({
             },
           ),
         });
-        playSound("success");
+        playSoundRef.current("success");
       }
       if (mine?.brokersFavorUnlocked) {
         toast.success(t("🤝 Broker's Favor unlocked!"), {
@@ -346,7 +402,7 @@ export function GameRoom({
             icon: <MeritIcon id={merit.id} className="h-4 w-4" />,
           },
         );
-        playSound("confirm");
+        playSoundRef.current("confirm");
       }
     };
     const onRestarted = (data: { roomId: string }) => {
@@ -402,11 +458,11 @@ export function GameRoom({
   useEffect(() => {
     const pending = state.game._pendingDebtSettlements;
     if (!pending || pending.length === 0) return;
-    for (const s of pending) aid.repay(s.amount, s.debtId);
+    for (const s of pending) aidRepay(s.amount, s.debtId);
     act((g) => {
       g._pendingDebtSettlements = [];
     });
-  }, [state.game._pendingDebtSettlements, aid.repay, act]);
+  }, [state.game._pendingDebtSettlements, aidRepay, act]);
 
   // Word on the Docks: completeOrder sets this the instant this captain's
   // own running total crosses the threshold; only the server knows whether
@@ -438,7 +494,7 @@ export function GameRoom({
             { WORD_ON_THE_DOCKS_THRESHOLD, "data.reward": data.reward },
           ),
         });
-        notifications.push({
+        pushNotification({
           icon: "📣",
           title: t("Word on the Docks!"),
           lines: [
@@ -456,7 +512,7 @@ export function GameRoom({
             { "data.winnerName": data.winnerName, WORD_ON_THE_DOCKS_THRESHOLD },
           ),
         });
-        notifications.push({
+        pushNotification({
           icon: "📣",
           title: t("Word on the Docks"),
           lines: [
@@ -476,9 +532,9 @@ export function GameRoom({
     return () => {
       socket.off("docks:won", onDocksWon);
     };
-  }, [socket, room.id, me.id, act, notifications.push]);
+  }, [socket, room.id, me.id, act, pushNotification]);
 
-  // Tidewatch Alerts: every captain in the room applies the same flip and
+  // Tidewatch Alerts: every captain in the harbor applies the same flip and
   // sees the same toast.
   useEffect(() => {
     if (!socket) return;
@@ -490,7 +546,7 @@ export function GameRoom({
           "The harbor takes notice of a bustling crew. One more cargo lot joins the Port Purchase board, every round, for the rest of this voyage.",
         ),
       });
-      notifications.push({
+      pushNotification({
         icon: "🌊",
         title: t("Tidewatch Alert"),
         lines: [
@@ -509,9 +565,9 @@ export function GameRoom({
     return () => {
       socket.off("tidewatch:surge", onSurge);
     };
-  }, [socket, room.id, act, notifications.push]);
+  }, [socket, room.id, act, pushNotification]);
 
-  // Paying a loan back is the room's to close first and this captain's to
+  // Paying a loan back is the harbor's to close first and this captain's to
   // record second. The loan is the server's own book, and it can be gone
   // by the time the press lands (a voyage that ended, a seat that was
   // written off), in which case a local debit here would take the Gold
@@ -525,9 +581,9 @@ export function GameRoom({
     (debtId: string) => {
       const debt = state.game.debts.find((d) => d.id === debtId);
       if (!debt) return;
-      aid.repay(debt.amount, debtId);
+      aidRepay(debt.amount, debtId);
     },
-    [aid, state.game.debts],
+    [aidRepay, state.game.debts],
   );
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -555,10 +611,11 @@ export function GameRoom({
     [state.game, state.logs],
   );
   const playerDetail = usePlayerDetail(socket, room.id, myDetail);
+  const requestPlayerDetail = playerDetail.requestDetail;
   // Whatever this voyage has told this captain and no one else. Empty in
   // every Classic harbor, because nothing is ever sent there.
   const privateLog = usePrivateLog(socket, room.id);
-  // [B4: the log surfaces] The room's own log, which is the other half of
+  // The harbor's own log, which is the other half of
   // the same pair and is read beside it at Dusk. It subscribes here, where
   // the socket is, but it asks the server for nothing until the screen
   // that draws it says so.
@@ -566,27 +623,27 @@ export function GameRoom({
   // The other half of that contrast: the one thing this voyage tells
   // everyone. No objective is drawn in Classic, so the hook stays inert
   // and the panel renders nothing there. The fleet's size goes with it,
-  // because the commission's quotas are scaled by it and only the room
+  // because the commission's quotas are scaled by it and only the harbor
   // knows what it was pinned to.
   const objective = useObjective(socket, room.id, state.game, ctx, act, seats);
-  // [I1: the telemetry spine] What this voyage's records are missing
-  // otherwise: the orders each leg dealt and filled, and how varied the
+  // What this voyage's records are missing
+  // otherwise: the orders each round dealt and filled, and how varied the
   // hold closed it. Nothing comes back from this, and nothing on the
   // screen reads it: it is the one subscription in this component that is
   // purely a measurement.
-  useLegReport(socket, room.id, state.game);
-  // [H6: the Manifest Audit] The harbor's vote and its finding, in one
+  useRoundReport(socket, room.id, state.game);
+  // The harbor's vote and its finding, in one
   // hook because they are one interaction: the vote is what the Parley
   // phase offers, and the finding is what outlives it. Both are broadcast
-  // and both are room stamped inside the hook. Inert in Classic, where no
+  // and both are harbor stamped inside the hook. Inert in Classic, where no
   // vote can be called and none is ever sent.
   const audit = useAudit(socket, room.id, state.game, me.id);
-  // [F5: public offers] The fleet's ledger: this captain's own boon picks
+  // The fleet's ledger: this captain's own boon picks
   // reported out, the whole table's reported back. Both directions are
   // mode gated inside the hook (see its own note), so a Classic harbor
   // costs no frame either way and the panels draw nothing of it.
   const boons = useBoonLedger(socket, room.id, state.game);
-  // [H7: Maroon and the Harbormaster] The second vote, and the one piece
+  // The second vote, and the one piece
   // of state in this component a client applies to its own books on
   // somebody else's word, which is why this hook is handed `act`. Inert in
   // Classic, where no rung exists, no vote can be called and no leaning
@@ -601,7 +658,7 @@ export function GameRoom({
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
-  // [B3: standing orders] The captain's own record, edited in place.
+  // The captain's own record, edited in place.
   const [standingOpen, setStandingOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -625,6 +682,12 @@ export function GameRoom({
     (room as { host?: PublicUser }).host?.id ?? me.id,
   );
   const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
+  // Whether the socket's own roster has landed. The fetch further down
+  // asks the server the same question on mount, and the two answers can
+  // cross: a broadcast that lands while the fetch is still on its way is
+  // the fresher of the two, and letting the slower answer land on top of
+  // it would put a captain back off the roster until the next broadcast.
+  const rosterBroadcast = useRef(false);
   useEffect(() => {
     if (!socket) return;
     // Read defensively, field by field, even though the server always
@@ -633,6 +696,7 @@ export function GameRoom({
     // rather than drop the whole roster over a field it does not expect.
     const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== room.id) return;
+      rosterBroadcast.current = true;
       if (data.hostId) setHostId(data.hostId);
       if (data.members) setMembers(data.members);
       if (data.mutedUserIds) setMutedUserIds(data.mutedUserIds);
@@ -650,11 +714,11 @@ export function GameRoom({
   const [dmHistory, setDmHistory] = useState<ChatMessage[]>([]);
   // Every direct thread this captain is part of in this harbor, as the
   // server hydrated them on join and as they arrive live. Session only, so
-  // it dies with the room like the harbor log beside it.
+  // it dies with the harbor like the harbor log beside it.
   const [dmSession, setDmSession] = useState<ChatMessage[]>([]);
 
   // The session conversation, sent by the server when this captain joined.
-  // It is the room's own memory, so this is the only place it can come from:
+  // It is the harbor's own memory, so this is the only place it can come from:
   // nothing about a voyage is written down.
   useEffect(() => {
     if (!socket) return;
@@ -705,7 +769,7 @@ export function GameRoom({
   // Which chat tab is showing, lifted out of the Tabs component itself so
   // a notification click can jump the user straight to the right one.
   const [chatTab, setChatTab] = useState<"room" | "dm">("room");
-  // Which of the room's foldable panels are folded away: the captain's
+  // Which of the harbor's foldable panels are folded away: the captain's
   // rail, and inside the right rail the roster and the chat. The record
   // is client scoped and persists across visits; see use-panel-prefs for
   // why it is split into rail keys and widget keys.
@@ -730,7 +794,7 @@ export function GameRoom({
   // to the merged stub.
   const oneFolded = panelCollapsed.roster !== panelCollapsed.chat;
 
-  // Load the room's members on mount. The conversation is deliberately not
+  // Load the harbor's members on mount. The conversation is deliberately not
   // fetched with them: a session's chat is held in the server's memory and
   // arrives over the socket on join, because there is no stored history to
   // ask for.
@@ -740,6 +804,10 @@ export function GameRoom({
       try {
         const { room: detail } = await api.getRoom(room.id);
         if (!alive) return;
+        // The socket's roster wins if it has already answered, because
+        // this answer is a snapshot taken when the question went out and
+        // the broadcast is the harbor's live one.
+        if (rosterBroadcast.current) return;
         setMembers(detail.members);
       } catch {
         /* ignore */
@@ -754,14 +822,21 @@ export function GameRoom({
   // grouped together.
   useEffect(() => {
     if (!state.loaded) return;
-    const lines = state.newLines.filter((l) => l.trim().length > 0);
+    // The new lines are read here, in the language the captain is
+    // holding, rather than where they were written. A toast and the
+    // Ledger tab behind it then say the same thing in the same language,
+    // and a captain who flips the pick mid voyage finds the ledger they
+    // are reading in the language they just chose.
+    const lines = renderLedger(locale, state.newLines).filter(
+      (l) => l.trim().length > 0,
+    );
     if (lines.length === 0) return;
-    notifications.push({
+    pushNotification({
       icon: "📜",
       title: t("Captain's Ledger"),
       lines,
     });
-  }, [state.newLines, state.loaded, notifications.push]);
+  }, [state.newLines, state.loaded, pushNotification, locale]);
 
   const openDm = useCallback(
     async (user: PublicUser) => {
@@ -792,7 +867,7 @@ export function GameRoom({
     if (!socket) return;
     const onRoomMsg = (data: { roomId: string; message: ChatMessage }) => {
       if (data.roomId !== room.id || data.message.sender.id === me.id) return;
-      notifications.push({
+      pushNotification({
         icon: "⚓",
         title: `${data.message.sender.displayName} · ${t("Harbor")}`,
         lines: [data.message.content],
@@ -802,7 +877,7 @@ export function GameRoom({
     };
     const onDm = (message: ChatMessage) => {
       if (message.sender.id === me.id) return;
-      notifications.push({
+      pushNotification({
         icon: "✉️",
         title: `${message.sender.displayName} · ${t("Direct")}`,
         lines: [message.content],
@@ -818,7 +893,7 @@ export function GameRoom({
       socket.off("chat:room", onRoomMsg);
       socket.off("chat:dm", onDm);
     };
-  }, [socket, room.id, me.id, notifications.push, openDm]);
+  }, [socket, room.id, me.id, pushNotification, openDm]);
 
   // First time tutorial hint.
   const autoTutorialFired = useRef(false);
@@ -865,10 +940,10 @@ export function GameRoom({
     // when the board itself drops it, wherever the voyage has got to by then.
     //
     // The departure is leavePhase, which is the seat's own work and then the
-    // lap's step off it, and it is the same one the room's clock runs for a
+    // lap's step off it, and it is the same one the harbor's clock runs for a
     // captain who is not there. A bare nextPhase would move a captain out of
     // most seats but names no work for the ones that need it: at Dawn it does
-    // nothing at all, so the press would ready the room into an advance nobody
+    // nothing at all, so the press would ready the harbor into an advance nobody
     // could carry out. The press is refused instead (markReady returns false),
     // and the captain is told why rather than left pressing a button that
     // looks like it worked.
@@ -954,7 +1029,7 @@ export function GameRoom({
   const handleSelectPlayer = useCallback(
     (userId: string) => {
       setSelectedPlayerId(userId);
-      playerDetail.requestDetail(userId);
+      requestPlayerDetail(userId);
       api
         .getLegacyFor(userId)
         .then(({ legacy }) =>
@@ -962,9 +1037,7 @@ export function GameRoom({
         )
         .catch(() => {});
     },
-    // The press itself, not the hook's whole answer: the callback reads
-    // nothing else off it, and the answer moves whenever a peek resolves.
-    [playerDetail.requestDetail],
+    [requestPlayerDetail],
   );
 
   function copyCode() {
@@ -992,9 +1065,9 @@ export function GameRoom({
     );
   }
 
-  // What both chats in this room need to carry the shared offer board. The
+  // What both chats in this harbor need to carry the shared offer board. The
   // harbor thread offers to the harbor; a private thread with a captain in
-  // the room offers to that captain alone, and one with a captain outside it
+  // the harbor offers to that captain alone, and one with a captain outside it
   // carries no trade surface, since an offer can only be aimed at a captain
   // the board can reach.
   const chatTrade: ChatTrade = {
@@ -1009,7 +1082,7 @@ export function GameRoom({
       ? { ...chatTrade, defaultTarget: dmTarget }
       : undefined;
 
-  // On a wide window the room is an app shell: it takes the window's own
+  // On a wide window the harbor is an app shell: it takes the window's own
   // height and never grows past it, so the three columns below can each
   // scroll inside themselves and the rails stay where the captain left
   // them. Below the lg breakpoint it is an ordinary document again, with
@@ -1174,7 +1247,7 @@ export function GameRoom({
                 onSwitch={draft.switchPath}
                 onDismissError={draft.clearError}
               />
-              {/* [F4: boons at milestone moments] What the moments have
+              {/* What the moments have
                   left in this captain's hands, under the chip because the
                   two answer the same question in the same words. It
                   draws nothing when nothing is held, so a rail without a
@@ -1192,7 +1265,7 @@ export function GameRoom({
               </div>
             </div>
             {/* The stub a folded rail leaves: the way back, and the one
-                reading a folded captain still checks, the leg they are on.
+                reading a folded captain still checks, the round they are on.
                 It exists only on the wide layout, because below the
                 breakpoint the rails are full width rows and a folded row
                 would have no stub to come back from. */}
@@ -1253,7 +1326,7 @@ export function GameRoom({
                 readyCount={phaseSync.readyCount}
                 requiredCount={phaseSync.requiredCount}
                 harborCount={members.length}
-                clock={phaseSync.phaseClock}
+                clockDeadline={phaseSync.phaseDeadline}
                 onStandingOrders={() => setStandingOpen(true)}
                 onCancelReady={phaseSync.cancelReady}
                 onShortcuts={() => setShortcutHelpOpen(true)}
@@ -1312,7 +1385,7 @@ export function GameRoom({
                   onTutorialOpen={() => setTutOpen(true)}
                   colorFor={colorFor}
                   roster={roster}
-                  // [W2: the path draft] The room's deal, for the stage at
+                  // The harbor's deal, for the stage at
                   // the draft's own seat. The chip in the rail above reads
                   // the same hook for its in deal state.
                   draft={draft}
@@ -1328,7 +1401,7 @@ export function GameRoom({
                     server did not send: it is read from the captain's own
                     voyage, on the captain's own screen, and no drawer holds
                     it, which is why the card asks for it rather than it
-                    travelling on the private entry. Only a Broker's card
+                    traveling on the private entry. Only a Broker's card
                     prints it. */}
                 {privateLog.map((entry, index) => (
                   <PrivateCard
@@ -1467,7 +1540,7 @@ export function GameRoom({
                     was handed live, so unmounting the harbor on the way to
                     Direct would drop every line said while the captain was
                     looking at the other one, and switching back would show
-                    the log as it stood when the voyage started. The room's
+                    the log as it stood when the voyage started. The harbor's
                     history reaches this panel once, on join, so there is
                     nothing to reseed it from. */}
                 <TabsContent
@@ -1528,16 +1601,10 @@ export function GameRoom({
                 panelCollapsed.roster && !rightFolded ? "lg:flex" : "lg:hidden",
               )}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-members"
-                aria-label={t("Open the Harbor Roster")}
-                title={t("Open the Harbor Roster")}
-                onClick={() => setPanelCollapsed("roster", false)}
-              >
-                <Ship className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="roster"
+                onOpen={() => setPanelCollapsed("roster", false)}
+              />
             </div>
             <div
               className={cn(
@@ -1546,16 +1613,10 @@ export function GameRoom({
                 panelCollapsed.chat && !rightFolded ? "lg:flex" : "lg:hidden",
               )}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-chat"
-                aria-label={t("Open the chat")}
-                title={t("Open the chat")}
-                onClick={() => setPanelCollapsed("chat", false)}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="chat"
+                onOpen={() => setPanelCollapsed("chat", false)}
+              />
             </div>
             {/* The one stub both folded widgets leave, the way back shaped
                 like what it leads to: one press each, and the press opens
@@ -1566,26 +1627,14 @@ export function GameRoom({
             <div
               className={cn(RAIL_STUB, rightFolded ? "lg:flex" : "lg:hidden")}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-members"
-                aria-label={t("Open the Harbor Roster")}
-                title={t("Open the Harbor Roster")}
-                onClick={() => setPanelCollapsed("roster", false)}
-              >
-                <Ship className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-chat"
-                aria-label={t("Open the chat")}
-                title={t("Open the chat")}
-                onClick={() => setPanelCollapsed("chat", false)}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="roster"
+                onOpen={() => setPanelCollapsed("roster", false)}
+              />
+              <RailStubButton
+                panel="chat"
+                onOpen={() => setPanelCollapsed("chat", false)}
+              />
             </div>
           </div>
         </div>
@@ -1615,7 +1664,7 @@ export function GameRoom({
         mode={state.game.mode}
         difficulty={state.game.difficulty}
       />
-      {/* [B3: standing orders] The form writes the record the way the
+      {/* The form writes the record the way the
           load heal does, through the normalizer, rather than trusting
           what the controls composed. The controls can only build the
           closed vocabulary, so this is not a guard against them: it is
@@ -1698,6 +1747,7 @@ export function GameRoom({
           onClick={() => setTipsOpen(true)}
           className="fixed bottom-5 right-5 pm-grad-advisor rounded-full h-12 w-12 flex items-center justify-center shadow-lg z-40"
           title={t("Strategy tips")}
+          aria-label={t("Strategy tips")}
         >
           <LifeBuoy className="h-5 w-5" />
         </motion.button>

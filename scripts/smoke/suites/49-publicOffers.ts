@@ -29,17 +29,18 @@ import {
 import type { Captain, WireHistory } from "../wire";
 import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function publicOffersSuite(
   run: SmokeRun,
   inputs: { gambitHost: Captain; gambitSecond: Captain },
 ): Promise<void> {
   const { gambitHost, gambitSecond } = inputs;
-  // [F5] The plan's sentence is one line: every offer is public, the whole
-  // fleet sees the three cards a captain was shown and the one they kept.
-  // Its rollback is a second line with teeth: this is the one build layer
-  // feature that must not be quietly disabled, so there is no switch of
-  // its own and the harbor's mode is the whole gate.
+  // Every offer is public: the whole fleet sees the three cards a captain
+  // was shown and the one they kept. The rollback is a second rule with
+  // teeth: this is the one build layer feature that must not be quietly
+  // disabled, so there is no switch of its own and the harbor's mode is
+  // the whole gate.
   //
   // The checks come in the halves the feature lives in. The record the two
   // pick sites write is engine state, so it is walked here in process; the
@@ -47,7 +48,7 @@ export async function publicOffersSuite(
   // ledger that is not wired to the seat it is called from is a screen
   // that never fills; and the one seam neither half can reach, the socket
   // handler between the report and the module that stores it, is read
-  // from the source the way the leg report's seam is, because it is
+  // from the source the way the round report's seam is, because it is
   // module private and a fake would prove nothing about it.
 
   // ========== A. The record the picks write ==========
@@ -61,7 +62,7 @@ export async function publicOffersSuite(
   // fallback reach it: selectBoon is the one pick site the round's draft
   // has, so a record written there is true however the pick arrived.
   const drafting = voyageState();
-  const draftLogs: string[] = [];
+  const draftLogs: LedgerLine[] = [];
   startBoonDrafting(drafting, draftLogs);
   const firstTrio = drafting.boonChoices.map((card) => card.id);
   const firstKept = firstTrio[1];
@@ -75,13 +76,12 @@ export async function publicOffersSuite(
       roundRecord.shown.join() === firstTrio.join() &&
       roundRecord.kept === firstKept &&
       !("moment" in roundRecord),
-    "choosing from the round's draw records the leg, the three cards that were on the table and the one kept, and carries no moment because none was answered",
+    "choosing from the round's draw records the round, the three cards that were on the table and the one kept, and carries no moment because none was answered",
   );
 
   // A later pick replaces it rather than joining a history, through the
-  // click path this time (lockInBoon is what the draft screen presses),
-  // which is the plan's deferred iteration read as the shipped rule: the
-  // record is the latest decision and losing the older one costs the
+  // click path this time (lockInBoon is what the draft screen presses):
+  // the record is the latest decision and losing the older one costs the
   // table the last thing it saw, not a mechanic.
   drafting.currentRound = 2;
   startBoonDrafting(drafting, draftLogs);
@@ -103,14 +103,13 @@ export async function publicOffersSuite(
     "and the record is this captain's latest decision rather than a history: the click path writes the same record the engine's own pick does, so whatever way a pick arrived, the fleet reads the one that actually happened",
   );
 
-  // The moment's pick, which is the one the plan's evaluation argument is
-  // practically about: passing on a boon that would advance the shared
-  // objective is the thing the table argues over, and it is only
-  // arguable if the record names the moment the pick answered.
+  // The moment's pick is the hard case: passing on a boon that would
+  // advance the shared objective is the thing the table argues over, and
+  // it is only arguable if the record names the moment the pick answered.
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
     const answering = voyageState();
     answering.crewLost = [{ name: "Old Salt", round: 1 }];
-    const momentLogs: string[] = [];
+    const momentLogs: LedgerLine[] = [];
     queueMilestoneMoment(answering, momentLogs, "crew_loss");
     const shownBefore = milestoneChoices(answering, "crew_loss").map(
       (card) => card.id,
@@ -157,7 +156,7 @@ export async function publicOffersSuite(
 
   // ========== B. The two ends of the wire ==========
 
-  // Read from the source rather than faked, for the reason the leg
+  // Read from the source rather than faked, for the reason the round
   // report's seam is read the same way: the handler reaches its captain
   // through a listener map this suite cannot see, so a fake would prove
   // that a fake works.
@@ -184,7 +183,7 @@ export async function publicOffersSuite(
       hook.includes("gambitSystemsOn") &&
       !ledgerModule.includes("NEXT_PUBLIC") &&
       !hook.includes("NEXT_PUBLIC"),
-    "and both ends gate on the harbor's own mode rather than on a switch of the feature's own, which is the plan's rollback clause read as code: turning public offers off is turning the mode off, so there is no second lever for anyone to forget",
+    "and both ends gate on the harbor's own mode rather than on a switch of the feature's own, which is the design's rollback clause read as code: turning public offers off is turning the mode off, so there is no second lever for anyone to forget",
   );
   const parleyScreen = srcFile(
     "src/components/portmasters/game/phases/Parley.tsx",
@@ -194,7 +193,7 @@ export async function publicOffersSuite(
   );
   check(
     parleyScreen.includes("OpenBoons") && draftScreen.includes("OpenBoons"),
-    "the two screens the plan's evaluation names read the ledger: the draft where the cards are drawn, and the Parley table where the table argues about what was passed on",
+    "the two screens the design's evaluation names read the ledger: the draft where the cards are drawn, and the Parley table where the table argues about what was passed on",
   );
   check(
     [
@@ -333,12 +332,12 @@ export async function publicOffersSuite(
   await boonSettle();
   check(
     boonFrames.length === beforeStale,
-    "a stale tab cannot rewind the table's picture: a report from an older leg than the captain's own record is refused rather than stored",
+    "a stale tab cannot rewind the table's picture: a report from an older round than the captain's own record is refused rather than stored",
   );
 
   // Every way a report can fail to make the claim, dropped whole. The
   // kept card off the table, a table wider than a draw, a card dealt
-  // twice, a module where a boon belongs, a leg that is zero or
+  // twice, a module where a boon belongs, a round that is zero or
   // fractional or written as a word, and an empty table.
   const beforeMalformed = boonFrames.length;
   const malformed = [
@@ -367,11 +366,11 @@ export async function publicOffersSuite(
   await boonSettle();
   check(
     boonFrames.length === beforeMalformed,
-    "and a report that cannot make the claim is dropped whole: a kept card off the table, a table of four, a card dealt twice, a module where a boon belongs, a leg that is zero or fractional or written as a word, and an empty table",
+    "and a report that cannot make the claim is dropped whole: a kept card off the table, a table of four, a card dealt twice, a module where a boon belongs, a round that is zero or fractional or written as a word, and an empty table",
   );
 
   // A captain who is not seated in the harbor cannot report into it,
-  // because the seat check reads the room off the socket rather than off
+  // because the seat check reads the harbor off the socket rather than off
   // the frame.
   const bareSocket = await openAuthedSocket(gambitSecond);
   run.sockets.push(bareSocket);
@@ -385,12 +384,12 @@ export async function publicOffersSuite(
   await boonSettle();
   check(
     boonFrames.length === beforeStranger,
-    "and a captain who is not seated in the harbor cannot report into it, because the seat check reads the room off the socket rather than off the frame",
+    "and a captain who is not seated in the harbor cannot report into it, because the seat check reads the harbor off the socket rather than off the frame",
   );
 
   // A pick that answered a moment rides out with the moment named, so
   // the table reads which moment the card answered rather than guessing
-  // from the leg.
+  // from the round.
   const momentLabel = MILESTONE_TRIGGERS[0];
   const beforeMoment = boonFrames.length;
   hostLedgerSocket.emit("boon:report", {
@@ -412,7 +411,7 @@ export async function publicOffersSuite(
           kept: hostShown[0],
           moment: momentLabel,
         }),
-    "a pick that answered a moment rides out with the moment named on it, so the table reads which moment the card answered rather than guessing from the leg",
+    "a pick that answered a moment rides out with the moment named on it, so the table reads which moment the card answered rather than guessing from the round",
   );
 
   // An unreadable moment label is dropped rather than refused: it is a
@@ -466,7 +465,7 @@ export async function publicOffersSuite(
       Object.values(finalBoonFrame?.entries ?? {}).every(
         (entry) => Object.keys(entry).sort().join(",") === "kept,round,shown",
       ),
-    "the ledger's fields are the plan's allow list and nothing else: a room and a map of records, each record a leg, a trio and a kept card",
+    "the ledger's fields are the design's allow list and nothing else: a harbor and a map of records, each record a round, a trio and a kept card",
   );
   check(
     boonForbidden.every((word) => !finalBoonBody.includes(word)),
@@ -475,7 +474,7 @@ export async function publicOffersSuite(
 
   // A captain who reloads is handed the ledger as it stands, which is
   // also how the refused stale report is read back: the seat whose tab
-  // tried to rewind still reads the leg its captain actually picked in.
+  // tried to rewind still reads the round its captain actually picked in.
   const ledgerReload = await openAuthedSocket(gambitSecond);
   run.sockets.push(ledgerReload);
   const handedLedger = waitForEvent<BoonLedger>(
@@ -489,14 +488,14 @@ export async function publicOffersSuite(
     JSON.stringify(reloaded?.entries?.[gambitSecond.id]) ===
       JSON.stringify({ round: 2, shown: trio, kept }) &&
       reloaded?.entries?.[gambitHost.id]?.round === 4,
-    "a captain who reloads is handed the ledger as it stands, and the seat whose stale report was refused still reads the leg its captain actually picked in",
+    "a captain who reloads is handed the ledger as it stands, and the seat whose stale report was refused still reads the round its captain actually picked in",
   );
 
   // ========== D. A Classic harbor ==========
 
   // The rollback read as code: a harbor on the founding mode runs no
   // ledger at all, so a well formed report is refused before anything is
-  // stored and no frame ever reaches the room.
+  // stored and no frame ever reaches the harbor.
   const classicRoom = await call<{ room: { id: string; code: string } }>(
     "/api/rooms",
     {
@@ -540,13 +539,13 @@ export async function publicOffersSuite(
   await boonSettle();
   check(
     classicSeat.status === 200 && classicLedgers.length === 0,
-    "a Classic harbor runs no ledger: a well formed report is refused before anything is stored and no frame reaches the room, which is the plan's rollback read as code",
+    "a Classic harbor runs no ledger: a well formed report is refused before anything is stored and no frame reaches the harbor, which is the design's rollback read as code",
   );
 
   // ========== E. The restart ==========
 
   // A restarted voyage has drafted nothing, and the ledger of the old
-  // voyage goes with it: a new fleet would otherwise start its first leg
+  // voyage goes with it: a new fleet would otherwise start its first round
   // reading the picks of a voyage it never sailed.
   const boonRoomRow = () =>
     db.room.findUnique({

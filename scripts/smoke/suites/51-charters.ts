@@ -12,7 +12,7 @@ import {
 } from "@/lib/game/cards";
 import { NO_LEAN } from "@/lib/game/constants/cards";
 import {
-  CHARTER_LEG,
+  CHARTER_ROUND,
   CHARTER_MOMENT,
   CHARTER_PATH,
   CHARTERS,
@@ -43,23 +43,24 @@ import {
   snapToCheckpoint,
 } from "@/lib/game/engine";
 import { startMarket } from "@/lib/game/engine/market";
-import {
-  calcTransportCost,
-  calcVAT,
-  getCardFinalCost,
-} from "@/lib/game/engine/pricing";
+import { calcTransportCost, getCardFinalCost } from "@/lib/game/engine/pricing";
 import {
   escortCost,
   pirateChance,
   resolvePirateAttack,
 } from "@/lib/game/engine/pirates";
-import { hireWorker, processProduction } from "@/lib/game/engine/workers";
+import {
+  hireWorker,
+  maintenanceDue,
+  processProduction,
+  wageBill,
+} from "@/lib/game/engine/workers";
 import { readStoredRecord, TELEMETRY_EVENT_CAP } from "@/lib/game/telemetry";
 import { healLoadedVoyage } from "@/lib/session/heal-save";
 import {
   closeVoyageTelemetry,
   noteCharterTaken,
-  noteLegAdvanced,
+  noteRoundAdvanced,
   noteTelemetry,
   openVoyageTelemetry,
 } from "@/server/realtime/telemetry";
@@ -67,19 +68,20 @@ import { heldPathOf } from "@/server/realtime/draft";
 import { db } from "@/lib/db";
 import {
   CARRIES_A_DASH,
-  CLASSIC,
-  GAMBIT,
   carriesADash,
   check,
+  CLASSIC,
+  GAMBIT,
+  ledgerSentences,
   suffix,
   switchFor,
   voyageState,
   withEnv,
 } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 /**
- * [F6: charters at leg four] The plan's second feature of the cycle: a
- * voyage offers one charter at the fourth leg, a trio of the captain's
+ * A voyage offers one charter at the fourth round, a trio of the captain's
  * two path charters and one wildcard, and the one they take carries for
  * the rest of the voyage. What is checked here is the feature end to
  * end: the vocabulary and the ten cards, the three pure reads that
@@ -90,14 +92,14 @@ import {
  * It sits beside the milestone boons' article and joins the group that
  * needs no harbor, for the same reasons: the moment is a pure function
  * of a state, and the one half that touches the database (the
- * accumulator the leg report feeds) opens no table of its own. The
+ * accumulator the round report feeds) opens no table of its own. The
  * voyage schedule's chartered waves share the noun, which is why every
  * captain facing string here says charter in the possessive the screen
  * uses.
  */
 export async function chartersSuite(): Promise<void> {
-  // A captain standing at the charter's leg. The path is dealt by the
-  // draft in a real room; here it is seated directly, because the path's
+  // A captain standing at the charter's round. The path is dealt by the
+  // draft in a real harbor; here it is seated directly, because the path's
   // own deal has its own article and this one is about what a path does
   // when the offer reads it.
   const pathlessAt = (round: number) => {
@@ -123,8 +125,8 @@ export async function chartersSuite(): Promise<void> {
   // ========== A. The vocabulary ==========
 
   check(
-    CHARTER_LEG === 4 && CHARTERS.length === 10,
-    "the moment lands on the fourth leg of the twelve and the pool holds the plan's ten, counted off the catalogue rather than typed here",
+    CHARTER_ROUND === 4 && CHARTERS.length === 10,
+    "the moment lands on the fourth round of the twelve and the pool holds the design's ten, counted off the catalogue rather than typed here",
   );
 
   check(
@@ -312,7 +314,7 @@ export async function chartersSuite(): Promise<void> {
 
   // ========== C. The pure reads ==========
 
-  // The moment reads off the voyage alone: the fourth leg reached with
+  // The moment reads off the voyage alone: the fourth round reached with
   // no answer given, whether or not the deal handed the captain a path.
   // The path gates the offer rather than the question, which is the
   // split charterChoices and charterPending make below.
@@ -326,7 +328,7 @@ export async function chartersSuite(): Promise<void> {
           charter: "weavers_charter",
         }),
       ),
-    "the moment is due at the fourth leg and past it rather than only at it, a pathless captain's question still reads due because the offer is what their path gates, and an answered voyage is a finished question rather than one asked again",
+    "the moment is due at the fourth round and past it rather than only at it, a pathless captain's question still reads due because the offer is what their path gates, and an answered voyage is a finished question rather than one asked again",
   );
 
   // The trio, for every path at once: the pair first, in the catalogue's
@@ -358,7 +360,7 @@ export async function chartersSuite(): Promise<void> {
       loomTrio[1] === "quality_mark" &&
       loomTrio.join() === loomAgain.join() &&
       loomTrio.join() === loomLater.join(),
-    "and the seed leaves the round out: the same captain is dealt the same three on a re read and again at a later leg, so a room advance, a checkpoint or a reload cannot reshuffle the cards under their eyes",
+    "and the seed leaves the round out: the same captain is dealt the same three on a re read and again at a later round, so a harbor advance, a checkpoint or a reload cannot reshuffle the cards under their eyes",
   );
 
   check(
@@ -374,7 +376,7 @@ export async function chartersSuite(): Promise<void> {
         !charterPending(
           Object.assign(loomAt(6), { charter: "weavers_charter" }),
         ),
-      "the moment is drawn only when the switch is on, the leg is reached, a path is held and no answer stands, which is the whole of what a screen has to ask before it draws the overlay",
+      "the moment is drawn only when the switch is on, the round is reached, a path is held and no answer stands, which is the whole of what a screen has to ask before it draws the overlay",
     );
     withEnv("NEXT_PUBLIC_CHARTERS", "0", () => {
       check(
@@ -419,7 +421,7 @@ export async function chartersSuite(): Promise<void> {
   withEnv("NEXT_PUBLIC_CHARTERS", "1", () => {
     const answering = loomAt(4);
     answering.modifierFlags = { vat_discount: 0.5 };
-    const logs: string[] = [];
+    const logs: LedgerLine[] = [];
     const trio = charterChoices(answering);
     const took = answerCharter(answering, trio[0].id, logs);
     check(
@@ -434,7 +436,7 @@ export async function chartersSuite(): Promise<void> {
             answering.cardTally[card.id]?.picked ===
             (card.id === "weavers_charter" ? 1 : 0),
         ) &&
-        logs.some(
+        ledgerSentences(logs).some(
           (line) =>
             line.includes(CHARTER_MOMENT.icon) &&
             line.includes(cardLead("weavers_charter")),
@@ -449,8 +451,16 @@ export async function chartersSuite(): Promise<void> {
     );
 
     const refusing = loomAt(4);
-    const refuseLogs: string[] = [];
-    const refusedWrong = answerCharter(refusing, "gun_charter", refuseLogs);
+    const refuseLogs: LedgerLine[] = [];
+    // The wildcard draw can land any charter off this captain's path, so
+    // a particular one (Gun Charter was the original guess) is not
+    // guaranteed to sit off the table. Derive a card this table does not
+    // deal, so a draw change cannot make a stale click look valid.
+    const dealt = charterChoices(refusing);
+    const stale =
+      CHARTERS.find((card) => !dealt.some((offered) => offered.id === card.id))
+        ?.id ?? "not_a_charter";
+    const refusedWrong = answerCharter(refusing, stale, refuseLogs);
     const quiet =
       refusing.charter === null && Object.keys(refusing.cardTally).length === 0;
     check(
@@ -458,7 +468,7 @@ export async function chartersSuite(): Promise<void> {
         quiet &&
         !answerCharter(voyageState(), "weavers_charter", []) &&
         answerCharter(refusing, charterChoices(refusing)[0].id, refuseLogs) &&
-        !answerCharter(refusing, "gun_charter", refuseLogs),
+        !answerCharter(refusing, stale, refuseLogs),
       "a press is validated against the same derived table the screen drew, so a stale click on a card this moment does not deal is refused with the trio left standing, and an answer with no moment waiting is refused as well",
     );
 
@@ -484,7 +494,7 @@ export async function chartersSuite(): Promise<void> {
     rolling.phase = "resolve";
     rolling.pirateAttackResolved = true;
     rolling.modifierFlags = { loom_extra_produce: 1, vat_discount: 0.5 };
-    const rollLogs: string[] = [];
+    const rollLogs: LedgerLine[] = [];
     const ctx = {
       seedBase: `smoke:charters:${suffix}`,
       harborId: "harbor-a",
@@ -705,14 +715,24 @@ export async function chartersSuite(): Promise<void> {
   }
 
   {
-    const product = Object.keys(PRODUCT_PRICES)[1];
-    const plainVat = calcVAT(voyageState(), product, 500);
+    const plain = voyageState();
     const quiet = voyageState();
     quiet.modifierFlags = { voyage_dues_discount: 0.5 };
+    for (const state of [plain, quiet]) {
+      state.money = 1000;
+      state.larder = 10;
+      state.fixedCost = 101;
+      state.maintenancePenalty = 0;
+      hireWorker(state, "weaver", []);
+    }
+    const wages = (state: ReturnType<typeof voyageState>) =>
+      wageBill(state).reduce((sum, row) => sum + row.due, 0);
     check(
-      plainVat > 0 &&
-        calcVAT(quiet, product, 500) === Math.floor(plainVat * 0.5),
-      "The Quiet Account is read in the dues arithmetic: the harbor dues halved, taken as the same multiplication Harbor Credit takes and landing after it rather than beside it",
+      wages(plain) > 0 &&
+        wages(quiet) === Math.floor(wages(plain) * 0.5) &&
+        maintenanceDue(plain) === 101 &&
+        maintenanceDue(quiet) === 50,
+      "The Quiet Account is read in the dues arithmetic: harbor dues are halved, in the one helper both the wage bill and the ship's upkeep read, and each bill is floored after the multiply rather than rounded on one side only",
     );
   }
 
@@ -752,25 +772,29 @@ export async function chartersSuite(): Promise<void> {
       raided.currentRound = 6;
       raided.money = 400;
       raided.modifierFlags = { marque_salvage: 0.25 };
-      const raidLogs: string[] = [];
+      const raidLogs: LedgerLine[] = [];
       resolvePirateAttack(raided, raidLogs);
       const bare = voyageState();
       bare.currentRound = 6;
       bare.money = 400;
-      const bareLogs: string[] = [];
+      const bareLogs: LedgerLine[] = [];
       resolvePirateAttack(bare, bareLogs);
       const empty = voyageState();
       empty.currentRound = 6;
       empty.money = 0;
       empty.modifierFlags = { marque_salvage: 0.25 };
-      const emptyLogs: string[] = [];
+      const emptyLogs: LedgerLine[] = [];
       resolvePirateAttack(empty, emptyLogs);
       check(
         raided.money === 100 &&
-          raidLogs.some((line) => line.includes("recovered 100")) &&
+          ledgerSentences(raidLogs).some((line) =>
+            line.includes("recovered 100"),
+          ) &&
           bare.money === 0 &&
           empty.money === 0 &&
-          !emptyLogs.some((line) => line.includes("recovered")),
+          !ledgerSentences(emptyLogs).some((line) =>
+            line.includes("recovered"),
+          ),
         "The Letter of Marque is read at the one site a raid takes gold: a quarter of the raid comes back and the ledger line says how much, a bare hold loses everything, and a hold with nothing in it salvages nothing rather than putting a recovery line over a zero",
       );
     } finally {
@@ -796,7 +820,7 @@ export async function chartersSuite(): Promise<void> {
       retired.charter === null &&
       stranger.charter === null &&
       legacy.charter === null,
-    "the load path heals the field through the pool's own reader: a charter this build still ships stays, and a retired id, a write that is not a card and a save from before the field existed all read as a voyage that has not answered yet, which is the plan's rollback clause read word for word",
+    "the load path heals the field through the pool's own reader: a charter this build still ships stays, and a retired id, a write that is not a card and a save from before the field existed all read as a voyage that has not answered yet, which is the design's rollback clause read word for word",
   );
 
   // ========== G. The take on the wire ==========
@@ -819,7 +843,7 @@ export async function chartersSuite(): Promise<void> {
   try {
     const roomA = `${roomPrefix}a`;
     openVoyageTelemetry(roomFacts(roomA), []);
-    noteLegAdvanced(roomA, 4);
+    noteRoundAdvanced(roomA, 4);
     noteCharterTaken(roomA, "u-a", "weavers_charter", "loom", "honest");
     noteCharterTaken(roomA, "u-a", "gun_charter", "convoy", "pirate");
     await closeVoyageTelemetry(roomA, "concluded", []);
@@ -835,12 +859,12 @@ export async function chartersSuite(): Promise<void> {
     check(
       takesA.length === 1 &&
         fieldsA !== null &&
-        fieldsA.leg === 4 &&
+        fieldsA.round === 4 &&
         fieldsA.charter === "weavers_charter" &&
         fieldsA.path === "loom" &&
         fieldsA.role === "honest" &&
         captainA !== undefined,
-      "a captain's take is written once per voyage whatever the client repeats: the first claim stands rather than the last, the leg is the accumulator's rather than a number the claim chose, and the path and the alignment are the fields the caller attached rather than anything the wire said",
+      "a captain's take is written once per voyage whatever the client repeats: the first claim stands rather than the last, the round is the accumulator's rather than a number the claim chose, and the path and the alignment are the fields the caller attached rather than anything the wire said",
     );
 
     const roomB = `${roomPrefix}b`;
@@ -879,7 +903,7 @@ export async function chartersSuite(): Promise<void> {
     });
     check(
       rowsC === 0,
-      "a take noted against a room the accumulator never opened is dropped by the writer rather than opening a record for it, so a stray claim cannot mint a voyage in the operator's table",
+      "a take noted against a harbor the accumulator never opened is dropped by the writer rather than opening a record for it, so a stray claim cannot mint a voyage in the operator's table",
     );
 
     const roomD = `${roomPrefix}d`;
@@ -911,16 +935,16 @@ export async function chartersSuite(): Promise<void> {
   });
   check(
     leftovers === 0,
-    "and the synthetic rooms this suite sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
+    "and the synthetic harbors this suite sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
   );
 
   const repoRoot = join(import.meta.dirname, "..", "..", "..");
   const wiring = readFileSync(
-    join(repoRoot, "src", "server", "realtime", "wiring", "leg-report.ts"),
+    join(repoRoot, "src", "server", "realtime", "wiring", "round-report.ts"),
     "utf8",
   );
   const hook = readFileSync(
-    join(repoRoot, "src", "lib", "use-leg-report.ts"),
+    join(repoRoot, "src", "lib", "use-round-report.ts"),
     "utf8",
   );
   check(
@@ -931,12 +955,12 @@ export async function chartersSuite(): Promise<void> {
       wiring.includes("noteCharterTaken(roomId") &&
       hook.includes("chartersOn(game.mode)") &&
       hook.includes("game.charter ?? undefined"),
-    "the two ends of the wire the take sits between: the client claims the charter only while the switch is on, and the server vouches it through the pool before attributing the path off the room's own book and the alignment off the table, dropping a take it cannot place on either rather than filling in a guess",
+    "the two ends of the wire the take sits between: the client claims the charter only while the switch is on, and the server vouches it through the pool before attributing the path off the harbor's own book and the alignment off the table, dropping a take it cannot place on either rather than filling in a guess",
   );
 
   check(
     heldPathOf("smoke51-never-drafted", "u-a") === null,
-    "and the book the server attributes paths from answers null for a room it has never seen, which is the one reader of that book and the shape every unattributable take takes on its way to the drop",
+    "and the book the server attributes paths from answers null for a harbor it has never seen, which is the one reader of that book and the shape every unattributable take takes on its way to the drop",
   );
 
   // ========== H. The barrel ==========

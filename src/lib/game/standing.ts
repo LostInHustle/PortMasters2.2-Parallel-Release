@@ -2,10 +2,10 @@
 // PortMasters 2.2 Parallel Release: standing orders, as a captain writes
 // them.
 //
-// [B3: standing orders] The room's clock already protects a table from the
-// captain who walked away: the server holds the timer, and a seat the room
+// The harbor's clock already protects a table from the
+// captain who walked away: the server holds the timer, and a seat the harbor
 // has run out is left by its own defaults rather than held open forever. What that leaves is the other half of the problem. The
-// defaults are the engine's opinion, not the captain's, so the leg a
+// defaults are the engine's opinion, not the captain's, so the round a
 // slow player never got to play is played for them by a stranger.
 //
 // This module is the fix's vocabulary: the record a captain writes once,
@@ -21,11 +21,11 @@
 // The record lives on the voyage state rather than on the account. Two
 // reasons, and the second is the one that decided it: the Ledger
 // Integrity Pass judges saves rather than account rows (see
-// ./integrity.ts), and the plan's rollback paragraph asks that the
+// ./integrity.ts), and the design's rollback paragraph asks that the
 // written set survive the feature being switched off, which is a record
 // the feature must be able to leave alone. An account level set, so a
 // captain configures once for every harbor they ever sail into, is the
-// iteration a later slice would do; this one is the set that plays one
+// iteration a later pass would do; this one is the set that plays one
 // voyage.
 // =====================================================================
 import { cardById } from "./cards";
@@ -42,11 +42,11 @@ import { MARKET_GOODS } from "./constants/goods";
 type StandingBuy = { good: string; maxPrice: number };
 
 /**
- * What a captain writes once and the engine reads when the room's clock
+ * What a captain writes once and the engine reads when the harbor's clock
  * plays a seat they were not standing at.
  *
  * `enabled` is the captain's own switch and the whole of the rollback the
- * plan asks for: with it off, every seat is left exactly the way the
+ * design asks for: with it off, every seat is left exactly the way the
  * engine's own defaults leave it, and the written set below stays
  * on the record rather than being deleted, because a switch that erased
  * the captain's work would punish them for trying it.
@@ -88,9 +88,10 @@ export type StandingOrders = {
  * ./integrity.ts derives its ceilings, so a charter that adds a good
  * widens this with it instead of quietly leaving lines off the end.
  *
- * The board's list rather than the hold's, which is the one thing D4 changed
- * here. An instruction buys a card, and the merchant's cards are dealt from
- * the goods the merchant trades (see MARKET_GOODS in ./constants): the moment
+ * The board's list rather than the hold's, which is the one thing the refit
+ * bench changed here. An instruction buys a card, and the merchant's cards
+ * are dealt from the goods the merchant trades (see MARKET_GOODS in
+ * ./constants): the moment
  * Rags became cargo without becoming a market good, a line for Rags turned
  * into a line that could never fire, and a cap counted over it would be the
  * length of a list a line longer than anything the board can answer.
@@ -182,7 +183,7 @@ export function normalizeStandingOrders(raw: unknown): StandingOrders {
  */
 export function standingBoon(orders: StandingOrders): CardRecord | null {
   if (!orders.boon) return null;
-  // [F2: the card record, and the mode weighting field] Resolved through the
+  // Resolved through the
   // walk rather than through a second find over the boon table, and held to
   // the kind: the id a record names is a boon's or it is nothing, so a
   // standing order that named a module would be read as unwritten rather
@@ -192,7 +193,7 @@ export function standingBoon(orders: StandingOrders): CardRecord | null {
 }
 
 /**
- * Whether a set would do anything at all if the room's clock played a
+ * Whether a set would do anything at all if the harbor's clock played a
  * seat right now.
  *
  * The switch alone does not answer that: a captain who turned it on and

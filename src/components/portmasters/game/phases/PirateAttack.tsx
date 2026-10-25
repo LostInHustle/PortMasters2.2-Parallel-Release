@@ -8,17 +8,20 @@ import {
   escortCost,
   escortCoverage,
   escortCoverOf,
+  expectedRaidLoss,
   hireEscort,
   pirateChance,
+  raidGoldAtRisk,
   resolvePirateAttack,
 } from "@/lib/game/engine";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ShieldCheck, Skull } from "lucide-react";
-import { PhaseHeading, StatTile, SummaryHeading } from "./PhaseShared";
+import type { LedgerAct } from "@/lib/game/ledger";
+import { FigureTile, PhaseHeading, SummaryHeading } from "./PhaseShared";
 
 /**
- * The first station of the Resolve phase: the raid the leg ends on. The
+ * The first station of the Resolve phase: the raid the round ends on. The
  * captain either buys the harbor's escort or sails into it, and the screen
  * shows what each would cost against what a raid would take.
  *
@@ -32,18 +35,28 @@ export function PirateAttack({
   act,
 }: {
   game: GameState;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  act: LedgerAct;
 }) {
   const escortFee = escortCost(game);
   const raidPct = Math.round(pirateChance(game) * 100);
+  // The risk after the Letter of Marque's recovery, read through the
+  // engine's own rule (see expectedRaidLoss): the tile and the advice
+  // below quote the Gold a raid would actually take, not the purse times
+  // the odds.
+  const expectedLoss = expectedRaidLoss(game);
+  // The exposure the odds above are taken against, read through the same
+  // rule as the expected loss rather than off the raw purse: a Letter of
+  // Marque gives part of a raid's Gold back, and the tile beside the
+  // expected loss must describe the same raid (see raidGoldAtRisk).
+  const goldAtRisk = raidGoldAtRisk(game);
   // Read only to explain the note below. The leak is already inside the
   // figure above, so this tells the captain why the odds look as high as
   // they do rather than showing a second, separate number.
   const leak = game.brokerTippedPirates
     ? difficultyConfig(game.difficulty).brokerCorruptionRisk
     : 0;
-  // [D3: Convoy: the Escort Contract] Whose guns are standing over this
-  // leg, if anybody's. Read through the engine's own function rather than
+  // Whose guns are standing over this
+  // round, if anybody's. Read through the engine's own function rather than
   // off the field, so a build with the market off reads as uncovered here
   // exactly as it does at the raid roll.
   const cover = escortCoverOf(game);
@@ -67,7 +80,7 @@ export function PirateAttack({
         {cover && (
           <p className="text-sm text-parley">
             {t(
-              "🛡️ {cover.sellerName} sold you this leg's cover. Their cannons beat off {coverPct}% of a boarding party, and their own hold answers for the rest.",
+              "🛡️ {cover.sellerName} sold you this round's cover. Their cannons beat off {coverPct}% of a boarding party, and their own hold answers for the rest.",
               {
                 "cover.sellerName": cover.sellerName,
                 coverPct: Math.round(escortCoverage() * 100),
@@ -100,7 +113,7 @@ export function PirateAttack({
           </SummaryHeading>
           <div className="grid grid-cols-3 gap-2">
             {/* Raid probability */}
-            <StatTile
+            <FigureTile
               value={`${raidPct}%`}
               valueClassName={cn(
                 "tabular-nums",
@@ -113,21 +126,20 @@ export function PirateAttack({
               label={t("Raid Chance")}
             />
             {/* Gold at risk */}
-            <StatTile
-              value={game.money}
+            <FigureTile
+              value={goldAtRisk}
               valueClassName="tabular-nums text-alarm"
               label={t("Gold at Risk")}
             />
             {/* Expected loss */}
-            <StatTile
-              value={Math.round((game.money * raidPct) / 100)}
+            <FigureTile
+              value={Math.round(expectedLoss)}
               valueClassName="tabular-nums text-warn"
               label={t("Expected Loss")}
             />
           </div>
           {/* Recommendation */}
           {(() => {
-            const expectedLoss = (game.money * raidPct) / 100;
             const recommend = escortFee < expectedLoss && game.money > 0;
             if (!recommend) return null;
             return (

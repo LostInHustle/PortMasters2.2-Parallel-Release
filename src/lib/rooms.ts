@@ -1,12 +1,12 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: shared room membership helpers
+// PortMasters 2.2 Parallel Release: shared harbor membership helpers
 //
 // Plain database logic with no Next specific imports, so it can be
 // called from API routes and from the realtime layer alike.
-// Centralizes what "a player leaves a room" actually means (drop the
+// Centralizes what "a player leaves a harbor" actually means (drop the
 // seat, hand off the host crown if they were holding it, remove the
-// room entirely once nobody is left in it, unless the caller asks for
-// it to be kept), plus the room code generator and the room name
+// harbor entirely once nobody is left in it, unless the caller asks for
+// it to be kept), plus the harbor code generator and the harbor name
 // normalizer that the API routes and the Lobby's create form both call.
 // =====================================================================
 import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
@@ -15,8 +15,8 @@ import { normalizeMode } from "./game/mode";
 import { unlockById } from "./unlock";
 import type { RoomDetail, RoomSummary } from "./api";
 
-// Forwarded so callers that work with rooms (the realtime mini
-// service, the API routes) can import everything room related from one
+// Forwarded so callers that work with harbors (the realtime mini
+// service, the API routes) can import everything harbor related from one
 // module instead of piecing it together from ./db, ./api, and ./utils.
 export type { RoomDetail };
 
@@ -29,16 +29,16 @@ export type { RoomDetail };
 // the client believed had it, and no check anywhere would have said a word.
 //
 // The parameters are structural rather than Prisma types on purpose. Three of
-// the five callers hand over a room whose members came back on the row, and
+// the five callers hand over a harbor whose members came back on the row, and
 // the other two have already read the seats into a separate list after
-// writing one, so the members are passed in beside the room rather than dug
+// writing one, so the members are passed in beside the harbor rather than dug
 // out of it.
 //
 // Difficulty and mode both arrive here as bare database strings. They used to
 // leave through an `as Difficulty` cast, which is a promise the compiler takes
 // on faith and the database never made: any value at all, including one this
 // build has never heard of, sailed out of here wearing a valid type. Both now
-// pass through their own normalizer, so a room whose row somehow holds
+// pass through their own normalizer, so a harbor whose row somehow holds
 // something unexpected resolves to the founding value instead of handing the
 // client a lap or a tier that does not exist. Unlock is read the same way and
 // resolves to nothing rather than to a phrase this build does not have, so a
@@ -100,12 +100,12 @@ export function roomLockedFor(
   return memberIds.length > 0;
 }
 
-// The one place a captain is admitted to a room, shared by the two join
+// The one place a captain is admitted to a harbor, shared by the two join
 // routes so the rule cannot drift between them again.
 //
 // The gate only guards a voyage somebody is actually sailing. A harbor whose
 // whole crew has gone home holds no game to interrupt, and the server keeps
-// such a harbor standing across a restart, so sealing it would leave a room in
+// such a harbor standing across a restart, so sealing it would leave a harbor in
 // the lobby that nobody can ever open again. Whoever walks in next may take it
 // over. The by code route used to seal on `started` alone, which made the same
 // harbor reachable by link and closed to its own code.
@@ -113,7 +113,7 @@ export function roomLockedFor(
 // A returning member always gets back in. A brief disconnect or a refresh must
 // never cost a captain their own seat.
 //
-// The room parameter is structural, like serializeRoom's, and every caller
+// The harbor parameter is structural, like serializeRoom's, and every caller
 // hands over the row it just loaded. That makes this the one place a newly
 // seated captain learns which voyage they are joining, so a field dropped
 // here is a captain walking into a harbor on the wrong lap with nothing to
@@ -147,7 +147,7 @@ export async function admitToRoom(
   ) {
     return {
       error:
-        "This voyage has already set sail. Ask the host to open a new room.",
+        "This voyage has already set sail. Ask the host to open a new harbor.",
     };
   }
 
@@ -171,10 +171,10 @@ type LeaveRoomResult =
 
 type LeaveRoomOptions = {
   // Boot reconciliation sets this. Every other caller leaves it unset,
-  // where the last captain out takes the room with them, which is what
-  // keeps the public lobby free of rooms nobody is sitting in. A
+  // where the last captain out takes the harbor with them, which is what
+  // keeps the public lobby free of harbors nobody is sitting in. A
   // restart is the exception: the harbor and the voyage saved inside it
-  // belong to the captain, so the seats are dropped and the room stays.
+  // belong to the captain, so the seats are dropped and the harbor stays.
   keepEmptyRoom?: boolean;
 };
 
@@ -209,7 +209,7 @@ export async function leaveRoomForUser(
   return { roomDeleted: false, newHostId: null };
 }
 
-// Every room a user currently sits in, for cleaning up on logout.
+// Every harbor a user currently sits in, for cleaning up on logout.
 export async function roomIdsForUser(userId: string): Promise<string[]> {
   const memberships = await db.roomMember.findMany({
     where: { userId },
@@ -218,8 +218,8 @@ export async function roomIdsForUser(userId: string): Promise<string[]> {
   return memberships.map((m) => m.roomId);
 }
 
-// Every userId currently seated in a room, straight from the membership
-// table. This is the one and only definition of "who's in the room" that
+// Every userId currently seated in a harbor, straight from the membership
+// table. This is the one and only definition of "who's in the harbor" that
 // the ready check protocol and the Start Game gate both use. It's
 // deliberately the durable list of members, not whoever happens to have a
 // live socket connected right now. A member whose tab is still loading, or
@@ -235,9 +235,9 @@ export async function roomMemberIds(roomId: string): Promise<string[]> {
 }
 
 // Six characters, human friendly, no ambiguous ones. Used by the
-// create room API route and surfaced in the Lobby so a captain can hand
+// create harbor API route and surfaced in the Lobby so a captain can hand
 // the code to a friend. Generated server side so a malicious client can't
-// pre pick a code that collides with another room's.
+// pre pick a code that collides with another harbor's.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export function generateRoomCode(): string {
   let out = "";
@@ -249,10 +249,10 @@ export function generateRoomCode(): string {
 }
 
 // Mobile keyboards and pasted text love to leave behind double spaces or a
-// stray non breaking space, which show up as odd gaps once a room name is
+// stray non breaking space, which show up as odd gaps once a harbor name is
 // rendered. Collapse any run of whitespace down to one regular space and
-// trim the ends so a messy paste still looks clean. Used both when a room
-// is created and defensively wherever a name gets rendered, so any room
+// trim the ends so a messy paste still looks clean. Used both when a harbor
+// is created and defensively wherever a name gets rendered, so any harbor
 // named before this existed still displays cleanly.
 export function normalizeRoomName(name: string): string {
   return name.replace(/\s+/g, " ").trim();

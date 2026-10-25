@@ -1,6 +1,6 @@
 # PortMasters 2.2 Parallel Release: Development Guide
 
-This file began as the step by step build plan for the project, and that plan has been carried out. Rather than leave a completed checklist behind, it is kept as the guide to changing the code now that it exists: where each kind of change belongs, and which rules are load bearing enough that breaking them will cost you a voyage rather than a build.
+This guide is for changing the code: where each kind of change belongs, and which rules are strict enough that breaking them will cost you a voyage rather than a build.
 
 ## How the code is layered
 
@@ -30,29 +30,29 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 **The lap is single sourced, and it belongs to the mode.** A voyage's synchronized order is `checkpointPhaseOrder` on the mode record in `src/lib/game/mode.ts`, because the two modes walk the same six phases in different orders and an order is a property of a voyage. `src/lib/game/checkpoint.ts` is the only place it is read (`lapPhases`, `lapSuccessor`, `openingPhase`, `isGatedPhase`, `checkpointRank`, `closesRound`), and both the ready check and the interface read it from there. A second copy will drift, and one already did: the phase after whichever phase a captain was on used to be written into the engine once per transition, which is seven copies of one order and seven chances for a mode to stop being a mode.
 
-**A phase is described once.** `PHASE_FACES` in `src/lib/game/phases.ts` is one record per phase: its label, its icon, its fill and whether it is one of the leg's six. The rail, the briefing charts and every phase panel read that table rather than keeping one of their own, and `normalizePhase` in the same file is what places a phase value written before [B1] where it belongs now (see `LEGACY_PHASES` there). Add a phase to the union and it needs an entry; a phase the table does not carry is a panel no checkpoint can reach.
+**A phase is described once.** `PHASE_FACES` in `src/lib/game/phases.ts` is one record per phase: its label, its icon, its fill and whether it is one of the round's six. The rail, the briefing charts and every phase panel read that table rather than keeping one of their own, and `normalizePhase` in the same file is what places a phase value written before the six phase model where it belongs now (see `LEGACY_PHASES` there). Add a phase to the union and it needs an entry; a phase the table does not carry is a panel no checkpoint can reach.
 
 **Every read of saved state is defensive.** A game state is JSON that a previous version of the game wrote. Read fields through the normalize helpers so a voyage saved before a field existed costs a captain that field, not the whole voyage.
 
-**The ready check gates the room, not the captain.** Nobody advances a phase until every captain still active has readied. Any new phase has to register with the checkpoint protocol or the harbor will wait forever.
+**The ready check gates the harbor, not the captain.** Nobody advances a phase until every captain still active has readied. Any new phase has to register with the checkpoint protocol or the harbor will wait forever.
 
-**The clock is the server's, and it announces rather than moves.** Since [B2] a seat also ends when its budget runs out, and that budget is the `seconds` field on the phase's own record in `PHASE_FACES`. The timer behind it lives in `src/server/realtime/checkpoint.ts` and is the server's business alone; what crosses the wire is the deadline, on `phase:ready_update` as `phaseEndsAt` and `phaseSeconds`. It must not ride the game state: a clock read folded into the state is a hidden input, and the engine's replay property is exactly the thing that depends on there being none. The fire emits the same `phase:advance` a unanimous ready set emits and never touches the checkpoint, so the two ways a seat ends are one frame by design (see `announceAdvance`), and a captain who had not acted leaves through `autoCommit` in `src/lib/game/engine/lifecycle.ts`, which stays pure and takes no clock.
+**The clock is the server's, and it announces rather than moves.** A seat also ends when its budget runs out, and that budget is the `seconds` field on the phase's own record in `PHASE_FACES`. The timer behind it lives in `src/server/realtime/checkpoint.ts` and is the server's business alone; what crosses the wire is the deadline, on `phase:ready_update` as `phaseEndsAt` and `phaseSeconds`. It must not ride the game state: a clock read folded into the state is a hidden input, and the engine's replay property is exactly the thing that depends on there being none. The fire emits the same `phase:advance` a unanimous ready set emits and never touches the checkpoint, so the two ways a seat ends are one frame by design (see `announceAdvance`), and a captain who had not acted leaves through `autoCommit` in `src/lib/game/engine/lifecycle.ts`, which stays pure and takes no clock.
 
 **The Ledger Integrity Pass runs on load.** It is what makes a hand edited save visible instead of silently rewarded. A new persisted field that the pass does not know about should be added to it rather than skipped.
 
-**One venture per voyage per room.** The convoy rule is room wide on purpose, and the check belongs on the server so two captains cannot both claim the same voyage.
+**One venture per voyage per harbor.** The convoy rule is harbor wide on purpose, and the check belongs on the server so two captains cannot both claim the same voyage.
 
 **A new private path repeats the private information review.** A new private channel, a new persisted secret, a new broadcast payload, or a new path that trusts a client repeats the review in `docs/SECURITY_REVIEW.md` before it repeats the closed test, and `npm run check:private` is the part of that a command can hold. The reason is written there: a secret that arrives by a second path is a leak nobody reviewed, and nothing else in the toolchain would notice one.
 
 ## Changing the interface
 
-The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colours, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
+The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colors, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
 
 Four habits worth keeping:
 
-**Give text room to be long.** A captain's display name, a room name and a chronicle line are all user supplied and can be any length. Wrap them in `pm-truncate` where the container is fixed, and give flex children `min-w-0` so they are allowed to shrink rather than pushing the layout wide.
+**Give text room to be long.** A captain's display name, a harbor name and a chronicle line are all user supplied and can be any length. Wrap them in `pm-truncate` where the container is fixed, and give flex children `min-w-0` so they are allowed to shrink rather than pushing the layout wide.
 
-**Measure a screen against the column it stands in.** Every screen in the app draws inside a column that is narrower than the window, and it is narrower by a different amount on each screen: the game room's middle column, the operator console's register, the balance dashboard's panels. A breakpoint that reads the window is therefore reading a number the layout cannot see, and it fails both ways round. It fires early, where the column has not changed but the window has, so the same screen rearranges itself for no one; and it fires late, where the column is narrower than the window at every size, so the screen lays itself out for room it does not have. Put `@container` on the element that carries the cap and the padding, read `@` variants below it, and read the window only inside a modal, which is as wide as the window. `docs/SYSTEM_ANALYSIS.md` has the ladders and the measurements under "The Room's Width" and "The Operator Screens' Width".
+**Measure a screen against the column it stands in.** Every screen in the app draws inside a column that is narrower than the window, and it is narrower by a different amount on each screen: the harbor's middle column, the operator console's register, the balance dashboard's panels. A breakpoint that reads the window is therefore reading a number the layout cannot see, and it fails both ways round. It fires early, where the column has not changed but the window has, so the same screen rearranges itself for no one; and it fires late, where the column is narrower than the window at every size, so the screen lays itself out for room it does not have. Put `@container` on the element that carries the cap and the padding, read `@` variants below it, and read the window only inside a modal, which is as wide as the window. `docs/SYSTEM_ANALYSIS.md` has the ladders and the measurements under "The Harbor's Width" and "The Operator Screens' Width".
 
 **Give a table's columns their proportions.** Left to itself a table sizes each column from whatever that table happens to be carrying, so two tables of the same four facts laid out one above the other come out with different columns and one of them breaks a line where the other does not. Measure the longest string in each column on one line, give the columns shares that clear the ones that have to, and name in a comment which column is the one that gives and why. `w-[35%]` on a `Th` is a hint with a floor under it: content that cannot break still sets the column's minimum.
 
@@ -64,13 +64,16 @@ Four habits worth keeping:
 npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
 npm run check:private    # no second path to a secret the game hides
+npm run check:prose      # no banned dash in Markdown or text
 npm run build            # type errors fail the build on purpose
 # then, in a second terminal, with the clock on for both lines:
 PHASE_CLOCK=1 npm run dev
 PHASE_CLOCK=1 npm run test:smoke
 ```
 
-The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its legs, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
+`npm run build` runs the tag, card, status, dead surface and prose checks before it compiles a page, so a clean build also clears those five. `npm run check:prose` can be run alone while editing documentation.
+
+The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its rounds, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 
 Before a run that involves players who are not the authors, `npm run check:closed-test` is the first command: it refuses to bless anything but a local SQLite file whose name begins with `closed-test`, so the invitations go out from somebody who has just read the database's name and a count of what is already inside it.
 
@@ -88,7 +91,7 @@ Four things about it are load bearing, and each one is easy to undo by accident.
 
 **The healthcheck stays dependency free.** `/api/health` answers from the process and touches nothing else, so a database that is briefly busy cannot fail the probe and turn a slow query into a restart loop. Anything added to that route should keep it that way.
 
-One more, for a new hostname: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognises, and it recognises `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
+One more, for a new hostname: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognizes, and it recognizes `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
 
 ## Testing more than the smoke test covers
 

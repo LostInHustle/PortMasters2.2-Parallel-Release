@@ -1,37 +1,18 @@
-// =====================================================================
-// PortMasters 2.2 Parallel Release: the Ocean Gambit objective deck.
+// The Ocean Gambit objective deck: one public commission per voyage, drawn
+// before it starts and owed by the whole fleet.
 //
-// One public commission per voyage, drawn before it starts, owed by the
-// whole fleet. It is the Imperial Mandate wearing a new hat (see
-// MANDATE_TEMPLATES in ./difficulty.ts for the mechanism it copies): the
-// same port and goods and gold shape, except that a mandate is owed by one
-// captain in one round and this is owed by everybody across the voyage.
+// A data module: the server draws the objective to clamp reports, the
+// engine pays delivery, and the interface renders it. None of the three
+// owns the vocabulary; nothing here reads a clock, a socket or a database.
 //
-// It is a data module, like ./mode.ts and ./gambit.ts, and for the same
-// reason: the server draws the objective to clamp what clients report, the
-// engine pays delivery against it, and the interface renders it, and none
-// of those three should own the vocabulary the other two have to agree
-// with. Nothing here reads a clock, a socket or a database.
+// Authoring rule: an objective a single captain can satisfy alone produces
+// no conversation. Every entry asks for at least STARTING_STOCK items (16
+// in ./constants/goods.ts) and at least two goods, so a hold cannot cover
+// one and the fleet has to buy or trade over more than one round.
 //
-// The writing rule for this deck is the one rule that matters, and it is
-// the plan's: an objective a single captain can satisfy alone produces no
-// conversation and gives a saboteur nothing to sabotage, so an objective
-// that six captains could finish without talking is rejected outright.
-// That is enforced as a property of the data rather than as a note here:
-// every entry below asks for at least as many items as a captain begins
-// the voyage holding (STARTING_STOCK in ./constants/goods.ts comes to 16), and
-// every entry asks for at least two different goods. A hold cannot cover
-// one, so the fleet has to buy, trade, or both, and it has to do it over
-// more than one round.
-//
-// Prices are the Emperor's, paid per item, and they run a little above the
-// going rate on purpose. A commission is a commission; the cost to a
-// captain is the goods and the orders they are not filling, not a discount
-// on the goods themselves. These numbers are the balance knob the epic's
-// evaluation will move, so they live in one place. The other knob, the
-// quota rung that scales a commission with the size of the fleet that owes
-// it, lives in this module too and is written out below the deck.
-// =====================================================================
+// Prices are the Emperor's, paid per item, and they run above the going
+// rate on purpose: a commission costs a captain the goods and the orders
+// they are not filling, not a discount.
 
 import { createRng, pick } from "./rng";
 import type { ObjectiveTraceEntry } from "./types";
@@ -39,22 +20,16 @@ import type { ObjectiveTraceEntry } from "./types";
 export type Objective = {
   id: string;
   name: string;
-  // One sentence, shown to every captain from the first phase. Says what
-  // the fleet is being asked for and why it takes a fleet.
+  // One sentence, shown to every captain from the first phase.
   line: string;
-  // What the commission asks for, and what the Emperor pays per item. There
-  // is no port here and there cannot be: the engine has no captain location
-  // to check against, so a destination would be a promise nothing keeps.
+  // No port: the engine has no captain location to check against, so a
+  // destination would be a promise nothing keeps.
   resources: readonly { type: string; required: number; price: number }[];
 };
 
-// Six commissions, every good drawn from the founding tier so an objective
-// is fillable in the first round of every difficulty. Ordered smallest to
-// largest, which is the order a reader wants them in. The rung below does
-// not filter on that order: it scales every entry's quotas, because the
-// authoring rule above is a property of the entry rather than of its size,
-// and an entry deleted for being small would take a commission out of the
-// deck rather than make the deck harder.
+// Six commissions, every good from the founding tier so an objective is
+// fillable in round one at every difficulty, ordered smallest to largest.
+// The quota rung below scales every entry rather than filtering by size.
 export const OBJECTIVE_DECK: readonly Objective[] = [
   {
     id: "hemp_cordage",
@@ -115,54 +90,36 @@ export const OBJECTIVE_DECK: readonly Objective[] = [
   },
 ];
 
-// ========== The quota rung ==========
-// The deck's quotas are authored for a founding table, and a voyage with a
-// fifth and a sixth captain on it moves half again as much cargo. Left
-// alone, one commission gets easier with every extra seat, which is not a
-// difficulty setting anybody chose: it is the sabotage window widening as
-// the table shrinks, and the Pirate is the captain who pays for it. So the
-// quotas scale with the fleet the voyage was dealt to, and only the quotas:
-// every price stays put, so a wider commission pays the fleet more for the
-// extra cargo rather than paying less per item for it.
+// A larger fleet moves more cargo, so a fixed quota gets easier with every
+// extra seat. Quotas scale with the fleet and prices do not, so a wider
+// commission pays more for the extra cargo rather than less per item.
 //
-// Quota per head held constant is what makes the rung flat rather than
-// merely harder. Four captains are the deck's authoring table, so four or
-// fewer is the anchor and multiplies by nothing, which is what keeps a
-// voyage that began before the rung existed on exactly the board it drew.
-// Five captains carry a quarter more than four, six carry half again, and
-// the rounding is up rather than nearest because the error it can introduce
-// (at most one item per good) should fall on the side the Pirate's band
-// lives on. A table larger than six sails on the top band: the deal itself
-// is authored for six (see ./gambit.ts), and a seventh seat is a size this
-// rung has no measurement for.
+// Four captains are the authoring table: four or fewer multiply by
+// nothing, which keeps older voyages on the board they drew. Five carry a
+// quarter more, six half again. Rounding is up, so the error falls on the
+// side the Pirate's band lives on. Above six uses the top band, since the
+// deal itself is authored for six (see ./gambit.ts).
 type SeatBand = {
-  // The fewest captains in this band. 0 is the anchor's own floor, and the
-  // reading for a voyage that was never pinned.
+  // Fewest captains in this band; 0 is the anchor's floor.
   min: number;
-  // What every quota in the drawn commission is multiplied by.
+  // Multiplier applied to every quota in the drawn commission.
   factor: number;
-  // What the band is called wherever a human reads it. Authored rather
-  // than derived from the floor above, because "4 or fewer" is the sentence
-  // a report wants and "0 to 4" is a range. The English lives here, the way
-  // every shared constant does, and the rows that print it read the label
-  // through t() where the band becomes part of a sentence (see the rowed
-  // frames in ./dashboard).
+  // Label shown wherever a human reads the band.
   label: string;
 };
 
-// The bands, smallest first, which is also the order a report reads them
-// in. Exported because the two readers outside this module (the win rate
-// reader in ./balance and the smoke suite) have to walk the same bands
-// this table holds rather than list them again.
+// Smallest first. Exported because ./balance and the smoke suite walk the
+// same table.
 export const SEAT_BANDS: readonly SeatBand[] = [
   { min: 0, factor: 1, label: "4 or fewer" },
   { min: 5, factor: 1.25, label: "5" },
   { min: 6, factor: 1.5, label: "6 or more" },
 ];
 
-// Which band a fleet of this size sails on. A pinned count and 0 both land
-// here, which is the backward compatibility: 0 is the anchor, so a room
-// that started before the rung existed draws the founding deck.
+/**
+ * Which band a fleet of this size sails on. 0 and a pinned count both land
+ * on the anchor, which keeps older harbors compatible.
+ */
 export function seatBand(seats: number): SeatBand {
   let band = SEAT_BANDS[0];
   for (const candidate of SEAT_BANDS) {
@@ -171,20 +128,10 @@ export function seatBand(seats: number): SeatBand {
   return band;
 }
 
-// The seed for the draw. It carries the harbor and the voyage and no
-// captain, which is the whole mechanism: every captain in one harbor has to
-// arrive at the same commission, and the only way for that to be true
-// without the server telling them is for the seed to be built out of values
-// they all already hold. The voyage epoch is what makes a restarted voyage
-// draw a new commission rather than replaying one the fleet already met.
-//
-// The fleet's size is folded in on the same reasoning and adds one case of
-// its own: the count is a public fact of the room (see Room.voyageSeats),
-// so every captain still works the commission out rather than being told
-// it, and a harbor restarted at a different size draws a different
-// commission for the same reason a restarted epoch does. It is appended
-// only above the anchor band, so a founding table's seed is the string it
-// always was and its board is the board it always drew.
+// Built from values every captain already holds (harbor, voyage epoch, and
+// fleet size above the anchor), so all of them derive the same commission
+// without the server telling them. The epoch makes a restarted voyage draw
+// a new one; the seats suffix leaves an anchor table's seed unchanged.
 export function objectiveSeed(
   harborId: string,
   voyageEpoch: number,
@@ -195,19 +142,10 @@ export function objectiveSeed(
 }
 
 /**
- * Which commission this harbor owes, from a seed the caller owns.
- *
- * The draw chooses the objective and nothing else. What the fleet's size
- * decides is the rung: the entry the seed names, with every count in it
- * multiplied by the band's factor. That is applied here and nowhere else,
- * so a caller does not have to know the rung exists beyond passing the size
- * it already holds, and the two callers that matter (the server clamping
- * what a captain reports, the client showing the board) cannot scale it
- * twice or forget to scale it at all.
- *
- * An entry at the anchor comes back as it is authored rather than as a copy
- * of it, which is both the board every voyage before the rung drew and the
- * object the smoke suite compares against.
+ * The seed picks the entry; the band scales every count. Applied here and
+ * nowhere else, so the server and the client cannot scale twice or forget.
+ * An anchor entry comes back as authored, which is also the object the
+ * smoke suite compares against.
  */
 export function drawObjective(seed: string, seats = 0): Objective {
   const objective = pick(createRng(seed), OBJECTIVE_DECK);
@@ -222,20 +160,17 @@ export function drawObjective(seed: string, seats = 0): Objective {
   };
 }
 
-// How many items the commission is for, across every good. No production
-// site sums a commission, so the smoke oracle and its suites are this
-// export's readers: they hold the draw and the due to this one total.
+/** Items across every good. The smoke suites are the readers. */
 export function objectiveTotalItems(objective: Objective): number {
   return objective.resources.reduce((sum, r) => sum + r.required, 0);
 }
 
-// What the whole commission pays out if the fleet fills it, at the widest
-// band it can be drawn on. Read by the Ledger Integrity Pass, which has to
-// know the largest amount of Gold this mode can conjure out of a hold in a
-// round, so it is read across every band rather than off the deck as
-// authored: a six captain commission pays half again what the founding one
-// does, and a ceiling that read the deck alone would call that payout
-// impossible the first time a full table filled one.
+/**
+ * What the commission pays at the widest band it can be drawn on. The
+ * Ledger Integrity Pass needs the largest payout this mode can produce, so
+ * a ceiling read off the authored deck alone would call a full table's
+ * payout impossible.
+ */
 export function widestObjectivePayout(): number {
   let widest = 0;
   for (const band of SEAT_BANDS) {
@@ -251,13 +186,10 @@ export function widestObjectivePayout(): number {
 }
 
 /**
- * What the fleet has handed over, made safe to render and to broadcast.
- *
- * Three things are thrown away here rather than trusted: goods the
- * commission never asked for, counts that are not whole numbers, and counts
- * past what is still owed. The last one is what stops a doctored client
- * moving the public board past the requirement, and it is also what makes
- * the server and the clients demonstrably agree on what the deck says.
+ * Delivered counts made safe to render and broadcast. Drops goods the
+ * commission never asked for, non-whole counts, and anything past what is
+ * still owed, so a doctored client cannot move the board past the
+ * requirement.
  */
 export function clampObjectiveTally(
   objective: Objective,
@@ -275,24 +207,10 @@ export function clampObjectiveTally(
 }
 
 /**
- * Two readings of one commission, merged good by good into the higher.
- *
- * A max rather than a sum, because the two readings overlap: the board a
- * room broadcasts already contains the captain hearing it, so adding the
- * two would count that captain's own handover twice the moment one frame
- * landed. A max also cannot be walked backwards by a frame that arrives
- * late, which is the same reason the room's own tally merges this way (see
- * the merge in src/server/realtime/objective.ts).
- *
- * One definition rather than one per reader, because two readers need the
- * same answer and either could get it wrong alone: the screen draws the
- * bar, the count on the button and the goods a press would take from it,
- * and the engine holds the press itself to it. What the higher of the two
- * is, in one sentence, is the fullest reading of the commission anyone
- * holds, so a handover is visible the instant it happens, an in flight
- * broadcast can never take one away, and the goods about to be given are
- * measured against what the commission has actually taken rather than
- * against one captain's share of it.
+ * Two readings merged good by good into the higher. Max rather than sum
+ * because the broadcast board already includes the hearing captain's
+ * handover; a max also cannot be walked backwards by a late frame. This is
+ * the one definition both the screen and the engine use.
  */
 export function higherObjectiveTally(
   board: Record<string, number>,
@@ -306,23 +224,11 @@ export function higherObjectiveTally(
 }
 
 /**
- * The fleet's commission leg by leg, merged out of every captain's own
- * record of it.
- *
- * What each client writes down is the harbor's total rather than its own
- * contribution (see the trace effect in src/lib/use-objective.ts), so this
- * is one number seen by several captains and not a sum of parts. That is
- * why it merges by max per good per leg, the rule the live board already
- * merges by: a captain whose client missed a leg, reloaded, or joined the
- * voyage late cannot walk the curve backwards, and a leg that two clients
- * both recorded is recorded once. Legs come back in order, because the
- * whole point of the trace is that it reads as a story.
- *
- * [H8: the reveal and the replay ledger] Written here rather than in the
- * one module that calls it, because this is the same arithmetic
- * objectiveProgress and clampObjectiveTally are written with, and a second
- * reading of what the fleet handed over is how the ledger would come to
- * disagree with the board it is drawn beside.
+ * The fleet's commission round by round. Each client writes the harbor's total
+ * rather than its own contribution (see the trace effect in
+ * src/lib/use-objective.ts), so this merges by max per good per round. A
+ * client that missed a round cannot walk the curve backwards, and rounds come
+ * back in round order.
  */
 export function fleetTrace(
   traces: readonly (readonly ObjectiveTraceEntry[])[],
@@ -348,30 +254,10 @@ export function fleetTrace(
 }
 
 /**
- * What one captain would hand over if they delivered right now: the goods
- * and counts the commission would take from them, and what it would pay.
- *
- * This is the single definition of "how much of this is still owed", and
- * both callers need it. The engine moves the goods, and the interface has
- * to say what its button will do before it is pressed, and a second copy
- * of this arithmetic in the button is exactly how the promise and the
- * payment drift apart.
- *
- * The tally passed in is what the commission has already taken, good by
- * good, as the caller reads it: the board the room last reported merged
- * with the captain's own record (see higherObjectiveTally), which is the
- * read a screen has. A caller driving one captain with no room around them
- * passes that captain's own record alone, which is the whole of what a
- * lone captain's board could say.
- *
- * What comes back is capped at what the commission still asks for and
- * never past it, and this is where "take only what remains" is decided:
- * a captain offering three when one is still owed is handed back a row of
- * one, and a commission with nothing outstanding has no rows at all. That
- * is the same rule the Supply Barge reaches an ask by (see buyFromBarge)
- * and the same rule the room's own acceptance applies to a report (see
- * src/server/realtime/objective.ts), so a handover the engine would take
- * whole is a handover the harbor agrees it took.
+ * What one captain would hand over right now. The one definition of
+ * "still owed": the engine moves the goods and the button says what it
+ * will do. `delivered` is the merged board (see higherObjectiveTally), and
+ * rows are capped at what the commission still asks for.
  */
 export function objectiveTaking(
   objective: Objective,
@@ -387,14 +273,12 @@ export function objectiveTaking(
   return rows;
 }
 
-// One good's line on the commission. Not exported: it reaches the surfaces
-// inside ObjectiveProgress, which is what callers hold.
+// One good's line on the commission. Not exported: callers hold
+// ObjectiveProgress.
 type ObjectiveRow = {
   type: string;
   delivered: number;
   required: number;
-  // What the Emperor pays for this good, carried alongside so a surface
-  // showing what is still owed does not have to go back to the deck for it.
   price: number;
   met: boolean;
 };
@@ -403,15 +287,10 @@ export type ObjectiveProgress = {
   rows: ObjectiveRow[];
   delivered: number;
   required: number;
-  // 0 to 1, for a progress bar. 0 for a commission asking for nothing,
-  // which no authored entry does and which must not divide by zero if one
-  // ever does.
-  fraction: number;
   met: boolean;
 };
 
-// Delivered against required, per good and in total. Pure: the same tally
-// always reads the same, so the panel and the tests agree by construction.
+/** Delivered against required, per good and in total. Pure. */
 export function objectiveProgress(
   objective: Objective,
   tally: Record<string, number>,
@@ -433,7 +312,6 @@ export function objectiveProgress(
     rows,
     delivered,
     required,
-    fraction: required === 0 ? 0 : delivered / required,
     met: required > 0 && delivered >= required,
   };
 }

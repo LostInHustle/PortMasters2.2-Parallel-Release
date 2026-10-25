@@ -1,7 +1,7 @@
 // =====================================================================
 // Realtime layer: the inbound budget.
 //
-// [J2: the mute and the report] Every other part of this layer answers a
+// Every other part of this layer answers a
 // frame. This is the one part that decides whether to read one at all.
 // Nothing in the tree counted requests before it, which the private
 // information review recorded as a finding rather than fixed, and the
@@ -12,7 +12,7 @@
 // captain in a voyage sends two heartbeats per eight seconds, a captain
 // trading sends between two and nine frames a second in clusters of up to
 // three inside one hundred and twenty milliseconds, a client mounting the
-// room sends about nine frames in a hundred and fifty, and the tightest
+// harbor sends about nine frames in a hundred and fifty, and the tightest
 // legitimate loop in the smoke suite sends twelve frames a hundred
 // milliseconds apart. The machine ceiling is twenty five a second, reached
 // only by a script repeatedly triggering the three debounced reports this app's
@@ -26,7 +26,7 @@
 // so a socket's first frame (its auth) is never the thing refused, and it
 // is per socket rather than per account, so a captain with two tabs pays
 // twice and a captain who reloads does not. A reconnect is a new socket,
-// and the delay its client honours is a second, so nothing about an honest
+// and the delay its client honors is a second, so nothing about an honest
 // connection can reach this.
 //
 // A frame over budget is dropped rather than queued, and the captain is
@@ -101,11 +101,11 @@ export function guardInbound(socket: Socket): void {
     if (warned) return;
     warned = true;
     const state = sockets.get(socket.id);
-    // Straight down this socket rather than to a room, because the captain
-    // being slowed is the only one it concerns. The room is the socket's
+    // Straight down this socket rather than to a harbor, because the captain
+    // being slowed is the only one it concerns. The harbor is the socket's
     // own, which is what the client's handler compares against
     // (src/lib/use-phase-sync.ts): a frame that arrives before the socket
-    // has joined a harbor carries an empty room and is dropped by that
+    // has joined a harbor carries an empty harbor and is dropped by that
     // check, which is the right outcome, since there is no surface to print
     // it on yet.
     socket.emit("room:error", {

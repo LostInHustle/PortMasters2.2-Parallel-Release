@@ -23,8 +23,9 @@ import {
 import type { GameState, OrderCard } from "@/lib/game/types";
 import {
   CARRIES_A_DASH,
-  GAMBIT,
   check,
+  GAMBIT,
+  ledgerSentences,
   switchFor,
   voyageState,
   walkSrc,
@@ -32,13 +33,14 @@ import {
 } from "../harness";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function pathboundOrderBoardSuite(): Promise<void> {
   // =================================================================
-  // [D2: the nine slot order board] The manifest's pathbound slots, read
-  // against the plan's own clause for the feature: "Six basic orders open,
-  // three pathbound orders greyed out, each stamped with the crest of the
-  // path that would unlock it and labeled in plain language."
+  // The nine slot order board: the manifest's pathbound slots, read
+  // against the rule for the feature: "Six basic orders open, three
+  // pathbound orders grayed out, each stamped with the crest of the path
+  // that would unlock it and labeled in plain language."
   //
   // The boards below are dealt through the real lifecycle rather than
   // assembled by hand: snapToCheckpoint runs the engine's own startOrders,
@@ -93,7 +95,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
       plainCards.length === scheduled &&
         pathCards.length === PATH_ORDER_SLOTS &&
         board.customerCards.length === scheduled + PATH_ORDER_SLOTS,
-      `a fair winds board is the tier's own draw plus the paths' three, which is the plan's nine slot board (${plainCards.length} open, ${pathCards.length} pathbound)`,
+      `a fair winds board is the tier's own draw plus the paths' three, which is the design's nine slot board (${plainCards.length} open, ${pathCards.length} pathbound)`,
     );
 
     // Every pathbound card is a one good errand whose good belongs to a
@@ -124,7 +126,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
           config.orderPool.includes(o.resources[0].type)
         );
       }),
-      "and each is stamped with the crest and the name of the path whose pool owns its good, read off the record rather than written onto the card, which is the plan's own instruction for the lock reason",
+      "and each is stamped with the crest and the name of the path whose pool owns its good, read off the record rather than written onto the card, which is the design's own instruction for the lock reason",
     );
     // The good's kind is the card's kind, which is the claim that a
     // pathbound errand is priced by the generator every other card of that
@@ -140,7 +142,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
     );
 
     // The lock itself. A captain with no path is locked out of every
-    // pathbound card, and every captain is pathless until D7's draft deals
+    // pathbound card, and every captain is pathless until the draft deals
     // one, so this is the state of the table this build ships: the rule
     // teaches by being true rather than by being staged.
     const marked = pathCards[0];
@@ -183,13 +185,15 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
     };
     if (marked && owner) {
       const refused = seatFor(null);
-      const refusal: string[] = [];
+      const refusal: LedgerLine[] = [];
       completeOrder(refused.state, refused.card.id, refusal);
       check(
         canFillOrder(refused.state, refused.card) === false &&
           refused.state.money === 100 &&
           !refused.state.completedOrders.includes(refused.card.id) &&
-          refusal.some((line) => line.includes(pathLockLine(owner))),
+          ledgerSentences(refusal).some((line) =>
+            line.includes(pathLockLine(owner)),
+          ),
         "a locked card is refused even with the goods aboard, and the refusal is the same sentence the board prints on the card rather than a second one written for the ledger",
       );
       const opened = seatFor(owner);
@@ -226,7 +230,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
       "and an ordinary order demanding the very same good is open to every captain, marker and all, so the lock is the marker's doing and never the good's",
     );
 
-    // The count the leg report files, which the balance dashboard's
+    // The count the round report files, which the balance dashboard's
     // expired orders are read off: a locked card is not an order anybody
     // failed to fill, so it is not a dealt one either.
     check(
@@ -235,15 +239,15 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
         openOrderCount({ ...board, path: owner }) ===
           scheduled +
             pathCards.filter((o) => pathOrderOf(o, GAMBIT) === owner).length,
-      "and the dealt count a leg report files leaves the locked cards out, counting the tier's own draw when the captain holds no path and adding back exactly the cards the path they hold posted",
+      "and the dealt count a round report files leaves the locked cards out, counting the tier's own draw when the captain holds no path and adding back exactly the cards the path they hold posted",
     );
   });
 
   // The switch, at the other end: the same seed and the same round with
-  // path orders off. This is the plan's rollback clause read literally
-  // ("Flag off and the three pathbound slots disappear, leaving the
-  // existing six"), and it is this feature's backward compatibility read at
-  // the same time: the six the draw deals are the same six, card for card,
+  // path orders off. The rollback reads literally ("Flag off and the three
+  // pathbound slots disappear, leaving the existing six"), and it is this
+  // feature's backward compatibility read at the same time: the six the
+  // draw deals are the same six, card for card,
   // whether the feature is on or off, because the pathbound slots are drawn
   // from a stream of their own.
   const pathOffBoard = withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () =>
@@ -275,7 +279,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
   );
   // The same reading for a card already dealt: a marked card is a marker
   // on a card, so a build with the switch off plays it as an ordinary
-  // order rather than leaving it grey forever.
+  // order rather than leaving it gray forever.
   const markedCards = pathOnBoard.customerCards.filter((o) => o.isPathOrder);
   check(
     markedCards.length === PATH_ORDER_SLOTS &&
@@ -289,8 +293,8 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
     "and a card already dealt by a build with the switch on is an ordinary order to a build with it off, so rolling the feature back mid voyage leaves nobody holding a card no one can fill",
   );
 
-  // The plan's definition of done asks new state to round trip through a
-  // save, and the marker is new state on a persisted object: the board is
+  // New state has to round trip through a save, and the marker is new
+  // state on a persisted object: the board is
   // written into the save blob, so a marked card has to come back marked
   // and be read the same way at both ends of the switch after a trip
   // through JSON as it was read before one.
@@ -328,8 +332,8 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
       new Set(PATH_IDS.map((id) => pathLockLine(id))).size === PATH_IDS.length,
     "the lock line names the path it waits on for every path, reads free of dashes under the house rule, and is never the same sentence for two paths",
   );
-  // The plan's instruction for this feature, held by a scan of the tree
-  // rather than by memory: the lock reason is computed from the path config
+  // The rule for this feature, held by a scan of the tree rather than by
+  // memory: the lock reason is computed from the path config
   // rather than written into the card. The stem below is the part of the
   // sentence that is literal in the source (the rest is the path's own
   // name), and it is swept for across every source file, so finding it in

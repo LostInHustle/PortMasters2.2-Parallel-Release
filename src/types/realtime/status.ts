@@ -3,7 +3,7 @@
 //
 // One captain's last reported status, broadcast on game:status.
 //
-// The heartbeat the room runs on: the public account shape, the round and the
+// The heartbeat the harbor runs on: the public account shape, the round and the
 // phase the captain reports, and the few numbers the harbor panel prints
 // beside a name. Nothing here is a secret, which is why the shape is a
 // broadcast rather than a private entry.
@@ -26,18 +26,18 @@ import type { PublicUser } from "./presence";
 //
 // bankrupt and marooned are the marks a failed voyage leaves on a seat
 // that keeps sailing (see GameState). They are optional so that a client
-// from before this slice, and every Classic voyage that has never had
+// from before this change, and every Classic voyage that has never had
 // either, reads as neither: the roster badges a captain only on an
 // explicit true, and the server refuses to maroon a captain it has been
 // told is already written off.
 //
-// [C1: the Larder and Short Rations] shortRations rides the same frame and
-// for the same kind of reason. The plan asks for the shortage to be
+// shortRations rides the same frame and
+// for the same kind of reason. The design asks for the shortage to be
 // visible to the fleet and not only to the captain feeling it, and a
 // captain's own books are the only place this engine can read it from: the
 // Larder lives in the browser's GameState, so the browser is what reports
 // it, exactly as it reports gold and reputation. Optional, like the two
-// marks above, so a client that predates this slice reads as a fed crew
+// marks above, so a client that predates this change reads as a fed crew
 // rather than as a hungry one, and only an explicit true draws a badge.
 export type GameStatusUpdate = {
   roomId: string;

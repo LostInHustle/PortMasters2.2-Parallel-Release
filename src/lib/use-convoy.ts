@@ -4,6 +4,7 @@ import { VentureSummary } from "@/types/realtime/ventures";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
+import { refusalHandler } from "@/lib/refusals";
 
 // The wire shape for a venture lives in @/types/realtime as VentureSummary,
 // which this hook holds under its own ConvoyVenture alias below.
@@ -22,7 +23,7 @@ type ConvoyVenture = VentureSummary;
  * Convoy Ventures: the shared, multi round board of open ventures: a thin
  * relay around the venture:* socket events, kept separate from GameState
  * the same way useBarter and useAid are, since an open venture is real
- * room wide state no single client's deterministic engine can compute on
+ * harbor wide state no single client's deterministic engine can compute on
  * its own. Unlike barter and aid, this one is backed by a real database
  * table server side (a venture can outlive a single phase, even a single
  * round), but the client side shape here is deliberately identical to
@@ -35,11 +36,11 @@ type ConvoyVenture = VentureSummary;
  * telling it exactly how much of its requested amount actually landed (a
  * venture can be topped up by someone else microseconds earlier, so less
  * may have been needed than was asked to give). `onSettled` fires on
- * every client in the room whenever any venture resolves, for any of the
+ * every client in the harbor whenever any venture resolves, for any of the
  * three outcomes above; the caller filters the settlements list for its
  * own userId to find out whether it was involved at all.
  *
- * `locked` reflects whether this room has already used its one Convoy
+ * `locked` reflects whether this harbor has already used its one Convoy
  * Venture chance for the current voyage: once true, posting a new venture
  * will always be rejected, and it only ever goes back to false on a fresh
  * voyage.
@@ -96,10 +97,11 @@ export function useConvoy(
       if (data.roomId !== roomId) return;
       onSettledRef.current(data.ventureId, data.outcome, data.settlements);
     };
-    const onPostError = (data: { roomId: string; error: string }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.error);
-    };
+    const onPostError = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; error: string }) => data.error,
+    );
 
     socket.on("venture:update", onUpdate);
     socket.on("venture:contributed", onContributedEvent);

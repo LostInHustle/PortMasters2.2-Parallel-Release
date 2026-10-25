@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cardText } from "@/lib/game/cards";
+import { renderLedger } from "@/lib/game/ledger";
 import type { Difficulty } from "@/lib/game/difficulty";
 import { t } from "@/lib/game/i18n";
 import {
@@ -24,55 +25,27 @@ import { phaseLabel } from "@/lib/game/engine";
 import { SKILLED_LEGEND } from "@/lib/game/status-copy";
 import { cn } from "@/lib/utils";
 import { itemColorResolver } from "@/lib/use-color-preference";
+import { useLanguage } from "@/lib/use-language-preference";
 import { Avatar, Pill, ItemIcon } from "../shared";
+import { FigureTile } from "../profile/FigureTile";
 import { workerStatusLine } from "./phases/WorkerList";
 import { FoldRow } from "./FoldRow";
 import { CaptainLegacyCard } from "../CaptainLegacyCard";
 import { CloseFooter } from "./CloseFooter";
 import { Coins, Trophy, Ship, Loader2, Eye } from "lucide-react";
 
-// One stat, its own tile instead of a pill sharing a row with three
-// others. Reused for every number the profile leads with (Gold,
-// Reputation, Ship Level), so a future stat is one more tile, not a
-// rework of a cramped row.
-function ProfileStatTile({
-  icon,
-  value,
-  label,
-  toneClassName,
-}: {
-  icon: React.ReactNode;
-  value: string | number;
-  label: string;
-  toneClassName: string;
-}) {
-  return (
-    <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.05] py-2 text-center">
-      <div
-        className={cn(
-          "text-sm font-semibold flex items-center justify-center gap-1",
-          toneClassName,
-        )}
-      >
-        {icon} {value}
-      </div>
-      <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
-    </div>
-  );
-}
-
 /**
  * One line of a captain's cargo: the good's icon, its name in the good's
- * own colour, and the count the popup was told. One component rather than
+ * own color, and the count the popup was told. One component rather than
  * one row under Raw Materials and another under Finished Goods, because
  * the two lists are the same kind of thing and their rows should not be
  * two chances to drift.
  *
- * The colour is resolved by the caller rather than looked up here, because
- * the resolver comes from the viewer's own colour preference and belongs to
+ * The color is resolved by the caller rather than looked up here, because
+ * the resolver comes from the viewer's own color preference and belongs to
  * the screen rather than to a row of it. It is allowed to be absent, which
- * is the resolver's own answer for a good it has no colour for: the name
- * then draws in the panel's text colour.
+ * is the resolver's own answer for a good it has no color for: the name
+ * then draws in the panel's text color.
  */
 function CargoRow({
   item,
@@ -97,7 +70,7 @@ function CargoRow({
 /**
  * The "click a collapsed roster bar, see everything" popup. Doubles as a
  * bankrupt captain's spectator window. There's no separate read only
- * board, watching the rest of the room just means opening their popups.
+ * board, watching the rest of the harbor just means opening their popups.
  *
  * Laid out as a profile: the standings first (an identity header, the
  * headline figures, the comparison against your own seat and the legacy
@@ -142,6 +115,18 @@ export function PlayerDetailModal({
 }) {
   const resolveColor = itemColorResolver(colorFor);
   const [refOpen, setRefOpen] = useState(false);
+
+  // The other captain's ledger, read in this reader's language. The
+  // snapshot carries the material of each line rather than a finished
+  // sentence, so a captain reading somebody else's ledger reads it in the
+  // language they are holding, not in the language that captain happened
+  // to be holding when the line was written.
+  const { locale } = useLanguage();
+  const detailLines = useMemo(
+    () => renderLedger(locale, detail?.logs ?? []),
+    [locale, detail?.logs],
+  );
+
   const workerGroups = detail
     ? unlockedWorkerTypes(difficulty, detail.round).map((w) => {
         const list = detail.workers?.[w.id] ?? [];
@@ -158,8 +143,8 @@ export function PlayerDetailModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Capped and scrollable. This panel is the tallest dialog in the
           game: header, stat tiles, comparison bar, legacy card, cargo,
-          workers, modules and a log box. Uncapped it ran taller than a
-          laptop viewport, and because the dialog is vertically centred
+          artisans, modules and a log box. Uncapped it ran taller than a
+          laptop viewport, and because the dialog is vertically centered
           with the page scroll locked, both the title and the Close
           button were off screen with no way to reach them. */}
       <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto pm-scroll">
@@ -201,7 +186,7 @@ export function PlayerDetailModal({
             )}
             {detail?.phase === "endgame" && (
               <Pill tone="gain" className="shrink-0">
-                {t("🏁 Voyage complete")}
+                {t("🏁 Voyage Ended")}
               </Pill>
             )}
           </div>
@@ -215,7 +200,7 @@ export function PlayerDetailModal({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                {t("Asking the harbor master…")}
+                {t("Asking the Harbormaster…")}
               </>
             ) : (
               t("Not available right now, they may have stepped away.")
@@ -224,23 +209,26 @@ export function PlayerDetailModal({
         ) : (
           <div className="space-y-3.5">
             <div className="grid grid-cols-3 gap-2">
-              <ProfileStatTile
-                icon={<Coins className="h-3.5 w-3.5" />}
+              <FigureTile
+                size="profile"
+                icon={Coins}
                 value={detail.money}
                 label={t("Gold")}
-                toneClassName="text-gold-ink"
+                valueClassName="text-gold-ink"
               />
-              <ProfileStatTile
-                icon={<Trophy className="h-3.5 w-3.5" />}
+              <FigureTile
+                size="profile"
+                icon={Trophy}
                 value={detail.score}
                 label={t("Reputation")}
-                toneClassName="text-favor"
+                valueClassName="text-favor"
               />
-              <ProfileStatTile
-                icon={<Ship className="h-3.5 w-3.5" />}
+              <FigureTile
+                size="profile"
+                icon={Ship}
                 value={detail.shipLevel}
                 label={t("Ship Level")}
-                toneClassName="text-sea"
+                valueClassName="text-sea"
               />
             </div>
 
@@ -307,7 +295,7 @@ export function PlayerDetailModal({
 
                   <div className="rounded-xl border border-black/10 dark:border-white/10 p-3.5">
                     <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-                      {t("👥 Workers")}
+                      {t("👥 Artisans")}
                     </h4>
                     {/* The star the idle rows carry, defined where it
                         appears for the same reason the bench carries the
@@ -338,9 +326,12 @@ export function PlayerDetailModal({
                                   count: g.list.length,
                                 })}
                               </div>
-                              {g.list.map((w, i) => (
+                              {g.list.map((w) => (
                                 <div
-                                  key={i}
+                                  // The hand's own name, which is what
+                                  // tells one hand from another, the same
+                                  // identity the bench draws it by.
+                                  key={w.name}
                                   className="text-[11px] text-muted-foreground"
                                 >
                                   {workerStatusLine(w, detail.round)}
@@ -368,7 +359,8 @@ export function PlayerDetailModal({
                           const text = cardText(card);
                           return (
                             <div key={card.id} className="text-[12px]">
-                              {card.icon} <strong>{text.name}</strong>:{" "}
+                              {card.icon} <strong>{text.name}</strong>
+                              {t(": ")}
                               {text.desc}
                             </div>
                           );
@@ -388,7 +380,7 @@ export function PlayerDetailModal({
                         </p>
                       ) : (
                         <div className="space-y-0.5 font-mono text-[11px] leading-relaxed">
-                          {detail.logs.map((l, i) => (
+                          {detailLines.map((l, i) => (
                             <div
                               key={i}
                               className="whitespace-pre-wrap break-words"
@@ -502,10 +494,10 @@ function ComparisonBar({
   );
 }
 
-// One colour for both captains: the bar compares two numbers, and the
+// One color for both captains: the bar compares two numbers, and the
 // tint names the stat rather than the captain. Two tone fields, one per
 // captain, would read as an invitation to give one captain a different
-// colour from the other, which is not what the bar does.
+// color from the other, which is not what the bar does.
 type ComparisonStat = {
   label: string;
   mine: number;

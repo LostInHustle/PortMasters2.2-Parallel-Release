@@ -1,30 +1,14 @@
-// =====================================================================
-// Realtime layer: online presence and room rosters.
+// Online presence and harbor rosters.
 //
-// Two maps sit at the centre of this module:
-//   sockets     socketId -> SocketState
-//   userSockets userId    -> Set<socketId>   (a user may hold several)
+// Two maps sit at the center: sockets (socketId -> SocketState) and userSockets
+// (userId -> Set<socketId>, since a user may hold several). onlineUsers() and
+// roomMembers() collapse the sockets map to one row per user; newest socket wins,
+// so a reconnecting captain's fresh status overrides the stale one.
 //
-// onlineUsers() collapses the sockets map down to one row per user for
-// the lobby's captains online list. roomMembers(roomId) collapses it
-// the same way for a single room's roster, newest socket wins so a
-// reconnecting captain's fresh status overrides the stale one their
-// dropped socket is still broadcasting.
-//
-// scheduleDeparture arms the 30s grace timer that reaps a seat after a
-// captain's last socket goes away. A reconnect inside the window cancels
-// it; a sustained absence lets it fire, which calls leaveRoomForUser
-// and tears down every per room structure for a deleted room.
-//
-// scheduleBootDeparture arms the same timer for the same reason at
-// process start, and differs in one respect only: a harbor that loses
-// its whole crew that way is kept instead of removed.
-//
-// Both take their cleanup callbacks as parameters rather than importing
-// them, because they sit at the top of a dependency chain that reaches
-// into barter, aid, chat, conclusion, and the cross module room
-// teardown. Passing them in keeps the dependency graph acyclic.
-// =====================================================================
+// scheduleDeparture arms the 30s grace timer that reaps a seat after the last
+// socket goes; a reconnect cancels it. scheduleBootDeparture arms the same timer
+// at process start but keeps a harbor that loses its whole crew. Both take their
+// cleanup callbacks as parameters to keep the dependency graph acyclic.
 import { PrivateEntry } from "@/types/realtime/private-entry";
 import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
@@ -40,12 +24,8 @@ import { noteVoyageLogDeparture } from "./voyage-log";
 export const sockets = new Map<string, SocketState>();
 export const userSockets = new Map<string, Set<string>>();
 
-// One event, every socket a captain is holding. A captain may have two
-// tabs open on the same room, and a direct message addressed to them has
-// to arrive on both. It sits here beside the map it walks rather than in
-// the file that first needed it, because the loan, venture and admin
-// modules reach for it too and every one of them was writing this loop
-// out by hand instead.
+// One event, every socket a captain is holding. Two tabs must both receive a
+// direct message. It sits beside the map it walks because other modules need it.
 export function emitToUser(
   io: Server,
   userId: string,
@@ -57,19 +37,26 @@ export function emitToUser(
   }
 }
 
-// The one way a secret reaches its owner, and the reason it is a function
-// rather than a line at each call site: the entry goes to the sockets of
-// the captain it is about and nowhere else, never into a room channel and
-// never into a broadcast. Everything hidden in this game rides this, so
-// the rule lives in one place that can be read at a glance rather than in
-// every handler that has a secret to deliver.
+// One harbor-wide system line, each socket in its own captain's language.
+export function broadcastRoomSystem(
+  io: Server,
+  roomId: string,
+  content: (locale: Locale) => string,
+): void {
+  for (const [socketId, state] of sockets) {
+    if (state.roomId !== roomId) continue;
+    io.to(socketId).emit("room:system", {
+      roomId,
+      content: content(state.locale),
+    });
+  }
+}
+
+// The one way a secret reaches its owner: to that captain's sockets and nowhere
+// else, never a harbor channel or a broadcast. Everything hidden in the game
+// rides this, so the rule lives in one place.
 //
-// The entry is built per socket rather than once for the user, because a
-// line can carry the reader's language and one captain can hold two tabs
-// in two of them. The builder is handed this socket's language and
-// returns the entry; a line that reads the same in every language goes
-// through the same shape, so the delivery of a secret has one form rather
-// than two.
+// The entry is built per socket because two tabs can hold two languages.
 export function emitPrivate(
   io: Server,
   roomId: string,
@@ -82,25 +69,20 @@ export function emitPrivate(
   }
 }
 
-// Abandoned seat cleanup. Keyed by "roomId:userId" since a user can
-// only hold one pending departure per room at a time.
+// Abandoned seat cleanup. Keyed by "roomId:userId" since a user can only hold
+// one pending departure per harbor at a time.
 const departureTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const DEPARTURE_GRACE_MS = 30_000;
 
-// [J1: the private information review] The on demand detail question,
-// held server side between the ask and the answer.
+// The on demand detail question, held server side between the ask and the answer.
 //
-// Keyed by the pair, "askerId:targetId", because that pair is what an
-// answer names and a captain stands in one harbor at a time, so the room
-// is a value on the entry rather than part of the key. The answer carries
-// no room and no requester of its own now: the server relays the ones
-// written down here, which is what stops a captain from composing a
-// response about a question nobody asked and addressing it at any
-// account in the tree.
+// Keyed by "askerId:targetId" because a captain stands in one harbor at a time,
+// so the harbor is a value on the entry. The answer carries no harbor or
+// requester of its own: the server relays only what was written down here, which
+// stops a captain composing a response to a question nobody asked.
 const detailRequests = new Map<string, { roomId: string; askedAt: number }>();
-// The window an answer is worth relaying in. Longer than a detail popup
-// is ever open on a live socket, and short enough that a question left
-// behind by a client that never answered cannot be used later.
+// How long an answer is worth relaying. Short enough that an unanswered question
+// cannot be used later.
 const DETAIL_REQUEST_TTL_MS = 30_000;
 
 export function rememberDetailRequest(
@@ -115,9 +97,8 @@ export function rememberDetailRequest(
   detailRequests.set(`${askerId}:${targetId}`, { roomId, askedAt: now });
 }
 
-// The room the question was asked about, or null when there is no
-// question waiting, which is the answer that drops the frame. Consumed
-// either way, so one question relays one answer.
+// The harbor the question was asked about, or null. Consumed either way, so one
+// question relays one answer.
 export function takeDetailRequest(
   targetId: string,
   askerId: string,
@@ -130,52 +111,33 @@ export function takeDetailRequest(
   return held.roomId;
 }
 
-// A restarted voyage is a new voyage, and a harbor that has gone takes
-// its questions with it. Same shape as every other per room clear.
+// A restarted voyage is a new voyage, and a harbor that has gone takes its questions.
 export function forgetDetailRequests(roomId: string): void {
   for (const [key, held] of detailRequests) {
     if (held.roomId === roomId) detailRequests.delete(key);
   }
 }
 
-// In process locks that guard room:start and room:restart against
-// firing twice for the same room if the host double clicks or has two
-// tabs open.
+// In-process locks that guard room:start and room:restart against a double
+// click or two tabs.
 export const startingRooms = new Set<string>();
 export const restartingRooms = new Set<string>();
 
-// The room's commission board, and the reports settling against it.
+// The harbor's commission board, and the reports settling against it.
 //
-// It sits beside the two claims above because it is the same kind of
-// thing, an in process lock a room's own frames share, and it differs
-// from them in one respect: a caller queues on it rather than being
-// turned away. Two captains pressing Deliver in the same instant are
-// both standing over the goods their press names, so both are owed an
-// answer and the second is settled after the first rather than dropped
-// (see recordObjectiveHandover in ./objective). A restart is the other
-// caller and wants the opposite of a turn: it takes the same claim so
-// that the report it is waiting on finishes against the board that
-// report read before the new voyage's board is cleared underneath it,
-// which is the one window in which a line accepted against the dead
-// objective could be seeded into the fresh one (see the
-// clearObjectiveTallies call in ./wiring/restart-voyage).
-//
-// A map rather than the sets above, and the reason is the waiting: a
-// queue needs something to await, so each entry is the tail of that
-// room's queue and the keys are the rooms a claim is held on.
+// Callers queue on this lock rather than being turned away: two Deliver presses
+// both stand over goods and both are owed an answer. A restart takes the same
+// claim so the report it waits on finishes against the board it read, before the
+// fresh voyage's board replaces it. A map because a queue needs something to
+// await: each entry is the tail of that harbor's queue.
 const objectiveRooms = new Map<string, Promise<void>>();
 
 /**
- * Waits for one room's commission board to be free, takes it, and hands
- * back the release.
+ * Waits for one harbor's commission board, takes it, and returns the release.
  *
- * The claim is held from before the caller's first await to after its
- * last write, which is what makes it a claim rather than a check: both
- * callers run their stretch inside a try/finally, so a claim that threw
- * releases rather than wedging the room's board for good. A claim that
- * arrives while one is held waits for it, in the order the claims were
- * made, so the second of two presses is settled against the board the
- * first one left rather than against the board both of them read.
+ * The claim spans the caller's awaits, and both callers use try/finally, so a
+ * throw releases rather than wedging the board. A claim arriving while one is
+ * held waits in order, so the second press settles against the first's board.
  */
 export async function claimObjectiveRoom(roomId: string): Promise<() => void> {
   const previous = objectiveRooms.get(roomId) ?? Promise.resolve();
@@ -190,7 +152,7 @@ export async function claimObjectiveRoom(roomId: string): Promise<() => void> {
   await previous;
   return () => {
     release();
-    // Only the tail clears the room, so a release cannot drop the claim a
+    // Only the tail clears the harbor, so a release cannot drop the claim a
     // captain behind this one is already waiting on.
     if (objectiveRooms.get(roomId) === mine) objectiveRooms.delete(roomId);
   };
@@ -204,9 +166,8 @@ export function forgetSocket(socketId: string): void {
   sockets.delete(socketId);
 }
 
-// One row per user, never per socket. A captain can hold several
-// sockets at once (two browser tabs, or a reconnect's brand new socket
-// while the dropped one is still inside pingTimeout).
+// One row per user, never per socket: a captain can hold several sockets (two
+// tabs, or a reconnect before pingTimeout).
 export function onlineUsers(): Array<PublicUser & { roomId: string | null }> {
   const seen = new Map<string, PublicUser & { roomId: string | null }>();
   for (const s of sockets.values()) {
@@ -221,11 +182,9 @@ export function broadcastPresence(io: Server): void {
   io.emit("presence:update", { users: onlineUsers() });
 }
 
-// Collapses every socket claiming this room down to one row per user.
-// Reverse iterated so the newest socket (inserted last) wins the dedup:
-// when a hosting edge proxy recycles an idle WebSocket, the stale one
-// hangs around in sockets until pingTimeout fires. Walking newest first
-// means the freshly reconnected socket always claims the roster slot.
+// Collapses every socket in this harbor to one row per user. Reverse iterated so
+// the newest socket wins: when an edge proxy recycles an idle WebSocket, the
+// stale one lingers until pingTimeout, and the fresh socket must claim the slot.
 export function roomMembers(
   roomId: string,
 ): Array<PublicUser & { socketId: string }> {
@@ -238,10 +197,8 @@ export function roomMembers(
   return Array.from(byUser.values());
 }
 
-// The room one captain is currently seated in, or null when they are in
-// the lobby or holding no socket at all. A captain with two tabs open
-// holds one seat rather than two, so whichever socket claims a room
-// speaks for them.
+// The harbor a captain is seated in, or null in the lobby or with no socket.
+// Two tabs hold one seat, so whichever socket claims a harbor speaks for them.
 export function seatedRoomOf(userId: string): string | null {
   for (const s of sockets.values()) {
     if (s.userId === userId && s.authed && s.roomId) return s.roomId;
@@ -249,10 +206,8 @@ export function seatedRoomOf(userId: string): string | null {
   return null;
 }
 
-// The public identity of one captain, taken from whichever socket is
-// carrying them, or null when they hold no socket at all. Used where a
-// session conversation has to be addressed to someone without going to
-// the database for a row that is not being written there anyway.
+// The public identity of one captain from whichever socket carries them, or null
+// with no socket. Used where a session message needs a name without a db row.
 export function publicUserOf(userId: string): PublicUser | null {
   for (const s of sockets.values()) {
     if (s.userId === userId && s.authed) return s.user;
@@ -260,9 +215,8 @@ export function publicUserOf(userId: string): PublicUser | null {
   return null;
 }
 
-// Returns whether a pending departure was actually found and canceled.
-// room:join uses this to tell a genuine first join apart from a captain
-// whose connection merely blipped and is rejoining moments later.
+// Whether a pending departure was found and canceled. room:join uses this to
+// tell a first join from a reconnect.
 export function cancelDeparture(roomId: string, userId: string): boolean {
   const key = `${roomId}:${userId}`;
   const t = departureTimers.get(key);
@@ -274,17 +228,12 @@ export function cancelDeparture(roomId: string, userId: string): boolean {
   return false;
 }
 
-// The cleanup callbacks scheduleDeparture needs. Passed in rather than
-// imported so this module doesn't pull in barter, aid, chat, conclusion,
-// or the cross module room teardown, which would create a cycle.
+// The cleanup callbacks scheduleDeparture needs. Passed in rather than imported
+// to keep the dependency graph acyclic.
 export type DepartureCleanup = {
   removeUserBarterOffers: (io: Server, roomId: string, userId: string) => void;
-  // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] The two consent
-  // boards' own, for the reason the barter board has one: the room must not
-  // be left holding an offer from, or a promise by, a captain who is no
-  // longer in it. Both markets are swept by one callback because a
-  // departure is one event, and the two conditions a departure applies to a
-  // row are stated where they are applied (see removeUser in ./consent).
+  // The two consent boards' own callback: the harbor must not keep an offer
+  // from, or a promise by, a captain who has left (see removeUser in ./consent).
   removeUserConsentBoards: (io: Server, roomId: string, userId: string) => void;
   removeUserAidRequest: (io: Server, roomId: string, userId: string) => void;
   emitRoomMembers: (io: Server, roomId: string) => Promise<void>;
@@ -292,31 +241,24 @@ export type DepartureCleanup = {
   clearRoomAllMaps: (roomId: string) => void;
 };
 
-// Everything one armed departure needs. Bundled into a single object
-// rather than five positional arguments, and because the boot variant
-// below differs from the live one by exactly one field.
+// Everything one armed departure needs. Bundled because the boot variant differs
+// by one field.
 type DeparturePlan = {
   roomId: string;
   userId: string;
   displayName: string;
   cleanup: DepartureCleanup;
-  // Boot reconciliation sets this. A live departure leaves it false, so
-  // the last captain out removes the room and the public lobby stays
-  // free of rooms nobody is sitting in. A restart is a different case:
-  // the harbor and the voyage saved inside it belong to the captain, so
-  // boot drops the seats and keeps the room for them to walk back into.
+  // Set on boot reconciliation, false for a live departure: the last captain
+  // out removes the harbor, while boot keeps an emptied one for its owner.
   keepEmptyRoom: boolean;
 };
 
-// Everything one seat loses when it is given up: barter and aid offers
-// pulled, membership deleted, host reassigned, and, unless the plan says
-// to keep it, the room removed once it empties out.
+// Everything one seat loses when it is given up: barter, consent and aid rows
+// pulled, membership deleted, host reassigned, and the harbor removed unless the
+// caller keeps it.
 //
-// Exported so there is one definition of this and not two. The grace
-// timer calls it when its window closes, and the operator console calls
-// it the moment a ban or a purge has to take a seat away, which is a case
-// that cannot wait 30 seconds: the flagged captain would still be holding
-// a chair, and the room's other captains would still be counting them.
+// Exported so there is one definition. The grace timer calls it at the window's
+// close; the console calls it at once for a ban or purge, which cannot wait.
 export async function reapDeparture(
   io: Server,
   plan: DeparturePlan,
@@ -332,54 +274,29 @@ export async function reapDeparture(
   }).catch(() => null);
   if (!result) return;
 
-  // [I1: the telemetry spine] The seat is actually gone, so the voyage
-  // that was under way just lost its captain: the plan's abandon point,
-  // recorded after the write that took the seat rather than before it, so
-  // a leave that failed is not counted as one. A harbor whose voyage
-  // never started has nothing open to record against, which is what keeps
-  // every ordinary lobby departure out of the records.
+  // The seat is gone, so a running voyage just lost its captain. Recorded after
+  // the write, so a failed leave is not counted. A voyage never started has no
+  // record to write to, which keeps ordinary lobby departures out.
   noteCaptainLeft(roomId, userId);
-  // [B4: the log surfaces] The same departure into the room's log, after
-  // the same write and for the same reason: a leave that failed is not a
-  // leave. The name comes off the plan rather than a lookup, because the
-  // captain's own row may already be gone by the time this runs and the
-  // plan was built while the seat still existed.
+  // The same departure into the harbor's log, for the same reason. The name comes
+  // from the departure record because the row may already be gone.
   noteVoyageLogDeparture(io, roomId, userId, displayName);
 
   if (result.roomDeleted) {
-    // The room was deleted because this was its last member. Tear
-    // down every in memory structure for it so a future room (with a
-    // different id) doesn't inherit stale data from a room that no
-    // longer exists.
+    // The last member left, so the harbor was deleted. Tear down every in-memory
+    // structure so a future harbor cannot inherit stale data.
     //
-    // [I1: the telemetry spine] A voyage the harbor abandoned mid leg is
-    // exactly the broken voyage the plan asks a record to explain, so the
-    // record is written before the teardown and with nobody present: the
-    // last captain just walked out, which is the whole of what this
-    // outcome means. It survives the room it describes, unlike a
-    // chronicle or a loan, because a measurement that vanished with the
-    // lobby it was taken in would read as a harbor where nobody ever
-    // abandons anything.
+    // The broken voyage is written before the teardown, with nobody present: the
+    // last captain just walked out. The record must outlive the harbor it describes.
     void closeVoyageTelemetry(roomId, "emptied", []);
     cleanup.clearRoomAllMaps(roomId);
   } else {
-    // The room reads this notice, so it goes to every socket still seated
-    // in the harbor, each in that captain's own language. The captain who
-    // just left has already been taken out of the map, so the walk is the
-    // remaining crew.
-    for (const [socketId, state] of sockets) {
-      if (state.roomId !== roomId) continue;
-      io.to(socketId).emit("room:system", {
-        roomId,
-        content: tFor(state.locale, "{displayName}'s voyage has ended", {
-          displayName,
-        }),
-      });
-    }
+    // The departing captain is already out of the map, so the notice reaches the rest.
+    broadcastRoomSystem(io, roomId, (locale) =>
+      tFor(locale, "{displayName}'s voyage has ended", { displayName }),
+    );
     await cleanup.emitRoomMembers(io, roomId);
-    // The captain who just left might have been the only one still
-    // out at sea; everyone else could already be sitting at their
-    // endgame screen waiting on exactly this.
+    // They may have been the only one at sea; everyone else may be waiting on this.
     await cleanup.maybeConcludeVoyage(io, roomId);
   }
 }
@@ -392,36 +309,28 @@ function armDeparture(io: Server, plan: DeparturePlan): void {
   cancelDeparture(roomId, userId);
   const t = setTimeout(async () => {
     departureTimers.delete(key);
-    // They may have reconnected to a different room, or signed back in,
-    // in the time it took the timer to fire, so only act if they're
-    // still gone from this one. This check belongs to the timer alone:
-    // it is the whole reason the timer waits, and the immediate reap the
-    // console takes has already decided the captain is not coming back.
+    // They may have reconnected elsewhere or signed back in during the wait, so
+    // act only if they are still gone from this harbor. The immediate console reap
+    // has already decided they are not coming back.
     if (userSockets.get(userId)?.size) return;
     await reapDeparture(io, plan);
   }, DEPARTURE_GRACE_MS);
-  // Like the clock's and the advance watch's, this must never be the
-  // reason a process stays up.
+  // As with the clock and the advance watch, this must never keep the process up.
   t.unref();
   departureTimers.set(key, t);
 }
 
-// Releases every armed grace timer. The shutdown's path: a process going
-// away is not a captain leaving, so no seat is reaped over it.
+// Releases every armed grace timer on shutdown: a process going away is not a leave.
 export function clearDepartureTimers(): void {
   for (const timer of departureTimers.values()) clearTimeout(timer);
   departureTimers.clear();
 }
 
-// Takes an account out of the presence bookkeeping outright: the account
-// leaves userSockets, and every socket it holds gives up its claim on a
-// room and leaves that room's channel. The socket ids come back so the
-// caller can close them.
+// Takes an account out of presence outright: userSockets loses it, and each
+// socket gives up its harbor and channel. The ids come back for the caller to close.
 //
-// A ban or a purge uses this before reaping, because the ordinary
-// disconnect path is the wrong shape for it: that path announces a
-// departure nobody chose and arms a 30 second timer for a seat that is
-// already gone.
+// A ban or purge uses this before reaping: the ordinary disconnect path announces
+// a departure nobody chose and arms a timer for a seat already gone.
 export function detachUser(io: Server, userId: string): string[] {
   const ids = Array.from(userSockets.get(userId) ?? []);
   userSockets.delete(userId);
@@ -434,36 +343,27 @@ export function detachUser(io: Server, userId: string): string[] {
   return ids;
 }
 
-// Takes every socket out of one room, without touching any other room
-// those accounts may be holding, and without closing anything: the
-// captains emptied out this way stay signed in and land in the Lobby.
+// Takes every socket out of one harbor without touching other harbors those
+// accounts hold, and without closing anything: the captains stay signed in.
 //
-// Used when a room stops existing underneath its crew, which today means
-// a purge deleting the account that hosted it. detachUser is the wrong
-// tool there: it ends an account, while this ends a room, and a captain
-// with a second tab somewhere else must keep that tab's standing.
+// Used when a harbor stops existing under its crew, such as a purge deleting the
+// host. detachUser is wrong there: it ends an account, while this ends a harbor.
 export function emptyRoom(io: Server, roomId: string): void {
   for (const [socketId, state] of sockets) {
     if (state.roomId !== roomId) continue;
     io.sockets.sockets.get(socketId)?.leave(roomChannel(roomId));
     state.roomId = null;
-    // The account keeps its place in userSockets. The sockets here are
-    // still connected and still registered: the map's documented meaning
-    // is every live socket an account holds. This used to edit the set as
-    // if the socket had gone away, which left a captain sitting in an
-    // emptied room absent from their own account's entry, so a later ban
-    // or purge of them found no ids at detachUser and closed nothing
-    // while the socket went on acting on its cached session. The status
-    // row goes outright, the same rule room:join and room:leave apply: a
-    // captain who is no longer in this room sends a fresh status if they
-    // ever come back, and until then the roster must not read them as
-    // present.
+    // The account keeps its place in userSockets: these sockets are still live.
+    // Removing the set here once left a captain in an emptied harbor missing from
+    // their account, so a later ban found no ids and closed nothing. The status
+    // row goes, the same rule room:join and room:leave apply: absent from this
+    // harbor until they send a fresh status.
     forgetStatus(roomId, state.userId);
   }
 }
 
-// A live departure: the captain's last socket has gone away. If they
-// were the last one in the room, the room goes with them.
+// A live departure: the last socket is gone. If it was the last in the harbor,
+// the harbor goes too.
 export function scheduleDeparture(
   io: Server,
   roomId: string,
@@ -480,10 +380,8 @@ export function scheduleDeparture(
   });
 }
 
-// The boot variant. Same grace window and the same reaping, but a harbor
-// that loses its whole crew is kept rather than removed, so a captain
-// who comes back after a restart finds the room and the voyage saved
-// inside it still waiting.
+// The boot variant: same grace window and reaping, but a harbor that loses its
+// whole crew is kept, so a captain returning after a restart finds it waiting.
 function scheduleBootDeparture(
   io: Server,
   roomId: string,
@@ -500,30 +398,16 @@ function scheduleBootDeparture(
   });
 }
 
-// ========== Boot time membership reconciliation ==========
-// Every map above starts empty on every process boot, but Room/RoomMember
-// in the database persist across it. Without this, a captain who was
-// seated in a room the moment the process went down keeps that seat
-// forever: there is no live socket left to ever fire the disconnect
-// event that would normally arm their departure grace timer, so
-// activeRosterSet requires a ready signal from them that can now never
-// arrive, and the whole room is stuck on whatever checkpoint it was at,
-// permanently.
+// Boot-time membership reconciliation.
 //
-// The fix mirrors the disconnect grace period: arm the same departure
-// timer for every current member of every room as soon as the process
-// comes up. A captain whose browser tab is still genuinely open
-// reconnects within a couple of seconds (the client authenticates again
-// and resends room:join automatically), which cancels this. Anyone who
-// doesn't reconnect within the window is reaped the same way.
+// Every map above starts empty on boot, but Room and RoomMember persist. Without
+// this, a captain seated when the process went down keeps that seat forever: no
+// live socket can fire the disconnect that arms their timer, and activeRosterSet
+// waits for a ready signal that can never arrive, so the harbor is stuck.
 //
-// It arms the boot variant of that timer, so a harbor whose whole crew
-// fails to come back is left standing rather than swept away. A restart
-// is not the same event as everyone walking out: the room and the
-// voyage saved inside it are the captain's, and losing them to a server
-// restart is a surprise, not a cleanup. An empty room cannot hold the
-// ready check hostage either, since activeRosterSet reads the seats and
-// there are none left to wait on.
+// The fix mirrors the grace period: arm the same timer for every member on boot.
+// A tab still open reconnects within seconds and cancels it; the rest are reaped.
+// The boot variant keeps a harbor whose whole crew fails to return.
 export async function reconcileMembershipAfterBoot(
   io: Server,
   cleanup: DepartureCleanup,

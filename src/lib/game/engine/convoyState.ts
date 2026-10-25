@@ -1,15 +1,16 @@
 // =====================================================================
-// [MANIFEST 04: Convoy Ventures] The client side Gold effects of backing
-// and settling a convoy venture. The venture's own math (contribution
-// caps, deadline windows, payout rates) is pure and already lives in
-// ../convoy.ts; this file is only the part that moves money.
+// The client side Gold effects of backing and settling a convoy venture.
+// The venture's own math (contribution caps, deadline windows, payout
+// rates) is pure and already lives in ../convoy.ts; this file is only the
+// part that moves money.
 // =====================================================================
 import type { GameState } from "../types";
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
+import { debitGold } from "./settlement";
 
-// [MANIFEST 04: Convoy Ventures] Escrows a contribution immediately, the
-// same moment barter posting escrows an offer (see postBarterOffer) rather
-// than waiting for the venture to actually resolve. The server (see the
+// Escrows a contribution immediately, the same moment barter posting
+// escrows an offer (see postBarterOffer) rather than waiting for the
+// venture to actually resolve. The server (see the
 // venture:contribute handler in src/server/realtime/wiring/ventures.ts) is
 // the one authority on whether this contribution actually landed (a
 // venture that filled or expired between the click and the server's
@@ -18,23 +19,21 @@ import { t } from "@/lib/game/i18n";
 export function contributeToVenture(
   state: GameState,
   amount: number,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
-  if (amount <= 0) return;
-  if (state.money < amount) {
-    logs.push(
-      t("❌ Need {amount} Gold to back that Venture, have {state.money}", {
+  debitGold(state, amount, logs, {
+    short: line(
+      "❌ Need {amount} Gold to back that Venture, have {state.money}",
+      {
         amount,
         "state.money": state.money,
-      }),
-    );
-    return;
-  }
-  state.money -= amount;
-  logs.push(t("⚓ Backed a Venture with {amount} Gold", { amount }));
+      },
+    ),
+    taken: line("⚓ Backed a Venture with {amount} Gold", { amount }),
+  });
 }
 
-// [MANIFEST 04: Convoy Ventures] The payout side, for any of three outcomes.
+// The payout side, for any of three outcomes.
 // Fired once per contributor, by the server, the moment a venture resolves:
 // "filled" (amount is this contributor's proportional share of targetGold
 // times CONVOY_VENTURE_PAYOUT_MULTIPLIER), "failed" (amount is
@@ -50,18 +49,21 @@ export function contributeToVenture(
 export function receiveVentureSettlement(
   state: GameState,
   amount: number,
-  logs: string[],
+  logs: LedgerLine[],
   outcome: "filled" | "failed" | "destroyed",
 ) {
   state.money += amount;
   logs.push(
     outcome === "filled"
-      ? t("⚓ Venture filled! Your share: {amount} Gold", { amount })
+      ? line("⚓ Venture filled! Your share: {amount} Gold", { amount })
       : outcome === "failed"
-        ? t("⚓ Venture missed its deadline. Partial refund: {amount} Gold", {
-            amount,
-          })
-        : t(
+        ? line(
+            "⚓ Venture missed its deadline. Partial refund: {amount} Gold",
+            {
+              amount,
+            },
+          )
+        : line(
             "⚓ Venture canceled: another venture in the harbor already claimed this voyage's one chance. Full refund: {amount} Gold",
             { amount },
           ),

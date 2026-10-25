@@ -13,11 +13,11 @@
 // same property that protects the private channel protects this one from
 // the other side: there is nowhere in these three payloads to put an
 // alignment, a hold, a purse or a card, so no version of a reveal can
-// leak one. The smoke suite reads every frame the room receives back and
+// leak one. The smoke suite reads every frame the harbor receives back and
 // checks that, rather than trusting the types.
 //
 // The vote and its running tally are public by design. A nomination is
-// made out loud, like a ready check: the room is meant to see who is
+// made out loud, like a ready check: the harbor is meant to see who is
 // accusing whom, because the argument that follows is the feature. What
 // is not public is the manifest itself, which only the carried reveal
 // carries, and only for the one captain the majority named.
@@ -28,20 +28,20 @@ import type { OrderFill } from "@/lib/game/types";
 /** One captain's nomination, sent to the server. */
 export type AuditVote = {
   roomId: string;
-  /** The round the vote belongs to, checked against the room's checkpoint. */
+  /** The round the vote belongs to, checked against the harbor's checkpoint. */
   round: number;
   targetUserId: string;
 };
 
 /**
- * The nominations so far this leg, broadcast after every vote including
+ * The nominations so far this round, broadcast after every vote including
  * the one that carries, and answered to the captain whose card asks (see
  * audit:state:request in src/server/realtime/wiring/audit.ts).
  *
  * Keyed by voter rather than counted, because the count is arithmetic the
  * client can do and the names are the part it cannot reconstruct.
  *
- * The three numbers beside the names are the room's own count, and they
+ * The three numbers beside the names are the harbor's own count, and they
  * are on the frame because a card cannot work them out for itself: the
  * roster this vote is divided by is the active one (see activeRosterSet),
  * and the member list a client holds is a different set, since a captain
@@ -63,7 +63,7 @@ export type AuditTally = {
   needed: number;
   /**
    * The captains the count is divided by who have not named anyone yet
-   * this leg, which is who the room is waiting on. Ids, so the reader
+   * this round, which is who the harbor is waiting on. Ids, so the reader
    * names them from the roster it already has.
    */
   awaiting: string[];
@@ -73,7 +73,7 @@ export type AuditTally = {
  * What the harbor was shown, once the majority carried.
  *
  * `fulfillments` is the sample drawn out of the target's manifest: the
- * lines themselves rather than a summary, so the room reads what the
+ * lines themselves rather than a summary, so the harbor reads what the
  * captain did instead of being told what to conclude about it. It can be
  * shorter than the reveal count, and it is empty for a captain who has
  * filled nothing, which is a finding rather than a failure.
@@ -88,17 +88,17 @@ export type AuditReveal = {
   target: { userId: string; name: string };
   fulfillments: OrderFill[];
   /**
-   * [C1: the Larder and Short Rations] The audited captain's Larder, which
-   * the plan's audit clause opens alongside the sample.
+   * The audited captain's Larder, which
+   * the design's audit clause opens alongside the sample.
    *
    * It is on this frame and on no other, and that is the design rather than
    * an accident of where it was easy to read. The Larder count travels to
    * the server in the captain's own save, so the reveal can read it without
-   * the room being handed it continuously: what the fleet sees all voyage
+   * the harbor being handed it continuously: what the fleet sees all voyage
    * is whether a crew is hungry (see GameStatusUpdate.shortRations, which
-   * the plan does ask to be public), and the count itself is opened by the
+   * the design does ask to be public), and the count itself is opened by the
    * majority that voted for it. Servering it on the status frame instead
-   * would have made this clause a number the room already had.
+   * would have made this clause a number the harbor already had.
    *
    * Undefined when the provisions layer is switched off, for the same
    * reason the badge above is: a voyage with the switch off carries a
@@ -113,7 +113,7 @@ export type AuditReveal = {
    * answer it: the rule is an empty Larder aboard a crew with somebody on
    * it (see onShortRations in @/lib/game/larder), so a captain who lost
    * every hand and carries an empty hold is not on short rations, and a
-   * sentence drawn from the count alone told the room they were. The
+   * sentence drawn from the count alone told the harbor they were. The
    * sentence and the badge print from this field, so the reveal says what
    * the rule says rather than what the number suggests.
    *

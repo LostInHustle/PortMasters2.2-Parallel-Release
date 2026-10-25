@@ -3,6 +3,7 @@
 import { completeOrder } from "@/lib/game/engine";
 import { PORTS_TIER0 } from "@/lib/game/constants/world";
 import { check, voyageState } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 /**
  * The settlement's two guarded reads, both about a card the type allows
@@ -21,7 +22,7 @@ import { check, voyageState } from "../harness";
  * read back as numbers to prove the settlement keeps them numbers.
  */
 export async function theOrderThatSettlesSuite(): Promise<void> {
-  const logs: string[] = [];
+  const logs: LedgerLine[] = [];
 
   // ========== A. A line without a count takes nothing ==========
 

@@ -1,6 +1,10 @@
 "use client";
 
-import { maintenanceDue, unlockedWorkerRoster } from "@/lib/game/engine";
+import {
+  maintenanceDue,
+  unlockedWorkerRoster,
+  wagesDue,
+} from "@/lib/game/engine";
 import { onShortRations } from "@/lib/game/larder";
 import { survivalLayerOn } from "@/lib/game/flags";
 import {
@@ -10,15 +14,16 @@ import {
   warmthScore,
 } from "@/lib/game/garments";
 import { t } from "@/lib/game/i18n";
-import type { GameState } from "@/lib/game/types";
+import { crewSize, type GameState } from "@/lib/game/types";
 import type { WorkerType } from "@/lib/game/constants/crew";
 import { useConvoy } from "@/lib/use-convoy";
 import { VoyageTimeline } from "./VoyageTimeline";
+import type { LedgerLine } from "@/lib/game/ledger";
 import { GameLogPanel } from "./GameLogPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VoyageHeader } from "./status/VoyageHeader";
 import { StatGrid } from "./status/StatGrid";
-import { ColdLegChip } from "./status/ColdLegChip";
+import { ColdRoundChip } from "./status/ColdRoundChip";
 import { CargoHold } from "./status/CargoHold";
 import { ShipTab } from "./status/ShipTab";
 import { DuesTab } from "./status/DuesTab";
@@ -45,7 +50,7 @@ export type RosterEntry = WorkerType & {
  * The captain's own rail.
  *
  * The handful of numbers that are checked every few seconds (round, waters,
- * funds, reputation, and what is owed at round end) lead the column, and
+ * Gold, reputation, and what is owed at round end) lead the column, and
  * everything else is a tab, so the ledger is a peer tab rather than a
  * footnote below the fold. Five sections stacked in one narrow column
  * (Captain's Log, Vessel Status, Cargo Hold, Outstanding Loans, Dues) would be an unavoidably long vertical scroll in a rail
@@ -73,7 +78,7 @@ export function GameStatusPanel({
   colorFor,
 }: {
   game: GameState;
-  logs: string[];
+  logs: LedgerLine[];
   onRepayLoan?: (debtId: string) => void;
   // The hook's own return rather than a shape written out again here, so a
   // field the hook gains reaches the panel below with it.
@@ -84,35 +89,39 @@ export function GameStatusPanel({
   const showObligations = !["harbor", "dawn", "endgame", "bankruptcy"].includes(
     game.phase,
   );
-  // [C1: the Larder and Short Rations] Read once for the two decisions
+  // Read once for the two decisions
   // below, since it is the same answer to both: whether the layer is
   // running decides whether the stat exists at all, and if it is running,
-  // whether the crew is short decides what colour the number wears.
+  // whether the crew is short decides what color the number wears.
   const larderOn = survivalLayerOn(game.mode);
   const shortRations = larderOn && onShortRations(game);
-  // [C3: garments and the cold] The weather and the wardrobe, read once
+  // The weather and the wardrobe, read once
   // each for the chip below. The layer decides whether there is a chip at
-  // all, the tag decides whether this leg is one worth saying anything
+  // all, the tag decides whether this round is one worth saying anything
   // about, and the score is the same sum the settlement tick freezes
   // against, so the warning printed here and the check that bites the crew
   // cannot read differently.
   const garmentsOn = garmentsLayerOn(game.mode);
-  const coldLeg = garmentsOn && legIsCold(game);
+  const coldRound = garmentsOn && legIsCold(game);
   const warmth = warmthScore(game);
   const shortWarmth = shortOfWarmth(game);
 
   // The whole unlocked roster, not the three founding types, each type
   // with its hands and the wage it is due: the join lives in the engine
-  // now (see unlockedWorkerRoster), so this rail and Worker Management
-  // cannot come to disagree about who owes what. The obligations figure
-  // below is summed from it, which is what keeps the alarm tone off a
-  // solvent captain's rail.
+  // now (see unlockedWorkerRoster), so this rail and Artisan Management
+  // cannot come to disagree about who owes what.
+  //
+  // The two figures below are not summed from that roster. The wage is
+  // the engine's own reading of the bill it is about to charge, and the
+  // hands are the whole crew rather than the visible part of it, so the
+  // rail and the settle sheet quote one number each rather than two
+  // walks of the same list that can only agree by accident.
   const roster = unlockedWorkerRoster(game);
-  const pendWages = roster.reduce((sum, r) => sum + r.due, 0);
+  const pendWages = wagesDue(game);
   const pendMaint = maintenanceDue(game);
   const pendTotal = pendWages + pendMaint;
   const safe = game.money >= pendTotal;
-  const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
+  const nW = crewSize(game);
   const duesAlert = (showObligations && !safe) || game.debts.length > 0;
 
   return (
@@ -137,7 +146,9 @@ export function GameStatusPanel({
           larder={game.larder}
           shortRations={shortRations}
         />
-        {coldLeg && <ColdLegChip warmth={warmth} shortWarmth={shortWarmth} />}
+        {coldRound && (
+          <ColdRoundChip warmth={warmth} shortWarmth={shortWarmth} />
+        )}
         <VoyageTimeline phase={game.phase} mode={game.mode} className="mt-2" />
       </div>
 
@@ -183,6 +194,7 @@ export function GameStatusPanel({
         <TabsContent value="dues">
           <DuesTab
             showObligations={showObligations}
+            atHarbor={game.phase === "harbor"}
             workerCount={nW}
             pendWages={pendWages}
             pendMaint={pendMaint}

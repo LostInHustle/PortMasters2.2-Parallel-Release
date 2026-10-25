@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
 import type { EscortContract } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
@@ -23,7 +23,7 @@ const CHANNEL = {
 } as const;
 
 /**
- * The room's escort contract board, as one captain sees it.
+ * The harbor's escort contract board, as one captain sees it.
  *
  * The board itself, the per captain filtering and the report that fires
  * when a contract this captain is party to moves past the offer stage are
@@ -110,14 +110,20 @@ export function useEscortContracts(
     [socket, roomId, clearError],
   );
 
-  return {
-    contracts,
-    error,
-    clearError,
-    post,
-    accept,
-    decline,
-    cancel,
-    claim,
-  };
+  // The answer, held to one identity until something inside it changes.
+  // The panel that draws the contract board takes this whole object as a
+  // prop.
+  return useMemo(
+    () => ({
+      contracts,
+      error,
+      clearError,
+      post,
+      accept,
+      decline,
+      cancel,
+      claim,
+    }),
+    [contracts, error, clearError, post, accept, decline, cancel, claim],
+  );
 }

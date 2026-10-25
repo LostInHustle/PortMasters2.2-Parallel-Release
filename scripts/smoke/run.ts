@@ -19,7 +19,7 @@ export type SmokeRun = {
   // Harbors opened for the one walk that sails a voyage rather than
   // probing a route. They are this run's, so cleanup deletes them, and
   // they are listed here rather than derived from anything above because
-  // that walk needs a room whose whole voyage it drives itself.
+  // that walk needs a harbor whose whole voyage it drives itself.
   lapRoomIds: string[];
   sockets: Socket[];
   // Only armed once the first account has been proven visible to this

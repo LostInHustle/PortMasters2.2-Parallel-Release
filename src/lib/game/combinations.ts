@@ -1,14 +1,14 @@
 // =====================================================================
-// [F7: the combination instrument] Win rate by combination, read off the
+// Win rate by combination, read off the
 // chronicle's own record of what each finished voyage was holding.
 //
-// The plan's second half, verbatim: "with forty boons, twenty modules and
+// The design's second half, verbatim: "with forty boons, twenty modules and
 // ten charters the pair matrix is far past what anyone can hand test.
 // Instrument win rate by combination, automatically flag any pair
 // appearing in more than a threshold share of wins", with the balance
 // target "that any two card combination stays under sixty two percent
 // win rate once it has at least forty recorded appearances". The rule
-// that keeps this instrument honest is the plan's too: broken pairs are
+// that keeps this instrument honest is the design's too: broken pairs are
 // found empirically and never by reasoning, so nothing here knows what
 // any card does. It counts pairs and wins and says which counts are
 // loud.
@@ -28,7 +28,7 @@ import { cardById, cardName } from "./cards";
 
 // ========== The thresholds ==========
 
-// How many appearances a pair needs before its rate is a rate. The plan's
+// How many appearances a pair needs before its rate is a rate. The design's
 // words are the number ("once it has at least forty recorded
 // appearances"), and it is the same forty the conversion floor already
 // reads cards at (see CARD_CONVERSION_FLOOR in ./cards, whose own
@@ -36,7 +36,7 @@ import { cardById, cardName } from "./cards";
 // evidence, whichever instrument is doing the counting.
 export const PAIR_APPEARANCE_FLOOR = 40;
 
-// The balance target: the plan's words are that a pair "stays under sixty
+// The balance target: the design's words are that a pair "stays under sixty
 // two percent win rate", so a measurable pair at or above this share of
 // its appearances has not stayed under and is a broken pair. The line is
 // read inclusively for exactly that reason: thirty one wins out of fifty
@@ -45,8 +45,8 @@ export const PAIR_APPEARANCE_FLOOR = 40;
 export const PAIR_WIN_CEILING = 0.62;
 
 // The share of all wins a pair may appear in before the flag fires, the
-// plan's "more than a threshold share of wins". Authored here with its
-// reasoning because the plan leaves the number to the build: with
+// rule "more than a threshold share of wins". Authored here with its
+// reasoning because the design leaves the number to the build: with
 // roughly seventy cards in the pools, a pair appears in about one
 // percent of wins under uniform play (a held set carries a handful of
 // cards and each one pairs with every other), so a pair riding fifteen
@@ -117,17 +117,17 @@ export type PairRow = {
   wins: number;
   /** wins over appearances, or null below the floor. */
   rate: number | null;
-  /** wins over the winning voyages, the plan's share of wins. */
+  /** wins over the winning voyages, the design's share of wins. */
   share: number;
   /** What this row tripped, empty for a pair neither flag fires on. */
   flags: PairFlag[];
 };
 
 /**
- * The two ways a pair can be loud. `win_rate` is the plan's balance
+ * The two ways a pair can be loud. `win_rate` is the design's balance
  * target tripped (a measurable pair at or above the ceiling); `share_of_wins`
- * is the plan's automatic flag (a measurable pair in more than the
- * threshold share of wins, and that line stays strict because the plan's
+ * is the design's automatic flag (a measurable pair in more than the
+ * threshold share of wins, and that line stays strict because the design's
  * own word for it is "more than"). A pair can trip both, which is why the
  * row carries a list rather than a verdict.
  */
@@ -156,7 +156,7 @@ type PairReading = {
  * instrument reads, and letting it dilute every share would be counting
  * silence as evidence.
  *
- * The two flags share the appearance floor on purpose. The plan attaches
+ * The two flags share the appearance floor on purpose. The design attaches
  * it to the win rate reading in words, but its own reason is general
  * ("a card with a high win rate over nine appearances is noise"), and a
  * pair present in one fifth of three wins is the same noise wearing the

@@ -5,7 +5,7 @@ import type { Socket } from "socket.io-client";
 
 // =====================================================================
 // The voyage's own seat count: how many captains the voyage under way was
-// dealt to, as the room pinned it at departure.
+// dealt to, as the harbor pinned it at departure.
 //
 // Two hooks in one file because they are one fact, and the session has to
 // call them at two different points: the reading is state the loader
@@ -16,20 +16,20 @@ import type { Socket } from "socket.io-client";
 
 export type SeatPin = { roomId: string; seats: number };
 
-// [H5: the quota rung] How many captains the voyage now under way was
-// dealt to, as the room pinned it at departure, stamped with the room it
+// How many captains the voyage now under way was
+// dealt to, as the harbor pinned it at departure, stamped with the harbor it
 // belongs to exactly as the private log and the commission board are. It
-// is the second input to the public commission (see ./game/objectives.ts)
+// is the second input to the public commission (see ../game/objectives.ts)
 // and the only fact this hook holds that a captain cannot work out for
 // themselves: membership can change mid voyage, so the size the quotas
-// were scaled to has to be read from the room rather than counted off a
+// were scaled to has to be read from the harbor rather than counted off a
 // roster.
 //
-// Null is a real state and not a synonym for zero: zero means the room has
+// Null is a real state and not a synonym for zero: zero means the harbor has
 // no voyage pinned, and nothing may be handed over against a board while
 // the number that decides its quotas is unknown. A stamp from another
 // harbor reads as null rather than as a value, which is also what makes a
-// room change safe without an effect having to clear it.
+// harbor change safe without an effect having to clear it.
 export function useSeatPin(roomId: string): {
   seats: number | null;
   setSeatPin: Dispatch<SetStateAction<SeatPin | null>>;
@@ -83,5 +83,5 @@ export function useSeatPinFrames({
       socket.off("room:started", onStarted);
       socket.off("room:restarted", onRestarted);
     };
-  }, [enabled, socket, roomId]);
+  }, [enabled, socket, roomId, setSeatPin]);
 }

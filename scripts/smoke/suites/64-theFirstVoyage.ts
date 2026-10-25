@@ -1,6 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: The first voyage.
 //
-// W5's article. What a new captain meets before the first market, held to
+// What a new captain meets before the first market, held to
 // the records the surfaces read: the guide rows the three path surfaces
 // print, the tutorial's path page, the manual's path page, and the two
 // lines the draft and the Welcome screen state. Nothing here opens a
@@ -213,8 +213,8 @@ export async function theFirstVoyageSuite(): Promise<void> {
     "the draft's own screen states why the deal comes first, the line ONB-1 asked the panel to carry",
   );
 
-  // BUG-7's deferred half, closed where W5 touched the manual it was
-  // parked on: the artisan page's advice used to end on the manual's own
+  // The deferred half, closed on the manual it was parked on: the
+  // artisan page's advice used to end on the manual's own
   // comparison of the two modes' stakes, a second telling of a rule the
   // mode record owns and prints a page earlier. The page is a function of
   // the mode now (the third of the manual's pages that read the record), and

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/game/constants/brand";
 import { START_VOYAGE } from "@/lib/game/constants/copy";
-import { STARTING_STOCK } from "@/lib/game/constants/goods";
+import { RESOURCES_TIER0, STARTING_STOCK } from "@/lib/game/constants/goods";
 import { INCOME_TAX_RATE, VAT_RATE } from "@/lib/game/engine";
 import { openingPhase } from "@/lib/game/checkpoint";
 import { difficultyConfig, pirateOddsLabel } from "@/lib/game/difficulty";
@@ -58,8 +58,8 @@ function HarborRoster({
   );
 }
 
-// Named for the meaning each one carries rather than the colour it
-// happens to be, the same way ActionSuggester's tones are: the colour
+// Named for the meaning each one carries rather than the color it
+// happens to be, the same way ActionSuggester's tones are: the color
 // follows the meaning, and a rename of the palette should not have to
 // reach into this file.
 const INFO_TONES: Record<"gain" | "warn" | "sea" | "alarm", string> = {
@@ -91,7 +91,7 @@ function InfoCard({
 }
 
 // Welcome is the pre voyage lobby. The voyage has not started yet, so it
-// ignores act/ctx and the other in voyage hooks; it only reads the room
+// ignores act/ctx and the other in voyage hooks; it only reads the harbor
 // (to derive whether the viewer is the host), the roster (for the harbor
 // avatars) and phaseSync (for the startGame action and the ready list).
 // onTutorialOpen is the one extra beyond PhasePanelProps.
@@ -105,15 +105,15 @@ export function Welcome({
 }: Pick<PhasePanelProps, "game" | "phaseSync" | "members" | "me" | "room"> & {
   onTutorialOpen?: () => void;
 }) {
-  // The captains in the harbor, read from room membership rather than
+  // The captains in the harbor, read from harbor membership rather than
   // from the ready check's roster. The two were the same list until the
   // waiting roster learned to exclude the pier (the harbor is not a seat
-  // the room readies out of, see waitingRosterSet in
+  // the harbor readies out of, see waitingRosterSet in
   // src/server/realtime/checkpoint.ts): every captain standing here fell
   // out of it, the start button disabled itself with "Need at least one
   // captain in the harbor" for a host standing in a full one, and the
   // server's own guard, which counts membership, would have taken the
-  // start. Who is in the harbor is a fact about the room; the roster is
+  // start. Who is in the harbor is a fact about the harbor; the roster is
   // an answer about the seat.
   const harborIds = members.map((m) => m.id);
   // Solo Practice Mode: a captain may start the voyage alone. The
@@ -131,22 +131,24 @@ export function Welcome({
   // describe two different voyages.
   const play = modeConfig(game.mode);
   const briefing = play.briefing;
-  // The seat the departure walks the room into, read off the mode's own
+  // The seat the departure walks the harbor into, read off the mode's own
   // lap rather than named here (see openingPhase). For a dealing Gambit
   // build it is the path draft, and the round pill below names it as the
   // first thing that will be asked of the captain.
   const opening = openingPhase(game.mode);
-  // The InfoCard numbers derive from the room's difficulty tier, so each
+  // The InfoCard numbers derive from the harbor's difficulty tier, so each
   // tier advertises its real dials: Fair Winds reads exactly like the
   // founding trade figures (20% raid, 15 Gold maintenance), while Open
   // Waters and Monsoon print their own.
   const cfg = difficultyConfig(game.difficulty);
   // The three starting goods as the card prints them: each pair reads
   // through its own row (see manual.048 in the pack), and the list joins
-  // with the separator the language writes a list with.
-  const stockLine = ["Hemp", "Silk", "Tea"]
-    .map((r) => t("{r}×{stockQty}", { r: t(r), stockQty: STARTING_STOCK[r] }))
-    .join(listJoiner());
+  // with the separator the language writes a list with. The goods are the
+  // founding tier's own list rather than a second copy of it, so a
+  // change to what a voyage opens with reaches this card.
+  const stockLine = RESOURCES_TIER0.map((r) =>
+    t("{r}×{stockQty}", { r: t(r), stockQty: STARTING_STOCK[r] }),
+  ).join(listJoiner());
   // income tax is not yet a DifficultyConfig dial: every charter still
   // uses the founding 10%, which is what calcIncomeTax charges.
   const taxRate = INCOME_TAX_RATE;
@@ -166,7 +168,7 @@ export function Welcome({
         {/* The voyage's own length, read from the state the captain is
             sailing rather than from the tier: a Gambit voyage is twelve
             rounds on every tier, so the tier's ladder would greet the crew
-            with the length of a voyage they are not on (see voyageLegs in
+            with the length of a voyage they are not on (see voyageRounds in
             src/lib/game/mode).
 
             It counts rounds rather than voyages: a voyage is the whole
@@ -193,7 +195,7 @@ export function Welcome({
               <Ship className="h-5 w-5 mr-2" />
               {canStart
                 ? harborIds.length === 1
-                  ? t("Start Solo Practice Voyage")
+                  ? t("Start Solo Practice")
                   : t(START_VOYAGE)
                 : t("Need at least one captain in the harbor")}
             </Button>
@@ -215,24 +217,24 @@ export function Welcome({
         </Button>
       </div>
       <div className="max-w-2xl mx-auto mt-3 space-y-2">
-        {/* The label carries no count of the legs: they are counted where
+        {/* The label carries no count of the rounds: they are counted where
             they are written, in the mode record. A number that has to agree
             with a list beside it is a second copy of that list, and the
             label is the copy that rots: a mode changes its lap and rewrites
             its own description, and nobody remembers the number on the pill
             above it. The wording avoids "in Order" for the same reason it
-            avoids a count: in this game Order is a noun, and the leg the
+            avoids a count: in this game Order is a noun, and the round the
             mode moved is the one that carries it.
 
             What follows the label is whatever shape the mode briefs in,
             and the shape is the mode's decision rather than this screen's:
             a line for the mode that has always printed one, and the chart
-            for the mode whose whole design is the order its legs run in.
+            for the mode whose whole design is the order its rounds run in.
             A line and a chart are two renderings of one record, not two
             records, which is why this branch is a branch on the data
             rather than a second panel beside the first. */}
         {/* One pill for the two questions this screen exists to answer,
-            what you are playing and what it costs you to fail (W4): the
+            what you are playing and what it costs you to fail: the
             round and the mode's own line are one thing said twice, and a
             captain reading their first lobby should meet the start button
             before a stack of competing pills. The badge line rides under
@@ -245,7 +247,7 @@ export function Welcome({
           {briefing.kind === "line" ? (
             t(briefing.text)
           ) : (
-            <RoundFlow legs={briefing.legs} closes={briefing.closes} />
+            <RoundFlow phases={briefing.phases} closes={briefing.closes} />
           )}
           {/* The first seat, named: a captain who has read the chart
               knows the shape of the lap and not what standing in its
@@ -264,8 +266,11 @@ export function Welcome({
             </span>
           )}
           <span className="block mt-1.5 pt-1.5 border-t border-sea/15">
-            <strong>🧭 {t(play.badge)}:</strong> {t(play.tagline)}{" "}
-            {t(play.failureRule)}
+            <strong>
+              🧭 {t(play.badge)}
+              {t(": ")}
+            </strong>{" "}
+            {t(play.tagline)} {t(play.failureRule)}
             {/* It points at the button without a direction, because the
                 button sits above this panel rather than below it. */}
             {play.differences.length > 0 &&
@@ -307,7 +312,7 @@ export function Welcome({
               title={t("🚀 Starting Resources")}
               rows={[
                 t("📦 {stock}", { stock: stockLine }),
-                t("💰 {gold} Gold starting funds", { gold: cfg.startingGold }),
+                t("💰 {gold} starting Gold", { gold: cfg.startingGold }),
               ]}
             />
             <InfoCard
@@ -315,14 +320,14 @@ export function Welcome({
               title={t("⏱️ Production Delay")}
               rows={[
                 t("Assign task now → item arrives at Resolve"),
-                t("Workers don't produce instantly!"),
+                t("Artisans don't produce instantly!"),
               ]}
             />
             <InfoCard
               tone="sea"
               title={t("💸 Round End Costs")}
               rows={[
-                t("🔧 {cfg.maintenance} Gold ship maintenance per round", {
+                t("🔧 {cfg.maintenance} Gold ship maintenance fee per round", {
                   "cfg.maintenance": cfg.maintenance,
                 }),
                 t("👥 Wages settled at Resolve, not on hire"),

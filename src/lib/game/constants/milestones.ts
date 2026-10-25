@@ -1,44 +1,38 @@
 // =====================================================================
-// [F4: boons at milestone moments] The five moments a boon can arrive
+// The five moments a boon can arrive
 // at, and the words a captain meets when one does.
 //
-// This is the vocabulary and nothing else, the same split F1 took with
-// the tags and F2 with the card shape: the words live here and the walk
-// that reads them lives in ../milestones, so a module that wants to ask
-// what a moment is imports this one, and a module that wants to know
-// whether one is due imports that one.
+// This is the vocabulary and nothing else, the same split the tags and the
+// card shape took: the words live here and the walk that reads them lives
+// in ../milestones, so a module that wants to ask what a moment is imports
+// this one, and a module that wants to know whether one is due imports
+// that one.
 //
-// The five triggers are the plan's five, in the plan's order, and the
-// trigger id keeps the plan's own word for each even where the tree
-// reads it slightly differently, so the vocabulary can be held against
-// the plan text line by line:
+// The five triggers, in the order the checks walk:
 //
-//   - crew_loss. The plan's "losing a crew member", read off the list
-//     C2 writes the moment a hand goes (see ../crew).
+//   * crew_loss. Losing a hand, read off the list the crew module writes
+//     the moment a hand goes (see ../crew).
 //
-//   - pathbound_order. The plan's "first pathbound order", read at the
-//     completion of an order carrying the path's own mark (see
+//   * pathbound_order. The first order along the captain's path, read at
+//     the completion of an order carrying the path's own mark (see
 //     ./engine/orders and isPathOrder in ../types).
 //
-//   - renown_rung. The plan's "crossing a Renown threshold". The tree
-//     grants Renown, the account level, only at a voyage's conclusion,
-//     so no mid voyage crossing exists to fire on and a boon dealt
-//     after the books close would be dealt to a finished voyage. The
-//     smallest honest reading is taken instead, and named here rather
-//     than hidden: the voyage's own Reputation crossing a rung of the
+//   * renown_rung. Crossing a Reputation rung. The tree grants Renown,
+//     the account level, only at a voyage's conclusion, so no mid voyage
+//     crossing exists to fire on and a boon dealt after the books close
+//     would be dealt to a finished voyage. The smallest honest reading is
+//     taken instead: the voyage's own Reputation crossing a rung of the
 //     ladder the game already prints to a captain (see MERCHANT_RATINGS
 //     in ./reputation), so the rungs move with that one table. The
 //     captain facing copy below says Reputation, because that is the
-//     number on their rail, and the id keeps the plan's word, because
-//     that is the word the trigger is checked against.
+//     number on their rail.
 //
-//   - cold_leg. The plan's "surviving a cold leg with zero frostbite",
-//     read off the settlement tick's own marks (see ../garments): the
-//     leg was cold and no hand carries a frostbite written for the leg
-//     after it.
+//   * cold_round. Surviving a cold round with zero frostbite, read off the
+//     settlement tick's own marks (see ../garments): the round was cold
+//     and no hand carries a frostbite written for the round after it.
 //
-//   - mandate. The plan's "contributing to a Joint Mandate", read at
-//     the first delivery to the voyage's shared commission (see
+//   * mandate. Contributing to a Joint Mandate, read at the first
+//     delivery to the voyage's shared commission (see
 //     ./engine/objectives).
 // =====================================================================
 
@@ -46,9 +40,9 @@
 // marks and a field on a card, so it is a string union rather than a
 // number, the same reading CARD_TRIGGER took.
 export type MilestoneTrigger =
-  "crew_loss" | "pathbound_order" | "renown_rung" | "cold_leg" | "mandate";
+  "crew_loss" | "pathbound_order" | "renown_rung" | "cold_round" | "mandate";
 
-// The plan's order, and the order the checks walk. Exported rather than
+// The design's order, and the order the checks walk. Exported rather than
 // implied by the type, because a union has no runtime order and the
 // normalizers and the suite both need to ask whether a string is one of
 // the five.
@@ -56,7 +50,7 @@ export const MILESTONE_TRIGGERS: readonly MilestoneTrigger[] = [
   "crew_loss",
   "pathbound_order",
   "renown_rung",
-  "cold_leg",
+  "cold_round",
   "mandate",
 ];
 
@@ -90,10 +84,10 @@ export const MILESTONE_MOMENTS: Record<MilestoneTrigger, MilestoneMoment> = {
     title: "A Rung Crossed",
     line: "Your Reputation has crossed a rung of the merchant ledger. Take what a known name is worth.",
   },
-  cold_leg: {
+  cold_round: {
     icon: "❄️",
     title: "Through the Cold",
-    line: "A cold leg, and every hand came through it. Take something from the water you weathered.",
+    line: "A cold round, and every hand came through it. Take something from the water you weathered.",
   },
   mandate: {
     icon: "📜",
@@ -110,7 +104,10 @@ export function normalizeMilestoneTrigger(
   raw: unknown,
 ): MilestoneTrigger | null {
   if (typeof raw !== "string") return null;
-  return (MILESTONE_TRIGGERS as readonly string[]).includes(raw)
-    ? (raw as MilestoneTrigger)
+  // The earlier spelling of the cold round moment, read so a save written
+  // before the round vocabulary landed keeps its answer.
+  const trigger = raw === "cold_leg" ? "cold_round" : raw;
+  return (MILESTONE_TRIGGERS as readonly string[]).includes(trigger)
+    ? (trigger as MilestoneTrigger)
     : null;
 }

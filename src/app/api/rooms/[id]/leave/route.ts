@@ -1,7 +1,7 @@
-// POST /api/rooms/[id]/leave: leave a room
+// POST /api/rooms/[id]/leave: leave a harbor
 // Delegates to leaveRoomForUser, which drops the seat, hands off the
 // host crown if the leaving captain was holding it, and removes the
-// room entirely once nobody is left in it.
+// harbor entirely once nobody is left in it.
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { leaveRoomForUser } from "@/lib/rooms";

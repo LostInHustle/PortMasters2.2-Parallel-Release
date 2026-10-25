@@ -190,7 +190,7 @@ export async function dealAlignments(
   } catch (error) {
     // The held read above is a check and this write is its act, and the
     // two are three awaits apart (the objective, the roster, the draw),
-    // which is all the room a second departure needs to arrive between
+    // which is all the harbor a second departure needs to arrive between
     // them with a hand of its own. The table refuses the second row set
     // on its own key, room and captain, and that refusal is the promise
     // in the header above read at the one moment it can fail: the rows
@@ -279,20 +279,20 @@ type HeldCard = {
  * have any business knowing them.
  *
  * The voyage's end is the first: it records whether each captain won the
- * game their card set them. The room is read once rather than per
+ * game their card set them. The harbor is read once rather than per
  * captain, because the conclusion walks every finisher anyway and this is
  * one indexed read of a table with one row per seat. It is called after
  * the last captain has finished, so nothing of that read is in flight
  * during play, and what it answers is written to a row only the captain
  * it belongs to can read.
  *
- * [F6: charters at leg four] The charter take is the second. The leg
+ * The charter take is the second. The round
  * report's one claim that is not a figure is a card a captain holds, and the
  * alignment that take is recorded with has to come off this table rather
  * than off the wire (see charter_taken in @/lib/game/telemetry), so an
  * operator measurement says what the voyage dealt a captain and never
  * what a captain said about themselves. It is called during play, once
- * per leg a claim arrives on, which the once per voyage dedup in
+ * per round a claim arrives on, which the once per voyage dedup in
  * noteCharterTaken bounds to what a client's repetition costs, and a
  * captain this table cannot name is left unattributed by the caller
  * rather than filled in.

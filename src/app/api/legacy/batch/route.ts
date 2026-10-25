@@ -1,5 +1,5 @@
 // POST /api/legacy/batch: Captain's Legacy summaries for a batch of user
-// ids at once. Same "signed in, not room scoped, nothing sensitive"
+// ids at once. Same "signed in, not harbor scoped, nothing sensitive"
 // policy as GET /api/legacy/[userId] (see that route for the reasoning);
 // this just exists so a screen showing many captains at once, like the
 // Lobby's "Captains Online" list, doesn't need one request per captain.

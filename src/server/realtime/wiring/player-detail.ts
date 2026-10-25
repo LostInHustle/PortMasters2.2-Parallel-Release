@@ -18,14 +18,14 @@ import {
 export function wirePlayerDetail(io: Server, socket: Socket): void {
   // A question about a captain is written down here before it is
   // forwarded, and an answer is relayed only against a question that is
-  // waiting for one. Before [J1: the private information review] the
+  // waiting for one. Before the
   // response handler took a client's word for it: it checked that the
   // sender claimed to be the captain the answer was about and nothing
   // else, so any authenticated captain could push a snapshot of their
   // own composing, at a moment nobody asked for it, into another
   // captain's detail panel, and could address any account in the tree
-  // while doing it since the room on the frame was the sender's to name.
-  // The hold makes the pair a real question and answer, and the room
+  // while doing it since the harbor on the frame was the sender's to name.
+  // The hold makes the pair a real question and answer, and the harbor
   // and the requester on the relayed frame are the ones the server
   // wrote down rather than the ones the answering client sent back.
   socket.on(
@@ -38,7 +38,7 @@ export function wirePlayerDetail(io: Server, socket: Socket): void {
       if (!roomId || !targetUserId || roomId !== s.roomId) return;
       // The question may only be about a captain in this harbor, which
       // is what the popup is for. A target elsewhere would never answer
-      // anyway, since their own client compares the room on the frame
+      // anyway, since their own client compares the harbor on the frame
       // against the one they are in, and this is the cheaper way to say
       // the same thing.
       if (!(await roomMemberIds(roomId)).includes(targetUserId)) return;
@@ -71,14 +71,14 @@ export function wirePlayerDetail(io: Server, socket: Socket): void {
       if (!s) return;
       const requesterId = payload?.requesterId;
       if (!requesterId || payload?.targetUserId !== s.userId) return;
-      // The room and the requester are read off the waiting question,
+      // The harbor and the requester are read off the waiting question,
       // never off the frame: a response that names a question nobody
       // asked is dropped rather than relayed.
       const asked = takeDetailRequest(s.userId, requesterId);
       if (!asked) return;
       // The asker has to still be standing in the harbor the question
       // was about. Read off the live presence map rather than the
-      // database, because this is a frame about the room as it is now.
+      // database, because this is a frame about the harbor as it is now.
       if (!roomMembers(asked).some((m) => m.id === requesterId)) return;
       emitToUser(io, requesterId, "player:detail:response", {
         roomId: asked,

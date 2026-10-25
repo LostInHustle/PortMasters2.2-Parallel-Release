@@ -2,17 +2,17 @@
 
 import { Anchor, Crown, Gem, Trophy } from "lucide-react";
 import { t } from "@/lib/game/i18n";
-import { StatTile } from "./StatTile";
+import { FigureTile } from "./FigureTile";
 
 export function KeyStatsGrid({
   totalVoyages,
   seaMasterCrowns,
-  bestScore,
+  bestReputation,
   renownXP,
 }: {
   totalVoyages: number;
   seaMasterCrowns: number;
-  bestScore: number;
+  bestReputation: number;
   renownXP: number;
 }) {
   // The four labels are read where they are handed over, not where they
@@ -20,29 +20,33 @@ export function KeyStatsGrid({
   // words here are this profile's own four readings, each with a row.
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <StatTile
+      <FigureTile
         icon={Anchor}
         label={t("Voyages")}
         value={totalVoyages}
         tone="sea"
+        size="large"
       />
-      <StatTile
+      <FigureTile
         icon={Crown}
         label={t("Sea Master")}
         value={seaMasterCrowns}
         tone="gold"
+        size="large"
       />
-      <StatTile
+      <FigureTile
         icon={Trophy}
         label={t("Best Rep")}
-        value={bestScore}
+        value={bestReputation}
         tone="due"
+        size="large"
       />
-      <StatTile
+      <FigureTile
         icon={Gem}
         label={t("Renown XP")}
         value={renownXP}
         tone="intel"
+        size="large"
       />
     </div>
   );

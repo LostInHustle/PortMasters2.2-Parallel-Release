@@ -1,12 +1,12 @@
 // =====================================================================
 // Realtime layer: Tidewatch Alerts.
 //
-// [MANIFEST 03] Never a difficulty dial: voyage length, tier content,
+// Never a difficulty dial: voyage length, tier content,
 // and card count baseline all stay entirely the host's choice. This
 // only reads Reputation every captain is already reporting through the
-// ordinary game:status heartbeat and, once the room's combined total
+// ordinary game:status heartbeat and, once the harbor's combined total
 // clears TIDEWATCH_SURGE_THRESHOLD, flips a one direction, one time
-// flag for the room. roomSurges tracks which rooms have already
+// flag for the harbor. roomSurges tracks which harbors have already
 // triggered this voyage, so a status report arriving after the flip is
 // a harmless no op, not a repeat trigger.
 // =====================================================================

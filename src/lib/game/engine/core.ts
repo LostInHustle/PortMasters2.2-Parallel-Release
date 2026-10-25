@@ -19,17 +19,17 @@ export function hasModule(state: GameState, id: string): boolean {
 // it climbs, and the climb ends at ship level three (see MAX_SHIP_LEVEL
 // in ../constants/ships), so the top of the ladder is three slots.
 //
-// It was three copies of the same comparison before F3 needed a fourth
-// (the shipyard's own slot line, the draft's install or swap label and the
-// nudge that points a captain at an empty slot), and the reason it is a
-// reader rather than a fourth copy is what the copies already disagreed
-// about: a hull can read as over its slots, because a module trade settles
-// on two machines that cannot see each other's hulls and the buyer's side
-// bolts the module on rather than losing it (see applyModuleTradeSide in
-// ./modules). A subtraction floors at zero and says "full" for an
-// overfilled hull, which is the answer every one of those readers wants;
-// a comparison would need each of them to remember which way a negative
-// count reads.
+// It was three copies of the same comparison before the module market
+// needed a fourth (the shipyard's own slot line, the draft's install or
+// swap label and the nudge that points a captain at an empty slot), and
+// the reason it is a reader rather than a fourth copy is what the copies
+// already disagreed about: a hull can read as over its slots, because a
+// module trade settles on two machines that cannot see each other's
+// hulls and the buyer's side bolts the module on rather than losing it
+// (see applyModuleTradeSide in ./modules). A subtraction floors at zero
+// and says "full" for an overfilled hull, which is the answer every one
+// of those readers wants; a comparison would need each of them to
+// remember which way a negative count reads.
 export function moduleSlotsOpen(
   state: Pick<GameState, "shipLevel" | "equippedModules">,
 ): number {
@@ -54,9 +54,9 @@ export function getOwnedAmount(state: GameState, item: string): number {
 }
 
 // The one question every priced handshake asks of a purse before a click:
-// whether it covers the fee. D3's escort asked it first, the module market
-// and the refit bench asked it again in their own words, and three copies
-// of one comparison are the drift this tree keeps catching, so the
+// whether it covers the fee. The escort contract asked it first, the module
+// market and the refit bench asked it again in their own words, and three
+// copies of one comparison are the drift this tree keeps catching, so the
 // comparison lives here beside the purse reader it folds.
 //
 // The settles deliberately do not ask it, because the server has never

@@ -1,15 +1,15 @@
 // =====================================================================
-// [F2: the card record, and the mode weighting field] The pool: every boon
+// The pool: every boon
 // and every module, written as one card record each (see ./cards for the
 // shape and the vocabulary). The tags sit here beside the id and the
 // prose because a card's tags are part of what the card is, and the rest
 // of the record is here for the same reason; the fields it carries are
 // the ones that were previously nowhere or in the wrong place:
 //
-//   - The prose was a good's name in ten of these cards. Silk Winds named
+//   * The prose was a good's name in ten of these cards. Silk Winds named
 //     Silk, Hemp Monopoly named Hemp, the Fleet of Treasures named Foreign
 //     Balm and Pearl String. Every one of them now names the tag its effect
-//     actually reads, which is F1's rule ("effects name tags, never item
+//     actually reads, which is the rule ("effects name tags, never item
 //     keys") applied to the copy a captain reads rather than only to the
 //     engine. Three cards are renamed to match what they do, and their ids
 //     are deliberately not: an id is a handle a standing order and a saved
@@ -17,31 +17,58 @@
 //     handle where it is (the same reading ./paths.ts takes of a persisted
 //     name).
 //
-//   - The offer weights were a switch statement in the engine, keyed by id
+//   * The offer weights were a switch statement in the engine, keyed by id
 //     and reading inventory and roster by name. They are now a condition on
 //     the record, in the three or four shapes the engine actually needs,
 //     and the engine holds no card's id at all.
 //
-//   - The mode list and the power budget are new, and they are the pair
+//   * The mode list and the power budget are new, and they are the pair
 //     that gives the two modes different pools. Classic runs a ceiling of
 //     three, so the three cards above it below carry a zero there: the two
 //     that bend the whole ledger (Tax Evasion and the Woven Monopoly) and
 //     the one that halves two risks at once (the Deep Sea Escort Pact).
 //     Ocean Gambit runs the whole pool. Both weightings are authored here
-//     from the start, which is the plan's rollback clause: switching a mode
+//     from the start, which is the design's rollback clause: switching a mode
 //     between the tight pool and the wide one is a config change.
 //
-//   - The second language is authored beside the first for every card, so
-//     the translation pass J3 describes is a pass over a pool that already
-//     carries both, and a card that arrives later cannot arrive with one
-//     string and pass review: the content check fails the build.
+//   * The second language is not written here. The Mandarin for a card
+//     lives in the pack (src/lib/game/i18n/zh.json), one row per card and
+//     face, and the record reads its own row by id, so a card's Chinese
+//     is written in one place rather than twice. A card that arrives
+//     later cannot arrive without its rows: the content check holds the
+//     record and the pack in step and fails the build.
 // =====================================================================
-import { BOTH_MODES, GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
+import {
+  BOTH_MODES,
+  GAMBIT_ONLY,
+  NO_LEAN,
+  type CardRecord,
+  type CardText,
+} from "./cards";
+import { tIdFor } from "../i18n";
+
+// The Mandarin for a card, read from the pack by the card's id.
+//
+// The pack is where the Chinese for every card is written, so a record
+// does not keep a second copy of it: the record asks the pack for the
+// two rows that belong to this card, and the smoke suite holds the
+// record and the rows in step. A card the pack does not carry answers
+// with its own id, which is the honest line to print and the reason the
+// check fails loudly rather than quietly.
+function zhCard(id: string): CardText {
+  return {
+    name: tIdFor("zh", `card.${id}.name`),
+    desc: tIdFor("zh", `card.${id}.desc`),
+  };
+}
 
 // The emergency loan's figure, named because two surfaces print it: the
 // card a captain is dealt and the manual's own line about the draft. The
-// record's effect and both of its strings read this constant, so the
-// number shown and the number the purse receives cannot come apart.
+// record's effect and its English read this constant, so the number
+// shown and the number the purse receives cannot come apart. The
+// Mandarin is the pack's row, which carries the same figure in its own
+// hand, and the smoke suite holds the two in step, so a retune of the
+// constant that forgets the pack fails the build.
 export const EMERGENCY_LOAN_GOLD = 40;
 
 export const BOONS_TIER0: CardRecord[] = [
@@ -65,9 +92,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Weaver's Winds",
-        desc: "Freight on woven goods is halved this round.",
+        desc: "Freight on woven goods is halved this round, down to the harbor minimum of 5 Gold.",
       },
-      zh: { name: "织风", desc: "本轮织物类货物的运费减半。" },
+      zh: zhCard("silk_wind"),
     },
   },
   {
@@ -84,9 +111,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Favorable Tides",
-        desc: "Base freight is 4 Gold cheaper this round.",
+        desc: "Base freight is 4 Gold cheaper this round, down to the harbor minimum of 5 Gold.",
       },
-      zh: { name: "顺风顺水", desc: "本轮基础运费降低4金币。" },
+      zh: zhCard("favorable_tides"),
     },
   },
   {
@@ -108,9 +135,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Merchant's Charm",
-        desc: "Port purchases cost 15% less this round.",
+        desc: "Purchases at the market cost 15% less this round.",
       },
-      zh: { name: "商贾魅力", desc: "本轮港口采购降价 15%。" },
+      zh: zhCard("merchant_charm"),
     },
   },
   {
@@ -132,9 +159,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Artisan's Inspiration",
-        desc: "Every worker produces 1 extra item this round.",
+        desc: "Every artisan produces 1 extra item this round.",
       },
-      zh: { name: "匠人灵感", desc: "本轮所有工匠多产出1件。" },
+      zh: zhCard("artisan_inspiration"),
     },
   },
   {
@@ -153,10 +180,7 @@ export const BOONS_TIER0: CardRecord[] = [
         name: "Emergency Loan",
         desc: `Gain ${EMERGENCY_LOAN_GOLD} Gold immediately. No strings attached.`,
       },
-      zh: {
-        name: "紧急钱庄",
-        desc: `立即获得${EMERGENCY_LOAN_GOLD}金币，无需偿还。`,
-      },
+      zh: zhCard("emergency_loan"),
     },
   },
   {
@@ -171,8 +195,8 @@ export const BOONS_TIER0: CardRecord[] = [
     effect: { kind: "flags", flags: { income_tax_override: 0.05 } },
     modes: BOTH_MODES,
     strings: {
-      en: { name: "Tax Shelter", desc: "Income tax is 5% this round." },
-      zh: { name: "免税令", desc: "本轮所得税率降至 5%。" },
+      en: { name: "Tax Shelter", desc: "Income tax is halved this round." },
+      zh: zhCard("tax_shelter"),
     },
   },
   {
@@ -194,9 +218,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Bulk Monopoly",
-        desc: "Bulk goods cost 2 Gold less per unit this round.",
+        desc: "All raw materials and products cost 2 Gold less per unit this round.",
       },
-      zh: { name: "大宗垄断", desc: "本轮散货每单位便宜2金币。" },
+      zh: zhCard("hemp_monopoly"),
     },
   },
   {
@@ -213,9 +237,9 @@ export const BOONS_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Master's Apprentice",
-        desc: "Hiring costs half this round.",
+        desc: "Wages are halved this round.",
       },
-      zh: { name: "学徒传承", desc: "本轮雇工费用减半。" },
+      zh: zhCard("master_apprentice"),
     },
   },
 ];
@@ -235,8 +259,11 @@ export const BOONS_TIER1: CardRecord[] = [
     effect: { kind: "flags", flags: { free_intel: 1 } },
     modes: BOTH_MODES,
     strings: {
-      en: { name: "Farsight", desc: "One Broker's rumor is free this round." },
-      zh: { name: "远见", desc: "本轮免费获得一条掮客密语。" },
+      en: {
+        name: "Farsight",
+        desc: "One Broker's Whisper is free this round.",
+      },
+      zh: zhCard("farsight"),
     },
   },
   {
@@ -267,7 +294,7 @@ export const BOONS_TIER1: CardRecord[] = [
         name: "Kiln and Forge Guild",
         desc: "Orders for the first charter's goods pay 15% more this round.",
       },
-      zh: { name: "窑炉行会", desc: "本轮第一批特许货物的订单多付 15%。" },
+      zh: zhCard("kiln_and_forge_guild"),
     },
   },
   {
@@ -291,7 +318,7 @@ export const BOONS_TIER1: CardRecord[] = [
         name: "Frontier Tariff Relief",
         desc: "VAT on finished goods is halved this round.",
       },
-      zh: { name: "关津减税", desc: "本轮成品增值税减半。" },
+      zh: zhCard("frontier_tariff_relief"),
     },
   },
 ];
@@ -319,7 +346,7 @@ export const BOONS_TIER2: CardRecord[] = [
         name: "Exotic Treasures",
         desc: "Orders for the second charter's goods pay 15% more this round.",
       },
-      zh: { name: "异域奇珍", desc: "本轮第二批特许货物的订单多付 15%。" },
+      zh: zhCard("exotic_treasures"),
     },
   },
   {
@@ -343,7 +370,7 @@ export const BOONS_TIER2: CardRecord[] = [
         name: "Deep Sea Escort Pact",
         desc: "Escort costs and pirate risk are both halved this round.",
       },
-      zh: { name: "远洋护航契约", desc: "本轮护航费用与海盗风险双双减半。" },
+      zh: zhCard("deep_sea_escort_pact"),
     },
   },
   {
@@ -362,13 +389,13 @@ export const BOONS_TIER2: CardRecord[] = [
         name: "Merchants Converge",
         desc: "One extra trade order appears on this round's board.",
       },
-      zh: { name: "商贾云集", desc: "本轮订单板上多出一张贸易订单。" },
+      zh: zhCard("merchants_converge"),
     },
   },
 ];
 
-// [F4: boons at milestone moments] The launch pool: one boon per moment,
-// five cards, exactly the small set the plan's iteration note asks for
+// The launch pool: one boon per moment,
+// five cards, exactly the small set the design's iteration note asks for
 // ("The pool should stay small at launch, and the first widening should
 // target the paths with the lowest pick rate"), which is why each card
 // carries a path lean from the first wave rather than none.
@@ -385,6 +412,15 @@ export const BOONS_TIER2: CardRecord[] = [
 // conditioning: the crew loss card is worth the same to a rich captain
 // and a broke one, and what decides which of these a captain sees is
 // which moment arrived and which of the five they already hold.
+//
+// Every card is Gambit only, and the mode weights say so rather than the
+// granting code alone. The five moments are systems of the Gambit release:
+// the switch that arms them reads gambitSystems, which Classic carries
+// false, so a card declaring a Classic weight could never be dealt there.
+// The weight was BOTH_MODES once, and the declaration was the only place
+// the unreachability was not written down. The validator now refuses a
+// milestone boon with a Classic weight for the same reason.
+
 //
 // Each card writes a key of its own. The five keys are new here (see
 // MODIFIER_KEYS in ../types), and no round drafted card writes any of
@@ -403,16 +439,13 @@ export const MILESTONE_BOONS: CardRecord[] = [
     trigger: "crew_loss",
     condition: { kind: "always", weight: 1 },
     effect: { kind: "flags", flags: { steady_rations: 1 } },
-    modes: BOTH_MODES,
+    modes: GAMBIT_ONLY,
     strings: {
       en: {
         name: "Steady Watch",
-        desc: "The crew eats one fewer than their number each leg (never fewer than one), for the voyage.",
+        desc: "The crew eats one fewer than their number each round (never fewer than one), for the voyage.",
       },
-      zh: {
-        name: "守望",
-        desc: "本航程余下期间，船员每段少耗一份口粮（至少一份）。",
-      },
+      zh: zhCard("steady_watch"),
     },
   },
   {
@@ -422,19 +455,16 @@ export const MILESTONE_BOONS: CardRecord[] = [
     icon: "🧣",
     tags: ["cold"],
     pathWeight: { convoy: 2 },
-    trigger: "cold_leg",
+    trigger: "cold_round",
     condition: { kind: "always", weight: 1 },
     effect: { kind: "flags", flags: { cold_hardened: 1 } },
-    modes: BOTH_MODES,
+    modes: GAMBIT_ONLY,
     strings: {
       en: {
         name: "Cold Hardened",
         desc: "The warmth the crew wears counts one higher, for the voyage.",
       },
-      zh: {
-        name: "耐寒",
-        desc: "本航程余下期间，船员衣物的暖意多算 1 点。",
-      },
+      zh: zhCard("cold_hardened"),
     },
   },
   {
@@ -443,20 +473,22 @@ export const MILESTONE_BOONS: CardRecord[] = [
     power: 3,
     icon: "🗺️",
     tags: ["public"],
-    pathWeight: { quartermaster: 1.5, aroma: 1.5 },
+    // The two paths whose order pools reach the manifest: the Loom's
+    // garments and the Aroma's commodities. The Quartermaster's provisions
+    // are pantry goods and never become board orders, so a lean there
+    // would favor a seat the card can never pay (see pathDealsBoardOrders
+    // and milestoneChoices).
+    pathWeight: { loom: 1.5, aroma: 1.5 },
     trigger: "pathbound_order",
     condition: { kind: "always", weight: 1 },
     effect: { kind: "flags", flags: { route_mastery: 0.25 } },
-    modes: BOTH_MODES,
+    modes: GAMBIT_ONLY,
     strings: {
       en: {
         name: "Route Mastery",
         desc: "Orders that follow your path pay a quarter more, for the voyage.",
       },
-      zh: {
-        name: "商道精通",
-        desc: "本航程余下期间，沿你商道的订单，报酬多四分之一。",
-      },
+      zh: zhCard("route_mastery"),
     },
   },
   {
@@ -469,16 +501,13 @@ export const MILESTONE_BOONS: CardRecord[] = [
     trigger: "renown_rung",
     condition: { kind: "always", weight: 1 },
     effect: { kind: "flags", flags: { harbor_credit: 0.25 } },
-    modes: BOTH_MODES,
+    modes: GAMBIT_ONLY,
     strings: {
       en: {
         name: "Harbor Credit",
-        desc: "Product sales dues are a quarter lower, for the voyage.",
+        desc: "Product sales VAT is a quarter lower, for the voyage.",
       },
-      zh: {
-        name: "港湾信用",
-        desc: "本航程余下期间，成品销售的增值税降低四分之一。",
-      },
+      zh: zhCard("harbor_credit"),
     },
   },
   {
@@ -491,16 +520,13 @@ export const MILESTONE_BOONS: CardRecord[] = [
     trigger: "mandate",
     condition: { kind: "always", weight: 1 },
     effect: { kind: "flags", flags: { fleet_color: 0.25 } },
-    modes: BOTH_MODES,
+    modes: GAMBIT_ONLY,
     strings: {
       en: {
         name: "Fleet Colors",
         desc: "Raiders think twice: pirate risk is a quarter lower, for the voyage.",
       },
-      zh: {
-        name: "船队旗帜",
-        desc: "海盗三思，本航程余下期间，劫掠风险降低四分之一。",
-      },
+      zh: zhCard("fleet_colors"),
     },
   },
 ];
@@ -519,7 +545,7 @@ export const BOONS: CardRecord[] = [
 export const BOON_SWAP_COST = 10;
 
 // How many cards a draft puts in front of a captain. One number for both
-// drafts and for the plan's own phrase about them ("the three presented
+// drafts and for the design's own phrase about them ("the three presented
 // cards are drawn from a weighted pool rather than a filtered one"), because
 // two numbers here would let the boon draft and the shipyard drift into
 // presenting different sized hands with nothing to say that was intended.
@@ -540,9 +566,9 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Smuggler's Hold",
-        desc: "Purchases cost 15% less. Income tax is 20% higher.",
+        desc: "Purchases at the market cost 15% less. Income tax is 20% higher.",
       },
-      zh: { name: "走私暗舱", desc: "采购成本降低15%，所得税提高20%。" },
+      zh: zhCard("smugglers_hold"),
     },
   },
   {
@@ -559,12 +585,9 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Bulk Hauler Rigging",
-        desc: "Freight is 1 Gold less per item. Ship upgrades cost 15 Gold more.",
+        desc: "Freight is 1 Gold less per item. Hull upgrades cost 15 Gold more.",
       },
-      zh: {
-        name: "散货索具",
-        desc: "每件货物运费减1金币，船只升级费用增加15金币。",
-      },
+      zh: zhCard("bulk_hauler"),
     },
   },
   {
@@ -581,9 +604,9 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Artisan's Workshop",
-        desc: "Workers produce 1 extra item. Wages are 20% higher.",
+        desc: "Artisans produce 1 extra item. Wages are 20% higher.",
       },
-      zh: { name: "工匠工坊", desc: "工匠多产出1件，工钱多出20%。" },
+      zh: zhCard("artisans_workshop"),
     },
   },
   {
@@ -604,10 +627,7 @@ export const MODULES_TIER0: CardRecord[] = [
         name: "Tax Evasion Ledger",
         desc: "Income tax and VAT are halved. A completed order has a 15% chance of a 20 Gold audit.",
       },
-      zh: {
-        name: "避税账本",
-        desc: "所得税与增值税减半，每笔订单完成时有15%的概率被稽查，罚款20金币。",
-      },
+      zh: zhCard("tax_evasion"),
     },
   },
   {
@@ -628,10 +648,7 @@ export const MODULES_TIER0: CardRecord[] = [
         name: "Woven Monopoly",
         desc: "Woven freight is free. Woven orders pay 20% more.",
       },
-      zh: {
-        name: "织物垄断",
-        desc: "织物类运费为 0，织物类订单多付 20%。",
-      },
+      zh: zhCard("silk_monopoly"),
     },
   },
   {
@@ -648,12 +665,9 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Broker's Network",
-        desc: "Intel costs 2 Gold and reveals 2 rumors.",
+        desc: "A Whisper costs 2 Gold and reveals 2.",
       },
-      zh: {
-        name: "掮客人脉",
-        desc: "密语花费2金币，每次购买揭示2条。",
-      },
+      zh: zhCard("brokers_network"),
     },
   },
   {
@@ -672,7 +686,7 @@ export const MODULES_TIER0: CardRecord[] = [
         name: "Salvage Crane",
         desc: "A completed order has a 30% chance to refund its freight.",
       },
-      zh: { name: "打捞起重机", desc: "订单完成时有30%的概率退还运费。" },
+      zh: zhCard("salvage_crane"),
     },
   },
   {
@@ -691,7 +705,7 @@ export const MODULES_TIER0: CardRecord[] = [
         name: "Overdrive Engine",
         desc: "Freight is 5 Gold less. Maintenance costs 10 Gold more.",
       },
-      zh: { name: "超载引擎", desc: "运费降低5金币。维护费增加10金币。" },
+      zh: zhCard("overdrive_engine"),
     },
   },
 ];
@@ -714,7 +728,7 @@ export const MODULES_TIER1: CardRecord[] = [
         name: "Maritime Bureau Token",
         desc: "Charter goods pay 10% more on orders.",
       },
-      zh: { name: "市舶司信物", desc: "特许货物的订单多付 10%。" },
+      zh: zhCard("bureau_token"),
     },
   },
   {
@@ -733,7 +747,7 @@ export const MODULES_TIER1: CardRecord[] = [
         name: "Kiln Cellar",
         desc: "Bulk goods cost 2 Gold less per unit.",
       },
-      zh: { name: "窑窖", desc: "散货每单位便宜2金币。" },
+      zh: zhCard("kiln_cellar"),
     },
   },
   {
@@ -750,9 +764,9 @@ export const MODULES_TIER1: CardRecord[] = [
     strings: {
       en: {
         name: "Ocean Interpreter",
-        desc: "Broker's Whisper reveals 1 extra rumor at no extra cost.",
+        desc: "Each Broker's Whisper reveals 1 extra at no extra cost.",
       },
-      zh: { name: "通译", desc: "掮客密语每次多揭示 1 条，不另收费。" },
+      zh: zhCard("ocean_relay"),
     },
   },
 ];
@@ -774,7 +788,7 @@ export const MODULES_TIER2: CardRecord[] = [
         name: "Foreign Quarter Pass",
         desc: "Luxury goods cost 3 Gold less per unit.",
       },
-      zh: { name: "蕃坊通行证", desc: "奢华货物每单位便宜3金币。" },
+      zh: zhCard("foreign_quarter_pass"),
     },
   },
   {
@@ -793,7 +807,7 @@ export const MODULES_TIER2: CardRecord[] = [
         name: "Persian Dome Compass",
         desc: "Pirate raids are 30% less likely.",
       },
-      zh: { name: "波斯穹顶罗盘", desc: "海盗劫掠风险降低 30%。" },
+      zh: zhCard("persian_dome_compass"),
     },
   },
   {
@@ -810,9 +824,9 @@ export const MODULES_TIER2: CardRecord[] = [
     strings: {
       en: {
         name: "Fleet of Treasures",
-        desc: "Freight on luxury orders is 3 Gold less per unit.",
+        desc: "Luxury freight is free.",
       },
-      zh: { name: "珍宝船队", desc: "奢华货物每单位运费便宜3金币。" },
+      zh: zhCard("fleet_of_treasures"),
     },
   },
 ];

@@ -41,6 +41,7 @@ import { pathConfig } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { MarketBlock, MarketEmpty, OfferRow } from "./OfferBoard";
 import { RefusalLine } from "../shared";
+import type { LedgerAct } from "@/lib/game/ledger";
 import type { Refit } from "./phases/PhaseShared";
 
 // The selling path's own record, resolved once at module load rather than on
@@ -48,7 +49,7 @@ import type { Refit } from "./phases/PhaseShared";
 // pathConfig). Its `goods` field is the three garments, read off the
 // wardrobe table, so the form's menu and the orders a Loom captain is
 // offered are one list rather than two that agree today.
-const SELLER_PATH = pathConfig(REFIT_SELLER_PATH)!;
+const SELLER_PATH = pathConfig(REFIT_SELLER_PATH);
 
 // What the harbor tailors do, quoted rather than spelled into the two
 // sentences that describe it. "One point" written as words is a second place
@@ -64,17 +65,17 @@ function tailorWorkText(): string {
 }
 
 /**
- * [D4: Loom: the Refit] The Loom's bench, drawn on the port board of the
- * Market phase because that is where the plan puts it: a garment put right
- * in one leg, sold by a Loom captain to another captain at a price the two
- * of them agree, and read by the room for the rest of the leg.
+ * The Loom's bench, drawn on the port board of the
+ * Market phase because that is where the design puts it: a garment put right
+ * in one round, sold by a Loom captain to another captain at a price the two
+ * of them agree, and read by the harbor for the rest of the round.
  *
  * Four things stand on this panel and they are one economy read from four
  * ends. The offer form is the trade itself. The harbor pile is the Loom's
  * supply, and it is also the reason to hold the path at all. The harbor
  * tailors are what every other captain can do alone, and without a price to
  * be cheaper than, "faster and cheaper than they could manage alone" would
- * be a sentence rather than a trade. And the board is the room's view of who
+ * be a sentence rather than a trade. And the board is the harbor's view of who
  * has offered what.
  *
  * Everything a captain can do here is a socket frame or an engine call on
@@ -85,7 +86,7 @@ function tailorWorkText(): string {
  * restoreGarment the refit runs, at a different price.
  *
  * The two rules the buttons carry are the server's, not this file's. A Loom
- * captain takes on one refit a leg, and an offer belongs to the leg it was
+ * captain takes on one refit a round, and an offer belongs to the round it was
  * posted in, so a board that lags a checkpoint shows the refusal before a
  * click instead of after one.
  */
@@ -97,7 +98,7 @@ export function RefitBench({
   members,
 }: {
   game: GameState;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  act: LedgerAct;
   refit: Refit;
   me: PublicUser;
   members: PublicUser[];
@@ -117,7 +118,7 @@ export function RefitBench({
   const takenOn = refitSellerBusy(refit.refits, me.id, game.currentRound);
   const pile = ragsLeftAtPort(game);
   const held = game.inventory[RAGS] ?? 0;
-  const mendedThisLeg = game.mendRound === game.currentRound;
+  const mendedThisRound = game.mendRound === game.currentRound;
   // What the harbor tailors can work on, which is the crew's own wardrobe
   // read one good at a time: a captain means the thin coat, not a list of
   // durability numbers.
@@ -127,13 +128,13 @@ export function RefitBench({
 
   return (
     <div className="rounded-xl border border-refit/15 bg-refit/[0.03] px-3.5 py-2.5">
-      {/* No heading line of its own on the bench (W4): the fold row above
+      {/* No heading line of its own on the bench: the fold row above
           it already names the desk, and a header here would add a third
           repetition of the same sentence between the row and the
           paragraph that explains the trade. */}
       <p className="text-[11px] text-muted-foreground mb-2 max-w-2xl">
         {t(
-          "Clothes lose a point of wear every leg and two on a cold one. A {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a single leg for whatever fee the two of you agree, and anyone can take {TAILOR_WORK} from the harbor tailors for {MEND_GOLD_PER_POINT} Gold. One open offer per captain you name, one refit taken on a leg, and an offer nobody takes before the Market closes is gone.",
+          "Clothes lose a point of wear every round and two on a cold one. A {SELLER_PATH.name} captain can put {REFIT_POINTS} points back in a single round for whatever fee the two of you agree, and anyone can take {TAILOR_WORK} from the harbor tailors for {MEND_GOLD_PER_POINT} Gold. One open offer per captain you name, one refit taken on a round, and an offer nobody takes before the Market closes is gone.",
           {
             "SELLER_PATH.name": t(SELLER_PATH.name),
             REFIT_POINTS,
@@ -151,7 +152,7 @@ export function RefitBench({
           {takenOn ? (
             <p className="text-center text-[11px] text-muted-foreground">
               {t(
-                "You have already taken on a refit this leg, and one pair of hands works one garment. The bench opens again next leg.",
+                "You have already taken on a refit this round, and one pair of hands works one garment. The bench opens again next round.",
               )}
             </p>
           ) : (
@@ -205,8 +206,8 @@ export function RefitBench({
             <span className="font-bold text-refit">{pile}</span>
             <span className="text-muted-foreground">
               {pile === 1
-                ? t("rag left for you this leg")
-                : t("rags left for you this leg")}
+                ? t("rag left for you this round")
+                : t("rags left for you this round")}
             </span>
             <span className="text-muted-foreground">
               {t("· in the hold: {held}", { held })}
@@ -238,10 +239,10 @@ export function RefitBench({
           <p className="text-center text-[11px] text-muted-foreground mt-1.5">
             {pile === 0
               ? t(
-                  "No rags came ashore this leg. The pile only fills after a cold one.",
+                  "No rags came ashore this round. The pile only fills after a cold one.",
                 )
               : t(
-                  "The pile is what the fleet's scrap comes to after a cold leg, and it is drawn from the voyage's own weather. {REWEAVE_RAGS} rags go back on the loom as one {REWEAVE_GOOD}.",
+                  "The pile is what the fleet's scrap comes to after a cold round, and it is drawn from the voyage's own weather. {REWEAVE_RAGS} rags go back on the loom as one {REWEAVE_GOOD}.",
                   {
                     REWEAVE_RAGS,
                     REWEAVE_GOOD: t(REWEAVE_GOOD),
@@ -252,9 +253,9 @@ export function RefitBench({
       )}
 
       {/* What every captain can do alone, and the price a refit is measured
-          against. One point a leg, once, whatever the path.
+          against. One point a round, once, whatever the path.
 
-          A leg whose mend is spent keeps the whole row on screen rather
+          A round whose mend is spent keeps the whole row on screen rather
           than swapping it for a sentence: the field read the row vanishing
           as every button having fired, and no panel that deletes its own
           record can argue with that. The worked garment's number has moved
@@ -263,10 +264,10 @@ export function RefitBench({
       <MarketBlock tone="plain">
         <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
           <span className="text-muted-foreground">{t("Harbor tailors")}</span>
-          {mendedThisLeg ? (
+          {mendedThisRound ? (
             <span className="text-muted-foreground">
               {t(
-                "have already worked on the crew this leg. Another garment waits for tomorrow.",
+                "have already worked on the crew this round. Another garment waits for tomorrow.",
               )}
             </span>
           ) : mendable.length === 0 ? (
@@ -279,18 +280,18 @@ export function RefitBench({
             </span>
           ) : (
             <span className="text-muted-foreground">
-              {t("will put {points} back for {gold} Gold, once a leg.", {
+              {t("will put {points} back for {gold} Gold, once a round.", {
                 points: tailorWorkText(),
                 gold: MEND_GOLD_PER_POINT,
               })}
             </span>
           )}
           {/* The row of buttons stays a row after the mend: the same
-              buttons, greyed, with the numbers the mend left behind. The
-              spent leg reads the whole wardrobe, because a garment already
+              buttons, grayed, with the numbers the mend left behind. The
+              spent round reads the whole wardrobe, because a garment already
               whole has no room to mend and would otherwise vanish from a
               row whose whole job is to account for where the points went. */}
-          {(mendedThisLeg
+          {(mendedThisRound
             ? Array.from(
                 new Set((game.garments ?? []).map((garment) => garment.good)),
               )
@@ -303,8 +304,8 @@ export function RefitBench({
                 key={worn}
                 size="sm"
                 className="h-7 rounded-lg px-2.5 text-[11px]"
-                variant={mendedThisLeg ? "secondary" : "default"}
-                disabled={mendedThisLeg}
+                variant={mendedThisRound ? "secondary" : "default"}
+                disabled={mendedThisRound}
                 onClick={() => act((g, l) => mendGarment(g, worn, l))}
               >
                 {ICONS.Rags}{" "}
@@ -336,7 +337,7 @@ export function RefitBench({
         <MarketEmpty className="py-2">
           {canSell
             ? t("Nothing on the bench yet. Your offer is the first.")
-            : t("No refit work on offer this leg.")}
+            : t("No refit work on offer this round.")}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
@@ -384,7 +385,7 @@ function RefitRow({
   // The server's own refusals, shown before the click rather than after it.
   // The bound is read on the seller's side here because that is the side
   // this market bounds (see refitSellerBusy): a customer may buy a refit for
-  // every garment they own, and a Loom has two hands and one leg. The
+  // every garment they own, and a Loom has two hands and one round. The
   // customer's own side is the purse, and it is the last condition for the
   // reason the escort's row gives it last: the fee moves at the handshake on
   // the customer's machine, and a settle that ran short would pay what the

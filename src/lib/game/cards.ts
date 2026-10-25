@@ -1,49 +1,10 @@
-// =====================================================================
-// [F2: the card record, and the mode weighting field] The walk over the
-// pool: every question the tree asks about a card is one of the readers
-// here, and every one of them reads the record rather than the table it
-// came from. ./constants/cards holds the shape and ./constants/drafts
-// holds the cards, the same split F1 took between the vocabulary and the
-// rule over it.
-//
-// The readers, in the order they are asked:
-//
-//   - cardById, cardsOfKind and cardText are the door. Nothing outside
-//     this file indexes the pool by hand, and the surface a captain reads
-//     is read through cardText, which is why J3's translation is a change
-//     to that one accessor rather than a hunt through every screen.
-//
-//   - The two tag readers are F1's, and this is where they first go to
-//     work in production: holdOfTag sums the hold over the goods a tag
-//     names (through entriesWithTag) and cargoCarriesTag asks the same
-//     question of an order's own manifest (through tagsOf). Together they
-//     are what let a card's effect say "woven" and mean it, which is the
-//     epic's own instruction ("Tag everything, and let effects reference
-//     tags rather than items").
-//
-//   - cardWeight is the offer's weight, and it is the product of the three
-//     fields that carry one: the mode's weight, the condition's answer, and
-//     the lean toward the captain's path. The plan's own words for the
-//     third are the reason it multiplies rather than filters: "Path
-//     weighting is what makes an offer feel like it belongs to you without
-//     locking you out of the rest of the pool".
-//
-//   - validateCards is the content check, run by scripts/cards.ts ahead of
-//     every build, the way scripts/tags.ts already gates the tag rule. It
-//     is deliberately a reduction over a subject rather than a read of the
-//     shipped tables, so the checks can build a pool with one thing wrong
-//     in it and watch the clause fire: a detector nobody has watched fire
-//     is a detector nobody has tested.
-//
-//   - The tally and its reader are F2's evaluation, which the plan states
-//     as a measurement rather than a feature: "Offer to pick conversion per
-//     card, with the appearance count beside it, because a card with a high
-//     win rate over nine appearances is noise and a card with a high win
-//     rate over four hundred is a problem." The tally rides the captain's
-//     own state rather than the telemetry event stream, which is I2's
-//     precedent for data that must not fight the event cap: it is a few
-//     counters on a save, and the report reads them back.
-// =====================================================================
+// The card pool and the readers over it. ./constants/cards holds the record
+// shape and ./constants/drafts holds the cards. Everything outside asks a
+// card question through a reader here rather than indexing the pool by
+// hand, and cardText is the one accessor a surface reads a card through, so
+// translation stays in one place. validateCards reduces over a subject
+// rather than the shipped tables so a check can build a pool with one thing
+// wrong in it and watch the clause fire.
 import {
   BOON_TRIGGERS,
   type CardCondition,
@@ -56,9 +17,10 @@ import {
   MODE_POWER_CEILING,
 } from "./constants/cards";
 import { CHARTERS, CHARTER_PATH } from "./constants/charters";
+import { MILESTONE_TRIGGERS } from "./constants/milestones";
 import { WORKER_TYPE_IDS } from "./constants/crew";
 import { BOONS, MODULES } from "./constants/drafts";
-import { getLocale, type Locale } from "./i18n";
+import { getLocale, tIdFor, type Locale } from "./i18n";
 import { type GameMode } from "./mode";
 import { PATH_IDS, type PathId, pathConfig } from "./paths";
 import { unlockedBoons, unlockedModules } from "./pools";
@@ -66,22 +28,15 @@ import { MAX_TAGS_PER_ENTRY, TAGS } from "./constants/tags";
 import { entriesWithTag, taggedEntries, tagsOf, type TaggedKind } from "./tags";
 import { MODIFIER_KEYS, type GameState } from "./types";
 
-// Every card the build ships, in one list: the two drafted ladders and
-// F6's charters, stacked in the order the catalogues are named. Read by
-// the content check and by the two readers below; nothing else walks it,
-// because everything else wants a kind or an id rather than the whole
-// pool.
+// Every card the build ships: the two drafted ladders and the charters,
+// stacked in catalogue order.
 export const CARDS: readonly CardRecord[] = [...BOONS, ...MODULES, ...CHARTERS];
-
-// ========== The door ==========
 
 /**
  * The card an id names, or null where the pool has none.
  *
- * Null rather than a throw, for the reason normalizePath answers null: the
- * id arrives from a save, a standing order or a wire frame, so an id this
- * build does not know is an ordinary event (an older save, a newer card)
- * rather than a fault, and every caller has something honest to do with it.
+ * Null rather than a throw: the id arrives from a save, a standing order or
+ * a wire frame, so an unknown id is an ordinary event rather than a fault.
  */
 export function cardById(id: string): CardRecord | null {
   return CARDS.find((card) => card.id === id) ?? null;
@@ -94,48 +49,40 @@ export function cardsOfKind(kind: CardKind): CardRecord[] {
 /**
  * The card's words in a language, defaulting to the one being read.
  *
- * The one accessor every surface reads a card through, which is the whole
- * point of carrying both strings: the pick a captain makes in settings is
- * read here rather than hunted through every screen that ever prints a
- * card. The default reads the tree's live pick (see ./i18n), so a call
- * site with no opinion follows the captain, and one that has an opinion
- * (a ledger line quoting another language) passes it in.
+ * The one accessor every surface reads a card through. English comes off the
+ * record; Mandarin comes out of the language pack by card id, because the
+ * pack is where the translation is written. The content check holds the pack
+ * and the record in step.
  */
 export function cardText(
   card: CardRecord,
   locale: Locale = getLocale(),
 ): CardText {
-  return card.strings[locale];
+  if (locale === "en") return card.strings.en;
+  return {
+    name: tIdFor(locale, `card.${card.id}.name`),
+    desc: tIdFor(locale, `card.${card.id}.desc`),
+  };
 }
 
 /**
- * The name of a card id, for a ledger line that has only the id.
- *
- * Answers the id itself where the pool has no such card, which is the
- * honest line to print: a line naming a card this build does not know is
- * better than a line naming nothing, and it is never a crash inside a log.
+ * The name of a card id, for a ledger line that has only the id. Answers the
+ * id itself where the pool has no such card, so a log line never throws.
  */
 export function cardName(id: string, locale: Locale = getLocale()): string {
-  return cardById(id)?.strings[locale].name ?? id;
+  const card = cardById(id);
+  return card === null ? id : cardText(card, locale).name;
 }
 
-/**
- * The glyph and the name, which is how the ledger introduces a card:
- * "🧵 Woven Monopoly: +20% Reward!". One function rather than a template at
- * each of the six sites that write such a line, so a card renamed for its
- * captain is renamed in the ledger the same afternoon.
- */
+/** The glyph and the name, which is how the ledger introduces a card. */
 export function cardLead(id: string, locale: Locale = getLocale()): string {
   const card = cardById(id);
-  return card === null ? id : `${card.icon} ${card.strings[locale].name}`;
+  return card === null ? id : `${card.icon} ${cardText(card, locale).name}`;
 }
 
 /**
  * The card that writes a given modifier key into the round's flags, or null.
- *
- * The flags a boon writes are how the pricing breakdowns name the source of
- * an adjustment (see ./engine/pricing), and the record is where that name
- * comes from now rather than a second lookup over the boon table.
+ * The pricing breakdowns use this to name the source of an adjustment.
  */
 export function cardByFlag(key: string): CardRecord | null {
   return (
@@ -145,17 +92,12 @@ export function cardByFlag(key: string): CardRecord | null {
   );
 }
 
-// ========== The two tag readers ==========
-
-/**
- * Whether an entry of any tagged catalogue carries a tag. A thin read of
- * F1's tagsOf, which answers null for an id no catalogue holds.
- */
+/** Whether an entry of any tagged catalogue carries a tag. */
 export function carriesTag(kind: TaggedKind, id: string, tag: string): boolean {
   return tagsOf(kind, id)?.includes(tag as never) ?? false;
 }
 
-/** The goods that carry a tag, read off F1's walk of the catalogues. */
+/** The goods that carry a tag. */
 export function goodsCarryingTag(tag: string): string[] {
   return entriesWithTag(tag as never)
     .filter((entry) => entry.kind === "good")
@@ -163,11 +105,9 @@ export function goodsCarryingTag(tag: string): string[] {
 }
 
 /**
- * How many units of goods carrying a tag the hold holds.
- *
- * F1's entriesWithTag is what makes this a tag read rather than a second
- * catalogue: the list of goods is derived from the vocabulary, so a good
- * added to the catalogue with this tag joins every card that reads it.
+ * How many units of goods carrying a tag the hold holds. Derived from the
+ * tag walk, so a good added to the catalogue with the tag joins every card
+ * that reads it.
  */
 export function holdOfTag(state: GameState, tag: string): number {
   return goodsCarryingTag(tag).reduce(
@@ -184,15 +124,10 @@ export function cargoCarriesTag(
   return resources.some((r) => carriesTag("good", r.type, tag));
 }
 
-// ========== The offer ==========
-
 /**
- * Whether the roster holds at least one artisan of a named type.
- *
- * A role arrives as a string off a record, so the name is held to the roster
- * the way normalizePath holds a path to the table: a role the roster cannot
- * hold is not a captain with none of them, it is a question with no answer,
- * and both read as false here rather than one of them reading as a crash.
+ * Whether the roster holds at least one artisan of a named type. An unknown
+ * role reads as false rather than throwing: it is a question with no answer,
+ * not a captain with no crew.
  */
 function employs(state: GameState, role: string): boolean {
   if (!(WORKER_TYPE_IDS as readonly string[]).includes(role)) return false;
@@ -201,11 +136,6 @@ function employs(state: GameState, role: string): boolean {
   );
 }
 
-/**
- * The weight a condition answers with for a captain. One comparison, no
- * branching in the caller, and the same weight for the same question
- * wherever it is asked.
- */
 export function conditionWeight(
   condition: CardCondition,
   state: GameState,
@@ -233,9 +163,8 @@ export function conditionWeight(
 }
 
 /**
- * How much a card leans toward a path. One is the silence of a card that
- * leans nowhere, and a lean is never zero: the validator holds that line,
- * because a zero here would be the filter the plan says this field is not.
+ * How much a card leans toward a path. One is no lean. A lean is never zero:
+ * the draw is weighted, not filtered, and the validator holds that line.
  */
 export function pathLean(card: CardRecord, path: PathId | null): number {
   if (path === null) return 1;
@@ -243,9 +172,19 @@ export function pathLean(card: CardRecord, path: PathId | null): number {
 }
 
 /**
- * The weight a card is offered with, or zero where it is not offered at
- * all. The three fields that carry a weight multiply, and nothing else
- * touches the number.
+ * Whether the pool offers a card in this mode at all. Read on its own by the
+ * save heals that hold cards rather than draw them: a rejoin in another mode
+ * drops the cards that mode does not run (see normalizeHeldBoons and
+ * heldFlagsOf in ./held-cards). A weight of zero and an absent entry are the
+ * same absence.
+ */
+export function cardRunsInMode(card: CardRecord, mode: GameMode): boolean {
+  return (card.modes[mode] ?? 0) > 0;
+}
+
+/**
+ * The weight a card is offered with, or zero where it is not offered. The
+ * mode weight, the condition's answer and the path lean multiply.
  */
 export function cardWeight(card: CardRecord, state: GameState): number {
   const mode = state.mode as GameMode;
@@ -257,16 +196,10 @@ export function cardWeight(card: CardRecord, state: GameState): number {
 }
 
 /**
- * What a draft of a given kind has on offer for this captain: the cards the
- * round has unlocked, weighted, with the ones this mode does not run and
- * the ones this captain has no use for already gone.
- *
- * The card's own kind is what decides its reader rather than a table here,
- * because the two unlocked readers each hold one kind's ladder and the pool
- * a mode runs is the same for both. A charter is the third kind and is
- * absent from this walk on purpose: its trio is composed at the moment it
- * is offered (see ./charters), and the empty arm below is that absence
- * stated rather than a kind nobody remembered to wire.
+ * The weighted cards a draft of a given kind may offer this captain, with
+ * the ones this mode does not run and the ones this captain has no use for
+ * removed. A charter is composed at the moment it is offered rather than
+ * drawn from a ladder (see ./charters), so the empty arm is deliberate.
  */
 export function offerPool(
   kind: CardKind,
@@ -284,12 +217,9 @@ export function offerPool(
 }
 
 /**
- * A draw of up to `count` cards from a weighted pool, without replacement:
- * once a card is drawn it leaves the pool, which is what makes the three
- * offered cards three different cards.
- *
- * The random source is passed rather than assumed, so a caller that wants a
- * seeded draw can have one and the tests can have a fixed one.
+ * Up to `count` cards drawn from a weighted pool without replacement, so the
+ * offered cards are always distinct. The random source is passed in so tests
+ * and seeded callers can supply one.
  */
 export function drawOffer(
   pool: Array<[CardRecord, number]>,
@@ -315,17 +245,30 @@ export function drawOffer(
   return picks;
 }
 
-// ========== The evaluation ==========
+/**
+ * How many cards each mode runs and how much power the widest of them
+ * carries. The card check prints it and the smoke suite holds each mode's
+ * widest card against its ceiling.
+ */
+export function modePoolShape(
+  cards: readonly CardRecord[] = CARDS,
+): Record<GameMode, { count: number; widest: number }> {
+  const shape = {} as Record<GameMode, { count: number; widest: number }>;
+  for (const mode of Object.keys(MODE_POWER_CEILING) as GameMode[]) {
+    const carried = cards.filter((card) => (card.modes[mode] ?? 0) > 0);
+    shape[mode] = {
+      count: carried.length,
+      widest: carried.reduce((top, card) => Math.max(top, card.power), 0),
+    };
+  }
+  return shape;
+}
 
 // One card's appearances and picks, as the save carries them.
 export type CardTally = Record<string, { offered: number; picked: number }>;
 
-// How many appearances a card needs before its rate is read as a rate. The
-// plan's own words are the number's reason ("a card with a high win rate
-// over nine appearances is noise and a card with a high win rate over four
-// hundred is a problem"), and forty is the floor F7 already reads a
-// combination at ("once it has at least forty recorded appearances"), so
-// the two instruments agree about what counts as evidence.
+// Appearances a card needs before its rate is read as a rate; forty matches
+// the floor other card statistics are read over.
 export const CARD_CONVERSION_FLOOR = 40;
 
 type CardReading = {
@@ -334,20 +277,16 @@ type CardReading = {
   kind: CardKind;
   offered: number;
   picked: number;
-  // Null while the appearances are below the floor. A rate over a handful
-  // of offers is not a small rate, it is not a rate at all, and the reader
-  // says so rather than printing a number the plan warns about.
+  // Null below the floor: a handful of offers is not a small rate, it is
+  // not a rate at all.
   rate: number | null;
 };
 
 /**
- * Offer to pick conversion per card, with the appearance count beside it.
- *
- * A pure reduction over the tally, so the report, the dashboard and a check
- * all read one instrument (the same reason ./balance owns readWinRates).
- * Ordered so the cards worth acting on come first: the measurable ones by
- * rate, then the rest by how often they have been seen, because the card
- * with the most appearances is the next one to become measurable.
+ * Offer to pick conversion per card, with the appearance count beside it. A
+ * pure reduction so the report, the dashboard and the checks read one
+ * instrument. Measurable cards come first by rate, then the rest by
+ * appearances.
  */
 export function readCardConversion(tally: CardTally): CardReading[] {
   const readings: CardReading[] = Object.entries(tally).map(([id, counts]) => ({
@@ -371,14 +310,9 @@ export function readCardConversion(tally: CardTally): CardReading[] {
 }
 
 /**
- * Whatever a save says about card appearances, read back as a tally.
- *
- * A save written before this field existed carries nothing here, and a save
- * written by hand carries whatever somebody typed, so every arm is checked
- * rather than trusted: a count is a whole number of at least zero, and a
- * card the pool does not know is not counted at all. That last one is not
- * tidiness, it is the report's integrity: a stale id from a retired card
- * would otherwise print as a row with no name.
+ * A save's card tally, read back with every arm checked: counts are whole
+ * numbers at least zero, and a card this build does not know is dropped so a
+ * retired id cannot print as a nameless row.
  */
 export function normalizeCardTally(raw: unknown): CardTally {
   if (raw === null || typeof raw !== "object") return {};
@@ -388,11 +322,7 @@ export function normalizeCardTally(raw: unknown): CardTally {
     if (value === null || typeof value !== "object") continue;
     const counts = value as { offered?: unknown; picked?: unknown };
     const offered = countOf(counts.offered);
-    // The clamp comes before the emptiness test rather than at the write, so
-    // the two readings agree about what was counted: a card whose only
-    // readable number is a pick count cannot survive as a row of zeroes,
-    // because the pick is a count of a card taken off a table it was never
-    // put on.
+    // Clamp before the emptiness test so picks can never exceed offers.
     const picked = Math.min(countOf(counts.picked), offered);
     if (offered === 0 && picked === 0) continue;
     tally[id] = { offered, picked };
@@ -407,9 +337,7 @@ function countOf(value: unknown): number {
 }
 
 /**
- * The two writes the tally takes, one per thing that can happen to a card:
- * it was offered, or it was taken. Written here rather than at the draft
- * site so the shape of a tally entry has one home.
+ * The two writes the tally takes: a card was offered, or a card was taken.
  */
 export function noteCardOffer(tally: CardTally, card: CardRecord): void {
   const entry = (tally[card.id] ??= { offered: 0, picked: 0 });
@@ -421,30 +349,19 @@ export function noteCardPick(tally: CardTally, card: CardRecord): void {
   entry.picked += 1;
 }
 
-// ========== The content check ==========
-
-// The clawback the rules are checked against, so a check can build a pool
-// with one thing wrong in it and watch the clause that is about that thing
-// fire. The shipped subject is what the build gates on.
+// The subject of the content check, so a check can build a pool with one
+// thing wrong in it and watch the clause fire.
 export interface CardSubject {
   cards: readonly CardRecord[];
   roles: readonly string[];
   paths: readonly PathId[];
   languages: readonly string[];
   catalogueWords: readonly string[];
-  // [F4: boons at milestone moments] Every key MODIFIER_KEYS names, so
-  // the coverage clause below can ask the pool about the keys rather
-  // than only about the cards. Optional rather than required, because
-  // every subject in the suite that is about a card builds its own and
-  // has no opinion about the union; the shipped subject fills it, which
-  // is where the clause has to hold anyway.
+  // Every key MODIFIER_KEYS names. Optional because hand built subjects in
+  // the suite carry their own cards and no opinion about the union.
   modifierKeys?: readonly string[];
-  // [F6: charters at leg four] The charter id to path pairing (see
-  // ./constants/charters), so the two per path clause below can hold the
-  // trio's first two slots against the records. Optional for the same
-  // reason modifierKeys is: a hand built pool in a check carries its own
-  // cards and no opinion about the pairing, and the shipped subject
-  // fills it.
+  // The charter id to path pairing (see ./constants/charters), optional for
+  // the same reason.
   charterPaths?: Record<string, string>;
 }
 
@@ -454,9 +371,8 @@ export function shippedCards(): CardSubject {
     roles: WORKER_TYPE_IDS,
     paths: PATH_IDS,
     languages: LANGUAGES,
-    // Every good and every food the catalogues hold, read off F1's walk
-    // rather than a second list, so an item added to the catalogue is
-    // scanned for the same afternoon.
+    // Every good and food the catalogues hold, read off the tag walk rather
+    // than a second list.
     catalogueWords: taggedEntries()
       .filter((entry) => entry.kind === "good" || entry.kind === "food")
       .map((entry) => entry.id),
@@ -466,24 +382,15 @@ export function shippedCards(): CardSubject {
 }
 
 /**
- * Everything the plan's F2 asks of a card pool, as findings.
- *
- * Each clause is one sentence the plan or its neighbours state, and the
- * scripts/cards.ts run fails the build on any finding, which is F1's own
- * answer to a rule people are expected to remember.
+ * Everything the card pool has to satisfy, as findings. scripts/cards.ts
+ * fails the build on any finding.
  */
 export function validateCards(subject: CardSubject): string[] {
   const findings: string[] = [];
 
-  // [F4: boons at milestone moments] Every flag key a card writes, and the
-  // id of the card that wrote it. One owner per key pool wide, because the
-  // ledger names a modifier's source by finding the card that writes the
-  // key (see cardByFlag), and that reader takes the first match: two
-  // writers would make that name a function of table order, and the day
-  // they disagreed the ledger would quietly print the wrong card. The map
-  // lives outside the card loop so the clause is about the pool rather
-  // than about one record, which is the same reading the duplicate id
-  // clause above takes.
+  // Every flag key a card writes, with the id of the card that wrote it. One
+  // owner per key because cardByFlag takes the first match, so two writers
+  // would make the ledger's attribution a function of table order.
   const keyOwner = new Map<string, string>();
 
   const seen = new Set<string>();
@@ -497,14 +404,9 @@ export function validateCards(subject: CardSubject): string[] {
     if (!CARD_KINDS.includes(card.kind)) {
       findings.push(`${at}: ${card.kind} is not a kind a card can have`);
     }
-    // [F4: boons at milestone moments] The kind's trigger, read apart for
-    // the one kind whose trigger is now a set. A module or a charter
-    // still arrives at its kind's one draft, and a boon arrives at the
-    // round draft or at one of the five moments, so the plan's own
-    // sentence ("a card that arrives at the boon draft and says so in its
-    // own words is a card that can disagree with its own kind") is kept
-    // for the kinds that still have one home and widened where F4 gave
-    // the boon five.
+    // A boon arrives at the round draft or at one of the milestone moments;
+    // a module or charter has one arrival. The trigger has to agree with the
+    // kind.
     if (card.kind === "boon" && !BOON_TRIGGERS.includes(card.trigger)) {
       findings.push(
         `${at}: a boon arrives at a draft or a moment, and ${card.trigger} is neither`,
@@ -516,12 +418,9 @@ export function validateCards(subject: CardSubject): string[] {
       );
     }
 
-    // F1's two tag rule, asked of the card the same way the walk asks it of
-    // every catalogue: one of the twelve, never more than two, never twice.
-    // The list is read as a plain array rather than through the one or two
-    // shape it is typed as, because a subject built by hand is exactly what
-    // these clauses are here for and a shape is not a guarantee about what
-    // somebody typed into a check.
+    // One of the twelve tags, at most two, never twice. Read as a plain
+    // array because a hand built subject is exactly what these clauses are
+    // here for.
     const tags: readonly string[] = card.tags;
     if (tags.length === 0) findings.push(`${at}: carries no tag`);
     if (tags.length > MAX_TAGS_PER_ENTRY) {
@@ -530,13 +429,8 @@ export function validateCards(subject: CardSubject): string[] {
     if (new Set(tags).size !== tags.length) {
       findings.push(`${at}: carries a tag twice`);
     }
-    // F1's walk holds this line over every catalogue and reads the cards
-    // through the same entries, so a card carrying a word outside the twelve
-    // is caught there too. It is written again here rather than left to that
-    // walk because this validator's subject is a card pool and nothing else:
-    // a clause that only fires when somebody else's walk is also run is a
-    // clause the card check cannot honestly claim, and a tag no effect looks
-    // up is a typo whether the pool it sits in is a catalogue or a deck.
+    // The tag walk catches this over the catalogues, but this validator's
+    // subject is a card pool, so it holds the line itself.
     for (const tag of tags) {
       if (!(TAGS as readonly string[]).includes(tag)) {
         findings.push(`${at}: ${tag} is not one of the twelve tags`);
@@ -549,9 +443,8 @@ export function validateCards(subject: CardSubject): string[] {
       );
     }
 
-    // The mode list, both halves of it. A card has to be offered somewhere,
-    // and a card may not sit in a mode whose ceiling its power is above:
-    // that pair is what makes the ceiling a ceiling rather than a comment.
+    // A card has to be offered somewhere, and may not sit in a mode whose
+    // ceiling its power is above.
     const offered = (Object.keys(card.modes) as GameMode[]).filter(
       (mode) => card.modes[mode] > 0,
     );
@@ -566,11 +459,28 @@ export function validateCards(subject: CardSubject): string[] {
         );
       }
     }
+    // Milestone boons are an Ocean Gambit system: the grant path reads
+    // gambitSystems, which Classic carries false, so a Classic weight would
+    // be a card Classic can never deal.
+    if (
+      card.kind === "boon" &&
+      (MILESTONE_TRIGGERS as readonly string[]).includes(card.trigger) &&
+      (card.modes.classic ?? 0) > 0
+    ) {
+      findings.push(
+        `${at}: arrives at the ${card.trigger} milestone, which Ocean Gambit alone runs, so classic's weight has to be zero`,
+      );
+    }
+    // A charter arrives at the charter moment, which is Gambit only, so the
+    // same reasoning applies.
+    if (card.kind === "charter" && (card.modes.classic ?? 0) > 0) {
+      findings.push(
+        `${at}: a charter arrives at the charter moment, which Ocean Gambit alone runs, so classic's weight has to be zero`,
+      );
+    }
 
-    // The lean. A lean that names no path is a lean nobody can read, and a
-    // lean of zero or less is the filter the plan says this field is not:
-    // the draw is weighted, so a captain is never locked out of a card for
-    // holding the wrong path.
+    // A lean names a real path, and is never zero: the draw is weighted, so
+    // no one is locked out of a card for holding the wrong path.
     for (const [path, weight] of Object.entries(card.pathWeight)) {
       if (pathConfig(path) === null) {
         findings.push(`${at}: leans toward ${path}, which is not a path`);
@@ -582,9 +492,7 @@ export function validateCards(subject: CardSubject): string[] {
       }
     }
 
-    // The condition's own clause, which only the crew arm needs: a role the
-    // roster cannot hold is a question the engine would always answer false
-    // for, so the card would be offered to nobody.
+    // A role the roster cannot hold would make the card unofferable.
     if (
       card.condition.kind === "crew_role" &&
       card.condition.roles.every((role) => !subject.roles.includes(role))
@@ -592,14 +500,9 @@ export function validateCards(subject: CardSubject): string[] {
       findings.push(`${at}: asks for a crew role the roster cannot hold`);
     }
 
-    // The effect the kind promises. A boon and a charter bend the game by
-    // writing flags, a module works by being installed, and a record that
-    // says one and is the other is a card the engine will read wrongly
-    // rather than not at all. The two flag writing kinds share the flag
-    // half of the clause because they share the mechanism; what differs
-    // between them is where the flags are read, a round for the boon and
-    // the rest of the voyage for the charter, and that difference lives
-    // at the read sites rather than in the shape.
+    // The effect has to match what the kind promises: boons and charters
+    // write flags, modules are installed. A record that says one and does
+    // the other is read wrongly by the engine rather than ignored.
     const writesFlags = card.kind === "boon" || card.kind === "charter";
     if (card.kind === "boon" && card.effect.kind !== "flags") {
       findings.push(
@@ -613,9 +516,8 @@ export function validateCards(subject: CardSubject): string[] {
       if (Object.keys(card.effect.flags).length === 0) {
         findings.push(`${at}: writes no flag, so choosing it changes nothing`);
       }
-      // The key ledger, written beside the clause that reads the flags
-      // rather than in a walk of its own, so a card that stops writing
-      // flags stops being counted as an owner in the same edit.
+      // Count an owner beside the clause that reads the flags, so a card
+      // that stops writing flags stops being an owner in the same edit.
       for (const key of Object.keys(card.effect.flags)) {
         const owner = keyOwner.get(key);
         if (owner !== undefined) {
@@ -631,19 +533,9 @@ export function validateCards(subject: CardSubject): string[] {
       );
     }
 
-    // Both language strings, and neither of them empty. This is J3's
-    // evaluation read forward: the pool carries both from the beginning, so
-    // a card that arrives with one string fails the build rather than the
-    // translation pass.
-    //
-    // The same pass carries the scan the plan puts in F1's evaluation: no
-    // card names an item. It reads the copy a captain sees in both
-    // languages, because the rule is about what the card says rather than
-    // only about what the engine reads, and a card whose text names Silk
-    // while its tag says woven is a card that teaches the wrong lesson
-    // twice. The two clauses share the loop because both are asked of the
-    // same string and a second walk would be a second place to forget a
-    // language.
+    // Both language strings, neither empty, and no card names an item in
+    // either. The text is scanned in both languages: a card that names Silk
+    // while its tag says woven teaches the wrong lesson twice.
     for (const language of subject.languages) {
       const text = stringsOf(card, language);
       if (!text) {
@@ -662,27 +554,19 @@ export function validateCards(subject: CardSubject): string[] {
     }
   }
 
-  // [F4: boons at milestone moments] The clause above read the pool through
-  // the cards; this one reads it through the keys. Every key the tree's
-  // ModifierKey union names has a read site in the engine, so a key no card
-  // writes is a read site that can never fire; the day a key is renamed on
-  // one side of that pair and not the other, this clause is what fails the
-  // build. The subject is the only place that knows the union, because a
-  // hand built pool in a check carries its own card list and no opinion
-  // about the keys, which is why the field is optional.
+  // The pool read through the keys: every key MODIFIER_KEYS names has a read
+  // site in the engine, so a key no card writes is a read site that can
+  // never fire. The subject is optional because hand built pools carry no
+  // opinion about the union.
   for (const key of subject.modifierKeys ?? []) {
     if (!keyOwner.has(key)) {
       findings.push(`no card writes ${key}`);
     }
   }
 
-  // [F6: charters at leg four] The pairing clause, read through the map
-  // the subject hands over rather than out of the records, because the
-  // map is what the trio's composition reads (see ./constants/charters).
-  // Both directions are held: a charter with no path is a card no trio
-  // can pair, an entry naming a card the pool does not have would pair
-  // nothing, and a path whose count is not two has a trio whose first
-  // two slots do not exist or exist twice.
+  // The charter to path pairing, held in both directions: every charter has
+  // a path, every paired id names a charter, and each path has exactly the
+  // two its trio composes from (see ./constants/charters).
   if (subject.charterPaths) {
     const charters = subject.cards.filter((card) => card.kind === "charter");
     const perPath = new Map<string, number>();
@@ -717,21 +601,16 @@ export function validateCards(subject: CardSubject): string[] {
   return findings;
 }
 
-// One language's strings off a card, or undefined where the card has none in
-// that language. A lookup rather than an index, because the language is a
-// string off the subject rather than one of the two the record is typed for:
-// a check that built a card with one string arrives here, and undefined is
-// the answer its clause is about.
+// One language's strings off a card, or undefined where the card has none.
+// A lookup rather than an index because the language comes in as a string,
+// and a check may hand in one the record is not typed for.
 function stringsOf(card: CardRecord, language: string): CardText | undefined {
   return (card.strings as Record<string, CardText | undefined>)[language];
 }
 
-// Whether a string names a catalogue key, whole word and as the catalogue
-// spells it. Case is kept because the catalogues are capitalised and English
-// prose is not: "Workers produce 1 extra item" is a sentence about labour,
-// while Produce is a food, and a scan that could not tell those apart would
-// fail the build over a verb. What it is looking for is the name, so it reads
-// the name.
+// Whether a string names a catalogue key as a whole word. Case matters: the
+// catalogues are capitalised and prose is not, so "Artisans produce" is a
+// sentence about labor while Produce is a food.
 function namesKey(text: string, key: string): boolean {
   return new RegExp(`\\b${escapeForRegExp(key)}\\b`).test(text);
 }

@@ -1,6 +1,6 @@
 // =====================================================================
 // The phase and round ready check: who has said they are done, and the
-// advance that follows when the room has.
+// advance that follows when the harbor has.
 // =====================================================================
 
 import type { Server, Socket } from "socket.io";

@@ -33,7 +33,7 @@ export async function wipingTheVoyageSuite(
   hostSocket.emit("room:restart", { roomId: roomId });
   check(
     (await clearedAtHost) !== null,
-    "restarting the voyage tells the room its conversation is gone",
+    "restarting the voyage tells the harbor its conversation is gone",
   );
   check(
     (await clearedAtGuest) !== null,

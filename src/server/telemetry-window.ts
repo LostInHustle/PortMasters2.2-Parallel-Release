@@ -1,13 +1,13 @@
 // =====================================================================
 // The operator window: the last three hundred voyages of a mode.
 //
-// [I4: the launch gates, and the three hundred voyage run] One query, in
+// One query, in
 // one place, so the two surfaces that read the run cannot read different
-// runs. Goal I3 put the window inline in the balance route, where it was
-// the only reader; goal I4 adds a command line report that has to answer
-// the same question about the same voyages, and two implementations of one
-// window is how a page and a report start disagreeing about whether the
-// mode passed.
+// runs. The balance dashboard kept the window inline in the balance
+// route, where it was the only reader; the command line report, added
+// later, has to answer the same question about the same voyages, and two
+// implementations of one window is how a page and a report start
+// disagreeing about whether the mode passed.
 //
 // The window's size comes from the launch floor rather than from a number
 // written here, which is the property worth keeping: a window smaller than
@@ -31,7 +31,7 @@ import { LAUNCH_MINIMUM_VOYAGES } from "@/lib/game/gates";
 import { readStoredRecord, type TelemetryRecord } from "@/lib/game/telemetry";
 import type { GameMode } from "@/lib/game/mode";
 
-// The mode the operator surfaces are about. The plan's gates are Ocean
+// The mode the operator surfaces are about. The design's gates are Ocean
 // Gambit's: a Classic voyage has no cards, no bands and no Barge, and
 // averaging one into the loop or market numbers would be reading two games
 // as one. Typed as GameMode so a renamed mode fails the build rather than
@@ -78,9 +78,9 @@ export async function readOperatorWindow(): Promise<DashboardInput> {
 
   // The chronicle rows for exactly the voyages in the window: the win
   // verdicts, which the record deliberately does not carry, since a
-  // captain's card must never enter a blob that outlives the room. The
-  // rooms are queried in one pass and the voyage each row belongs to is
-  // matched here rather than by a query, because a room can host several
+  // captain's card must never enter a blob that outlives the harbor. The
+  // harbors are queried in one pass and the voyage each row belongs to is
+  // matched here rather than by a query, because a harbor can host several
   // voyages and the epoch is what tells them apart.
   const outcomes: DashboardOutcome[] = [];
   if (voyages.size > 0) {

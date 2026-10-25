@@ -1,13 +1,13 @@
 // =====================================================================
 // Realtime layer: Quick Start queue.
 //
-// [MANIFEST 16] A captain who just wants to play, without rounding up
-// a room code or waiting for a friend, joins the Quick Start queue.
-// matchQueuedCaptains pairs them into an existing open public room that
+// A captain who just wants to play, without rounding up
+// a harbor code or waiting for a friend, joins the Quick Start queue.
+// matchQueuedCaptains pairs them into an existing open public harbor that
 // hasn't set sail yet (the first one with a free seat), or creates a
-// fresh one if no such room exists. The matched captains receive
+// fresh one if no such harbor exists. The matched captains receive
 // quickstart:matched with the roomId and roomCode, and their client
-// joins the room exactly as if they'd typed the code in by hand.
+// joins the harbor exactly as if they'd typed the code in by hand.
 //
 // The queue is a plain in process Map: no horizontal scaling, so that's
 // all the durability it needs. A captain who disconnects while queued
@@ -18,14 +18,14 @@ import { db } from "@/lib/db";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { DEFAULT_MODE } from "@/lib/game/mode";
 import { generateRoomCode, normalizeRoomName } from "@/lib/rooms";
-import { userSockets } from "./presence";
+import { emitToUser, userSockets } from "./presence";
 
 // The seat a captain is waiting in, and the tier they asked for.
 //
-// The tier only matters for the captain who ends up opening the room. Any
+// The tier only matters for the captain who ends up opening the harbor. Any
 // captain seated into a harbor that already exists sails at that harbor's
-// tier, which is the same rule that applies to joining by room code: the
-// tier belongs to the room, not to the person walking into it.
+// tier, which is the same rule that applies to joining by harbor code: the
+// tier belongs to the harbor, not to the person walking into it.
 const quickStartQueue = new Map<string, Difficulty>();
 
 export function joinQueue(userId: string, difficulty?: unknown): void {
@@ -36,7 +36,7 @@ export function leaveQueue(userId: string): void {
   quickStartQueue.delete(userId);
 }
 
-// A Quick Start room holds the same four captains an ordinary room does.
+// A Quick Start harbor holds the same four captains an ordinary harbor does.
 const QUICK_START_MAX_MEMBERS = 4;
 
 // Matches run one at a time, chained through this promise.
@@ -45,10 +45,10 @@ const QUICK_START_MAX_MEMBERS = 4;
 // button exists for. Two captains pressing Quick Start in the same tick
 // produce two join events, and both handlers reach their database lookup
 // before either has created anything. Each would find no open harbor, each
-// would open its own room, and the two captains would be seated in
+// would open its own harbor, and the two captains would be seated in
 // different harbors, which is the opposite of being paired. Chaining makes
 // the second match wait for the first to finish, so by the time it looks
-// for a room, the room the first one opened exists and has a free seat.
+// for a harbor, the harbor the first one opened exists and has a free seat.
 let matchChain: Promise<void> = Promise.resolve();
 
 export function matchQueuedCaptains(io: Server): Promise<void> {
@@ -60,9 +60,9 @@ export function matchQueuedCaptains(io: Server): Promise<void> {
   return run;
 }
 
-// Tries to pair every queued captain into a room. Walks the queue in
+// Tries to pair every queued captain into a harbor. Walks the queue in
 // insertion order (Map iteration is insertion ordered in JS). For each
-// captain, finds an existing open public room that hasn't started and
+// captain, finds an existing open public harbor that hasn't started and
 // has fewer than 4 members, or creates a fresh one. The captain is
 // added as a member and told to join via quickstart:matched.
 //
@@ -82,10 +82,10 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
       continue;
     }
 
-    // Find an existing open public room that hasn't started and has a
-    // free seat. Walk newest first so a room that was just created by
+    // Find an existing open public harbor that hasn't started and has a
+    // free seat. Walk newest first so a harbor that was just created by
     // a previous queued captain in this same loop is preferred, which
-    // tends to fill rooms before spilling into new ones.
+    // tends to fill harbors before spilling into new ones.
     //
     // Restricted to the founding mode. Quick Start is a one click path with
     // no choice in it, and the experimental mode is deliberately something a
@@ -93,10 +93,10 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     // a different lap. Dropping someone into one because they pressed a
     // button that promised them a game is the one way an experimental mode
     // could reach a player who never agreed to test anything. The mode is a
-    // room property like difficulty, but unlike the tier it is not inherited
+    // harbor property like difficulty, but unlike the tier it is not inherited
     // silently, so a queued captain only ever lands in a Classic harbor.
     //
-    // The member ids come back with the room so the liveness check below
+    // The member ids come back with the harbor so the liveness check below
     // can be made without a second query.
     const candidate = await db.room.findFirst({
       where: {
@@ -115,10 +115,10 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     let roomId: string;
     let roomCode: string;
 
-    // A harbor is only open if somebody in it is actually here. A room
+    // A harbor is only open if somebody in it is actually here. A harbor
     // whose remaining members have all closed their tabs is not open, it
     // is simply not cleaned up yet: their departure timers are still
-    // counting down. Seating a captain in one of those hands them a room
+    // counting down. Seating a captain in one of those hands them a harbor
     // nobody can set sail from until those timers fire, and the captain
     // who does press the button first is left reading "waiting for host"
     // with no way to tell whether anything is wrong.
@@ -134,7 +134,7 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
       roomId = candidate.id;
       roomCode = candidate.code;
     } else {
-      // No suitable room: create a fresh one with this captain as host,
+      // No suitable harbor: create a fresh one with this captain as host,
       // in the tier they picked in the lobby before pressing the button.
       //
       // No mode is written, so the row takes the schema default, which is
@@ -156,7 +156,7 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     }
 
     // Add the captain as a member (idempotent: if they're already in
-    // this room, the upsert is a no op).
+    // this harbor, the upsert is a no op).
     await db.roomMember.upsert({
       where: { userId_roomId: { userId, roomId } },
       create: { userId, roomId },
@@ -164,9 +164,7 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     });
 
     // Tell every socket the captain holds that they've been matched.
-    for (const sid of userSockets.get(userId) ?? []) {
-      io.to(sid).emit("quickstart:matched", { roomId, roomCode });
-    }
+    emitToUser(io, userId, "quickstart:matched", { roomId, roomCode });
 
     quickStartQueue.delete(userId);
   }

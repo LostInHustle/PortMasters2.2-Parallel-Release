@@ -1,15 +1,15 @@
 // =====================================================================
-// [F6: charters at leg four] The ten charters, two for each of the five
+// The ten charters, two for each of the five
 // paths, and the moment a voyage offers one of them.
 //
-// This is the vocabulary and nothing else, the same split F1 took with
-// the tags and F4 with the moments: the words live here and the walk
-// that reads them lives in ../charters, so a module that wants to ask
-// what a charter is imports this one, and a module that wants to know
+// This is the vocabulary and nothing else, the same split the tag
+// vocabulary keeps and the moments keep: the words live here and the
+// walk that reads them lives in ../charters, so a module that wants to
+// ask what a charter is imports this one, and a module that wants to know
 // whether one is due imports that one.
 //
-//   - A charter is offered once a voyage, at leg four, and the choice
-//     carries to the end of it. The plan's shape for the offer is a
+//   * A charter is offered once a voyage, at round four, and the choice
+//     carries to the end of it. The design's shape for the offer is a
 //     trio: the captain's two path charters, and one wildcard drawn at
 //     even weight from the other eight. The pairing lives here in
 //     CHARTER_PATH rather than in each record's own pathWeight, because
@@ -19,25 +19,25 @@
 //     NO_LEAN for that reason, and the validator holds the two per path
 //     count against this one map.
 //
-//   - The wildcard is drawn flat: every record's condition is the always
+//   * The wildcard is drawn flat: every record's condition is the always
 //     arm at weight one, so nothing about a captain bends the third slot
 //     of their trio. That is what keeps the dashboard's cover row an
 //     honest number (see COVER_CHARTERS below): a card any captain can
 //     be offered is what lets the row read the pool rather than read who
 //     happened to be dealt what.
 //
-//   - Every charter runs Ocean Gambit's pool alone. Power four is the
+//   * Every charter runs Ocean Gambit's pool alone. Power four is the
 //     floor that follows rather than a taste: a card absent from Classic
 //     must sit above Classic's ceiling of three, which the mode clause
 //     in ../cards enforces, and four is that floor. The Factor sits at
 //     five, the wide ceiling itself, as the one whose strength is a rule
 //     rather than a rate.
 //
-//   - The trigger is the one value charter_draft, and every record names
+//   * The trigger is the one value charter_draft, and every record names
 //     it in its own field the same way a boon does. A charter's kind
-//     needed no new vocabulary: CardKind carried the third word from F2
-//     (see ./cards), so what F6 adds to the shape is content rather than
-//     a field, which is the widening the pool record was built to take.
+//     needed no new vocabulary: CardKind carried the third word from
+//     ./cards, so what the charters add to the shape is content rather
+//     than a field, which is the widening the pool record was built to take.
 //
 // Every line is dash free by the house rule, and none of them names an
 // item: the same two scans the card pool answers to are run over these
@@ -46,12 +46,12 @@
 import type { PathId } from "../paths";
 import { GAMBIT_ONLY, NO_LEAN, type CardRecord } from "./cards";
 
-// The leg the moment lands on: the fourth of the voyage's twelve (see the
-// voyageLegs field in ../mode for the length and ../charters for the due
+// The round the moment lands on: the fourth of the voyage's twelve (see the
+// voyageRounds field in ../mode for the length and ../charters for the due
 // read). A constant rather than a literal at the read site, because the
-// plan names the number once, in the goal's own title, and the suite holds
+// design names the number once, in the goal's own title, and the suite holds
 // the due check to this line.
-export const CHARTER_LEG = 4;
+export const CHARTER_ROUND = 4;
 
 // What a captain meets when the moment arrives: the glyph and the two
 // lines the overlay prints, the same three fields a milestone moment
@@ -97,7 +97,7 @@ export const CHARTER_PATH: Record<string, PathId> = {
 // The ten, authored together rather than in waves: the trio's shape
 // makes an unpaired path a hole a captain's moment would fall through,
 // so the two per path count is the minimum a single voyage's offer can
-// be right about, and the plan's own count is ten.
+// be right about, and the design's own count is ten.
 export const CHARTERS: readonly CardRecord[] = [
   {
     id: "bulk_charter",
@@ -113,7 +113,7 @@ export const CHARTERS: readonly CardRecord[] = [
     strings: {
       en: {
         name: "The Bulk Charter",
-        desc: "Freight is 1 Gold cheaper per lot for the rest of the voyage.",
+        desc: "Freight is 1 Gold cheaper per item for the rest of the voyage.",
       },
       zh: {
         name: "大宗特许",
@@ -179,11 +179,11 @@ export const CHARTERS: readonly CardRecord[] = [
     strings: {
       en: {
         name: "The Standing Escort",
-        desc: "A cutter keeps station. Escort contracts cost half, for the rest of the voyage.",
+        desc: "A cutter keeps station. Hiring an escort at a harbor costs half, for the rest of the voyage.",
       },
       zh: {
         name: "常备护航",
-        desc: "快船随行，本航程护航合同费用减半。",
+        desc: "快船随行，本航程在港湾雇佣护航的费用减半。",
       },
     },
   },
@@ -201,11 +201,11 @@ export const CHARTERS: readonly CardRecord[] = [
     strings: {
       en: {
         name: "The Weavers' Charter",
-        desc: "The looms never stop. Each weaver produces 1 extra item every round, for the rest of the voyage.",
+        desc: "The looms never stop. Every hand at the loom produces 1 extra item every round, for the rest of the voyage.",
       },
       zh: {
         name: "织女特许",
-        desc: "织机不停，本航程每位织女每轮多产出1件货物。",
+        desc: "织机不停，本航程每位织工每轮多产出1件货物。",
       },
     },
   },
@@ -223,11 +223,11 @@ export const CHARTERS: readonly CardRecord[] = [
     strings: {
       en: {
         name: "The Quality Mark",
-        desc: "Your cloth carries the mark. Woven goods sell for 10% more, for the rest of the voyage.",
+        desc: "Your cloth carries the mark. Orders carrying woven goods pay 10% more, for the rest of the voyage.",
       },
       zh: {
         name: "品质印记",
-        desc: "织物皆盖印记，本航程织物售价提高 10%。",
+        desc: "织物皆盖印记，本航程含织物的订单报酬提高 10%。",
       },
     },
   },
@@ -245,11 +245,11 @@ export const CHARTERS: readonly CardRecord[] = [
     strings: {
       en: {
         name: "The Long Ledger",
-        desc: "The harbors keep your account. Port purchases cost 10% less, for the rest of the voyage.",
+        desc: "The harbors keep your account. Purchases at the market cost 10% less, for the rest of the voyage.",
       },
       zh: {
         name: "长账簿",
-        desc: "港口记账，本航程港口采购降价 10%。",
+        desc: "港湾记账，本航程集市采购降价 10%。",
       },
     },
   },

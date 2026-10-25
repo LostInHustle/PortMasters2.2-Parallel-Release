@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -22,18 +23,18 @@ import {
 // the process holds; this file is where a captain's pick is read,
 // remembered and applied, and it is three pieces:
 //
-//   - the pick itself, stored under one localStorage key the way the
+//   * the pick itself, stored under one localStorage key the way the
 //     colorblind preference beside it is (see ./use-color-preference):
 //     read once on mount, written on change, no server round trip for
 //     the captain's own screen.
 //
-//   - a readable cookie (pm_locale) kept in step with the pick, because
+//   * a readable cookie (pm_locale) kept in step with the pick, because
 //     the realtime layer composes some captain facing lines on the
 //     server and the socket that carries them reads the cookie at the
 //     handshake. It is not a second setting, only the same one written
 //     where the other end of the connection can read it.
 //
-//   - the provider every screen sits under, so the switch reaches the
+//   * the provider every screen sits under, so the switch reaches the
 //     trees that are on screen when the pick is made rather than only
 //     the next one that renders.
 //
@@ -55,15 +56,34 @@ const LANGUAGE_KEY = "portmasters_language";
 // than a session fact, so it outlives the tab by as much as a cookie can.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
+/** The pick on the readable cookie, for a browser that kept it but not storage. */
+function readCookieLocale(): Locale | null {
+  try {
+    const match = document.cookie.match(
+      new RegExp("(?:^|; )" + LOCALE_COOKIE_NAME + "=([^;]*)"),
+    );
+    if (!match) return null;
+    const stored = decodeURIComponent(match[1]);
+    return isLocale(stored) ? stored : null;
+  } catch {
+    // A hand edited cookie that will not decode names no language.
+    return null;
+  }
+}
+
 /** The captain's stored pick, or the shipped language where none is stored. */
 function readStoredLocale(): Locale {
   try {
     const stored = localStorage.getItem(LANGUAGE_KEY);
     if (isLocale(stored)) return stored;
   } catch {
-    // Private browsing or a disabled storage API: the default stands.
+    // Private browsing or a disabled storage API: the cookie below stands.
   }
-  return DEFAULT_LOCALE;
+  // The cookie is the same pick written where the server can read it (see
+  // storeLocale). Reading it back here covers the browser that kept the
+  // cookie and lost storage, which is otherwise the one case where the
+  // server composes Mandarin lines for a screen printing English.
+  return readCookieLocale() ?? DEFAULT_LOCALE;
 }
 
 /**
@@ -97,6 +117,21 @@ type LanguageSetting = {
 const LanguageContext = createContext<LanguageSetting | null>(null);
 
 /**
+ * The reading for a render outside the provider.
+ *
+ * One object rather than a new one per call, so a consumer that reads it
+ * is not handed a fresh identity every time it renders, and the language
+ * it carries is read live rather than captured, so a screen mounted
+ * without the provider still prints in the language the process holds.
+ */
+const OUTSIDE_PROVIDER: LanguageSetting = {
+  get locale() {
+    return getLocale();
+  },
+  setLanguage: storeLocale,
+};
+
+/**
  * The captain's language, and the write that changes it.
  *
  * Read through the context so every screen under the provider redraws
@@ -108,7 +143,7 @@ const LanguageContext = createContext<LanguageSetting | null>(null);
 export function useLanguage(): LanguageSetting {
   const context = useContext(LanguageContext);
   if (context) return context;
-  return { locale: getLocale(), setLanguage: storeLocale };
+  return OUTSIDE_PROVIDER;
 }
 
 /**
@@ -146,8 +181,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(next);
   }, []);
 
+  // The value is one object for as long as the language and the write
+  // are the same, so the screens that read it redraw when the pick
+  // changes rather than every time this provider renders for any other
+  // reason.
+  const setting = useMemo<LanguageSetting>(
+    () => ({ locale, setLanguage }),
+    [locale, setLanguage],
+  );
+
   return (
-    <LanguageContext.Provider value={{ locale, setLanguage }}>
+    <LanguageContext.Provider value={setting}>
       {children}
     </LanguageContext.Provider>
   );

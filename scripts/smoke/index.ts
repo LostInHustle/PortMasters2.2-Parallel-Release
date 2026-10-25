@@ -13,7 +13,7 @@
 //   PHASE_CLOCK=1 npm run test:smoke
 //
 // PHASE_CLOCK=1 is set on both lines on purpose: the clock suites need
-// the server under test to be timing its legs, and the run reads the
+// the server under test to be timing its rounds, and the run reads the
 // same variable to know which clock it is checking, so one shell
 // exports it for both.
 //
@@ -29,7 +29,7 @@
 //
 // Five of those values are assigned back into variables declared here
 // rather than destructured at the call site: the three captains and the
-// two harbor ids the cleanup below has to be able to read, whether the
+// two room ids the cleanup below has to be able to read, whether the
 // run passed or threw.
 // =====================================================================
 import "@/server/env";
@@ -59,7 +59,7 @@ import { actingOnASelectionSuite } from "./suites/17-actingOnASelection";
 import { privateInformationSpineSuite } from "./suites/18-privateInformationSpine";
 import { victoryRulesSuite } from "./suites/19-victoryRules";
 import { voyageBriefingsSuite } from "./suites/20-voyageBriefings";
-import { legClockSuite } from "./suites/21-legClock";
+import { roundClockSuite } from "./suites/21-roundClock";
 import { voyageEndToEndSuite } from "./suites/22-voyageEndToEnd";
 import { harborClockSuite } from "./suites/23-harborClock";
 import { standingOrdersSuite } from "./suites/24-standingOrders";
@@ -73,6 +73,12 @@ import { unlockCodeSuite } from "./suites/31-unlockCode";
 import { telemetrySpineSuite } from "./suites/32-telemetrySpine";
 import { balanceDashboardSuite } from "./suites/33-balanceDashboard";
 import { launchGatesSuite } from "./suites/34-launchGates";
+import { theVoyageLengthSuite } from "./suites/34-theVoyageLength";
+import { theLarderSuite } from "./suites/34-theLarder";
+import { theCrewByNameSuite } from "./suites/34-theCrewByName";
+import { theColdSuite } from "./suites/34-theCold";
+import { thePantrySuite } from "./suites/34-thePantry";
+import { theSurvivalLinesSuite } from "./suites/34-theSurvivalLines";
 import { pathsSuite } from "./suites/35-paths";
 import { pathboundOrderBoardSuite } from "./suites/36-pathboundOrderBoard";
 import { escortContractSuite } from "./suites/37-escortContract";
@@ -106,6 +112,8 @@ import { theFirstVoyageSuite } from "./suites/64-theFirstVoyage";
 import { theHousesAndTheAgesSuite } from "./suites/65-theHousesAndTheAges";
 import { theCrewAndTheLarderSuite } from "./suites/66-theCrewAndTheLarder";
 import { theBilingualHarborSuite } from "./suites/67-theBilingualHarbor";
+import { theLedgerReadsInYourLanguageSuite } from "./suites/68-theLedgerReadsInYourLanguage";
+import { thePriceAndThePromiseSuite } from "./suites/69-thePriceAndThePromise";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -121,7 +129,7 @@ async function main(): Promise<void> {
   let quickStartRoomId: string | null = null;
 
   // Every harbor that already exists before this run starts. Cleanup only
-  // ever deletes a room this run created, so a Quick Start that seats the
+  // ever deletes a harbor this run created, so a Quick Start that seats the
   // test captains into somebody's real open harbor cannot take that harbor
   // down with it.
   const preExistingRoomIds = new Set(
@@ -139,7 +147,7 @@ async function main(): Promise<void> {
     // Harbors opened for the one walk that sails a voyage rather than
     // probing a route. They are this run's, so cleanup deletes them, and
     // they are listed here rather than reused from the fields above
-    // because that walk needs a room whose whole voyage it drives itself.
+    // because that walk needs a harbor whose whole voyage it drives itself.
     lapRoomIds: [] as string[],
     sockets: [] as Socket[],
     // Only armed once the first account has been proven visible to this
@@ -155,7 +163,7 @@ async function main(): Promise<void> {
     // Safety interlock. The account was just written through the API; if
     // this connection cannot see it, the server and this script are on
     // different databases and the cleanup below would silently do
-    // nothing. Stop now, before a second account and a room exist.
+    // nothing. Stop now, before a second account and a harbor exist.
     const visible = await db.user.findUnique({
       where: { username: host.username },
       select: { id: true },
@@ -295,9 +303,9 @@ async function main(): Promise<void> {
     await victoryRulesSuite();
     console.log("\nThe voyage briefings");
     await voyageBriefingsSuite();
-    console.log("\nThe leg clock");
-    await legClockSuite();
-    console.log("\nA voyage end to end on the six phase leg");
+    console.log("\nThe round clock");
+    await roundClockSuite();
+    console.log("\nA voyage end to end on the six phase round");
     await voyageEndToEndSuite(run);
     console.log("\nThe harbor clock");
     await harborClockSuite(run);
@@ -376,8 +384,14 @@ async function main(): Promise<void> {
       inBandOutcomes,
       liveReading,
     } = balanceDashboard;
+    // The launch gates are one article of the run, and it used to be one
+    // file of 2,305 lines. It is now a run of articles, one theme each,
+    // and the run takes them in the order the checks used to come in. The
+    // four survival families hand their lines back rather than reading
+    // them, so the house rule over the whole set is read once, at the end
+    // of them.
     console.log("\nThe launch gates");
-    await launchGatesSuite(run, {
+    await launchGatesSuite({
       dashRecord,
       emptyReading,
       floorReading,
@@ -385,10 +399,28 @@ async function main(): Promise<void> {
       inBandOutcomes,
       liveReading,
       telHome,
+    });
+    console.log("\nThe voyage's length, and the table that sails it");
+    await theVoyageLengthSuite(run, {
       telSail,
       telStand,
       telWaitForOne,
     });
+    console.log("\nThe Larder, and the crew that eats from it");
+    const larderLines = await theLarderSuite();
+    console.log("\nThe crew, by name");
+    const crewLines = await theCrewByNameSuite(run);
+    console.log("\nThe clothes, and the cold");
+    const coldLines = await theColdSuite();
+    console.log("\nThree foods, spoilage and the split hold");
+    const pantryLines = await thePantrySuite();
+    console.log("\nThe survival layer's own lines");
+    await theSurvivalLinesSuite([
+      larderLines,
+      crewLines,
+      coldLines,
+      pantryLines,
+    ]);
     console.log("\nThe paths");
     await pathsSuite();
     console.log("\nThe pathbound order board");
@@ -428,14 +460,14 @@ async function main(): Promise<void> {
     console.log("\nThe tag vocabulary");
     await tagVocabularySuite();
     // The card record's article is the third of the three that need no
-    // harbor, and it is the tag walk's neighbour in the tree as well as in
+    // harbor, and it is the tag walk's neighbor in the tree as well as in
     // the run: the same pool the vocabulary is asked about is the one the
     // record puts a shape under, and both are static data rather than a
     // table anybody has to be sitting at.
     console.log("\nThe card record");
     await cardRecordSuite();
     // The milestone boons' article joins the three above that need no
-    // harbor, and it is the card record's neighbour in the run the way it
+    // harbor, and it is the card record's neighbor in the run the way it
     // is in the tree: the pool the record puts a shape under is the pool
     // the five moment cards are drawn from. Its checks walk the engine's
     // own state in process, and the one half that touches the database
@@ -443,22 +475,22 @@ async function main(): Promise<void> {
     // own, so no table has to be sitting for any of it.
     console.log("\nThe milestone boons");
     await milestoneBoonsSuite();
-    // [F5] The public offers' article follows the record suite it extends
+    // The public offers' article follows the record suite it extends
     // (the two pick sites its first half walks are the ones the milestone
     // boons' own article armed), and unlike it the wire half needs a real
     // harbor with live sockets, which is why it opens one of its own
     // rather than joining the group above that needs no table.
     console.log("\nPublic offers");
     await publicOffersSuite(run, { gambitHost, gambitSecond });
-    // [F6] The charters' article joins the group above that needs no
+    // The charters' article joins the group above that needs no
     // harbor, and it is the milestone boons' sibling in the tree as well
     // as in the run: both walk one moment off a state in process, and the
-    // one half that touches the database (the take the leg report files)
+    // one half that touches the database (the take the round report files)
     // opens no harbor of its own. It sits after the public offers because
     // it is the newer article and the ready check stays last.
     console.log("\nThe charters");
     await chartersSuite();
-    // [F7] The power budget's article is the charters' sibling in the
+    // The power budget's article is the charters' sibling in the
     // tree as well as in the run: both hold one derived table against a
     // state in process, and the instrument half reads fixture rows
     // through a pure reduction, so no harbor is opened here either. It
@@ -496,14 +528,14 @@ async function main(): Promise<void> {
     await theDoorsAndTheLoadSuite();
     console.log("\nThe mirror and the charge");
     await theMirrorAndTheChargeSuite();
-    // [W3] The status convention's article joins the pure cluster above:
+    // The status convention's article joins the pure cluster above:
     // the registry is static data and its validator is a pure function,
     // so nothing here needs a harbor. It sits after the correctness
     // articles because it is the newer article and the ready check stays
     // last.
     console.log("\nThe status convention");
     await theStatusConventionSuite();
-    // [W3] The mutes and the keys' article is the convention's sibling:
+    // The mutes and the keys' article is the convention's sibling:
     // it reads the preference functions through a storage stub and walks
     // src for the three key literals, so it opens no harbor either. It
     // sits last of the pure cluster because the ready check stays last
@@ -516,24 +548,22 @@ async function main(): Promise<void> {
     // same reason the two above it do.
     console.log("\nThe way out");
     await theWayOutSuite();
-    // [W5] The first voyage's article is the fourth of the pure cluster:
+    // The first voyage's article is the fourth of the pure cluster:
     // the surfaces a new captain meets before the first market are read as
     // records and source rather than as harbor state, so it opens nothing
     // either and sits with them ahead of the ready check.
     console.log("\nThe first voyage");
     await theFirstVoyageSuite();
-    // [HYG-5] The houses' article is the first of the two coverage
-    // articles the audit's hygiene finding asked for: it signs up one
-    // captain of its own for the account level pledge and reads the two
-    // boards through their routes, so it sits apart from the pure cluster
-    // above, and the ready check stays last.
+    // The houses' article is the first of the two coverage articles: it
+    // signs up one captain of its own for the account level pledge and
+    // reads the two boards through their routes, so it sits apart from the
+    // pure cluster above, and the ready check stays last.
     console.log("\nThe Houses and the Ages");
     await theHousesAndTheAgesSuite(run);
-    // [HYG-5] The crew and the Larder's article is the finding's second
-    // half and the wage article's sibling: one state walked in process
-    // from its first hire to its last dismissal, so it opens no harbor
-    // either, and it sits beside the houses because the two close the one
-    // finding together ahead of the ready check.
+    // The crew and the Larder's article is the wage article's sibling:
+    // one state walked in process from its first hire to its last
+    // dismissal, so it opens no harbor either, and it sits beside the
+    // houses ahead of the ready check.
     console.log("\nThe crew and the Larder");
     await theCrewAndTheLarderSuite();
     // The Bilingual Harbor's article is the language pack's own: the book
@@ -544,8 +574,23 @@ async function main(): Promise<void> {
     // ahead of the ready check.
     console.log("\nThe Bilingual Harbor");
     await theBilingualHarborSuite();
+    // The ledger's own article is the language pack's other half: the
+    // book and its readers are the pack, and this is what the pack is
+    // for, a captain's own record reading in the language they are
+    // holding. It opens no harbor either, and it sits with the pack
+    // because the two are one story: the pack is the book's half and
+    // the ledger is the reader's.
+    console.log("\nThe ledger reads in your language");
+    await theLedgerReadsInYourLanguageSuite();
+    // The purchase stack's article opens no harbor either: it walks the
+    // market catalogue and the card charge in process, because the rule it
+    // holds is arithmetic rather than a screen. It sits last among the
+    // price articles because it is the one that reads the charge and the
+    // hover through the same door.
+    console.log("\nThe price and the promise");
+    await thePriceAndThePromiseSuite();
     // The ready check's article is the one that needs a harbor and a wall
-    // clock rather than a table: its cure is a grace the room has to be
+    // clock rather than a table: its cure is a grace the harbor has to be
     // watched through, so it is the last thing the run does and it opens a
     // harbor of its own to spend that time in.
     console.log("\nThe ready check that stalls");

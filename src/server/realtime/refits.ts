@@ -1,9 +1,9 @@
 // =====================================================================
 // Realtime layer: the Loom's refit board.
 //
-// [D4: Loom: the Refit] The board Loom captains sell repair work from at a
+// The board Loom captains sell repair work from at a
 // port. The machinery that holds it is the consent factory both of this
-// epic's markets are made of (see ./consent), and what is left here is the
+// mode's markets are made of (see ./consent), and what is left here is the
 // binding: the event the bench speaks on and the payload it speaks in.
 //
 // This kind adds nothing to the shared visibility filter, and that absence
@@ -13,7 +13,7 @@
 // this board is the same row for everyone who may see it at all, so it
 // reads the shared filter directly instead of taking a pass over the result.
 //
-// The board is room state because an agreement between two captains is an
+// The board is harbor state because an agreement between two captains is an
 // object no single client can be the authority over, and what a customer's
 // client does with their side of it is the only place their clothes change
 // (see applyRefitSide in @/lib/game/engine/refits).

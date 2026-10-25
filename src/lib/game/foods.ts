@@ -1,51 +1,10 @@
-// =====================================================================
-// PortMasters 2.2 Parallel Release: the three foods and the sea's clock.
-//
-// [C4: three foods, spoilage and the split hold] C1 shipped a Larder that
-// was a plain number, and said so in its own header: "The survival
-// edition eventually carries three of those, with spoilage and a split
-// hold, and all of that is C4's." This module is that promise kept. A
-// ration is still a ration and the number on the screen is still how many
-// are aboard; what is new is that the number now has an account, and the
-// account knows what each meal is and when it came aboard.
-//
-// One account, one count. The count is the game's number: the HUD, the
-// audit's reveal, the shortage rule and the voyage summary all read
-// .larder and none of them changed. The lots are where that number comes
-// from, and they are the only thing spoilage can read, because only a
-// batch knows its own age. The two are written in the same statement by
-// every writer in this module and in ./larder, and the one door a foreign
-// save can come through reconciles them: on load the account wins, since
-// lots are the more specific fact, and the count is set to their sum
-// rather than the other way around. Nothing here ever invents food.
-//
-// Batches rather than a number per food, and the reason is the rot. A
-// count per food with a single stamp would refresh the whole stack every
-// time a captain bought one more meal of it, and rot a captain can dodge
-// by buying a mouthful is not a rule, it is a screen. A lot is what was
-// bought, and it ages from the leg it was bought in.
-//
-// The order is the second decision. The crew eats whatever spoils first,
-// which is why FOODS_DRAW_ORDER runs Produce, Salt Fish, Grain, and the
-// lots are kept sorted into that order rather than sorted at dinner: the
-// head of the list is always the next meal, oldest first within a food,
-// and eating is a walk from the head. A captain who keeps grain and buys
-// produce is eating the produce, which is both the sensible rule and the
-// one that makes the three foods mean something.
-//
-// Grain absorbs. When a count and an account disagree, or when a save
-// arrives with a count and no account, the difference lands on grain:
-// the food that never turns is the one whose age nothing can be wrong
-// about, so it is the one that can take an unknown age without lying
-// about one. This is the same choice ./larder's own reader makes for a
-// save that predates the pantry, and it is made twice because it is made
-// at two doors, the load and the write.
-//
-// Pure: no clock, no socket, no database. The age of a lot is a round
-// number and the leg is the only clock this module has, which is what the
-// plan asks for when it says spoilage "must be part of the deterministic
-// resolve step and may not read a clock".
-// =====================================================================
+// The three foods and the sea's clock. The count in state.larder is the
+// game's number; the lots are where that number comes from and the only
+// thing spoilage can read, since only a batch knows its own age. Every
+// writer keeps the two in step in the same statement. A foreign save comes
+// through normalizeLarderLots, where the lots are the more specific fact
+// and the count follows them; reconcileLarder is the other direction, and
+// it makes the account agree with a count that has moved without it.
 import {
   FOODS,
   FOODS_DRAW_ORDER,
@@ -57,18 +16,14 @@ import {
 import { survivalLayerOn } from "./flags";
 import { holdCapacityOn, storeRoomMeals } from "./hold";
 import { wholeStamp, type GameState, type LarderLot } from "./types";
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 
-// The most lots a voyage can legitimately be carrying. Purchases merge
-// into the lot of the same food bought in the same leg, so a twelve leg
-// voyage with three foods and a preserve or two comes to a few dozen at
-// the very most. A save past this is either damage or a forgery, and it
-// is trimmed at the tail: the head of the list is what is about to spoil
-// and the tail is grain that was going to keep, so a trimmed save loses
-// the food it was never going to eat first.
+// Bound on lots read from a save. Purchases merge into one lot per food
+// per round, so a twelve round voyage comes to a few dozen at most. Past this
+// a save is damage or a forgery, and the tail is trimmed: the head is what
+// is about to spoil, while the tail is grain that was going to keep.
 const LARDER_LOTS_MAX = 64;
 
-/** The meals the account adds up to, which is what the count should be. */
 export function larderMeals(state: Pick<GameState, "larderLots">): number {
   let meals = 0;
   for (const lot of state.larderLots ?? []) meals += lot.meals;
@@ -88,9 +43,8 @@ export function mealsOf(
 }
 
 /**
- * The pantry as a screen wants it: every food aboard, and how many legs
- * are left before the first of its meals turns. Null means grain or an
- * empty row, both of which keep.
+ * The pantry as a screen wants it: every food aboard, and how many rounds
+ * are left before the first of its meals turns. Null keeps.
  */
 export function pantryLines(
   state: Pick<GameState, "larderLots" | "currentRound">,
@@ -108,7 +62,7 @@ export function pantryLines(
   return out;
 }
 
-/** How many legs until the oldest lot of a food turns. Null keeps. */
+/** How many rounds until the oldest lot of a food turns. Null keeps. */
 function legsLeft(
   state: Pick<GameState, "larderLots" | "currentRound">,
   food: FoodId,
@@ -125,13 +79,10 @@ function legsLeft(
 }
 
 /**
- * Puts meals of a food aboard as a lot of the leg they arrived in.
- *
- * A second purchase of the same food in the same leg merges into the lot
- * already there rather than starting a second one with the same age, so
- * the list holds one entry per food per leg however many times a captain
- * presses the button. The insertion keeps the list in draw order, which
- * is the whole of what the order costs: one walk from the head.
+ * Puts meals aboard as a lot stamped with the round they arrived in. A
+ * second purchase of the same food in the same round merges into the
+ * existing lot. The list stays sorted in draw order, so the head is always
+ * the next meal.
  */
 export function addLot(
   state: Pick<GameState, "larderLots" | "currentRound">,
@@ -157,7 +108,6 @@ export function addLot(
   else state.larderLots.splice(at, 0, lot);
 }
 
-/** Whether a lot of the given food and leg belongs before this one. */
 function sortsBefore(
   food: FoodId,
   boughtRound: number,
@@ -170,12 +120,9 @@ function sortsBefore(
 }
 
 /**
- * Takes meals of one food out of its lots, oldest first.
- *
- * Returns what it actually took, which is less than asked for when the
- * food is not aboard in that quantity. Every caller is either eating or
- * converting, and both want to know what really happened rather than what
- * they asked for.
+ * Takes meals of one food from its lots, oldest first. Returns what was
+ * actually taken, which is short when the food is not aboard in that
+ * quantity.
  */
 function drawFood(
   state: Pick<GameState, "larderLots">,
@@ -200,14 +147,10 @@ function drawFood(
 }
 
 /**
- * The crew's meal, drawn in the order the sea takes things back.
- *
- * Returns the meals actually drawn, which the caller in ./larder uses to
- * keep its count in step. It reconciles first rather than trusting the
- * list: a caller that has just written a plain number, a test or a
- * scenario writer, leaves the count ahead of the account, and eating from
- * a pantry that does not match the number the game reads would be a meal
- * nobody ate.
+ * The crew's meal, drawn in FOODS_DRAW_ORDER. Reconciles first: a caller
+ * that wrote a plain count leaves the count ahead of the account, and
+ * eating from a pantry that does not match the game's number would be a
+ * meal nobody ate.
  */
 export function drawMeals(state: GameState, meals: number): number {
   reconcileLarder(state);
@@ -223,21 +166,11 @@ export function drawMeals(state: GameState, meals: number): number {
 }
 
 /**
- * Makes the account agree with the count, whatever happened to either.
- *
- * A count ahead of the account is food nobody bought, and it lands on
- * grain: the pantry is short by meals the game already believes the crew
- * has, and grain is the shape C1's plain number always had. An account
- * ahead of the count is food the game does not believe in, and it is
- * taken off the tail, which is grain first and produce last, for the
- * reason the load trims at the tail: what spoils first is what a captain
- * was going to lose anyway.
- *
- * Called by every writer that reads before it writes: the meal, because
- * it eats from the account, and provisioning, because it measures the
- * room left rather than the count. Preserving writes both numbers in one
- * statement and calls it for the same reason the other two do, so a state
- * that arrived parted cannot leave a conversion parted too.
+ * Makes the account agree with the count. A count ahead of the account is
+ * food nobody bought, and it lands on grain, the shape of the plain count
+ * the Larder began as. Food the game does not believe in is taken off the
+ * tail (grain first, produce last), since what spoils first was going to
+ * be lost anyway. Called by every writer that reads before it writes.
  */
 export function reconcileLarder(state: GameState): void {
   const account = larderMeals(state);
@@ -260,21 +193,13 @@ export function reconcileLarder(state: GameState): void {
 }
 
 /**
- * The settlement tick: what the sea has taken back since the last Dusk.
- *
- * Once a leg, stamped the way the Larder's own meal and C3's wear are
- * stamped and for the same reason: a leg can be settled through more than
- * one path, and spoilage charged twice is a silent defect, the same
- * rations lost for a reason no screen shows.
- *
- * A lot turns on the Dusk of the leg its age reaches its food's own
- * keeping, counted from the leg it was bought in. So produce bought at
- * one market is food for that leg and the two after it and is gone at the
- * second Dusk, which is the plan's "produce spoils in two"; salt fish
- * lasts six, and grain is never asked. The count comes down with the
- * account, in the same statement, so the two cannot part over a loss.
+ * The settlement tick: spoilage since the last Dusk. Stamped by round
+ * because a round can be settled through more than one path, and charging
+ * spoilage twice is silent. A lot turns on the Dusk its age reaches its
+ * food's keeping, counted from the round it was bought in. The count comes
+ * down with the account in the same statement.
  */
-export function tickSpoilage(state: GameState, logs: string[]): void {
+export function tickSpoilage(state: GameState, logs: LedgerLine[]): void {
   if (!survivalLayerOn(state.mode)) return;
   if (state.larderSpoilRound === state.currentRound) return;
   state.larderSpoilRound = state.currentRound;
@@ -298,13 +223,13 @@ export function tickSpoilage(state: GameState, logs: string[]): void {
     if (!meals) continue;
     spoiled += meals;
     logs.push(
-      t(
+      line(
         "{foodIcon} {meals} {rationWord} of {food} turned at sea. {larderAfter} left in the larder.",
         {
           foodIcon: FOODS[food].icon,
           meals,
           rationWord: meals === 1 ? "ration" : "rations",
-          food: t(food),
+          food: line(food),
           larderAfter: Math.max(0, state.larder - spoiled),
         },
       ),
@@ -315,34 +240,19 @@ export function tickSpoilage(state: GameState, logs: string[]): void {
 }
 
 /**
- * Preserve: three meals of produce become two of salt fish.
- *
- * The plan's own ratio and the plan's own verb, of the three meals that
- * were about to turn into two that will keep six legs, at the same slot
- * of the hold and the same price (see PRESERVE_MEALS_IN in ./constants).
- * What a captain pays for it is the third meal, which is the price of a
- * fresh clock and not a toll: preserving is what a hold does with produce
- * it cannot eat in time, and doing it early is a worse trade than eating
- * it, which is exactly the shape a decision should have.
- *
- * "At a port" is the panel's own gate rather than this function's, the
- * same way C3's wardrobe is worn from the harbor's bench and nowhere
- * else, and "Quartermaster only" is the half of this sentence this tree
- * cannot keep yet: there is no Quartermaster aboard. The seat and the
- * paths that compete for it are the next epic's, so the conversion ships
- * open to every captain rather than behind an invented office, and the
- * restriction lands with the seat that carries it.
- *
- * Returns the batches converted, so the caller can report what happened.
+ * Preserve: three meals of produce become two of salt fish, at the same
+ * slot and price (see PRESERVE_MEALS_IN in ./constants). The port gate
+ * lives in the panel; nothing here checks location. Returns the batches
+ * converted.
  */
-export function preserveFood(state: GameState, logs: string[]): number {
+export function preserveFood(state: GameState, logs: LedgerLine[]): number {
   if (!survivalLayerOn(state.mode)) return 0;
   reconcileLarder(state);
   const produce = mealsOf(state, "Produce");
   const batches = Math.floor(produce / PRESERVE_MEALS_IN);
   if (batches <= 0) {
     logs.push(
-      t(
+      line(
         "❌ Not enough Produce aboard to preserve: a batch is {PRESERVE_MEALS_IN} meals.",
         { PRESERVE_MEALS_IN },
       ),
@@ -355,7 +265,7 @@ export function preserveFood(state: GameState, logs: string[]): number {
   addLot(state, "Salt Fish", made, state.currentRound);
   state.larder = Math.max(0, state.larder - (taken - made));
   logs.push(
-    t(
+    line(
       "🐟 Preserved {taken} {rationWord} of Produce into {made} of Salt Fish ({state.larder} in the larder).",
       {
         taken,
@@ -369,19 +279,10 @@ export function preserveFood(state: GameState, logs: string[]): number {
 }
 
 /**
- * How many meals of a food the stores still have room for.
- *
- * The one room read every food goes through, and it answers the two
- * shapes the model has. With the split switched off there is no stores at
- * all and the ceiling is the Larder's own, whatever the food is, which is
- * the room C1 has always had. With it on the room is the stores' slots
- * times the food's density, so three times as many meals of produce fit
- * as of grain, and the capacity read itself is ./hold's rather than this
- * module's: the quarter a hungry crew costs the cargo has one home and
- * this is not it.
- *
- * Floored at zero, so every caller reads one shape: no room is no room,
- * however far over the ceiling the hold happens to be.
+ * Meals of a food the stores still have room for. With the split hold off
+ * the ceiling is LARDER_MAX; with it on, the stores' slots times the
+ * food's density (./hold owns that arithmetic). Floored at zero so every
+ * caller reads one shape.
  */
 export function foodRoomMeals(state: GameState, food: FoodId): number {
   if (!holdCapacityOn(state.mode))
@@ -400,14 +301,9 @@ export function normalizeLarderLots(
       if (!entry || typeof entry !== "object") continue;
       const lot = entry as Partial<LarderLot>;
       const food = lot.food;
-      // The table is asked for the key's own presence rather than through
-      // the in operator, which answers true for every member of
-      // Object.prototype: a damaged save carrying { food: "toString" }
-      // survived an in check, and the reads after it walked
-      // FOODS["toString"].mealsPerSlot, which is undefined, into NaN and
-      // out through the provisioning arithmetic into the captain's purse.
-      // The same own property guard the wardrobe's reader takes (see
-      // garmentSpec in ./garments).
+      // Own property check, not the in operator: `in` is true for every
+      // Object.prototype member, and a save carrying { food: "toString" }
+      // walked undefined values into NaN and out into the captain's purse.
       if (
         typeof food !== "string" ||
         !Object.prototype.hasOwnProperty.call(FOODS, food)
@@ -434,12 +330,8 @@ export function normalizeLarderLots(
 }
 
 /**
- * The spoilage stamp, read back the same way the Larder's own stamp is.
- *
- * A save written before this field existed carries no stamp, and it lands
- * on zero, which is a leg no voyage has: the first Dusk after loading
- * therefore reads the pantry, exactly as it would have had the captain
- * been sailing this build all along.
+ * The spoilage stamp; a missing stamp reads as 0, a round no voyage has, so
+ * the first Dusk after loading reads the pantry.
  */
 export function normalizeLarderSpoilRound(raw: unknown): number {
   return wholeStamp(raw);

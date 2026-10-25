@@ -6,7 +6,7 @@
  * ally travel inside that same delivery, a verdict is written to one
  * captain's own row and printed to the table once, at the reveal. The
  * paths are correct today, and what this script exists for is the day a
- * later slice adds a second one without knowing it was the second.
+ * change adds a second one without knowing it was the second.
  * Nothing else in the toolchain would notice: TypeScript does not know
  * which fields are secret, ESLint does not read payloads, and the smoke
  * suite only sweeps the harbors it happens to sail.
@@ -20,7 +20,7 @@
  *      client's one hook) and in the suite that sweeps it. A third file
  *      is a second path nobody reviewed.
  *   2. One reader of the alignment table. Only the module that deals the
- *      cards may read the rows back, so a slice that wants a card has to
+ *      cards may read the rows back, so anything that wants a card has to
  *      ask that module rather than the database.
  *   3. The verdict is a property in four places: the balance reader,
  *      the operator window, the wire type and the combination instrument.
@@ -29,24 +29,26 @@
  *      text of the emit rather than its meaning, so it catches a payload
  *      that says role or flourish or ally or alignment and passes one
  *      that smuggles the same value under another name.
- *   5. The tutorial's one dangerouslySetInnerHTML site. Its string is
- *      authored copy and the only values in it are constants, so the
- *      rule is that no second such site appears in the tree.
+ *   5. The one door authored copy reaches the browser as HTML. The
+ *      tutorial's pages are written as markup and one sentence wants a
+ *      bold word in the middle of it, so the tree has one component
+ *      that renders markup, and the rule is that no second such site
+ *      appears in the tree.
  *   6. The roster frame, which is the only thing that carries the mute
  *      list, addressed one captain at a time. A mute is the host's
- *      judgement of one captain, so a roster frame sent to a room is that
- *      judgement told to the room. What it cannot catch is the event name
+ *      judgment of one captain, so a roster frame sent to a harbor is that
+ *      judgment told to the harbor. What it cannot catch is the event name
  *      retyped at the emit or reached through a variable holding it, which
  *      is why the name is written out in full where it is sent.
  *   7. The draft frame, which carries a captain's hand, addressed one
  *      captain at a time. It is the sixth rule's shape for the sixth rule's
- *      reason: a hand is dealt to a seat, so a draft view sent to a room
+ *      reason: a hand is dealt to a seat, so a draft view sent to a harbor
  *      lays every seat's cards in front of the table. What it cannot catch
  *      is the same thing the sixth rule cannot catch, the event reached
  *      through a variable rather than written at the emit.
  *   8. The bazaar board, which carries one captain's own view of the rumor
  *      rows: a standing row's direction belongs to its publisher until the
- *      market it moves has been drawn, so a board sent to a room channel
+ *      market it moves has been drawn, so a board sent to a harbor channel
  *      hands the whole table the lean the feature exists to keep. It is
  *      the sixth and seventh rules' shape for their reason, and its
  *      emitters are the union of theirs because two files deliver this
@@ -91,19 +93,16 @@ const ALIGNMENT_TABLE_FILES = ["src/server/realtime/gambit.ts"];
    It is the exception the two rules above name either way: what they guard
    is a second production path, and a test that sweeps the wire for leaks is
    not one. The whole directory is covered because the suite is one suite
-   however many files it is written across, and the one file is named beside
-   it because the split left it in place while the new suite was read
-   against it. */
-const isSmoke = (file: string): boolean =>
-  file === "scripts/smoke.ts" || file.startsWith("scripts/smoke/");
+   however many files it is written across. */
+const isSmoke = (file: string): boolean => file.startsWith("scripts/smoke/");
 
 /* Rule 3. Where the win verdict is a property: the balance reader that
    counts it, the operator window that reads the count, the wire type
    the reveal is shaped by, and the combination instrument, whose whole
    reading is a reduction over rows that carry it (win rate by pair, see
-   src/lib/game/combinations.ts). The fourth was added when the F7
-   instrument landed, and it carries its sentence: the instrument
-   counts verdicts it does not decide, and counting is not travelling. */
+   src/lib/game/combinations.ts). The fourth was added when the
+   combination instrument landed, and it carries its sentence: the instrument
+   counts verdicts it does not decide, and counting is not traveling. */
 const VERDICT_PROPERTY_FILES = [
   "src/lib/game/balance.ts",
   "src/server/telemetry-window.ts",
@@ -137,7 +136,7 @@ const PER_RECIPIENT_EMITTERS = ["emitToUser(", "emitPrivate("];
 
 /* Rule 7. The frame that carries a draft hand, and the emitters that may
    deliver it. It is the sixth rule's shape and for the same reason: a hand
-   of cards belongs to one captain, so a draft view sent to a room channel
+   of cards belongs to one captain, so a draft view sent to a harbor channel
    lays every seat's cards in front of the table, and what leaks is the
    frame losing the captain it was addressed to rather than a payload that
    names something it should not. The four names below are the ones that
@@ -168,6 +167,16 @@ const BAZAAR_FRAME_EMITTERS = [
   "io.to(socket.id).emit(",
   "io.to(sid).emit(",
 ];
+
+/* Rule 5. The one door authored copy reaches the browser as HTML. The
+   component that owns it is named here rather than the screen that used
+   to own it, because the point of the rule is that the tree has one
+   place where markup can enter: a sentence that wants a bold word in it
+   asks the door, and a door that is a component is a door the tree can
+   point at. The strings that come through it are written in this
+   repository and carry nothing a captain typed, so the copy behind them
+   is ours and not theirs. */
+const HTML_DOOR_FILES = ["src/components/portmasters/RichText.tsx"];
 
 /* The scanner's own file. It holds the rule table above and the doc
    comments that describe it, so it names every token and every excluded
@@ -262,7 +271,7 @@ for (const file of files) {
       line: index + 1,
       message:
         `emits a payload whose statement carries ${token.label}. A broadcast carries what every` +
-        " captain in the room may read, so this wants an entry in SECRET_PAYLOAD_SITES" +
+        " captain in the harbor may read, so this wants an entry in SECRET_PAYLOAD_SITES" +
         " and a paragraph in docs/SECURITY_REVIEW.md.",
     });
   });
@@ -271,16 +280,16 @@ for (const file of files) {
 // ========== Rule 5: one HTML injection site ==========
 for (const file of scannedFiles) {
   const relativePath = rel(file);
+  if (HTML_DOOR_FILES.includes(relativePath)) continue;
   lines(file).forEach((text, index) => {
     if (!text.includes("dangerouslySetInnerHTML")) return;
-    if (relativePath === "src/components/portmasters/game/GameModals.tsx")
-      return;
     problems.push({
       file: relativePath,
       line: index + 1,
       message:
-        "renders HTML rather than text. The tutorial's string is authored copy with" +
-        " constants in it; a second site needs that same argument written down.",
+        "renders HTML rather than text. Authored copy reaches the browser as markup" +
+        " through one component (see HTML_DOOR_FILES in this script); a second site" +
+        " needs that same argument written down.",
     });
   });
 }
@@ -303,9 +312,9 @@ for (const file of scannedFiles) {
       file: relativePath,
       line: index + 1,
       message:
-        `delivers ${ROSTER_FRAME_EVENT} to a room. The mute list rides that frame and a mute is the` +
-        " host's judgement of one captain, so it goes out through emitToUser or emitPrivate" +
-        " (see PER_RECIPIENT_EMITTERS in this script) and never to a room channel.",
+        `delivers ${ROSTER_FRAME_EVENT} to a harbor. The mute list rides that frame and a mute is the` +
+        " host's judgment of one captain, so it goes out through emitToUser or emitPrivate" +
+        " (see PER_RECIPIENT_EMITTERS in this script) and never to a harbor channel.",
     });
   });
 }
@@ -329,7 +338,7 @@ for (const file of files) {
       file: relativePath,
       line: index + 1,
       message:
-        `delivers ${DRAFT_FRAME_EVENT} to a room. That frame carries a captain's hand, so it goes` +
+        `delivers ${DRAFT_FRAME_EVENT} to a harbor. That frame carries a captain's hand, so it goes` +
         " out one socket at a time (see DRAFT_FRAME_EMITTERS in this script).",
     });
   });
@@ -355,7 +364,7 @@ for (const file of files) {
       file: relativePath,
       line: index + 1,
       message:
-        `delivers ${BAZAAR_FRAME_EVENT} to a room. That frame is one captain's own board, since a` +
+        `delivers ${BAZAAR_FRAME_EVENT} to a harbor. That frame is one captain's own board, since a` +
         " standing row's direction is stripped for every reader but its publisher," +
         " so it goes out one socket at a time (see BAZAAR_FRAME_EMITTERS in this script).",
     });

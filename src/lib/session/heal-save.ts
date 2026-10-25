@@ -1,18 +1,7 @@
-// =====================================================================
-// Healing a voyage that came back off the server.
-//
-// Whatever the room answered is a blob a client wrote, possibly under an
-// older build, so every field this build reads is given a shape before the
-// first render: a missing array becomes an empty one, a missing tally
-// becomes zero, and a value this tree cannot account for is read as the
-// absence its readers already handle. Nothing here can invent a run a
-// captain did not play.
-//
-// The steps are grouped by the slice that added the fields, and they run in
-// the order the heal has always run in: the mode's reading is taken after
-// the fields it is derived from, and the two authoritative sources, the
-// room and the legacy row, are applied last so that they win.
-// =====================================================================
+// Heals a voyage that came back off the server. The answer was written by a
+// client, possibly under an older build, so every field gets a shape before
+// first render and nothing here invents a run a captain did not play. Mode is
+// resolved before its dependants; the authoritative sources are applied last.
 
 import {
   normalizeInventory,
@@ -32,7 +21,7 @@ import {
   reconcileModulePenalties,
 } from "@/lib/game/engine";
 import { normalizeOrderFills } from "@/lib/game/audit";
-import { cardById, normalizeCardTally } from "@/lib/game/cards";
+import { cardById, cardRunsInMode, normalizeCardTally } from "@/lib/game/cards";
 import type { CardRecord } from "@/lib/game/constants/cards";
 import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import {
@@ -63,114 +52,74 @@ import {
 } from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
 import { normalizePath } from "@/lib/game/paths";
-import { normalizePathSwitchLeg } from "@/lib/game/draft";
+import { normalizePathSwitchRound } from "@/lib/game/draft";
 import { normalizePhase } from "@/lib/game/phases";
 
-// What the room and the account answered at the moment this save was
-// loaded, which is everything the heal cannot read out of the blob itself.
+// What the harbor and the account answered at load time, which the heal
+// cannot read out of the blob itself.
 type LoadedSaveFacts = {
-  // The room's live answer and the hint the lobby carried in, which are
-  // allowed to disagree: the response is the room answering a moment ago,
-  // the hint is what the lobby said before the request.
+  // The harbor's live answer and the lobby's earlier hint, which may differ.
   apiMode?: GameMode;
   roomMode?: GameMode;
   roomDifficulty?: Difficulty;
-  // The captain's Renown as the legacy row just reported it, or null when
-  // that row could not be read. A row that did not arrive is not evidence
-  // of a captain with no Renown, so null leaves the save's own value
-  // standing rather than demoting anyone.
+  // The captain's Renown from the legacy row, or null when that row could
+  // not be read. Null is not evidence of no Renown, so the save's own value
+  // stands instead.
   legacyRenownLevel: number | null;
 };
 
-// Every field of a loaded voyage, healed in place. The steps below are the
-// slices of the game the save accumulates, each one named for the part of
-// the voyage it is about.
+// Every field of a loaded voyage, healed in place.
 export function healLoadedVoyage(
   game: GameState,
   facts: LoadedSaveFacts,
 ): void {
-  healSaveCollections(game);
+  // Resolved once with the harbor's authority: three heals below are mode
+  // shaped (the hull, the held boons and the hold ceiling), and resolving it
+  // once keeps them from disagreeing.
+  const mode = normalizeMode(facts.apiMode ?? facts.roomMode ?? game.mode);
+  healSaveCollections(game, mode);
   healCommissionAndHold(game);
-  healVoyageTallies(game);
+  healVoyageTallies(game, mode);
   healMarksAndLeans(game);
-  // The phase the save was written under, healed the way the mode below is
-  // and for a sharper reason: a legacy token ("3", "barter") or one no
-  // switch this build has would reach the first screen as a phase nothing
-  // advances and the ready check refuses, wedging the table behind one
-  // captain's old save. normalizePhase answers the token's own phase, or
-  // the entry phase where nothing answers, which are the two states every
-  // reader already handles. A live personal screen passes through
-  // untouched: the faces are phases this build speaks, so a save written
-  // mid yard is not moved by the heal.
+  // A legacy phase token or one this build does not know would wedge the
+  // table behind one captain's old save. normalizePhase answers the token's
+  // own phase or the entry phase; a live screen passes through untouched.
   game.phase = normalizePhase(game.phase);
-  // [C1: the Larder and Short Rations] The provisions a save was
-  // carrying, healed the way every other saved field is. A voyage
-  // saved before this layer existed holds no Larder and no stamp, so
-  // it lands on a full hold and a leg no voyage has: an old save
-  // loads provisioned, and the first Dawn after it loads is the
-  // crew's first meal. A damaged number heals the same way rather
-  // than putting a captain on short rations for a leg nobody played.
-  //
-  // The ceiling this one trims to is the mode's, so the mode is
-  // settled first: the save's own stamp where it carries one, and
-  // the room's live answer where it does not. A save written before
-  // the field existed would otherwise be healed in the founding
-  // mode, and the founding mode is the one whose hold has no
-  // ceiling, which would quietly trim a voyage that was sailing
-  // with one (see holdCapacityOn in ./game/hold).
-  const saveMode = normalizeMode(game.mode ?? facts.apiMode ?? facts.roomMode);
-  healProvisions(game, saveMode);
-  // [C2: crew loss by name] The roster's faces, and the voyage's
-  // own tally of hungry legs and of the hands it has lost. Run
-  // here rather than inside normalizeWorkerRoster above, which
-  // gives the roster its shape a few lines earlier: a drawn name
-  // depends on the losses, the draw lives in the crew module, and
-  // the crew module reads the type module, so the type module
-  // could not do this for itself without a cycle. Every reader of
-  // a name sits after both calls.
+  // A save from before the Larder carries no provisions, and lands on a full
+  // hold with a round no voyage has, so the first Dawn after loading is the
+  // crew's first meal. The ceiling trimmed to is the mode's.
+  healProvisions(game, mode);
+  // The roster's faces and the voyage's own tally of losses. Kept out of
+  // normalizeWorkerRoster above because the draw lives in the crew module,
+  // which reads the types module, so the types module cannot call it.
   healCrewIdentity(game);
   healWardrobe(game);
   healPapers(game);
   healConsentBoards(game);
-  // [E1: the Supply Barge] The vendor's per leg tally and the voyage's two
-  // food counters, healed the way every other added field is. A voyage
-  // saved before this feature holds none of the three, so it loads as a
-  // captain who has never bought from the Barge and whose food spending
-  // starts being counted now: the first leg after loading is one the
-  // vendor is full for rather than one the captain reads as already spent.
+  // A voyage from before the Supply Barge loads as a captain who has never
+  // bought from it, so the vendor's first round is full rather than spent.
   normalizeBargeState(game);
   refreshVoyageFacts(game, facts);
-  // Last, and after the facts above rather than with the collections: the
-  // fixed cost falls back to the tier's own maintenance, and the tier is
-  // only settled once the room has answered (see refreshVoyageFacts), and
-  // the two penalties are read back off the hull the load has healed.
+  // After the facts above: the fixed cost falls back to the settled tier's
+  // maintenance, and the penalties are read back off the healed hull.
   healShipLedger(game);
 }
 
-// The collections and the perk set a save may predate entirely: every one
-// of these slots starts empty, so a voyage written before a slice existed
-// loads as a captain who has none of it rather than as one carrying an
-// undefined the first reader would trip over.
-function healSaveCollections(game: GameState): void {
+// The collections and perk set a save may predate entirely.
+function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
   // Ensure required arrays exist (back compat).
   game.purchasedCards = game.purchasedCards ?? [];
   game.completedOrders = game.completedOrders ?? [];
   game.resourceCards = game.resourceCards ?? [];
   game.customerCards = game.customerCards ?? [];
-  // The hull is the one collection of held cards stored as whole records
-  // rather than resolved by id at each read, and the one whose elements
-  // the old bare coalesce never looked at. A save written before the card
-  // record existed carries elements of the old module shape, which has no
-  // strings table: the first yard screen to draw one threw, and the power
-  // budget summed it into NaN. Healed through the pool itself rather than
-  // field by field, because the pool is the shape every other reader
-  // already trusts (see healHull below).
+  // The hull stores whole records, and a save from before the card record
+  // carries the old module shape, which has no strings table. See healHull.
   game.equippedModules = healHull(
     (game as unknown as { equippedModules?: unknown }).equippedModules,
+    mode,
   );
-  // Rebuild the artisan roster defensively: fills in any type this
-  // save predates, and reads a pre charter save that still carried
-  // three separate weavers / masterWeavers / sachetMakers arrays.
+  // Fills in worker types the save predates, and reads pre-charter saves
+  // that still carried separate weavers / masterWeavers / sachetMakers.
   game.workers = normalizeWorkerRoster(
     (game as unknown as { workers?: unknown }).workers,
     game as unknown as {
@@ -179,13 +128,8 @@ function healSaveCollections(game: GameState): void {
       sachetMakers?: GameState["workers"]["sachet_maker"];
     },
   );
-  // The container has always been coalesced here; the elements are argued
-  // one by one for the reason every reader indexes them: the intelligence
-  // banner and the market's guarantee match both read .item and .port off
-  // each entry, and a damaged blob holding one null among them reached a
-  // render and threw. The element contract is the engine's own writers'
-  // (the rumor records in ./engine/orders and ./engine/market), so an
-  // entry failing it is damage rather than a whisper and is dropped.
+  // The banner and the market read .item and .port off each entry, so a null
+  // or partial record is damage and is dropped rather than rendered.
   game.revealedIntel = (game.revealedIntel ?? []).filter((entry) => {
     const w = entry as unknown as Record<string, unknown> | null;
     return (
@@ -195,39 +139,25 @@ function healSaveCollections(game: GameState): void {
       typeof w.port === "string"
     );
   });
-  // The round's demand tags carried the market's share of an older lap
-  // numbering in their name (phase2DemandTags), so a save written before
-  // the rename heals under the name this build reads and the legacy key
-  // is dropped rather than ridden along: one field, one name, in a fresh
-  // save either way.
+  // An old save carries this under its old name; it heals under the current
+  // name and the legacy key is dropped.
   const legacyDemand = (game as unknown as { phase2DemandTags?: string[] })
     .phase2DemandTags;
   game.marketDemandTags = game.marketDemandTags ?? legacyDemand ?? [];
   delete (game as unknown as { phase2DemandTags?: string[] }).phase2DemandTags;
   game.modifierFlags = game.modifierFlags ?? {};
-  // A voyage saved before Great Houses existed carries no perk set
-  // at all, and every wage, market and pirate path now reads one.
-  // Healing it here keeps an old save loadable rather than turning
-  // a missing field into a crash the first time a wage is paid.
-  //
-  // houseId is deliberately left as the save recorded it, not
-  // refreshed from the legacy row above: a pledge made after this
-  // voyage began applies to the next one, never mid voyage.
+  // Wages, markets and pirates read the perk set. houseId is left as
+  // recorded: a pledge applies to the next voyage, never mid voyage.
   game.housePerks = game.housePerks ?? noHousePerks();
   game.houseId = game.houseId ?? null;
   game.priceHistory = game.priceHistory ?? {};
 }
 
-// The hull, healed through the pool the way every other reader of a held
-// card already resolves one. Every element is asked of cardById: an id
-// the pool knows lands as this build's own record, so a save carrying an
-// older copy of a card heals to the current one, and anything the pool
-// cannot answer for (the old module shape's unknown id, a bare string, a
-// null) is damage rather than a card and is dropped rather than drawn.
-// Duplicates are kept one entry per copy, which is the shape the sell
-// and swap flows already read: a captain carrying two of the same module
-// keeps both.
-function healHull(raw: unknown): CardRecord[] {
+// The hull, healed through the pool. Unknown ids, strings and nulls are
+// damage and are dropped; duplicates are kept one entry per copy, which the
+// sell and swap flows read. A module the current mode does not run is
+// dropped, so a Gambit save rejoined in a Classic room loses it.
+function healHull(raw: unknown, mode: GameState["mode"]): CardRecord[] {
   if (!Array.isArray(raw)) return [];
   const hull: CardRecord[] = [];
   for (const item of raw) {
@@ -236,243 +166,128 @@ function healHull(raw: unknown): CardRecord[] {
         ? (item as Record<string, unknown>).id
         : null;
     const card = typeof id === "string" ? cardById(id) : null;
-    if (card !== null && card.kind === "module") hull.push(card);
+    if (card === null || card.kind !== "module") continue;
+    if (!cardRunsInMode(card, mode)) continue;
+    hull.push(card);
   }
   return hull;
 }
 
-// The fleet commission, the manifest audit and the hold: the three records
-// a voyage's own decisions are written into, each with a normalizer of its
-// own behind the missing field.
+// The fleet commission, the manifest audit and the hold.
 function healCommissionAndHold(game: GameState): void {
-  // A voyage saved before the fleet commission existed carries
-  // neither field, and both the panel and the report to the harbor
-  // read them, so an unhealed save would turn a missing key into a
-  // crash on the first render.
+  // The panel and the harbor report both read these fields.
   game.objectiveDelivered = game.objectiveDelivered ?? {};
   game.objectiveTrace = game.objectiveTrace ?? [];
-  // [H6: the Manifest Audit] A save written before the audit existed
-  // carries no manifest, and the engine pushes onto this array
-  // unconditionally, so without the heal the first order a captain
-  // filled after loading an old save would throw. The normalizer
-  // also bounds the list and throws away anything that could not be
-  // a fulfillment, since the record is read back out to a whole
-  // room rather than only by the captain who wrote it.
+  // The engine pushes unconditionally, so an old save without this array
+  // would throw on the first order filled. The normalizer also bounds it.
   game.orderFills = normalizeOrderFills(game.orderFills);
-  // Guarantees a key for every catalogued good and scrubs any value a
-  // pre catalogue save poisoned with NaN (stored as null by JSON), so
-  // a damaged hold heals on load instead of staying broken forever.
+  // Gives every good a key and scrubs NaN from old saves, where JSON stored
+  // it as null.
   game.inventory = normalizeInventory(game.inventory);
 }
 
-// The counters a voyage accumulates as it is played, every one of which the
-// engine reads unconditionally on the next action.
-function healVoyageTallies(game: GameState): void {
+// The counters a voyage accumulates and the engine reads unconditionally.
+function healVoyageTallies(game: GameState, mode: GameState["mode"]): void {
   game.boonChoices = game.boonChoices ?? [];
-  // [F2: the card record, and the mode weighting field] How often each card
-  // was offered and how often one was taken. A voyage saved before this
-  // field existed carries no tally at all, and the read is a normalizer
-  // rather than a coalesce because the field is read back out as a
-  // measurement: a count that is a fraction, a negative or a string is not
-  // a small number, and the report would print it beside real ones. A card
-  // this build does not know is dropped rather than carried, so a stale id
-  // from a retired card cannot print as a nameless row.
+  // A normalizer, not a coalesce: the tally is read as a measurement, and a
+  // stale card id must not print nameless.
   game.cardTally = normalizeCardTally(game.cardTally);
-  // [F4: boons at milestone moments] The three fields a moment writes: the
-  // boons held, the moments waiting to be answered and the mark each
-  // trigger is answered to. All three heal through the pure module's own
-  // readers, and that is the plan's rollback clause read as a load rule
-  // ("any boon that grants a durable effect has to be unwound through the
-  // same normalization path the rest of the state uses"): a held id the
-  // pool no longer answers for (a retired card) and a queued moment this
-  // build does not know are dropped rather than carried, and a mark keeps
-  // only the shapes its trigger's units use. The flags the held boons
-  // write are not rebuilt here, because every flag write rebuilds them
-  // (see endRound in @/lib/game/engine/lifecycle and the merge in
-  // applyBoon), so the list and the flags it rides cannot drift for longer
-  // than a leg's own next write.
-  game.heldBoons = normalizeHeldBoons(game.heldBoons);
+  // Held boons, queued moments and their marks. Retired ids, cards the mode
+  // does not run and unknown moments are dropped. The flags are rebuilt at
+  // the next write (see endRound and applyBoon), so drift cannot last long.
+  game.heldBoons = normalizeHeldBoons(game.heldBoons, mode);
   game.milestoneOffers = normalizeMilestoneOffers(game.milestoneOffers);
   game.milestonesAnswered = normalizeMilestonesAnswered(
     game.milestonesAnswered,
   );
-  // [F6: charters at leg four] The voyage's one charter, healed through
-  // the same pure reader the three fields above use, which is the plan's
-  // rollback read as a load rule ("a charter is a modifier set on the
-  // captain for the voyage, so it reverts with the pool"): an id the
-  // pool no longer answers for, or one that is not a charter, drops to
-  // null rather than being carried, and the flags it wrote are rebuilt
-  // at the next write for the reason the boons' are (see endRound in
-  // @/lib/game/engine/lifecycle).
-  game.charter = normalizeCharter(game.charter);
-  // [F5: public offers] The last boon decision, which a save written
-  // before the ledger existed does not carry. Healed as a bare presence
-  // default rather than through a normalizer, because it is the one field
-  // here no rule reads: the claim hook only sends it out, and a record
-  // already in a save is a fact that happened (the pick was made) rather
-  // than a value a rule could be hurt by, so there is nothing to scrub.
-  // An old save that heals to null simply reports nothing until the next
-  // pick, which is the same screen a fresh voyage shows.
+  // A charter reverts with the pool: an id the pool cannot answer or one
+  // that is not a charter becomes null, and its flags rebuild next write.
+  game.charter = normalizeCharter(game.charter, mode);
+  // The last boon decision, carried as presence only: it records a pick, not
+  // a value any rule reads, so there is nothing to scrub.
   game.boonRecord = game.boonRecord ?? null;
-  // The gates below are coalesced rather than read strictly, and the
-  // direction is deliberate: each records that a beat already ran (a swap
-  // taken, an escort sailed, the raid answered), so a damaged value that
-  // still reads truthy keeps the gate closed. Reopening one would let a
-  // reload replay a beat the room already settled, while a spurious closed
-  // gate only costs an option the next leg returns anyway. The verdicts
-  // read the opposite way on purpose (see healMarksAndLeans).
+  // These gates record that a beat ran, so a truthy damaged value keeps the
+  // gate closed. Reopening one would replay a settled beat; a wrongly closed
+  // gate only costs an option the next round returns.
   game.boonSwapUsed = game.boonSwapUsed ?? false;
   game.moduleSwapUsed = game.moduleSwapUsed ?? false;
   game.pirateAttackResolved = game.pirateAttackResolved ?? false;
   game.escortHired = game.escortHired ?? false;
   game.brokerTippedPirates = game.brokerTippedPirates ?? false;
-  // The voyage's two loan lists, healed through the pure reader beside the
-  // shape they hold rather than coalesced, for the reason the audit gave
-  // every other saved list in this file: the end of the last round walks
-  // them with arithmetic (see settleOutstandingDebts), so an entry a save
-  // damaged would carry NaN into the purse rather than merely look wrong.
+  // Both lists are walked with arithmetic at the last round's end, so a
+  // damaged entry would carry NaN into the purse.
   game.debts = normalizeLoans(game.debts);
   game.loansGiven = normalizeLoans(game.loansGiven);
-  // The largest single trade, a running maximum the engine folds with
-  // Math.max, which reads a missing key as NaN and would then hold NaN for
-  // the rest of the voyage. Healed with a strict number check, so a save
-  // written before the field existed reads as a voyage with no trade
-  // recorded rather than poisoning every later settle.
+  // A running maximum folded with Math.max, which would hold NaN for the
+  // rest of the voyage if the key were missing.
   game.largestTrade =
     typeof game.largestTrade === "number" && Number.isFinite(game.largestTrade)
       ? game.largestTrade
       : 0;
 }
 
-// The marks a failed voyage leaves and the leans a failed or a bribed
-// harbor puts on the market. The marks read strictly rather than
-// coalescing, because a damaged value would otherwise be read as a
-// verdict; the leans go through the normalizers their own readers use,
-// because a damaged lean would price a market rather than merely look
-// wrong.
+// The marks a failed voyage leaves and the leans on the market. Marks read
+// strictly so damage cannot read as a verdict; leans go through their
+// readers because a damaged lean would price a market.
 function healMarksAndLeans(game: GameState): void {
-  // [H7: Maroon and the Harbormaster] The two marks a failed seat
-  // carries, read strictly rather than coalesced: they are booleans
-  // a save can only have written itself, and a damaged one would
-  // read as a truthy string into the verdict and the Harbormaster's
-  // power. Anything that is not exactly true is not a failure.
+  // Anything not exactly true is not a failure, so a truthy string cannot
+  // reach the verdict or the Harbormaster's power.
   game.bankrupt = game.bankrupt === true;
   game.marooned = game.marooned === true;
-  // The loan a captain walked away from, read strictly for the same
-  // reason and healed here rather than among the debts it was written
-  // with: the endgame reads it first when the closing rank is dealt
-  // (see endGame), so a damaged value would decide a captain's own
-  // ranking rather than merely looking wrong. Anything that is not
-  // exactly true is not a default.
+  // The endgame reads this when the closing rank is dealt, so damage would
+  // decide a captain's ranking. Not exactly true is not a default.
   game.defaultedDebt = game.defaultedDebt === true;
-  // The port a Harbormaster leaned, read through the same normalizer
-  // the server's own call validates against, so a save cannot hand
-  // the pricing function a port that is not a port or a direction
-  // that is not a direction.
+  // The same normalizer the server validates against, so pricing never sees
+  // a port or direction that does not exist.
   game.portShift = normalizePortShift(game.portShift);
-  // [D5: Aroma: the Bazaar Rumor] The lean the market reads, healed
-  // the way the shift above is and for the same reason: the bazaar's
-  // lean is a client's blob like everything else in a save, and it is
-  // read by a pricing function rather than by a screen, so a damaged
-  // one would not look wrong, it would price a market. A save written
-  // before this feature carries no field at all and heals to no lean,
-  // which is the market every voyage priced before the bazaar existed.
+  // Read by a pricing function, so a damaged lean would price a market. An
+  // old save heals to no lean, the market before the bazaar existed.
   game.bazaarLean = normalizeRumorLean(game.bazaarLean);
-  // [B3: standing orders] A voyage saved before the record existed
-  // carries no set at all, and the engine reads it unconditionally
-  // the moment the room's clock plays a seat, so an unhealed save
-  // would hand the evaluation undefined the first time its captain
-  // walked away from the table. The normalizer answers with the
-  // default set, which is the shape an old save was already sailing:
-  // the switch on and every seat left at the engine's own default.
+  // Read unconditionally when a seat is played, so an old save would hand
+  // the evaluation undefined. The normalizer answers the default set.
   game.standingOrders = normalizeStandingOrders(game.standingOrders);
 }
 
-// The Larder, its lots and the leg it last spoiled in.
 function healProvisions(game: GameState, saveMode: GameMode): void {
   game.larder = normalizeLarder(game.larder, saveMode);
   game.larderFedRound = normalizeLarderFedRound(game.larderFedRound);
-  // [C4: three foods, spoilage and the split hold] What the rations
-  // are, and the leg they last spoiled in. Aimed at the two shapes
-  // the reads above are: a voyage saved before the pantry existed
-  // lands on the one lot C1's plain number always was, a hold of
-  // grain, and a lot this tree cannot account for is dropped rather
-  // than eaten.
-  //
-  // The count is then set to what the account adds up to, and that
-  // direction is the whole of the invariant (see ./foods): the lots
-  // are the more specific fact, so a save whose number and account
-  // disagree is read as the account, and a save with no account at
-  // all is read as the number. Nothing here can invent food, which
-  // is what keeps a doctored file from feeding a crew for free.
+  // A save from before the pantry lands on the one lot the old number was,
+  // and an unknown lot is dropped rather than eaten. The lots are the more
+  // specific fact, so the count follows the account; with no account, the
+  // number stands. Nothing here can invent food.
   game.larderLots = normalizeLarderLots(game.larderLots, game.larder);
   game.larder = larderMeals(game);
   game.larderSpoilRound = normalizeLarderSpoilRound(game.larderSpoilRound);
 }
 
-// The clothes a save was wearing, and the leg the settlement last read them
-// in.
 function healWardrobe(game: GameState): void {
-  // [C3: garments and the cold] The clothes a save was wearing, and
-  // the leg the settlement last read them in. Aimed at the same two
-  // shapes the heal above is: a voyage saved before the layer
-  // existed lands on an empty wardrobe, which is a crew with nothing
-  // on, and a garment a save cannot account for is dropped rather
-  // than worn. A damaged stamp lands on a leg no voyage has, so the
-  // first settlement after loading reads the wardrobe rather than
-  // treating the leg as one it already settled.
+  // An old save lands on an empty wardrobe and an unknown garment is dropped
+  // rather than worn. A damaged stamp lands on a round no voyage has.
   game.garments = normalizeGarments(game.garments);
   game.garmentsTickRound = normalizeGarmentsTickRound(game.garmentsTickRound);
 }
 
-// The path this captain sailed and the leg they last changed their papers
-// on.
 function healPapers(game: GameState): void {
-  // [D2: the nine slot order board] The path this captain sailed.
-  // Every save this build writes carries a path it was dealt by the
-  // draft or changed at a port (see D7 below), and every save from
-  // before the draft carries null, so the heal exists for the two
-  // shapes that can carry anything else: a file written by hand, and
-  // a save whose path names something this build retired. Both land
-  // on a captain who never drew, which is the ordinary table rather
-  // than a locked one, and the membership test behind this call is
-  // the one that keeps "constructor" from reading as a path.
+  // A hand written file or a retired path lands on a captain who never drew,
+  // the ordinary table. The membership test also rejects "constructor".
   game.path = normalizePath(game.path);
-  // [D7: the draft, and switching] And the leg this captain last
-  // changed their papers on, read through the module's own reader
-  // for the reason every counter this build added is: it is a stamp
-  // rather than a boolean, and a save carrying nonsense where the
-  // stamp belongs has to read as a captain who has not switched
-  // rather than as one who has. The other direction would cost an
-  // innocent captain the one switch their voyage allows, and it is
-  // the same reading normalizeOpportunistBorrows takes below.
-  game.pathSwitchLeg = normalizePathSwitchLeg(game.pathSwitchLeg);
+  // Nonsense where the stamp belongs must read as "not switched": the other
+  // direction costs an innocent captain their one switch for the voyage. A
+  // save from before the round vocabulary carries the stamp under the older
+  // key, so both spellings are read.
+  const legacy = game as unknown as { pathSwitchLeg?: unknown };
+  game.pathSwitchRound = normalizePathSwitchRound(
+    game.pathSwitchRound ?? legacy.pathSwitchLeg,
+  );
 }
 
-// The two markets' tallies and the ledger they both settle through.
 function healConsentBoards(game: GameState): void {
-  // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] The two
-  // markets' tallies and the ledger they both settle through.
+  // Counts are floored like every other tally: undefined becomes NaN, and a
+  // NaN score reads as forged to the Ledger Integrity Pass.
   //
-  // Three heals, and the third is the one that matters most. The
-  // counts are floored the way every other added tally is, so a save
-  // that predates a market reads as a captain who has never sold
-  // cover, absorbed a raid or put a garment right, rather than as
-  // one carrying an undefined that the first settlement would turn
-  // into NaN. A NaN in a score is not merely wrong: the Ledger
-  // Integrity Pass reads an impossible score as a forged one and
-  // would cost an innocent captain their Renown.
-  //
-  // The ledger is the guard on the other side of the same problem.
-  // It is what keeps a reload between an agreement and the Gold
-  // that follows it from moving that Gold twice, so a save carrying
-  // the name the previous build wrote has to have it read rather
-  // than dropped: losing it to a rename would be losing the
-  // protection, which is why the reader takes the old field (see
-  // normalizeConsentLedger). The two names are read off the save as
-  // it was written, which is what the cast is: everything above this
-  // line is this build's GameState and this is the one field whose
-  // old spelling still has to be understood.
+  // The ledger stops a reload between an agreement and its Gold from moving
+  // the Gold twice, so the previous build's field name has to be read rather
+  // than dropped. The cast is that old spelling.
   normalizeConsentLedger(
     game,
     game as unknown as {
@@ -482,48 +297,27 @@ function healConsentBoards(game: GameState): void {
   );
   normalizeEscortState(game);
   normalizeRefitState(game);
-  // [F3: modules in the shipyard ladder, and trading them between
-  // captains] The trade's own tally and its per module ledger. Same
-  // heal as the two kinds above and for the same reason on the
-  // counters; the per module record is the one a stale save cannot
-  // carry at all, so its reader answers an empty ledger rather than
-  // undefined and the first sale writes the first entry (see
-  // normalizeModuleTradeState).
+  // The trade's tally and per module ledger; a stale save carries neither,
+  // so its reader answers empty and the first sale writes the first entry.
   normalizeModuleTradeState(game);
 }
 
-// The hull's own ledger: the numbers the shipyard, the settlement and the
-// wage bill read as arithmetic rather than as views.
-//
-// Each of them is written once at creation (createInitialGameState) and
-// read subtractively forever after, so a damaged value here does not look
-// wrong, it prices wrong: the yard's upgrade row adds the penalty to the
-// ladder and lets an upgrade run state.money minus NaN, and the
-// maintenance bill carries a NaN into the purse every Resolve. The two
-// penalties are read back off the hull itself rather than floored,
-// because one shipped build wrote both directions of the mismatch (see
-// reconcileModulePenalties in the engine). The difficulty is read from
-// the settled field, which is why this heal runs after refreshVoyageFacts
-// rather than beside the collections.
+// The hull's own ledger. Each number is written at creation and read
+// subtractively after, so damage here does not look wrong, it prices wrong:
+// the upgrade row runs money minus NaN and maintenance carries NaN into the
+// purse. Penalties are recomputed from the hull because one shipped build
+// wrote both directions. Runs after refreshVoyageFacts for the tier.
 function healShipLedger(game: GameState): void {
   if (!Number.isFinite(game.fixedCost)) {
     game.fixedCost = difficultyConfig(game.difficulty).maintenance;
   }
-  // The ladder is healed index by index against the canonical one: a
-  // missing entry or one that is not a number lands on this build's fee for
-  // that step, and entries past the top a damaged file grew are dropped
-  // rather than read, since the yard never asks for them.
+  // Healed against the canonical ladder; entries past the top are dropped.
   game.shipUpgradeCost = SHIP_UPGRADE_LADDER.map((fee, i) => {
     const held = game.shipUpgradeCost?.[i];
     return typeof held === "number" && Number.isFinite(held) ? held : fee;
   });
-  // The level is the count of upgrades the hull took, an integer on a
-  // ladder with exactly MAX_SHIP_LEVEL steps, and every reader treats it
-  // as one: moduleSlotsOpen subtracts the equipped list from it and the
-  // freight discount multiplies by it. A damaged value that stayed in
-  // place would quote slots and discounts for levels the game cannot
-  // sell, so anything off the ladder is read as the level whose effects
-  // are the absence of all of them.
+  // The count of upgrades taken, on a ladder of MAX_SHIP_LEVEL steps. Any
+  // value off the ladder reads as no upgrades at all.
   const level = game.shipLevel;
   game.shipLevel = Number.isFinite(level)
     ? Math.min(MAX_SHIP_LEVEL, Math.max(0, Math.trunc(level)))
@@ -531,58 +325,34 @@ function healShipLedger(game: GameState): void {
   reconcileModulePenalties(game);
 }
 
-// The answers that come from outside the save, applied last so that they
-// win: the captain's Renown, their per voyage tallies, and the room's own
-// tier and lap.
+// The facts from outside the save, applied last so that they win.
 function refreshVoyageFacts(game: GameState, facts: LoadedSaveFacts): void {
-  // Refresh Renown from the freshly loaded legacy so a captain who
-  // leveled up since this voyage was saved gets the current unlock
-  // state; fall back to the saved value (then 1) if legacy is missing.
+  // A captain who leveled up since this voyage was saved gets the current
+  // unlocks; the saved value, then 1, covers a missing legacy row.
   game.renownLevel = facts.legacyRenownLevel ?? game.renownLevel ?? 1;
   game.brokersFavorUsed = game.brokersFavorUsed ?? false;
-  // [D6: Free Captain: Opportunist] A save written before the borrow
-  // existed carries no counter at all, and an undefined counter is
-  // NaN the first time one is spent, which would then ride the
-  // voyage's figures into the record. The healing is the module's own
-  // reader, so a save carrying a fraction or a negative is read here
-  // the way the board and the engine read it rather than trusted
-  // because it came off a disk.
+  // An undefined borrow counter is NaN the first time one is spent. The
+  // module's own reader also rejects fractions and negatives.
   game.opportunistBorrows = normalizeOpportunistBorrows(
     game.opportunistBorrows,
   );
-  // A save written before helping other captains had a per voyage
-  // ceiling has no tally at all, and the ceiling is arithmetic:
-  // cap minus undefined is NaN, which would then be added straight
-  // into score the first time that captain lent anyone Gold. A NaN
-  // score is not merely wrong, it reads as impossible to the Ledger
-  // Integrity Pass and would cost an innocent captain their Renown.
+  // Cumulative tallies read on the closing sheet. Undefined would become NaN
+  // on the first write, which reads as forged to the Ledger Integrity Pass.
   game.helperReputationEarned = game.helperReputationEarned ?? 0;
-  // The same arithmetic and the same heal for the peer ledger a
-  // Broker's card is measured on: a save written before it existed
-  // carries no tally at all, and the first trade added to undefined
-  // is NaN, which the Ledger Integrity Pass reads as impossible.
   game.peerTradeProfit = game.peerTradeProfit ?? 0;
-  // And once more for the boon Gold tally the Financial Summary prints:
-  // a save written before it existed carries no tally, and the first
-  // grant added to undefined would put a NaN on the voyage's closing
-  // sheet for a loan the captain actually took.
   game.boonGoldEarned = game.boonGoldEarned ?? 0;
-  // Old saves predate per voyage seeding; default their epoch to 0.
-  // Their already generated cards restore from the blob untouched, so
-  // only a future round would reseed, which is fine.
+  game.wagesPaid = game.wagesPaid ?? 0;
+  game.maintenancePaid = game.maintenancePaid ?? 0;
+  game.finesPaid = game.finesPaid ?? 0;
+  // Old saves predate per voyage seeding. Their generated cards restore from
+  // the blob untouched, so only a future round would reseed.
   game.voyageEpoch = game.voyageEpoch ?? 0;
-  // Refresh difficulty from the room (the authoritative source), the
-  // same reason renownLevel is refreshed above; default an old save
-  // that predates difficulty to whatever tier the room is on.
+  // The harbor is authoritative for the tier.
   game.difficulty = normalizeDifficulty(
     facts.roomDifficulty ?? game.difficulty,
   );
-  // Refresh mode from the room for the same reason, and with more at
-  // stake: mode decides which order this captain's phases run in. A
-  // save that predates modes carries no mode at all, and one restored
-  // under a lap the room is not keeping would run the right phases in
-  // the wrong order and quietly desynchronize from everyone else. The
-  // room is authoritative, so it wins; the caller's hint covers a
-  // response that does not carry the field.
+  // Mode decides the phase order. A save restored under a mode the harbor is
+  // not keeping would run the right phases in the wrong order and silently
+  // desynchronize, so the harbor wins; the hint covers a response without it.
   game.mode = normalizeMode(facts.apiMode ?? facts.roomMode ?? game.mode);
 }

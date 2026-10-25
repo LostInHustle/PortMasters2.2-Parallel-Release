@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
 import {
   leavePhase,
-  moduleDraftPossible,
   moduleSlotsOpen,
   startModuleDrafting,
   upgradeShip,
@@ -49,13 +48,11 @@ export function Shipyard({
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
     : 0;
   const affordable = game.money >= upgCost;
-  // [F7: the power budget] The draft's door reads the roll's own
-  // predicate, so a hull the cap has shut is told before the click rather
-  // than dealt an empty table: the button disables and the line below it
-  // says which of the two reasons it is, the same way every other
-  // disabled control on this panel is explained beside itself.
-  const draftDealable = moduleDraftPossible(game);
-  const canDraft = game.shipLevel > 0 && draftDealable;
+  // The door opens for any hull that has a slot to rig. Whether a module
+  // fits the hull's power is judged on the draft screen, after the captain
+  // can see the batch and weigh a card against the hull as it stands, not
+  // here at the door before they have had the chance to change anything.
+  const canDraft = game.shipLevel > 0;
   // The level guard rides along because a hull below its first upgrade has
   // no slots to fill rather than full ones, and the label below says
   // "Slots Full" only about a hull that has some. The open count itself is
@@ -78,28 +75,28 @@ export function Shipyard({
           )}
         </div>
         <div className="text-sm text-dusk mt-1.5">
-          {t("🔌 Module Slots: {n} / {m}", {
+          {t("🔌 Module Slots: {n}/{m}", {
             n: game.equippedModules.length,
             m: game.shipLevel,
           })}
         </div>
-        {/* [F7: the power budget] The hull's weight on one line, beside
+        {/* The hull's weight on one line, beside
             the slots it fills: the number every gate in the cap speaks
             in, read where the hull's composition is already the subject,
             so a refused pick at the table has something to point at. */}
         <div className="text-sm text-dusk mt-1.5">
-          {t("⚡ Hull Power: {n} / {m}", {
+          {t("⚡ Hull Power: {n}/{m}", {
             n: heldPower(game),
             m: HELD_POWER_CAP,
           })}
         </div>
         {game.equippedModules.length === 0 && (
           <PanelNote className="mt-2 text-xs">
-            {t("No modules installed. Upgrade ship to unlock slots!")}
+            {t("No modules installed. Upgrade the hull to unlock slots!")}
           </PanelNote>
         )}
       </div>
-      {/* The fit folds (W4): the gist names what is aboard and what it
+      {/* The fit folds: the gist names what is aboard and what it
           weighs, and the full descriptions and the synergy analyzer wait
           behind the one chevron, the same fold the market's readings wear
           (see FoldRow). Printing every module's description inline under
@@ -128,7 +125,8 @@ export function Shipyard({
                   <strong>
                     <Term term={text.name}>{text.name}</Term>
                   </strong>
-                  : {text.desc}
+                  {t(": ")}
+                  {text.desc}
                 </div>
               );
             })}
@@ -150,10 +148,10 @@ export function Shipyard({
         />
       ) : (
         <div className="flex flex-col gap-2">
-          {/* [B2: hard timers, the server as timekeeper] The clock on the
+          {/* The clock on the
               screen a captain has not acted on, drawn from the same
               published pair the waiting bar above draws. Dusk is a seat of
-              the leg like the others, so a captain deciding what to build
+              the round like the others, so a captain deciding what to build
               is owed the same countdown as one deciding what to buy. */}
           <PhaseClockBar phaseSync={phaseSync} members={members} />
           {canUpgrade && (
@@ -165,7 +163,7 @@ export function Shipyard({
               onClick={() => act((g, l) => upgradeShip(g, l))}
             >
               {t(
-                "⚓ Upgrade Ship (Lvl {nextShipLevel}), Cost {upgCost} Gold | +1 Slot, +{SHIP_DISCOUNT_PER_LEVEL} Discount",
+                "⚓ Hull Upgrade (Lvl {nextShipLevel}), Cost {upgCost} Gold | +1 Slot, +{SHIP_DISCOUNT_PER_LEVEL} Discount",
                 {
                   nextShipLevel: game.shipLevel + 1,
                   upgCost,
@@ -189,14 +187,6 @@ export function Shipyard({
               ? t("🔄 Draft & Swap Module (Slots Full)")
               : t("🔧 Draft & Install Module")}
           </Button>
-          {game.shipLevel > 0 && !draftDealable && (
-            <PanelNote className="text-center text-[11px]">
-              {t(
-                "Every module the yard could deal would pass this hull's {HELD_POWER_CAP} power. Selling one at the Parley table makes room.",
-                { HELD_POWER_CAP },
-              )}
-            </PanelNote>
-          )}
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"

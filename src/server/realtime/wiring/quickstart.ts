@@ -35,8 +35,8 @@ export function wireQuickStart(io: Server, socket: Socket): void {
       return;
     }
     // The tier travels with the request so the captain who ends up
-    // opening the room opens it in the tier they picked. Anyone seated
-    // into a room that already exists sails at that room's tier.
+    // opening the harbor opens it in the tier they picked. Anyone seated
+    // into a harbor that already exists sails at that harbor's tier.
     joinQueue(s.userId, payload?.difficulty);
     try {
       await matchQueuedCaptains(io);

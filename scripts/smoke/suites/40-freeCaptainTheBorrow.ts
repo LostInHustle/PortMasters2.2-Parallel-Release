@@ -1,6 +1,5 @@
 // PortMasters 2.2 Parallel Release, smoke run: Free Captain: the borrow.
 
-import { cargoCarriesTag } from "@/lib/game/cards";
 import {
   OPPORTUNIST_PENALTY,
   OPPORTUNIST_USES,
@@ -9,6 +8,7 @@ import {
 import {
   OPPORTUNIST_PATH,
   calcTransportCost,
+  cargoUnitsWithTag,
   canFillOrder,
   completeOrder,
   lockedBehind,
@@ -28,52 +28,54 @@ import {
 import { PATH_IDS, pathLockLine } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import {
-  GAMBIT,
   carriesADash,
   check,
+  GAMBIT,
+  ledgerSentences,
   suffix,
   voyageState,
   withEnv,
 } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function freeCaptainTheBorrowSuite(): Promise<void> {
   // =====================================================================
-  // [D6: Free Captain: Opportunist] The plan's clause for this feature,
-  // and the whole of it: "Once per voyage, fulfill any one pathbound
+  // The clause for this feature, and the whole of it: "Once per voyage,
+  // fulfill any one pathbound
   // order without joining that path, at a forty percent payout penalty."
   //
   // The checks are split the way the feature is. The allowance is
   // arithmetic and is read here without a server, because nothing in this
   // feature travels: the borrow is a permission the captain's own client
   // holds, the fill is the fill the manifest already ran, and the one
-  // wire fact it adds is the counter the leg report files, which is read
-  // where every leg report is read (see the telemetry spine). The board
+  // wire fact it adds is the counter the round report files, which is read
+  // where every round report is read (see the telemetry spine). The board
   // a captain meets is dealt through the engine's own lifecycle rather
   // than assembled by hand, the same way the pathbound board is dealt,
   // so what is read here is the board a Free Captain really meets in
   // the Orders phase.
   // =====================================================================
-  // ---- the allowance ----
-  // The two numbers the plan sets, and the payout they make. The penalty
+  // ========== the allowance ==========
+  // The two numbers the rule sets, and the payout they make. The penalty
   // is read off the constant rather than typed here, and the empty flag
-  // set is the captain before any charter: [F6] retunes the pair through
-  // the Factor, and the retune is read in its own checks below rather
-  // than folded into this one, so the base reading stays the base one.
+  // set is the captain before any charter: the charter retunes the pair
+  // through the Factor, and the retune is read in its own checks below
+  // rather than folded into this one, so the base reading stays the base one.
   check(
     OPPORTUNIST_USES === 1 &&
       OPPORTUNIST_PENALTY === 0.4 &&
       opportunistPayout({ modifierFlags: {} }, 100) === 60 &&
       opportunistPayout({ modifierFlags: {} }, 100) ===
         100 - Math.round(100 * OPPORTUNIST_PENALTY),
-    "a hundred Gold order pays sixty on the borrow, which is the plan's forty percent penalty read off the constant rather than typed into the rule",
+    "a hundred Gold order pays sixty on the borrow, which is the design's forty percent penalty read off the constant rather than typed into the rule",
   );
   // The property, over every face value a card can carry rather than over
   // one example: the payout never exceeds the face value, never goes
   // below zero, and never falls as the order grows. The first of those is
   // the one the smallest orders decide, because a deduction that floored
   // instead of rounding would leave a two Gold order paying two and the
-  // penalty would stop being real exactly where the plan says the reach
-  // has to cost something.
+  // penalty would stop being real exactly where the reach has to cost
+  // something.
   const bareBorrow = { modifierFlags: {} };
   check(
     Array.from({ length: 200 }, (_, i) => i + 1).every(
@@ -145,11 +147,10 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       }) === 0 &&
       opportunistBorrowsTaken({ opportunistBorrows: 2.7 }) === 2 &&
       opportunistBorrowsTaken({ opportunistBorrows: -4 }) === 0,
-    "the allowance is a count rather than a flag, bounded by the constant F6 retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
+    "the allowance is a count rather than a flag, bounded by the constant the charter retunes, and a counter that claims more spent than this build allows reads as none left rather than as a debt handed back to the captain",
   );
-  // ---- the Factor, and the borrow's second door ----
-  // [F6: charters at leg four] The charter whose text sells the borrow
-  // itself to whoever holds it: three open doors where the path has one,
+  // ========== the Factor, and the borrow's second door ==========
+  // The charter whose text sells the borrow itself to whoever holds it: three open doors where the path has one,
   // sixty percent where the path pays forty, and a holder who never held
   // the path. The numbers read here are the card's own shipped pair, the
   // same reading the first check takes of the base two, and every reader
@@ -220,9 +221,9 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       normalizeOpportunistBorrows(-1) === 0,
     "and a save written before the borrow existed reads as a captain who never borrowed anything, rather than as a counter that would turn the first spend into a NaN the record would carry",
   );
-  // ---- where the counter lives ----
-  // The plan's own clause: "The counter resets with the voyage, not with
-  // the round, and it lives in the same place as the other once per
+  // ========== where the counter lives ==========
+  // The clause: "The counter resets with the voyage, not with the round,
+  // and it lives in the same place as the other once per
   // voyage limits." Both halves are observed rather than asserted: the
   // rest of the round is walked through the engine's own lap until the
   // books roll over, and the counter is still spent afterwards; then the
@@ -245,7 +246,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
   }
   check(
     borrowCarried.currentRound === 2 && borrowCarried.opportunistBorrows === 1,
-    "a round walked through the engine's own lap leaves the borrow spent, which is what makes it a voyage's allowance rather than a leg's",
+    "a round walked through the engine's own lap leaves the borrow spent, which is what makes it a voyage's allowance rather than a round's",
   );
   restartGame(borrowCarried, [], {});
   check(
@@ -253,7 +254,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     "and setting sail again hands the allowance back with everything else the voyage holds, because the counter is part of the voyage's own state rather than of the account behind it",
   );
 
-  // ---- the board, and the fill ----
+  // ========== the board, and the fill ==========
   // The board a Free Captain meets, dealt through the engine's own
   // lifecycle: the tier's draw plus the paths' three, and every one of
   // the three is locked to a captain who holds none of those paths.
@@ -312,10 +313,10 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     const freight = calcTransportCost(
       filled,
       card.totalItems,
-      cargoCarriesTag(card.resources, "woven"),
+      cargoUnitsWithTag(card.resources, "woven"),
     );
     const paid = opportunistPayout(filled, card.reward);
-    const lines: string[] = [];
+    const lines: LedgerLine[] = [];
     completeOrder(filled, card.id, lines, true);
     check(
       filled.money === 500 + paid - freight &&
@@ -325,9 +326,10 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       "a borrowed order fills through the same settlement as any other, pays the reduced reward down to the coin, spends the allowance, and leaves the captain holding the path they already held: the order is filled without joining its own",
     );
     check(
-      lines.includes(opportunistLine(filled, card.reward, paid)) &&
-        paid < card.reward,
-      "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the plan says has to cost something real",
+      ledgerSentences(lines).includes(
+        opportunistLine(filled, card.reward, paid),
+      ) && paid < card.reward,
+      "and the ledger says what the card promised it would: the board's own sentence for the borrow, with both numbers, and a payout strictly below the face value, which is the reach the design says has to cost something real",
     );
 
     // The second locked card, with the allowance spent: refused through
@@ -337,14 +339,14 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     const spareLock = lockedBehind(filled, spare)!;
     stockFor(filled, spare);
     const moneyBefore = filled.money;
-    const refused: string[] = [];
+    const refused: LedgerLine[] = [];
     completeOrder(filled, spare.id, refused, true);
     check(
       filled.money === moneyBefore &&
         !filled.completedOrders.includes(spare.id) &&
         filled.opportunistBorrows === 1 &&
-        refused.includes(`❌ ${pathLockLine(spareLock)}`),
-      "a second borrow in the same voyage is refused and the order stays standing, with the lock line every other captain reads rather than a sentence written for this path: one action with one counter, which is the plan's own rollback shape",
+        ledgerSentences(refused).includes(`❌ ${pathLockLine(spareLock)}`),
+      "a second borrow in the same voyage is refused and the order stays standing, with the lock line every other captain reads rather than a sentence written for this path: one action with one counter, which is the design's own rollback shape",
     );
 
     // The flag on a card that was never locked: asked for, and read as
@@ -368,21 +370,23 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
     const ordinaryFreight = calcTransportCost(
       ordinary,
       openCard.totalItems,
-      cargoCarriesTag(openCard.resources, "woven"),
+      cargoUnitsWithTag(openCard.resources, "woven"),
     );
-    const ordinaryLines: string[] = [];
+    const ordinaryLines: LedgerLine[] = [];
     completeOrder(ordinary, openCard.id, ordinaryLines, true);
     check(
       ordinary.money === 500 + openCard.reward - ordinaryFreight &&
         ordinary.opportunistBorrows === 0 &&
-        !ordinaryLines.some((line) => line.includes("Free Captain")),
+        !ledgerSentences(ordinaryLines).some((line) =>
+          line.includes("Free Captain"),
+        ),
       "while the same flag asked for on an order nobody locked is read as nothing at all: the card pays its full reward, the allowance is untouched and no borrow line is written, so an over eager caller cannot tax a captain for an ability their order never needed",
     );
   });
 
-  // ---- the switch, off ----
-  // The rollback the plan asks for, and it is the one switch D2 already
-  // ships: with the locks off the board holds no pathbound card at all,
+  // ========== the switch, off ==========
+  // The rollback, and it is the one switch the path orders already ship:
+  // with the locks off the board holds no pathbound card at all,
   // so there is nothing for the borrow to reach through and the ability
   // is refused with the cards that carry it.
   withEnv("NEXT_PUBLIC_PATH_ORDERS", "off", () => {
@@ -393,7 +397,7 @@ export async function freeCaptainTheBorrowSuite(): Promise<void> {
       darkCards.length === 0 &&
         darkLocked.length === 0 &&
         !opportunistMayBorrow(dark, "convoy"),
-      "with the path orders rolled back the board holds none of the paths' three even though the draw wrote them, and the borrow is refused with them: the plan's rollback is one switch, and this one is already the locks'",
+      "with the path orders rolled back the board holds none of the paths' three even though the draw wrote them, and the borrow is refused with them: the design's rollback is one switch, and this one is already the locks'",
     );
   });
 

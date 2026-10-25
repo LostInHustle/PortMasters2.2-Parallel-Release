@@ -15,7 +15,7 @@ const FOCUSABLE_SELECTOR =
 /**
  * The overlay every dialog in the game sits in: a dimmed, blurred backdrop
  * that closes the dialog when it is clicked or when Escape is pressed,
- * wrapped around a centred column that holds the panel.
+ * wrapped around a centered column that holds the panel.
  *
  * It renders into `document.body` rather than in place, and that is the whole
  * point of it. A `fixed` element is positioned against the nearest ancestor
@@ -23,7 +23,7 @@ const FOCUSABLE_SELECTOR =
  * a `filter` or a `clip-path` is one of the things that does. The controls in
  * this game carry two of those at various moments: a pressable button lifts
  * and scales on hover, which is a `transform`, and the same rule brightens it,
- * which is a `filter`. A dialog opened from inside one of them would centre
+ * which is a `filter`. A dialog opened from inside one of them would center
  * on that button rather than on the viewport, and the part of it taller
  * than the button would run off the top of the screen where nothing could
  * reach it. Portalling to the body lifts a dialog out of that ancestry
@@ -32,12 +32,12 @@ const FOCUSABLE_SELECTOR =
  * are still true.
  *
  * The wrapper is the dialog: it carries the role, the label a screen
- * reader announces on open, and the three behaviours that make the modal
+ * reader announces on open, and the three behaviors that make the modal
  * claim true rather than decorative. Focus moves in when the dialog opens
  * and back to whatever held it when the dialog closes, so a captain who
  * opened the settings with the keyboard is returned to the settings
  * button rather than to the top of the page. Tab cycles within the dialog
- * instead of walking out into the room behind it, because a dimmed
+ * instead of walking out into the harbor behind it, because a dimmed
  * backdrop is a promise that the page behind will not be reached, and a
  * promise focus does not keep is a lie told to the readers who need the
  * promise most. Escape closes, as before.
@@ -180,7 +180,7 @@ export function ModalCard({ children }: { children: ReactNode }) {
  * numbers this takes: how wide the panel may be and how tall. The motion
  * props and the glass classes live here, so a caller cannot drift from
  * the shape the four share. The card above keeps its own shape because
- * its content is one centred column and the four are scrolled regions
+ * its content is one centered column and the four are scrolled regions
  * under fixed headers; the paper here is one width, one height and the
  * stack.
  */
@@ -217,19 +217,31 @@ export function ModalSheet({
  * itself. Five copies of a look is how a look drifts, and the drift is
  * invisible until two dialogs are open side by side, so the look lives here
  * and each caller passes only the label.
+ *
+ * A caller whose own layout needs one more rule on the button, such as a
+ * rule against being squeezed by a long heading beside it, hands that rule
+ * over as a class rather than drawing the circle again: the look is the
+ * part that has to stay shared, and a caller that copies the button has
+ * brought the drift back with it.
  */
 export function ModalClose({
   label,
   onClick,
+  className,
 }: {
   label: string;
   onClick: () => void;
+  /** A rule the caller's own layout needs on top of the shared look. */
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
+      className={cn(
+        "pm-pressable rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10",
+        className,
+      )}
       aria-label={label}
     >
       <X className="h-5 w-5" />

@@ -1,5 +1,5 @@
 // =====================================================================
-// [F4: boons at milestone moments] The three state changes the five
+// The three state changes the five
 // moments need: arming one, answering one, and the two sweeps that
 // notice the moments the voyage itself produces.
 //
@@ -7,7 +7,7 @@
 // ../held-cards (what is held). This half is the writes, and there are
 // exactly three:
 //
-//   - queueMilestoneMoment arms one moment. The switch, the queue guard,
+//   * queueMilestoneMoment arms one moment. The switch, the queue guard,
 //     the due gate, the tally and the ledger line all live here so the
 //     five trigger sites are one call each and none of them carries a
 //     copy of the order those readings are taken in. A moment whose pool
@@ -15,15 +15,15 @@
 //     because there is no decline and every card is a gain: an offer
 //     with an empty table would be a screen with no exit.
 //
-//   - answerMilestone takes one card off the head of the queue. It is
+//   * answerMilestone takes one card off the head of the queue. It is
 //     the only writer the queue, the held list and the marks have, and
 //     it validates against the same derived choices the screen drew (see
 //     milestoneChoices), so a stale click or a hand made frame is
 //     refused rather than trusted.
 //
-//   - The two sweeps are where the moments the voyage produces on its
+//   * The two sweeps are where the moments the voyage produces on its
 //     own are noticed. The crew loss is written by the dawn meal, so its
-//     sweep runs at dawn beside the meal; the cold leg and the rung are
+//     sweep runs at dawn beside the meal; the cold round and the rung are
 //     both facts the settlement produces (the tick's stamps and the
 //     settled books), so their sweep runs at the settlement's end. The
 //     three site moments (the pathbound order, the mandate) arm where
@@ -31,14 +31,14 @@
 //
 // Every path into here is idempotent, which matters because every one of
 // them can be entered twice: the dawn and the settlement both run again
-// when a captain catches up to the room (the same second entry the ticks'
+// when a captain catches up to the harbor (the same second entry the ticks'
 // own round stamps exist for), the queue guard keeps a waiting moment
 // from being armed again, and the marks only move forward, so the worst
 // a second entry does is arm the next unanswered moment of a repeatable
 // trigger when its terms already hold.
 // =====================================================================
 import { cardLead, noteCardOffer, noteCardPick } from "../cards";
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 import {
   MILESTONE_MOMENTS,
   type MilestoneTrigger,
@@ -65,7 +65,7 @@ import type { GameState } from "../types";
  */
 export function queueMilestoneMoment(
   state: GameState,
-  logs: string[],
+  logs: LedgerLine[],
   trigger: MilestoneTrigger,
 ): void {
   if (!milestoneBoonsOn(state.mode)) return;
@@ -73,7 +73,7 @@ export function queueMilestoneMoment(
   if (!milestoneDue(state, trigger)) return;
   const choices = milestoneChoices(state, trigger);
   if (choices.length === 0) {
-    // [F7: the power budget] Two empty tables, and the second is new. If
+    // Two empty tables, and the second is new. If
     // the family's pool itself is dry (every card held or out of this
     // mode's pool) there is no decline and no second table, so the moment
     // is spent rather than left to fire again at every settlement for the
@@ -98,12 +98,12 @@ export function queueMilestoneMoment(
   // carries the moment's glyph and its own words whole, and the title
   // arrives as a token value the way a label always does.
   logs.push(
-    t("\n{moment.icon}=== {moment.title} ===", {
+    line("\n{moment.icon}=== {moment.title} ===", {
       "moment.icon": moment.icon,
-      "moment.title": t(moment.title),
+      "moment.title": line(moment.title),
     }),
   );
-  logs.push(t(moment.line));
+  logs.push(line(moment.line));
 }
 
 /**
@@ -112,28 +112,28 @@ export function queueMilestoneMoment(
  * It runs right after the meal and the hunger settle, because that pair
  * is what writes a loss (see settleHunger in ../crew), and it runs
  * inside startBoonDrafting rather than at the settlement for its own
- * reason: the plan's cheapest engagement save is the choice handed to a
+ * reason: the design's cheapest engagement save is the choice handed to a
  * captain at the moment the hand goes, and the hand goes at dawn.
  */
-export function noteDawnMilestones(state: GameState, logs: string[]): void {
+export function noteDawnMilestones(state: GameState, logs: LedgerLine[]): void {
   queueMilestoneMoment(state, logs, "crew_loss");
 }
 
 /**
  * The settlement sweep: the two moments the settled books deal.
  *
- * The cold leg first, because its evidence is the freshest thing in the
+ * The cold round first, because its evidence is the freshest thing in the
  * ledger at this point (the tick above this call stamped the round and
  * wrote, or did not write, the frostbite), and the rung second, because
  * it reads the score every order and delivery left behind. Both are
- * read at the end of the settlement, where the numbers the plan's
+ * read at the end of the settlement, where the numbers the design's
  * triggers name are the round's final numbers.
  */
 export function noteSettlementMilestones(
   state: GameState,
-  logs: string[],
+  logs: LedgerLine[],
 ): void {
-  queueMilestoneMoment(state, logs, "cold_leg");
+  queueMilestoneMoment(state, logs, "cold_round");
   queueMilestoneMoment(state, logs, "renown_rung");
 }
 
@@ -151,7 +151,7 @@ export function noteSettlementMilestones(
 export function answerMilestone(
   state: GameState,
   cardId: string,
-  logs: string[],
+  logs: LedgerLine[],
 ): boolean {
   const trigger = state.milestoneOffers[0];
   if (trigger === undefined) return false;
@@ -161,7 +161,7 @@ export function answerMilestone(
   state.heldBoons.push(card.id);
   state.modifierFlags = { ...state.modifierFlags, ...heldFlagsOf(state) };
   noteCardPick(state.cardTally, card);
-  // [F5: public offers] The moment's own record, written the way the
+  // The moment's own record, written the way the
   // round's is (see selectBoon in ./boons). The choices were read before
   // the mark below moves, which is load bearing: the trio is drawn off a
   // seed that carries the trigger's mark, so reading it after markAnswered
@@ -179,9 +179,9 @@ export function answerMilestone(
   // moment's glyph and the card's lead arrive as its tokens, and the lead
   // carries the card's own words in the language already.
   logs.push(
-    t("{icon} Milestone boon: {lead}", {
+    line("{icon} Milestone boon: {lead}", {
       icon: MILESTONE_MOMENTS[trigger].icon,
-      lead: cardLead(card.id),
+      lead: (locale) => cardLead(card.id, locale),
     }),
   );
   return true;
@@ -207,8 +207,8 @@ function markAnswered(state: GameState, trigger: MilestoneTrigger): void {
       state.milestonesAnswered.renown_rung =
         (state.milestonesAnswered.renown_rung ?? 0) + 1;
       return;
-    case "cold_leg":
-      state.milestonesAnswered.cold_leg = state.currentRound;
+    case "cold_round":
+      state.milestonesAnswered.cold_round = state.currentRound;
       return;
     case "pathbound_order":
       state.milestonesAnswered.pathbound_order = 1;

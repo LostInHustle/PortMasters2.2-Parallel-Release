@@ -1,9 +1,9 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: the consent primitive.
 //
-// [D4: Loom: the Refit] D3's escort contract and D4's refit are the same
+// The escort contract and the refit bench are the same
 // transaction twice: one captain offers a service at a price, another
-// captain accepts it, and each side then moves its own purse. The plan asks
+// captain accepts it, and each side then moves its own purse. The design asks
 // for one of these rather than two ("the two features share one consent
 // primitive rather than growing two"), so this module is the shape itself
 // and ./contracts and ./refits are the two things it is about.
@@ -17,8 +17,8 @@
 //
 // What is deliberately not shared is the four things that differ, and each
 // one lives with its own kind: who may sell, what the two captains are
-// trading (a leg of cover, a garment put right), what an agreement does to
-// a state, and which side is bounded to one agreement a leg. A primitive
+// trading (a round of cover, a garment put right), what an agreement does to
+// a state, and which side is bounded to one agreement a round. A primitive
 // that took those as parameters would be a thing every caller has to read
 // before it can be used, which is the cost this module exists to avoid.
 //
@@ -42,9 +42,9 @@ import type { GameState, Phase } from "../types";
  *
  * `phase` is the phase the offer was made in, carried on the row rather
  * than compared against a constant, because an offer lives in the phase
- * that made it binding: D3's originally read "parley" where this now reads
- * the row, which is the same rule written once for two kinds that hold
- * their markets in different phases.
+ * that made it binding: the escort contract originally read "parley" where
+ * this now reads the row, which is the same rule written once for two kinds
+ * that hold their markets in different phases.
  */
 export type ConsentTerms = {
   id: string;
@@ -54,7 +54,7 @@ export type ConsentTerms = {
   buyerUserId: string | null;
   buyerName: string | null;
   fee: number;
-  // The leg the agreement was made for. An accepted agreement stands for
+  // The round the agreement was made for. An accepted agreement stands for
   // the round it was accepted in and is off the board the moment the
   // voyage stands in a later one.
   round: number;
@@ -73,7 +73,7 @@ export type ConsentTerms = {
  * a number at all, or that lands outside the bounds in ../constants,
  * answers null rather than being clamped: a fee somebody typed wrong is not
  * the fee they meant, and quietly charging a different one is the one
- * behaviour a market cannot have. A fraction is floored instead, because
+ * behavior a market cannot have. A fraction is floored instead, because
  * Gold is counted in whole coins and a form that hands back a value a hair
  * over the number somebody typed is a form, not a cheat.
  */
@@ -120,7 +120,7 @@ export function visibleConsent<T extends ConsentTerms>(
  * Two expiries and one rule each. An offer lives in the phase it was posted
  * in, because everything offered in that phase is binding once both parties
  * accept, and an offer nobody accepted before the phase closed is not
- * binding on anyone. An accepted agreement lives exactly one leg, which is
+ * binding on anyone. An accepted agreement lives exactly one round, which is
  * the round it was made in, so the round it no longer matches is what takes
  * it off the board. Read as a pure function of the list and the checkpoint
  * so the suite can hold both boundaries without a server.
@@ -144,7 +144,7 @@ export function expireConsent<T extends ConsentTerms>(
  * second identical row would only be a second way to take the same thing.
  * The rule is the board's bound as well as its tidiness. Nothing else caps
  * how many rows a board can hold, and a post costs no escrow the way a
- * barter offer does, so without this a single client could paper the room.
+ * barter offer does, so without this a single client could paper the harbor.
  * With it, a seller's rows are bounded by the table: one open offer and one
  * named offer per other captain, which is the most a market of N captains
  * can mean anything by.
@@ -192,9 +192,9 @@ export function consentSettled(status: string): boolean {
  * Both kinds need this bound and they need it on different sides, which is
  * why the side is a parameter rather than the function being written twice.
  * A convoy's bound is on the buyer, because one captain's cover is one
- * field: a second accepted contract could not be honoured, so the server
+ * field: a second accepted contract could not be honored, so the server
  * refuses the second accept. A loom's bound is on the seller, because one
- * captain can put one garment right in a leg, and the second customer would
+ * captain can put one garment right in a round, and the second customer would
  * be paying for work that was never done. A seller who may write several
  * contracts wears several claims, which is the risk that path is priced on,
  * and a buyer who may take several refits is simply a customer.
@@ -202,7 +202,7 @@ export function consentSettled(status: string): boolean {
  * An offer is not a commitment, so only a row that settled counts, which is
  * the predicate above rather than the "not an offer" test this used to
  * read: a reader that asked whether a row had stopped being an offer would
- * answer that a captain who said no was covered for the leg.
+ * answer that a captain who said no was covered for the round.
  */
 export function consentPartyBusy<T extends ConsentTerms>(
   rows: T[],
@@ -257,15 +257,15 @@ export function agreeConsent<T extends ConsentTerms>(
 // =====================================================================
 
 /**
- * Whether this movement has already been applied, read through the leg
+ * Whether this movement has already been applied, read through the round
  * stamp.
  *
- * A ledger left over from an earlier leg answers for nothing: the keys are
- * agreement ids, a leg's agreements are off the board by the next Dawn, and
+ * A ledger left over from an earlier round answers for nothing: the keys are
+ * agreement ids, a round's agreements are off the board by the next Dawn, and
  * a list that only ever grows is weight in every save the voyage writes.
  * The stamp is what lets the list be emptied at each roll without ever
  * losing a movement that has not settled yet, since both movements of an
- * agreement land in the leg it was agreed in.
+ * agreement land in the round it was agreed in.
  *
  * It is one ledger for both kinds rather than one each, because the two
  * answer the same question about the same count of Gold and the keys are
@@ -280,7 +280,7 @@ export function movementApplied(state: GameState, key: string): boolean {
   );
 }
 
-/** Records a movement as applied, on this leg's ledger. */
+/** Records a movement as applied, on this round's ledger. */
 export function markMovement(state: GameState, key: string): void {
   if (state.settledRound !== state.currentRound) {
     state.settledMovements = [];
@@ -290,10 +290,10 @@ export function markMovement(state: GameState, key: string): void {
 }
 
 /**
- * The ledger at the top of a leg: emptied, and stamped with the leg it was
+ * The ledger at the top of a round: emptied, and stamped with the round it was
  * emptied for.
  *
- * Called where every other per leg fact is cleared (startBoonDrafting, see
+ * Called where every other per round fact is cleared (startBoonDrafting, see
  * the call there), and the stamp is written rather than left alone so the
  * list is emptied here rather than at the next movement, which is what
  * keeps the saving small on a voyage where nothing more is agreed.
@@ -333,7 +333,7 @@ export function floorTallies(
  * build added is healed.
  *
  * The old name is read here for the one save that can carry it: a voyage
- * saved by the build before this one, mid leg, with an agreement already
+ * saved by the build before this one, mid round, with an agreement already
  * applied. That ledger is exactly what keeps a reload from moving the same
  * Gold twice, so losing it to a rename would be losing the protection
  * rather than tidying a field. The migration reads the field the previous

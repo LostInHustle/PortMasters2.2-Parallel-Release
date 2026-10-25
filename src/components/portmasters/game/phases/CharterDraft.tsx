@@ -8,12 +8,12 @@ import { MomentOverlay } from "./MomentOverlay";
 import type { PhasePanelProps } from "./PhaseShared";
 
 /**
- * [F6: charters at leg four] The charter moment's own five readings, on
+ * The charter moment's own five readings, on
  * the one overlay a moment is answered on (see ./MomentOverlay for the
  * body and for why the moment is an overlay rather than a phase).
  *
- * The moment is one fixed leg rather than a queue: it lands at the
- * fourth leg, and "waiting" is that leg reached with the state's own
+ * The moment is one fixed round rather than a queue: it lands at the
+ * fourth round, and "waiting" is that round reached with the state's own
  * charter field still null, which is what charterPending reads. The
  * words are the single CHARTER_MOMENT record for the same reason.
  *
@@ -39,7 +39,7 @@ export function CharterDraft({
       act={act}
       // The same guard every renderer of the moment asks, so the overlay
       // draws nothing at all unless the question is standing: switch on,
-      // a path held, the leg reached, no answer given.
+      // a path held, the round reached, no answer given.
       pending={charterPending}
       moment={() => CHARTER_MOMENT}
       choices={charterChoices}

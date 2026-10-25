@@ -17,7 +17,7 @@ import { onShortRations } from "@/lib/game/larder";
 // and the peek stays hidden for everyone no matter how established the
 // two captains are.
 //
-// [H7: Maroon and the Harbormaster] bankrupt and marooned ride along for
+// bankrupt and marooned ride along for
 // the same reason the phase does: the roster reads them to mark a
 // captain, and in the mode that keeps a failed seat sailing the phase
 // says nothing about it (see GameState.bankrupt). The server reads the
@@ -35,11 +35,10 @@ export function statusFrame(roomId: string, game: GameState) {
     renownLevel: game.renownLevel,
     bankrupt: game.bankrupt,
     marooned: game.marooned,
-    // [C1: the Larder and Short Rations] The fleet can see a hungry crew.
-    // The plan asks for the shortage to be public, and this is the frame
-    // the room already broadcasts: onShortRations answers false with the
-    // layer switched off, so a base game voyage reports undefined here
-    // and no badge is drawn anywhere.
+    // The fleet can see a hungry crew. This is the frame the harbor
+    // already broadcasts: onShortRations answers false with the layer
+    // switched off, so a base game voyage reports undefined here and no
+    // badge is drawn anywhere.
     shortRations: onShortRations(game) || undefined,
   };
 }

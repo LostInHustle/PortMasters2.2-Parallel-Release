@@ -5,21 +5,10 @@ import type { ChatMessage, PublicUser } from "@/lib/api";
 import type { BarterOffer } from "@/lib/use-barter";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/game/i18n";
+import { useLanguage } from "@/lib/use-language-preference";
 import { OfferCard } from "../game/BarterTrade";
 import type { ChatTrade } from "../ChatPanel";
 import { MessageRow } from "./MessageRow";
-
-// A value on its way into an HTML read, with the characters that would
-// otherwise be read as markup escaped. The search notice below goes to the
-// browser as HTML so its quotation entities decode the way JSX decoded
-// them before, and the query inside it is a captain's own typing: escaped,
-// it lands on the screen exactly as it was typed, in either language.
-function escapeForHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 // A message and an offer share one timeline, so both are carried in one
 // item shape. The timestamps are ISO 8601 in the same format, which is what
@@ -52,24 +41,18 @@ export function MessageList({
   searchQuery: string;
   emptyText: string;
 }) {
+  const { locale } = useLanguage();
   // One notice, two reasons to draw it: an empty channel and a search that
   // matched nothing are the same empty box with a different sentence in
   // it, so the sentence is chosen here and the box is drawn once below.
   //
-  // The search row carries its quotation marks as HTML entities, the way
-  // the JSX spelled them before the pack carried the sentence, so it is
-  // read as HTML and the browser decodes them back to the marks the source
-  // used to print.
+  // The query inside the search notice is a captain's own typing, and the
+  // notice is text, so the browser escapes it on the way to the screen: it
+  // lands there exactly as it was typed, in either language.
   const notice = !hasContent ? (
     emptyText
   ) : stream.length === 0 ? (
-    <span
-      dangerouslySetInnerHTML={{
-        __html: t("No messages match &ldquo;{searchQuery}&rdquo;.", {
-          searchQuery: escapeForHtml(searchQuery),
-        }),
-      }}
-    />
+    <span>{t("No messages match “{searchQuery}”.", { searchQuery })}</span>
   ) : null;
 
   return (
@@ -112,7 +95,7 @@ export function MessageList({
                   />
                 )}
                 <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
-                  {formatTime(offer.createdAt)}
+                  {formatTime(offer.createdAt, locale)}
                 </span>
               </motion.div>
             );

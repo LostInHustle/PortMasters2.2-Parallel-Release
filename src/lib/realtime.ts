@@ -40,7 +40,7 @@ let socket: Socket | null = null;
  * The tab's single socket, created on first use.
  *
  * Retries forever on purpose. A voyage can run for an hour and a flaky
- * minute should not end a captain's game; socket.io replays the room
+ * minute should not end a captain's game; socket.io replays the harbor
  * rejoin itself once the connection is back.
  */
 export function getSocket(): Socket {

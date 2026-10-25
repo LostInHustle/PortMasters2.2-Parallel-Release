@@ -1,11 +1,10 @@
 // PortMasters 2.2 Parallel Release, smoke run: the tag vocabulary.
 //
-// [F1] The plan's sentence for this goal is that no effect ever names an
-// item key, and the vocabulary it names things from instead is twelve
-// closed words. What is checked here is the wording half of that goal:
-// which twelve, what each one means, which entries carry which, and that
-// a caller can ask the question an effect will ask. Then the rule half,
-// which is the half the plan insists on rather than trusts: the two tag
+// No effect ever names an item key, and the vocabulary it names things
+// from instead is twelve closed words. What is checked here is the wording
+// half of that rule: which twelve, what each one means, which entries
+// carry which, and that a caller can ask the question an effect will ask.
+// Then the rule half, which is enforced rather than trusted: the two tag
 // maximum is held by validation at load time rather than by review, and
 // every one of the nine things that validation states is watched firing
 // here, against a subject built by hand carrying the one thing wrong that
@@ -18,11 +17,10 @@
 // after the run has put its captains away, beside the vendor's for the
 // same reason.
 //
-// What it deliberately does not check is the scan the plan puts in G4,
-// which is the one that walks the shipped cards for a named good. That
-// goal owns the content validator's home, and the cards that still name a
-// good are its first customers rather than this goal's leftovers: they
-// are listed in the plan as the work of F2.
+// What it deliberately does not check is the scan that walks the shipped
+// cards for a named good. That scan belongs to the content validator, and
+// the cards that still name a good are its first customers rather than
+// leftovers from this suite.
 
 import { CHARTERS } from "@/lib/game/constants/charters";
 import { BOONS, MODULES } from "@/lib/game/constants/drafts";
@@ -49,9 +47,9 @@ import {
 import { check, carriesADash } from "../harness";
 
 export async function tagVocabularySuite(): Promise<void> {
-  // The plan's own list, written here as the sentence this goal is being
-  // held to rather than read back off the constant the check is about. If
-  // the two ever part, one of them is wrong and this is where it shows.
+  // The twelve words, written here as the list the check is being held to
+  // rather than read back off the constant the check is about. If the two
+  // ever part, one of them is wrong and this is where it shows.
   const PLAN_VOCABULARY = [
     "cold",
     "bulk",
@@ -69,7 +67,7 @@ export async function tagVocabularySuite(): Promise<void> {
   check(
     TAGS.length === PLAN_VOCABULARY.length &&
       TAGS.every((tag, at) => tag === PLAN_VOCABULARY[at]),
-    "the vocabulary is the plan's twelve words in the plan's own order, because a closed list is the thing every card will be authored against and an order two readers can compare without a second alphabet",
+    "the vocabulary is the design's twelve words in the design's own order, because a closed list is the thing every card will be authored against and an order two readers can compare without a second alphabet",
   );
   const meanings = TAGS.map((tag) => TAG_MEANINGS[tag]);
   check(
@@ -79,10 +77,10 @@ export async function tagVocabularySuite(): Promise<void> {
   );
   check(
     MAX_TAGS_PER_ENTRY === 2,
-    "the ceiling is the plan's two, so every assignment in the tree is at or under the number the rule module enforces rather than under a second number kept beside it",
+    "the ceiling is the design's two, so every assignment in the tree is at or under the number the rule module enforces rather than under a second number kept beside it",
   );
 
-  // ---- The walk ----
+  // ========== The walk ==========
   const entries = taggedEntries();
   const of = (kind: string) => entries.filter((e) => e.kind === kind).length;
   check(
@@ -124,7 +122,7 @@ export async function tagVocabularySuite(): Promise<void> {
     "and the whole of the rule holds over the shipped content, which is the reading the build acts on: the same call, over the same walk, is what scripts/tags.ts runs before it lets a page be compiled",
   );
 
-  // ---- Reading one entry ----
+  // ========== Reading one entry ==========
   check(
     tagsOf("good", "Silk") === GOOD_TAGS["Silk"] &&
       tagsOf("good", "Rags")?.includes("woven") === true,
@@ -140,7 +138,7 @@ export async function tagVocabularySuite(): Promise<void> {
     "and every entry the tree ships can be read back by its own kind and id, so the answer for real content is a list and never the absence that means a missing entry",
   );
 
-  // ---- The questions an effect will ask ----
+  // ========== The questions an effect will ask ==========
   const cold = entriesWithTag("cold").map((entry) => entry.id);
   const wardrobe = Object.keys(GARMENTS);
   check(
@@ -149,7 +147,7 @@ export async function tagVocabularySuite(): Promise<void> {
       entriesWithTag("cold").some(
         (entry) => entry.kind === "boon" && entry.id === "cold_hardened",
       ),
-    "the cold tag gathers exactly the wardrobe and the one card that hardens against a cold leg, read against the table the cold rule already keeps its warmth ratings in, so a leg that asks for a garment and a card that asks for cold are asking the same question, and the moment card that answers such a leg is gathered by the same word rather than by a name kept beside it",
+    "the cold tag gathers exactly the wardrobe and the one card that hardens against a cold round, read against the table the cold rule already keeps its warmth ratings in, so a round that asks for a garment and a card that asks for cold are asking the same question, and the moment card that answers such a round is gathered by the same word rather than by a name kept beside it",
   );
   const pantryOf = (tag: Tag) =>
     entriesWithTag(tag)
@@ -161,7 +159,7 @@ export async function tagVocabularySuite(): Promise<void> {
       FOODS["Salt Fish"].keeps !== null &&
       FOODS.Produce.keeps !== null &&
       FOODS["Salt Fish"].keeps > FOODS.Produce.keeps,
-    "the pantry's two sides are the sides its own keepings make: grain and salt fish are preserved and produce is the one that turns, with the salt fish that keeps six legs against the produce's two as the row the rule bites on, so the split is read off the numbers rather than off a list somebody wrote of which foods spoil",
+    "the pantry's two sides are the sides its own keepings make: grain and salt fish are preserved and produce is the one that turns, with the salt fish that keeps six rounds against the produce's two as the row the rule bites on, so the split is read off the numbers rather than off a list somebody wrote of which foods spoil",
   );
   check(
     entriesWithTag("perishable").some((entry) => entry.kind === "good") &&
@@ -195,10 +193,10 @@ export async function tagVocabularySuite(): Promise<void> {
   ]);
   check(
     TAGS.every((tag) => !named.has(tag)),
-    "and not one of the twelve is the name of a good or a food, even read case blind, which is the plan's rule about item keys applied to the vocabulary itself: a tag a captain cannot point at on a shelf is what keeps an effect about a class of trade rather than about Silk",
+    "and not one of the twelve is the name of a good or a food, even read case blind, which is the design's rule about item keys applied to the vocabulary itself: a tag a captain cannot point at on a shelf is what keeps an effect about a class of trade rather than about Silk",
   );
 
-  // ---- Every rule, watched firing ----
+  // ========== Every rule, watched firing ==========
   // The subject is a parameter for exactly this: each rule below is handed
   // the shipped content with one thing changed, and each is asked for its
   // finding and for nothing else, since a rule that fires alongside three
@@ -229,7 +227,7 @@ export async function tagVocabularySuite(): Promise<void> {
     soleFinding(withRow("good", "Silk", ["woven", "luxury", "cold"]))?.includes(
       "at most 2",
     ) === true,
-    "a third tag on an entry is caught, which is the plan's own ceiling and the reason it is enforced rather than reviewed: every tag a good carries doubles the space a balance pass has to cover",
+    "a third tag on an entry is caught, which is the design's own ceiling and the reason it is enforced rather than reviewed: every tag a good carries doubles the space a balance pass has to cover",
   );
   check(
     soleFinding(withRow("good", "Silk", []))?.includes("carries no tags") ===
@@ -287,7 +285,7 @@ export async function tagVocabularySuite(): Promise<void> {
       ...shipped,
       keepings: { ...shipped.keepings, Grain: null, "Salt Fish": 3 },
     }).length === 0,
-    "while a keeping of null is read as never turning rather than as a zero, so the grain that outlasts the voyage stays on the preserved side and the rule holds it together with a food that turns in three legs without inventing a finding",
+    "while a keeping of null is read as never turning rather than as a zero, so the grain that outlasts the voyage stays on the preserved side and the rule holds it together with a food that turns in three rounds without inventing a finding",
   );
   check(
     soleFinding(
@@ -308,7 +306,7 @@ export async function tagVocabularySuite(): Promise<void> {
     "as is the water that sails a corrupt broker without carrying contraband, read off the same record's own flag rather than off a list kept in the checker",
   );
 
-  // ---- The house rule ----
+  // ========== The house rule ==========
   check(
     [
       "src/lib/game/constants/tags.ts",

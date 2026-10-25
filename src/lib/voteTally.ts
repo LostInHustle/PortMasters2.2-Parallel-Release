@@ -2,16 +2,16 @@
 // The one tally renderer the harbor's two votes share.
 //
 // The Manifest Audit and the maroon vote both put a target to the table
-// and both show the room who named whom, so both read their nominations
+// and both show the harbor who named whom, so both read their nominations
 // through this. Not folded into either panel because a second copy of it
 // would be a second answer to what a tally row looks like, and the two
 // panels would drift the first time one of them learned something the
 // other did not: neither of them needs anything this does not do.
 //
 // Grouped by target rather than counted server side, the same way it was
-// when it lived in the audit panel: the names are the part the room
+// when it lived in the audit panel: the names are the part the harbor
 // reads, and the count is arithmetic on a map already in hand. A voter
-// who has left the room is not dropped, they are named as a captain,
+// who has left the harbor is not dropped, they are named as a captain,
 // which is honest about a name this side no longer has.
 //
 // The census is the other half of what a captain needs and the half this
@@ -35,7 +35,7 @@ export type TallyRow = {
 };
 
 /**
- * The room's own count of a vote, as the tally frame carries it. Held as a
+ * The harbor's own count of a vote, as the tally frame carries it. Held as a
  * record of its own rather than read off the frame at every use so a panel
  * can hand the same shape to the shared renderer whichever vote it drew.
  */

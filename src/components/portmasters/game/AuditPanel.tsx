@@ -1,24 +1,28 @@
 "use client";
 
-// The Manifest Audit's two surfaces, in one file because they are the two
-// halves of one interaction and they share the vocabulary between them:
-// the card below is where a harbor decides to look, and the strip is what
-// it found.
+// The Manifest Audit's two surfaces: the card below is where a harbor
+// decides to look, and the strip is what it found.
 //
 // The card lives inside the Parley phase, because that is the only place
-// the vote can be called: the audit's price is the rest of that leg's
+// the vote can be called: the audit's price is the rest of that round's
 // trading, so the button that spends it belongs on the board it spends.
 // The strip is full width under the commission, because the finding is
-// the whole harbor's and outlives the leg it was made in.
+// the whole harbor's and outlives the round it was made in.
 //
-// It wears `intel`, which is a meaning colour rather than a panel's own
+// The frame both are drawn on belongs to the harbor rather than to the
+// audit: the vote card (see VoteCard) and the strip a carried vote
+// leaves (see VoteRevealStrip) are the ones the maroon wears too, since
+// the two votes ask the harbor the same question in the same shape. What
+// is left in this file is the audit's own: which window the vote opens
+// in, and what it says when it does.
+//
+// It wears `intel`, which is a meaning color rather than a panel's own
 // hue (see scripts/palette.ts). That is deliberate and it is the same
 // choice the commission made with gold: a surface that reports what
 // somebody knows is not chrome, and giving it a widget hue would put a
-// thirteenth colour on a wheel that already has twelve.
+// thirteenth color on a wheel that already has twelve.
 
 import { AuditReveal } from "@/types/realtime/audit";
-import { useState } from "react";
 import type { PublicUser } from "@/lib/api";
 import {
   AUDIT_REVEAL_WORDS,
@@ -31,13 +35,10 @@ import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { nameCount, tallyRows } from "@/lib/voteTally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
-import {
-  VoteSeatPicker,
-  type Marks,
-} from "@/components/portmasters/game/VoteSeatPicker";
-import { VoteCardShell } from "./VoteCardShell";
+import { type Marks } from "@/components/portmasters/game/VoteSeatPicker";
+import { VoteCard } from "./VoteCard";
+import { VoteRevealStrip } from "./VoteRevealStrip";
 import type { Audit } from "./phases/PhaseShared";
-import { RefusalLine } from "../shared";
 import { Utensils } from "lucide-react";
 
 /**
@@ -78,13 +79,6 @@ export function AuditVoteCard({
   audit: Audit;
   statuses?: Marks;
 }) {
-  // The leg is carried with the pick rather than reset by an effect: a
-  // target chosen in a leg the vote fell short in is not a target this
-  // leg's card keeps one press away, and a reading that cannot represent
-  // a stale choice beats one cleared a frame after it showed.
-  const [pick, setPick] = useState({ round: -1, target: "" });
-  const target = pick.round === game.currentRound ? pick.target : "";
-
   // The visibility rule is the reader's (auditCardShown): the open
   // window, or a window still ahead this voyage. The rung is read off
   // the mode's own record rather than compared against a constant, so
@@ -102,178 +96,149 @@ export function AuditVoteCard({
   const rows = tallyRows(audit.votes, members);
 
   return (
-    <VoteCardShell tone="intel" icon="🔎" title={t("Manifest Audit")}>
-      {open ? (
-        <>
-          <p
-            className="text-xs text-muted-foreground mb-3 leading-relaxed"
-            dangerouslySetInnerHTML={{
-              __html: t(
-                "A majority of the captains still sailing can open one manifest. What comes back is a sample of what they filed. A carried vote ends this leg&apos;s trading, and the voyage carries on at the next leg. The count below names who is still to vote, and what the vote does when the names it needs land on one captain.",
-              ),
-            }}
-          />
-          {/* The press and the list of seats it may be aimed at are the
-              shared picker's (see VoteSeatPicker), and the note it carries
-              is this vote's: a captain the harbor has written off cannot
-              be audited, and the list says why rather than leaving its
-              short length unexplained. */}
-          <VoteSeatPicker
-            selectLabel={t("Captain to audit")}
-            target={target}
-            onPick={(id) => setPick({ round: game.currentRound, target: id })}
-            members={members}
-            me={me}
-            statuses={statuses}
-            myVote={audit.myVote !== null}
-            canVote={audit.canVote}
-            onVote={() => audit.vote(target)}
-            callLabel={t("Call the audit")}
-            pickLabel={(name) => t("Open {name}'s manifest", { name })}
-            note={t("A captain the harbor has written off cannot be audited.")}
-          />
-          <RefusalLine
-            className="mt-2"
-            error={audit.error}
-            onDismiss={audit.clearError}
-          />
-          {/* The block below owns every word of what this captain said,
-              whose turn it is, and what the vote does with the names it
-              needs: a panel's own half of that count would be a second
-              answer to one question. */}
-          <VoteTallyRows
-            rows={rows}
-            census={audit.census}
-            members={members}
-            myVote={audit.myVote}
-            nextStep={(needed) =>
-              t(
-                "{namesNeeded} on one captain opens that captain's manifest to the whole harbor and closes this leg's trading.",
-                { namesNeeded: nameCount(needed) },
-              )
-            }
-          />
-          <p className="text-[10px] text-muted-foreground/80 mt-2">
-            {t(AUDIT_VOTE_RULE)}
-          </p>
-        </>
-      ) : (
-        <p className="text-xs text-muted-foreground leading-relaxed">
+    <VoteCard
+      game={game}
+      members={members}
+      me={me}
+      statuses={statuses}
+      tone="intel"
+      icon="🔎"
+      title={t("Manifest Audit")}
+      open={open}
+      // The rule in plain words.
+      rule={
+        <span>
           {t(
-            "This vote opens at leg {opensAt}, and this is leg {game.currentRound}. A simple majority of the captains still sailing then opens one captain's manifest: {AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. A carried vote ends that leg's trading, the voyage carries on at the next leg, and the harbor opens one manifest a voyage.",
-            {
-              opensAt,
-              "game.currentRound": game.currentRound,
-              AUDIT_REVEAL_WORDS: t(AUDIT_REVEAL_WORDS),
-            },
+            "A majority of the captains still sailing can open one manifest. What comes back is a sample of what they filed. A carried vote ends this round's trading, and the voyage carries on at the next round. The count below names who is still to vote, and what the vote does when the names it needs land on one captain.",
           )}
-        </p>
+        </span>
+      }
+      closed={t(
+        "This vote opens at round {opensAt}, and this is round {game.currentRound}. A simple majority of the captains still sailing then opens one captain's manifest: {AUDIT_REVEAL_WORDS} of their most recent order fulfillments, and nothing else. A carried vote ends that round's trading, the voyage carries on at the next round, and the harbor opens one manifest a voyage.",
+        {
+          opensAt,
+          "game.currentRound": game.currentRound,
+          AUDIT_REVEAL_WORDS: t(AUDIT_REVEAL_WORDS),
+        },
       )}
-    </VoteCardShell>
+      picker={{
+        selectLabel: t("Captain to audit"),
+        callLabel: t("Call the audit"),
+        pickLabel: (name) => t("Open {name}'s manifest", { name }),
+        note: t("A captain the harbor has written off cannot be audited."),
+        myVote: audit.myVote !== null,
+        canVote: audit.canVote,
+        onVote: (target) => audit.vote(target),
+      }}
+      refusal={{ error: audit.error, onDismiss: audit.clearError }}
+      tally={
+        <VoteTallyRows
+          rows={rows}
+          census={audit.census}
+          members={members}
+          myVote={audit.myVote}
+          nextStep={(needed) =>
+            t(
+              "{namesNeeded} on one captain opens that captain's manifest to the whole harbor and closes this round's trading.",
+              { namesNeeded: nameCount(needed) },
+            )
+          }
+        />
+      }
+      footnote={t(AUDIT_VOTE_RULE)}
+    />
   );
 }
 
 export function AuditRevealStrip({ reveal }: { reveal: AuditReveal | null }) {
-  // Held by the reveal it applies to rather than as a flag, so a dismissed
-  // finding cannot silence the next voyage's.
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  if (!reveal) return null;
-  const key = `${reveal.round}:${reveal.target.userId}`;
-  if (dismissed === key) return null;
-
   return (
-    <div className="rounded-2xl px-3 py-2 border border-intel/40 bg-intel/[0.06] ring-1 ring-intel/20">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm leading-none" aria-hidden>
-          🔎
-        </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-intel">
-          {t("Manifest Audit")} · {t("Leg {leg}", { leg: reveal.round })}
-        </span>
-        <span className="font-display text-sm font-semibold">
-          {t("{name}'s manifest", { name: reveal.target.name })}
-        </span>
-        <button
-          type="button"
-          className="ml-auto text-muted-foreground hover:text-foreground"
-          onClick={() => setDismissed(key)}
-          aria-label={t("Hide the audit")}
-        >
-          ✕
-        </button>
-      </div>
+    <VoteRevealStrip
+      tone="intel"
+      icon="🔎"
+      title={t("Manifest Audit")}
+      finding={reveal}
+      headline={
+        reveal ? t("{name}'s manifest", { name: reveal.target.name }) : null
+      }
+      dismissLabel={t("Hide the audit")}
+    >
+      {reveal ? (
+        <>
+          {/* A flagged reveal prints no lines at all, because there are none to
+              print: the server withholds a marked manifest rather than handing
+              the table evidence it has already judged unsound (see AuditReveal
+              .flagged). The flag is then the strip's whole finding, and it is
+              read off the reveal rather than counted from an empty list so it
+              cannot be confused with a captain who filed nothing. */}
+          {reveal.flagged ? null : reveal.fulfillments.length === 0 ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {t("No order fulfillments filed this voyage.")}
+            </p>
+          ) : (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {reveal.fulfillments.map((fill) => (
+                <span
+                  key={`${fill.round}:${fill.port}:${fill.items
+                    .map((i) => i.type)
+                    .join("+")}`}
+                  className="text-[11px] font-medium rounded-lg px-1.5 py-0.5 border border-intel/25 tabular-nums"
+                >
+                  {fulfillmentLine(fill)}
+                </span>
+              ))}
+            </div>
+          )}
 
-      {/* A flagged reveal prints no lines at all, because there are none to
-          print: the server withholds a marked manifest rather than handing
-          the table evidence it has already judged unsound (see AuditReveal
-          .flagged). The flag is then the strip's whole finding, and it is
-          read off the reveal rather than counted from an empty list so it
-          cannot be confused with a captain who filed nothing. */}
-      {reveal.flagged ? null : reveal.fulfillments.length === 0 ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {t("No order fulfillments filed this voyage.")}
-        </p>
-      ) : (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {reveal.fulfillments.map((fill) => (
-            <span
-              key={`${fill.round}:${fill.port}:${fill.items
-                .map((i) => i.type)
-                .join("+")}`}
-              className="text-[11px] font-medium rounded-lg px-1.5 py-0.5 border border-intel/25 tabular-nums"
-            >
-              {fulfillmentLine(fill)}
-            </span>
-          ))}
-        </div>
-      )}
+          {/* The second half of the design's
+              audit clause: the sample of fulfillments, plus the captain's
+              current Larder. Drawn only when the layer reports one, so a
+              voyage with the provisions switch off shows the reveal this strip
+              has always shown rather than a number nothing moves. The red is
+              the meaning red rather than the strip's own hue, because an empty
+              larder is the finding the room is looking for and it should be
+              readable before the count is. */}
+          {reveal.larder !== undefined && (
+            <div className="mt-1.5">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+                  reveal.shortRations
+                    ? "border-alarm/30 bg-alarm/5 text-alarm"
+                    : "border-intel/25 text-foreground",
+                )}
+              >
+                <Utensils className="h-3 w-3" />
+                {t("Larder")} {reveal.larder}
+              </span>
+              <span className="ml-1.5 text-[10px] text-muted-foreground/80">
+                {reveal.shortRations
+                  ? t(
+                      "an empty larder: this captain's crew is on short rations.",
+                    )
+                  : reveal.larder === 0
+                    ? t("an empty larder, with no crew aboard to go hungry.")
+                    : t("rations aboard, eaten one a head each round.")}
+              </span>
+            </div>
+          )}
 
-      {/* [C1: the Larder and Short Rations] The second half of the plan's
-          audit clause: the sample of fulfillments, plus the captain's
-          current Larder. Drawn only when the layer reports one, so a
-          voyage with the provisions switch off shows the reveal this strip
-          has always shown rather than a number nothing moves. The red is
-          the meaning red rather than the strip's own hue, because an empty
-          larder is the finding the room is looking for and it should be
-          readable before the count is. */}
-      {reveal.larder !== undefined && (
-        <div className="mt-1.5">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-              reveal.shortRations
-                ? "border-alarm/30 bg-alarm/5 text-alarm"
-                : "border-intel/25 text-foreground",
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
+            {t(
+              "{manifestLine} Opened by a majority in round {reveal.round}, which closed that round's trading; the finding stays on the table for the rest of the voyage.",
+              {
+                manifestLine: reveal.flagged
+                  ? t(
+                      "The harbor's own checks could not reconcile this manifest, so its lines are withheld.",
+                    )
+                  : t(
+                      "A random sample of this captain's most recent order fulfillments, opened by a vote of the harbor. Their card, their Gold and the rest of their hold were not opened.",
+                    ),
+                "reveal.round": reveal.round,
+              },
             )}
-          >
-            <Utensils className="h-3 w-3" />
-            {t("Larder")} {reveal.larder}
-          </span>
-          <span className="ml-1.5 text-[10px] text-muted-foreground/80">
-            {reveal.shortRations
-              ? t("an empty larder: this captain's crew is on short rations.")
-              : reveal.larder === 0
-                ? t("an empty larder, with no crew aboard to go hungry.")
-                : t("rations aboard, eaten one a head each leg.")}
-          </span>
-        </div>
-      )}
-
-      <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-        {t(
-          "{manifestLine} Opened by a majority in leg {reveal.round}, which closed that leg's trading; the finding stays on the table for the rest of the voyage.",
-          {
-            manifestLine: reveal.flagged
-              ? t(
-                  "The harbor's own checks could not reconcile this manifest, so its lines are withheld.",
-                )
-              : t(
-                  "A random sample of this captain's most recent order fulfillments, opened by a vote of the harbor. Their card, their Gold and the rest of their hold were not opened.",
-                ),
-            "reveal.round": reveal.round,
-          },
-        )}
-      </p>
-    </div>
+          </p>
+        </>
+      ) : null}
+    </VoteRevealStrip>
   );
 }

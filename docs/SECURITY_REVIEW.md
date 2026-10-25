@@ -1,30 +1,29 @@
 # PortMasters 2.2 Parallel Release: The Private Information Security Review
 
-[J1: the private information review] Ocean Gambit is the first mode in this
+Ocean Gambit is the first mode in this
 tree whose rules depend on things a captain is not allowed to know: an
 alignment, a personal goal, an ally, a win verdict. Everything else the game
 hides is hidden by being local, and this is hidden by being deliberate, so
 the paths that carry those facts are worth reading on purpose rather than
 trusting to have come out right.
 
-This is that reading. It covers the three surfaces the plan names, it records
+This is that reading. It covers the three surfaces below, it records
 what it found and what it fixed, and it names the boundaries that were
 accepted on purpose. Two gates came out of it, and the last section says when
 the whole review repeats.
 
-A second pass was taken for J2, which added the private paths the first pass
-did not have: a frame carrying the host's mute list, delivered one captain at
+A second pass added the private paths the first pass did not have: a frame carrying the host's mute list, delivered one captain at
 a time, and a report row that names two captains and reaches no wire at all.
 The two notes the first pass recorded rather than fixed are closed findings
 now, with what closed them written where they were raised.
 
 ## Scope
 
-Three surfaces, taken from the plan:
+Three surfaces:
 
 1. **Every site that builds a broadcast payload.** Anything a whole harbor
-   receives. There are 64 `io.to(...)` and `io.emit(...)` statements across
-   29 files under `src/server/realtime`, and a thirtieth file, the chat
+   receives. There are 57 `io.to(...)` and `io.emit(...)` statements across
+   28 files under `src/server/realtime`, and a twenty-ninth file, the chat
    module, carries the phrase inside a comment and no statement. The
    question asked of each is whether anything private can be inside the
    payload it sends. The two passes read the 50 statements across the 16
@@ -35,7 +34,7 @@ Three surfaces, taken from the plan:
    the count above is the surface as it stands rather than the pages that
    were turned. The last section records what the repeat rule makes of both.
 2. **Every site that writes to the log array.** The session conversation,
-   which lives in process memory for the length of a room's life and is
+   which lives in process memory for the length of a harbor's life and is
    deliberately never written to the database.
 3. **The save path that trusts a client.** `PUT /api/game/state` writes what
    a client sends, by design, and a save is read by the whole table at the
@@ -43,8 +42,8 @@ Three surfaces, taken from the plan:
 
 Out of scope, and named so it is not mistaken for covered: the account and
 session layer beyond identity binding, and transport security. The shape of
-the mute was out of scope in the first pass as a note for J2 and is read in
-the second, where the frame that carries it is added to the inventories
+the mute was out of scope in the first pass and is read in the second,
+where the frame that carries it is added to the inventories
 below, along with the report row beside it.
 
 ## Method
@@ -68,20 +67,23 @@ run as `npm run check:private`, holds eight rules:
    operator window, the wire type and the combination instrument, whose
    whole reading is a count over rows that carry it.
 4. No broadcast payload statement names a secret.
-5. The tutorial's one `dangerouslySetInnerHTML` site, which renders authored
-   copy with constants in it and nothing else.
+5. The one door authored copy reaches the browser as HTML, which is one
+   component rather than a screen. The tutorial's pages are written as
+   markup and one sentence wants a bold word in the middle of it, so the
+   tree has a single `RichText` component that renders markup, and no
+   other site may render it. Every other sentence in the tree is text.
 6. The roster frame, which is the only thing in the tree that carries the
-   mute list, goes out one captain at a time. A mute is the host's judgement
-   of one captain, so a roster frame sent to a room is that judgement told to
-   the room.
+   mute list, goes out one captain at a time. A mute is the host's judgment
+   of one captain, so a roster frame sent to a harbor is that judgment told to
+   the harbor.
 7. The draft frame, which carries a captain's hand, goes out one captain at
    a time for the sixth rule's reason. A hand dealt to a seat is that seat's
-   information, and a draft view sent to a room channel lays every seat's
+   information, and a draft view sent to a harbor channel lays every seat's
    cards in front of the table.
 8. The bazaar board, which carries one captain's own view of the rumor rows,
    goes out one captain at a time for the sixth and seventh rules' reason. A
    standing row's direction belongs to its publisher until the market it
-   moves has been drawn, so a board sent to a room channel hands the whole
+   moves has been drawn, so a board sent to a harbor channel hands the whole
    table the lean the feature exists to keep.
 
 Its first run produced 25 findings, nearly all of them its own noise, and the
@@ -95,7 +97,7 @@ probe file violating all five rules was written, the scan reported 9 findings
 and exited 1, and the probe was deleted in the same command.
 
 The second pass proved the sixth rule the same way rather than inheriting the
-first pass's proof: a probe file that delivered the roster frame to a room was
+first pass's proof: a probe file that delivered the roster frame to a harbor was
 written, the scan named the file and the line, reported 1 finding, exited 1,
 and the probe was deleted in the same command, after which the scan read the
 tree clean again. The rule keys on the event name at an emit statement plus an
@@ -104,7 +106,7 @@ beside it, because the defect it guards is not a payload that mentions the
 list: it is the frame losing the captain it was addressed to.
 
 The third pass added the seventh rule when the draft landed, and proved it
-the same way: a probe file that delivered a draft frame to a room was
+the same way: a probe file that delivered a draft frame to a harbor was
 written, the scan named the file and the line at the emit statement, reported
 1 finding, exited 1, and the probe was deleted in the same command, after
 which the scan read the tree clean again. The rule is deliberately the sixth
@@ -117,7 +119,7 @@ way) pass on their spelling rather than on their intent.
 
 The suite's own reading of the same boundary was proved the same way, on a
 copy of the tree rather than on the tree: with the draft's view changed to
-a room broadcast for one run, the sweep reported the two seats it caught
+a harbor broadcast for one run, the sweep reported the two seats it caught
 and the run exited 1, and the copy was restored from the tree and read
 clean again. The sweep keeps every frame both sockets at a draft table
 receive, on every event rather than on the events the feature names, and
@@ -128,7 +130,7 @@ that changes inside a single beat is a card that reached the wrong socket.
 
 ### 1. Broadcast payloads
 
-64 statements, 29 files, with a thirtieth file, the chat module, carrying
+57 statements, 28 files, with a twenty-ninth file, the chat module, carrying
 the phrase in a comment and no statement. The two passes read the 50
 statements across the 16 files that existed when they ran, and every one of
 those was read for what it carries; the four files added since are named in
@@ -138,7 +140,7 @@ which is one file off the surface and nine on with the total unchanged, and
 the growth and the conclusion's split since the extraction are recounted
 there too, so the count here is the surface as it stands rather than the
 pages that were turned. The findings that matter are in the next section; what the inventory
-establishes is the shape of the surface: the broadcasts carry room rosters,
+establishes is the shape of the surface: the broadcasts carry harbor rosters,
 chat lines, a voyage checkpoint, objective totals, barter and aid offers,
 telemetry statuses, the audit reveal, and the end of voyage reveal. The two
 that carry a secret are deliberate, and are listed under boundaries below.
@@ -146,23 +148,23 @@ that carry a secret are deliberate, and are listed under boundaries below.
 The roster frame is the one entry the second pass changed, and it changed by
 losing a recipient rather than a field: the count above is the count after
 the change, because the frame is the same frame sent to one captain at a
-time through `emitToUser` instead of to the room. The mute list it carries is
+time through `emitToUser` instead of to the harbor. The mute list it carries is
 read by each captain as what they may see, which for most of a harbor is
 nothing at all.
 
-[B2] added two fields to a payload that already existed rather than a payload
-of its own: `phase:ready_update` now also carries the moment the room's seat
+The phase clock added two fields to a payload that already existed rather than a payload
+of its own: `phase:ready_update` now also carries the moment the harbor's seat
 runs out and how long that seat was given, which is what every captain's
 countdown is drawn from. Both are public to the table by design, since the
-clock is on all of their screens at once and a deadline the room shares is
+clock is on all of their screens at once and a deadline the harbor shares is
 not a secret, and neither is derived from anything hidden: the deadline is
 the server's own arithmetic over a length that is a constant in the tree.
 The four clauses below were applied to it, and the one of them it touches is
 the broadcast payload clause, which it satisfies by adding fields to a
 statement already in this inventory rather than a statement of its own. The
 single new broadcast statement is the harbor's own line explaining a move the
-room did not vote for (`src/server/realtime/checkpoint.ts:319`), which
-carries a sentence and a room id and nothing about any captain. No new path
+harbor did not vote for (`src/server/realtime/checkpoint.ts:301`), which
+carries a sentence and a harbor id and nothing about any captain. No new path
 trusts a client either: the departure a captain who had not acted takes is
 computed by the same client authoritative engine the boundaries below
 already accept.
@@ -174,39 +176,39 @@ already accept.
 `appendBounded` (line 114), reached by `recordHarborMessage` (line 129) and
 `recordDirectMessage` (line 136), and both are bounded at 200 lines
 (`SESSION_LOG_LIMIT`, line 75). Reads are asymmetric on purpose: `harborLog`
-(line 143) hands back the room's own conversation, while `directLogFor`
+(line 143) hands back the harbor's own conversation, while `directLogFor`
 (line 151) filters on read to the lines the reader sent or received. The
 filter is the design rather than the storage, which is what keeps one
-captain's private thread from reaching another when a room is hydrated after
-a reload. Both arrays are dropped when the room is restarted or torn down
+captain's private thread from reaching another when a harbor is hydrated after
+a reload. Both arrays are dropped when the harbor is restarted or torn down
 (`clearSessionChat`, line 160). The lines here moved down by twenty when the
 mute book's own unique violation reader joined this module; the readers and
 the arrays are the same ones the pass read.
 
 Nothing here needed a fix. It is recorded because it is the one place in the
-product where private conversation is stored at all, and the next slice that
+product where private conversation is stored at all, and the next pass that
 adds a line to it should know which array it is writing into.
 
 ### 3. The save path
 
-`src/app/api/game/state/route.ts`. The `PUT` requires a session (line 109), a
-membership row (line 116), and then writes what it was handed. The Ledger
-Integrity Pass reads four numbers out of the blob (line 143) and marks the
+`src/app/api/game/state/route.ts`. The `PUT` requires a session (line 114), a
+membership row (line 125), and then writes what it was handed. The Ledger
+Integrity Pass reads four numbers out of the blob (line 152) and marks the
 row rather than rejecting it, which is deliberate: a captain must never lose
 a voyage to a false positive, and an implausible save is a mark the features
 that read standings can decline to trust.
 
-Three properties hold around it. The verdict is judged against the room's own
+Three properties hold around it. The verdict is judged against the harbor's own
 `currentRound` rather than anything in the payload, which is the one number a
-client cannot forge (line 139). The response shape is identical whether or
+client cannot forge (line 148). The response shape is identical whether or
 not the save tripped the guard, so a tampering client learns nothing about
-whether it was caught (line 180). And the alignment table is not in a save at
+whether it was caught (line 189). And the alignment table is not in a save at
 all: alignments live in `VoyageRole` rows the server writes, which is why a
 doctored save cannot invent one.
 
 ### 4. The report table
 
-`Report` (`prisma/schema.prisma:475`) is the one record the second pass
+`Report` (`prisma/schema.prisma:526`) is the one record the second pass
 added. Four columns and a moment: a harbor, a voyage, a reporter and a
 target, with a unique constraint over the four, so one report per pair per
 voyage is the table's own rule rather than a check standing in front of it.
@@ -217,7 +219,7 @@ operator's purge deletes the rows that name an account by hand, on the
 reporting side and the reported side alike.
 
 Nothing on the wire carries a report. The captain it names is not told, the
-harbor is not told, and the only frame it produces is the acknowledgement to
+harbor is not told, and the only frame it produces is the acknowledgment to
 the captain who filed it. With the mute, the second pass added no new private
 channel at all; it added a record the game keeps and a frame that lost an
 audience, which is why the review repeats over them rather than the suite
@@ -225,31 +227,31 @@ growing a sweep for them.
 
 ## Findings
 
-### F1, Medium, fixed: the detail popup trusted its clients
+### Medium, fixed: the detail popup trusted its clients
 
 `player:detail:response` relayed whatever the sending socket said. Any
 authenticated captain could emit one frame naming any `targetUserId` and any
-`requesterId` and any room, and the server would push the payload to the
+`requesterId` and any harbor, and the server would push the payload to the
 named account, anywhere in the tree, with a snapshot of the sender's
 choosing in it. Nothing private leaked the other way, but a captain could be
 handed a forged hold under another captain's name, which is the kind of
 defect that makes the popup worse than not existing.
 
 Fixed by holding the question. `player:detail:request` now verifies that the
-target is a member of the asker's own room before forwarding, and writes the
-pair down (`rememberDetailRequest`, `src/server/realtime/presence.ts:94`).
+target is a member of the asker's own harbor before forwarding, and writes the
+pair down (`rememberDetailRequest`, `src/server/realtime/presence.ts:88`).
 The response is relayed only if a question is waiting for that exact pair,
-and only if the asker is still standing in the room the question was about
-(`src/server/realtime/wiring/player-detail.ts:85`). The room and the requester on the
+and only if the asker is still standing in the harbor the question was about
+(`src/server/realtime/wiring/player-detail.ts:83`). The harbor and the requester on the
 relayed frame are the ones the server wrote down, never the ones the
 answering client sent. Holds expire after 30 seconds and are dropped with the
-room on a restart or a teardown. Three branches of it are now exercised by
+harbor on a restart or a teardown. Three branches of it are now exercised by
 the smoke suite: the question and answer, a second answer to a consumed
 question, and an answer to a captain who has left the harbor.
 
-### F2a, Low, fixed: a manifest line was bounded in shape but not in size
+### Low, fixed: a manifest line was bounded in shape but not in size
 
-`normalizeOrderFills` (`src/lib/game/audit.ts:189`) dropped entries that
+`normalizeOrderFills` (`src/lib/game/audit.ts:82`) dropped entries that
 could not be a fulfillment, but placed no bound on a port name, a good name,
 the number of goods in a line, or a count. Since a fill is printed to the
 whole table in an audit reveal and in the ledger at the end of a voyage, a
@@ -264,38 +266,38 @@ reads as a smaller trade than it was. Both sides of each bound are checked in
 the suite: what a real voyage produces survives, and what only a doctored
 save could is dropped.
 
-### F2b, Low to Medium, fixed: a save had no size limit
+### Low to Medium, fixed: a save had no size limit
 
-Any member of a room could write a save of any size, and the harbor pays for
+Any member of a harbor could write a save of any size, and the harbor pays for
 it: the conclusion parses every blob at the table and the Manifest Audit
 samples one, on the code path that has to finish before a voyage can end.
 
-Fixed with a 64 KB cap (`SAVE_BODY_MAX`, same route, line 105), chosen from
+Fixed with a 64 KB cap (`SAVE_BODY_MAX`, same route, line 111), chosen from
 measurement rather than taste: five real saves on a live database run 1.5 KB
 to 3.5 KB, so the cap is around twenty times the largest real one and leaves
 room for a long voyage, a big hold and a full ledger. An oversized save is
 refused with a 413 before the write, so the good save already on the row
 stays exactly as it was, which the suite checks.
 
-### F3, Low, fixed: there were no rate limits anywhere in `src`
+### Low, fixed: there were no rate limits anywhere in `src`
 
 Every entry point was capped in size and typed, and chat was capped at 1000
 characters on all three paths (`CHAT_MESSAGE_MAX`,
 `src/lib/realtime-endpoint.ts:22`), but nothing counted requests, so a captain
 with a script could emit status frames or detail questions as fast as the
 socket accepted them. The first pass recorded this rather than fixing it
-because no slice of the plan owned it and a limit invented then would have
-been a number with no reading behind it. The same slice that shaped the mute
+because no single feature owned it and a limit invented then would have
+been a number with no reading behind it. The same pass that shaped the mute
 has that reading, so it is fixed here.
 
 As fixed, `src/server/realtime/inbound-limit.ts` puts every incoming frame on
 a token bucket per socket, installed in front of every handler
-(`src/server/realtime/index.ts:264`): thirty frames in hand
-(`inbound-limit.ts:53`) and ten a second earned back, both read off the client
+(`src/server/realtime/index.ts:288`): thirty frames in hand
+(`inbound-limit.ts:56`) and ten a second earned back, both read off the client
 this tree ships rather than picked. An idle captain in a voyage sends two
 heartbeats per eight seconds, a captain trading sends two to nine frames a
 second in clusters of up to three inside a hundred and twenty milliseconds, a
-client mounting a room sends about nine frames in a hundred and fifty, and the
+client mounting a harbor sends about nine frames in a hundred and fifty, and the
 tightest legitimate loop the suite runs sends twelve frames a hundred
 milliseconds apart. Thirty clears the largest burst with the mount storm and a
 margin on top of it; ten a second sits at the highest sustained rate the app
@@ -319,13 +321,13 @@ hundred frames from one socket are answered thirty times, the captain behind
 them is told once, the next captain's twelve frames are answered twelve times,
 and the flooded socket is answered again once the budget refills.
 
-### F4, Low, fixed: the mute was visible to the room
+### Low, fixed: the mute was visible to the harbor
 
-`mutedUserIds` rode `room:members` as a room wide broadcast, so every captain
+`mutedUserIds` rode `room:members` as a harbor wide broadcast, so every captain
 in the harbor could see who had been muted, including the muted captain. The
-first pass recorded it as a design a later slice should decide on purpose
-rather than as a leak, since nothing secret was revealed about anyone, and J2
-is the slice that shaped the mute.
+first pass recorded it as a design a later pass should decide on purpose
+rather than as a leak, since nothing secret was revealed about anyone, and
+the later pass that shaped the mute is where it was fixed.
 
 As fixed, the frame is delivered one captain at a time through `emitToUser`
 (`src/server/realtime/chat.ts:222`), and the field means what that recipient
@@ -333,7 +335,7 @@ may see rather than what the harbor decided: the host is handed the list they
 set, a silenced captain is handed their own row of it, and a captain who is
 neither is handed nothing. No client shape changed, because both existing
 readers already read the list that way, and the scan's sixth rule is what
-keeps a later slice from turning the frame back into a broadcast.
+keeps a later pass from turning the frame back into a broadcast.
 
 ## Boundaries accepted on purpose
 
@@ -351,34 +353,34 @@ standings can decline to trust it.
 fields, so a client cannot write arbitrary JSON into a broadcast. The list is
 the boundary: everything else a client sends on that event is dropped. The
 round inside it is bounded as well as typed: it is read against the voyage's
-own length before a report can move the checkpoint (`namesALegOfTheVoyage`,
-`src/server/realtime/wiring/status-heartbeat.ts`), so a frame naming a leg
+own length before a report can move the checkpoint (`namesARoundOfTheVoyage`,
+`src/server/realtime/wiring/status-heartbeat.ts`), so a frame naming a round
 the voyage does not have, whether from a stale build or a modified client,
-leaves the room where it stands.
+leaves the harbor where it stands.
 
-**Two room wide carriers of a secret, both deliberate.**
+**Two harbor wide carriers of a secret, both deliberate.**
 `voyage:reveal` (`src/server/realtime/reveal.ts:40`) publishes every card at
 the end of a voyage, because that is what the end of a voyage is for, and
-`audit:reveal` (`src/server/realtime/audit.ts:398`) publishes two sampled
+`audit:reveal` (`src/server/realtime/audit.ts:249`) publishes two sampled
 manifest lines during one, because the audit's whole value is that the table
 sees them. Both are the mode's design rather than leaks of it, and both are
 reachable only at their own moment.
 
 **The win verdict and the alignment are on their own rows.** The chronicle
 row carries both (`prisma/schema.prisma:343-344`), and the wire type does not:
-the route that hands a captain their chronicles selects named fields, omits
-both, and filters on the reader (`src/app/api/chronicle/route.ts:29, 54`).
+the route that hands a captain their chronicles maps the row to a shape that
+carries neither, and filters on the reader (`src/app/api/chronicle/route.ts:22, 50`).
 That is the same allow list discipline the payloads follow, one layer down.
 
 **The operator window is admin gated.** The one console that can read across
 accounts refuses every action from a captain whose account row is not an
-administrator, and the check is server side (`src/server/realtime/admin.ts:111`).
+administrator, and the check is server side (`src/server/realtime/admin.ts:123`).
 
 **Identity is bound on the socket, never read from a payload.** `auth`
-resolves the account through `getUserFromToken` (`src/server/realtime/auth.ts:75`)
-and writes the id onto the socket state (line 102). `room:join` verifies a
+resolves the account through `getUserFromToken` (`src/server/realtime/auth.ts:65`)
+and writes the id onto the socket state (line 96). `room:join` verifies a
 membership row before the seat is claimed
-(`src/server/realtime/wiring/room-join.ts:67`). No handler in the
+(`src/server/realtime/wiring/room-join.ts:60`). No handler in the
 realtime layer reads a captain's identity out of the frame it was sent,
 which is what makes "the sender is who they say they are" true by
 construction rather than by review.
@@ -399,38 +401,38 @@ can honestly hold, and the price is the agreement. The published fee
 bounds (`CONSENT_FEE_MIN`, `CONSENT_FEE_MAX`) wall the per trade amount,
 and the module suite pins the clamp deliberately rather than by accident.
 
-**An escort claim is a report about a leg, so a frame that crosses the
-leg's close is refused rather than settled against the new one.** The
-claim handler rides the leg rather than the phase
+**An escort claim is a report about a round, so a frame that crosses the
+round's close is refused rather than settled against the new one.** The
+claim handler rides the round rather than the phase
 (`src/server/realtime/wiring/escort-contracts.ts`), a claim arriving
-after the room has carried the leg on meets "That contract was for an
-earlier leg.", and a claim reporting a raid that took nothing is dropped
+after the harbor has carried the round on meets "That contract was for an
+earlier round.", and a claim reporting a raid that took nothing is dropped
 silently, because there is no captain doing anything wrong. The loss a
 frame takes by arriving late is accepted: settling cover against the
-wrong leg's raid would be the worse reading, and no other captain can be
+wrong round's raid would be the worse reading, and no other captain can be
 moved by it.
 
 **The bazaar does not check who may speak, and that line is deliberate.**
 Being the Aroma lives in a save this server has never read, so the desk
 checks everything about a rumor row that can be checked without one (its
-shape, its bounds, the voyage leg it names) and nothing about the
+shape, its bounds, the voyage round it names) and nothing about the
 captain's path; the module's own header states the boundary at the code
-(`src/server/realtime/wiring/bazaar.ts:36-41`) rather than leaving it to
+(`src/server/realtime/wiring/bazaar.ts:35-40`) rather than leaving it to
 a reader to find.
 
 ## The severity one bar
 
-The plan's evaluation for this review is that no alignment field can reach
+The evaluation for this review is that no alignment field can reach
 the wrong client, at severity one. The verdict is that none does, and that
 none did before the fixes either: the alignment table has three production
-readers, all inside `src/server/realtime/gambit.ts` (lines 148, 220, 305),
+readers, all inside `src/server/realtime/gambit.ts` (lines 129, 186, 323),
 and the only wire field that can carry an alignment is `role`, inside a
 `PrivateEntry` that `emitPrivate` addresses to one captain's own sockets
-(`src/server/realtime/presence.ts:64`). The set stayed three when the
-charters landed at leg four: the take reads the table through the same
+(`src/server/realtime/presence.ts:60`). The set stayed three when the
+charters landed at round four: the take reads the table through the same
 module's own accessor, where the voyage's end was already the first caller
-(`cardsInRoom`, called from `src/server/realtime/conclusion/voyage.ts:313`
-and, for the take, `src/server/realtime/wiring/leg-report.ts:130`), which
+(`cardsInRoom`, called from `src/server/realtime/conclusion/voyage.ts:240`
+and, for the take, `src/server/realtime/wiring/round-report.ts:129`), which
 is a second caller rather than a fourth reader.
 
 That verdict is now mechanical rather than remembered. Two sweeps in the
@@ -459,7 +461,7 @@ row and creates no table.
 It deliberately does not contact a running server. The one route a script can
 call without credentials answers from the process and touches nothing else,
 by design, so it cannot say which database the server answering for it is
-writing to; asking would be theatre. The run time proof that a server and the
+writing to; asking would be theater. The run time proof that a server and the
 script driving it share one database is the smoke suite's safety interlock:
 the first account is created through the API, and the run stops before a
 second one exists unless that account can be read back through the driver's
@@ -518,89 +520,40 @@ fact of separation at run time.
 The rule, written here so nobody has to remember it: **a new private channel,
 a new persisted secret, a new broadcast payload, or a new path that trusts a
 client repeats this review before it repeats the closed test.** The same
-sentence is in `docs/IMPLEMENTATION_PLAN.md` under the rules that must not be
+sentence is in `docs/DEVELOPMENT_GUIDE.md` under the rules that must not be
 broken, and `npm run check:private` is the part of it a command can hold.
 
-It has been repeated once. J2 added a persisted record about two captains and
-changed the audience of a payload that had been arriving at the wrong one, so
+It has been repeated once. The second pass added a persisted record about two
+captains and changed the audience of a payload that had been arriving at the wrong one, so
 it triggered on two of the four clauses at once. The second pass is recorded
 on this page rather than in a document of its own, because a second reading of
 the same surfaces is a second pass over the same page: the scope, the
 inventories, the findings and the limits above now carry both.
 
-**The surface has grown since the second pass, and the trigger is met again.**
-The passes read 50 broadcast statements across 16 files. There are now 59
-across 20: the four files added since are `bazaar.ts`, `consent.ts`,
-`draft.ts` and `voyage-log.ts`, and the files that were already there carry
-five more statements between them than they did. That is the fourth clause
-read as a count, so this is written down as an owed repeat rather than
-settled here, and it is left visible on purpose: the numbers in the scope and
-the inventory above are the surface as it stands, and the reading behind them
-is the one the second pass took.
+**The surface has grown and moved since the second pass.** The passes read 50
+broadcast statements across 16 files; the tree now carries 57 executable
+statements across 28 files, with the chat module's comment beside them. The
+growth came in small steps: four modules joined the surface (`bazaar.ts`,
+`consent.ts`, `draft.ts`, `voyage-log.ts`), the checkpoint, the harbor join
+and the public offers ledger added one statement each, and the connection
+handlers moved out of the composition root into nine leaves under `wiring/`
+without adding a statement. Two later changes left the count alone: the
+Manifest Audit and the maroon now share one tally helper (`tally.ts`) instead
+of keeping two copies of the same walk, and the fleet commission added a
+grant addressed to one sender (`objective:granted`) whose payload is that
+captain's own standing and nothing about any other seat.
 
-**The surface then moved without growing.** The extraction that split the
-connection handlers one to a file changed where the statements live and
-nothing else about them: the composition root held 29 of the 59 and now holds
-none, those 29 sit one to a file across nine leaves under
-`src/server/realtime/wiring`, and the total is 59 before and after. No frame
-was added, no recipient changed, no payload gained a field, and no path that
-trusts a client appeared, so the private channel clause and the persisted
-secret clause are untouched and the broadcast payload clause is untouched in
-substance: a statement does not become a new payload by moving to another
-file. What it does change is the count that clause is read against, and that
-count is already recorded above as an owed repeat. The repeat stays owed, it
-is now owed over 28 files rather than 20, and no reading has been taken over
-the newer ones, which is stated here rather than implied by the numbers.
+None of the additions carries a private payload. The ledger broadcasts the
+public record the design makes public on purpose, the checkpoint broadcasts a
+deadline, the harbor join broadcast carries membership, and the shared tally
+helper reports a count, a roster and a book the harbor is shown already. The
+trigger stays met on the broadcast payload clause as a count rather than a
+reading, so the repeat stays owed, and no reading has been taken over the
+newer statements. That is stated here rather than implied by the numbers.
 
-**The surface then grew again, by measurement, and the scan's third rule
-grew with it.** The extraction's note left the count at 59 statements
-across 28 files, a count that included the chat module's comment line.
-Since then the checkpoint carries one statement more and the room join two,
-and the F5 public offers ledger added one in a file of its own,
-`boon-ledger.ts`, while the conclusion split into `conclusion/finishers.ts`
-and `conclusion/voyage.ts` and moved three statements between two files
-without adding one. The surface stands at 62 executable statements across
-29 files, the chat module's comment beside them. Nothing in the additions
-carries a private payload: the ledger's broadcast carries the public record
-the plan makes public by design, the checkpoint's carries a deadline, and
-the room join's carry membership. The trigger stays met on the broadcast
-payload clause as a count rather than a reading, and the repeat stays owed,
-now over 29 files, with no reading taken over the newer ones. The cycle
-this note is written in, F7, adds no broadcast statement at all: its diff
-grows the count zero, and what it does grow is rule 3's file list, where
-`src/lib/game/combinations.ts` joins the balance reader, the operator
-window and the wire type as a place the win verdict is a property. The
-rule's own sentence is that a fifth is a verdict that has learned to
-travel, and the list's comment records why the fourth does not: the
-instrument counts verdicts it does not decide, and counting is not
-travelling.
-
-What holds the newer paths in the meantime is `npm run check:private`, whose
+What guards the newer paths in the meantime is `npm run check:private`, whose
 fourth rule reads the text of every broadcast payload statement for a secret
-written into it, which is the part of this reading a command can keep. What
-that rule cannot do is the part this review exists for: it reads the words of
-an emit rather than its meaning, so it catches a payload that says role or
-flourish or ally or alignment and passes one that smuggles the same value
-under a name nobody taught it.
-
-**The surface has grown again, by two statements, since that note.** The same
-reading, run at the close of the latest cycle, counts 64 across the same 29
-files, the chat module's comment line still beside them. No finding is
-claimed over the two: a count moving inside the cycles since is exactly the
-trigger, so the repeat stays owed, now over 64 statements and 29 files, and
-no reading has been taken over the newer ones, stated here rather than
-implied by the numbers. What guards them in the meantime is the mechanical
-half: `npm run check:private` ran green over the whole tree, 484 files under
-seven rules, at the close of the same cycle.
-
-**The commission's handover is a new private frame, recorded here as
-such.** The fleet's commission gained two wires in the cycle that
-followed: a handover a captain sends, and a grant the server addresses to
-the sender alone (`objective:granted`), carrying the fleet's running total
-for that captain's own goal and nothing about any other seat. It repeats
-no secret this review hides: the payload is the sender's own standing, the
-same figure the public progress frame already carries as a total,
-delivered to one socket because the step from the fleet's total to one
-captain's share is that captain's own arithmetic. The wires add no
-broadcast statement, so the count above stands at 64 across the same 29
-files, and the repeat stays owed as stated.
+written into it. What that rule cannot do is the part this review exists for:
+it reads the words of an emit rather than its meaning, so it catches a payload
+that says role or flourish or ally or alignment and passes one that smuggles
+the same value under a name nobody taught it.

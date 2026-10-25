@@ -11,9 +11,9 @@
 // auth hold has settled writes the same field the handshake already
 // filled.
 //
-// The write covers the room's log too, and in two steps. It lands on the
+// The write covers the harbor's log too, and in two steps. It lands on the
 // socket's own copy of the language, which is the one the log's
-// accumulator renders each frame from, so every line the room writes
+// accumulator renders each frame from, so every line the harbor writes
 // after a flip arrives in the new language. And it asks the log's
 // history door for a reprint, because the lines already held on the
 // captain's screen were built for the old one: the log is stored as
@@ -43,7 +43,7 @@ export function wireLocale(socket: Socket): void {
     // socket.io keeps a connection's frames in order, so the server has
     // already written the new language onto this socket by the time the
     // log is built: the reprint cannot race the flip and land half
-    // translated. A captain holding no room has no log to reprint, and a
+    // translated. A captain holding no harbor has no log to reprint, and a
     // harbor that never opened one answers the request path with
     // nothing, so both absences cost a no op rather than a frame.
     if (changed && state.roomId) sendVoyageLogHistory(socket, state.roomId);

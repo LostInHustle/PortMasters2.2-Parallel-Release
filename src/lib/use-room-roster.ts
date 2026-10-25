@@ -9,7 +9,7 @@ import type { Socket } from "socket.io-client";
 type RoomStatusMap = Record<string, GameStatusUpdate>;
 
 /**
- * The room's live roster: who is aboard, each captain's last reported status,
+ * The harbor's live roster: who is aboard, each captain's last reported status,
  * and who the host has muted. Both surfaces that show the harbor at a glance
  * (MembersPanel's full roster and FleetTicker's strip) need exactly this, and
  * this shares the code, not the state: every caller still subscribes on its
@@ -32,7 +32,7 @@ export function useRoomRoster(
 
     const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== roomId) return;
-      // The list is what this captain may see rather than what the room
+      // The list is what this captain may see rather than what the harbor
       // holds (see RoomMembersPayload), and the server is the only writer
       // of it, so it is taken as handed rather than filtered here.
       setMutedUserIds(new Set(data.mutedUserIds ?? []));
@@ -46,7 +46,7 @@ export function useRoomRoster(
         seen.has(m.id) ? false : (seen.add(m.id), true),
       );
       setMembers(filtered);
-      // Prune status entries for captains no longer in the room. Over a long
+      // Prune status entries for captains no longer in the harbor. Over a long
       // session the map accumulates departed members whose last known gold and
       // reputation are now meaningless, and if a new captain ever arrived on
       // the same user id the stale status would flash before the first live
@@ -73,7 +73,7 @@ export function useRoomRoster(
     socket.on("room:members", onMembers);
     socket.on("game:status", onStatus);
     return () => {
-      // Detach listeners only, never leave the room channel here: this runs on
+      // Detach listeners only, never leave the harbor channel here: this runs on
       // any unmount, not on a deliberate departure.
       socket.off("room:members", onMembers);
       socket.off("game:status", onStatus);

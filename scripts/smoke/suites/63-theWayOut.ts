@@ -7,12 +7,12 @@
 //
 // Nothing here needs a server, a captain or a harbor: both exits are
 // shapes in the client source, held to their wiring rather than to a
-// live room, the same way the mutes and the keys' article walks src for
+// live harbor, the same way the mutes and the keys' article walks src for
 // its key literals. What it holds is that the leave press routes through
 // one guard before it commits the write off, that the confirm it opens
-// is the room's own dialog wired back to the leave flow rather than to a
+// is the harbor's own dialog wired back to the leave flow rather than to a
 // second one, and that the two finished voyage screens take their way
-// out from the room instead of drawing a press that goes nowhere.
+// out from the harbor instead of drawing a press that goes nowhere.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -49,7 +49,7 @@ export async function theWayOutSuite(): Promise<void> {
     /export function LeaveConfirmModal\(/.test(gameModals) &&
       gameRoom.includes("<LeaveConfirmModal") &&
       gameRoom.includes("onConfirm={handleLeave}"),
-    "the confirm the ask draws is the room's own dialog, wired back to the leave flow rather than to a second one",
+    "the confirm the ask draws is the harbor's own dialog, wired back to the leave flow rather than to a second one",
   );
 
   check(
@@ -57,6 +57,6 @@ export async function theWayOutSuite(): Promise<void> {
       bankruptcy.includes("Sail Again") &&
       phasePanel.includes("onLeave={onLeave}") &&
       gameRoom.includes("onLeave={requestLeave}"),
-    "both finished voyage screens offer the way out to a captain waiting on the host, threaded from the room's one leave flow",
+    "both finished voyage screens offer the way out to a captain waiting on the host, threaded from the harbor's one leave flow",
   );
 }

@@ -12,15 +12,15 @@
 // it out.
 //
 // The ceremony is a stagger, one card every REVEAL_STAGGER_MS in the
-// order the standings arrived in, which is the beat the plan asks for and
+// order the standings arrived in, which is the beat the design asks for and
 // the reason this panel is not a table. It is skippable from the first
-// second, because twenty five seconds of theatre is a joy on the first
+// second, because twenty five seconds of theater is a joy on the first
 // voyage of an evening and a hold up on the fourth, and either way the
 // host is waiting to start the next one.
 //
-// The ledger below it is the honest half of the plan's sentence. What is
-// durably recorded of a finished voyage is the commission's progress leg
-// by leg, the order fulfillments each client kept, and the endings, so
+// The ledger below it is the honest half of the design's sentence. What is
+// durably recorded of a finished voyage is the commission's progress round
+// by round, the order fulfillments each client kept, and the endings, so
 // those are what it shows: the fleet's story across the voyage, then
 // every trade left on the record with the traitors picked out of it.
 //
@@ -42,7 +42,7 @@ import { victoryLine } from "@/lib/game/victory";
 
 // How long the table sits with one card before the next one turns over.
 // Six captains is a little under half a minute, which is the length the
-// plan asks for, and it is the only timing in the mode that is spent
+// design asks for, and it is the only timing in the mode that is spent
 // rather than saved.
 const REVEAL_STAGGER_MS = 4200;
 
@@ -232,8 +232,8 @@ function RevealedCard({
 
 // The replay ledger: the voyage the table just sailed, in the order it
 // happened, out of the three things a finished voyage leaves behind. The
-// fleet's commission leg by leg is the spine of it, and the order
-// fulfillments are what puts names and cargo against a leg.
+// fleet's commission round by round is the spine of it, and the order
+// fulfillments are what puts names and cargo against a round.
 function ReplayLedger({
   reveal,
   myUserId,
@@ -242,27 +242,27 @@ function ReplayLedger({
   myUserId: string;
 }) {
   const { objective, fleetTrace } = reveal;
-  // Every fill on the wire, grouped by the leg it happened in and read
+  // Every fill on the wire, grouped by the round it happened in and read
   // through the same line the audit prints, so a trade the harbor was shown
   // mid voyage and the same trade here are one sentence.
-  const byLeg = new Map<
+  const byRound = new Map<
     number,
     { name: string; line: string; mine: boolean; traitor: boolean }[]
   >();
   for (const captain of reveal.captains) {
     const traitor = captain.role === "pirate" || captain.role === "broker";
     for (const fill of captain.fills) {
-      const rows = byLeg.get(fill.round) ?? [];
+      const rows = byRound.get(fill.round) ?? [];
       rows.push({
         name: captain.displayName,
         line: fulfillmentLine(fill),
         mine: captain.userId === myUserId,
         traitor,
       });
-      byLeg.set(fill.round, rows);
+      byRound.set(fill.round, rows);
     }
   }
-  const tradeLegs = [...byLeg.entries()].sort((a, b) => a[0] - b[0]);
+  const tradeRounds = [...byRound.entries()].sort((a, b) => a[0] - b[0]);
   const filled = Math.max(
     0,
     ...fleetTrace.map(
@@ -279,18 +279,18 @@ function ReplayLedger({
         </span>
       </div>
 
-      {/* The commission, leg by leg. The one number the whole table was
-          watching while they sailed it, read back at the end of every leg
+      {/* The commission, round by round. The one number the whole table was
+          watching while they sailed it, read back at the end of every round
           anyone recorded. */}
       <div className="px-3 py-2 border-t border-black/5 dark:border-white/10">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
           {t(objective.name)}
-          {t(", leg by leg")}
+          {t(", round by round")}
         </div>
         {fleetTrace.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">
             {t(
-              "No leg of this commission was recorded, so there is no curve to draw.",
+              "No round of this commission was recorded, so there is no curve to draw.",
             )}
           </p>
         ) : (
@@ -303,7 +303,7 @@ function ReplayLedger({
                   className="flex items-center gap-2 text-[11px] tabular-nums"
                 >
                   <span className="w-12 shrink-0 text-muted-foreground">
-                    {t("Leg {leg}", { leg: entry.round })}
+                    {t("Round {round}", { round: entry.round })}
                   </span>
                   <span className="flex-1 truncate">
                     {objective.resources.map((row) => (
@@ -336,20 +336,20 @@ function ReplayLedger({
         <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
           {filled > 0
             ? t(
-                "The fleet handed over what its captains reported each leg, and the Emperor read the board when the voyage ended.",
+                "The fleet handed over what its captains reported each round, and the Emperor read the board when the voyage ended.",
               )
             : t("The fleet handed over nothing it reported.")}
         </p>
       </div>
 
-      {/* What was traded, by leg, with the traitors picked out. The window
+      {/* What was traded, by round, with the traitors picked out. The window
           is the audit's: the fulfillments a client still held a record of
           when the voyage ended. */}
       <div className="px-3 py-2 border-t border-black/5 dark:border-white/10">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
           {t("What was traded on the record")}
         </div>
-        {tradeLegs.length === 0 ? (
+        {tradeRounds.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">
             {t(
               "No order fulfillment survived the voyage, which happens when a harbor buys and sells mostly through each other.",
@@ -357,10 +357,10 @@ function ReplayLedger({
           </p>
         ) : (
           <div className="space-y-1.5">
-            {tradeLegs.map(([round, rows]) => (
+            {tradeRounds.map(([round, rows]) => (
               <div key={round}>
                 <div className="text-[10px] font-semibold text-muted-foreground">
-                  {t("Leg {leg}", { leg: round })}
+                  {t("Round {round}", { round: round })}
                 </div>
                 {rows.map((row, i) => (
                   <div
@@ -371,7 +371,9 @@ function ReplayLedger({
                       row.mine && "font-semibold",
                     )}
                   >
-                    {row.name}: {row.line}
+                    {row.name}
+                    {t(": ")}
+                    {row.line}
                   </div>
                 ))}
               </div>

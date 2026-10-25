@@ -36,7 +36,7 @@ export function StatsTab({
       <KeyStatsGrid
         totalVoyages={stats.totalVoyages}
         seaMasterCrowns={legacy.seaMasterCrowns}
-        bestScore={legacy.bestScore}
+        bestReputation={legacy.bestReputation}
         renownXP={legacy.renownXP}
       />
 

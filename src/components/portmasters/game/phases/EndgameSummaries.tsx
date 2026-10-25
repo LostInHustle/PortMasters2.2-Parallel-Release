@@ -71,10 +71,14 @@ function LedgerColumn({
  * shown at the end of a voyage so a captain can see where their Gold
  * came from and where it went.
  *
- * Income: totalRevenue (trade orders), plus the boon Gold the voyage was
- * granted (game.boonGoldEarned, the Emergency Loan's grant today).
- * Expenses: totalCosts (purchases, transport), workerWages,
- * maintenanceCosts, vatPaid, incomeTaxPaid.
+ * Income: totalRevenue (trade orders, gross of VAT), plus the boon Gold
+ * the voyage was granted (game.boonGoldEarned, the Emergency Loan's grant
+ * today).
+ * Expenses: totalCosts (purchases, freight), wagesPaid,
+ * maintenancePaid, finesPaid, vatPaid, incomeTaxPaid. The wage,
+ * maintenance and fine rows read the voyage totals rather than the round
+ * fields of the same name, which endRound has already cleared by the time
+ * this sheet opens.
  *
  * The net figure should roughly track the final Gold minus the
  * starting Gold, though rounding and per round resets mean it is a
@@ -107,22 +111,28 @@ export function FinancialSummary({ game }: { game: GameState }) {
 
   const expenses: LedgerRow[] = [
     {
-      label: "Purchases & Transport",
+      label: "Purchases & Freight",
       value: game.totalCosts,
       icon: "📦",
       tone: "text-alarm",
     },
     {
-      label: "Worker Wages",
-      value: game.workerWages,
+      label: "Artisan Wages",
+      value: game.wagesPaid,
       icon: "👥",
       tone: "text-due",
     },
     {
-      label: "Ship Maintenance",
-      value: game.maintenanceCosts,
+      label: "Ship Maintenance Fee",
+      value: game.maintenancePaid,
       icon: "🔧",
       tone: "text-due",
+    },
+    {
+      label: "Fines",
+      value: game.finesPaid,
+      icon: "🚨",
+      tone: "text-alarm",
     },
     {
       label: "VAT Paid",

@@ -14,7 +14,7 @@ import {
   canPayFee,
   canSellModule,
   getOwnedAmount,
-  moduleListedThisLeg,
+  moduleListedThisRound,
   moduleSlotsOpen,
   type ModuleTrade,
 } from "@/lib/game/engine";
@@ -34,9 +34,8 @@ import type { ModuleTrades } from "./phases/PhaseShared";
 const UNKNOWN_MODULE_ICON = "🔧";
 
 /**
- * [F3: modules in the shipyard ladder, and trading them between captains]
- * The module market, drawn at the Parley table beside the exchange and the
- * protection market because that is where the plan puts it: a module bolted
+ * * The module market, drawn at the Parley table beside the exchange and the
+ * protection market because that is where the design puts it: a module bolted
  * to a captain's hull, sold to another captain at a price the two of them
  * agree, which gives the build layer its own liquidity and gives the table
  * a class of deal that is not about commodities.
@@ -45,9 +44,9 @@ const UNKNOWN_MODULE_ICON = "🔧";
  * Gold moves and the module changes hulls on the two clients that agreed to
  * it, through applyModuleTradeSide, and the board this panel draws is the
  * server's own view of who has listed what: a panel that decided any of
- * this by itself would be a second market the room could not see.
+ * this by itself would be a second market the harbor could not see.
  *
- * The trade's own rule is the plan's, and it is the seller's side of a
+ * The trade's own rule is the design's, and it is the seller's side of a
  * settle: a module traded away comes off the hull automatically rather than
  * being blocked (see the engine module's header). What this panel adds to
  * that is the buyer's side of the same thought, said before the click
@@ -60,7 +59,7 @@ const UNKNOWN_MODULE_ICON = "🔧";
  * form: a module is a thing bolted on, not an ability, so any captain with
  * one to spare may list it.
  *
- * An offer belongs to the leg it was posted in, so a board that lags a
+ * An offer belongs to the round it was posted in, so a board that lags a
  * checkpoint shows the stale refusal before a click instead of after one.
  */
 export function ModuleMarket({
@@ -87,14 +86,14 @@ export function ModuleMarket({
   const canSell = canSellModule(game);
   const others = members.filter((m) => m.id !== me.id);
   const roomOpen = moduleSlotsOpen(game);
-  // What this captain may still list this leg: the hull, less anything the
+  // What this captain may still list this round: the hull, less anything the
   // board already knows about, which is the kind's own bound read before a
-  // click rather than after one (see moduleListedThisLeg). A module already
+  // click rather than after one (see moduleListedThisRound). A module already
   // standing on a row is not in the menu, so the one rule the form can
   // break is one it cannot break from here.
   const sellable = game.equippedModules.filter(
     (card) =>
-      !moduleListedThisLeg(
+      !moduleListedThisRound(
         modules.moduleTrades,
         me.id,
         card.id,
@@ -115,7 +114,7 @@ export function ModuleMarket({
         UNKNOWN_MODULE_ICON,
       })}
       intro={t(
-        "A module bolted to a hull, sold at a price the two of you agree. It comes off the seller's hull and onto the buyer's the moment the two of you shake hands, so the buyer needs an open slot, and a hull's ladder tops out at {MAX_SHIP_LEVEL} slots at ship level {MAX_SHIP_LEVEL}. The fee is paid when you shake hands. One listing per module a leg, one open offer per captain you name, and an offer nobody takes before the Parley closes is gone.",
+        "A module bolted to a hull, sold at a price the two of you agree. It comes off the seller's hull and onto the buyer's the moment the two of you shake hands, so the buyer needs an open slot, and a hull's ladder tops out at {MAX_SHIP_LEVEL} slots at ship level {MAX_SHIP_LEVEL}. The fee is paid when you shake hands. One listing per module a round, one open listing per captain you name, and an offer nobody takes before the Parley closes is gone.",
         { MAX_SHIP_LEVEL },
       )}
     >
@@ -127,7 +126,7 @@ export function ModuleMarket({
           {sellable.length === 0 ? (
             <p className="text-center text-[11px] text-muted-foreground">
               {t(
-                "Every module on your hull is already on the board this leg. The market opens again next leg.",
+                "Every module on your hull is already on the board this round. The market opens again next round.",
               )}
             </p>
           ) : (
@@ -183,10 +182,10 @@ export function ModuleMarket({
         <MarketEmpty>
           {canSell
             ? t(
-                "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the leg turns or the Parley closes, so a row you posted earlier may already be gone.",
+                "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the round turns or the Parley closes, so a row you posted earlier may already be gone.",
               )
             : t(
-                "No modules on offer this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
+                "No modules listed this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
               )}
         </MarketEmpty>
       ) : (
@@ -262,14 +261,20 @@ function ModuleRow({
     ? t(STALE_OFFER)
     : roomOpen < 1
       ? t("Every slot on your hull is full. Make room at the yard first.")
-      : card !== null && !powerBudgetAllows(game, card)
-        ? t(
-            "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
-            { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
-          )
-        : !canPayFee(game, trade.fee)
-          ? feeShortfallLine(hold, trade.fee)
-          : null;
+      : card !== null && game.equippedModules.some((m) => m.id === trade.module)
+        ? // A hull reads a module as present or absent (hasModule), so a
+          // second copy adds no effect but would add a slot, power and the
+          // per copy surcharge the two costing modules carry. The trade
+          // path is the one door that did not ask this question.
+          t("That module is already bolted to your hull.")
+        : card !== null && !powerBudgetAllows(game, card)
+          ? t(
+              "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
+              { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
+            )
+          : !canPayFee(game, trade.fee)
+            ? feeShortfallLine(hold, trade.fee)
+            : null;
 
   return (
     <OfferRow

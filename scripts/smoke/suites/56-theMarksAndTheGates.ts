@@ -1,9 +1,11 @@
 // PortMasters 2.2 Parallel Release, smoke run: The marks and the gates.
 
+import { cardById } from "@/lib/game/cards";
+import { heldFlagsOf } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
 import { healLoadedVoyage } from "@/lib/session/heal-save";
 import { bankruptMark, leftTheVoyage, writtenOff } from "@/lib/seatMarks";
-import { check, voyageState } from "../harness";
+import { CLASSIC, GAMBIT, check, voyageState } from "../harness";
 
 /**
  * The two flag contracts in the load heal, held apart on purpose and
@@ -12,8 +14,8 @@ import { check, voyageState } from "../harness";
  * A gate records that a beat already ran (a swap taken, an escort
  * sailed, the raid answered, the broker paid), so it coalesces: a damaged
  * value that still reads truthy keeps the gate closed. Reopening one
- * would let a reload replay a beat the room already settled, while a
- * spurious closed gate only costs an option the next leg returns anyway.
+ * would let a reload replay a beat the harbor already settled, while a
+ * spurious closed gate only costs an option the next round returns anyway.
  *
  * A mark is a verdict about the captain (the bankruptcy, the maroon, the
  * loan walked away from), so it reads strictly: anything that is not
@@ -117,4 +119,76 @@ export async function theMarksAndTheGatesSuite(): Promise<void> {
       !leftTheVoyage(undefined),
     "the maroon door and the roster ask two questions of one status: a written off seat cannot be named while a written off seat that is still sailing is still counted, and only a terminal phase says the voyage is over",
   );
+
+  // ========== D. A save rejoined under the other mode drops what it cannot run ==========
+  // The mode is resolved with the harbor's authority once at the top of
+  // the heal (the same precedence refreshVoyageFacts settles later), and
+  // every durable card heals against that one answer. This is the case a
+  // save carried between rooms makes: an Ocean Gambit voyage rejoined in a
+  // Classic room must not keep a Gambit module bolted on, a Gambit boon
+  // held or a charter the mode never offers.
+  const silkMonopoly = cardById("silk_monopoly");
+  const kilnCellar = cardById("kiln_cellar");
+  const bulkCharter = cardById("bulk_charter");
+  check(
+    silkMonopoly !== null && kilnCellar !== null && bulkCharter !== null,
+    "the pool still answers for the two modules and the charter below, so a failure is the heal rather than a missing card",
+  );
+  if (silkMonopoly !== null && kilnCellar !== null && bulkCharter !== null) {
+    const rejoined = voyageState();
+    rejoined.equippedModules = [silkMonopoly, kilnCellar];
+    rejoined.heldBoons = ["steady_watch", "cold_hardened"];
+    rejoined.charter = bulkCharter.id;
+    healLoadedVoyage(rejoined, {
+      legacyRenownLevel: null,
+      apiMode: CLASSIC,
+    });
+    check(
+      rejoined.mode === CLASSIC &&
+        rejoined.equippedModules.map((mod) => mod.id).join() ===
+          "kiln_cellar" &&
+        rejoined.heldBoons.length === 0 &&
+        rejoined.charter === null &&
+        !("steady_rations" in heldFlagsOf(rejoined)),
+      "a Gambit save rejoined in a Classic room keeps the module both modes run and drops the module, the two boons and the charter only Gambit offers, and the dropped boon no longer writes its flag",
+    );
+
+    const sameRoom = voyageState();
+    sameRoom.equippedModules = [silkMonopoly, kilnCellar];
+    sameRoom.heldBoons = ["steady_watch", "cold_hardened"];
+    sameRoom.charter = bulkCharter.id;
+    healLoadedVoyage(sameRoom, {
+      legacyRenownLevel: null,
+      apiMode: GAMBIT,
+    });
+    check(
+      sameRoom.mode === GAMBIT &&
+        sameRoom.equippedModules.map((mod) => mod.id).join() ===
+          "silk_monopoly,kiln_cellar" &&
+        sameRoom.heldBoons.join() === "steady_watch,cold_hardened" &&
+        sameRoom.charter === bulkCharter.id &&
+        heldFlagsOf(sameRoom).steady_rations === 1,
+      "the same save healed in the room it was written in keeps every durable card it was carrying, so the mode gate drops what the mode does not run rather than what the heal calls Gambit",
+    );
+
+    // The merge answers by the mode it is handed rather than by the list
+    // alone, which is what keeps a state that never went through the heal
+    // from writing a flag its mode never offered.
+    check(
+      !(
+        "steady_rations" in
+        heldFlagsOf({
+          heldBoons: ["steady_watch"],
+          charter: null,
+          mode: CLASSIC,
+        })
+      ) &&
+        heldFlagsOf({
+          heldBoons: ["steady_watch"],
+          charter: null,
+          mode: GAMBIT,
+        }).steady_rations === 1,
+      "the durable flag merge reads the mode it is handed: the same held boon writes nothing under Classic and its flag under Ocean Gambit",
+    );
+  }
 }

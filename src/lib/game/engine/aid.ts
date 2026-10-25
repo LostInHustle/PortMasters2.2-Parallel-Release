@@ -13,7 +13,7 @@
 // ceiling: two separate ceilings would just move the exploit from
 // whichever is capped to whichever is not. ./backingState imports it.
 // =====================================================================
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 import {
   AID_REPUTATION_PER_GOLD,
   helperReputationCapFor,
@@ -24,7 +24,7 @@ import type { GameState } from "../types";
 export function receiveLoan(
   state: GameState,
   loan: { id: string; fromUserId: string; fromName: string; amount: number },
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   state.money += loan.amount;
   state.debts.push({
@@ -35,7 +35,7 @@ export function receiveLoan(
     roundBorrowed: state.currentRound,
   });
   logs.push(
-    t(
+    line(
       "🆘 {loan.fromName} lent you {loan.amount} Gold. Repay it before the voyage ends, or it's deducted automatically.",
       { "loan.fromName": loan.fromName, "loan.amount": loan.amount },
     ),
@@ -52,17 +52,17 @@ export function receiveLoan(
 export function grantHelperReputation(
   state: GameState,
   rawGain: number,
-  logs: string[],
+  logs: LedgerLine[],
 ): number {
-  // The cap follows the voyage's own pinned length rather than the room's
+  // The cap follows the voyage's own pinned length rather than the harbor's
   // tier, because the two stopped being the same number when the mode
-  // gained a length of its own (see voyageLegs in ../mode).
+  // gained a length of its own (see voyageRounds in ../mode).
   const cap = helperReputationCapFor(state.maxRounds);
   const headroom = Math.max(0, cap - state.helperReputationEarned);
   const granted = Math.min(Math.max(1, rawGain), headroom);
   if (granted <= 0) {
     logs.push(
-      t(
+      line(
         "🤝 No Reputation this time: you have already earned this voyage's full {cap} for helping other captains.",
         { cap },
       ),
@@ -82,7 +82,7 @@ export function grantLoan(
     borrowerName: string;
     amount: number;
   },
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   state.money -= loan.amount;
   state.loansGiven.push({
@@ -99,7 +99,7 @@ export function grantLoan(
   );
   if (repGain > 0) {
     logs.push(
-      t(
+      line(
         "🤝 Lent {loan.borrowerName} {loan.amount} Gold. Reputation +{repGain} for helping a fellow captain.",
         {
           "loan.borrowerName": loan.borrowerName,
@@ -110,7 +110,7 @@ export function grantLoan(
     );
   } else {
     logs.push(
-      t("🤝 Lent {loan.borrowerName} {loan.amount} Gold.", {
+      line("🤝 Lent {loan.borrowerName} {loan.amount} Gold.", {
         "loan.borrowerName": loan.borrowerName,
         "loan.amount": loan.amount,
       }),
@@ -120,15 +120,19 @@ export function grantLoan(
 
 // The debtor's side of a repayment, voluntary or forced. The receipt for
 // the press is the one caller (see onAidRepaySettled in
-// src/lib/use-harbor-boards.ts): the press asks the room and applies
-// nothing, and the debt this closes is the one the room's answer names, so
-// a loan the room no longer holds can never be debited here.
-export function repayLoan(state: GameState, debtId: string, logs: string[]) {
+// src/lib/use-harbor-boards.ts): the press asks the harbor and applies
+// nothing, and the debt this closes is the one the harbor's answer names, so
+// a loan the harbor no longer holds can never be debited here.
+export function repayLoan(
+  state: GameState,
+  debtId: string,
+  logs: LedgerLine[],
+) {
   const debt = state.debts.find((d) => d.id === debtId);
   if (!debt) return;
   if (state.money < debt.amount) {
     logs.push(
-      t(
+      line(
         "❌ Need {debt.amount} Gold to repay {debt.counterpartyName}, have {state.money}",
         {
           "debt.amount": debt.amount,
@@ -142,7 +146,7 @@ export function repayLoan(state: GameState, debtId: string, logs: string[]) {
   state.money -= debt.amount;
   state.debts = state.debts.filter((d) => d.id !== debtId);
   logs.push(
-    t("💰 Repaid {debt.counterpartyName}: {debt.amount} Gold", {
+    line("💰 Repaid {debt.counterpartyName}: {debt.amount} Gold", {
       "debt.counterpartyName": debt.counterpartyName,
       "debt.amount": debt.amount,
     }),
@@ -156,17 +160,19 @@ export function receiveRepayment(
   debtId: string,
   amount: number,
   fromName: string,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
   state.money += amount;
-  logs.push(t("💰 {fromName} repaid you {amount} Gold", { fromName, amount }));
+  logs.push(
+    line("💰 {fromName} repaid you {amount} Gold", { fromName, amount }),
+  );
 }
 
-// [MANIFEST 07: Bequest Routing] Called only on the original lender's own
-// client, only for a loan they redirected before it was repaid. No Gold
-// changes here: the redirect target already received it via
-// receiveRepayment on their own client instead. This only stops a debt
+// Called only on the original lender's own client, only for a loan they
+// redirected before it was repaid. No Gold changes here: the redirect
+// target already received it via receiveRepayment on their own client
+// instead. This only stops a debt
 // that is no longer open from sitting in loansGiven forever, which is
 // what would otherwise happen since aid:repaid never reaches this client
 // for a redirected loan.
@@ -174,11 +180,11 @@ export function clearRedirectedLoan(
   state: GameState,
   debtId: string,
   redirectedToName: string,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   state.loansGiven = state.loansGiven.filter((l) => l.id !== debtId);
   logs.push(
-    t("🤝 Your bequest was paid out to {redirectedToName}", {
+    line("🤝 Your bequest was paid out to {redirectedToName}", {
       redirectedToName,
     }),
   );
@@ -191,9 +197,9 @@ export function clearRedirectedLoan(
 // amount owed is what flags defaultedDebt for the endgame screen, rather
 // than bankrupting mid voyage, since by this point the voyage is ending
 // for everyone regardless.
-export function settleOutstandingDebts(state: GameState, logs: string[]) {
+export function settleOutstandingDebts(state: GameState, logs: LedgerLine[]) {
   if (!state.debts.length) return;
-  logs.push(t("\n📋=== Settling Outstanding Loans ==="));
+  logs.push(line("\n📋=== Settling Outstanding Loans ==="));
   const settlements: {
     amount: number;
     debtId: string;
@@ -216,7 +222,7 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
     if (paid < debt.amount) {
       state.defaultedDebt = true;
       logs.push(
-        t(
+        line(
           "⚠️ Could not fully repay {debt.counterpartyName}: paid {paid} of {debt.amount} Gold owed",
           {
             "debt.counterpartyName": debt.counterpartyName,
@@ -227,7 +233,7 @@ export function settleOutstandingDebts(state: GameState, logs: string[]) {
       );
     } else {
       logs.push(
-        t(
+        line(
           "💰 Settled outstanding loan to {debt.counterpartyName}: {paid} Gold",
           {
             "debt.counterpartyName": debt.counterpartyName,

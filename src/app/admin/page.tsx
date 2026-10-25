@@ -27,7 +27,7 @@ import { PageSplash } from "@/components/ui/page-splash";
 type Status = "loading" | "gate" | "console";
 
 export default function AdminPage() {
-  // This route renders outside the harbor room, so it subscribes to the
+  // This route renders outside the harbor harbor, so it subscribes to the
   // captain's language at its own root: a flip redraws the splash and the
   // console under it rather than waiting for the next route change.
   useLanguage();
@@ -38,11 +38,11 @@ export default function AdminPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     api
       .me()
       .then((res) => {
-        if (cancelled) return;
+        if (canceled) return;
         // An account that is signed in but is not an operator gets the
         // card, and the card is where it finds that out: signing in there
         // goes through the same role check.
@@ -57,10 +57,10 @@ export default function AdminPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) setStatus("gate");
+        if (!canceled) setStatus("gate");
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
 
@@ -68,7 +68,7 @@ export default function AdminPage() {
   // in exactly one thing, as they do in the game: whether the session is
   // ended on the server first. The socket is closed and the account is
   // forgotten either way, so nothing is left holding a credential the
-  // server has stopped honouring.
+  // server has stopped honoring.
   const leave = (message: string | null) => {
     disconnectSocket();
     setAuthToken(null);

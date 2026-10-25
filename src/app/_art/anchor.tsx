@@ -1,4 +1,4 @@
-// The harbour anchor, rebuilt from primitives for the two generated
+// The harbor anchor, rebuilt from primitives for the two generated
 // images beside this folder. The app icon and the social card are drawn
 // through satori, which lays out boxes and borders and does not rasterize
 // an svg element, so the game's mark cannot be handed to it as the path
@@ -35,7 +35,7 @@ export function AnchorMark({ size, ink }: { size: number; ink: string }) {
       }}
     >
       {/* The ring at the top: r 3 with a 2 wide stroke, so its outer edge
-          is a circle of 4 from the centre. */}
+          is a circle of 4 from the center. */}
       <div
         style={{
           ...box(u, 8, 1, 8, 8),
@@ -68,7 +68,7 @@ export function AnchorMark({ size, ink }: { size: number; ink: string }) {
           borderRadius: 1 * u,
         }}
       />
-      {/* The arms: the lower half of a circle of r 10 around the centre,
+      {/* The arms: the lower half of a circle of r 10 around the center,
           drawn as a box whose bottom corners carry the outer radius. */}
       <div
         style={{

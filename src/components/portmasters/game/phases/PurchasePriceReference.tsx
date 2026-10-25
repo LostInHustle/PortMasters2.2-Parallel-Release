@@ -9,7 +9,7 @@ import {
 import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { Term } from "../../Term";
-import { ItemIcon } from "../../shared";
+import { ItemIcon, PanelLabel } from "../../shared";
 import { Sparkline } from "../../Sparkline";
 import { ExpectedPriceTooltip } from "../PriceTooltips";
 import { HuePanel } from "./PhaseShared";
@@ -27,9 +27,9 @@ export function MarketPriceReference({
 }) {
   return (
     <HuePanel tone="market">
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-1.5">
+      <PanelLabel tone="text-muted-foreground" className="mb-1.5">
         {t("━━ MARKET PRICE REFERENCE (hover for details) ━━")}
-      </div>
+      </PanelLabel>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {MARKET_GOODS.map((item) => {
           const history = game.priceHistory?.[item] ?? [];

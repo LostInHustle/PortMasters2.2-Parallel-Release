@@ -22,7 +22,7 @@
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { Anchor, Ship, Waves } from "lucide-react";
-import { APP_NAME } from "@/lib/game/constants/brand";
+import { APP_NAME, APP_TAGLINE } from "@/lib/game/constants/brand";
 import { t } from "@/lib/game/i18n";
 import { useLanguage } from "@/lib/use-language-preference";
 import { DISPLAY_NAME_MAX } from "@/lib/credentials";
@@ -36,7 +36,7 @@ import {
 } from "@/components/portmasters/CredentialCard";
 
 // The register tab: the captain's own two fields with the app's display
-// name between them, because a harbor is easier to read when the room
+// name between them, because a harbor is easier to read when the harbor
 // shows what a captain calls themselves rather than what they sign in as.
 const REGISTER_FIELDS: CredentialFieldSpec[] = [
   { ...CHOSEN_NAME, autoFocus: true },
@@ -139,8 +139,7 @@ function HarborHeader() {
       {/* A tagline, not a second title: the screen prints one name for
           the game, and this line is only the sentence under it. */}
       <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Waves className="h-3.5 w-3.5" />{" "}
-        {t("Maritime trade on the ancient Silk Road")}
+        <Waves className="h-3.5 w-3.5" /> {t(APP_TAGLINE)}
       </p>
     </div>
   );
@@ -176,13 +175,6 @@ export function AuthScreen({ onAuthed, notice, onDismissNotice }: DoorProps) {
         register: <Anchor className="mr-2 h-4 w-4" />,
       }}
       accent="pm-grad-brand shadow-brand/20"
-      footer={
-        <>
-          {t(
-            "Open this page in another browser to register a second captain and see them appear online in real time.",
-          )}
-        </>
-      }
     />
   );
 }

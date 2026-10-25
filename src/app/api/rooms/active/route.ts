@@ -1,10 +1,10 @@
-// GET /api/rooms/active: the room the current captain is still seated in,
+// GET /api/rooms/active: the harbor the current captain is still seated in,
 // if any, so a page load can put them back where they actually are.
 //
-// Why this exists. Room membership is durable (the RoomMember table) and
+// Why this exists. Harbor membership is durable (the RoomMember table) and
 // is already the authority the realtime layer trusts: the checkpoint
 // required roster is built straight from it. The client, however, held
-// the active room in React state only, so any reload dropped a captain
+// the active harbor in React state only, so any reload dropped a captain
 // into the Lobby while the server still counted them as seated and still
 // waited on their ready vote. Reading membership back from the database
 // rather than persisting a room id on the client keeps one source of
@@ -12,7 +12,7 @@
 // they correctly land in the Lobby; a captain who merely refreshed does,
 // so they land back aboard.
 //
-// This returns the room only, deliberately without chat history, even
+// This returns the harbor only, deliberately without chat history, even
 // though GET /api/rooms/[id] bundles both: GameRoom refetches detail and
 // recent messages itself the moment it mounts, so shipping them here too
 // would put up to a hundred rows on every single page load for a caller
@@ -26,8 +26,8 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return unauthorizedResponse();
 
-  // Nothing stops a captain holding seats in more than one room (RoomMember
-  // is unique per user and room, not per user), so pick the seat they took
+  // Nothing stops a captain holding seats in more than one harbor (RoomMember
+  // is unique per user and harbor, not per user), so pick the seat they took
   // most recently: that is the voyage they were actually sailing.
   const membership = await db.roomMember.findFirst({
     where: { userId: user.id },
@@ -40,13 +40,13 @@ export async function GET() {
     where: { id: membership.roomId },
     include: ROOM_WITH_MEMBERS,
   });
-  // A membership row whose room is gone should not happen (the relation
-  // cascades on delete), but report "no active room" rather than a 404:
+  // A membership row whose harbor is gone should not happen (the relation
+  // cascades on delete), but report "no active harbor" rather than a 404:
   // the caller's only real question is whether to restore or show the
   // Lobby.
   if (!room) return NextResponse.json({ room: null });
 
-  // Serialized through the one shared helper, so a field added to the room
+  // Serialized through the one shared helper, so a field added to the harbor
   // shape reaches this route and every other one at the same time. This
   // literal was hand written and matched the helper exactly, which is the
   // state a duplicate sits in right up until the day it does not.

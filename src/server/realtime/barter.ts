@@ -21,7 +21,7 @@
 // every swap on offer in one place whichever way it arrived.
 //
 // targetUserId is optional: unset for an ordinary open offer, anyone in
-// the room can see and accept it. Set for a direct offer to one specific
+// the harbor can see and accept it. Set for a direct offer to one specific
 // captain, a safeguard against exactly the failure mode an open board
 // has (agreeing on a trade with someone in chat and then having a third
 // captain accept it first). A direct offer is only ever visible to its
@@ -170,15 +170,15 @@ export function flexibleSpentReason(locale: Locale): string {
   );
 }
 
-// The room's open offers. Module local on purpose: every reader and every
-// writer sits in this file, and there is one meaning for a room's board
+// The harbor's open offers. Module local on purpose: every reader and every
+// writer sits in this file, and there is one meaning for a harbor's board
 // being absent, so nothing outside should be reaching for the map itself.
 const roomBarterOffers = new Map<string, BarterOffer[]>();
 
 // Flexible offers of this captain's that somebody else has already taken,
-// per room and then per captain. Held here rather than on a socket so a
+// per harbor and then per captain. Held here rather than on a socket so a
 // captain who reloads or reconnects midway keeps the allowance they have
-// already spent, and held per room rather than per account because the
+// already spent, and held per harbor rather than per account because the
 // allowance is a voyage's, not a lifetime's, which is also what the offer
 // board itself is scoped to.
 //
@@ -186,7 +186,7 @@ const roomBarterOffers = new Map<string, BarterOffer[]>();
 // either surface, and neither is posting, so this tally is the whole of
 // the policy that barterAccess turns into "offers left".
 //
-// Deliberately not cleared by clearBarter. That runs every time the room's
+// Deliberately not cleared by clearBarter. That runs every time the harbor's
 // checkpoint moves off the bartering phase, which happens several times a
 // voyage, and the allowance is a per voyage one: clearing it there would
 // hand every captain a fresh set of flexible offers at each phase
@@ -212,9 +212,9 @@ export function barterList(roomId: string): BarterOffer[] {
   return roomBarterOffers.get(roomId) ?? [];
 }
 
-// Writes a room's board back, dropping the map entry outright when the
+// Writes a harbor's board back, dropping the map entry outright when the
 // last offer has gone. Every change to the board goes through here, so
-// "a room with an empty board" has one representation rather than an
+// "a harbor with an empty board" has one representation rather than an
 // empty array in some paths and a missing key in others.
 export function setBarterOffers(roomId: string, offers: BarterOffer[]): void {
   if (offers.length) roomBarterOffers.set(roomId, offers);
@@ -223,7 +223,7 @@ export function setBarterOffers(roomId: string, offers: BarterOffer[]): void {
 
 // An open offer (no target) is visible to everyone; a direct offer is
 // visible only to the two captains it actually involves, its poster and
-// its named target, so the rest of the room never sees, and can never
+// its named target, so the rest of the harbor never sees, and can never
 // accept, a trade that was never meant for them.
 //
 // Module local on the same reasoning as the map above: the one caller is
@@ -267,9 +267,9 @@ export function barterPayloadFor(roomId: string, userId: string) {
   };
 }
 
-// Personalized per connected socket, unlike every other room wide
+// Personalized per connected socket, unlike every other harbor wide
 // broadcast: a direct offer means two different captains in the same
-// room can legitimately see two different boards. Iterates the presence
+// harbor can legitimately see two different boards. Iterates the presence
 // map rather than asking Socket.IO's own room registry, so this stays a
 // synchronous, in memory operation like the rest of the broadcasts.
 export function broadcastBarter(io: Server, roomId: string): void {
@@ -279,7 +279,7 @@ export function broadcastBarter(io: Server, roomId: string): void {
   }
 }
 
-// Drops every open offer for a room (phase moved on, or the room
+// Drops every open offer for a harbor (phase moved on, or the harbor
 // restarted) and tells everyone still in it the board is now empty.
 export function clearBarter(io: Server, roomId: string): void {
   if (!roomBarterOffers.has(roomId)) return;
@@ -288,7 +288,7 @@ export function clearBarter(io: Server, roomId: string): void {
 }
 
 // Drops just one departed captain's own offers, so nobody can accept a
-// dangling offer from someone who isn't in the room (or online) anymore.
+// dangling offer from someone who isn't in the harbor (or online) anymore.
 export function removeUserBarterOffers(
   io: Server,
   roomId: string,
@@ -304,7 +304,7 @@ export function removeUserBarterOffers(
 
 // Takes one offer off the board without broadcasting, for the accept
 // handler, which has a second change to fold in and would rather tell the
-// room about both at once. It also drops every other flexible offer the
+// harbor about both at once. It also drops every other flexible offer the
 // poster still had up, in the harbor or in any private thread: a
 // captain's flexible offers share the one allowance, so once one of them
 // has gone through the rest could only ever be accepted into a refusal,
@@ -325,7 +325,7 @@ export function consumeAcceptedOffer(roomId: string, offer: BarterOffer): void {
   setBarterOffers(roomId, next);
 }
 
-// Wipes the board for a room without broadcasting. Called when the room
+// Wipes the board for a harbor without broadcasting. Called when the harbor
 // itself is being torn down (last member departed) and there's nobody
 // left in the channel to broadcast to.
 export function clearBarterSilent(roomId: string): void {

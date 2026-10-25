@@ -9,6 +9,7 @@ import { emitRoomMembers } from "../chat";
 import { noteDraftAway } from "../draft";
 import {
   broadcastPresence,
+  broadcastRoomSystem,
   forgetSocket,
   scheduleDeparture,
   sockets,
@@ -34,24 +35,16 @@ export function wireDisconnect(
       }
       if (s.roomId) {
         forgetStatusIfLastSocket(s.roomId, s.userId, userSockets);
-        // The room reads this notice, so it goes to every socket still
-        // seated in the harbor, each in that captain's own language. The
-        // leaving socket was taken out of the map above, so the walk is
-        // the rest of the crew.
-        for (const [socketId, state] of sockets) {
-          if (state.roomId !== s.roomId) continue;
-          io.to(socketId).emit("room:system", {
-            roomId: s.roomId,
-            content: tFor(
-              state.locale,
-              "{s.user.displayName} has gone ashore",
-              { "s.user.displayName": s.user.displayName },
-            ),
-          });
-        }
+        // The leaving socket was taken out of the map above, so the
+        // notice reaches the rest of the crew.
+        broadcastRoomSystem(io, s.roomId, (locale) =>
+          tFor(locale, "{s.user.displayName} has gone ashore", {
+            "s.user.displayName": s.user.displayName,
+          }),
+        );
         void emitRoomMembers(io, s.roomId);
         if (!set || set.size === 0) {
-          // [W2: the path draft] A live draft holds the room at the
+          // A live draft holds the harbor at the
           // draft's seat, so a seat whose last socket just went is a seat
           // the draft would otherwise wait on forever. The draft's own
           // absence watch gives it a window to come back and then lays
@@ -70,7 +63,7 @@ export function wireDisconnect(
       }
       // A disconnect also pulls the captain out of the Quick Start
       // queue, so a closed tab doesn't leave a phantom entry that
-      // matchQueuedCaptains would try to seat into a room.
+      // matchQueuedCaptains would try to seat into a harbor.
       leaveQueue(s.userId);
       broadcastPresence(io);
     }

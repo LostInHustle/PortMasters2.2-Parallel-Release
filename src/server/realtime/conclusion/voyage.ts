@@ -1,14 +1,9 @@
-// =====================================================================
 // What the harbor knows the moment its voyage ends.
 //
-// Split out of ../conclusion.ts, which is the orchestrator: every function
-// here answers one question the conclusion asks, in the order it asks it.
-// The room's finished roster, the boards a finished voyage leaves behind,
-// the saves and the marks on them, the voyage's own row and the deal that
-// belongs to it, the loans a borrower never came back for, the two verdicts
-// (a forged finish, and a crown), and the two frames the room is told the
-// result with.
-// =====================================================================
+// Every function here answers one question the conclusion asks, in the order it
+// asks it: the finished roster, the boards left behind, the saves and their
+// marks, the voyage row and its deal, unrepaid loans, the two verdicts, and the
+// frames the harbor is told the result with.
 import { RevealedCaptain, type StandingRow } from "@/types/realtime/voyage";
 import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
@@ -52,31 +47,26 @@ import { roomStatuses } from "../status";
 import { closeVoyageTelemetry } from "../telemetry";
 import { resolveExpiredVentures } from "../ventures";
 
-// The hand this harbor was dealt, as the module that deals it answers.
+// The hand this harbor was dealt, as the dealing module answers.
 type VoyageHand = Awaited<ReturnType<typeof cardsInRoom>>;
 
-// One captain still seated in the voyage when it ended, as the room's own
-// status cache last reported them.
+// One captain still seated when the voyage ended, as the status cache last saw them.
 export type FinishedCaptain = {
   userId: string;
   user: PublicUser;
   reputation: number;
   gold: number;
   phase: string;
-  // [H7: Maroon and the Harbormaster] The harbor's mark, as the captain
-  // last reported it. In Classic it is redundant with the bankruptcy
-  // phase, which is why every reader below accepts either; in Ocean
-  // Gambit it is the only place the mark survives, because a bankrupt
-  // captain there goes on sailing and finishes at the endgame screen
-  // like everyone else. Null on a status that never carried the field,
-  // which is a status from a client older than this feature.
+  // The harbor's mark, as the captain last reported it. In Classic it is
+  // redundant with the bankruptcy phase, which is why readers accept either; in
+  // Ocean Gambit it is the only place the mark survives, since a bankrupt
+  // captain goes on sailing. Null on a status from an older client.
   bankrupt: boolean;
 };
 
-// Every captain still seated when the voyage ended, or null when the group
-// is not all finished yet: a harbor that has emptied, a room with no
-// statuses cached, and one member still sailing are the same answer to
-// this question, which is that there is nothing to conclude.
+// Every captain still seated when the voyage ended, or null when there is
+// nothing to conclude: an emptied harbor, no cached statuses, and one member
+// still sailing are the same answer.
 export async function readFinishedCaptains(
   roomId: string,
 ): Promise<FinishedCaptain[] | null> {
@@ -88,10 +78,8 @@ export async function readFinishedCaptains(
   const finished: FinishedCaptain[] = [];
   for (const id of memberIds) {
     const st = statuses.get(id);
-    // Every seat has to have left the voyage for the harbor to have one
-    // to conclude, read through the roster's own predicate: a member with
-    // no status frame at all and a member still sailing are the same
-    // answer here, which is that there is nothing to conclude yet (see
+    // Every seat has to have left the voyage, read through the roster's own
+    // predicate: no status and still sailing are the same answer here (see
     // leftTheVoyage in @/lib/seatMarks).
     if (!st || !leftTheVoyage(st)) return null;
     finished.push({
@@ -111,99 +99,58 @@ export async function clearVoyageBoards(
   io: Server,
   roomId: string,
 ): Promise<void> {
-  // The voyage is over, so the trade board goes with it. Nothing else
-  // would ever sweep it: the board is cleared when the room's checkpoint
-  // moves on, and a voyage that has finished stops moving its checkpoint
-  // entirely, because endgame and bankruptcy are personal phases that
-  // never become a room checkpoint. Without this, an offer still standing
-  // when the last captain finishes would leave its poster escrowed in the
-  // save they end the voyage with. Each client returns its own escrow as
-  // the board empties.
+  // The voyage is over, so the trade board goes with it. Nothing else would
+  // sweep it: the board clears when the checkpoint moves, and a finished voyage
+  // stops moving its checkpoint. Without this, an offer still standing would
+  // leave its poster escrowed in the save they end with.
   clearBarter(io, roomId);
-  // [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] And the two
-  // consent boards, for the same reason and with the same shape: a voyage
-  // that has ended stops moving its checkpoint, so nothing else would ever
-  // sweep them, and a promise left standing on either would be one about a
-  // leg nobody is going to sail.
+  // The two consent boards, same reason and shape: a finished voyage stops moving
+  // its checkpoint, so a promise left standing would be about a round nobody sails.
   escortContracts.clear(io, roomId);
   refitContracts.clear(io, roomId);
-  // [F3: modules in the shipyard ladder, and trading them between
-  // captains] And the module market's, for the fourth time and the same
-  // reason: a voyage that has ended stops moving its checkpoint, so
-  // nothing else would ever sweep it, and a listing left standing would
-  // be one about a leg nobody is going to sail.
+  // The module market, same reason: a listing left standing would be about a round
+  // nobody is going to sail.
   moduleTrades.clear(io, roomId);
-  // [D5: Aroma: the Bazaar Rumor] And the bazaar's rows, for the third time
-  // and the same reason. They carry no escrow and no promise, so nothing is
-  // left hanging by them, but a row is about a voyage's leg and the voyage
-  // it is about has ended: the next one starts with a bazaar nobody has
-  // spoken at, which is also what every captain's cooldown is measured
-  // from. The leg is read here rather than carried on the call, because
-  // every send from this board is personalized by the room's leg and a
-  // cleared board is still a send. This is a map lookup: the checkpoint
-  // this voyage has been holding all along is still in hand.
+  // The bazaar's rows, same reason. They carry no escrow, but a row is about a
+  // round and the voyage has ended. The round is read here because every send from
+  // this board is personalized by it, and the checkpoint is still in hand.
   clearBazaar(io, roomId, (await getCheckpoint(roomId)).round);
-  // [D7: the draft, and switching] And the path draft's two maps, for the
-  // fourth time and the same reason. A draft that outlived the voyage would
-  // be a hand of cards dealt to a table that has finished sailing, and it
-  // would be the one thing left in this process that could still write a
-  // path into a captain's save after the chronicle was drawn. The book of
-  // switches goes with it: the voyage it counted is over, and the next one
-  // hands every captain their one switch back. There is nothing to publish
-  // here beyond the null views the clear sends, and no line for the log,
-  // which has just been written up.
+  // The path draft's maps, same reason. A draft that outlived the voyage would
+  // be a hand dealt to a finished table, and could still write a path into a
+  // save after the chronicle was drawn. The switch book goes with it.
   clearPathVoyage(io, roomId);
-  // The voyage is over, so the flexible allowance goes with it. Next
-  // voyage opens on a full one, which is also the only moment a captain's
-  // Renown can have moved, so the counter can never carry a stale level's
-  // worth of taken offers into a voyage that allows more of them.
+  // The flexible allowance goes too, so the next voyage opens on a full one and
+  // the counter cannot carry a stale level's taken offers forward.
   clearFlexibleAccepted(roomId);
 }
 
-// The harbor's saves, read once, at the moment the voyage ends: the readers
-// of them each want a different thing out of the same rows, and reading
-// them once is what keeps those readers from describing different voyages.
+// The harbor's saves, read once when the voyage ends: each reader wants a
+// different thing from the same rows, and reading once keeps them from
+// describing different voyages.
 type HarborSaves = {
-  // The blob each captain's save parsed into, or null for a row the read
-  // could not parse.
+  // Parsed save per captain, or null for a row that could not parse.
   saves: Map<string, Record<string, unknown> | null>;
-  // The peer ledger per captain, the one ending figure the Broker's
-  // verdict turns on.
+  // The peer ledger per captain, the Broker's one ending figure.
   peerTradeProfits: Map<string, number>;
-  // The rows the ledger integrity pass marked, in the shape the verdict
-  // reader wants them.
+  // Rows the integrity pass marked, in the verdict reader's shape.
   marked: { userId: string; integrityNote: string | null }[];
 };
 
 export async function readHarborSaves(roomId: string): Promise<HarborSaves> {
-  // [I2: the two measurements most likely to be skipped] The harbor's
-  // saves, read once, at the moment the voyage ends.
+  // The saves are read once, at the moment the voyage ends, and this is the one
+  // moment they still exist as a set. The two non-concluding endings hand the
+  // record no ledger: an emptied harbor takes its saves with it, and a wipe has
+  // no conclusion behind it to have read one.
   //
-  // This is the one moment they still exist as a set. A voyage that
-  // concludes ends with every save in place; the two endings that do not
-  // conclude hand the record no ledger at all, because a harbor that
-  // empties takes its saves with it when the room row goes, and a wipe
-  // closes its record at a moment with no conclusion behind it to have
-  // read one.
-  //
-  // Three readers below want them and each wants a different thing out of
-  // them, which is why the read is here rather than at any of the three:
-  // the record's captain lines carry the peer ledger, the marks the
-  // integrity pass left are read out of the same rows, and every verdict
-  // below is decided on the blob its own chronicle's extras came from.
-  // Reading them once is what keeps those three from describing three
-  // different voyages, and it is the reading the record's own two fields
-  // are documented as sharing with the rule.
+  // Three readers want different things from these rows: the record's captain
+  // lines need the peer ledger, the integrity marks come from the same rows, and
+  // every verdict is decided on the blob its own chronicle came from.
   const saves = new Map<string, Record<string, unknown> | null>();
-  // The peer ledger per captain, which is the one ending figure the
-  // Broker's verdict turns on. Built here from the same blob the verdict
-  // is decided on below, so a captain's line cannot report a profit the
-  // rule did not judge them on.
+  // The peer ledger per captain, built from the same blob the verdict is decided
+  // on, so a captain's line cannot report a profit the rule did not judge.
   const peerTradeProfits = new Map<string, number>();
-  // The rows the ledger integrity pass marked, in the shape the verdict
-  // loop below reads them: it disqualifies every row marked impossible at
-  // any point in the voyage, since the live figures alone cannot see a
-  // save that was forged at round three and spent down since.
+  // Rows the integrity pass marked. A row marked impossible at any point
+  // disqualifies, since live figures cannot see a save forged earlier and spent down.
   const marked: { userId: string; integrityNote: string | null }[] = [];
   for (const row of await db.gameState.findMany({
     where: { roomId },
@@ -229,16 +176,10 @@ export function closeVoyageRecord(
   roomId: string,
   peerTradeProfits: Map<string, number>,
 ): void {
-  // [I1: the telemetry spine] The voyage concluded, which is the outcome
-  // of the three an ending produces, and the record closes here rather
-  // than at the bottom of this function so the write is on its way before
-  // the legacy, chronicle and rival writes that follow, none of which are
-  // measurement and all of which are slower. The captains still standing
-  // are the room's live sockets: a member whose screen is dark is seated
-  // but not present, and the plan's retention figure reads that
-  // distinction rather than a seat count. Not awaited for the same reason
-  // the restart does not await it, and a record that cannot be written is
-  // logged by the spine rather than thrown into this handler.
+  // The voyage concluded, and the record closes here rather than at the bottom
+  // so the write is under way before the slower legacy, chronicle and rival
+  // writes. Present captains are the harbor's live sockets, not its seats.
+  // Not awaited: the spine logs a failed write rather than throwing into the handler.
   void closeVoyageTelemetry(
     roomId,
     "concluded",
@@ -249,19 +190,16 @@ export function closeVoyageRecord(
 
 // The voyage this harbor sailed under, and the deal that belongs to it.
 export type VoyageRun = {
-  // The room's own row, reduced to the one fact the steps read, or null
-  // for a room that has already gone.
+  // The harbor's row, reduced to the one fact the steps read, or null if gone.
   room: { voyageEpoch: number } | null;
   difficulty: Difficulty;
   renownMultiplier: number;
   mode: GameMode;
   seats: number;
   rounds: number;
-  // The commission the fleet was working on, null in Classic, where no
-  // objective is drawn and the columns stay empty.
+  // The fleet's commission, null in Classic.
   objective: Objective | null;
-  // The hand the room was dealt, empty in Classic, where no hand was dealt
-  // and no win is judged.
+  // The hand the harbor was dealt, empty in Classic.
   cards: VoyageHand;
 };
 
@@ -278,25 +216,16 @@ export async function readVoyageRun(roomId: string): Promise<VoyageRun> {
   const roomDifficulty = normalizeDifficulty(roomForDifficulty?.difficulty);
   const renownMultiplier = difficultyConfig(roomDifficulty).renownXpMultiplier;
 
-  // The commission this harbor was working on, drawn from the same seed
-  // every client drew it from: the room's id is the harbor's id, and the
-  // epoch and the pinned seat count are the voyage it sailed under, so the
-  // server arrives at the identical deck entry without ever having been
-  // told what it was. Both rung inputs have to be here rather than only in
-  // the clamp: this draw is what the met flag below is read from, so a
-  // conclusion that drew the founding board for a six seat voyage would
-  // call every commission a full table filled unmet. Null in Classic,
-  // where no objective is drawn and the columns stay empty.
+  // The commission, drawn from the same seed every client drew it from: room
+  // id, epoch and the pinned seat count are the voyage, so the server arrives
+  // at the same deck entry without being told. Both rung inputs must be here,
+  // since this draw is what the met flag below reads.
   const roomMode = normalizeMode(roomForDifficulty?.mode);
   const roomSeats = roomForDifficulty?.voyageSeats ?? 0;
-  // [I5: session length, and table size] The voyage's own length, read once
-  // and reused by the three places that need it: the chronicle's prose, the
-  // chronicle row, and the ceiling the finishers' saves are judged against.
-  // The tier's ladder is not the voyage's length on a mode that pins one,
-  // and reading it here would have judged a twelve leg Gambit voyage against
-  // an eight round ceiling, which is a false forgery rather than a strict
-  // check: the honest captain it flags is the one who played the longer
-  // voyage well.
+  // The voyage's length, read once and reused for the chronicle prose, the
+  // chronicle row, and the finishers' ceiling. The tier's ladder is not the
+  // voyage's length on a mode that pins one; using it would flag an honest
+  // captain on a longer voyage.
   const roomRounds = voyageRoundsFor(roomMode, roomDifficulty);
   const objective =
     roomMode === "ocean_gambit"
@@ -306,11 +235,8 @@ export async function readVoyageRun(roomId: string): Promise<VoyageRun> {
         )
       : null;
 
-  // The hand this harbor was dealt, read once for the whole conclusion,
-  // which is the one reader outside the table that has any business
-  // knowing it. Read here rather than inside the finisher loop below
-  // because it is one row per seat and the loop walks every seat, and left
-  // empty in Classic, where no hand was dealt and no win is judged.
+  // The hand, read once for the whole conclusion, the one reader outside the
+  // table that needs it. Empty in Classic.
   const cards = roomMode === "ocean_gambit" ? await cardsInRoom(roomId) : {};
 
   return {
@@ -332,8 +258,7 @@ export async function resolveOpenVentures(
   roomId: string,
   room: VoyageRun["room"],
 ): Promise<void> {
-  // Force resolve every still open venture: the voyage is over, so
-  // anything still open never will fill.
+  // Force resolve every still open venture: the voyage is over, so none will fill.
   if (!room) return;
   await resolveExpiredVentures(io, roomId, room.voyageEpoch, 0, true);
 }
@@ -344,25 +269,15 @@ export function sweepAbsentBorrowerLoans(
   finished: FinishedCaptain[],
 ): void {
   // Sweep stale loans for absent borrowers. A still connected borrower
-  // is one whose report may simply not have arrived yet; sweeping that
-  // loan would race their genuine settlement. An absent borrower paid
-  // nothing by definition, so 0 is the honest repaid amount.
+  // Sweep loans whose borrower is absent. A connected borrower may still be
+  // settling, and sweeping would race their report; an absent one paid nothing,
+  // so 0 is honest.
   //
-  // That reasoning holds for a captain who finished the voyage solvent
-  // and may still be settling up. It does not hold for a bankrupt one.
-  // Insolvency is final for the purposes of this sweep in either mode,
-  // because the sweep runs at the moment the voyage concludes and there
-  // are no more rounds to earn anything back in: a bankrupt captain keeps
-  // their socket open to watch the standings rather than to pay anybody,
-  // so treating them as present stranded their loans for good. This sweep
-  // is the only thing that ever closes a loan its borrower never reports,
-  // and with it skipped the pledge riding on the loan never resolved
-  // either.
-  //
-  // The mark is read from either signal for the reason above, through the
-  // one reader that owns the rule: Classic reports it as the bankruptcy
-  // phase, and Ocean Gambit, where the seat survives, reports it as the
-  // flag (see bankruptMark in @/lib/seatMarks).
+  // Insolvency is final for this sweep in either mode: it runs when the voyage
+  // concludes and there are no more rounds to earn anything back. A bankrupt
+  // captain keeps a socket open to watch, so treating them as present stranded
+  // their loans for good, and the pledge riding on the loan never resolved.
+  // The mark is read through bankruptMark, which accepts either signal.
   const bankrupt = new Set(
     finished.filter((f) => bankruptMark(f)).map((f) => f.userId),
   );
@@ -379,18 +294,12 @@ export function sweepAbsentBorrowerLoans(
   if (sweptAny) broadcastLoans(io, roomId);
 }
 
-// The beat the conclusion stops for after its own sweeps, before it reads
-// the room back. The sweeps are what pays the last money of a voyage out:
-// an escrow returns to its poster when
-// the trade board clears, an open venture refunds its half, and each of
-// those lands in a captain's own client and comes back on that client's
-// next broadcast. Two cadences are what the number is measured against:
-// the status beacon follows any change to a voyage within 120ms, and the
-// autosave follows one within 700ms, so a beat of a second and a half
-// stands past both with room for a window the browser has throttled into
-// the background. It is paid once per concluded voyage, and a verdict
-// read a beat early is a captain told they lost a goal their own endgame
-// screen says they met.
+// The beat the conclusion stops for after its sweeps. The sweeps pay the last
+// money out: escrow returns when the trade board clears, an open venture refunds
+// its half, and each lands in a client and returns on its next broadcast. The
+// status beacon follows within 120ms and autosave within 700ms, so a beat and a
+// half stands past both. A verdict read early says a captain lost a goal their
+// endgame screen says they met.
 const SETTLEMENT_BEAT_MS = 1500;
 
 export function awaitSettlementBeat(): Promise<void> {
@@ -403,30 +312,24 @@ export function readForgedUsers(
   marked: HarborSaves["marked"],
   rounds: number,
 ): Set<string> {
-  // Ledger integrity verdict: two sources, because the live figures
-  // alone are not enough. A captain who forged a save at round three,
-  // spent the Gold down, and reports an ordinary total at the end
-  // would pass a check that only ever looks at what they finish
-  // holding. The mark left on their saved state is the memory of what
-  // they already claimed, so both are consulted and either one is
-  // enough to disqualify.
+  // Two sources, both needed: live figures cannot catch a save forged at round
+  // three and spent down since, and the mark is the memory of what was claimed.
+  // Either one disqualifies.
   const forgedUsers = new Set<string>();
   for (const f of finished) {
     const verdict = checkSave({ money: f.gold, score: f.reputation }, rounds);
     if (verdict.severity !== "ok") {
       console.warn(
-        `[integrity] ${verdict.severity} finish user=${f.userId} room=${roomId} ${describeFindings(verdict.findings)}`,
+        `[integrity] ${verdict.severity} finish user=${f.userId} harbor=${roomId} ${describeFindings(verdict.findings)}`,
       );
     }
     if (verdict.severity === "impossible") forgedUsers.add(f.userId);
   }
-  // The marks themselves were read with the rest of the harbor's saves
-  // above: one read of the room's rows, and this is the reader that turns
-  // them into disqualifications.
+  // The marks were read with the rest of the saves above; this turns them into disqualifications.
   for (const row of marked) {
     if (!forgedUsers.has(row.userId)) {
       console.warn(
-        `[integrity] finish disqualified by an earlier save user=${row.userId} room=${roomId} ${row.integrityNote ?? ""}`,
+        `[integrity] finish disqualified by an earlier save user=${row.userId} harbor=${roomId} ${row.integrityNote ?? ""}`,
       );
     }
     forgedUsers.add(row.userId);
@@ -438,13 +341,9 @@ export function pickSeaMaster(
   finished: FinishedCaptain[],
   forgedUsers: Set<string>,
 ): string | null {
-  // The crown goes to the highest Reputation among the captains the harbor
-  // has not written off, which the bankrupt flag now says out loud. It used
-  // to be implicit: only the endgame phase was crownable, and until H7 the
-  // only way to be bankrupt was to be sitting in the bankruptcy phase
-  // instead. Now that a captain can finish the voyage at the endgame screen
-  // with the mark on them, the rule it always meant is written where it is
-  // read.
+  // The crown goes to the highest Reputation among captains the harbor has not
+  // written off. The bankrupt flag makes that explicit, since a captain can now
+  // finish at the endgame screen with the mark on them.
   const crownable = finished.filter(
     (f) => f.phase === "endgame" && !f.bankrupt && !forgedUsers.has(f.userId),
   );
@@ -454,8 +353,7 @@ export function pickSeaMaster(
     : null;
 }
 
-// The standings, as the room reads them: emitted before anything else the
-// conclusion sends.
+// The standings, emitted before anything else the conclusion sends.
 export function publishStandings(
   io: Server,
   roomId: string,
@@ -469,8 +367,7 @@ export function publishStandings(
   });
 }
 
-// The reveal: the whole hand, every verdict and the fleet's commission leg
-// by leg, as one frame. Only where there was a hand to reveal.
+// The reveal: the whole hand, every verdict and the fleet's trace, as one frame.
 export function publishReveal(
   io: Server,
   reveal: {
@@ -481,20 +378,11 @@ export function publishReveal(
     traces: ObjectiveTraceEntry[][];
   },
 ): void {
-  // [H8: the reveal and the replay ledger] And then the cards come down.
-  //
-  // Emitted after the standings rather than with them, and never in place
-  // of them: a captain watching the end of a voyage is owed the result
-  // first, and the ledger is what they read next. It goes out in one frame
-  // to the whole room, because the reveal is the table's moment rather than
-  // a private one, and it is the only frame in the mode that names an
-  // alignment to anyone but its holder.
-  //
-  // Only where there was a hand to reveal. Classic deals no cards, so its
-  // conclusion has no alignment to name and the guard below is what keeps
-  // an empty ledger off its screen. The order is the standings':
-  // `standings` was sorted a few lines up, and the ledger reads in the same
-  // order so the two blocks on the screen tell one story.
+  // And then the cards come down. Emitted after the standings and never in place
+  // of them: the result first, the ledger next. One frame to the whole harbor,
+  // since the reveal is the table's moment and the only frame that names an
+  // alignment to anyone but its holder. Classic deals no cards, so the guard
+  // keeps an empty ledger off its screen.
   const { roomId, objective, standings, captains, traces } = reveal;
   if (!objective) return;
   const rank = new Map(standings.map((s, index) => [s.userId, index]));

@@ -83,6 +83,11 @@ export async function unauthorizedResponse(): Promise<NextResponse> {
  * pick (see use-language-preference). Anything the pack cannot print, and
  * a request with no cookie at all, lands on the shipped language, the same
  * honest fallback the socket's handshake reader gives it.
+ *
+ * The shell reads it too, for the document's own language attribute
+ * (see src/app/layout.tsx). It is the one reader outside a route, and it
+ * is here rather than beside itself because a cookie read twice is a
+ * cookie whose fallback can drift.
  */
 export async function requestLocale(): Promise<Locale> {
   const store = await cookies();
@@ -119,8 +124,8 @@ function sessionCookie(token: string, maxAgeSec: number, https: boolean) {
   return `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${https ? "; Secure" : ""}`;
 }
 
-// How long a browser that has seen the game over TLS should keep refusing
-// to go back to plain http for it. Six months, the usual reading, and no
+// How long a browser that has seen the game served over TLS should keep
+// refusing plain http for it. Six months, the usual reading, and no
 // includeSubDomains: a tunnel's hostname is often shared with other
 // services, and pinning their subdomains from here would reach past the
 // game.

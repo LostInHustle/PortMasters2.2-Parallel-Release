@@ -2,7 +2,7 @@ import { Anchor } from "lucide-react";
 
 /**
  * The splash a screen shows while its first read is in flight: one line,
- * centred on the canvas.
+ * centered on the canvas.
  *
  * Written once because three entry screens wear it: the harbor door, the
  * operator console and the balance dashboard. The landing screen carries

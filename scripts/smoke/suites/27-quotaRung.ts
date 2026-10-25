@@ -78,16 +78,16 @@ export async function quotaRungSuite(
     pairedCrew,
     pairedRoomId,
   } = inputs;
-  // H5's difficulty rung: the commission's quotas scale with the size of
+  // The difficulty rung: the commission's quotas scale with the size of
   // the fleet the voyage was dealt to, so the sabotage window is the same
   // width at four seats as at six. The gate that rung exists for is a
   // claim about win rates, so there are two halves here and both matter:
   // the band table's own arithmetic, and the plumbing that carries a
-  // pinned size from the room into the board the server clamps against.
+  // pinned size from the harbor into the board the server clamps against.
   // The second half is the one a unit test cannot reach, which is why it
   // is checked against a harbor that really set sail.
 
-  // ---- The bands, which need no sockets ----
+  // ========== The bands, which need no sockets ==========
   check(
     seatBand(0).factor === 1 &&
       seatBand(1).factor === 1 &&
@@ -110,7 +110,7 @@ export async function quotaRungSuite(
   );
 
   // The anchor, good for good and string for string. This is the promise
-  // the rung made to every voyage that predates it: a room whose pin is
+  // the rung made to every voyage that predates it: a harbor whose pin is
   // missing reads as the anchor, and a voyage that begins at four seats
   // or fewer draws the board the deck would have drawn with no rung at
   // all, down to the entry.
@@ -192,9 +192,9 @@ export async function quotaRungSuite(
     "and is wider than the deck as authored, so a full table's payout cannot read as forged",
   );
 
-  // ---- The instrument the gate is read with ----
+  // ========== The instrument the gate is read with ==========
   // Pure arithmetic over rows, exercised here because every claim the
-  // epic's evaluation will make is made through it. The Classic row is
+  // gate makes is made through it. The Classic row is
   // the one that has to fall out: no card was dealt there, and counting
   // its won flag would drag every rate toward zero.
   const voyageRows: VoyageOutcome[] = [
@@ -267,7 +267,7 @@ export async function quotaRungSuite(
     "every role the reader reports has a band of its own, and the fleet's worst is still the Pirate's best",
   );
 
-  // ---- The swing reader ----
+  // ========== The swing reader ==========
   // How far a role's rate moves across the bands it played. The command
   // line report prints it and the balance dashboard shows it, so the
   // arithmetic lives here rather than in either of them, and the two
@@ -301,7 +301,7 @@ export async function quotaRungSuite(
     "and a role that played none is the other absence, told apart by the band count beside it",
   );
 
-  // ---- The pin, over the wire ----
+  // ========== The pin, over the wire ==========
   // Two voyages that really set sail and one that was restarted, which is
   // the whole life of the column: the six seat table from the paired
   // section pins its own size, a five seat harbor opened here pins the
@@ -315,8 +315,8 @@ export async function quotaRungSuite(
     });
   // The harbor the commission section sailed from is in the lobby by now,
   // because that section restarts its voyage to prove the board clears,
-  // and no start has followed. So its pin is the zero a room that never
-  // pinned reads as, and a room that never pinned is a room that draws the
+  // and no start has followed. So its pin is the zero a harbor that never
+  // pinned reads as, and a harbor that never pinned is a harbor that draws the
   // founding deck: the pure checks above are what hold that reading to the
   // board it drew before the rung existed.
   check(
@@ -389,7 +389,7 @@ export async function quotaRungSuite(
   );
   check(
     (await pinned(rungRoomId))?.voyageSeats === 5,
-    "and the room records the same number the departure carried",
+    "and the harbor records the same number the departure carried",
   );
 
   // The reload path, which is the other frame a live client draws from: a

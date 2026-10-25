@@ -1,7 +1,7 @@
 "use client";
 
 import { PlayerReportAck } from "@/types/realtime/moderation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
 import { useRoomRoster } from "@/lib/use-room-roster";
@@ -10,18 +10,18 @@ import { t } from "@/lib/game/i18n";
 import { usePlayerDetail } from "@/lib/use-player-detail";
 import { RosterHeader } from "./roster/RosterHeader";
 import { RosterRow } from "./roster/RosterRow";
-import { SystemNotices } from "./roster/SystemNotices";
+import { SystemNotices, type SystemNotice } from "./roster/SystemNotices";
 
 // The panel itself is the wiring and nothing else: the roster hook, the
 // notice feed, the run of actions this viewer has taken, and the sort. The
 // heading, the row and the notices under it are drawn by the three
 // components under ./roster, each handed only the fields it draws.
 /**
- * Live roster of room members, collapsed down to what matters at a glance:
+ * Live roster of harbor members, collapsed down to what matters at a glance:
  * gold, reputation, and whether they're still in the run. Click a row to
  * open the full detail popup (cargo, workers, log) in PlayerDetailModal.tsx.
  *
- * [MANIFEST: Partial Sight] Each non self row carries an eye button that
+ * Each non self row carries an eye button that
  * opens a small popover showing a banded cargo read of the target captain.
  * The bands come straight from bandFor in engine/partialSight: "none", "a
  * few", "some", "plenty", "a haul". The peek is gated by canSeeDetail, so
@@ -48,10 +48,10 @@ export function MembersPanel({
   hostId: string;
   onSelectPlayer: (userId: string) => void;
   myRenownLevel?: number;
-  // The fold, owned by the room rather than by this panel (see
+  // The fold, owned by the harbor rather than by this panel (see
   // usePanelPrefs in GameRoom): the roster and the chat share the right
   // rail, so folding one is a fact about the rail the other lives in, and
-  // on the wide layout it is the room that hides this panel outright and
+  // on the wide layout it is the harbor that hides this panel outright and
   // stands its strip in the rail. What arrives here is the below
   // breakpoint half of the same record: the fold to the head that a full
   // width row has room for. Defaulted open, which is the panel's own
@@ -67,8 +67,16 @@ export function MembersPanel({
     roomId,
     initialMembers,
   );
-  const [systemNotes, setSystemNotes] = useState<string[]>([]);
-  // [J2: the mute and the report] The captains this one has reported in
+  const [systemNotes, setSystemNotes] = useState<SystemNotice[]>([]);
+  // The number each notice carries. A notice is a thing that arrives rather
+  // than a place in a list: the feed keeps only the last twelve, so a
+  // notice's position is not its identity, and a list keyed by position
+  // gives the notice that just left and the one that just arrived the same
+  // key. The counter is read in the event handler rather than inside the
+  // state update, so a redraw that replays the update cannot spend a
+  // number twice.
+  const nextNoticeId = useRef(0);
+  // The captains this one has reported in
   // this harbor, held here so the flag settles on the row it was raised
   // against. The server is the authority on the limit (one report per pair
   // per voyage, held by the table's own constraint); this is only what the
@@ -80,7 +88,7 @@ export function MembersPanel({
   // row the host" check further down.
   const viewerIsHost = me.id === hostId;
 
-  // [MANIFEST: Partial Sight] The peek button uses usePlayerDetail's
+  // The peek button uses usePlayerDetail's
   // requestDetail to ask the target's client for a snapshot, then applies
   // bandFor to each cargo count before showing it.
   //
@@ -92,14 +100,15 @@ export function MembersPanel({
   // zeros.
   const { detail, loading, requestDetail } = usePlayerDetail(socket, roomId);
 
-  // The room channel itself is joined (and rejoined on every reconnect)
+  // The harbor channel itself is joined (and rejoined on every reconnect)
   // from GameRoom.tsx, since that needs to happen exactly once per
   // connection regardless of which panels happen to be mounted.
   useEffect(() => {
     if (!socket) return;
     const onSystem = (data: { roomId: string; content: string }) => {
       if (data.roomId !== roomId) return;
-      setSystemNotes((prev) => [...prev.slice(-12), data.content]);
+      const note = { id: nextNoticeId.current++, text: data.content };
+      setSystemNotes((prev) => [...prev.slice(-12), note]);
     };
     socket.on("room:system", onSystem);
     return () => {
@@ -108,7 +117,7 @@ export function MembersPanel({
       // handleLeave in GameRoom.tsx, for a deliberate departure. This cleanup
       // runs on any unmount, when the captain has not left at all, and
       // dropping the channel then would silently break every later
-      // room scoped event with no error and no recovery short of a full
+      // harbor scoped event with no error and no recovery short of a full
       // reload.
       socket.off("room:system", onSystem);
     };

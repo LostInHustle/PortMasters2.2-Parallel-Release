@@ -22,13 +22,13 @@
 //
 // The server evaluates this once at conclusion, with the numbers it
 // already holds, and writes the answer onto the captain's own Chronicle
-// row. Nothing here is broadcast: the reveal is a later slice, and a win
+// row. Nothing here is broadcast: the reveal is a later pass, and a win
 // condition that announced itself would be an alignment leak with extra
 // steps.
 //
 // The numbers below are the mode's balance knobs, and each one is the
 // first thing to move when a band reads wrong rather than the role itself.
-// The plan's bands live in one place, WIN_RATE_TARGETS in ./balance: an
+// The design's bands live in one place, WIN_RATE_TARGETS in ./balance: an
 // honest side's share of voyage wins, with a Broker's and a Pirate's
 // beside it.
 // =====================================================================
@@ -41,7 +41,7 @@ import { t } from "./i18n";
 import { normalizeInventory } from "./types";
 
 // What the Broker has to realize in coin from other captains to win. The
-// proposal's number, and the whole balance of the role: raise it and the
+// design's number, and the whole balance of the role: raise it and the
 // Broker has to churn harder, lower it and the seat goes quiet.
 export const BROKER_PAYOUT_TARGET = 2200;
 
@@ -118,8 +118,8 @@ export function readEnding(
  *
  * Split out of the ending above because a reader can want this one number
  * without wanting the rest of the ending around it: the voyage record's
- * captain lines carry it (goal I2), and they are written by the spine,
- * which has no business inventing the reported finish the ending takes.
+ * captain lines carry it, written by the telemetry spine, which has no
+ * business inventing the reported finish the ending takes.
  * One implementation rather than two, so the number on a captain's line
  * and the number the Broker's verdict was decided on cannot be two
  * readings of one save. A value that is not a finite number is the absence

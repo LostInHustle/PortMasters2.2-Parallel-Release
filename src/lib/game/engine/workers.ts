@@ -1,20 +1,6 @@
-// =====================================================================
-// Artisans: hiring, dismissal, task assignment, production, and the two
-// round end bills (wages, then ship maintenance) that can bankrupt a
-// captain who overextended their crew.
-//
-// The roster is driven off WORKER_TYPES rather than a hardcoded branch per
-// artisan, so a charter that opens a new artisan type is hirable, payable
-// and assignable without touching this file.
-//
-// Wages price through getHireCost in ./pricing, which is the single source
-// of truth for what an artisan actually costs per round. fireWorker's
-// severance reads the same function, so hiring, payroll, and severance all
-// agree on a single number even when the Artisan's Workshop module or the
-// Master's Apprentice boon is shifting the wage around. The earlier split,
-// where severance read the raw WAGES table and so ignored both surcharges
-// and discounts, was a balance inconsistency that this refactor closes.
-// =====================================================================
+// Artisan hiring, dismissal, assignments, production and the two round end
+// bills. Roster behavior is driven by WORKER_TYPES, and every wage path uses
+// getHireCost so hire, payroll and severance agree.
 import { ICONS } from "../constants/brand";
 import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
 import { RECIPES } from "../constants/goods";
@@ -23,65 +9,49 @@ import { newCrewIdentity } from "../crew";
 import { isFrostbitten } from "../garments";
 import { unlockedWorkerTypes } from "../pools";
 import {
-  frozenAssignRefusal,
-  frozenWorkLog,
-  hungryProductionNote,
+  frozenAssignRefusalLine,
+  frozenWorkLogLine,
+  hungryProductionNoteLine,
 } from "../status-copy";
 import type { GameState } from "../types";
-import { t } from "@/lib/game/i18n";
+import { joined, line, type LedgerLine } from "@/lib/game/ledger";
 import { hasModule } from "./core";
-import { getHireCost } from "./pricing";
+import { discountedDue, getHireCost } from "./pricing";
 
-export function hireWorker(state: GameState, type: string, logs: string[]) {
+export function hireWorker(state: GameState, type: string, logs: LedgerLine[]) {
   const wage = getHireCost(state, type);
   const def = workerType(type);
   const label = def?.label ?? type;
-  // Jade Pavilion's pledge covers the first artisan to come aboard, once a
-  // voyage. What an artisan costs to take on is the wage for the round it
-  // joins: there is no separate joining fee (see getHireCost), so the
-  // pledge waives exactly that one payment and the artisan is paid as
-  // normal from the round after. The affordability check below is against
-  // the same number, so a captain with an empty purse can still take the
-  // free hire that their House promised them.
+  // The Jade Pavilion pledge waives the first wage only, so there is no
+  // separate joining fee. The affordability check uses that same zero,
+  // allowing a free hire.
   const pledged = state.housePerks.jadeFreeHireAvailable;
   if (!pledged && state.money < wage) {
-    logs.push(t("❌ Insufficient funds to hire workers!"));
+    logs.push(line("❌ Not enough Gold to hire artisans!"));
     return;
   }
   const list = state.workers[type as WorkerTypeId];
-  // The pledge is only spent once the artisan is actually on the roster, so
-  // a hire that bails out above leaves it intact for the next attempt.
   if (!list) return;
-  // The log line takes its label from WORKER_TYPES through `def?.label`,
-  // and a new worker carries no progress field (see Worker in types.ts):
-  // progress was always 0, so the roster tracks produced counts alone.
-  //
-  // [C2: crew loss by name] Who the new hand is, drawn here rather than
-  // inside their object literal, because the draw reads the roster and the
-  // voyage's losses. Read after every guard above, so a hire that bails
-  // out over an empty purse never spends a name, and the log line
-  // introduces the person rather than the trade: the bench's rows carry
-  // names now, and a captain meeting an artisan here and a row there
-  // should meet the same one.
+  // Read after the guards so a failed hire does not consume a crew name.
   const identity = newCrewIdentity(state);
+  // The pledge is spent only once the artisan is on the roster, so a failed
+  // hire leaves it intact.
   list.push({
     task: null,
     producedCount: 0,
     isSkilled: false,
     name: identity.name,
     seq: identity.seq,
-    // Present only on the pledge hire, so a saved voyage carries the flag
-    // on the one artisan it means rather than as an explicit false on every
-    // worker. An absent flag and a false one read identically.
+    // Absent means false; only a pledge hire carries the flag.
     freeFirstWage: pledged || undefined,
   });
   logs.push(
-    t(
+    line(
       "{workerIcon} Hired {identity.name} the {label}! Wage: {wage} Gold / Round (paid at round end)",
       {
         workerIcon: def?.icon ?? "🧑",
         "identity.name": identity.name,
-        label: t(label),
+        label: line(label),
         wage,
       },
     ),
@@ -89,7 +59,7 @@ export function hireWorker(state: GameState, type: string, logs: string[]) {
   if (pledged) {
     state.housePerks.jadeFreeHireAvailable = false;
     logs.push(
-      t(
+      line(
         "🪷 Jade Pavilion pledge honored: this artisan joins at no cost, so the first wage is on the House.",
       ),
     );
@@ -100,20 +70,18 @@ export function fireWorker(
   state: GameState,
   type: string,
   idx: number,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   const list = state.workers[type as WorkerTypeId];
   if (!list) return;
-  // Severance reads the same getHireCost(state, type) the hire and
-  // payroll paths use, so a boon or module that shifts the wage shifts
-  // the severance in lockstep.
+  // Severance uses the same wage reader as hire and payroll.
   const wage = getHireCost(state, type);
   const label = workerType(type)?.label ?? type;
   if (idx < 0 || idx >= list.length) return;
   if (state.money < wage) {
     logs.push(
-      t("❌ Insufficient funds for {label}'s severance: {wage} Gold", {
-        label: t(label),
+      line("❌ Not enough Gold for {label}'s severance: {wage}", {
+        label: line(label),
         wage,
       }),
     );
@@ -121,23 +89,20 @@ export function fireWorker(
   }
   state.money -= wage;
   const worker = list.splice(idx, 1)[0];
-  // [C2: crew loss by name] The line says who left. It used to say the
-  // trade alone ("Dismissed a Weaver"), which was all the roster ever
-  // carried; the bench's rows show a name now, and a dismissal that named
-  // only the craft would leave a captain matching people to the bill.
   logs.push(
-    t("💔 Dismissed {worker.name} the {label}. Severance: {wage} Gold", {
+    line("💔 Dismissed {worker.name} the {label}. Severance: {wage} Gold", {
       "worker.name": worker.name,
-      label: t(label),
+      label: line(label),
       wage,
     }),
   );
   if (worker.task)
     logs.push(
-      "  " +
-        t("This worker was making: {worker.task}", {
-          "worker.task": t(worker.task),
-        }),
+      line(
+        "This artisan was making: {worker.task}",
+        { "worker.task": line(worker.task) },
+        "  ",
+      ),
     );
 }
 
@@ -145,15 +110,12 @@ export function assignTask(
   state: GameState,
   type: string,
   task: string,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   const list = state.workers[type as WorkerTypeId];
   if (!list) return;
   const recipe = RECIPES[task];
-  // [C3: garments and the cold] Whether any hand was passed over for the
-  // cold, kept so the refusal below can say what happened instead of
-  // reporting a full bench over hands that are standing idle because they
-  // froze.
+  // Track this so a refusal can distinguish a frozen hand from a full bench.
   let frozen = false;
   for (const worker of list) {
     if (isFrostbitten(worker, state.currentRound)) {
@@ -168,41 +130,48 @@ export function assignTask(
           break;
         }
       if (!can) {
-        // Names every material the recipe needs against what's actually on
-        // hand, flagging the short ones, instead of just naming the good
-        // that failed to start. The check right above already knows exactly
-        // which material and by how much; throwing that away here left the
-        // player to go compare the recipe against their inventory by hand.
-        const short = Object.entries(recipe.materials)
-          .map(([m, a]) => {
+        // List every material and mark the short ones, rather than naming only the
+        // first missing good. The list is joined at the read (see `joined`), so
+        // the separator and the good names follow the reader's language.
+        const short = joined(
+          Object.entries(recipe.materials).map(([m, a]) => {
             const have = state.inventory[m] || 0;
-            return t("{moduleIcon}{m} {have}/{a}{shortMark}", {
+            return line("{moduleIcon}{m} {have}/{a}{shortMark}", {
               moduleIcon: ICONS[m],
-              m: t(m),
+              m: line(m),
               have,
               a,
               shortMark: have < a ? " ⚠️" : "",
             });
-          })
-          .join(" + ");
+          }),
+          () => " + ",
+        );
         logs.push(
-          t("❌ Material shortage to produce {task}! (Have: {short})", {
-            task: t(task),
+          line("❌ Material shortage to produce {task}! (Have: {short})", {
+            task: line(task),
             short,
           }),
         );
         return;
       }
+      // Materials are spent when the task is assigned, not when it produces.
       for (const [m, a] of Object.entries(recipe.materials))
         state.inventory[m] -= a;
       worker.task = task;
-      const matTxt = Object.entries(recipe.materials)
-        .map(([m, a]) => `${ICONS[m]}${t(m)}×${a}`)
-        .join(" + ");
+      const matTxt = joined(
+        Object.entries(recipe.materials).map(([m, a]) =>
+          line("{icon}{m}×{amount}", {
+            icon: ICONS[m],
+            m: line(m),
+            amount: a,
+          }),
+        ),
+        () => " + ",
+      );
       logs.push(
-        t("📋 Assigned: Produce {icon}{task} (Req: {materials})", {
+        line("📋 Assigned: Produce {icon}{task} (Req: {materials})", {
           icon: ICONS[task],
-          task: t(task),
+          task: line(task),
           materials: matTxt,
         }),
       );
@@ -211,113 +180,101 @@ export function assignTask(
   }
   logs.push(
     frozen
-      ? frozenAssignRefusal()
-      : t("❌ All workers are already assigned tasks!"),
+      ? frozenAssignRefusalLine()
+      : line("❌ All artisans are already assigned tasks!"),
   );
 }
 
-export function processProduction(state: GameState, logs: string[]) {
-  const bonus = state.modifierFlags.worker_bonus_production || 0;
-  // [F6: charters at leg four] The Weavers' Charter, read once here for the
-  // reason the boon above is: one fact about the captain, not one per
-  // artisan. It is a fact about weaving hands alone, which is what its text
-  // names, so the map below carries which trades weave and only those take
-  // the extra item.
-  const weavingCharter = state.modifierFlags.loom_extra_produce || 0;
-  // Every artisan type, whether or not this tier has unlocked it: a captain
-  // can only ever have hired an unlocked one, and an empty list costs nothing.
-  // The singular label, not a plural with its trailing s trimmed off.
-  // WORKER_TYPES already carries both forms, and the trim only read
-  // correctly by accident: it happens to work on all seven plural spellings
-  // today, and would have produced "Master" from a plural like "Master
-  // Artisans" without anyone noticing until it reached a log line.
+// The yield before any bonus: an unskilled hand makes one and a skilled
+// hand makes two. Named once because the bonus check in processProduction
+// reads the same rule, and a promotion that moved one copy would leave the
+// other behind.
+function baseWorkerYield(skilled: boolean): number {
+  return skilled ? 2 : 1;
+}
+
+// Shared by production and the roster tooltip. The Weavers' Charter applies
+// only to weaving trades.
+export function workerBaseYield(
+  state: GameState,
+  skilled: boolean,
+  weaves = false,
+): number {
+  let amt = baseWorkerYield(skilled);
+  amt += state.modifierFlags.worker_bonus_production || 0;
+  if (hasModule(state, "artisans_workshop")) amt += 1;
+  if (weaves) amt += state.modifierFlags.loom_extra_produce || 0;
+  return amt;
+}
+
+export function processProduction(state: GameState, logs: LedgerLine[]) {
+  // Visit every type, even locked ones; an empty list costs nothing. The charter
+  // boosts only the two weaving trades, keyed by id rather than label so copy
+  // changes cannot move the rule.
   const allLists = WORKER_TYPES.map((w) => ({
     list: state.workers[w.id] ?? [],
     name: w.label,
-    // [F6: charters at leg four] A Master Weaver is a weaver, and the
-    // charter's sentence says each weaver, so both weaving trades take
-    // the charter's item while the smiths and the makers do not. Read off
-    // the type's own id rather than its label, because the label is the
-    // string the ledger prints and a copy change must not move a rule.
     weaves: w.id === "weaver" || w.id === "master",
   }));
-  // [C1: the Larder and Short Rations] Read once, outside both loops,
-  // because it is one fact about the captain rather than one per artisan:
-  // the ship either went hungry this leg or it did not. The line below is
-  // said once for the same reason, so the smaller numbers that follow it
-  // have an explanation above them instead of a note on every row, and it
-  // names the stake as well as the state so the empty larder's price is
-  // read before it is paid. [W3: the status convention] The sentence is
-  // composed in ../status-copy, where the hunger family's three clauses
-  // are authored once and its way back is held to every surface.
+  // One fact for the whole crew. Print the note once so later rows have
+  // context.
   const short = onShortRations(state);
-  if (short) logs.push(hungryProductionNote());
+  if (short) logs.push(hungryProductionNoteLine());
   for (const { list, name, weaves } of allLists) {
     for (const w of list) {
-      // [C3: garments and the cold] The bench will not hand work to a hand
-      // out of action, but a save is not the bench and can carry a task
-      // beside a frostbite mark. The rule is that a hand out of action does
-      // not work, so the task is left standing rather than dropped: its
-      // materials were spent when it was assigned, and it produces the leg
-      // after this one.
+      // A saved task can sit beside frostbite. Leave the task standing; its
+      // materials were already spent, so it produces next round.
       if (isFrostbitten(w, state.currentRound)) {
-        if (w.task) logs.push(frozenWorkLog(w.name, w.task));
+        if (w.task) logs.push(frozenWorkLogLine(w.name, w.task));
         continue;
       }
       if (w.task) {
-        let base = w.isSkilled ? 2 : 1;
-        let amt = base + bonus;
-        if (hasModule(state, "artisans_workshop")) amt += 1;
-        // [F6: charters at leg four] The charter's item lands before the
-        // ration reduction, like every addition above it: the extra work
-        // is done on the round it is done, and a hungry leg then shrinks
-        // the whole of it rather than a part.
-        if (weaves && weavingCharter) amt += weavingCharter;
+        const base = baseWorkerYield(w.isSkilled);
+        // Additions apply before the ration reduction, so hunger shrinks the whole
+        // output.
+        let amt = workerBaseYield(state, w.isSkilled, weaves);
         if (short) amt = shortRationsYield(amt);
         state.inventory[w.task] = (state.inventory[w.task] || 0) + amt;
         w.producedCount = (w.producedCount || 0) + amt;
-        // The tail used to read "(Boon Bonus)", which was already loose
-        // (the workshop module is not a boon) and became a plain
-        // misattribution the afternoon a charter could raise this number:
-        // three sources can now land on one line, so the line names what
-        // they have in common rather than one of the three.
+        // Several sources can raise output, so the line says "Bonus" rather than
+        // naming one.
         if (amt > base)
           logs.push(
-            t("✅ Skilled {name} finished {amt}× {taskIcon}{w.task}! (Bonus)", {
-              name: t(name),
-              amt,
-              taskIcon: ICONS[w.task],
-              "w.task": t(w.task),
-            }),
+            line(
+              "✅ Skilled {name} finished {amt}× {taskIcon}{w.task}! (Bonus)",
+              {
+                name: line(name),
+                amt,
+                taskIcon: ICONS[w.task],
+                "w.task": line(w.task),
+              },
+            ),
           );
-        // Reads its own amount rather than the 2 this branch used to spell
-        // out. That was true for as long as a skilled artisan's output could
-        // only be 2 or more, and the short rations reduction above is what
-        // ended that: a hungry crew's skilled hand makes 1, and a line
-        // promising 2 over a hold that gained 1 is the ledger lying about
-        // work the captain can count.
+        // Read amt, not the base 2: short rations can reduce a skilled hand to 1.
         else if (w.isSkilled)
           logs.push(
-            t("✅ Skilled {name} finished {amt}× {taskIcon}{w.task}!", {
-              name: t(name),
+            line("✅ Skilled {name} finished {amt}× {taskIcon}{w.task}!", {
+              name: line(name),
               amt,
               taskIcon: ICONS[w.task],
-              "w.task": t(w.task),
+              "w.task": line(w.task),
             }),
           );
         else
           logs.push(
-            t("✅ {name} finished {taskIcon}{w.task}!", {
-              name: t(name),
+            line("✅ {name} finished {taskIcon}{w.task}!", {
+              name: line(name),
               taskIcon: ICONS[w.task],
-              "w.task": t(w.task),
+              "w.task": line(w.task),
             }),
           );
         if (w.producedCount >= 2 && !w.isSkilled) {
+          // Two produced items promote an unskilled hand; check after this round's
+          // output is added.
           w.isSkilled = true;
           logs.push(
-            t("⭐ {name} Promotion! Can now produce 2 items per round!", {
-              name: t(name),
+            line("⭐ {name} Promotion! Can now produce 2 items per round!", {
+              name: line(name),
             }),
           );
         }
@@ -327,27 +284,8 @@ export function processProduction(state: GameState, logs: string[]) {
   }
 }
 
-/**
- * The wage bill a payroll run is about to charge, read without charging
- * it.
- *
- * payWages is that run; this is the same arithmetic standing still, and
- * the two are one reader for a reason. Four surfaces used to walk the
- * roster themselves, and none of them knew about the Jade Pavilion
- * pledge: a sponsored hand's first wage is waived, so every surface that
- * counted hands and multiplied by the trade's wage overbilled a pledged
- * captain by exactly one wage. The button on the settle screen warned of
- * a bankruptcy the run would never deliver, the harbor aid request was
- * seeded with a shortfall that did not exist (it gates on affordability),
- * and the rail and the advice line quoted the same figure one wage high.
- * The pledge is read here and spent in payWages, which is the half of
- * this pair that is allowed to write: a reader that cleared the flag
- * would spend the waiver on whichever screen happened to render first.
- */
 type WageBillRow = {
   id: WorkerTypeId;
-  // Hands whose wage is due, and hands the Pavilion covers. The two
-  // together are the roster the row's label counts.
   count: number;
   sponsored: number;
   label: string;
@@ -355,6 +293,11 @@ type WageBillRow = {
   due: number;
 };
 
+// The bill a payroll run is about to charge, without charging it. This is
+// the shared read for every warning surface, including the Jade Pavilion
+// waiver. Only payWages may spend the waiver.
+//
+// count excludes sponsored hands; sponsored is reported separately.
 export function wageBill(state: GameState): WageBillRow[] {
   return WORKER_TYPES.map((w) => {
     const roster = state.workers[w.id] ?? [];
@@ -369,83 +312,51 @@ export function wageBill(state: GameState): WageBillRow[] {
       sponsored,
       label: w.label,
       plural: w.plural,
-      due: count * getHireCost(state, w.id),
+      due: discountedDue(state, count * getHireCost(state, w.id)),
     };
   });
 }
 
-/**
- * The bill keyed by worker type, for the two screens that join it against
- * the unlocked roster rather than printing it straight (the status rail
- * and Worker Management). The key is the engine's own id, which is also
- * what WORKER_TYPES and the roster share, so a missing row reads as a
- * type the roster does not know rather than a type with an unpaid wage.
- * The join itself is unlockedWorkerRoster below, which both screens read.
- */
-export function payrollIndex(state: GameState): Map<WorkerTypeId, WageBillRow> {
+// Keyed by the engine's worker id for joins against WORKER_TYPES.
+function payrollIndex(state: GameState): Map<WorkerTypeId, WageBillRow> {
   return new Map(wageBill(state).map((b) => [b.id, b]));
 }
 
-/**
- * The unlocked roster, each type carrying its hands and the wage the next
- * payroll run is due from it: the join the two screens that print the
- * roster make (the status rail and Worker Management). Both of them used
- * to write the join out themselves, the pledge story in the comment and
- * all, so a roster change or a wage rule had two places to stay in step.
- *
- * The due reads off the engine's own bill (payrollIndex) rather than a
- * hand count multiplied at the screen: a Jade Pavilion pledge waives a
- * sponsored hand's first wage, and a screen that counted hands and
- * multiplied overbilled a pledged captain by exactly one wage. A type
- * outside the unlocked roster is one payWages does not charge either, so
- * it takes no row here.
- */
+// The unlocked roster joined with the engine's bill. Screens must not
+// multiply hand counts themselves, or they will bill a sponsored hand.
 export function unlockedWorkerRoster(state: GameState) {
   const payroll = payrollIndex(state);
-  return unlockedWorkerTypes(state.difficulty, state.currentRound).map((w) => ({
-    ...w,
-    list: state.workers[w.id] ?? [],
-    due: payroll.get(w.id)?.due ?? 0,
-  }));
+  return unlockedWorkerTypes(state.difficulty, state.currentRound).map((w) => {
+    const row = payroll.get(w.id);
+    return {
+      ...w,
+      list: state.workers[w.id] ?? [],
+      count: row?.count ?? 0,
+      sponsored: row?.sponsored ?? 0,
+      due: row?.due ?? 0,
+    };
+  });
 }
 
-/**
- * The Gold a payroll run is about to charge: the rows above, added up.
- * payWages reads this beside its own copy of the bill, and the three
- * screens that warn a captain before the charge lands (the settle sheet,
- * the status rail's obligations figure and the advisor's settlement
- * advice) read the same total, so what is billed and what is warned of
- * are one walk of one roster.
- *
- * It has to be read BEFORE payWages clears any Jade Pavilion waiver: the
- * flag promises to cover exactly one wage and is spent in that clearing
- * pass, so the same roster read after the pass bills nothing.
- */
+// Read before payWages clears waivers, or a sponsored hand's wage reappears
+// in the same roster.
 export function wagesDue(state: GameState): number {
   return wageBill(state).reduce((sum, b) => sum + b.due, 0);
 }
 
+// Wages are their own settlement line and are not part of roundCosts, or
+// Total Cost would count them twice. A failure's consequences are decided in
+// ./seats, which knows the mode.
 export function payWages(
   state: GameState,
-  logs: string[],
+  logs: LedgerLine[],
 ): true | "bankruptcy" {
-  // The bill comes off the shared reader above, so the figure charged
-  // here and the figure every screen quotes are one reading of one
-  // roster rather than five. A type whose only artisan is sponsored owes
-  // nothing but is kept, because it still has a pledge to report below.
+  // Keep rows that are due or sponsored so the pledge can still be reported.
   const bills = wageBill(state).filter((b) => b.count > 0 || b.sponsored > 0);
-  // The total is read here, beside the bill and before the pass below,
-  // for the same reason the bill is: wagesDue reads this roster again, and
-  // once the pass below has spent the waivers a sponsored hand's first
-  // wage reads as owed again.
+  // Read before the waiver pass, using the same shared bill as the screens.
   const total = wagesDue(state);
-  // This is also where a Jade Pavilion pledge is spent. The waiver is
-  // cleared before any early return below, because it covers exactly one
-  // payroll run whether or not a bill follows from it: leaving it set
-  // would quietly excuse that artisan every round for the rest of the
-  // voyage instead of only the round they joined. The bill and its
-  // total above were read before this line, which is what lets one pass
-  // both print the pledge and charge the wage it replaced.
+  // Spend every waiver before any early return. The pledge covers one payroll
+  // run whether or not a bill results.
   for (const w of WORKER_TYPES) {
     for (const worker of state.workers[w.id] ?? []) {
       if (!worker.freeFirstWage) continue;
@@ -453,12 +364,10 @@ export function payWages(
     }
   }
   for (const b of bills) {
-    // The singular reads (crew.role.* carries it); the English plural has
-    // no row of its own and stays as the roster spells it.
-    const bLabel = b.sponsored === 1 ? t(b.label) : b.plural;
+    const bLabel = line(b.sponsored === 1 ? b.label : b.plural);
     if (b.sponsored > 0)
       logs.push(
-        t(
+        line(
           "🪷 Jade Pavilion covers the wage for {b.sponsored} {bLabel} this round.",
           {
             "b.sponsored": b.sponsored,
@@ -471,18 +380,13 @@ export function payWages(
   if (state.money >= total) {
     state.money -= total;
     state.workerWages += total;
-    // The wage bill is its own expense line and is not part of the round's
-    // goods bucket. It used to be added to roundCosts as well, which put the
-    // same Gold into the settlement's Total Cost twice: once through that
-    // field and once through the workerWages term the ledger sums beside it.
-    // The voyage ledger never carried wages at all, and the endgame summary
-    // lists them as their own row, so the round bucket was the one place
-    // that disagreed with the other two.
+    // The voyage tally is written here because endRound clears workerWages.
+    state.wagesPaid += total;
     for (const b of bills) {
-      const bLabel = b.count === 1 ? t(b.label) : b.plural;
+      const bLabel = line(b.count === 1 ? b.label : b.plural);
       if (b.due > 0)
         logs.push(
-          t("💰 Paid wages for {b.count} {bLabel}: {b.due} Gold", {
+          line("💰 Paid wages for {b.count} {bLabel}: {b.due} Gold", {
             "b.count": b.count,
             bLabel,
             "b.due": b.due,
@@ -492,64 +396,50 @@ export function payWages(
     return true;
   }
   logs.push(
-    t("⚠️ Insufficient funds! Needed: {total} Gold, Have: {state.money} Gold", {
+    line("⚠️ Not enough Gold! Needed: {total}, Have: {state.money}", {
       total,
       "state.money": state.money,
     }),
   );
-  // Both lines stopped short of promising what happens next. They used to
-  // say the workers struck and the voyage was over, which was true for as
-  // long as insolvency ended a voyage; in the mode that keeps the seat
-  // sailing, the crew is left unpaid and the voyage is not over at all.
-  // What the failure costs is decided in ./seats, which is the one place
-  // that knows which mode this is.
-  logs.push(t("💥 Could not pay wages, the crew is left unpaid."));
-  logs.push(t("💥 Reputation collapsed: a bankruptcy is recorded."));
+  logs.push(line("💥 Could not pay wages, the crew is left unpaid."));
+  logs.push(line("💥 Reputation collapsed: a bankruptcy is recorded."));
   return "bankruptcy";
 }
 
-/**
- * The maintenance fee a round is about to charge: the flat fee every
- * voyage carries plus whatever an installed module has added to it (the
- * overdrive engine's surcharge, reconciled against the hull on load by
- * ./boons). payMaintenance below charges exactly this, and the three
- * screens that quote the bill before it lands (the settle sheet, the
- * status rail's obligations figure and the advisor's settlement advice)
- * read their maintenance line from here.
- */
+// Flat fee plus module surcharges, from the same reader every warning
+// surface uses.
 export function maintenanceDue(state: GameState): number {
-  return state.fixedCost + state.maintenancePenalty;
+  return discountedDue(state, state.fixedCost + state.maintenancePenalty);
 }
 
+// Maintenance is its own settlement line, not part of roundCosts, for the
+// same double count reason as wages.
 export function payMaintenance(
   state: GameState,
-  logs: string[],
+  logs: LedgerLine[],
 ): true | "bankruptcy" {
   const cost = maintenanceDue(state);
-  // Maintenance is its own expense line on both payment paths below, and the
-  // same double count the wage note above describes applied to it: the fee
-  // was added to roundCosts and totalCosts as well, while the settlement
-  // adds maintenanceCosts to Total Cost itself and the endgame summary
-  // prints it as a row beside the purchases row.
   if (state.money >= cost) {
     state.money -= cost;
     state.maintenanceCosts += cost;
-    logs.push(t("💸 Paid Ship Maintenance Fee: {cost} Gold", { cost }));
+    state.maintenancePaid += cost;
+    logs.push(line("💸 Paid Ship Maintenance Fee: {cost} Gold", { cost }));
     return true;
   }
   if (state.money > 0) {
+    // A forced partial payment still counts toward the round and voyage totals.
     const paid = state.money;
     state.money = 0;
     state.maintenanceCosts += paid;
+    // Voyage tally, for the same reason as wages.
+    state.maintenancePaid += paid;
     logs.push(
-      t("⚠️ Forced payment of {paid} Gold (Needed {cost} Gold)", {
+      line("⚠️ Forced payment of {paid} Gold (Needed {cost} Gold)", {
         paid,
         cost,
       }),
     );
-    // See the note on the wage failure above: this line used to end the
-    // voyage in words, which is only half of what it now means.
-    logs.push(t("⚠️ Funds depleted: the maintenance fee goes unpaid."));
+    logs.push(line("⚠️ Gold depleted: the maintenance fee goes unpaid."));
     return "bankruptcy";
   }
   return "bankruptcy";

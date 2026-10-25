@@ -208,7 +208,7 @@ export async function listAccounts(): Promise<AdminRoster> {
 // =====================================================================
 
 // Everything a ban or a purge does to an account before the row itself is
-// touched: every socket it holds is detached from the room bookkeeping,
+// touched: every socket it holds is detached from the harbor bookkeeping,
 // told why, and closed, and every seat it holds is reaped on the spot
 // rather than left to the 30 second grace timer.
 //
@@ -235,7 +235,7 @@ async function endAccountSessions(
       userId: target.id,
       displayName: target.displayName,
       cleanup,
-      // A seat given up by an operator never keeps a room alive.
+      // A seat given up by an operator never keeps a harbor alive.
       keepEmptyRoom: false,
     });
   }
@@ -256,7 +256,7 @@ async function endAccountSessions(
 
 // Reads every harbor an account hosts and hands it to the operator as a
 // plain list of ids, so the purge can tell those harbors' crews before the
-// delete cascades the rooms away.
+// delete cascades the harbors away.
 async function hostedRoomIds(userId: string): Promise<string[]> {
   const rooms = await db.room.findMany({
     where: { hostId: userId },
@@ -473,24 +473,24 @@ async function purgeResolved(
 
   // Told before the delete, because the delete is what takes their harbors
   // away: the room rows cascade, and so does every save and membership
-  // hanging off those rooms. (Chronicles ride the account rather than the
-  // room, so a purged host's harbors keep the other captains' chronicles;
+  // hanging off those harbors. (Chronicles ride the account rather than the
+  // harbor, so a purged host's harbors keep the other captains' chronicles;
   // see VoyageChronicle in prisma/schema.prisma.) A captain who is sitting
   // in one of them has to be handed back to the Lobby rather than left in
   // a harbor that no longer exists.
   const hosted = await hostedRoomIds(target.id);
   const socketIds = detachUser(io, target.id);
-  // [I1: the telemetry spine] The records of the harbors this account
+  // The records of the harbors this account
   // hosted go with them, and this is the one place that has to say so by
-  // hand. Every other row hanging off a room cascades with it; a telemetry
+  // hand. Every other row hanging off a harbor cascades with it; a telemetry
   // record deliberately does not (see VoyageTelemetry in
-  // prisma/schema.prisma), because it has to outlive the ordinary room
+  // prisma/schema.prisma), because it has to outlive the ordinary harbor
   // deletion that ends most voyages. A purge is not that: the operator is
   // erasing an account, and a record that names it is part of the account.
   if (hosted.length) {
     await db.voyageTelemetry.deleteMany({ where: { roomId: { in: hosted } } });
   }
-  // [J2: the mute and the report] The reports this account was named in go
+  // The reports this account was named in go
   // with it, on either side. The rule is the one the telemetry block above
   // states: the operator is erasing an account, and a row that names it is
   // part of the account. A report names two captains rather than one, so
@@ -515,14 +515,14 @@ async function purgeResolved(
       });
     }
     emptyRoom(io, roomId);
-    // No room row is left to repair, so every per room structure goes with
+    // No room row is left to repair, so every per harbor structure goes with
     // it here rather than through the departure path.
     cleanup.clearRoomAllMaps(roomId);
   }
 
   // Every other seat this account held, in harbors it does not own. Those
   // harbors survive the purge, so the seats are given up the ordinary way:
-  // host hand off, and the room removed if this was its last member.
+  // host hand off, and the harbor removed if this was its last member.
   const hostedSet = new Set(hosted);
   const seats = await roomIdsForUser(target.id);
   for (const roomId of seats) {
@@ -536,9 +536,9 @@ async function purgeResolved(
     });
   }
 
-  // [I1: the telemetry spine] The rest of the records that name this
+  // The rest of the records that name this
   // account: the delete above covers the harbors it hosted, but a record
-  // in any other harbor it sailed in is room keyed, not user keyed, and
+  // in any other harbor it sailed in is harbor keyed, not user keyed, and
   // would otherwise survive the purge while naming somebody who no longer
   // exists. The rule is the same one the report delete below states, and
   // the account id appears only inside the record's JSON body, so a LIKE

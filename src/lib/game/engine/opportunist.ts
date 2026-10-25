@@ -1,23 +1,23 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: the Free Captain's borrow.
 //
-// [D6: Free Captain: Opportunist] The plan hands this path the honest
+// The design hands this path the honest
 // version of what the paywall was reaching for. Once a voyage, a Free
 // Captain fills any one pathbound order without joining its path, at a
-// forty percent payout penalty. The plan says why that is the right shape
+// forty percent payout penalty. The design says why that is the right shape
 // and it is worth keeping where the rule lives: the locked card stays
 // tantalizing, it stays reachable, and the reach costs something real,
 // while the cost is zero dollars. What the captain spends is a once a
 // voyage allowance and a fifth of their payout on that one order, and a
-// price that is not money is the whole reason the plan calls it honest.
+// price that is not money is the whole reason the design calls it honest.
 //
-// [F6: charters at leg four] The Factor is the borrow's second door. The
-// plan's trio offers the charter to a Free Captain among their own pair,
+// The Factor is the borrow's second door. The
+// design's trio offers the charter to a Free Captain among their own pair,
 // and every other path can draw it as its wildcard, and its text sells
 // the borrow itself to whoever holds it: "Borrowing is open three times a
 // voyage, and each borrow carries a 60% penalty." A charter the four
 // other paths could take and gain nothing from would be a trap inside a
-// trio, which is the dishonesty the plan's own Letter of Marque note
+// trio, which is the dishonesty the design's own Letter of Marque note
 // warns about, so the charter opens the door to its holder and the
 // readers below answer in its terms: the allowance becomes the charter's
 // count rather than the path's one, the penalty becomes the charter's
@@ -36,10 +36,11 @@
 //
 // Pure: no socket, no database, no clock. The one switch this feature
 // reads is the one its locked cards already read, and it is judged in
-// ./flags, which is where the epic keeps that policy.
+// ./flags, which is where the design keeps that policy.
 // =====================================================================
 import { cardByFlag, cardText } from "../cards";
 import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 import { OPPORTUNIST_PENALTY, OPPORTUNIST_USES } from "../constants/paths";
 import { pathOrdersOn } from "../flags";
 import type { PathId } from "../paths";
@@ -55,7 +56,7 @@ export const OPPORTUNIST_PATH: PathId = "free_captain";
 /**
  * Whether the locked cards are this captain's to open at all.
  *
- * [F6: charters at leg four] Two doors, one reader: the path that owns
+ * Two doors, one reader: the path that owns
  * the ability, and the Factor, the charter whose text sells the borrow
  * itself to whoever holds it. Written here rather than at its two call
  * sites (the guard below and the board's spent line) because it is a
@@ -75,10 +76,10 @@ export function opportunistIsBorrower(
  * What this voyage's allowance is: the path's one borrow, or the three
  * the Factor opens.
  *
- * [F6: charters at leg four] The charter replaces the base count rather
+ * The charter replaces the base count rather
  * than adding to it, because its text promises a number ("Borrowing is
  * open three times a voyage") rather than an increment, and the moment
- * is at leg four: a captain who spent the base borrow before the charter
+ * is at round four: a captain who spent the base borrow before the charter
  * arrived holds the same three after it, so the reading has to be one
  * number rather than a running sum. Zero or absent reads as the base
  * count, the fallback INCOME_TAX_RATE's own reader takes: a flag that
@@ -134,14 +135,14 @@ export function opportunistBorrowsLeft(
  * other ability reader in this tree takes: the flag is the operator's
  * rollback and the door is the captain's own, and a build with the feature
  * off must refuse a Free Captain as flatly as it refuses everyone else.
- * The rollback is D2's own switch, which is deliberate rather than a
- * shortcut: this ability exists only where a locked order does, so taking
- * the locks off the board (see pathOrdersOn) takes the borrow with them
- * and leaves nothing durable behind, exactly as the plan's rollback clause
- * asks.
+ * The rollback is the pathbound order board's own switch, which is
+ * deliberate rather than a shortcut: this ability exists only where a locked
+ * order does, so taking the locks off the board (see pathOrdersOn) takes the
+ * borrow with them and leaves nothing durable behind, exactly as the design's
+ * rollback clause asks.
  *
  * The door itself is opportunistIsBorrower's answer and not a comparison
- * written here, because [F6: charters at leg four] gave the ability a
+ * written here, because gave the ability a
  * second way in: the Factor's holder borrows without holding the path,
  * and the board's spent line asks the same question of the same reader.
  *
@@ -182,8 +183,7 @@ export function opportunistMayBorrow(
  * orders: at a quarter penalty a two Gold order keeps `2 - round(0.5)`, a
  * coin, while `round(2 * 0.75)` is two and the borrow would have paid full
  * price. Forty percent happens to agree in both spellings today, which is
- * exactly why the spelling is not the thing to leave to chance: [F6:
- * charters at leg four] retunes this number through the Factor, and the
+ * exactly why the spelling is not the thing to leave to chance: retunes this number through the Factor, and the
  * reader takes the state so the retune moves the arithmetic without
  * writing a second copy of it here. The rate is read the way the
  * allowance is, the state's flag with the constant as the fallback, so a
@@ -205,7 +205,7 @@ export function opportunistPayout(
  * The lead the borrow's one sentence is printed under: the name of the
  * door it came through.
  *
- * [F6: charters at leg four] Only one of the two doors is the Free
+ * Only one of the two doors is the Free
  * Captain's, so the lead cannot be typed: a Quartermaster borrowing on
  * the Factor's warrant is not a Free Captain, and a ledger line calling
  * them one would be a receipt contradicting the card that paid it. The
@@ -221,6 +221,14 @@ function borrowLead(state: Pick<GameState, "path" | "modifierFlags">): string {
 }
 
 /**
+ * The English the borrow is described with, named beside its two readers
+ * so the card and the ledger are one sentence told twice rather than two
+ * sentences that can drift.
+ */
+const OPPORTUNIST_SENTENCE =
+  "{lead}: {payout} Gold instead of {reward}. One order filled without joining the path.";
+
+/**
  * The one sentence the borrow is described with, printed on the card that
  * offers it and written into the ledger when it is spent.
  *
@@ -229,17 +237,64 @@ function borrowLead(state: Pick<GameState, "path" | "modifierFlags">): string {
  * reading the log are reading about one transaction, and two strings
  * would be two accounts of it. It names both numbers because the penalty
  * is the price of the ability and a reader who sees only the smaller one
- * has been told what they get and not what it cost.
+ * has been told what they get and not what it cost. The payout is the
+ * reward the fill actually credits (quote.reward), not the pre tax basis
+ * the penalty was taken from: a VAT or a bonus lands between the two, and
+ * a sentence quoting the basis beside a Reward line quoting the credit
+ * gave one fill two payouts.
  */
 export function opportunistLine(
   state: Pick<GameState, "path" | "modifierFlags">,
   reward: number,
   payout: number,
 ): string {
-  return t(
-    "{lead}: {payout} Gold instead of {reward}. One order filled without joining the path.",
-    { lead: borrowLead(state), payout, reward },
-  );
+  return t(OPPORTUNIST_SENTENCE, {
+    lead: borrowLead(state),
+    payout,
+    reward,
+  });
+}
+
+/**
+ * The same sentence, as a line for a captain's own ledger.
+ *
+ * The card that offers the borrow and the ledger that records it are
+ * reading about one transaction, so they are made of the same English and
+ * the same values. The line is held as material rather than as a finished
+ * sentence, so a captain who reads their ledger in another language reads
+ * the borrow in that language too, and the name of the door it came
+ * through travels with the sentence rather than being frozen into it.
+ */
+export function opportunistLedgerLine(
+  state: Pick<GameState, "path" | "modifierFlags">,
+  reward: number,
+  payout: number,
+): LedgerLine {
+  return line(OPPORTUNIST_SENTENCE, {
+    lead: borrowLeadLine(state),
+    payout,
+    reward,
+  });
+}
+
+/**
+ * The lead the borrow's ledger line is printed under, as material.
+ *
+ * The same reading borrowLead takes, held so the line reads in the
+ * reader's language. The Factor's own name is a card's name rather than
+ * a word the pack carries, so it travels as a reader of the language
+ * rather than as a string the voyage froze.
+ */
+function borrowLeadLine(
+  state: Pick<GameState, "path" | "modifierFlags">,
+): LedgerLine {
+  if (state.path === OPPORTUNIST_PATH) return line("🎭 Free Captain");
+  const factor = cardByFlag("factor_borrows");
+  return factor === null
+    ? line("🎭 Borrow")
+    : line("🎭 {factorName}", {
+        factorName: (locale) => cardText(factor, locale).name,
+      });
 }
 
 /**
@@ -278,8 +333,8 @@ export const OPPORTUNIST_SPENT_LINE =
 /**
  * Heals the counter at the load site, the way every other field this build
  * added is healed, and no voyage saved before this feature carries one: a
- * save from before D6 reads as a captain who has never borrowed anything,
- * which is the right reading of a voyage that predates the ability.
+ * save from before the borrow reads as a captain who has never borrowed
+ * anything, which is the right reading of a voyage that predates the ability.
  *
  * A value that is not a number heals to zero rather than to a guess, which
  * is the direction the healing goes: the failure this prevents is a save

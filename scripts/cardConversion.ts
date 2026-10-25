@@ -1,8 +1,7 @@
 /**
  * The card conversion report.
  *
- * [F2: the card record, and the mode weighting field] The plan's evaluation
- * for this goal is one reading per card: "Offer to pick conversion per card,
+ * The reading is one per card: "Offer to pick conversion per card,
  * with the appearance count beside it, because a card with a high win rate
  * over nine appearances is noise and a card with a high win rate over four
  * hundred is a problem." This prints exactly that, off the voyage saves that
@@ -12,9 +11,9 @@
  * names at the time. It only reads.
  *
  * A card below the floor prints its appearance count and no rate rather than
- * a percentage, because the plan's own sentence is about the difference
- * between the two: the count is what decides whether the rate means
- * anything, so the count is what the row prints until it does.
+ * a percentage, because the difference between the two is the point: the
+ * count is what decides whether the rate means anything, so the count is
+ * what the row prints until it does.
  */
 
 import {
@@ -23,6 +22,7 @@ import {
   readCardConversion,
   type CardTally,
 } from "@/lib/game/cards";
+import { ratePercent } from "@/lib/game/balance";
 import { parseJsonObject } from "@/lib/game/json";
 import { db } from "@/lib/db";
 import { runReport } from "./report";
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
       String(reading.picked).padStart(7),
       reading.rate === null
         ? "n/a".padStart(7)
-        : `${(reading.rate * 100).toFixed(1)}%`.padStart(7),
+        : ratePercent(reading.rate).padStart(7),
     ];
     console.log(cells.join("  "));
   }

@@ -3,57 +3,124 @@
 // from during Parley, ordered over ../contracts' own board.
 // =====================================================================
 
-import {
-  LEG_ALREADY_COVERED,
-  OFFER_FOR_ANOTHER_CAPTAIN,
-  consentFeeRule,
-  STALE_OFFER,
-} from "@/lib/game/constants/copy";
+import { ROUND_ALREADY_COVERED } from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
-import {
-  agreeConsent,
-  consentFeeFor,
-  consentPartyBusy,
-  type EscortContract,
-} from "@/lib/game/engine";
+import { consentPartyBusy, type EscortContract } from "@/lib/game/engine";
+import { escortClaimFrom } from "@/lib/game/engine/contracts";
 import { escortContractsOn } from "@/lib/game/flags";
 import { tFor } from "@/lib/game/i18n";
-import { auditSpentLeg, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
 import { escortContracts } from "../contracts";
 import { rowId } from "../ids";
 import { noteVoyageLog } from "../voyage-log";
-import { offerStandingRefusal, resolveNamedBuyer } from "./consent-shared";
-
-// The refusal every gate in this market answers with when the switch is
-// off, said once so its four handlers cannot drift apart.
-const MARKET_OFF = "The escort market is not running in this harbor.";
+import {
+  acceptConsentOffer,
+  offerTakeRefusal,
+  postConsentOffer,
+  type ConsentAcceptSpec,
+  type ConsentPostSpec,
+} from "./consent-shared";
+import { makeFail, marketOffRefusal } from "./fail";
 
 // The refusal a handler answers with when the offer it was handed is gone:
 // turned down, taken back, or settled out from under the press. Three
 // handlers race the same board and a captain can meet any of them, so the
-// sentence is said once here for the same reason MARKET_OFF is.
+// sentence is said once here for the same reason the market's own
+// sentences are: one refusal, one wording.
 const OFFER_GONE = "That offer is no longer on the board.";
+
+// The market's own answers to the questions the shared frames ask. The
+// frames are in ./consent-shared, and what is here is what makes this
+// market the escort market and not the module market: the phase it sells
+// in, the four states a row stands in, the cover a captain may already
+// hold, and the sentences each of those refusals is made of.
+//
+// The refusal a row that is not an offer draws is the one place this
+// market does not share a wording with the other two: an agreed cover, a
+// spent cover and a turned down offer are three different things to a
+// captain, and the board's own states are what the sentences name.
+const ESCORT_POST: ConsentPostSpec<EscortContract> = {
+  board: (roomId) => escortContracts.list(roomId),
+  market: "escort",
+  errorEvent: "contract:error",
+  on: escortContractsOn,
+  phase: "parley",
+  phaseRefusal: (locale) =>
+    tFor(locale, "One round of protection is sold in the Parley phase."),
+  // The audit's spend closes this board on the tick it lands rather
+  // than on the advance that follows it (see auditSpentRound).
+  auditSpend: "Protection is sold",
+  selfRefusal: (locale) =>
+    tFor(locale, "You can't sell protection to yourself."),
+};
+
+const ESCORT_ACCEPT: ConsentAcceptSpec<EscortContract> = {
+  board: (roomId) => escortContracts.list(roomId),
+  market: "escort",
+  errorEvent: "contract:error",
+  on: escortContractsOn,
+  idKey: "contractId",
+  phase: "parley",
+  phaseRefusal: (locale) =>
+    tFor(locale, "A contract is agreed in the Parley phase."),
+  missingRefusal: (locale) => tFor(locale, OFFER_GONE),
+  // Four refusals for a row that is not an offer, and each names the
+  // state it found rather than the state the captain wanted, because the
+  // two captains here are looking at two screens: a seller whose buyer
+  // reloaded sees the row one frame after it moved.
+  statusRefusal: (row, locale) => {
+    if (row.status === "agreed") {
+      return tFor(locale, "That contract has already been agreed.");
+    }
+    if (row.status === "claimed") {
+      return tFor(locale, "That cover has already answered for a raid.");
+    }
+    if (row.status === "declined") {
+      return tFor(locale, "That offer has already been turned down.");
+    }
+    return null;
+  },
+  selfRefusal: (locale) =>
+    tFor(locale, "You are the one selling that protection."),
+  // A contract agreed after the spend is trading the round the harbor just
+  // closed (see auditSpentRound).
+  auditSpend: "Contracts are agreed",
+  // The buyer's side, and the side is the whole of what the two markets
+  // differ on here (see consentPartyBusy): a captain may hold one cover
+  // a round, and a cover is a round of somebody else's safety.
+  busy: (rows, _opening, userId, round, locale) =>
+    consentPartyBusy(rows, "buyer", userId, round)
+      ? tFor(locale, ROUND_ALREADY_COVERED)
+      : null,
+};
 
 export function wireEscortContracts(io: Server, socket: Socket): void {
   //
-  // [D3: Convoy: the Escort Contract] The market a Convoy captain sells
+  // The market a Convoy captain sells
   // protection from during Parley. The board itself lives in ./contracts,
   // and everything these handlers do is order it: refuse a post that
   // duplicates one already standing, move one offer to agreed, let the
   // captain it was addressed to turn it down, let the seller take back an
-  // offer nobody has acted on, and let the covered captain report the raid
-  // once.
+  // offer nobody has acted on, and let the covered captain report the
+  // raid once.
+  //
+  // Two of those five now run through the frames in ./consent-shared,
+  // which is where the order the questions are asked in lives, and what
+  // this file holds is the market's own answers to them. The other three
+  // (the turning down, the taking back, and the raid) stay here, because
+  // the market's own words for them are its own: only this market has a
+  // captain who may turn an offer down, only this market's rows carry
+  // four states rather than two, and only this market answers a raid.
   //
   // The money never passes through here. A fee moves on the two clients
   // when the board says the two captains agreed, and the absorbed raid
   // moves on the seller's client when the board says the raid arrived,
-  // which is the same division of labour the barter board runs on and the
+  // which is the same division of labor the barter board runs on and the
   // reason none of these handlers reads a purse. What the server is
   // authoritative about is the ordering: one captain per cover, one claim
-  // per contract, and no agreement about a leg that has already gone.
+  // per contract, and no agreement about a round that has already gone.
   socket.on("contract:state:request", (payload: { roomId?: string }) => {
     const s = seated(socket, payload);
     if (!s) return;
@@ -71,187 +138,63 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       fee?: number;
       targetUserId?: string;
     }) => {
-      const s = seated(socket, payload);
-      if (!s) return;
-      const { roomId } = s;
-      const fail = (error: string): void => {
-        socket.emit("contract:error", { roomId, error });
-      };
-      if (!escortContractsOn(s.mode)) {
-        fail(tFor(s.locale, MARKET_OFF));
-        return;
-      }
-      // The fee is read through the same reader the panel reads it
-      // through, so a posting form and a posting socket cannot disagree
-      // about what a fee is (see consentFeeFor).
-      const fee = consentFeeFor(payload?.fee);
-      if (fee === null) {
-        fail(consentFeeRule(s.locale));
-        return;
-      }
-      // The one await in this handler, and every check is after it, so
-      // nothing between a check and the change it guards can yield.
-      const cp = await getCheckpoint(roomId);
-      if (cp.phase !== "parley") {
-        fail(
-          tFor(s.locale, "One leg of protection is sold in the Parley phase."),
+      await postConsentOffer(socket, payload, ESCORT_POST, (post) => {
+        // A captain this seller was turned down by reads one row about that
+        // pair rather than a stack of them, so the second offer to the same
+        // buyer replaces the refusal it follows. Without this a seller could
+        // paper the board with refusals, which is the one bound the primitive
+        // above cannot hold on their behalf: it counts offers, and a refusal
+        // is not an offer.
+        const kept = post.rows.filter(
+          (c) =>
+            !(
+              c.status === "declined" &&
+              c.sellerUserId === post.sellerUserId &&
+              c.buyerUserId === post.buyerUserId
+            ),
         );
-        return;
-      }
-      // The audit's spend closes this board on the tick it lands rather
-      // than on the advance that follows it (see auditSpentLeg).
-      if (auditSpentLeg(roomId, cp.round)) {
-        fail(auditSpentReason("Protection is sold", s.locale));
-        return;
-      }
-      const named = await resolveNamedBuyer(
-        roomId,
-        s.userId,
-        payload?.targetUserId,
-        tFor(s.locale, "You can't sell protection to yourself."),
-        s.locale,
-      );
-      if (!named.ok) {
-        fail(named.reason);
-        return;
-      }
-      const { buyerUserId, buyerName } = named;
-      const list = escortContracts.list(roomId);
-      const standing = offerStandingRefusal(
-        list,
-        s.userId,
-        buyerUserId,
-        buyerName,
-        s.locale,
-      );
-      if (standing !== null) {
-        fail(standing);
-        return;
-      }
-      // A captain this seller was turned down by reads one row about that
-      // pair rather than a stack of them, so the second offer to the same
-      // buyer replaces the refusal it follows. Without this a seller could
-      // paper the board with refusals, which is the one bound the primitive
-      // above cannot hold on their behalf: it counts offers, and a refusal
-      // is not an offer.
-      const kept = list.filter(
-        (c) =>
-          !(
-            c.status === "declined" &&
-            c.sellerUserId === s.userId &&
-            c.buyerUserId === buyerUserId
-          ),
-      );
-      const contract: EscortContract = {
-        id: rowId(roomId, s.userId),
-        sellerUserId: s.userId,
-        sellerName: s.user.displayName,
-        buyerUserId,
-        buyerName,
-        fee,
-        round: cp.round,
-        // The phase the offer was made in, which is the phase it expires
-        // with. D3's market is the Parley and only the Parley, so this is
-        // that rule written on the row rather than compared against a
-        // constant in the board's own expiry (see expireConsent).
-        phase: cp.phase,
-        status: "offered",
-      };
-      escortContracts.set(roomId, [...kept, contract]);
-      // [B4: the log surfaces] The room's line, which carries no buyer
-      // for the reason the kind's own note gives: a direct offer is one
-      // captain's business and the log is everyone's.
-      noteVoyageLog(io, roomId, {
-        kind: "contract_posted",
-        captain: contract.sellerName,
-        fee: contract.fee,
+        const contract: EscortContract = {
+          id: rowId(post.roomId, post.sellerUserId),
+          sellerUserId: post.sellerUserId,
+          sellerName: post.sellerName,
+          buyerUserId: post.buyerUserId,
+          buyerName: post.buyerName,
+          fee: post.fee,
+          round: post.round,
+          // The phase the offer was made in, which is the phase it expires
+          // with. The escort market is the Parley and only the Parley, so
+          // this is that rule written on the row rather than compared
+          // against a constant in the board's own expiry (see expireConsent).
+          phase: post.phase,
+          status: "offered",
+        };
+        escortContracts.set(post.roomId, [...kept, contract]);
+        // The harbor's line, which carries no buyer
+        // for the reason the kind's own note gives: a direct offer is one
+        // captain's business and the log is everyone's.
+        noteVoyageLog(io, post.roomId, {
+          kind: "contract_posted",
+          captain: contract.sellerName,
+          fee: contract.fee,
+        });
+        escortContracts.broadcast(io, post.roomId);
       });
-      escortContracts.broadcast(io, roomId);
     },
   );
 
   socket.on(
     "contract:accept",
     async (payload: { roomId?: string; contractId?: string }) => {
-      const s = requireAuth(socket);
-      if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      const contractId = payload?.contractId;
-      if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = (error: string): void => {
-        socket.emit("contract:error", { roomId, error });
-      };
-      if (!escortContractsOn(s.mode)) {
-        fail(tFor(s.locale, MARKET_OFF));
-        return;
-      }
-      const cp = await getCheckpoint(roomId);
-      // Synchronous from here down, so the offer cannot be taken by
-      // somebody else between the read and the write: JavaScript runs
-      // this block to the end before any other handler sees it.
-      //
-      // Four refusals for a row that is not an offer, and each names the
-      // state it found rather than the state the captain wanted, because
-      // the two captains here are looking at two screens: a seller whose
-      // buyer reloaded sees the row one frame after it moved.
-      const board = escortContracts.list(roomId);
-      const opening = board.find((c) => c.id === contractId);
-      if (!opening) {
-        fail(tFor(s.locale, OFFER_GONE));
-        return;
-      }
-      if (opening.status === "agreed") {
-        fail(tFor(s.locale, "That contract has already been agreed."));
-        return;
-      }
-      if (opening.status === "claimed") {
-        fail(tFor(s.locale, "That cover has already answered for a raid."));
-        return;
-      }
-      if (opening.status === "declined") {
-        fail(tFor(s.locale, "That offer has already been turned down."));
-        return;
-      }
-      if (opening.sellerUserId === s.userId) {
-        fail(tFor(s.locale, "You are the one selling that protection."));
-        return;
-      }
-      if (opening.buyerUserId !== null && opening.buyerUserId !== s.userId) {
-        fail(tFor(s.locale, OFFER_FOR_ANOTHER_CAPTAIN));
-        return;
-      }
-      if (opening.round !== cp.round) {
-        fail(tFor(s.locale, STALE_OFFER));
-        return;
-      }
-      if (cp.phase !== "parley") {
-        fail(tFor(s.locale, "A contract is agreed in the Parley phase."));
-        return;
-      }
-      // A contract agreed after the spend is trading the leg the harbor
-      // just closed (see auditSpentLeg).
-      if (auditSpentLeg(roomId, cp.round)) {
-        fail(auditSpentReason("Contracts are agreed", s.locale));
-        return;
-      }
-      if (consentPartyBusy(board, "buyer", s.userId, cp.round)) {
-        fail(tFor(s.locale, LEG_ALREADY_COVERED));
-        return;
-      }
-      escortContracts.set(
-        roomId,
-        agreeConsent(board, contractId, {
-          userId: s.userId,
-          name: s.user.displayName,
-        }),
-      );
-      noteVoyageLog(io, roomId, {
-        kind: "contract_agreed",
-        captain: opening.sellerName,
-        taker: s.user.displayName,
-        fee: opening.fee,
+      await acceptConsentOffer(socket, payload, ESCORT_ACCEPT, (accepted) => {
+        escortContracts.set(accepted.roomId, accepted.rows);
+        noteVoyageLog(io, accepted.roomId, {
+          kind: "contract_agreed",
+          captain: accepted.opening.sellerName,
+          taker: accepted.taker.name,
+          fee: accepted.opening.fee,
+        });
+        escortContracts.broadcast(io, accepted.roomId);
       });
-      escortContracts.broadcast(io, roomId);
     },
   );
 
@@ -263,11 +206,9 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const roomId = payload?.roomId ?? s.roomId;
       const contractId = payload?.contractId;
       if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = (error: string): void => {
-        socket.emit("contract:error", { roomId, error });
-      };
+      const fail = makeFail(socket, roomId, "contract:error");
       if (!escortContractsOn(s.mode)) {
-        fail(tFor(s.locale, MARKET_OFF));
+        fail(marketOffRefusal("escort", s.locale));
         return;
       }
       const cp = await getCheckpoint(roomId);
@@ -306,12 +247,12 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         );
         return;
       }
-      if (offer.buyerUserId !== s.userId) {
-        fail(tFor(s.locale, OFFER_FOR_ANOTHER_CAPTAIN));
-        return;
-      }
-      if (offer.round !== cp.round) {
-        fail(tFor(s.locale, STALE_OFFER));
+      // The open offer is already refused above, so the row reaching here
+      // names its buyer, and the shared rule is the same one the accept
+      // handler asks.
+      const takeRefusal = offerTakeRefusal(offer, s.userId, cp.round, s.locale);
+      if (takeRefusal !== null) {
+        fail(takeRefusal);
         return;
       }
       // The row stays and its status is the whole of what changed, which is
@@ -337,11 +278,9 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const roomId = payload?.roomId ?? s.roomId;
       const contractId = payload?.contractId;
       if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = (error: string): void => {
-        socket.emit("contract:error", { roomId, error });
-      };
+      const fail = makeFail(socket, roomId, "contract:error");
       if (!escortContractsOn(s.mode)) {
-        fail(tFor(s.locale, MARKET_OFF));
+        fail(marketOffRefusal("escort", s.locale));
         return;
       }
       const board = escortContracts.list(roomId);
@@ -364,7 +303,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         );
         return;
       }
-      // Only an offer can be withdrawn. The plan's own sentence is that
+      // Only an offer can be withdrawn. The design's own sentence is that
       // everything offered in Parley is binding once both parties accept,
       // so an agreed contract is not the seller's to take back: what a
       // seller who regrets the price has is the gap the voyage leaves
@@ -409,25 +348,37 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
       const roomId = payload?.roomId ?? s.roomId;
       const contractId = payload?.contractId;
       if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = (error: string): void => {
-        socket.emit("contract:error", { roomId, error });
-      };
+      const fail = makeFail(socket, roomId, "contract:error");
       if (!escortContractsOn(s.mode)) return;
       const raidGold = payload?.raidGold;
-      // A raid that would have taken nothing is not a claim: the covered
-      // captain keeps their empty hold and the seller owes nothing (see
-      // escortClaimFrom). Dropped silently rather than refused, because
-      // there is no captain doing anything wrong here.
-      if (
-        typeof raidGold !== "number" ||
-        !Number.isFinite(raidGold) ||
-        raidGold <= 0
-      ) {
+      // The wire can carry anything at all, so a value that is not a
+      // number, or one the guns could never be paid, is not a raid's take
+      // and is dropped here. Whether the raid took enough to be a claim is
+      // the engine's own question, and it is asked below.
+      if (typeof raidGold !== "number" || !Number.isFinite(raidGold)) {
         return;
       }
       const cp = await getCheckpoint(roomId);
       const board = escortContracts.list(roomId);
       const contract = board.find((c) => c.id === contractId);
+      // The claim the raid would raise, asked of the engine's own rule
+      // (see escortClaimFrom): a raid that would have taken nothing is not
+      // a claim, and one that would is carried in whole Gold. The cover
+      // is the contract the claim is against, and its seller is that
+      // contract's own name where the contract is on the board and empty
+      // where it is not, because the claim is read here for its Gold and
+      // its contract rather than for a name, and the refusal below is
+      // what a captain with no contract of theirs gets.
+      const claim = escortClaimFrom(
+        { contractId, sellerName: contract?.sellerName ?? "" },
+        raidGold,
+      );
+      if (claim === null) {
+        // The covered captain keeps their empty hold and the seller owes
+        // nothing. Dropped silently rather than refused, because there is
+        // no captain doing anything wrong here.
+        return;
+      }
       if (!contract || contract.status !== "agreed") {
         fail(
           tFor(
@@ -441,13 +392,13 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
         fail(tFor(s.locale, "That contract covers another captain."));
         return;
       }
-      // The leg, not the phase. The raid is rolled in Resolve and the
-      // claim follows it by a frame, but a room whose clock has already
-      // carried it on is still the leg the contract was sold for, and a
-      // claim is a report about that leg rather than an action taken in
+      // The round, not the phase. The raid is rolled in Resolve and the
+      // claim follows it by a frame, but a harbor whose clock has already
+      // carried it on is still the round the contract was sold for, and a
+      // claim is a report about that round rather than an action taken in
       // one phase of it.
       if (contract.round !== cp.round) {
-        fail(tFor(s.locale, "That contract was for an earlier leg."));
+        fail(tFor(s.locale, "That contract was for an earlier round."));
         return;
       }
       escortContracts.set(
@@ -457,7 +408,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
             ? {
                 ...c,
                 status: "claimed" as const,
-                raidGold: Math.floor(raidGold),
+                raidGold: claim.raidGold,
               }
             : c,
         ),

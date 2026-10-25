@@ -1,12 +1,11 @@
 /**
  * The closed test guard.
  *
- * [J1: the private information review] The review's other half is the
- * closed test: thirty players, none of them the people who built the
- * mode, on a database that has never held a real account. The plan's
- * discipline is that it runs on a separate database from anything with
- * real accounts, and the only part of that a script can check is the
- * name. So this checks the name, out loud, before anybody is invited.
+ * The closed test is thirty players, none of them the people who built the
+ * mode, on a database that has never held a real account. Its discipline is
+ * that it runs on a separate database from anything with real accounts, and
+ * the only part of that a script can check is the name. So this checks the
+ * name, out loud, before anybody is invited.
  *
  * One rule. The database this process resolves has to be a local file
  * whose name begins with closed-test. Everything else is refused: the
@@ -22,7 +21,7 @@
  *   route a script can call without credentials is /api/health, which
  *   answers { status: "ok" } and touches nothing else by design, so it
  *   has no way to say which database the server answering for it is
- *   writing to. Asking would be theatre. The real proof that a server
+ *   writing to. Asking would be theater. The real proof that a server
  *   and the script driving it share one database happens at run time,
  *   and it already exists: the smoke suite refuses to clean up after
  *   itself until it has read back, through its own connection, the

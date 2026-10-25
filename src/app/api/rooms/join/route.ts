@@ -1,13 +1,17 @@
-// POST /api/rooms/join: join a room by its 6 character code
-import { NextRequest, NextResponse } from "next/server";
+// POST /api/rooms/join: join a harbor by its 6 character code
+//
+// The answer is the shared one (see joinHarborResponse in @/lib/api-rooms),
+// so the by code route and the by id route cannot disagree about who may
+// come aboard. What this route owns is the naming: a code off the body,
+// and the sentence a code that names no harbor is refused with.
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import {
   getCurrentUser,
   requestLocale,
   unauthorizedResponse,
 } from "@/lib/api-auth";
-import { admitToRoom } from "@/lib/rooms";
+import { joinHarborResponse } from "@/lib/api-rooms";
 import { tFor } from "@/lib/game/i18n";
 import { readJson } from "@/lib/api-json";
 
@@ -23,32 +27,15 @@ export async function POST(req: NextRequest) {
   const body = await readJson(
     req,
     Schema,
-    tFor(locale, "A 6 character room code is required"),
+    tFor(locale, "A 6 character harbor code is required"),
   );
   if (!body.ok) return body.response;
   const code = body.data.code.toUpperCase();
 
-  const room = await db.room.findUnique({
-    where: { code },
-    include: {
-      members: true,
-      host: {
-        select: PUBLIC_USER_SELECT,
-      },
-    },
-  });
-  if (!room)
-    return NextResponse.json(
-      { error: tFor(locale, "No room exists with that code") },
-      { status: 404 },
-    );
-
-  const admitted = await admitToRoom(room, user.id);
-  if ("error" in admitted)
-    return NextResponse.json(
-      { error: tFor(locale, admitted.error) },
-      { status: 403 },
-    );
-
-  return NextResponse.json({ room: admitted.room });
+  return joinHarborResponse(
+    { code },
+    user.id,
+    locale,
+    "No harbor exists with that code",
+  );
 }

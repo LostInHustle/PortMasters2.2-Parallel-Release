@@ -18,7 +18,7 @@ import {
   draftDeck,
   draftHands,
   keepFrom,
-  normalizePathSwitchLeg,
+  normalizePathSwitchRound,
   passLeft,
   pathSwitchFee,
   pathSwitchPhase,
@@ -42,11 +42,12 @@ import type { TelemetryRecord } from "@/lib/game/telemetry";
 import type { OrderCard, Phase } from "@/lib/game/types";
 import type { VoyageLogEntry } from "@/lib/game/voyage-log";
 import {
-  GAMBIT,
-  LEDGER_PHRASE,
   call,
   carriesADash,
   check,
+  GAMBIT,
+  LEDGER_PHRASE,
+  ledgerSentences,
   openAuthedSocket,
   signUp,
   suffix,
@@ -57,6 +58,7 @@ import {
 import type { Captain, WireHistory } from "../wire";
 import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function pathDraftSuite(
   run: SmokeRun,
@@ -66,7 +68,7 @@ export async function pathDraftSuite(
         voyageEpoch: number;
         sampleRate: number;
         outcome: string;
-        leg: number;
+        round: number;
         record: string;
       };
       record: TelemetryRecord | null;
@@ -74,41 +76,41 @@ export async function pathDraftSuite(
   },
 ): Promise<void> {
   // =====================================================================
-  // [D7: the draft, and switching] The plan's clause for this feature, and
-  // the whole of it: "Deal each captain three path cards face down from a
+  // The draft, and switching. The clause for this feature, and the whole
+  // of it: "Deal each captain three path cards face down from a
   // deck seeded so at least two Quartermaster cards are in circulation.
   // Keep one, pass two to the left, keep one of the two received, pass
   // one, discard the last. Then switching: once per voyage, at a port,
-  // legs three through nine, forfeiting unfulfilled pathbound orders and
+  // rounds three through nine, forfeiting unfulfilled pathbound orders and
   // paying a Refit fee scaled to Renown, and the switch is published to
   // the fleet log where everyone sees it."
   //
   // The checks are split the way the feature is. The deal's arithmetic is
   // read here without a server, because the rule module holds no state and
-  // nothing about a deck needs a room. The deal itself is then played on a
+  // nothing about a deck needs a harbor. The deal itself is then played on a
   // real harbor, because the privacy of a hand is the wire half of this
   // feature and no reading of a rule module can observe it: two captains
   // sit down, the voyage sets sail, and every frame both sockets receive
   // is kept. The switch is read in both halves, the engine's own guard
-  // over a save and the room's publication over the wire, because the
-  // plan's "everyone knows" is a claim about the fleet rather than about
-  // the captain who changed their papers.
+  // over a save and the harbor's publication over the wire, because
+  // "everyone knows" is a claim about the fleet rather than about the
+  // captain who changed their papers.
   // =====================================================================
   const { telWaitForOne } = inputs;
 
-  // ---- the deal's arithmetic ----
+  // ========== the deal's arithmetic ==========
   check(
     DRAFT_DEAL === 3 &&
       DRAFT_WATCH_MS === 15_000 &&
       DRAFT_QUARTERMASTER_MIN >= 2,
-    "the deal is three cards a captain over three steps that close when every hand is in, and the only clock the feature owns is the fifteen second absence window a seat that went dark is given, which nobody is ever shown, with the Quartermaster floor at the two the plan asks to be in circulation",
+    "the deal is three cards a captain over three steps that close when every hand is in, and the only clock the feature owns is the fifteen second absence window a seat that went dark is given, which nobody is ever shown, with the Quartermaster floor at the two the design asks to be in circulation",
   );
 
   // The composition, over every table this lap can seat. Two properties
   // are read at every size: the deck is exactly three cards a captain, so
   // it is dealt out entirely, and the Quartermaster floor holds, which is
-  // the plan's "always physically present" read as a guarantee rather than
-  // a lean. The smallest table is the one that decides the second: a solo
+  // "always physically present" read as a guarantee rather than a lean.
+  // The smallest table is the one that decides the second: a solo
   // captain's deck is three cards and two of them are the floor.
   check(
     Array.from({ length: 12 }, (_, i) => i + 1).every((captains) => {
@@ -120,7 +122,7 @@ export async function pathDraftSuite(
         PATH_IDS.every((id) => counts[id] >= 0)
       );
     }),
-    "every table from one captain to twelve is dealt a deck of exactly three cards a captain with the Quartermaster floor held, so the deck is dealt out to the last card and the card the plan wants in circulation is in circulation at every size",
+    "every table from one captain to twelve is dealt a deck of exactly three cards a captain with the Quartermaster floor held, so the deck is dealt out to the last card and the card the design wants in circulation is in circulation at every size",
   );
 
   // The deck itself: the composition, shuffled. The shuffle is what hides
@@ -186,10 +188,10 @@ export async function pathDraftSuite(
   check(
     DRAFT_AUTO_PICK === 0 &&
       keepFrom(spreadHand, DRAFT_AUTO_PICK)?.kept === "quartermaster",
-    "and the card the room lays for a captain who let the clock run out is the first card of their own hand, which is a card they were dealt rather than one the server liked",
+    "and the card the harbor lays for a captain who let the clock run out is the first card of their own hand, which is a card they were dealt rather than one the server liked",
   );
 
-  // ---- the window, the seat and the price ----
+  // ========== the window, the seat and the price ==========
   check(
     pathSwitchWindow(PATH_SWITCH_FROM_ROUND) &&
       pathSwitchWindow(PATH_SWITCH_TO_ROUND) &&
@@ -203,7 +205,7 @@ export async function pathDraftSuite(
       ) &&
       !pathSwitchPhase(null) &&
       !pathSwitchPhase(4),
-    "new papers are read in legs three through nine and in the three seats the port is: a captain buys, commits and talks at Market, Orders and Parley, and sails, raids and settles accounts in the others",
+    "new papers are read in rounds three through nine and in the three seats the port is: a captain buys, commits and talks at Market, Orders and Parley, and sails, raids and settles accounts in the others",
   );
   const feeLadder = Array.from({ length: RENOWN_MAX_LEVEL }, (_, rung) =>
     pathSwitchFee(rung + 1),
@@ -219,7 +221,7 @@ export async function pathDraftSuite(
           fee <= PATH_SWITCH_FEE_MAX &&
           (rung === 0 || fee >= feeLadder[rung - 1]),
       ),
-    `the price of new papers is the plan's Refit fee scaled to Renown: the base at the first rung, ${PATH_SWITCH_FEE_PER_LEVEL} Gold more for each rung above it, and a ceiling that binds before the ladder's top rung rather than above it, so a captain really meets the bound`,
+    `the price of new papers is the design's Refit fee scaled to Renown: the base at the first rung, ${PATH_SWITCH_FEE_PER_LEVEL} Gold more for each rung above it, and a ceiling that binds before the ladder's top rung rather than above it, so a captain really meets the bound`,
   );
   check(
     pathSwitchFee(0) === PATH_SWITCH_FEE_BASE &&
@@ -229,13 +231,13 @@ export async function pathDraftSuite(
     "and a save carrying a rung nobody sails on pays the base rather than less than it, because the ladder's floor is where every captain starts",
   );
   check(
-    normalizePathSwitchLeg(4.7) === 4 &&
-      normalizePathSwitchLeg(9) === 9 &&
-      normalizePathSwitchLeg(0) === 0 &&
-      normalizePathSwitchLeg(-2) === 0 &&
-      normalizePathSwitchLeg(Number.NaN) === 0 &&
-      normalizePathSwitchLeg("four") === 0,
-    "the leg a switch is stamped with reads as the voyage's own counter, and nonsense in that field reads as a captain who has not changed their papers: the direction that keeps a corrupt save from spending the one switch a voyage allows",
+    normalizePathSwitchRound(4.7) === 4 &&
+      normalizePathSwitchRound(9) === 9 &&
+      normalizePathSwitchRound(0) === 0 &&
+      normalizePathSwitchRound(-2) === 0 &&
+      normalizePathSwitchRound(Number.NaN) === 0 &&
+      normalizePathSwitchRound("four") === 0,
+    "the round a switch is stamped with reads as the voyage's own counter, and nonsense in that field reads as a captain who has not changed their papers: the direction that keeps a corrupt save from spending the one switch a voyage allows",
   );
   check(
     pathSwitchOpenLine(PATH_SWITCH_FROM_ROUND - 1, "market") ===
@@ -250,23 +252,25 @@ export async function pathDraftSuite(
     "the harbor's answer about when it reads new papers is one sentence per fact and the season is asked before the seat, so a switch attempted in the wrong part of a voyage is told about the voyage rather than about the phase it happened to be attempted in",
   );
 
-  // ---- what a kept card writes into a save ----
+  // ========== what a kept card writes into a save ==========
   const kept = voyageState();
-  const keptLines: string[] = [];
+  const keptLines: LedgerLine[] = [];
   check(
     kept.path === null &&
-      kept.pathSwitchLeg === 0 &&
+      kept.pathSwitchRound === 0 &&
       applyDraftPath(kept, "quartermaster", keptLines) === true &&
       kept.path === "quartermaster" &&
       keptLines.length === 1 &&
-      keptLines[0]!.includes(pathConfig("quartermaster")!.name) &&
+      ledgerSentences(keptLines)[0]!.includes(
+        pathConfig("quartermaster")!.name,
+      ) &&
       applyDraftPath(kept, "loom", keptLines) === false &&
       kept.path === "quartermaster" &&
       keptLines.length === 1,
     "the card the draft leaves a captain holding is written once and only once: a second card arriving, which a reload or a second deal would send, is a frame to drop rather than an identity to overwrite behind the fleet's back",
   );
 
-  // ---- the switch, over a save ----
+  // ========== the switch, over a save ==========
   // A board dealt through the engine's own lifecycle in a seat inside the
   // window, so the forfeiture below walks the manifest a captain really
   // meets rather than cards assembled by hand. It is read under the path
@@ -295,7 +299,7 @@ export async function pathDraftSuite(
       .filter((row) => row.lock === from)
       .map((row) => row.card);
     // One of the old papers' cards already filled, on the boards that
-    // carry two of them: the manifest is also the leg's history, so a
+    // carry two of them: the manifest is also the round's history, so a
     // filled order is not something a switch can take away. A board that
     // carries only one of them leaves it open instead, and the forfeiture
     // below reads its count off the ledger rather than off a card.
@@ -305,14 +309,14 @@ export async function pathDraftSuite(
       (card) => pathOrderOf(card, GAMBIT) === null,
     );
     state.path = from;
-    state.pathSwitchLeg = 0;
+    state.pathSwitchRound = 0;
     state.completedOrders = [
       ...state.completedOrders,
       ...filled.map((card) => card.id),
     ];
     const fee = pathSwitchFee(state.renownLevel);
     const purse = state.money;
-    const lines: string[] = [];
+    const lines: LedgerLine[] = [];
     const applied = applyPathSwitch(state, to, lines);
     const held = (card: OrderCard) =>
       state.customerCards.some((kept) => kept.id === card.id);
@@ -333,29 +337,30 @@ export async function pathDraftSuite(
   });
   check(
     switched.locked.length > 0,
-    `a leg four board carries the paths' cards like any other (${switched.locked.length} locked), which is what the forfeiture below has to have to walk`,
+    `a round four board carries the paths' cards like any other (${switched.locked.length} locked), which is what the forfeiture below has to have to walk`,
   );
   check(
     switched.applied &&
       switched.state.path === switched.to &&
-      switched.state.pathSwitchLeg === 4 &&
+      switched.state.pathSwitchRound === 4 &&
       switched.state.money === switched.purse - switched.fee &&
       switched.open.length > 0 &&
       switched.open.every((card) => !switched.held(card)) &&
       switched.filled.every((card) => switched.held(card)) &&
       switched.loose.every((card) => switched.held(card)),
-    "the one switch a voyage allows charges the fee, stamps the leg it happened on and takes the unfulfilled pathbound orders of the path being set aside with it, while the orders already filled and the cards nobody locked stay on the manifest",
+    "the one switch a voyage allows charges the fee, stamps the round it happened on and takes the unfulfilled pathbound orders of the path being set aside with it, while the orders already filled and the cards nobody locked stay on the manifest",
   );
   check(
-    switched.lines.some(
+    ledgerSentences(switched.lines).some(
       (line) =>
         line.includes(pathConfig(switched.from)!.name) &&
         line.includes(pathConfig(switched.to)!.name) &&
         line.includes(String(switched.fee)),
     ) &&
-      switched.lines.filter((line) => line.startsWith("📜 Forfeited"))
-        .length === 1 &&
-      switched.lines.includes(
+      ledgerSentences(switched.lines).filter((line) =>
+        line.startsWith("📜 Forfeited"),
+      ).length === 1 &&
+      ledgerSentences(switched.lines).includes(
         `📜 Forfeited ${switched.open.length} unfulfilled pathbound order${switched.open.length === 1 ? "" : "s"}.`,
       ),
     "and the ledger says the whole of the price: the path set aside, the path taken up, the Gold it cost, and the orders it took with it counted once and counted right",
@@ -388,7 +393,7 @@ export async function pathDraftSuite(
       ...marked.map((card) => card.id),
     ];
     const before = carried.customerCards.length;
-    const lines: string[] = [];
+    const lines: LedgerLine[] = [];
     const switchedHere = applyPathSwitch(
       carried,
       PATH_IDS.find((id) => id !== carried.path)!,
@@ -402,13 +407,15 @@ export async function pathDraftSuite(
         marked.every((card) =>
           carried.customerCards.some((kept) => kept.id === card.id),
         ) &&
-        lines.every((line) => !line.startsWith("📜 Forfeited")),
+        ledgerSentences(lines).every(
+          (line) => !line.startsWith("📜 Forfeited"),
+        ),
       "and a manifest whose pathbound cards are all filled loses nothing to a switch and says so by leaving the forfeiture line off entirely, so the line a captain reads is the count of what they gave up rather than a sentence the ledger prints every time",
     );
   });
 
   // The refusals, one per fact, and each of them is the sentence the panel
-  // greys a button out with and the switch itself obeys, because they are
+  // grays a button out with and the switch itself obeys, because they are
   // one function rather than two that could drift.
   const atSea = (round: number, phase: Phase, path: PathId, money: number) => {
     const state = voyageState();
@@ -427,7 +434,7 @@ export async function pathDraftSuite(
     pathSwitchBlocked(voyageState(), wantedPath) ===
       "You hold no path to set aside." &&
       pathSwitchBlocked(atPort, heldPath) === "You already hold that path." &&
-      pathSwitchBlocked({ ...atPort, pathSwitchLeg: 3 }, wantedPath) ===
+      pathSwitchBlocked({ ...atPort, pathSwitchRound: 3 }, wantedPath) ===
         "A captain changes their papers once a voyage, and yours are already changed." &&
       pathSwitchBlocked(
         atSea(PATH_SWITCH_FROM_ROUND - 1, "orders", heldPath, 500),
@@ -442,7 +449,7 @@ export async function pathDraftSuite(
       pathSwitchBlocked(atSea(4, "dawn", heldPath, 500), wantedPath) ===
         "Papers are changed at the port, in Market, Orders or Parley." &&
       pathSwitchBlocked(atPort, wantedPath) === null,
-    "a captain with no path to set aside, one who has already changed their papers this voyage, one outside the legs the window spans, one in a seat that is not the port, one naming the path they already hold and one at the port in season: each is refused or allowed in the words the panel prints, and only the last of them can switch",
+    "a captain with no path to set aside, one who has already changed their papers this voyage, one outside the rounds the window spans, one in a seat that is not the port, one naming the path they already hold and one at the port in season: each is refused or allowed in the words the panel prints, and only the last of them can switch",
   );
   check(
     pathSwitchBlocked(atPort, wantedPath) === null &&
@@ -454,13 +461,13 @@ export async function pathDraftSuite(
     "and a purse that cannot answer the price is refused last, after everything about where and when, so a captain is never told what a switch costs instead of why they cannot make one",
   );
   const refusedBoard = atSea(4, "dawn", heldPath, 500);
-  const refusedLines: string[] = [];
+  const refusedLines: LedgerLine[] = [];
   check(
     applyPathSwitch(refusedBoard, wantedPath, refusedLines) === false &&
       refusedBoard.path === heldPath &&
-      refusedBoard.pathSwitchLeg === 0 &&
+      refusedBoard.pathSwitchRound === 0 &&
       refusedBoard.money === 500 &&
-      refusedLines[0] ===
+      ledgerSentences(refusedLines)[0] ===
         "Papers are changed at the port, in Market, Orders or Parley.",
     "a switch attempted in a seat the port does not keep is refused with the reason written into the captain's own ledger and nothing charged: a refusal costs a captain nothing but the sentence",
   );
@@ -470,10 +477,10 @@ export async function pathDraftSuite(
         pathSwitchBlocked(atSea(4, "dawn", heldPath, 500), wantedPath) &&
       pathSwitchOpenLine(2, "dawn") ===
         pathSwitchBlocked(atSea(2, "dawn", heldPath, 500), wantedPath),
-    "and the room asks the same function the engine does, so a switch the fleet is shown is a switch the captain's own books would accept: the season and the seat are one sentence told twice",
+    "and the harbor asks the same function the engine does, so a switch the fleet is shown is a switch the captain's own books would accept: the season and the seat are one sentence told twice",
   );
 
-  // The plan's rollback, and it is one switch: with the draft off nothing
+  // The rollback, and it is one switch: with the draft off nothing
   // deals a path, so the change of papers has no precondition to meet and
   // says so in its first sentence rather than in a rule written for the
   // rolled back build.
@@ -485,11 +492,11 @@ export async function pathDraftSuite(
     "the draft's own switch reads off the environment and defaults to on, and the pathless captain it leaves behind is refused by the same first sentence a captain who never drew one meets, so the rolled back build needs no second rule",
   );
 
-  // ---- the deal, played on a real harbor ----
+  // ========== the deal, played on a real harbor ==========
   // Two captains, because a pass needs a seat to pass to and a hand's
   // privacy is only observable with a second set of frames to compare
   // against. Every frame both sockets receive is kept, and the deal is
-  // read back against the rule module's own composition: what the room
+  // read back against the rule module's own composition: what the harbor
   // deals is what this tree says a table of two is owed, to the last card.
   const draftHost = await signUp("draft_a");
   const draftMate = await signUp("draft_b");
@@ -626,9 +633,9 @@ export async function pathDraftSuite(
     `the two hands on the table are the deck this tree says a table of two is owed, to the last card (${PATH_IDS.map((id) => `${id} ${openingCounts[id]}`).join(", ")})`,
   );
 
-  // The host keeps the card the plan's evaluation watches for and the
-  // mate's seat goes dark: absence rather than silence is what arms the
-  // room's one timer, because a captain who is present and thinking holds
+  // The host keeps the card the draft watches for and the mate's seat goes
+  // dark: absence rather than silence is what arms the
+  // harbor's one timer, because a captain who is present and thinking holds
   // the table however long they take (see the header of
   // src/server/realtime/draft.ts). The socket going is the beat the old
   // interface proved with a countdown.
@@ -637,7 +644,7 @@ export async function pathDraftSuite(
     return quartermaster >= 0 ? quartermaster : DRAFT_AUTO_PICK;
   };
   const hostFirstPick = pickOf(openingHands[0]!);
-  // The step a pick was read off rides the answer, and the room holds
+  // The step a pick was read off rides the answer, and the harbor holds
   // that at the door: an index is only a card against one hand, so an
   // answer stamped with a step the table is not standing in is refused
   // rather than read against the cards in front of it. The beat is the
@@ -697,11 +704,11 @@ export async function pathDraftSuite(
     (await secondCard)?.error === "Your card is already laid down.",
     "and a captain who lays a second card down in the same step is told what happened rather than ignored, because the first answer is the one the table has been shown",
   );
-  // The mate's tab closes. The room gives a gone seat DRAFT_WATCH_MS to
+  // The mate's tab closes. The harbor gives a gone seat DRAFT_WATCH_MS to
   // come back and then lays the first card of that captain's own hand,
   // which is what closes the step. The beat is timed from the socket going
   // rather than from a constant, so the check below reads the window the
-  // room actually waited rather than the window it was supposed to.
+  // harbor actually waited rather than the window it was supposed to.
   const awayAt = Date.now();
   draftSeats[1]!.socket.close();
   const atSecond = (await hostSecond)!;
@@ -709,12 +716,12 @@ export async function pathDraftSuite(
     atSecond !== null &&
       atSecond.hand.length === 2 &&
       Date.now() - awayAt >= DRAFT_WATCH_MS - 2000,
-    "a step a gone seat never answered stays open through the room's whole absence window and then closes on that window alone, so what turns a step over is the table answering rather than any clock face, and the two cards the gone seat was passed travel without them having chosen anything",
+    "a step a gone seat never answered stays open through the harbor's whole absence window and then closes on that window alone, so what turns a step over is the table answering rather than any clock face, and the two cards the gone seat was passed travel without them having chosen anything",
   );
   // And the same captain answering a step the table has left, which is the
   // other direction from the probe above: a delayed duplicate of their own
   // first keep, arriving after the turnover. The index would be read
-  // against the second step's hand if the stamp were trusted, so the room
+  // against the second step's hand if the stamp were trusted, so the harbor
   // owes the refusal, and what proves the refusal cost the seat nothing is
   // the seat still being open for that captain's real answer below.
   const pastStep = waitForEvent<{ roomId?: string; error?: string }>(
@@ -743,8 +750,8 @@ export async function pathDraftSuite(
     "and the refused answer left nothing down: the seat reads back open in the step the table is standing in, which is what lets that captain's own answer for the step be the one the table counts",
   );
   // The mate walks back in, inside the thirty second departure grace the
-  // room keeps for a returning seat (see scheduleDeparture): a fresh socket
-  // for the same captain, whose join is answered with the step the room is
+  // harbor keeps for a returning seat (see scheduleDeparture): a fresh socket
+  // for the same captain, whose join is answered with the step the harbor is
   // standing in rather than the one the seat left.
   const mateBack = await openAuthedSocket(draftMate);
   run.sockets.push(mateBack);
@@ -765,13 +772,13 @@ export async function pathDraftSuite(
   const mateAtSecond = (await mateSecond)!;
   check(
     mateAtSecond !== null && mateAtSecond.hand.length === 2,
-    "and the seat that walks back in is handed the step the room is in rather than the beat it left, so what a returning captain is shown is the cards that are actually on the table",
+    "and the seat that walks back in is handed the step the harbor is in rather than the beat it left, so what a returning captain is shown is the cards that are actually on the table",
   );
   // The pass, read off both frames: each captain holds the two cards the
   // other did not keep, in the order they were dealt and not kept in. The
   // order is part of the promise, because a pick is an index into this
   // array: a frame whose cards are in another order would have the client
-  // choosing by one numbering and the room counting by another.
+  // choosing by one numbering and the harbor counting by another.
   const mateRests = openingHands[1]!.filter(
     (_, index) => index !== DRAFT_AUTO_PICK,
   );
@@ -785,13 +792,13 @@ export async function pathDraftSuite(
   );
   check(
     draftSeats[1]!.errors.length === 0,
-    "the captain whose seat went dark is never told they did anything wrong, and the card the room laid for them was one of their own",
+    "the captain whose seat went dark is never told they did anything wrong, and the card the harbor laid for them was one of their own",
   );
 
   // The second keep and then the last, and the two answers a captain
   // sends into them are not the same kind of answer. The host is present
   // and answers both in person. The mate's seat went dark inside the
-  // first step, so the room's absence watch has already laid that seat's
+  // first step, so the harbor's absence watch has already laid that seat's
   // second card by the time the seat walks back in (the fire carries a
   // whole step over, and the check beside the close above is the one
   // that watched it happen). The mate's own second keep therefore lands
@@ -802,8 +809,8 @@ export async function pathDraftSuite(
   // the path that captain sails on is the paper they chose. The keeps
   // below each name the step they were read off, which is what makes
   // that the whole of the story rather than a race. Because the second
-  // keep is refused, the second paper the room records for that seat is
-  // the one the watch laid, and the expectation below reads the room's
+  // keep is refused, the second paper the harbor records for that seat is
+  // the one the watch laid, and the expectation below reads the harbor's
   // record rather than the refused attempt: reading the attempt there
   // passed only on the deals where the attempt and the auto pick landed
   // on the same index, which the dealt odds put at about thirteen runs
@@ -858,10 +865,10 @@ export async function pathDraftSuite(
     "the last step is the two papers that captain kept, in the order they kept them, so the choice is between a card out of their own deal and a card they kept off the pass rather than between two cards somebody else chose",
   );
   // The host keeps the card on offer and the mate the other of their two,
-  // which is the plan's own evaluation read as a fixture: taking the card
-  // in the deck the plan watches for is a choice somebody makes rather
-  // than a duty somebody gets assigned, so the two captains at this table
-  // end on different papers for different reasons.
+  // which is the reading held as a fixture: taking the card in the deck
+  // the deal watches for is a choice somebody makes rather than a duty
+  // somebody gets assigned, so the two captains at this table end on
+  // different papers for different reasons.
   const hostLastPick = pickOf(hostAtLast.hand);
   const mateLastPick = mateAtLast.hand.length - 1 - pickOf(mateAtLast.hand);
   draftSeats[0]!.socket.emit("draft:keep", {
@@ -906,10 +913,10 @@ export async function pathDraftSuite(
           entry.text ===
           `Smoke draft_b takes up the ${pathConfig(matePath)!.name} path.`,
       ),
-    "and the fleet is told what each captain took in the voyage log, once a seat, at the leg the draft was dealt in and named by the captain rather than by the card",
+    "and the fleet is told what each captain took in the voyage log, once a seat, at the round the draft was dealt in and named by the captain rather than by the card",
   );
 
-  // ---- the hand, read back off the wire ----
+  // ========== the hand, read back off the wire ==========
   // What the checks above cannot show, because every one of them reads a
   // frame that named the draft rather than what the two sockets were
   // actually sent. `hand` is a field of one wire type and one only (see
@@ -953,13 +960,13 @@ export async function pathDraftSuite(
     `the only frames either socket received that name a hand are the draft's own, one hand a captain a beat (${draftSeats.reduce((count, seat) => count + seat.frames.length, 0)} frames read on every event across the two sockets), so a hand is private in its whole shape: the frame goes to the captain it was dealt to and to no one else`,
   );
 
-  // ---- the seat the settle could not reach ----
+  // ========== the seat the settle could not reach ==========
   // The bug cycle's own shape, fixed in the reader: the settled view is
   // emitted to sockets and the draft is deleted in the same breath, so a
   // captain whose socket was dark from the last pick through the settle
   // was sent the result into nothing and every later request answered
   // null, leaving their save pathless while the fleet's log and the
-  // room's book went on naming their path. The book the settle wrote
+  // harbor's book went on naming their path. The book the settle wrote
   // still holds it, and the join below is the request a reload sends
   // (see draftViewFor). The socket is kept off the seats above on
   // purpose: it hears the result frame rather than a beat, and the sweep
@@ -1041,9 +1048,9 @@ export async function pathDraftSuite(
     "with the fleet's log exactly as long as it was before either question, so the result is read back rather than dealt again",
   );
 
-  // ---- the switch, published to the fleet ----
+  // ========== the switch, published to the fleet ==========
   // The captain who drew the older papers is the one who changes them, and
-  // the frame that comes back is the room's answer rather than their own
+  // the frame that comes back is the harbor's answer rather than their own
   // press: the fee, the forfeiture and the stamp are theirs to apply, and
   // nothing here charges anybody.
   const switcher = draftSeats[0]!;
@@ -1061,15 +1068,15 @@ export async function pathDraftSuite(
   check(
     (await tooEarly)?.error ===
       `The harbor reads new papers from round ${PATH_SWITCH_FROM_ROUND}.`,
-    "a switch pressed in the leg the voyage opens on is refused by the room with the season it is waiting for, and nothing is published",
+    "a switch pressed in the round the voyage opens on is refused by the harbor with the season it is waiting for, and nothing is published",
   );
   check(
     switcher.switched.length === 0 && other.switched.length === 0,
     "so the fleet has heard nothing, which is what makes the publication the price of the change rather than a line about it",
   );
 
-  // The room's seat, moved the way this suite moves any room's seat, to a
-  // leg and a seat the port keeps.
+  // The harbor's seat, moved the way this suite moves any harbor's seat, to a
+  // round and a seat the port keeps.
   const draftRoomRow = async () =>
     db.room.findUnique({
       where: { id: draftRoomId },
@@ -1099,15 +1106,15 @@ export async function pathDraftSuite(
     }
     return row;
   };
-  // The first leg the window opens on, named once so that the reading of
-  // the published frame below is of this same leg rather than of a number
+  // The first round the window opens on, named once so that the reading of
+  // the published frame below is of this same round rather than of a number
   // written out twice.
-  const switchLegRound = PATH_SWITCH_FROM_ROUND + 1;
-  const atThePort = await parkDraftRoom(switchLegRound, "orders");
+  const switchRound = PATH_SWITCH_FROM_ROUND + 1;
+  const atThePort = await parkDraftRoom(switchRound, "orders");
   check(
-    atThePort?.currentRound === switchLegRound &&
+    atThePort?.currentRound === switchRound &&
       atThePort?.currentPhase === "orders",
-    "and the room can be walked to a leg and a seat where the port reads new papers",
+    "and the harbor can be walked to a round and a seat where the port reads new papers",
   );
   const nonsense = waitForEvent<{ roomId?: string; error?: string }>(
     switcher.socket,
@@ -1120,7 +1127,7 @@ export async function pathDraftSuite(
   });
   check(
     (await nonsense)?.error === "No such path.",
-    "a switch naming a path this build does not have is refused at the room rather than published to it, since the fleet log is a record rather than a place to try things out",
+    "a switch naming a path this build does not have is refused at the harbor rather than published to it, since the fleet log is a record rather than a place to try things out",
   );
   const published = waitForEvent<PathSwitched>(
     other.socket,
@@ -1142,7 +1149,7 @@ export async function pathDraftSuite(
     publishedFrame?.path === otherPath &&
       publishedFrame.name === "Smoke draft_a" &&
       switcher.switched.length === 1,
-    "a switch in season is published to the whole room, the captain who made it included, and it carries the path taken up and not the one set aside, because the server has never read a save to know what that was",
+    "a switch in season is published to the whole harbor, the captain who made it included, and it carries the path taken up and not the one set aside, because the server has never read a save to know what that was",
   );
   check(
     (await logged)?.entry?.text ===
@@ -1162,7 +1169,7 @@ export async function pathDraftSuite(
     (await again)?.error ===
       "A captain changes their papers once a voyage, and yours are already changed." &&
       switcher.switched.length === 1,
-    "and a second change in the same voyage is refused by the room's own book, which is the half of the once a voyage rule a server can keep",
+    "and a second change in the same voyage is refused by the harbor's own book, which is the half of the once a voyage rule a server can keep",
   );
   const offSeat = await parkDraftRoom(5, "dawn");
   const notAtPort = waitForEvent<{ roomId?: string; error?: string }>(
@@ -1177,10 +1184,10 @@ export async function pathDraftSuite(
       notAtPortFrame?.error ===
         "Papers are changed at the port, in Market, Orders or Parley." &&
       // The mate's own socket is carrying the host's switch, which the
-      // room published to the whole fleet, so what is read here is that
+      // harbor published to the whole fleet, so what is read here is that
       // no frame names the mate rather than that the socket is empty.
       other.switched.every((frame) => frame.userId === draftHost.id),
-    "while a captain in a seat that is not the port is refused in the engine's own words, so the room and the books tell a captain the same thing",
+    "while a captain in a seat that is not the port is refused in the engine's own words, so the harbor and the books tell a captain the same thing",
   );
   const late = await parkDraftRoom(PATH_SWITCH_TO_ROUND + 1, "orders");
   const closed = waitForEvent<{ roomId?: string; error?: string }>(
@@ -1193,19 +1200,19 @@ export async function pathDraftSuite(
     late?.currentRound === PATH_SWITCH_TO_ROUND + 1 &&
       (await closed)?.error ===
         `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.`,
-    "and past the last leg of the window the room closes it with the leg it closes after, which is the same sentence the panel would have greyed the button out with",
+    "and past the last round of the window the harbor closes it with the round it closes after, which is the same sentence the panel would have grayed the button out with",
   );
 
-  // ---- one departure for one press, however it arrives ----
+  // ========== one departure for one press, however it arrives ==========
   // The departure handler's claim is taken before its first await, and
   // this is that sentence read off the wire: two room:start frames in one
   // tick must move the harbor exactly as one did. Before the claim moved,
-  // both frames passed a map checked after the reads (the room read, the
+  // both frames passed a map checked after the reads (the harbor read, the
   // roster read), both ran the whole departure, and both dealt the table,
   // which is the shape the field report's crash wore: one voyage
   // announced twice and two alignment deals colliding on the table's own
   // key. A double tap, a retried frame and a second tab all arrive as
-  // these two frames, so the room below is the regression that keeps the
+  // these two frames, so the harbor below is the regression that keeps the
   // claim where it is.
   const racer = await signUp("race");
   run.extraAccounts.push(racer);
@@ -1237,7 +1244,7 @@ export async function pathDraftSuite(
     raceErrors += 1;
   });
   raceSocket.on("draft:update", (payload: DraftView | null) => {
-    // The null frame carries no room, so it is counted as itself: it is
+    // The null frame carries no harbor, so it is counted as itself: it is
     // the sentence a harbor tells a captain with no draft in front of
     // them, on the way in and again the moment a wipe takes one away.
     if (payload === null) {
@@ -1282,9 +1289,9 @@ export async function pathDraftSuite(
   raceSocket.emit("room:start", { roomId: raceRoomId });
   check(
     (await refusedAgain)?.error === "This voyage has already set sail.",
-    "while an honest second press after the departure is still refused with the room's own sentence, which is the refusal the claim is not allowed to swallow",
+    "while an honest second press after the departure is still refused with the harbor's own sentence, which is the refusal the claim is not allowed to swallow",
   );
-  // The room the doubled press sailed goes home cleanly: the draft that
+  // The harbor the doubled press sailed goes home cleanly: the draft that
   // did stand ends with its voyage rather than outliving it, told away
   // with the same null frame the solo wipe above is read against.
   const raceWiped = waitForEvent<{ roomId?: string }>(
@@ -1298,9 +1305,9 @@ export async function pathDraftSuite(
     "and the harbor sailed by the doubled press wipes clean, the one draft it dealt told away with the wipe's own null frame, so the one voyage it ran is one its host can end",
   );
 
-  // ---- the wipe that takes a draft with it ----
-  // The plan's own rollback note is "draft state is transient per voyage,
-  // so nothing durable is at risk", and this is that sentence read as a
+  // ========== the wipe that takes a draft with it ==========
+  // The rollback note is "draft state is transient per voyage, so nothing
+  // durable is at risk", and this is that sentence read as a
   // frame: a harbor wiped while its captains are still reading their cards
   // tells them there is no draft rather than leaving three cards in front
   // of a table that has already set sail again.
@@ -1363,11 +1370,11 @@ export async function pathDraftSuite(
     "and a harbor wiped while that draft is being read tells the seat holding the cards, once, that there is no draft, which is the frame the client puts the table away on: the only other time that seat heard it was walking in before the voyage had dealt anything",
   );
 
-  // ---- the record the draft leaves behind ----
-  // The telemetry spine's two D7 numbers, read off the row the draft
-  // room's own wipe writes rather than off the frames above: the path each
+  // ========== the record the draft leaves behind ==========
+  // The telemetry spine's two draft numbers, read off the row the draft
+  // harbor's own wipe writes rather than off the frames above: the path each
   // captain took up and the seconds that captain's interface took. A
-  // record is written when a voyage closes, so the room is wiped here,
+  // record is written when a voyage closes, so the harbor is wiped here,
   // and that is a reading of its own: the wipe must not be able to drop
   // what the draft measured before it.
   const draftWiped = waitForEvent<{ roomId?: string }>(
@@ -1402,27 +1409,27 @@ export async function pathDraftSuite(
       ) &&
       takenBy(draftHost.id) === hostPath &&
       takenBy(draftMate.id) === matePath,
-    "the draft is measured per captain per seat: the path each of them took up, filed against the captain who kept it and not against their neighbor, and the seconds that captain's own interface took, which is the number the plan's target of forty five is read against",
+    "the draft is measured per captain per seat: the path each of them took up, filed against the captain who kept it and not against their neighbor, and the seconds that captain's own interface took, which is the number the design's target of forty five is read against",
   );
   check(
     draftSwitched.length === 1 &&
       draftSwitched[0]?.actor === draftHost.id &&
       draftSwitched[0]?.path === otherPath &&
-      draftSwitched[0]?.leg === switchLegRound &&
-      // The voyage went on to the leg the room was parked on last, so the
-      // leg above is the leg the papers were changed on rather than the
-      // leg the record happens to have ended on.
-      draftRecord?.endedAtLeg === PATH_SWITCH_TO_ROUND + 1,
-    "and the one change of papers a voyage allowed is filed beside it with the leg it happened on, so a reader can tell a table that switched from one that never did",
+      draftSwitched[0]?.round === switchRound &&
+      // The voyage went on to the round the harbor was parked on last, so the
+      // round above is the round the papers were changed on rather than the
+      // round the record happens to have ended on.
+      draftRecord?.endedAtRound === PATH_SWITCH_TO_ROUND + 1,
+    "and the one change of papers a voyage allowed is filed beside it with the round it happened on, so a reader can tell a table that switched from one that never did",
   );
 
   // The house rule, over the copy this feature added. Every sentence a
   // captain reads in this feature is written in one of these files: the
   // rule module carries the ledger's own lines, the engine carries the
-  // refusals the panel prints, the room module carries the sentences a
+  // refusals the panel prints, the harbor module carries the sentences a
   // refused request is answered with, the hook carries none and the two
   // components carry the faces of the beats. The two components are swept
-  // whole, unlike the borrow's board, because they read no colour through
+  // whole, unlike the borrow's board, because they read no color through
   // a CSS custom property: their classes are Tailwind's and carry no
   // doubled hyphen.
   check(

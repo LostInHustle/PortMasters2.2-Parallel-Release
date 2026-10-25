@@ -1,12 +1,12 @@
 // =====================================================================
 // Realtime layer: Word on the Docks winners.
 //
-// [MANIFEST 02] A spontaneous, room wide race layered alongside the
+// A spontaneous, harbor wide race layered alongside the
 // scheduled Imperial Mandates. Whoever's own client is first to report
 // crossing the completed orders threshold wins; this server's only job
 // is deciding who was first, the same first report wins arbitration
 // the barter board already uses for who gets to accept a given offer.
-// One winner per room per voyage, so this is keyed by room, not by
+// One winner per harbor per voyage, so this is keyed by harbor, not by
 // round, and cleared on restart.
 // =====================================================================
 

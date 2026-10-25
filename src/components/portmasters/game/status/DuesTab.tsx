@@ -5,7 +5,9 @@ import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Term } from "../../Term";
+import { PanelLabel } from "../../shared";
 import { loanSettleLine } from "../phases/SettlementAid";
+import { PanelTotal } from "../phases/PhasePanels";
 import { Row, SubRow } from "./Rows";
 import type { RosterEntry } from "../GameStatusPanel";
 
@@ -18,6 +20,7 @@ import type { RosterEntry } from "../GameStatusPanel";
  */
 export function DuesTab({
   showObligations,
+  atHarbor,
   workerCount,
   pendWages,
   pendMaint,
@@ -31,6 +34,7 @@ export function DuesTab({
   onRepayLoan,
 }: {
   showObligations: boolean;
+  atHarbor: boolean;
   workerCount: number;
   pendWages: number;
   pendMaint: number;
@@ -48,7 +52,11 @@ export function DuesTab({
     <>
       {showObligations ? (
         <>
-          <Row label={<Term term="Maintenance">{t("🔧 Maintenance")}</Term>}>
+          <Row
+            label={
+              <Term term="Maintenance">{t("🔧 Ship Maintenance Fee")}</Term>
+            }
+          >
             <b>{t("{contract.fee} Gold", { "contract.fee": pendMaint })}</b>
           </Row>
           <Row
@@ -56,7 +64,7 @@ export function DuesTab({
               <Term term="Wages">
                 👥 {t("Wages")}
                 {workerCount > 0
-                  ? t(" ({count} workers)", { count: workerCount })
+                  ? t(" ({count} artisans)", { count: workerCount })
                   : ""}
               </Term>
             }
@@ -79,40 +87,40 @@ export function DuesTab({
                 value={t("{r.due} Gold", { "r.due": r.due })}
               />
             ))}
-          <div
-            className={cn(
-              "mt-1 flex items-center justify-between border-t pt-2",
-              safe ? "border-gain/20" : "border-alarm/30",
-            )}
+          <PanelTotal
+            tone={safe ? "border-gain/20" : "border-alarm/30"}
+            className="mt-1"
+            label={
+              <span className="text-xs font-semibold">{t("💸 Total Due")}</span>
+            }
           >
-            <span className="text-xs font-semibold">{t("💸 Total Due")}</span>
             <span
               className={cn("font-bold", safe ? "text-gain" : "text-alarm")}
             >
               {t("{contract.fee} Gold", { "contract.fee": pendTotal })}
             </span>
-          </div>
+          </PanelTotal>
           {safe ? (
             <div className="mt-1.5 text-center text-[10px] text-gain">
-              {t("✅ Funds sufficient for round end")}
+              {t("✅ Enough Gold for round end")}
             </div>
           ) : (
             <div className="mt-1.5 rounded-md bg-alarm/5 py-1 text-center text-[10px] text-alarm">
-              {t("🚨 Risk: Funds may fall short at round end!")}
+              {t("🚨 Risk: Gold may fall short at round end!")}
             </div>
           )}
         </>
-      ) : (
+      ) : atHarbor ? (
         <p className="py-2 text-[11px] text-muted-foreground">
           {t("Nothing is owed until the voyage is under way.")}
         </p>
-      )}
+      ) : null}
 
       {hasLoans && (
         <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
-          <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
+          <PanelLabel tone="text-muted-foreground" className="mb-1">
             {t("━━ Outstanding Loans ━━")}
-          </div>
+          </PanelLabel>
           {debts.map((d) => (
             <div
               key={d.id}

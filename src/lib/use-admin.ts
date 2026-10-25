@@ -37,7 +37,7 @@ import {
   AdminBulkAction,
   AdminBulkReport,
 } from "@/types/realtime/admin";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { api } from "@/lib/api";
 // This hook composes three of the console's sentences, and every one of
@@ -283,5 +283,12 @@ export function useAdmin(
 
   const dismissError = useCallback(() => setError(null), []);
 
-  return { accounts, error, pending, refresh, act, bulk, dismissError };
+  // The answer, held to one identity until something inside it changes.
+  // The console draws from this whole object, so an object rebuilt every
+  // render is a console that draws itself again every time anything above
+  // it does.
+  return useMemo(
+    () => ({ accounts, error, pending, refresh, act, bulk, dismissError }),
+    [accounts, error, pending, refresh, act, bulk, dismissError],
+  );
 }

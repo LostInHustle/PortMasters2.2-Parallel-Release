@@ -1,7 +1,7 @@
 // PortMasters 2.2 Parallel Release, smoke run: The voyage log.
 
 import { openingPhase } from "@/lib/game/checkpoint";
-import { LEG_PHASE_ORDER, phaseFace } from "@/lib/game/phases";
+import { ROUND_PHASE_ORDER, phaseFace } from "@/lib/game/phases";
 import type {
   VoyageLogEntry,
   VoyageLogFacts,
@@ -37,16 +37,16 @@ import type { SmokeRun } from "../run";
 
 export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // =====================================================================
-  // [B4: the log surfaces]
+  // The log surfaces
   //
-  // The plan asks for two logs at Dusk, one the whole room reads and one
-  // each captain holds, and what is held below is the contract between
-  // them rather than the screen they are drawn on: the room's log carries
+  // There are two logs at Dusk, one the whole harbor reads and one each
+  // captain holds, and what is held below is the contract between them
+  // rather than the screen they are drawn on: the harbor's log carries
   // what the table already saw and never a hidden thing, and the private
   // channel carries what one captain was told and reaches no other
-  // socket. That is the plan's own evaluation, a two client assertion
-  // that no private entry appears in the other captain's transcript, read
-  // here against the surface this slice adds.
+  // socket. The two client assertion that no private entry appears in the
+  // other captain's transcript is read here against the surface this
+  // article adds.
   //
   // The vocabulary is checked first and without a server, so a failure
   // further down is never read as a server that declined to write a line.
@@ -57,7 +57,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // rather than a list written out a second time.
   const logFacts: Record<VoyageLogKind, VoyageLogFacts> = {
     voyage_started: { kind: "voyage_started" },
-    leg_advanced: { kind: "leg_advanced", phase: "parley" },
+    round_advanced: { kind: "round_advanced", phase: "parley" },
     offer_posted: {
       kind: "offer_posted",
       captain: "Smoke logger1",
@@ -81,7 +81,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       offerItem: "Hemp",
       offerAmount: 3,
     },
-    leg_timed_out: { kind: "leg_timed_out", phase: "market" },
+    round_timed_out: { kind: "round_timed_out", phase: "market" },
     audit_carried: { kind: "audit_carried", target: "Smoke logger2" },
     maroon_carried: { kind: "maroon_carried", target: "Smoke logger2" },
     captain_left: { kind: "captain_left", captain: "Smoke logger1" },
@@ -114,9 +114,8 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       good: "Linen Clothes",
       fee: 12,
     },
-    // [F3: modules in the shipyard ladder, and trading them between
-    // captains] The market's pair, and the rows carry the module as its
-    // card id rather than its name: the writer resolves it through the
+    // The market's pair, and the rows carry the module as its card id
+    // rather than its name: the writer resolves it through the
     // pool, which is what the lines below are here to hold.
     module_posted: {
       kind: "module_posted",
@@ -131,19 +130,19 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
       module: "bulk_hauler",
       fee: 12,
     },
-    // [D5: Aroma: the Bazaar Rumor] The one fact this table carries that
-    // is deliberately incomplete, and the line below says the same: the
-    // captain and the good, with no direction, because the log is public
-    // the moment it is written and the direction is not public yet.
+    // The one fact this table carries that is deliberately incomplete, and
+    // the line below says the same: the captain and the good, with no
+    // direction, because the log is public the moment it is written and
+    // the direction is not public yet.
     rumor_published: {
       kind: "rumor_published",
       captain: "Smoke logger1",
       good: "Silk",
     },
-    // [D7: the draft, and switching] The identity pair, and the switch is
-    // the line the plan asks for by name: "the switch is published to the
-    // fleet log where everyone sees it." Both carry the path taken up and
-    // never the path left, for the reason the writer's own note gives.
+    // The identity pair, and the switch is the line the log carries by
+    // name: "the switch is published to the fleet log where everyone sees
+    // it." Both carry the path taken up and never the path left, for the
+    // reason the writer's own note gives.
     path_taken: {
       kind: "path_taken",
       captain: "Smoke logger1",
@@ -157,18 +156,19 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   };
   const logLines: Record<VoyageLogKind, string> = {
     voyage_started: "The voyage leaves the dock.",
-    leg_advanced: "The harbor weighs anchor for the Parley.",
+    round_advanced: "The harbor weighs anchor for the Parley.",
     offer_posted: "Smoke logger1 posts 3 Hemp for 2 Silk.",
     offer_filled:
       "Smoke logger2 fills Smoke logger1's offer of 3 Hemp for 2 Silk.",
-    offer_expired: "Smoke logger1's offer of 3 Hemp lapses with the leg.",
-    leg_timed_out: "The tide runs out on the Market.",
+    offer_expired: "Smoke logger1's offer of 3 Hemp lapses with the round.",
+    round_timed_out: "The tide runs out on the Market.",
     audit_carried: "The harbor audits Smoke logger2.",
     maroon_carried: "The harbor maroons Smoke logger2.",
     captain_left: "Smoke logger1 leaves the harbor.",
-    contract_posted: "Smoke logger1 offers one leg of protection for 12 Gold.",
+    contract_posted:
+      "Smoke logger1 offers one round of protection for 12 Gold.",
     contract_agreed:
-      "Smoke logger2 buys a leg of protection from Smoke logger1 for 12 Gold.",
+      "Smoke logger2 buys a round of protection from Smoke logger1 for 12 Gold.",
     contract_claimed:
       "Raiders bound for Smoke logger2 met Smoke logger1's guns.",
     refit_posted:
@@ -196,8 +196,8 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
     "and no two kinds share a sentence, so a line a captain reads names the thing that happened",
   );
   check(
-    LEG_PHASE_ORDER.every((phase) =>
-      voyageLogLine({ kind: "leg_advanced", phase }).includes(
+    ROUND_PHASE_ORDER.every((phase) =>
+      voyageLogLine({ kind: "round_advanced", phase }).includes(
         phaseFace(phase).label,
       ),
     ),
@@ -205,14 +205,14 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   );
 
   // The round belongs to the log's own stamp rather than to the caller,
-  // which is what lets a screen group a voyage by leg without working
-  // out which leg a line fell in.
+  // which is what lets a screen group a voyage by round without working
+  // out which round a line fell in.
   const stamped = voyageLogEntry(3, logFacts.captain_left);
   check(
     stamped.round === 3 &&
       stamped.kind === "captain_left" &&
       stamped.text === logLines.captain_left,
-    "a line carries the leg it happened on, the kind of thing it was and the sentence, and nothing else",
+    "a line carries the round it happened on, the kind of thing it was and the sentence, and nothing else",
   );
 
   // The cap, which both sides of the wire share. The oldest line is the
@@ -232,7 +232,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     normalizeVoyageLogEntry(stamped)?.kind === "captain_left" &&
       normalizeVoyageLogEntry(stamped)?.round === 3,
-    "a line that is a line is read back as it was written, leg and all",
+    "a line that is a line is read back as it was written, round and all",
   );
   const notLines: unknown[] = [
     null,
@@ -326,7 +326,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
     "both counts over the two columns are headed by the noun they count and worded for their number, so the harbor's log and the private one each read as lines rather than as two figures the captain has to label for themselves",
   );
 
-  // ---- The two logs, in a real harbor ----
+  // ========== The two logs, in a real harbor ==========
   // One Ocean Gambit harbor with two captains in it, because the pair
   // under test needs the private channel to carry something: a card is
   // dealt in this mode and nowhere else, and both captains hold one.
@@ -390,7 +390,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   const logMateSeat = logSeats[1];
 
   // The lines a socket was sent, read off the frames it kept. Only the
-  // room's log, since the private channel's frames are the other half of
+  // harbor's log, since the private channel's frames are the other half of
   // this pair and the point of the checks below is to keep the two apart.
   const logEntriesOn = (frames: readonly LogFrame[]) =>
     frames
@@ -425,11 +425,11 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     logTextOn(logHostSeat.frames).includes(logLines.voyage_started) &&
       logTextOn(logMateSeat.frames).includes(logLines.voyage_started),
-    "the room's log opens with the voyage and reaches every socket in the harbor, not only the host's",
+    "the harbor's log opens with the voyage and reaches every socket in the harbor, not only the host's",
   );
   // The seat a voyage opens in is entered by the host's start rather than
   // by a ready vote, and it is anchored all the same. A log whose first
-  // anchor line belonged to the second seat would read as a leg nobody
+  // anchor line belonged to the second seat would read as a round nobody
   // played, and the opening seat of a Gambit voyage is not the pier: the
   // phase the mode opens at is where the crew actually stands.
   const logOpened = logEntriesOn(logHostSeat.frames);
@@ -437,16 +437,16 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     logOpened[0]?.kind === "voyage_started" &&
       logOpened[0]?.round === 1 &&
-      logOpened[1]?.kind === "leg_advanced" &&
+      logOpened[1]?.kind === "round_advanced" &&
       logOpened[1]?.round === 1 &&
       logOpened[1]?.text ===
-        voyageLogLine({ kind: "leg_advanced", phase: openingSeat }),
-    "and the seat the voyage opens in is anchored like every other, so the log's spine has no gap where its first leg should be",
+        voyageLogLine({ kind: "round_advanced", phase: openingSeat }),
+    "and the seat the voyage opens in is anchored like every other, so the log's spine has no gap where its first round should be",
   );
 
-  // A leg moves, and the log's own stamp moves with it. The status
-  // report is the real one a client sends, and it is what moves a room's
-  // checkpoint; the two reports below take the room from the leg it
+  // A round moves, and the log's own stamp moves with it. The status
+  // report is the real one a client sends, and it is what moves a harbor's
+  // checkpoint; the two reports below take the harbor from the round it
   // opened on to the Parley of the next one.
   // The two anchor lines the reports below write. Named once each, and
   // read again at the end of the section where the voyage is checked for
@@ -467,7 +467,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     anchorFrame?.entry?.round === 2 &&
       anchorFrame.entry.text === dawnAnchorLine,
-    "a leg that moves writes the anchor line for the seat being entered, stamped with the leg it is entering rather than the one it left",
+    "a round that moves writes the anchor line for the seat being entered, stamped with the round it is entering rather than the one it left",
   );
 
   const atParley = waitForEvent<{ entry: VoyageLogEntry }>(
@@ -484,7 +484,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     parleyFrame?.entry?.round === 2 &&
       parleyFrame.entry.text === parleyAnchorLine,
-    "and a phase that moves inside one leg keeps that leg's number, so a captain reading back sees the leg as one stretch rather than six",
+    "and a phase that moves inside one round keeps that round's number, so a captain reading back sees the round as one stretch rather than six",
   );
 
   // The offer board, which is the one surface whose whole life is worth
@@ -505,7 +505,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   check(
     postedLog?.entry?.text === "Smoke logger1 posts 3 Hemp for 2 Silk." &&
       postedLog.entry.round === 2,
-    "an offer on the board writes the whole trade into the room's log, naming the captain who posted it",
+    "an offer on the board writes the whole trade into the harbor's log, naming the captain who posted it",
   );
 
   // The settlement, taken by the second captain through the accept the
@@ -513,7 +513,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // a row, so the offer's id is read off the board itself: the host asks
   // for its own state and reads the answer, which is the same copy the
   // accepting client reads its id off. Asking rather than reading the
-  // frames the room was already sent, because the line above and the
+  // frames the harbor was already sent, because the line above and the
   // board update that follows it are two frames and the log's own is the
   // first of them, so the board is not on the socket yet when the line
   // arrives.
@@ -531,7 +531,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   );
   check(
     postedOffer !== undefined,
-    "the offer is standing on the room's board, so the settlement below has something to settle",
+    "the offer is standing on the harbor's board, so the settlement below has something to settle",
   );
   const filledLine = waitForEvent<{ entry: VoyageLogEntry }>(
     logHostSeat.socket,
@@ -550,13 +550,13 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   );
 
   // The lapsed line, which is the board's other ending: an offer still
-  // standing when the room leaves the Parley goes back to its poster.
+  // standing when the harbor leaves the Parley goes back to its poster.
   // The two lines this offer produces are named once each and read in
   // both places they are needed: here, and in the readback at the end of
   // the section, where the same voyage is checked for order.
   const secondPostLine = "Smoke logger1 posts 1 Silk for 4 Hemp.";
   const secondLapseLine =
-    "Smoke logger1's offer of 1 Silk lapses with the leg.";
+    "Smoke logger1's offer of 1 Silk lapses with the round.";
   const secondPosted = waitForEvent<{ entry: VoyageLogEntry }>(
     logHostSeat.socket,
     "voyage:log",
@@ -571,7 +571,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   });
   check(
     (await secondPosted)?.entry?.text === secondPostLine,
-    "a second offer goes up while the room is still at the exchange",
+    "a second offer goes up while the harbor is still at the exchange",
   );
   const lapsedLine = waitForEvent<{ entry: VoyageLogEntry }>(
     logHostSeat.socket,
@@ -606,7 +606,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   const leavesTheHarbor = "Smoke logger2 leaves the harbor.";
   check(
     left?.entry?.text === leavesTheHarbor,
-    "a seat that leaves the voyage writes one line into the room's log, and the log's own guard is what keeps the reap from writing a second",
+    "a seat that leaves the voyage writes one line into the harbor's log, and the log's own guard is what keeps the reap from writing a second",
   );
   check(
     logTextOn(logHostSeat.frames).filter((text) =>
@@ -616,7 +616,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   );
 
   // The history the Dusk screen asks for, answered to the socket that
-  // asked rather than to the room.
+  // asked rather than to the harbor.
   const history = waitForEvent<{
     roomId: string;
     round: number;
@@ -634,7 +634,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // run of positions rather than as a membership list, so the check says
   // what its name says: a captain who asks for the log is handed the
   // voyage, not a bag of lines. A line the clock added on its own (a
-  // phase that ran out while the room stood in it) is allowed to sit
+  // phase that ran out while the harbor stood in it) is allowed to sit
   // between two of these without failing the run, which is why the
   // comparison is strictly increasing positions rather than equality
   // with the whole list.
@@ -662,7 +662,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
         (entry, index) =>
           entry.kind === logEntriesOn(logHostSeat.frames)[index]?.kind,
       ),
-    "and it is the same log the room was reading as it happened, line for line, rather than a second copy assembled when it was asked for",
+    "and it is the same log the harbor was reading as it happened, line for line, rather than a second copy assembled when it was asked for",
   );
   check(
     readBack.every(
@@ -672,12 +672,12 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
         typeof entry.text === "string" &&
         Object.keys(entry).length === 3,
     ) && readBack.length > 0,
-    "and every line in it is a leg, a kind and a sentence, with no fourth field for anything hidden to travel in",
+    "and every line in it is a round, a kind and a sentence, with no fourth field for anything hidden to travel in",
   );
 
-  // The plan's own evaluation, read against this surface: the private
-  // channel's material reaches the captain it was dealt to and appears
-  // in no line the room can read.
+  // The private channel's contract, read against this surface: its
+  // material reaches the captain it was dealt to and appears in no line
+  // the harbor can read.
   const cardTexts = logSeats
     .map((seat) => {
       const cardFrame = seat.frames.find(
@@ -713,7 +713,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   );
   check(
     publicLeaks.length === 0,
-    "no line in the room's log carries a role, a flourish, an ally or an alignment word, on any socket in the harbor",
+    "no line in the harbor's log carries a role, a flourish, an ally or an alignment word, on any socket in the harbor",
   );
   check(
     logSeats.every((seat) =>
@@ -721,11 +721,11 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
         cardTexts.every((card) => !text.includes(card.text ?? "")),
       ),
     ),
-    "and no private entry appears in the other captain's transcript, which is the plan's own evaluation for this slice",
+    "and no private entry appears in the other captain's transcript, which is the design's own evaluation for the log",
   );
 
   // A restarted voyage is a new voyage, so the log goes with it and the
-  // room is told. The request afterwards is answered with nothing rather
+  // harbor is told. The request afterwards is answered with nothing rather
   // than with the voyage that just ended.
   const restarted = waitForEvent<{ roomId: string }>(
     logHostSeat.socket,

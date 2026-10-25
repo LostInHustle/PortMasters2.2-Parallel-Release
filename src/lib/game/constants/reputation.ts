@@ -1,5 +1,7 @@
+import { getLocale, tFor, type Locale } from "../i18n";
+
 // Reputation a captain gains for lending Gold to another captain short on
-// funds, scaled to the amount so a token loan doesn't pay the same as
+// Gold, scaled to the amount so a token loan doesn't pay the same as
 // bailing someone out completely. Floored at 1 so even a small loan is
 // worth something.
 export const AID_REPUTATION_PER_GOLD = 1 / 5;
@@ -38,11 +40,11 @@ export const AID_REPUTATION_PER_GOLD = 1 / 5;
 const HELPER_REPUTATION_BASE = 48;
 const HELPER_REPUTATION_PER_ROUND = 6;
 
-// The cap takes the voyage's own length rather than the room's tier, and
+// The cap takes the voyage's own length rather than the harbor's tier, and
 // the caller passes the length the voyage was pinned to (GameState.maxRounds
 // through ./engine/aid). Reading the tier here was right while a tier and a
 // voyage were the same number of rounds and wrong the moment they were not:
-// a Gambit voyage is twelve legs on every tier, so a tier read would hand a
+// a Gambit voyage is twelve rounds on every tier, so a tier read would hand a
 // Fair Winds crew the cap of an eight round voyage and cut them off at
 // eighty percent of what they had honestly earned.
 export function helperReputationCapFor(voyageRounds: number): number {
@@ -78,7 +80,7 @@ export function merchantRatingForScore(score: number): MerchantRating {
 }
 
 // The rank line both Endgame surfaces print: the log line endGame writes
-// (see ./engine/lifecycle.ts) and the Endgame screen's badge (see
+// (see ../engine/lifecycle.ts) and the Endgame screen's badge (see
 // Endgame.tsx). The pair used to be hand written in both places, and they
 // drifted exactly the way a duplicated branch does: the screen was missing
 // the "defaulted on a loan" case entirely, still showing a captain's score
@@ -87,13 +89,35 @@ export function merchantRatingForScore(score: number): MerchantRating {
 export function endgameRatingFor(
   score: number,
   defaultedDebt: boolean,
+  locale: Locale = getLocale(),
 ): string {
-  if (defaultedDebt) return "💥 Bankrupt: Defaulted on a Loan";
+  if (defaultedDebt) return tFor(locale, "💥 Bankrupt: Defaulted on a Loan");
   const r = merchantRatingForScore(score);
-  return `${r.icon} ${r.label}`;
+  return `${r.icon} ${tFor(locale, r.label)}`;
 }
 
-// [MANIFEST 05: Backing] A third captain can co sign part of an existing
+// A rating label, read in a language.
+//
+// The label travels: the table stores it and the prose prints it, and
+// both halves of that trip need a language. The column holds the bare
+// English label, and it holds it for every row written so far: a
+// stored value cannot be changed without a migration, and a migration
+// that rewrote the labels would leave the rows already written holding
+// a language nobody stored. So the label is read rather than rewritten.
+// The pack is keyed by the English, and the pack carries every rating
+// label under exactly the spelling this table uses, so a stored label
+// is the key its Mandarin sits under.
+//
+// A label the pack does not carry prints as itself, the same honest
+// line every other read in the tree takes.
+export function merchantRatingLabel(
+  label: string,
+  locale: Locale = getLocale(),
+): string {
+  return tFor(locale, label);
+}
+
+// A third captain can co sign part of an existing
 // loan between two others, pledging their own Gold as a safety net for the
 // lender. The pledge is escrowed immediately, the same moment every other
 // commitment in this game is (a barter offer, an aid loan, a Convoy

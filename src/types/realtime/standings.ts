@@ -34,7 +34,7 @@ export type HouseStanding = {
   perk: string;
   crowns: number;
   voyages: number;
-  bestScore: number;
+  bestReputation: number;
 };
 
 export type LeaderboardEntry = {
@@ -46,7 +46,7 @@ export type LeaderboardEntry = {
   renownXP: number;
   voyagesCompleted: number;
   seaMasterCrowns: number;
-  bestScore: number;
+  bestReputation: number;
   consecutiveSolventVoyages: number;
   houseId: HouseId | null;
 };

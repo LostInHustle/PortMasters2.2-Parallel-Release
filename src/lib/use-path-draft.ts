@@ -3,20 +3,20 @@
 // =====================================================================
 // The path draft, and switching, client side.
 //
-// [D7: the draft, and switching] The room's two path frames, as one captain
+// The harbor's two path frames, as one captain
 // meets them, and the difference between them is the feature rather than
 // the plumbing.
 //
 // The draft is private in its whole shape: the server deals the deck and
 // this captain is sent their own hand and nobody else's (see the note on
 // DraftView in @/types/realtime). So the view is held here rather than in a
-// room wide state, and nothing about it is derived from anything else on
+// harbor wide state, and nothing about it is derived from anything else on
 // the screen.
 //
 // The switch is the opposite and that is its price: "the price of changing
 // your identity is that everyone knows." This hook listens for the whole
-// room's frame and acts on the one that names this captain, which is what
-// makes the room's answer the authority on a change to the captain's own
+// harbor's frame and acts on the one that names this captain, which is what
+// makes the harbor's answer the authority on a change to the captain's own
 // books: a switch the server refused is a switch that cost nobody anything,
 // because the fee is only paid when the frame comes back (see
 // applyPathSwitch).
@@ -36,8 +36,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { applyDraftPath, applyPathSwitch } from "@/lib/game/engine";
 import { normalizePath, type PathId } from "@/lib/game/paths";
-import type { GameState } from "@/lib/game/types";
-import { refusedForRoom } from "@/lib/refusals";
+import type { LedgerAct } from "@/lib/game/ledger";
+
+import { guardedRefusalHandler } from "@/lib/refusals";
 
 // The events this feature speaks on, named in one place for the reason the
 // bazaar's and the two consent boards' own channels are.
@@ -111,14 +112,14 @@ function readDraftView(data: unknown, roomId: string): DraftView | null {
  *
  * The apply functions are the caller's, the same shape useMaroon takes: a
  * frame about this captain's own papers is a write to this captain's own
- * save and nothing else in the room may make it, so the hook reads the wire
+ * save and nothing else in the harbor may make it, so the hook reads the wire
  * and hands the write out rather than holding a copy of the books.
  */
 export function usePathDraft(
   socket: Socket | null,
   roomId: string | null,
   myUserId: string,
-  act: (fn: (g: GameState, logs: string[]) => void) => void,
+  act: LedgerAct,
 ) {
   const [view, setView] = useState<DraftView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,12 +151,8 @@ export function usePathDraft(
         act((g, l) => applyDraftPath(g, path, l));
       }
     };
-    const onDraftError = (data: { roomId?: string; error?: string }) => {
-      const err = refusedForRoom(data, roomId);
-      if (err === null) return;
-      setError(err);
-    };
-    // The room's one publication, read for the one name that is this
+    const onDraftError = guardedRefusalHandler(roomId, setError);
+    // The harbor's one publication, read for the one name that is this
     // captain's. The path is read through normalizePath rather than asserted
     // because it came off the wire, and a frame that is not a path is a
     // frame to drop: the engine would refuse it anyway, but a refusal writes
@@ -170,16 +167,12 @@ export function usePathDraft(
       if (path === null) return;
       act((g, l) => applyPathSwitch(g, path, l));
     };
-    const onSwitchError = (data: { roomId?: string; error?: string }) => {
-      const err = refusedForRoom(data, roomId);
-      if (err === null) return;
-      setError(err);
-    };
+    const onSwitchError = guardedRefusalHandler(roomId, setError);
     // The hand lives in the server's process and nowhere else, so a socket
     // that drops mid draft and comes back has to ask again: the reconnect is
     // a new connection that was never sent a view, and a captain left
     // holding a stale hand would be reading cards the table has already
-    // passed. The room held the seat for them while they were gone (see
+    // passed. The harbor held the seat for them while they were gone (see
     // noteDraftAway on the server), so the view that comes back is the
     // step the table is actually standing at.
     const request = (): void => {
@@ -232,8 +225,8 @@ export function usePathDraft(
   );
 
   // The press. It carries the path this captain means to sail on and asks
-  // the room to publish it; nothing is charged here, and the fee, the
-  // forfeiture and the stamp are applied when the room's frame comes back
+  // the harbor to publish it; nothing is charged here, and the fee, the
+  // forfeiture and the stamp are applied when the harbor's frame comes back
   // (see onSwitched above). The panel draws the same guard before the press
   // (see pathSwitchBlocked), so a refusal at this end is the fleet being out
   // of step rather than a captain being surprised.

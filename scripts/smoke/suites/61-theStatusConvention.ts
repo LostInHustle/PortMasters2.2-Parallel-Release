@@ -1,6 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: the status convention.
 //
-// [W3] Every state a captain can see says what it is, why it happened and
+// Every state a captain can see says what it is, why it happened and
 // the way back, and the clauses are authored once in
 // @/lib/game/status-copy. This article holds the registry to its own
 // rules the way the card record's article holds the card pool: first the
@@ -17,7 +17,7 @@
 //
 // Then the two engine contracts the sentences sit on, checked here so
 // they cannot move quietly: the cold's way back is the exact promise the
-// smoke oracle reads for at the engine's refusal line, and the hunger
+// smoke suite reads for at the engine's refusal line, and the hunger
 // rule quotes the engine's own count rather than a retyped number.
 //
 // Last, the sweep's guard list itself, held to its contract: every
@@ -30,7 +30,7 @@
 // after the run has put its captains away, beside the card record's for
 // the same reason.
 
-import { CREW_LOSS_AFTER_HUNGRY_LEGS } from "@/lib/game/constants/crew";
+import { CREW_LOSS_AFTER_HUNGRY_ROUNDS } from "@/lib/game/constants/crew";
 import {
   FROZEN_CREW,
   HUNGRY_CREW,
@@ -38,7 +38,7 @@ import {
   SKILLED_LEGEND,
   STATUS_FAMILIES,
   STATUS_SENTENCES,
-  coldLegChipLine,
+  coldRoundChipLine,
   frozenAssignRefusal,
   frozenBenchLine,
   frozenFrostbiteLog,
@@ -140,7 +140,7 @@ export async function theStatusConventionSuite(): Promise<void> {
 
   check(
     frozenAssignRefusal().includes("keeps every hand working"),
-    "the engine's refusal still carries the promise the oracle reads for, so the sentence can only move by moving this check first rather than by a copy edit six files away",
+    "the engine's refusal still carries the promise the smoke suite reads for, so the sentence can only move by moving this check first rather than by a copy edit six files away",
   );
 
   check(
@@ -149,15 +149,15 @@ export async function theStatusConventionSuite(): Promise<void> {
       frozenAssignRefusal(),
       frozenWorkLog("A hand", "the nets"),
       frozenFrostbiteLog("A hand", "Weaver"),
-      coldLegChipLine("1", true),
+      coldRoundChipLine("1", true),
     ].every((line) => line.includes(FROZEN_CREW.remedy)),
     "every cold sentence gives the same way back to within its wording, which is the drift this convention closes: the bench's row had dropped the remedy while the engine kept it, the rail's chip warned without saying what to do about it, and one account of the cold is now one account",
   );
 
   check(
-    hungryRule().includes(`${CREW_LOSS_AFTER_HUNGRY_LEGS} legs in a row`) &&
+    hungryRule().includes(`${CREW_LOSS_AFTER_HUNGRY_ROUNDS} rounds in a row`) &&
       hungryRule().includes("costs the newest hand aboard"),
-    "the hunger rule quotes the engine's own count rather than a retyped number, so a balance pass that moves CREW_LOSS_AFTER_HUNGRY_LEGS moves every sentence that quotes it",
+    "the hunger rule quotes the engine's own count rather than a retyped number, so a balance pass that moves CREW_LOSS_AFTER_HUNGRY_ROUNDS moves every sentence that quotes it",
   );
 
   check(

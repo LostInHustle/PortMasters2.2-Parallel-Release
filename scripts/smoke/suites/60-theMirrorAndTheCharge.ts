@@ -76,7 +76,7 @@ export async function theMirrorAndTheChargeSuite(): Promise<void> {
     return g;
   };
 
-  // ---- A. The transport mirror ----
+  // ========== A. The transport mirror ==========
   const transportFlagSets: Partial<Record<ModifierKey, number>>[] = [
     {},
     { transport_flat_discount: 5 },
@@ -105,8 +105,11 @@ export async function theMirrorAndTheChargeSuite(): Promise<void> {
         for (const flags of transportFlagSets) {
           for (const modules of transportModuleSets) {
             const g = stateFor(shipLevel, flags, modules);
-            const charge = calcTransportCost(g, items, woven);
-            const final = explainTransportCost(g, items, woven).final;
+            // Every unit woven, or none: the parity sweep keeps its old
+            // two arms, handed to the stack as the count it now reads.
+            const wovenUnits = woven ? items : 0;
+            const charge = calcTransportCost(g, items, wovenUnits);
+            const final = explainTransportCost(g, items, wovenUnits).final;
             transportPoints += 1;
             transportFinals.add(final);
             if (final !== charge && transportMiss === null) {
@@ -134,7 +137,7 @@ export async function theMirrorAndTheChargeSuite(): Promise<void> {
     "and the matrix moves through both of the values the pair was repaired over: the finals spread across many outcomes, the five Gold minimum is what a light or empty run quotes on both sides of the pair, and a Silk Monopoly on woven goods lands on a free run, so the equality above is a claim about arithmetic rather than a table of one number agreeing with itself",
   );
 
-  // ---- B. The VAT mirror ----
+  // ========== B. The VAT mirror ==========
   const vatFlagSets: Partial<Record<ModifierKey, number>>[] = [
     {},
     { vat_discount: 0.25 },

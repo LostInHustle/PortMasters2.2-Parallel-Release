@@ -10,16 +10,16 @@ import type { Action } from "./reducer";
 import type { SeatPin } from "./use-seat-pin";
 
 // =====================================================================
-// Loading the captain's voyage when they arrive, or when the room they
+// Loading the captain's voyage when they arrive, or when the harbor they
 // are standing in changes.
 //
 // Three answers are possible and all three have to leave a captain able to
-// play: the room had a voyage, the room had none, and the server never
+// play: the harbor had a voyage, the harbor had none, and the server never
 // answered at all. Each one ends in a dispatch, which is why the reading
 // itself lives here rather than in the hook that owns the state.
 // =====================================================================
 
-// The room's answer to a load, and the account's, as the API types them.
+// The harbor's answer to a load, and the account's, as the API types them.
 type LoadedVoyage = Awaited<ReturnType<typeof api.getGameState>>;
 type LoadedLegacy = Awaited<ReturnType<typeof api.getLegacy>>;
 
@@ -61,7 +61,7 @@ function useFallbackMemory(): {
   return { houseIdRef, renownRef };
 }
 
-// The two reads a load is made of, asked together: the room's own record of
+// The two reads a load is made of, asked together: the harbor's own record of
 // the voyage, and the captain's account beside it.
 function fetchVoyage(
   roomId: string,
@@ -95,26 +95,26 @@ export function useVoyageLoad({
   setStartingGoldBonus: Dispatch<SetStateAction<number>>;
 }): void {
   const { houseIdRef, renownRef } = useFallbackMemory();
-  const env: LoadEnv = {
-    roomId,
-    ctx,
-    roomMode,
-    dispatch,
-    setSeatPin,
-    setStartingGoldBonus,
-    houseIdRef,
-    renownRef,
-  };
 
-  // Load saved state on mount / room change.
+  // Load saved state on mount / harbor change.
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
+    const env: LoadEnv = {
+      roomId,
+      ctx,
+      roomMode,
+      dispatch,
+      setSeatPin,
+      setStartingGoldBonus,
+      houseIdRef,
+      renownRef,
+    };
 
     // One background retry for the two unreachable paths below, and the
     // reason this hook asks a second time at all: a transport hiccup that
     // costs the first request must not cost the voyage. The retry repeats
-    // the same two reads and lands whatever the room really holds, its
+    // the same two reads and lands whatever the harbor really holds, its
     // save first and its checkpoint second, through the loaded path
     // below. A retry that fails too leaves the fresh fallback standing
     // and stops asking.
@@ -136,7 +136,7 @@ export function useVoyageLoad({
     // Safety net: if the API call hangs (network hiccup, server spinning up),
     // fall back to a fresh game after 12 s instead of showing the loading
     // screen forever. This is the root cause fix for the loading freeze
-    // reported when joining or hosting a room.
+    // reported when joining or hosting a harbor.
     const LOAD_TIMEOUT_MS = 12_000;
     let loadTimedOut = false;
     const timeoutId = setTimeout(() => {
@@ -166,22 +166,32 @@ export function useVoyageLoad({
       clearTimeout(timeoutId);
       if (retryId !== null) clearTimeout(retryId);
     };
-  }, [roomId, enabled, ctx, roomMode]);
+  }, [
+    roomId,
+    enabled,
+    ctx,
+    roomMode,
+    dispatch,
+    setSeatPin,
+    setStartingGoldBonus,
+    houseIdRef,
+    renownRef,
+  ]);
 }
 
-// The reading for the two loads that never reached the room, whether the
+// The reading for the two loads that never reached the harbor, whether the
 // request hung past its safety net or answered with an error. Both carry
 // the same facts, so both leave the same state: no pin, because a request
 // that never landed knows nothing about the fleet's size and this captain
 // draws the founding board and keeps a working hand rather than holding a
 // commission they are forbidden to touch, and no checkpoint, because the
-// room never said where it was standing. The seed still carries the
-// room's deterministic economy through ctx, and the House and Renown
+// harbor never said where it was standing. The seed still carries the
+// harbor's deterministic economy through ctx, and the House and Renown
 // remembered across loads ride along, so an unreachable server never
 // turns a pledge into no pledge or a captain into a first voyage
 // beginner. What closes the checkpoint gap is the retry the caller
 // schedules beside this call: an answer on that second ask lands the
-// room's real voyage through the loaded path beside this one.
+// harbor's real voyage through the loaded path beside this one.
 function applyUnreachableLoad(env: LoadEnv): void {
   env.setSeatPin({ roomId: env.roomId, seats: 0 });
   env.dispatch({
@@ -195,7 +205,7 @@ function applyUnreachableLoad(env: LoadEnv): void {
   });
 }
 
-// What the room answered, once it has answered: the pin, the two values
+// What the harbor answered, once it has answered: the pin, the two values
 // remembered for the fallback paths above, and the voyage itself, healed
 // and handed to the reducer.
 function applyLoadedAnswer(
@@ -209,17 +219,17 @@ function applyLoadedAnswer(
     difficulty: roomDifficulty,
     // Named for what it is rather than shadowing the roomMode the
     // caller passed in. Both are in play below and they are allowed
-    // to disagree: the response is the room answering live, the
+    // to disagree: the response is the harbor answering live, the
     // argument is what the lobby said a moment before the request.
     mode: apiMode,
     // The seat count this voyage was pinned to, which is the one
-    // room fact on this response that nothing else can substitute
-    // for. A response without it is a room with no voyage pinned,
+    // harbor fact on this response that nothing else can substitute
+    // for. A response without it is a harbor with no voyage pinned,
     // which is the founding board and the reading every client had
     // before the rung existed.
     seats: roomSeats,
   } = loaded;
-  // Both halves of the room's answer land in one render, this batch
+  // Both halves of the harbor's answer land in one render, this batch
   // included, so the commission a captain draws for the voyage they
   // just restored is drawn at the table size that voyage was dealt
   // to rather than one render later.

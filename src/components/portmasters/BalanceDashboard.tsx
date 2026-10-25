@@ -4,7 +4,7 @@
 // The balance dashboard: one page that answers whether the mode is
 // healthy.
 //
-// [I3: the dashboard, and the front page number] The plan asks for a page
+// The design asks for a page
 // somebody on balance duty can read in under a minute, and names the three
 // questions it has to answer: is the Quartermaster seat healthy, is
 // anything becoming a staple, and is the variance too swingy. The
@@ -15,14 +15,14 @@
 // disagreeing about a number: both ask the same reader, and neither
 // recomputes what the reader already said.
 //
-// The front page is the strip at the top: the plan's front page number,
+// The front page is the strip at the top: the design's front page number,
 // the Barge revenue share, and then the three questions, each with the
 // state it is in and the one line it can answer with. The panels below are
 // the same three questions in detail plus the floor, and every row on them
 // carries the gate it is judged against and the verdict, so a reader never
 // has to hold a target in their head to know whether a number is good.
 //
-// [I4: the launch gates, and the three hundred voyage run] Above that strip
+// Above that strip
 // sits the ship decision: the sixteen launch gates reduced by
 // src/lib/game/gates.ts into one of three states, with the reasons behind
 // it. The verdict is computed here rather than fetched, from the reading
@@ -59,7 +59,7 @@ import { Gauge, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 // which of the meaning tones says it: an out of band gate is warn rather
 // than alarm on purpose, because the mode has not shipped yet and a number
 // outside its band is being watched rather than having broken. The three
-// verdicts that are not judgements (no source, no gate, unplayed) take the
+// verdicts that are not judgments (no source, no gate, unplayed) take the
 // quiet default, since none of them is a finding.
 type ChipTone = "gain" | "warn" | "default";
 
@@ -80,7 +80,7 @@ const STATE: Record<QuestionState, { tone: ChipTone; word: string }> = {
 
 // The ship decision's three states, in the same tones the readings under
 // them use, so a held gate and the strip that says the mode is held are
-// not two colours about one fact. Held is warn rather than alarm for the
+// not two colors about one fact. Held is warn rather than alarm for the
 // reason the out of band chips are: a mode that has not shipped is being
 // watched, not broken.
 const LAUNCH: Record<LaunchState, { tone: ChipTone; word: string }> = {
@@ -90,7 +90,7 @@ const LAUNCH: Record<LaunchState, { tone: ChipTone; word: string }> = {
 };
 
 export function BalanceDashboard() {
-  // This page renders outside the harbor room, so it subscribes to the
+  // This page renders outside the harbor harbor, so it subscribes to the
   // captain's language at its own root: a flip redraws the screen
   // through the state write below rather than waiting for the next
   // route change.
@@ -106,15 +106,15 @@ export function BalanceDashboard() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     const read = async () => {
       try {
         const answer = await api.adminBalance();
-        if (cancelled) return;
+        if (canceled) return;
         setReading(answer.reading);
         setError(null);
       } catch (err) {
-        if (cancelled) return;
+        if (canceled) return;
         setError(
           err instanceof Error
             ? err.message
@@ -125,7 +125,7 @@ export function BalanceDashboard() {
     };
     void read();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [nonce]);
 
@@ -211,7 +211,7 @@ export function BalanceDashboard() {
                 is for, then the front page below it. */}
               <LaunchStrip verdict={readLaunchVerdict(reading)} />
 
-              {/* The front page: the plan's number first, then the three
+              {/* The front page: the design's number first, then the three
                 questions. A tile carries the state and the one sentence the
                 panel below can say today, so the strip alone is the minute
                 the evaluation asks for.
@@ -258,7 +258,7 @@ export function BalanceDashboard() {
 
 // The ship decision, over the sixteen gates the panels below carry. It is
 // one strip rather than a panel because the answer is a sentence: the
-// state, the run against the plan's floor, the gates by where they stand,
+// state, the run against the design's floor, the gates by where they stand,
 // and then every reason the verdict is not clear.
 //
 // Every word of it is the verdict's own. The chip, the answer, the tally
@@ -282,7 +282,7 @@ function LaunchStrip({ verdict }: { verdict: LaunchVerdict }) {
 
       <div className="grid gap-x-6 gap-y-1 px-4 py-3 text-xs @xl:grid-cols-2">
         <p className="text-muted-foreground">
-          {t("Run {voyages} of {required} recorded voyages", {
+          {t("{voyages} of {required} recorded voyages", {
             voyages: verdict.voyages,
             required: verdict.required,
           })}
@@ -322,23 +322,23 @@ function GapList({ gaps }: { gaps: string[] }) {
   );
 }
 
-// The plan's front page number, in the plan's own slot: the tile says what
+// The design's front page number, in the design's own slot: the tile says what
 // the number is, what it reads today and what it is judged against. Every
 // part of it is taken from the line rather than written here, the chip
 // included, which is what let the tile start reading a real share the day
 // the Barge shipped without a line of this file changing, and what keeps it
-// honest now that the number is reduced out of the leg reports: the plan
+// honest now that the number is reduced out of the round reports: the design
 // sets no band on the share of food spending, so the chip reads measured
 // rather than good or bad, and a window with no report in it still reads as
 // nothing to read rather than as a zero.
 //
 // Only a judged reading gets the display size. A verdict that is not a
-// judgement has no number to show, only a sentence about what is missing,
+// judgment has no number to show, only a sentence about what is missing,
 // and a sentence at display size is the page shouting an absence: those
 // read at body size, in the quieter ink the rest of the page's prose uses.
 // The size itself grows with the window rather than sitting at one value,
 // because this is the one number the page is opened to find and a wall
-// display has the room to say so.
+// display has the harbor to say so.
 function FrontNumber({ line }: { line: DashboardReadingLine }) {
   const chip = VERDICT[line.verdict];
   const judged =
@@ -375,7 +375,7 @@ function FrontNumber({ line }: { line: DashboardReadingLine }) {
 }
 
 // One of the three questions, answered at a glance. The chip is the state
-// and the sentence is the answer, which is what the plan asks the front
+// and the sentence is the answer, which is what the design asks the front
 // page to do: read the top of this page and know where the mode stands
 // without scrolling.
 function FrontTile({
@@ -440,7 +440,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
                 things: measured across them, the Gate column came out 291
                 pixels wide on one panel and 135 on the next, and the
                 Reading column starved to 237 on the panel with the longest
-                Window lists while its neighbour ran 295, wrapping labels
+                Window lists while its neighbor ran 295, wrapping labels
                 that fit on two lines next door onto four. The label is the
                 one thing a reader scans first, so it gets a floor rather
                 than whatever is left over.
@@ -488,7 +488,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
           The first line is the whole width of the card on purpose. An
           earlier version laid the label out beside the value and the
           verdict, and on a phone that left the longest label on the page
-          121 pixels to say "Distinct goods a hold closes a leg carrying,
+          121 pixels to say "Distinct goods a hold closes a round carrying,
           median" in: three lines, and the one reading whose name most
           needs reading was the one that was hardest to read. Given its own
           line it says the same words in two. */}
@@ -516,8 +516,8 @@ function Panel({ panel }: { panel: DashboardPanel }) {
 }
 
 // A verdict at row scale: a dot and the word, no chip. Forty chips down
-// four tables turn the verdict column into a stripe of coloured lozenges,
-// and a stripe is not a column anyone scans; the dot keeps the colour and
+// four tables turn the verdict column into a stripe of colored lozenges,
+// and a stripe is not a column anyone scans; the dot keeps the color and
 // lets the word sit on the row's own baseline. The full pill is kept for
 // the three places a verdict is a headline rather than a detail: the
 // launch strip, a panel's header and a front tile. The word and its tone

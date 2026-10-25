@@ -3,10 +3,10 @@
 //
 // The objective is the one thing in Ocean Gambit that is public by
 // design, so this is the one new thing in the mode that is meant to be
-// broadcast to the whole room, and it is worth saying out loud how it
+// broadcast to the whole harbor, and it is worth saying out loud how it
 // differs from the alignment sitting next to it in this directory. The
 // alignment is a secret defended all the way to the wire. This is a shared
-// number nobody needs defending from, and the only two defences it gets
+// number nobody needs defending from, and the only two defenses it gets
 // are the ones a shared number needs: it cannot be double counted, and it
 // cannot be inflated past what the commission asked for.
 //
@@ -26,24 +26,24 @@
 // board is read. What arrives is held to what the harbor has left of every
 // good at that instant, and only that much of it is merged, so the fleet's
 // record can never hold more than the commission named no matter how many
-// captains press at once. That read, the judgement on it and the merge
+// captains press at once. That read, the judgment on it and the merge
 // that follows are one synchronous stretch with nothing awaited inside
 // them: this is a single Node process, so the second of two reports that
 // arrive together is judged against the board the first one just wrote
 // rather than against the board it also read. The clamp in objectiveTotalFor
-// below still caps the sum it hands out, as the last line of defence a
+// below still caps the sum it hands out, as the last line of defense a
 // public number wants, but it is no longer the only one: a harbor whose
 // tallies were somehow overfilled reads met rather than "17 of 12", and
 // what rides the wire is what every client would have clamped for itself.
 //
 // Two frames reach this module and they are two ends of one press. A
 // report is a captain's standing on the board, sent on a debounce and on a
-// heartbeat, and the room hears a sum. A handover is the same standing
+// heartbeat, and the harbor hears a sum. A handover is the same standing
 // offered by a press on the Deliver button: it is asked before the goods
 // move rather than after, the accepted rows come back to that captain
-// alone, and the room hears the same public board either way (see
+// alone, and the harbor hears the same public board either way (see
 // recordObjectiveHandover). Both go through the same acceptance, and both
-// hold the room's claim while they settle, which is what makes two
+// hold the harbor's claim while they settle, which is what makes two
 // captains pressing in the same instant settle one after the other.
 // =====================================================================
 
@@ -60,7 +60,7 @@ import {
 import { roomChannel } from "./channel";
 import { claimObjectiveRoom } from "./presence";
 
-// room -> captain -> what the commission has accepted from that captain,
+// harbor -> captain -> what the commission has accepted from that captain,
 // by good. Accepted rather than claimed: a report past what the harbor had
 // left is merged as the amount it could take (see acceptAgainstRemaining),
 // so the sum of these lines is what the commission actually holds.
@@ -170,7 +170,7 @@ function acceptAgainstRemaining(
   return accepted;
 }
 
-// Wipes a room's board. Called on room:restart and when a room is deleted
+// Wipes a harbor's board. Called on room:restart and when a harbor is deleted
 // after its last member departs.
 //
 // The restart call is not a tidy up, it is load bearing: a report of zero
@@ -183,12 +183,12 @@ export function clearObjectiveTallies(roomId: string): void {
 }
 
 /**
- * The commission a room is working on, or null if the room is not on the
+ * The commission a harbor is working on, or null if the harbor is not on the
  * Gambit lap.
  *
- * Both entry points need this and both need it read from the room rather
+ * Both entry points need this and both need it read from the harbor rather
  * than from the report, so it is defined once: a client cannot report
- * against an objective of its own invention, and a Classic room cannot
+ * against an objective of its own invention, and a Classic harbor cannot
  * carry a board at all, whatever it is sent.
  */
 export async function objectiveForRoom(
@@ -199,7 +199,7 @@ export async function objectiveForRoom(
     select: { mode: true, voyageEpoch: true, voyageSeats: true },
   });
   if (!room || normalizeMode(room.mode) !== "ocean_gambit") return null;
-  // The rung's two inputs, read from the room for the same reason the epoch
+  // The rung's two inputs, read from the harbor for the same reason the epoch
   // is: they are facts of the voyage in progress rather than of the report,
   // so a client cannot report against a commission of its own invention, at
   // its own table size, and have it stand.
@@ -211,15 +211,15 @@ export async function objectiveForRoom(
 
 /**
  * One commission read down to what it can still take from this captain,
- * merged, and told to the room. The one settlement both frames share.
+ * merged, and told to the harbor. The one settlement both frames share.
  *
  * This is the synchronous stretch and there is nothing awaited in it: the
  * remaining is read here, the acceptance is judged here and the merge
  * happens here, so the second of two frames that arrive together is judged
  * against the board the first one just wrote rather than against the board
  * it also read. That is the whole of "simultaneous handovers settle one
- * after the other", and it is why both callers hold the room's claim from
- * before the room read: a frame cannot reach this function with another
+ * after the other", and it is why both callers hold the harbor's claim from
+ * before the harbor read: a frame cannot reach this function with another
  * frame's read still open behind it.
  *
  * The accepted rows come back because a handover owes its captain an
@@ -240,7 +240,7 @@ function settleObjective(
 
   // Always broadcast, including when the merged total is empty and
   // including when a report was accepted as nothing. An empty board is a
-  // fact about the room and the room is entitled to hear it, and the
+  // fact about the harbor and the harbor is entitled to hear it, and the
   // broadcast is also how the captain whose handover was refused finds out
   // what the commission actually holds rather than only what they claim.
   const payload: ObjectiveProgressPayload = {
@@ -252,16 +252,16 @@ function settleObjective(
 }
 
 /**
- * One captain's report, all the way to the room.
+ * One captain's report, all the way to the harbor.
  *
- * Everything a report has to be judged against comes from the room rather
+ * Everything a report has to be judged against comes from the harbor rather
  * than from the report: the mode, the voyage epoch, and from those the
  * commission itself. The acceptance is what a public number needs and a
  * private one does not. A captain can lie about their own hold and it costs
  * nobody anything, but this number is on everyone's screen, so what reaches
- * the room is what the commission actually asked for and nothing more.
+ * the harbor is what the commission actually asked for and nothing more.
  *
- * The claim is taken first and the room read inside it, so the whole of
+ * The claim is taken first and the harbor read inside it, so the whole of
  * this call sits between one report and the next, and a restart that has
  * to clear the board for a new voyage waits here rather than clearing it
  * out from under a line this call is about to raise (see
@@ -290,20 +290,20 @@ export async function recordObjectiveReport(
  * is the whole reason the frame exists: the take a press would make is
  * worked out in that captain's own client, against the board that client
  * last heard, and two boards that were heard before either press are the
- * same board. So a client proposes what it would take, the room holds the
+ * same board. So a client proposes what it would take, the harbor holds the
  * proposal to what the commission has left at this instant, and the goods
  * move only for what came back (see deliverToObjective in
  * src/lib/game/engine/objectives.ts). A commission that is already filled
  * therefore answers nothing, to everyone, however many captains press at
  * once, and the answer is private because it is about one captain's press:
- * the room hears the board move and not who moved it.
+ * the harbor hears the board move and not who moved it.
  *
  * The rows handed back are this captain's accepted standing, good by good,
  * rather than a delta, which is the same shape acceptAgainstRemaining
  * already answers in and the same shape the board is carried in. A caller
  * with no commission to answer against (a Classic harbor, whatever it is
  * sent) gets null and sends nothing: the press could not have been offered
- * in a room that draws no board.
+ * in a harbor that draws no board.
  */
 export async function recordObjectiveHandover(
   io: Server,

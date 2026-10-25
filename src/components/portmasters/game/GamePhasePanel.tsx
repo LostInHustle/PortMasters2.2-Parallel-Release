@@ -58,7 +58,7 @@ type Props = PhasePanelProps & {
   reveal?: VoyageReveal | null;
   myLegacy?: CaptainLegacySummary | null;
   onRestart?: () => void;
-  // The room's leave flow, threaded to the two finished voyage screens so
+  // The harbor's leave flow, threaded to the two finished voyage screens so
   // a captain waiting on the host can set out for a new harbor instead.
   onLeave?: () => void;
 };
@@ -68,7 +68,7 @@ export function GamePhasePanel(props: Props) {
   // The phase's own accent, read from its face in @/lib/game/phases, which
   // is the one table that describes a phase: the gradient is not written
   // down again here, so a phase renamed in the engine cannot leave a stale
-  // key beside a panel wearing the wrong colour.
+  // key beside a panel wearing the wrong color.
   const accentGradient = phaseFace(game.phase).gradient;
   // The floor under the stage is a share of the viewport rather than a
   // flat one: the floor exists so a short phase does not
@@ -88,7 +88,7 @@ export function GamePhasePanel(props: Props) {
         layoutId="phaseAccent"
         transition={{ duration: 0.3, ease: "easeOut" }}
       />
-      {/* [F6: charters at leg four] The charter overlay, drawn on the
+      {/* The charter overlay, drawn on the
           same slot as the milestone draft and for the same reasons: it
           sits outside the AnimatePresence so the answer does not cross
           fade with a board swap, and it draws nothing at all unless the
@@ -99,7 +99,7 @@ export function GamePhasePanel(props: Props) {
           with, while the charter's window never closes and can wait for
           the next frame. */}
       <CharterDraft game={game} act={props.act} />
-      {/* [F4: boons at milestone moments] The milestone overlay, drawn
+      {/* The milestone overlay, drawn
           ahead of whichever board the phase is showing. It sits outside
           the AnimatePresence below on purpose: the board beneath it still
           swaps as the fleet moves on, and the moment a captain is
@@ -122,8 +122,8 @@ export function GamePhasePanel(props: Props) {
   );
 }
 
-/* The accent strip along the top of the panel, one colour per phase.
-   The colours live in the phase's own face (see @/lib/game/phases) and
+/* The accent strip along the top of the panel, one color per phase.
+   The colors live in the phase's own face (see @/lib/game/phases) and
    in src/app/palette.css behind them, so what is left here is the
    lookup: this file writes no gradient table of its own.
 
@@ -190,12 +190,12 @@ function ActivePhase(props: Props) {
         />
       );
     case "path_draft":
-      // [W2: the path draft] The deal's own screen, at the seat a dealing
+      // The deal's own screen, at the seat a dealing
       // Gambit departure opens at. It is a whole stage rather than a strip
       // above the board, because cards dealt as a band across the table
       // have a captain reading their first market behind them. The panel
       // takes the deal's own board and nothing else; the wait inside it is
-      // the room's count rather than a button, so there is no ready footer
+      // the harbor's count rather than a button, so there is no ready footer
       // here to draw (see canLeavePhase, which refuses this seat).
       return <PathDraft draft={draft} />;
     case "dawn":
@@ -205,10 +205,10 @@ function ActivePhase(props: Props) {
           ctx={ctx}
           act={act}
           phaseSync={phaseSync}
-          // [F5: public offers] The draft's own screen reads the fleet's
+          // The draft's own screen reads the fleet's
           // ledger under the three cards: the picks are made here, so the
           // table's latest keeps are what a captain stares at while
-          // choosing, which is the plan's teach by watching clause.
+          // choosing, which is the design's teach by watching clause.
           boons={boons}
           members={members}
           me={me}
@@ -224,7 +224,7 @@ function ActivePhase(props: Props) {
           me={me}
           members={members}
           colorFor={colorFor}
-          // [D4: Loom: the Refit] The bench is a station of this phase, so
+          // The bench is a station of this phase, so
           // the port board is what draws it. The escort market above is a
           // whole screen's because it opens at the Parley table, which has
           // one panel; the Market has two stations and this one is the
@@ -241,19 +241,18 @@ function ActivePhase(props: Props) {
           act={act}
           barter={barter}
           escort={escort}
-          // [F3: modules in the shipyard ladder, and trading them between
-          // captains] The module market, a whole screen's like the two
+          // The module market, a whole screen's like the two
           // markets around it rather than a station of a phase's, because
           // it opens where they do: at the Parley table.
           modules={modules}
-          // [D5: Aroma: the Bazaar Rumor] The desk, which is a whole
+          // The desk, which is a whole
           // screen's like the escort market above it rather than a station
           // of a phase's, because it opens where that market does: at the
           // Parley table.
           bazaar={bazaar}
           audit={audit}
-          // [F5: public offers] The fleet's ledger under the two votes:
-          // the plan's evaluation surface, where the table argues about
+          // The fleet's ledger under the two votes:
+          // the design's evaluation surface, where the table argues about
           // what each captain passed on.
           boons={boons}
           maroon={maroon}
@@ -290,10 +289,10 @@ function ActivePhase(props: Props) {
       );
     case "dusk":
       return (
-        // [B4: the log surfaces] Dusk carries both logs under the yard.
+        // Dusk carries both logs under the yard.
         // They are one screen because they answer one question, which is
         // what happened while this captain was not looking, and the
-        // shipyard is where a leg ends and a captain has the time to read
+        // shipyard is where a round ends and a captain has the time to read
         // it. The wrapper is a plain block rather than a card: the panel
         // is already inside the phase frame, and a card in a card reads as
         // a mistake.
@@ -344,7 +343,7 @@ function ActivePhase(props: Props) {
           me={me}
           roster={roster}
           // The host's restart travels with the panel for the same reason
-          // it travels to Endgame: the room owns the one handler, and the
+          // it travels to Endgame: the harbor owns the one handler, and the
           // two screens a finished voyage can end on offer the same call.
           room={room}
           onRestart={onRestart}

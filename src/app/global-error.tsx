@@ -10,6 +10,12 @@ import { useLanguage } from "@/lib/use-language-preference";
 // stylesheet behind it, and this screen would render as unstyled text at
 // the exact moment the game is least able to explain itself.
 //
+// The two boundaries above it share one glass card (see ./error-shell),
+// and this one cannot join them, because that card is drawn with classes
+// and here there is no stylesheet for those classes to mean anything by.
+// The words are shared all the same, since both are read out of the same
+// language pack.
+//
 // It carries the same words as the screen-level boundary beside it, so
 // the two failures read as one game handling one kind of problem, and
 // its only action is a reload, because at this level there is no segment

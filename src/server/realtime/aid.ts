@@ -18,7 +18,7 @@ import { roomCheckpoints } from "./checkpoint";
 
 const roomAidRequests = new Map<string, AidRequest[]>();
 
-// The one place the map is written. A room with nothing open is held as
+// The one place the map is written. A harbor with nothing open is held as
 // no entry at all rather than an empty list, so every writer has to make
 // the same set or delete choice, and none of them should be making it
 // on their own.
@@ -60,7 +60,7 @@ export function setAidRequest(
 }
 
 // The common tail of every removal: drop what the caller doesn't want
-// kept, and tell the room only if that actually took something out.
+// kept, and tell the harbor only if that actually took something out.
 function dropAidRequests(
   io: Server,
   roomId: string,
@@ -84,7 +84,7 @@ export function removeAidRequest(
 }
 
 // Drops just one departed captain's own open request, so nobody can
-// fund a request from someone who isn't in the room (or online) anymore.
+// fund a request from someone who isn't in the harbor (or online) anymore.
 export function removeUserAidRequest(
   io: Server,
   roomId: string,
@@ -93,14 +93,14 @@ export function removeUserAidRequest(
   dropAidRequests(io, roomId, (r) => r.fromUserId !== userId);
 }
 
-// The round an aid request was posted in, read from the room's current
+// The round an aid request was posted in, read from the harbor's current
 // checkpoint. Used by the aid:post handler when building an AidRequest.
 export function currentCheckpointRound(roomId: string): number {
   return roomCheckpoints.get(roomId)?.round ?? 1;
 }
 
-// Wipes the aid board for a room without broadcasting. Called when the
-// room itself is being torn down.
+// Wipes the aid board for a harbor without broadcasting. Called when the
+// harbor itself is being torn down.
 export function clearAidSilent(roomId: string): void {
   roomAidRequests.delete(roomId);
 }

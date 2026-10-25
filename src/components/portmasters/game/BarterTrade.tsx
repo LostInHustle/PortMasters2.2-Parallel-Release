@@ -16,8 +16,8 @@
 //
 // Both of these act on the shared board through useBarter, which is the
 // only client side copy of what is still open. Nothing here decides when
-// escrow comes back: a post the room refuses is the room's to answer, and
-// a withdrawal is the room's to confirm, and useBarter is what turns
+// escrow comes back: a post the harbor refuses is the harbor's to answer, and
+// a withdrawal is the harbor's to confirm, and useBarter is what turns
 // either one into the return of the goods, so there is exactly one route
 // by which goods come back to a hold.
 // =====================================================================
@@ -56,9 +56,10 @@ import { cn } from "@/lib/utils";
 import { ItemIcon } from "../shared";
 import { AudienceSelect } from "./AudienceSelect";
 import { JustForChip, PathDeskRow } from "./phases/PhaseShared";
+import type { LedgerAct } from "@/lib/game/ledger";
 import type { Barter } from "./phases/PhaseShared";
 
-type Act = (fn: (g: GameState, logs: string[]) => void) => void;
+type Act = LedgerAct;
 
 // Shared by both composers, so the two cannot drift into disagreeing
 // about what counts as postable. The amounts are held as plain numbers
@@ -178,7 +179,7 @@ export function OfferCard({
   const canAfford =
     getOwnedAmount(game, offer.requestItem) >= offer.requestAmount;
   const isDirect = Boolean(offer.targetUserId);
-  // The server refuses an accept it should not honour whether or not this
+  // The server refuses an accept it should not honor whether or not this
   // agrees, so this only spares a captain a click that could not succeed.
   //
   // Taking an offer is never rationed, so this captain's own tally is

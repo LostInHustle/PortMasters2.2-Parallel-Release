@@ -81,8 +81,8 @@ export async function manifestAuditSuite(
     gambitSixth,
     gambitThird,
   } = inputs;
-  // [H6] The fleet's one evidence tool, and the only majority vote in
-  // the game: from leg five, once a voyage, more than half of the
+  // The fleet's one evidence tool, and the only majority vote in
+  // the game: from round five, once a voyage, more than half of the
   // captains still sailing may open one captain's manifest and see two
   // of their last five order fulfillments.
   //
@@ -92,7 +92,7 @@ export async function manifestAuditSuite(
   // because a majority rule that is not wired to the checkpoint it is
   // called from is a rule that never fires.
 
-  // ---- The sample, and the majority that asks for it ----
+  // ========== The sample, and the majority that asks for it ==========
   const manifestFill = (
     round: number,
     port: string,
@@ -143,11 +143,11 @@ export async function manifestAuditSuite(
         auditSeed("harbor-a", 1, 5, "captain-a") &&
       auditSeed("harbor-a", 1, 5, "captain-b") !==
         auditSeed("harbor-a", 1, 5, "captain-a"),
-    "the seed carries the voyage, the leg and the captain, so no two audits sample the same way",
+    "the seed carries the voyage, the round and the captain, so no two audits sample the same way",
   );
 
-  // The majority. Strictly more than half, which is the plan's simple
-  // majority read the only way it can be read: two captains cannot both
+  // The majority. Strictly more than half, which is the simple majority
+  // read the only way it can be read: two captains cannot both
   // hold one, so there is no tie to break and the answer does not depend
   // on who answered first.
   const votesFor = (targets: string[]) =>
@@ -170,12 +170,12 @@ export async function manifestAuditSuite(
   check(
     auditCarried(votesFor(["a", "b", "b"]), 5) === null &&
       auditCarried(new Map(), 5) === null,
-    "a room split across two captains carries nothing, and neither does a room with no votes in it",
+    "a harbor split across two captains carries nothing, and neither does a harbor with no votes in it",
   );
 
   // The count a card prints, held against the comparison that decides the
   // vote rather than against a second statement of the same rule. A card
-  // that told the room one name fewer was enough, or one more, would be a
+  // that told the harbor one name fewer was enough, or one more, would be a
   // card the table argued with instead of each other, and the two were
   // written apart: the walk below is the one that keeps them one rule.
   const neededCarries = (roster: number) => {
@@ -289,8 +289,8 @@ export async function manifestAuditSuite(
   // two counts (see carriedTarget in @/lib/game/audit). The band is the
   // sizes this mode deals, and it is walked through both votes at once so
   // a change to either threshold, or to the walk under both, is a failure
-  // here rather than a difference found by playing: at five seats the plan
-  // reads four votes against three.
+  // here rather than a difference found by playing: at five seats the
+  // count reads four votes against three.
   const carriesExactlyAt = (
     carried: (
       votes: ReadonlyMap<string, string>,
@@ -324,7 +324,7 @@ export async function manifestAuditSuite(
     "which at a five seat harbor is four votes against three and at seven is five against four, so the maroon stays the deliberately harder of the two to call",
   );
 
-  // The book of nominations, judged again against the room that exists now.
+  // The book of nominations, judged again against the harbor that exists now.
   // A nomination is cast by one captain and for another, so both ends are
   // the roster's: a vote either of them has left behind is dropped rather
   // than counted under a shrunken roster, which is the same flaw the door
@@ -343,12 +343,12 @@ export async function manifestAuditSuite(
       prunedBook.get("voter-0") === "voter-1" &&
       prunedBook.get("voter-1") === "voter-0" &&
       !prunedBook.has("voter-2"),
-    "a nomination for a captain the room has stopped counting is dropped from the book, and one between counted captains stays",
+    "a nomination for a captain the harbor has stopped counting is dropped from the book, and one between counted captains stays",
   );
   check(
     pruneStaleVotes(new Map([["gone-captain", "voter-0"]]), liveRoster).size ===
       0 && pruneStaleVotes(new Map(), liveRoster).size === 0,
-    "and a nomination cast by a captain the room has stopped counting goes the same way",
+    "and a nomination cast by a captain the harbor has stopped counting goes the same way",
   );
 
   // The record behind the sample, which is the one thing in the mode a
@@ -376,14 +376,14 @@ export async function manifestAuditSuite(
       items: [{ type: "Tea", qty: 2 }],
       reward: 22.9,
     },
-    "Leg 6: two Bundles of Tea to nowhere, 10 Gold",
+    "Round 6: two Bundles of Tea to nowhere, 10 Gold",
   ]);
   check(
     messyManifest.length === 2 &&
       messyManifest[0].round === 1 &&
       messyManifest[1].round === 5 &&
       messyManifest[1].reward === 22,
-    "a manifest is read for what it can hold: an empty line, a blank port, a zero count and a negative payout are dropped, and a fractional leg is floored",
+    "a manifest is read for what it can hold: an empty line, a blank port, a zero count and a negative payout are dropped, and a fractional round is floored",
   );
   const nineFills = Array.from({ length: 9 }, (_, i) =>
     manifestFill(i + 1, "Quanzhou Port", "Tea", 1, 10),
@@ -401,13 +401,13 @@ export async function manifestAuditSuite(
       ]).length === 0,
     "a save with no manifest, or with lines that are not one, reads as a captain who has filed nothing",
   );
-  // The leg bound, which landed with the bug audit: a fill dated past the
-  // leg the room itself has reached cannot be a thing the captain did, so
-  // a reader that knows the room's leg drops it. Read from both sides
+  // The round bound, which landed with the bug audit: a fill dated past the
+  // round the harbor itself has reached cannot be a thing the captain did, so
+  // a reader that knows the harbor's round drops it. Read from both sides
   // here, because both readers exist and they disagree on purpose: the
-  // audit reveal passes the leg the vote carried in, the finish ledger
+  // audit reveal passes the round the vote carried in, the finish ledger
   // passes the voyage's own length, and the load path passes nothing,
-  // because a save being healed has no room to be read against yet.
+  // because a save being healed has no harbor to be read against yet.
   const futureFills = [
     manifestFill(4, "Quanzhou Port", "Tea", 1, 10),
     manifestFill(5, "Ningbo Port", "Silk", 1, 10),
@@ -417,11 +417,10 @@ export async function manifestAuditSuite(
     normalizeOrderFills(futureFills, 5).length === 2 &&
       normalizeOrderFills(futureFills, 5).every((fill) => fill.round <= 5) &&
       normalizeOrderFills(futureFills).length === 3,
-    "a fill dated past the leg the room has reached is dropped by the reader that knows the leg, and kept by the one that does not",
+    "a fill dated past the round the harbor has reached is dropped by the reader that knows the round, and kept by the one that does not",
   );
 
-  // [J1: the private information review] The bounds the review put on a
-  // fill, read from both sides. A fill is printed to the whole table in
+  // The bounds on a fill, read from both sides. A fill is printed to the whole table in
   // an audit reveal and in the ledger at the end of a voyage, and until
   // this pass the only bound on its text and its width was the client
   // that wrote it, so a doctored save could put a paragraph of its
@@ -464,7 +463,7 @@ export async function manifestAuditSuite(
   );
 
   // The same list, read by the pass that guards every other number in a
-  // save. It matters most here: this is the one record a room reads and
+  // save. It matters most here: this is the one record a harbor reads and
   // believes, so a save that could stuff it could lie to a whole table
   // at once.
   check(
@@ -485,8 +484,8 @@ export async function manifestAuditSuite(
     manifestFill(6, "Ningbo Port", "Brocade", 2, 120),
   );
   check(
-    manifestLine === "Leg 6: 2 Brocade to Ningbo Port, 120 Gold",
-    "a manifest line names the leg, the goods, the port and what the order paid",
+    manifestLine === "Round 6: 2 Brocade to Ningbo Port, 120 Gold",
+    "a manifest line names the round, the goods, the port and what the order paid",
   );
   // Read with the same rule the briefings are read with, defined once at
   // the top of this file for the reason it is built out of code points:
@@ -496,7 +495,7 @@ export async function manifestAuditSuite(
     "and carries no dash of any kind, which is the house rule for every string a captain reads",
   );
 
-  // ---- The vote, in a real harbor ----
+  // ========== The vote, in a real harbor ==========
   // Five captains, because five is the smallest table where a majority
   // is neither nearly everyone nor a coin toss: three carry and two do
   // not.
@@ -597,9 +596,9 @@ export async function manifestAuditSuite(
   auditSockets[0].emit("room:start", { roomId: auditRoomId });
   await Promise.all(auditDeparture);
 
-  // And once it has sailed, the vote belongs to one checkpoint: the leg
+  // And once it has sailed, the vote belongs to one checkpoint: the round
   // five Parley. Anywhere else it is refused, which is what keeps the
-  // audit's price (the rest of that leg's trading) a price for the audit
+  // audit's price (the rest of that round's trading) a price for the audit
   // rather than a tax on the voyage.
   auditSockets[1].emit("audit:vote", {
     roomId: auditRoomId,
@@ -609,11 +608,11 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     tallyFrames.length === 0,
-    "and one called from a checkpoint that is not the leg five Parley is refused",
+    "and one called from a checkpoint that is not the round five Parley is refused",
   );
 
-  // A harbor reaches leg five the way it reaches every leg: a captain
-  // reports where they are standing and the room's checkpoint follows the
+  // A harbor reaches round five the way it reaches every round: a captain
+  // reports where they are standing and the harbor's checkpoint follows the
   // furthest report. Nothing here is special to the audit.
   auditSockets[1].emit("game:status", {
     roomId: auditRoomId,
@@ -645,7 +644,7 @@ export async function manifestAuditSuite(
   check(
     auditCheckpoint?.currentRound === AUDIT_FROM_ROUND &&
       auditCheckpoint?.currentPhase === "parley",
-    `the room's checkpoint is at leg ${AUDIT_FROM_ROUND}'s Parley, where the vote is called from`,
+    `the harbor's checkpoint is at round ${AUDIT_FROM_ROUND}'s Parley, where the vote is called from`,
   );
   const auditVoyage = auditCheckpoint?.voyageEpoch ?? 0;
 
@@ -682,8 +681,8 @@ export async function manifestAuditSuite(
     "the harness can hand a captain the manifest their audit is read from",
   );
 
-  // A nomination is public: the room watches the count. Two of five is
-  // not a majority, so the room hears who was named and no manifest
+  // A nomination is public: the harbor watches the count. Two of five is
+  // not a majority, so the harbor hears who was named and no manifest
   // opens.
   auditSockets[1].emit("audit:vote", {
     roomId: auditRoomId,
@@ -703,7 +702,7 @@ export async function manifestAuditSuite(
   // out on the client: five captains still sailing, three names to carry
   // it, and the four who have not named anyone yet. The captain who is not
   // in this harbor is not among the four, because the roster behind the
-  // count is the room's own and not the account list.
+  // count is the harbor's own and not the account list.
   const firstTally = tallyFrames[0];
   const firstAwaiting = firstTally?.awaiting ?? [];
   check(
@@ -715,7 +714,7 @@ export async function manifestAuditSuite(
       [gambitHost.id, gambitThird.id, gambitFourth.id, gambitFifth.id].every(
         (id) => firstAwaiting.includes(id),
       ),
-    "and the count travels with the names: five still sailing, three names to carry, and the four captains the room is still waiting on",
+    "and the count travels with the names: five still sailing, three names to carry, and the four captains the harbor is still waiting on",
   );
   // The shortfall the card prints, derived from the frame the card is
   // reading rather than sent as a fourth number on it: the census still
@@ -732,7 +731,7 @@ export async function manifestAuditSuite(
     "and the shortfall read off that frame is the frame's own arithmetic: one name in leaves two more needed, and the census it was read against still balances the captains still to speak against the names in the book",
   );
 
-  // A captain names one captain a leg. Both ways a second press can arrive
+  // A captain names one captain a round. Both ways a second press can arrive
   // are refused here at the door: the same name again, and a different
   // name, which is the press that could move the table's count after the
   // table was shown it. The refusal is a sentence, because a captain whose
@@ -843,7 +842,7 @@ export async function manifestAuditSuite(
         frame.reveal?.target?.userId === auditTargetId &&
         frame.reveal?.target?.name === "Smoke gamb_d",
     ),
-    "naming the harbor, the leg and the captain the majority named, by the name the table knows them by",
+    "naming the harbor, the round and the captain the majority named, by the name the table knows them by",
   );
 
   // What the reveal carries is its allow list read the other way round,
@@ -851,10 +850,10 @@ export async function manifestAuditSuite(
   // same save holds this captain's Gold, their hold and their card, so
   // the check is that none of it came out with the manifest.
   //
-  // [C1: the Larder and Short Rations] `larder` came out of this list
-  // when C1 landed, and the change is worth reading closely because
-  // pulling a word out of a sweep is exactly how a real leak would be
-  // smuggled past one. The plan's audit clause names the Larder: the
+  // `larder` came out of this list when the Larder arrived, and the change
+  // is worth reading closely because pulling a word out of a sweep is
+  // exactly how a real leak would be smuggled past one. The audit rule
+  // names the Larder: the
   // reveal is two fulfillments plus the audited captain's current Larder,
   // and never the card, the Gold or the hold. So the word belongs in the
   // reveal and it is asserted below, positively and by shape, rather than
@@ -908,7 +907,7 @@ export async function manifestAuditSuite(
       (hasLarder
         ? "fulfillments,larder,roomId,round,shortRations,target"
         : "fulfillments,roomId,round,target"),
-    "the reveal's fields are the plan's allow list and nothing else, with the Larder pair on it when the provisions layer is on: the count the badge prints and the engine's own short rations reading the sentence prints, so the reveal says what the rule says rather than what the number suggests",
+    "the reveal's fields are the design's allow list and nothing else, with the Larder pair on it when the provisions layer is on: the count the badge prints and the engine's own short rations reading the sentence prints, so the reveal says what the rule says rather than what the number suggests",
   );
   check(
     !hasLarder || typeof auditRevealFrame?.shortRations === "boolean",
@@ -934,7 +933,7 @@ export async function manifestAuditSuite(
     "and the frame's shape is that allow list, field for field",
   );
 
-  // One audit a voyage. The room watched it carry, so the card is gone
+  // One audit a voyage. The harbor watched it carry, so the card is gone
   // from every screen; a frame that names another captain anyway is
   // refused at the door and answered with the reason, because a captain
   // whose press did nothing is owed the sentence rather than a silence
@@ -959,14 +958,14 @@ export async function manifestAuditSuite(
     "and the captain who sent it is told the voyage's audit has carried rather than left watching a count that never moved",
   );
 
-  // The audit spends the leg's Parley, and the room leaves it the way a
-  // room leaves every leg: every captain marks ready. What the server
-  // does is tell the room what it found; the leaving is the clients',
+  // The audit spends the round's Parley, and the harbor leaves it the way a
+  // harbor leaves every round: every captain marks ready. What the server
+  // does is tell the harbor what it found; the leaving is the clients',
   // and the ready votes below stand in for them. A server that emptied
-  // the checkpoint's ready set on the room's behalf would move the
+  // the checkpoint's ready set on the harbor's behalf would move the
   // checkpoint while every client sat waiting to be told to move, which
   // is the one way to leave a harbor stuck forever, so what this
-  // actually proves is that the vote left the room able to advance.
+  // actually proves is that the vote left the harbor able to advance.
   const auditAdvances = auditSockets.map((socket) =>
     waitForEvent<{ roomId: string; round: number; phase: string }>(
       socket,
@@ -986,11 +985,11 @@ export async function manifestAuditSuite(
     auditLeft.every(
       (frame) => frame?.round === AUDIT_FROM_ROUND && frame?.phase === "parley",
     ),
-    "the room leaves the Parley the audit spent, carrying the checkpoint it was leaving",
+    "the harbor leaves the Parley the audit spent, carrying the checkpoint it was leaving",
   );
 
   // A captain who comes back after the vote sees what the harbor saw.
-  // The finding is public because the room voted for it, and a table
+  // The finding is public because the harbor voted for it, and a table
   // arguing about an audit one of them cannot see is a table arguing
   // past each other.
   //
@@ -1059,11 +1058,11 @@ export async function manifestAuditSuite(
     "and a harbor that has just reopened hands nobody the last voyage's finding",
   );
 
-  // [bug audit] The room that reopens is the room the two walks below
+  // [bug audit] The harbor that reopens is the harbor the two walks below
   // sail. The first is the stale nomination: a vote the book still holds
-  // from a captain the room has stopped counting must not carry a
+  // from a captain the harbor has stopped counting must not carry a
   // majority with nobody behind it. The book below holds two, the second
-  // captain goes bankrupt mid leg, and the room is four. Without the
+  // captain goes bankrupt mid round, and the harbor is four. Without the
   // prune the third nomination would be the third vote in the book and
   // the manifest would open two captains early; with it, the third vote
   // is two of four and the fourth is what opens.
@@ -1097,7 +1096,7 @@ export async function manifestAuditSuite(
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   // The count before anyone has voted, which is the one count no
-  // broadcast carries: a leg's book is built by the captains in it, so
+  // broadcast carries: a round's book is built by the captains in it, so
   // the empty one is never sent, and a card that opens first has to ask
   // (see audit:state:request in src/server/realtime/wiring/audit.ts). The
   // answer is the tally frame itself, so the numbers a card reads before
@@ -1134,7 +1133,7 @@ export async function manifestAuditSuite(
     targetUserId: auditTargetId,
   });
   await auditSettle();
-  // The second captain goes bankrupt mid leg. The room stops counting
+  // The second captain goes bankrupt mid round. The harbor stops counting
   // them there and then, and the nomination they already cast stays in
   // the book until the next one forces the book to be read again.
   auditSockets[1].emit("game:status", {
@@ -1164,7 +1163,7 @@ export async function manifestAuditSuite(
       !(gambitSecond.id in (prunedTally?.votes ?? {})) &&
       prunedTally?.votes[gambitHost.id] === auditTargetId &&
       prunedTally?.votes[gambitThird.id] === auditTargetId,
-    "a nomination from a captain the room has stopped counting leaves the book when the next one lands, so two of the four still sailing open nothing",
+    "a nomination from a captain the harbor has stopped counting leaves the book when the next one lands, so two of the four still sailing open nothing",
   );
   const prunedAwaiting = prunedTally?.awaiting ?? [];
   check(
@@ -1175,7 +1174,7 @@ export async function manifestAuditSuite(
       [gambitFourth.id, gambitFifth.id].every((id) =>
         prunedAwaiting.includes(id),
       ),
-    "and the count the card reads agrees with the book: four still sailing, three names to carry, the captain who left not among the two the room is waiting on",
+    "and the count the card reads agrees with the book: four still sailing, three names to carry, the captain who left not among the two the harbor is waiting on",
   );
   auditSockets[3].emit("audit:vote", {
     roomId: auditRoomId,
@@ -1192,7 +1191,7 @@ export async function manifestAuditSuite(
   );
 
   // The second walk is the marked manifest: a row the Ledger Integrity
-  // Pass has judged impossible is the one save the room must not read
+  // Pass has judged impossible is the one save the harbor must not read
   // anything out of, because every number in it is exactly as
   // trustworthy as the number that failed. The reveal for it withholds
   // the lines and the Larder and carries the flag instead, the same
@@ -1254,7 +1253,7 @@ export async function manifestAuditSuite(
   check(
     flaggedSeeded.status === 200 &&
       flaggedRow?.integritySeverity === "impossible",
-    "a save whose books the Ledger Integrity Pass cannot reconcile is marked before the room ever looks at it",
+    "a save whose books the Ledger Integrity Pass cannot reconcile is marked before the harbor ever looks at it",
   );
   const flaggedBase = revealFrames.length;
   for (const voter of [auditSockets[0], auditSockets[2], auditSockets[4]]) {
@@ -1280,25 +1279,25 @@ export async function manifestAuditSuite(
     "with the reveal's exact field list one word longer than the ordinary one, and nothing else on it",
   );
 
-  // ---- The two halves of a carry ----
+  // ========== The two halves of a carry ==========
   // The fourth walk, and the two ways a carry can fall through; both of
-  // them are about a room that moves while the vote is standing rather
+  // them are about a harbor that moves while the vote is standing rather
   // than about the arithmetic, which is why they are read on the wire.
   //
   // The first is the membership row. A captain who walks out gives up
   // their seat through the route the Leave button posts to, and that row
   // is what the roster is read from, so a nomination they cast a moment
-  // earlier is a vote the room has stopped counting. The socket is left
+  // earlier is a vote the harbor has stopped counting. The socket is left
   // open on purpose: no room:leave is sent, which is the shape a client
   // that walked out without cleaning up leaves behind, and it is also the
   // shape the frame counts below are read in, since a socket stays in the
-  // harbor's broadcast room until it says otherwise, so one broadcast is
+  // harbor's broadcast harbor until it says otherwise, so one broadcast is
   // still one frame on each of the five.
   //
   // The second is the pair of presses that arrive together once the count
   // is one short of carrying. Both handlers read a book that already
   // carries, so both decide the same carry and both go looking for the
-  // same manifest; what the room must see is one manifest per socket,
+  // same manifest; what the harbor must see is one manifest per socket,
   // which is the check that fails when the second write is not refused.
   auditSockets[0].emit("room:restart", { roomId: auditRoomId });
   for (
@@ -1384,7 +1383,7 @@ export async function manifestAuditSuite(
   );
 
   // The ballot from the seat that is gone. It is refused, and the refusal
-  // is also the moment the room learns that the count it is reading has
+  // is also the moment the harbor learns that the count it is reading has
   // moved: the nomination the captain cast while they still held the seat
   // is out of the book, and the four still sailing are what the count is
   // divided by now.
@@ -1404,17 +1403,17 @@ export async function manifestAuditSuite(
       !(gambitFifth.id in (movedTally?.votes ?? {})) &&
       movedTally?.votes[gambitSecond.id] === auditTargetId &&
       revealFrames.length === carryRevealBase,
-    "a ballot from a captain who left the harbor is refused with a sentence rather than counted, and the count the room was reading goes out corrected with it: the name they cast is out of the book",
+    "a ballot from a captain who left the harbor is refused with a sentence rather than counted, and the count the harbor was reading goes out corrected with it: the name they cast is out of the book",
   );
   check(
     movedTally?.roster === auditSockets.length - 1 &&
       movedTally?.needed === auditNamesNeeded(auditSockets.length - 1) &&
       movedAwaiting.length === auditSockets.length - 2 &&
       !movedAwaiting.includes(gambitFifth.id),
-    "and the numbers behind it are the four still sailing rather than the five the last count was divided by, with the captain who left not among the captains the room is waiting on",
+    "and the numbers behind it are the four still sailing rather than the five the last count was divided by, with the captain who left not among the captains the harbor is waiting on",
   );
 
-  // A standing exchange offer, posted while the leg's Parley is still
+  // A standing exchange offer, posted while the round's Parley is still
   // open. The accept checks below need a membership the post refusals
   // cannot reach, because a captain can carry an offer across the spend
   // rather than only make one inside it. Cloth is the offered side so the
@@ -1440,7 +1439,7 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     standingOffer.id !== "",
-    "a captain can hold an offer across the spend: one is posted while the leg's parley is open and the room reads it back by id",
+    "a captain can hold an offer across the spend: one is posted while the round's parley is open and the harbor reads it back by id",
   );
 
   // Two names in, one short of the three that carry. The pair below is the
@@ -1489,13 +1488,13 @@ export async function manifestAuditSuite(
           frame.needed === auditNamesNeeded(auditSockets.length - 1),
       ) &&
       carriedTallies.some((frame) => Object.keys(frame.votes).length === 4),
-    "and every count from there on is divided by the four still sailing rather than the five the leg started with, the last of them holding the four names that carried it",
+    "and every count from there on is divided by the four still sailing rather than the five the round started with, the last of them holding the four names that carried it",
   );
 
   // The spend closes the boards on the tick the count carries, while the
-  // room still stands in the Parley: a trade posted into that window is
+  // harbor still stands in the Parley: a trade posted into that window is
   // refused as spent rather than as out of phase, which is the sentence
-  // the phase gate alone would never write. The gate is auditSpentLeg
+  // the phase gate alone would never write. The gate is auditSpentRound
   // (src/server/realtime/audit.ts), asked beside the phase by the wires
   // that trade.
   const spentTradeRefusals: string[] = [];
@@ -1525,7 +1524,7 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     spentTradeRefusals.length === 1 &&
-      (spentTradeRefusals[0] ?? "").includes("spent this leg's Parley") &&
+      (spentTradeRefusals[0] ?? "").includes("spent this round's Parley") &&
       !CARRIES_A_DASH.test(spentTradeRefusals[0] ?? ""),
     "a trade posted into the spent parley is refused with its own sentence rather than the phase's",
   );
@@ -1547,11 +1546,11 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     spentEscortRefusals.length === 1 &&
-      (spentEscortRefusals[0] ?? "").includes("spent this leg's Parley"),
+      (spentEscortRefusals[0] ?? "").includes("spent this round's Parley"),
     "the escort desk refuses a post into the spent parley with the same sentence",
   );
 
-  // And the module market, the third wire trading this leg, reads the
+  // And the module market, the third wire trading this round, reads the
   // same predicate beside its own phase gate.
   const spentModuleRefusals: string[] = [];
   auditSockets[0].on("module:error", (payload: { error?: string }) => {
@@ -1567,14 +1566,14 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     spentModuleRefusals.length === 1 &&
-      (spentModuleRefusals[0] ?? "").includes("spent this leg's Parley"),
+      (spentModuleRefusals[0] ?? "").includes("spent this round's Parley"),
     "and the module market refuses its listing into the spent parley the same way",
   );
 
   // And the standing offer from the parley above, still open, is not a door
-  // either: accepting it is trading this leg the same as posting one, so
-  // the accept wire reads auditSpentLeg as well, and the offer stays where
-  // it stands rather than settling into the very leg the room voted to
+  // either: accepting it is trading this round the same as posting one, so
+  // the accept wire reads auditSpentRound as well, and the offer stays where
+  // it stands rather than settling into the very round the harbor voted to
   // close.
   const spentAcceptFails: string[] = [];
   auditSockets[0].on(
@@ -1592,7 +1591,7 @@ export async function manifestAuditSuite(
   await auditSettle();
   check(
     spentAcceptFails.length === 1 &&
-      (spentAcceptFails[0] ?? "").includes("spent this leg's Parley") &&
+      (spentAcceptFails[0] ?? "").includes("spent this round's Parley") &&
       !CARRIES_A_DASH.test(spentAcceptFails[0] ?? ""),
     "a standing offer accepted into the spent parley is refused with the spend's own sentence rather than settling",
   );
@@ -1620,7 +1619,7 @@ export async function manifestAuditSuite(
   // the pair from a single socket, which is the shape a bounce on the
   // button or a doubled client takes. The door's check and its write are
   // one uninterrupted step, so one of the two lands and the other is
-  // refused, and the count the room is shown never holds the same
+  // refused, and the count the harbor is shown never holds the same
   // captain's name twice. A fresh voyage is what makes the book below
   // empty and the audit unspent.
   auditSockets[0].emit("room:restart", { roomId: auditRoomId });
@@ -1683,7 +1682,7 @@ export async function manifestAuditSuite(
   const pairTally = tallyFrames[tallyFrames.length - 1];
   check(
     pairRefusals.length === 1 &&
-      pairRefusals[0] === "Your name is already in for this leg's audit." &&
+      pairRefusals[0] === "Your name is already in for this round's audit." &&
       tallyFrames.length === pairTallyBase + auditSockets.length &&
       Object.keys(pairTally?.votes ?? {}).length === 1 &&
       pairTally?.votes[gambitHost.id] === auditTargetId &&
@@ -1738,7 +1737,7 @@ export async function manifestAuditSuite(
       tallyRowCode.includes('"has" : "have"') &&
       tallyRowCode.includes("No name is in yet") &&
       tallyRowCode.includes("Your name is not in yet"),
-    "and the block says what it does not have: a room whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote and the captains who have named one are both counted and worded for their own number",
+    "and the block says what it does not have: a harbor whose census has not arrived is told that rather than shown a count of zero, a book with nobody in it is given a line of its own rather than a leader drawn from nothing, a captain whose own name is not in is told it is their turn, and the names that carry the vote and the captains who have named one are both counted and worded for their own number",
   );
   check(
     tallyRowCode.includes("namedCountLine(named, census.roster)") &&
@@ -1750,7 +1749,7 @@ export async function manifestAuditSuite(
   );
   check(
     tallyRowCode.includes("nextStep(census.needed)") &&
-      auditPanelCode.includes("closes this leg's trading") &&
+      auditPanelCode.includes("closes this round's trading") &&
       maroonPanelCode.includes("puts that captain ashore") &&
       !auditPanelCode.includes("puts that captain ashore") &&
       !maroonPanelCode.includes("census.needed -") &&
@@ -1814,14 +1813,14 @@ export async function manifestAuditSuite(
       maroonHookCode.includes("if (data.votes?.[myUserId]) setPressed(null)") &&
       auditHookCode.includes("pressed !== game.currentRound") &&
       maroonHookCode.includes("pressed !== game.currentRound") &&
-      auditHookCode.includes("[socket, roomId, myUserId]") &&
-      maroonHookCode.includes("[socket, roomId, myUserId]"),
+      auditHookCode.includes("[socket, roomId, myUserId, setHeld") &&
+      maroonHookCode.includes("[socket, roomId, myUserId, setHeld"),
     "both vote hooks lift the press that is still in flight only on the frame that carries this captain's own name, so another captain's ballot cannot put the button back while the first press is on its way, and the id the guard reads is a dependency of the effect that reads it",
   );
   check(
-    seatPickerCode.includes("import { seatMarks, type SeatStatus }") &&
+    seatPickerCode.includes("import { writtenOff, type SeatStatus }") &&
       seatPickerCode.includes("!marked(m.id)") &&
-      seatPickerCode.includes("seatMarks(statuses?.[id]).writtenOff") &&
+      seatPickerCode.includes("writtenOff(statuses?.[id])") &&
       !auditPanelCode.includes("seatMarks") &&
       !maroonPanelCode.includes("seatMarks") &&
       auditPanelCode.includes(

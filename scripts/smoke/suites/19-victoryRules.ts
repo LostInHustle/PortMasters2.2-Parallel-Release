@@ -20,23 +20,24 @@ import {
   victoryLine,
 } from "@/lib/game/victory";
 import { check } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function victoryRulesSuite(): Promise<void> {
-  // H4. What a card is worth at the end of a voyage, which is arithmetic
+  // What a card is worth at the end of a voyage, which is arithmetic
   // over numbers other code produced, so all of it is settled here rather
   // than over a socket: the same reason the deck and the draw above are
   // checked without a connection between them. Where those numbers come
   // from is the other half, and the concluded voyage in the section below
   // is where that half is read back off the rows it left behind.
 
-  // ---- The peer ledger ----
+  // ========== The peer ledger ==========
   // The one number a Broker is measured on. A trade has two sides and each
   // side runs on its own captain's client, so the property that matters is
   // that the two sides read the same trade: whatever one counts as profit,
   // the other counts as loss, and nothing else in the game moves either.
   const seller = createInitialGameState();
   const buyer = createInitialGameState();
-  const tradeLogs: string[] = [];
+  const tradeLogs: LedgerLine[] = [];
   // A purse deep enough to pay with, set rather than earned: this block is
   // about what settles, not about how a captain afforded it. The seller's
   // side needs no such help, because the stock a voyage opens with is the
@@ -73,7 +74,7 @@ export async function victoryRulesSuite(): Promise<void> {
   // board when the voyage moves on, moved goods and moved no coin, and a
   // ledger that counted it would pay a captain for changing their mind.
   const withdrawn = createInitialGameState();
-  const refundLogs: string[] = [];
+  const refundLogs: LedgerLine[] = [];
   postBarterOffer(withdrawn, "Hemp", 2, "Gold", 90, refundLogs);
   refundBarterOffer(withdrawn, "Hemp", 2, refundLogs);
   check(
@@ -86,7 +87,7 @@ export async function victoryRulesSuite(): Promise<void> {
   // hands.
   const swapper = createInitialGameState();
   const swapped = createInitialGameState();
-  const swapLogs: string[] = [];
+  const swapLogs: LedgerLine[] = [];
   postBarterOffer(swapper, "Hemp", 3, "Silk", 2, swapLogs);
   acceptBarterOffer(swapped, "Silk", 2, "Hemp", 3, swapLogs);
   settleBarterTrade(swapper, "Silk", 2, "Hemp", 3, swapLogs);
@@ -95,7 +96,7 @@ export async function victoryRulesSuite(): Promise<void> {
     "and goods traded for goods move the ledger on neither side",
   );
 
-  // ---- The three cards ----
+  // ========== The three cards ==========
   // Every branch of every role, walked on an ending built for it. A
   // commission of this block's own is drawn rather than named, so the
   // delivery goal below is measured against whatever the deck deals. It is
@@ -244,7 +245,7 @@ export async function victoryRulesSuite(): Promise<void> {
     "and the target printed on a Broker's card is read from the same knob the rule is",
   );
 
-  // ---- Reading an ending ----
+  // ========== Reading an ending ==========
   // The rules are only as sound as the numbers they are handed, and those
   // arrive out of a save blob a client wrote. Every field is treated as
   // untrusted, the same discipline the Ledger Integrity Pass reads money
@@ -281,7 +282,7 @@ export async function victoryRulesSuite(): Promise<void> {
     "and no save can talk over the finish report the row is built from",
   );
 
-  // ---- The pass that guards them ----
+  // ========== The pass that guards them ==========
   // The Broker is the one role that wins alone, so a doctored save is the
   // cheapest win in the mode and the guard has to know the field.
   check(

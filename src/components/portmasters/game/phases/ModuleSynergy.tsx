@@ -6,6 +6,7 @@ import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { HuePanel } from "./PhasePanels";
+import { PanelLabel } from "../../shared";
 
 /**
  * Module interaction rules. Each rule names a set of module IDs and the
@@ -54,7 +55,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["bulk_hauler", "silk_monopoly"],
     label:
-      "Freight Mastery: {bulkHauler} reduces transport per item and {silkMonopoly} can zero it out on any order carrying woven goods. Shipping costs almost nothing.",
+      "Freight Mastery: {bulkHauler} reduces the Freight you pay per item and {silkMonopoly} can zero it out on any order carrying woven goods. Freight costs almost nothing.",
     params: (name) => ({
       bulkHauler: name("bulk_hauler"),
       silkMonopoly: name("silk_monopoly"),
@@ -64,7 +65,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["artisans_workshop", "salvage_crane"],
     label:
-      "Production Engine: {artisansWorkshopName} boosts worker output and {salvageCraneName} refunds the freight on some orders. More goods, more Gold back.",
+      "Production Engine: {artisansWorkshopName} boosts artisan output and {salvageCraneName} refunds the freight on some orders. More goods, more Gold back.",
     params: (name) => ({
       artisansWorkshopName: name("artisans_workshop"),
       salvageCraneName: name("salvage_crane"),
@@ -74,7 +75,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["brokers_network", "ocean_relay"],
     label:
-      "Intel Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
+      "Whisper Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
     params: (name) => ({
       brokersNetworkName: name("brokers_network"),
       oceanRelayName: name("ocean_relay"),
@@ -84,7 +85,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["overdrive_engine", "bulk_hauler"],
     label:
-      "Penalty Stack: {overdriveEngineName} adds maintenance and {bulkHaulerName} raises upgrade cost. Consider swapping one if funds are tight.",
+      "Penalty Stack: {overdriveEngineName} adds maintenance and {bulkHaulerName} raises upgrade cost. Consider swapping one if Gold is tight.",
     params: (name) => ({
       overdriveEngineName: name("overdrive_engine"),
       bulkHaulerName: name("bulk_hauler"),
@@ -150,9 +151,9 @@ export function ModuleSynergyAnalyzer({
 
   return (
     <HuePanel tone="modules" className="p-3.5 mb-4">
-      <div className="text-[10px] font-semibold tracking-wide text-muted-foreground mb-2">
+      <PanelLabel tone="text-muted-foreground" className="mb-2">
         {t("Module Synergy Analysis")}
-      </div>
+      </PanelLabel>
       {/* Active bonuses */}
       {activeBonuses.length > 0 && (
         <div className="mb-2">
@@ -167,7 +168,9 @@ export function ModuleSynergyAnalyzer({
                   key={card.id}
                   className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
                 >
-                  {card.icon} {text.name}: {text.desc}
+                  {card.icon} {text.name}
+                  {t(": ")}
+                  {text.desc}
                 </span>
               );
             })}

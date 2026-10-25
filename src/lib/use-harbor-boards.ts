@@ -4,11 +4,11 @@
 // The harbor's boards, as this captain's client holds them.
 //
 // What makes them one module is what they have in common: none of them lives in a save
-// file. Each is real room wide state that no single client's
+// file. Each is real harbor wide state that no single client's
 // deterministic engine can compute on its own, so each arrives over the
 // socket and is written into this captain's own voyage here, on the side
 // of the event they were on. Everything else about a voyage is the
-// session's (see ./use-game-session) and everything else about the room
+// session's (see ./use-game-session) and everything else about the harbor
 // is GameRoom's.
 //
 // The relays above each board are the whole vocabulary it has: a trade
@@ -26,7 +26,7 @@ import { toast } from "sonner";
 
 // The three settlements at the bottom of this hook are captain facing
 // toasts, and each is read at the moment it is raised, so the news
-// follows the language the captain is reading the room in.
+// follows the language the captain is reading the harbor in.
 import { t } from "./game/i18n";
 import { useBarter, type BarterOffer, type PostedOffer } from "./use-barter";
 import {
@@ -74,7 +74,7 @@ import {
   settleBarterTrade,
 } from "./game/engine";
 
-import type { GameState } from "./game/types";
+import type { LedgerWrite } from "./game/ledger";
 import type { useGameSession } from "./use-game-session";
 import type { useSound } from "./use-sound";
 
@@ -107,13 +107,13 @@ export function useHarborBoards({
   // case in ./session/reducer). A receipt that arrives first is held here
   // instead, and everything held is replayed together, in arrival order,
   // once the real voyage has landed. The trade this makes is deliberate:
-  // holding costs a gift of goods in the one case where the room is
+  // holding costs a gift of goods in the one case where the harbor is
   // restarted inside that same moment, while dropping loses a captain's
   // escrow, a loan, a payout or a garment silently, which is the worse of
   // the two.
-  const heldReceipts = useRef<((g: GameState, l: string[]) => void)[]>([]);
+  const heldReceipts = useRef<LedgerWrite[]>([]);
   const onVoyage = useCallback(
-    (apply: (g: GameState, l: string[]) => void) => {
+    (apply: LedgerWrite) => {
       if (!loaded) {
         heldReceipts.current.push(apply);
         return;
@@ -190,7 +190,7 @@ export function useHarborBoards({
     },
     [act, loaded],
   );
-  // A post the room turned away. The composer had already escrowed the
+  // A post the harbor turned away. The composer had already escrowed the
   // offered goods on its own side (the engine's post takes them, which is
   // what stops one stock from being promised twice), so the refusal is
   // the one thing that can give them back, and the post it names is where
@@ -270,7 +270,7 @@ export function useHarborBoards({
   );
   // The receipt for a repayment this captain sent. Nothing left the hold
   // when the press went out, so this is the moment the debt and the Gold
-  // move on this side, and the only moment they do: a repayment the room
+  // move on this side, and the only moment they do: a repayment the harbor
   // has no loan for is refused rather than answered, and a refusal leaves
   // both exactly where they were (see GameRoom's handleRepayLoan). The
   // forced settlement at the end of a voyage leaves its own receipts with
@@ -351,7 +351,7 @@ export function useHarborBoards({
       if (!mine) return;
       // The purse moves on the receipt, and the receipt waits for the
       // voyage like every other one. The two spoken outcomes below are
-      // news about the room rather than a write to the voyage, so they go
+      // news about the harbor rather than a write to the voyage, so they go
       // out when the frame arrives, held or not.
       onVoyage((g, l) => receiveVentureSettlement(g, mine.amount, l, outcome));
       if (outcome === "filled") {
@@ -377,7 +377,7 @@ export function useHarborBoards({
         });
       }
     },
-    [act, meId, playSound],
+    [meId, onVoyage, playSound],
   );
   const convoy = useConvoy(
     socket,
@@ -386,7 +386,7 @@ export function useHarborBoards({
     onVentureSettled,
   );
 
-  // [D3: Convoy: the Escort Contract] The last of the relays that only
+  // The last of the relays that only
   // ever touch this captain's own purse: a contract this
   // captain is a side of has moved, and the engine works out what that
   // means for them (see applyEscortSide). Both sides of a contract run this
@@ -407,7 +407,7 @@ export function useHarborBoards({
   );
   const escort = useEscortContracts(socket, roomId, meId, onEscortSettle);
 
-  // [D4: Loom: the Refit] The bench's relay, which is the escort's shape
+  // The bench's relay, which is the escort's shape
   // with one fewer number in it: a refit this captain is a side of has been
   // agreed, and the engine works out what that means for them (see
   // applyRefitSide). The customer pays and their own garment gets the points
@@ -429,7 +429,6 @@ export function useHarborBoards({
   );
   const refit = useRefitContracts(socket, roomId, meId, onRefitSettle);
 
-  // [F3: modules in the shipyard ladder, and trading them between captains]
   // The market's relay, which is the bench's shape exactly: a trade this
   // captain is a side of has been agreed, and the engine works out what
   // that means for them (see applyModuleTradeSide). The buyer pays and
@@ -441,7 +440,7 @@ export function useHarborBoards({
   // reason: a module trade's whole result is the fee and the hull, and the
   // hull is already this captain's own state. The one thing this relay
   // carries that the two above it do not is a durable object changing
-  // hands, which is why its engine side is written the way the plan asked
+  // hands, which is why its engine side is written the way the design asked
   // it to be: the seller's side unequips automatically rather than
   // refusing, so an agreed trade always completes.
   const onModuleSettle = useCallback(
@@ -454,7 +453,7 @@ export function useHarborBoards({
   );
   const modules = useModuleTrades(socket, roomId, meId, onModuleSettle);
 
-  // [D5: Aroma: the Bazaar Rumor] The bazaar's relay, and it is the
+  // The bazaar's relay, and it is the
   // shortest of the three because nothing about a rumor moves anything
   // between captains. There is no settle report to give and no field on
   // GameState to mirror into, which is the difference between this board
@@ -467,13 +466,13 @@ export function useHarborBoards({
   // been told, for the desk and the board to draw.
   const bazaar = useBazaarRumors(socket, roomId);
 
-  // [D7: the draft, and switching] The path draft's relay, which is the one
-  // in this room that carries a card addressed to a single captain: the
+  // The path draft's relay, which is the one
+  // in this harbor that carries a card addressed to a single captain: the
   // draft deals every seat its own hand and this hook holds the one it was
   // dealt (see ./use-path-draft). It takes `act` where the three markets
   // above take nothing, because the two frames it listens for are writes to
   // this captain's own save: the settled view is the path they sail on, and
-  // the room's published switch is applied to their own purse and manifest,
+  // the harbor's published switch is applied to their own purse and manifest,
   // which is the same shape useMaroon's result handoff takes.
   const draft = usePathDraft(socket, roomId, meId, act);
 

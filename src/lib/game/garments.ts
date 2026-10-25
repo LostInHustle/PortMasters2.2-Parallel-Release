@@ -1,73 +1,34 @@
-// =====================================================================
-// PortMasters 2.2 Parallel Release: garments and the cold.
+// Garments and the cold. A garment is a finished good with a warmth rating
+// and a durability, the weather is a tag on a round, and the check between
+// them decides who freezes. The garments are existing goods: Linen Clothes,
+// Cotton Clothes and Brocade (see GARMENTS in ./constants).
 //
-// [C3: garments and the cold] One data model for three jobs, which is what
-// the plan asks for and what this module is: a garment is a finished good
-// with a warmth rating and a durability, the weather is a tag on a leg, and
-// the check between them decides who freezes.
+// A worn garment is one way: wearing is the decision, so it never comes off.
+// Warmth is the rating times the fraction left, summed rather than drawn as
+// a bar. A garment worn to zero leaves the wardrobe and pays RAG_SCRAP_VALUE
+// as scrap. Weather is drawn from voyage wide fields rather than stored, so
+// every captain in a harbor sees the same cold rounds and a reload replays
+// them.
 //
-// The garments are the tree's own clothes rather than three new goods.
-// Linen Clothes is the hemp garment, Cotton Clothes the cloth one and
-// Brocade the fine silk, which is the mapping the plan's ratings one, two
-// and three are written onto (see GARMENTS in ./constants for the table and
-// for why the Sachet is not in it). That choice is what makes the plan's
-// own evaluation readable in this tree rather than in a new one: the fine
-// silks a captain either wears or sells are Brocade, a good that already
-// has a recipe, a price and a customer.
-//
-// Three things about the shape are decisions rather than readings.
-//
-// A worn garment is one way. Wearing is the decision, and a garment taken
-// off and put back on would be a durability bar with extra steps: it would
-// be the one way a captain could reset a fraction, and the plan says the
-// player never manages a bar. So a garment that goes on stays on until the
-// sea has had it, and the panel says so before the button is pressed.
-//
-// Warmth is a sum, not a bar. What a garment gives is its rating times the
-// fraction of itself that is left, and that is the number the check reads
-// and the number the panel prints. Nothing anywhere draws a durability
-// meter, because the plan's sentence is that a multiplier is a decision.
-//
-// A garment at zero leaves the wardrobe and pays the plan's four Gold as
-// scrap, which is the one way this tree can give a finished good a cash value
-// outside an order or a barter (see RAG_SCRAP_VALUE in ./constants). The
-// scrap is a good like any other rather than a bare number on the state,
-// named in the catalogue the Loom's bench buys it off the quay from and
-// reweaves (see RAGS there). What a rag is worth and what it turns back
-// into are not read here: they belong to the bench's own arithmetic.
-//
-// The weather is drawn rather than stored. Every input the tag needs is
-// already room wide on the state, so one function answers for the whole
-// harbor, replays on reload, and needs no field, no stamp and no context to
-// thread: see legIsCold below.
-//
-// The load site heals the wardrobe the way every other saved field is
-// healed (see normalizeGarments), and the settlement tick is one line in
-// ./engine/lifecycle beside the wage bill it lands with.
-//
-// Pure: no clock, no socket, no database. The one environment read is
-// deliberate and it is documented where it happens.
-// =====================================================================
+// Pure: no clock, no socket, no database.
 import { workerType } from "./constants/crew";
 import {
-  COLD_LEG_CHANCE,
-  COLD_LEG_WARMTH,
+  COLD_ROUND_CHANCE,
+  COLD_ROUND_WARMTH,
   GARMENTS,
-  GARMENT_DECAY_COLD_LEG,
-  GARMENT_DECAY_PER_LEG,
+  GARMENT_DECAY_COLD_ROUND,
+  GARMENT_DECAY_PER_ROUND,
   RAG_SCRAP_VALUE,
   type GarmentSpec,
 } from "./constants/garments";
 import { newestAboard } from "./crew";
-import { crewSize } from "./larder";
 import { flagOnFor, survivalLayerOn } from "./flags";
-// The sentences this module pushes are read at the moment they are built
-// rather than stored at module scope, so the line a language flip changes is
-// the one the settlement hands the log rather than a copy made earlier.
-import { t } from "./i18n";
-import { frozenFrostbiteLog } from "./status-copy";
+// Lines are built when pushed, so a language flip applies to the next one.
+import { line, type LedgerLine } from "./ledger";
+import { frozenFrostbiteLogLine } from "./status-copy";
 import { createRng } from "./rng";
 import {
+  crewSize,
   flatWorkerRoster,
   wholeStamp,
   type GameState,
@@ -76,33 +37,15 @@ import {
 } from "./types";
 
 // The most garments a save may claim the crew is wearing. A bound on input
-// rather than on play, the same kind of number as ./crew's name and loss
-// ceilings: how much a captain can own is the hold's business rather than
-// this module's, and the hold's own size is a rule ./hold reads under its own
-// switch, so this exists so a save written by hand cannot put a paragraph of
-// Brocade in a panel or a log line.
+// rather than on play: the hold decides how much a captain can own, and this
+// keeps a hand written save from filling a panel with Brocade.
 const GARMENTS_WORN_MAX = 12;
 
 /**
- * Whether the garments layer is running.
- *
- * The plan's rollback for this feature is one flag, and this is it, read
- * through the same policy function every other switch in the family uses
- * (see flagOnFor in ./flags, which carries the note about how a read has to
- * be written for a browser bundle to see it). It is a rule of the survival
- * family rather than a layer of its own, so the layer governs it from
- * above: a build with the provisions off has no cold either, whatever this
- * says.
- *
- * With the switch off nothing is read of the wardrobe, nothing decays and
- * nobody freezes, and a save carrying one reads back as the same voyage with
- * its clothes still on it, unread rather than rewritten.
- *
- * It takes the mode as its first reading (see flagOnFor), so the layered
- * shape above becomes a three part answer: the mode, then this layer's own
- * switch, then the provisions layer it stands on. A Classic table stops at
- * the first of them, which is what keeps the whole family off the shipped
- * voyage without a second list of what is and is not in Classic.
+ * Whether the garments layer is running. One switch, read through the policy
+ * function the whole family uses; the survival layer governs it, so a build
+ * with provisions off has no cold either. With it off, nothing is read,
+ * nothing decays and nobody freezes, and a save keeps its clothes unread.
  */
 export function garmentsLayerOn(mode: unknown): boolean {
   return (
@@ -111,14 +54,9 @@ export function garmentsLayerOn(mode: unknown): boolean {
 }
 
 /**
- * The catalogue entry for a good, or null when it is not a garment.
- *
- * Own property rather than a plain lookup, because a save names its goods
- * with strings and a string like "toString" would otherwise come back with
- * a function from the object's prototype and be read as a garment. The
- * field check after it is the same thought one step further out: what this
- * returns is arithmetic, so it answers only for entries that carry the two
- * numbers the arithmetic needs.
+ * The catalogue entry for a good, or null when it is not a garment. The own
+ * property check keeps strings like "toString" from reaching the prototype,
+ * and only entries with the two numbers the arithmetic needs are answered.
  */
 export function garmentSpec(good: unknown): GarmentSpec | null {
   if (typeof good !== "string") return null;
@@ -131,21 +69,10 @@ export function garmentSpec(good: unknown): GarmentSpec | null {
 }
 
 /**
- * The leg's weather tag: whether this leg is a cold one.
- *
- * Drawn rather than stored, and drawn from the voyage's own numbers rather
- * than from a captain's. The epoch, the mode, the difficulty and the round
- * are the same on every captain's state in a harbor (see the field notes in
- * ./types), so every captain sails the same weather without the server
- * announcing anything, and a restart, which bumps the epoch, rerolls it into
- * a new voyage's weather exactly as it rerolls the market.
- *
- * Two properties the plan asks for by name. It is deterministic: the same
- * save answers the same way on every read, so a reload replays the leg it
- * was in the middle of rather than rerolling the sea. And it reads no
- * clock: the input is the round number, never the wall clock, which is what
- * lets the settlement tick live inside the resolve step without being a
- * different rule on a slow table than on a fast one.
+ * Whether this round is cold. Drawn from fields shared by every captain in the
+ * harbor (epoch, mode, difficulty, round), so all tables sail the same
+ * weather without the server announcing it, and a restart rerolls it. The
+ * same save answers the same way on every read, and no clock is involved.
  */
 export function legIsCold(
   state: Pick<
@@ -154,33 +81,14 @@ export function legIsCold(
   >,
 ): boolean {
   const seed = `${state.voyageEpoch}:${state.mode}:${state.difficulty}:cold:${state.currentRound}`;
-  return createRng(seed)() < COLD_LEG_CHANCE;
+  return createRng(seed)() < COLD_ROUND_CHANCE;
 }
 
-// =====================================================================
-// The wardrobe's own denominator: the one arithmetic the score below is
-// taken in.
-//
-// The score is a sum of fractions (a rating times the share of a garment
-// that is left), and a fraction like a sixth or an eighth is not a number
-// binary can hold. Summed as doubles, a crew whose warmth is exactly the
-// two a cold leg asks can come out a hair under it, and the check that
-// reads the sum then takes a hand over a rounding error in the sea's own
-// arithmetic: two Linen Clothes at two and four of six beside Cold
-// Hardened is the smallest such crew. So every contribution is taken in
-// whole units of this scale and the total is divided once at the end, and
-// the number the check reads, the number the panel prints and the number
-// the log line quotes are the wardrobe table's own fraction rather than
-// whatever a chain of additions left behind.
-//
-// The scale is read off the table rather than written down, for the reason
-// every derived number in this tree is: a balance pass that retunes a
-// maximum moves it along, where a constant here would have gone quietly
-// inexact the day the table moved. A contribution is whole exactly while
-// the maximum divides the scale, which is what a smallest common multiple
-// is, and both the maxima and the ratings are whole numbers (see
-// ./constants/garments for the table and its own note).
-// =====================================================================
+// The wardrobe's own denominator, chosen so every contribution is whole.
+// Summing fractions as doubles can land a crew exactly at the cold round's ask
+// a hair under it, so contributions are taken in whole scale units and the
+// total is divided once. The scale is derived from the table, so a retune
+// moves it rather than leaving a constant quietly inexact.
 function greatestCommonDivisor(a: number, b: number): number {
   return b === 0 ? a : greatestCommonDivisor(b, a % b);
 }
@@ -191,17 +99,9 @@ const GARMENT_SCALE = Object.values(GARMENTS).reduce(
 );
 
 /**
- * The warmth a garment gives right now, as a whole number of the scale's
- * units: its rating times the fraction of itself that is left, which is the
- * plan's multiplier, kept in the one denominator every maximum divides.
- *
- * A damaged durability is read through the same healing the load site uses
- * rather than trusted as arithmetic, so a save cannot hand this sum a NaN or
- * a fraction outside the garment's own maximum. In play it is always a whole
- * number inside the maximum, because every write to it is this module's.
- *
- * Units rather than the score itself because the score is a sum, and it is
- * the sum that has to stay exact: see the scale above and warmthScore.
+ * The warmth a garment gives right now, as whole units of the scale: its
+ * rating times the fraction left. Durability is healed here rather than
+ * trusted, so a save cannot hand the sum a NaN or an out of range value.
  */
 function warmthUnits(garment: WornGarment, spec: GarmentSpec): number {
   const left = durabilityOf(garment.durability, spec);
@@ -209,45 +109,25 @@ function warmthUnits(garment: WornGarment, spec: GarmentSpec): number {
 }
 
 /**
- * Whether the crew's clothes are short of what this leg asks.
- *
- * One answer for the two readers that need it, the settlement tick below and
- * the badge the voyage screen wears, so the warning a captain sees and the
- * check that bites them cannot disagree. Layer, weather and score, in that
- * order, because each is cheaper than the next and the first can answer for
- * the whole build.
+ * Whether the crew's clothes are short of what this round asks. One answer for
+ * the settlement tick and the voyage screen badge, so the warning and the
+ * check cannot disagree. Layer, weather and score, cheapest first.
  */
 export function shortOfWarmth(state: GameState): boolean {
   return (
     garmentsLayerOn(state.mode) &&
     legIsCold(state) &&
-    warmthScore(state) < COLD_LEG_WARMTH
+    warmthScore(state) < COLD_ROUND_WARMTH
   );
 }
 
 /**
- * The warmth score: the sum across worn garments of the rating times the
- * fraction left, plus the boon that hardens the crew against the cold.
- * The one number the plan's check reads.
- *
- * [F4: boons at milestone moments] Cold Hardened, the boon a cold leg
- * deals, counts as one more of warmth for the rest of the voyage, and it
- * is folded into the sum rather than into the check so that the number
- * the warning is about, the number the settlement prints and the number
- * the panel wears all stay the one number this function exists to be.
- * The field it reads is the round's flag set, which is where a held
- * boon's effect rides (see heldFlagsOf in ./held-cards).
- *
- * Exported because two readers print it as well as compare it, and a panel
- * that did the arithmetic again would be a second opinion about the number
- * the crew freezes against.
- *
- * Taken in whole units of GARMENT_SCALE and divided once, rather than by
- * adding the fractions up as doubles, because this is the number a hand is
- * decided on: the drift of a fraction chain is around a quadrillionth of a
- * point of warmth, which is nothing anywhere except at the comparison
- * below, where a mathematically exact meeting can land a hair under the ask
- * and cost the crew a hand (see the scale's own note).
+ * The warmth score: the sum across worn garments of rating times fraction
+ * left, plus the Cold Hardened boon, which counts as one more warmth for the
+ * rest of the voyage. Folded into the sum so the warning, the settlement and
+ * the panel all read one number, and exported because those readers print it
+ * as well as compare it. Taken in whole scale units and divided once,
+ * because this number decides whether a hand freezes.
  */
 export function warmthScore(
   state: Pick<GameState, "garments" | "modifierFlags">,
@@ -263,18 +143,9 @@ export function warmthScore(
 }
 
 /**
- * One garment's own contribution, which is what the wardrobe panel prints
- * beside it and what the sum above is made of.
- *
- * Exported rather than kept private to the sum for the reason a sum and its
- * parts are exported together anywhere else in this tree: a panel that did
- * the multiplication again would be a second place the plan's multiplier is
- * written, and the two would agree right up until one of them moved. Takes
- * the garment rather than the state so a reader can ask about one of them.
- *
- * Read through the same units the sum is taken in, so a part is the sum's
- * own arithmetic asked one garment at a time rather than a second rounding
- * of the same fraction (see GARMENT_SCALE).
+ * One garment's contribution, which the wardrobe panel prints beside it.
+ * Exported so the panel does not repeat the multiplication and drift from
+ * the sum, and read through the same scale units the sum uses.
  */
 export function garmentWarmth(garment: WornGarment | undefined | null): number {
   const spec = garmentSpec(garment?.good);
@@ -282,43 +153,15 @@ export function garmentWarmth(garment: WornGarment | undefined | null): number {
   return warmthUnits(garment, spec) / GARMENT_SCALE;
 }
 
-// The tolerance the printed warmth is read with, a billionth of a point of
-// warmth.
-//
-// It swallows the only lie the arithmetic tells: a score is exact by
-// construction (see GARMENT_SCALE) but a double still carries the divided
-// total to within a quadrillionth or so of it, so a score that is exactly a
-// tenth of warmth would otherwise print as the tenth below. The other side
-// of it is the seam between two real readings: a score is a whole number of
-// the scale's units, and one unit is a hundred and twentieth at the table's
-// current maxima, eight orders of magnitude wider than this can move.
+// A billionth of a point of warmth, enough to absorb the double's rounding
+// of an exactly representable score without reaching the next tenth.
 const WARMTH_PRINT_TOLERANCE = 1e-9;
 
 /**
- * The score as a captain reads it: one decimal, a whole number left whole,
- * and read down to the tenth the crew certainly has rather than to the
- * nearest one. Used by the log line and the panel both, so the number the
- * warning was about and the number the settlement reports are the same
- * string.
- *
- * The direction of the rounding is a rule rather than a taste, and the field
- * reported it: the number printed here is the number a captain measures
- * against the leg's ask (the panel's line asking for 2, the chip's sentence,
- * the shortfall the settlement names), while what the cold actually reads is
- * the score itself (see shortOfWarmth and tickGarments). Rounded to nearest,
- * a crew a hair under the two a cold leg asks printed "2" beside a panel
- * that still said the ask was unmet, and so a captain who had just paid the
- * harbor tailors for a mend could watch the wardrobe's own number meet the
- * ask while the sea went on to take a hand. Read down, the tenth printed
- * meets the ask exactly when the score does, and that belongs to the two
- * sides of the comparison rather than to the two numbers the constants
- * happen to carry today.
- *
- * Reading down is also what holds a panel's parts inside its own total: each
- * of the wardrobe's rows prints this function of its own garment's
- * contribution, and a reader who adds those tenths up can never arrive above
- * the tenth printed under them, because a sum of floors is never above the
- * floor of the sum.
+ * The score as a captain reads it: one decimal, read down rather than to
+ * nearest. A crew a hair under the ask would otherwise print "2" beside a
+ * panel saying the ask was unmet while the sea took a hand. Reading down
+ * also keeps a panel's rows from summing above its total.
  */
 export function warmthText(score: number): string {
   const tenth = Math.floor(score * 10 + WARMTH_PRINT_TOLERANCE) / 10;
@@ -326,12 +169,8 @@ export function warmthText(score: number): string {
 }
 
 /**
- * Whether a hand is out of action this leg.
- *
- * The mark is compared to the round rather than cleared on a schedule, so a
- * mark whose leg has passed is inert rather than wrong: a frostbite a leg
- * ago simply is not this leg's. The tick below clears the spent ones as it
- * walks, so the roster carries only a live sentence.
+ * Whether a hand is out of action this round. The mark is compared to the
+ * round, so an older mark is inert rather than wrong.
  */
 export function isFrostbitten(
   worker: Pick<Worker, "frostbittenRound">,
@@ -342,54 +181,41 @@ export function isFrostbitten(
 
 /**
  * Putting a garment on: one good leaves the hold and joins the wardrobe.
- *
- * One way, and the refusals are written out rather than silent, for the
- * reason the bench's other refusals are: a captain who presses a button is
- * owed a sentence about what happened. Every branch is reachable by a
- * legitimate voyage. There is nobody aboard on a ship whose crew has not
- * been hired yet or whose last hand has been lost. There is nothing to wear
- * when the hold carries none of that good, which is the ordinary case of a
- * captain who sold the lot. And the ceiling above is the one branch play
- * cannot reach, which is why its sentence reads as the bound it is.
- *
- * The last refusal is the rule of the panel rather than of the hold: a
- * garment worn is one way and wears from the day it goes on, so clothes put
- * on for a leg that did not ask for them cost their whole life and buy
- * nothing. A crew the leg is not asking anything of is left alone, and the
- * sentence that turns the press away says which of the two nothings this
- * is: a mild leg, or a crew the cold has already been answered for.
+ * Every refusal is spoken, because a captain who presses a button is owed a
+ * sentence. Clothes put on for a round that did not ask for them would wear
+ * for nothing, so a mild or already answered round is refused.
  */
 export function wearGarment(
   state: GameState,
   good: unknown,
-  logs: string[],
+  logs: LedgerLine[],
 ): boolean {
   if (!garmentsLayerOn(state.mode)) return false;
   const spec = garmentSpec(good);
   if (!spec || typeof good !== "string") {
-    logs.push(t("❌ That is not something the crew can wear."));
+    logs.push(line("❌ That is not something the crew can wear."));
     return false;
   }
   if (crewSize(state) === 0) {
-    logs.push(t("❌ There is nobody aboard to wear it."));
+    logs.push(line("❌ There is nobody aboard to wear it."));
     return false;
   }
   if ((state.garments?.length ?? 0) >= GARMENTS_WORN_MAX) {
-    logs.push(t("❌ The crew can wear no more than they already have on."));
+    logs.push(line("❌ The crew can wear no more than they already have on."));
     return false;
   }
   if ((state.inventory[good] || 0) < 1) {
-    logs.push(t("❌ No {good} in the hold to wear.", { good: t(good) }));
+    logs.push(line("❌ No {good} in the hold to wear.", { good: line(good) }));
     return false;
   }
   if (!shortOfWarmth(state)) {
     logs.push(
       legIsCold(state)
-        ? t(
-            "❌ The crew already meets this cold leg. Clothes put on for nothing still wear, so the rest stay in the hold until a leg asks for them.",
+        ? line(
+            "❌ The crew already meets this cold round. Clothes put on for nothing still wear, so the rest stay in the hold until a round asks for them.",
           )
-        : t(
-            "❌ The sea is mild this leg and asks for no warmth. Clothes put on now would wear from today, so the hold keeps them for a cold leg.",
+        : line(
+            "❌ The sea is mild this round and asks for no warmth. Clothes put on now would wear from today, so the hold keeps them for a cold round.",
           ),
     );
     return false;
@@ -400,28 +226,21 @@ export function wearGarment(
   // thing that makes the decision: what went onto the crew's backs is worth
   // its rating today and a fraction of it later.
   logs.push(
-    t("🧥 The crew puts on the {good}. Warmth {spec.warmth} while it lasts.", {
-      good: t(good),
-      "spec.warmth": spec.warmth,
-    }),
+    line(
+      "🧥 The crew puts on the {good}. Warmth {spec.warmth} while it lasts.",
+      {
+        good: line(good),
+        "spec.warmth": spec.warmth,
+      },
+    ),
   );
   return true;
 }
 
 /**
- * Which of the crew's garments of this good a repair would work on, and how
- * much of it is missing.
- *
- * The most worn one, because that is the one a captain means: a crew with
- * two of the same garment wants the thin one put right, and answering with
- * anything else would spend a mend on the wrong coat. The answer is zero
- * for a good the crew is not wearing at all and for one already at its own
- * maximum, which is the same reading the two callers need: the bench greys
- * a button out on it, and the repair below does nothing on it.
- *
- * Exported because the panels that offer a repair quote it as well as
- * compare it, and a panel that worked the shortfall out again would be a
- * second opinion about the number the button turns on.
+ * How much of the most worn garment of a good is missing. The most worn one
+ * is the one a captain means, and zero means nothing to repair. Exported
+ * because the repair panels quote the number the button turns on.
  */
 export function garmentRoom(
   state: Pick<GameState, "garments">,
@@ -439,27 +258,16 @@ export function garmentRoom(
 }
 
 /**
- * Putting points back into a garment the crew is wearing, and the one writer
- * of a durability that goes up.
- *
- * [D4: Loom: the Refit] The port mend and the Loom's refit are the same
- * arithmetic at two prices, so they are one function: both name a good,
- * both hand it a number of points, and both are refused in the same place.
- * It returns how much of the garment actually came back rather than a
- * boolean, because both callers charge for the work and neither may charge
- * for work it did not do: a mend on a garment already whole is not a mend,
- * and a fee is not owed for one.
- *
- * It reads the same healing every other reader here reads (durabilityOf)
- * rather than trusting the field, and it writes a new row rather than
- * mutating one, which is the shape the settlement tick already uses for the
- * garments it keeps.
+ * Putting points back into a worn garment, and the one writer of a
+ * durability that goes up. The port mend and the Loom's refit are the same
+ * arithmetic at two prices. Returns how much actually came back, so callers
+ * charge only for work done, and writes a new row rather than mutating one.
  */
 export function restoreGarment(
   state: GameState,
   good: unknown,
   points: number,
-  logs: string[],
+  logs: LedgerLine[],
 ): number {
   if (!garmentsLayerOn(state.mode)) return 0;
   const spec = garmentSpec(good);
@@ -485,10 +293,10 @@ export function restoreGarment(
     i === target ? { ...garment, durability: after } : garment,
   );
   logs.push(
-    t(
+    line(
       "🧵 The {good} comes back to {after} of {spec.durability}, worth {warmthGrade} of warmth.",
       {
-        good: t(good),
+        good: line(good),
         after,
         "spec.durability": spec.durability,
         warmthGrade: warmthText(garmentWarmth({ good, durability: after })),
@@ -499,23 +307,12 @@ export function restoreGarment(
 }
 
 /**
- * The settlement tick: the tag, the check, the frostbite and the wear.
- *
- * Called once from the resolve step (see finishSettlement in
- * ./engine/lifecycle, which is the settlement step the plan names), stamped
- * by the round so a leg that arrives through two paths is read once. The
- * stamp is written before anything else happens, which is what makes the
- * second call a no op rather than a second decay.
- *
- * Order matters and it is the plan's: the check is read against the clothes
- * the crew actually wore through the leg, so the wear below is applied after
- * the check rather than before it, and the frostbite mark is written for the
- * next leg, because that is the leg the hand cannot work.
- *
- * The marks a leg ends with are cleared here as the walk goes, so a hand
- * frostbitten two legs ago is not carrying a sentence whose leg is over.
+ * The settlement tick: the tag, the check, the frostbite and the wear. Called
+ * once from finishSettlement, stamped by the round so a second call is a no
+ * op. The check reads the clothes worn through the round, so wear comes after
+ * it, and the frostbite mark is written for the next round.
  */
-export function tickGarments(state: GameState, logs: string[]): void {
+export function tickGarments(state: GameState, logs: LedgerLine[]): void {
   if (!garmentsLayerOn(state.mode)) return;
   if (state.garmentsTickRound === state.currentRound) return;
   state.garmentsTickRound = state.currentRound;
@@ -529,32 +326,31 @@ export function tickGarments(state: GameState, logs: string[]): void {
 
   const worn = state.garments ?? [];
   const cold = legIsCold(state);
-  // Nothing worn on a fair leg is a leg with nothing to say: no clothes to
-  // wear out and no check to fail.
+  // Nothing worn on a fair round: no clothes to wear out and no check to fail.
   if (worn.length === 0 && !cold) return;
 
   const score = warmthScore(state);
   logs.push(
-    t("\n🧥=== Round {state.currentRound} · The Cold and the Cloth ===", {
+    line("\n🧥=== Round {state.currentRound} · The Cold and the Cloth ===", {
       "state.currentRound": state.currentRound,
     }),
   );
   if (cold) {
     logs.push(
-      score >= COLD_LEG_WARMTH
-        ? t(
-            "❄️ A cold leg, and the crew's {warmthGrade} of warmth is enough for the {COLD_LEG_WARMTH} it asks.",
-            { warmthGrade: warmthText(score), COLD_LEG_WARMTH },
+      score >= COLD_ROUND_WARMTH
+        ? line(
+            "❄️ A cold round, and the crew's {warmthGrade} of warmth is enough for the {COLD_ROUND_WARMTH} it asks.",
+            { warmthGrade: warmthText(score), COLD_ROUND_WARMTH },
           )
-        : t(
-            "❄️ A cold leg, and the crew's {warmthGrade} of warmth falls short of the {COLD_LEG_WARMTH} it asks.",
-            { warmthGrade: warmthText(score), COLD_LEG_WARMTH },
+        : line(
+            "❄️ A cold round, and the crew's {warmthGrade} of warmth falls short of the {COLD_ROUND_WARMTH} it asks.",
+            { warmthGrade: warmthText(score), COLD_ROUND_WARMTH },
           ),
     );
-    if (score < COLD_LEG_WARMTH) frostbiteNewest(state, logs);
+    if (score < COLD_ROUND_WARMTH) frostbiteNewest(state, logs);
   }
 
-  const step = cold ? GARMENT_DECAY_COLD_LEG : GARMENT_DECAY_PER_LEG;
+  const step = cold ? GARMENT_DECAY_COLD_ROUND : GARMENT_DECAY_PER_ROUND;
   const kept: WornGarment[] = [];
   let rags = 0;
   for (const garment of worn) {
@@ -565,9 +361,9 @@ export function tickGarments(state: GameState, logs: string[]): void {
       rags++;
       state.money += RAG_SCRAP_VALUE;
       logs.push(
-        t(
+        line(
           "🌊 The {garment.good} wears through to rags and is scrapped for {RAG_SCRAP_VALUE} Gold.",
-          { "garment.good": t(garment.good), RAG_SCRAP_VALUE },
+          { "garment.good": line(garment.good), RAG_SCRAP_VALUE },
         ),
       );
       continue;
@@ -576,53 +372,38 @@ export function tickGarments(state: GameState, logs: string[]): void {
   }
   state.garments = kept;
   if (worn.length > 0 && rags === 0) {
-    // The number is durability points rather than warmth, which are two
-    // units rather than one: warmth is the garment's rating scaled by the
-    // durability it has left (see warmthScore), so two points off a coat
-    // costs a fraction of its warmth. The line used to call the points
-    // warmth, and a captain watching the wardrobe could never reconcile
-    // the sentence with the numbers.
+    // The step is durability points, not warmth. Warmth is the rating scaled
+    // by what is left, so two points off a coat costs a fraction of its
+    // warmth; the line used to say warmth and did not reconcile.
     logs.push(
-      t("🧵 Worn clothes lose {step} point of wear to the sea.", { step }),
+      line("🧵 Worn clothes lose {step} point of wear to the sea.", { step }),
     );
   }
 }
 
 /**
- * One hand pays for a leg spent short of warmth, and it is the newest aboard.
- *
- * The same rule ./crew's loss takes, through the same walk, because a voyage
- * should have one answer to which hand pays and the plan does not give a
- * second one for the cold. The mark is one leg of work and nothing else:
- * the hand is still aboard, still eats and is still paid. The line names
- * the why and the way back, because "out of action" alone read as the sea
- * having taken a hand for good, when warm clothes before the cold are all
- * it ever asked for. [W3: the status convention] The sentence itself is
- * composed in ./status-copy, so the bite, the work log and the bench all
- * phrase the cold from one set of clauses.
+ * One hand pays for a round spent short of warmth, and it is the newest
+ * aboard, the same rule crew loss takes. The mark costs one round of work and
+ * nothing else; the sentence comes from ./status-copy so the log and the
+ * bench phrase it alike.
  */
-function frostbiteNewest(state: GameState, logs: string[]): void {
+function frostbiteNewest(state: GameState, logs: LedgerLine[]): void {
   const newest = newestAboard(state);
   if (newest === null) {
-    logs.push(t("🥶 There is nobody aboard to take the cold."));
+    logs.push(line("🥶 There is nobody aboard to take the cold."));
     return;
   }
   const hand = state.workers[newest.type]?.[newest.index];
   if (!hand) return;
   hand.frostbittenRound = state.currentRound + 1;
   const label = workerType(newest.type)?.label ?? newest.type;
-  logs.push(frozenFrostbiteLog(hand.name, label));
+  logs.push(frozenFrostbiteLogLine(hand.name, label));
 }
 
 /**
- * How much of a garment is left, read so that no caller can be handed a
- * number outside the garment's own ends.
- *
- * A durability that is not a number heals to the garment's full value rather
- * than to nothing, which is the direction ./larder's own reader heals in and
- * for the same reason: a save damaged by a bad write should put a captain on
- * a whole garment, not on a ruined one they never wore out. A fraction is
- * floored, because the sea takes whole points of durability.
+ * How much of a garment is left, clamped to its own ends. A non-number heals
+ * to full rather than to nothing, so damage does not ruin a garment the
+ * captain never wore out. Fractions floor, because wear is whole points.
  */
 function durabilityOf(raw: unknown, spec: GarmentSpec): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return spec.durability;
@@ -630,21 +411,9 @@ function durabilityOf(raw: unknown, spec: GarmentSpec): number {
 }
 
 /**
- * The wardrobe a save was carrying, healed the way every other saved field
- * is.
- *
- * A voyage saved before this layer existed holds no wardrobe at all and
- * lands on an empty one, which is a crew with nothing on: the first cold leg
- * after loading is one they meet the way a fresh voyage meets it, rather
- * than one they meet in clothes a save invented for them.
- *
- * An entry is kept only when it is a garment the catalogue knows, so a save
- * claiming a hold full of sails for the crew to wear is read as a wardrobe
- * missing those entries rather than as warmth nobody can account for. A
- * durability at or below zero is a garment already in rags, which is a state
- * the wardrobe does not carry, so it is dropped rather than worn. The list
- * is capped, and the cap is the only branch here play cannot reach (see
- * GARMENTS_WORN_MAX).
+ * The wardrobe a save was carrying. An old save with no wardrobe lands on an
+ * empty one. An entry is kept only when the catalogue knows it and its
+ * durability is above zero; the cap is the only branch play cannot reach.
  */
 export function normalizeGarments(raw: unknown): WornGarment[] {
   if (!Array.isArray(raw)) return [];
@@ -666,12 +435,8 @@ export function normalizeGarments(raw: unknown): WornGarment[] {
 }
 
 /**
- * The tick's stamp, read back the same way the Larder's is.
- *
- * A save written before this field existed carries no stamp and lands on
- * zero, which is a leg no voyage has: the first settlement after loading
- * therefore reads the wardrobe, exactly as it would have had the captain
- * been sailing this build all along.
+ * The tick's stamp. An old save lands on zero, a round no voyage has, so the
+ * first settlement after loading reads the wardrobe.
  */
 export function normalizeGarmentsTickRound(raw: unknown): number {
   return wholeStamp(raw);

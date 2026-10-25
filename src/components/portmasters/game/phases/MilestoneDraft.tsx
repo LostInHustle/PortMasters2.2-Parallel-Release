@@ -8,7 +8,7 @@ import { MomentOverlay } from "./MomentOverlay";
 import type { PhasePanelProps } from "./PhaseShared";
 
 /**
- * [F4: boons at milestone moments] The milestone moment's own five
+ * The milestone moment's own five
  * readings, on the one overlay a moment is answered on (see
  * ./MomentOverlay for the body and for why a moment is an overlay rather
  * than a phase).

@@ -1,7 +1,7 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: the harbor's second vote and the Harbormaster.
 //
-// [H7: Maroon and the Harbormaster] The harbor's second vote, and the one
+// The harbor's second vote, and the one
 // action in the protocol by which a captain moves another captain's books.
 //
 // Laid out like the audit block above, and for the same reason: the vote
@@ -9,23 +9,23 @@
 // the feature, and the result is public because it is a thing the harbor
 // did out loud to a captain standing at its table. Nothing private lives
 // in any of these payloads and there is nowhere in them to put anything
-// private. The result names a captain and a leg; the shift names a port
+// private. The result names a captain and a round; the shift names a port
 // and a direction.
 //
 // The shift is the one worth describing. It is a client's action whose
 // effect lands on other clients' books, since every captain in the harbor
 // prices their own market against it, so it travels the road the Harbor
 // Pulse already travels rather than a second road built beside it: the
-// server holds it for the leg, broadcasts the notice below, and includes
+// server holds it for the round, broadcasts the notice below, and includes
 // the bare shift on the advance that opens a port market (see
 // maybeAdvance in src/server/realtime/checkpoint.ts). Nothing prices a
-// market off the notice. The notice is what the room reads.
+// market off the notice. The notice is what the harbor reads.
 // =====================================================================
 
 /** One captain's nomination, sent to the server. */
 export type MaroonVote = {
   roomId: string;
-  /** The round the vote belongs to, checked against the room's checkpoint. */
+  /** The round the vote belongs to, checked against the harbor's checkpoint. */
   round: number;
   targetUserId: string;
 };
@@ -51,14 +51,14 @@ export type MaroonTally = {
   needed: number;
   /**
    * The captains the count is divided by who have not named anyone yet
-   * this leg, which is who the room is waiting on. Ids, so the reader
+   * this round, which is who the harbor is waiting on. Ids, so the reader
    * names them from the roster it already has.
    */
   awaiting: string[];
   /**
    * The captain the vote named once it has carried, or null while the
    * vote is live. The nominations die with the vote that carried, so
-   * without this the empty book reads exactly like a fresh leg and a
+   * without this the empty book reads exactly like a fresh round and a
    * captain whose ask lands after the carry would be offered a press
    * that is already spent. It is the server's own record of the vote,
    * which is what a state request is asking about.
@@ -85,9 +85,9 @@ export type MaroonResult = {
 /**
  * The Harbormaster's call, sent to the server: one port, one direction.
  *
- * The leg and the harbor are read off the room rather than trusted from
+ * The round and the harbor are read off the harbor rather than trusted from
  * here, the same way an audit nomination's are, so a client cannot lean a
- * market it is not standing in or name a port the room has not unlocked.
+ * market it is not standing in or name a port the harbor has not unlocked.
  */
 export type PortShiftCall = {
   roomId: string;
@@ -97,7 +97,7 @@ export type PortShiftCall = {
 };
 
 /**
- * The same call as the room receives it, with the hand that made it.
+ * The same call as the harbor receives it, with the hand that made it.
  *
  * The name is in the frame because the power is public by design: a
  * captain who moves every price in a harbor has to be nameable at the

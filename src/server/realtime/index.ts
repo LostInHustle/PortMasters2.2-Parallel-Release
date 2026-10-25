@@ -7,7 +7,7 @@
 // and no second process to start.
 //
 // This file is the composition root. It creates the Socket.IO server,
-// holds the cross module room teardown (the one list of every per room
+// holds the cross module harbor teardown (the one list of every per harbor
 // structure, and the callbacks a departure runs), and wires the
 // connection. The frames themselves live one concern to a file under
 // ./wiring, each of them a leaf nothing else imports, and this file names
@@ -57,7 +57,7 @@ import { removeUserAidRequest, clearAidSilent } from "./aid";
 import { hydrateLoans, clearLoansSilent } from "./loans";
 import { emitRoomMembers, clearMutedUsers, clearSessionChat } from "./chat";
 import { concludedRooms, maybeConcludeVoyage } from "./conclusion";
-// [D7: the draft, and switching] The room's half of the path draft, and its
+// The harbor's half of the path draft, and its
 // book of switches. It is dealt in the same breath as the alignment cards
 // above and cleared in the same places they are, because the two are the
 // same kind of thing: private information this process mints, hands to one
@@ -70,7 +70,7 @@ import { clearBoonLedger } from "./boon-ledger";
 import { clearMaroons } from "./maroon";
 import { clearReveals } from "./reveal";
 import { closeVoyageTelemetry, dropVoyageTelemetry } from "./telemetry";
-// [B4: the log surfaces] The room's own log, which is a product surface
+// The harbor's own log, which is a product surface
 // rather than a measurement and is therefore opened by every voyage the
 // spine above may or may not be recording.
 import { clearVoyageLog } from "./voyage-log";
@@ -81,7 +81,7 @@ import { wireRoomJoin } from "./wiring/room-join";
 import { wireStatusHeartbeat } from "./wiring/status-heartbeat";
 import { wirePhaseReady } from "./wiring/phase-ready";
 import { wirePulse } from "./wiring/pulse";
-import { wireLegReport } from "./wiring/leg-report";
+import { wireRoundReport } from "./wiring/round-report";
 import { wireObjective } from "./wiring/objective";
 import { wireAudit } from "./wiring/audit";
 import { wireMaroon } from "./wiring/maroon";
@@ -106,23 +106,23 @@ import { wireQuickStart } from "./wiring/quickstart";
 import { wireOperator } from "./wiring/operator";
 import { wireDisconnect } from "./wiring/disconnect";
 
-// ========== Cross module room teardown ==========
-// Called when a room is deleted after its last member departs. Tears
-// down every per room structure so a future room (with a different id)
-// doesn't inherit stale data from a room that no longer exists.
+// ========== Cross module harbor teardown ==========
+// Called when a harbor is deleted after its last member departs. Tears
+// down every per harbor structure so a future harbor (with a different id)
+// doesn't inherit stale data from a harbor that no longer exists.
 // Deliberately not through the individual clear* helpers that broadcast:
 // the room row is already gone, the Loan rows went with it on cascade,
 // and there is nobody left in the channel to broadcast an empty board to.
 function clearRoomAllMaps(roomId: string): void {
   roomCheckpoints.delete(roomId);
-  // [B2: hard timers, the server as timekeeper] The room's clock, which is
-  // an in process timer for a room that no longer exists. It is disarmed
+  // The harbor's clock, which is
+  // an in process timer for a harbor that no longer exists. It is disarmed
   // rather than dropped, because the deadline lives on the checkpoint this
   // function just deleted and a timer whose seat is gone has nothing left to
   // fire at.
   disarmPhaseClock(roomId);
-  // And the watch on the last announcement this room ever made, which is a
-  // timer for the same reason and outlives its room the same way. See
+  // And the watch on the last announcement this harbor ever made, which is a
+  // timer for the same reason and outlives its harbor the same way. See
   // watchForReports in ./checkpoint: a fire here would find no checkpoint to
   // hand back and no members to hand it to, so it is stopped rather than
   // left to spend itself.
@@ -131,17 +131,16 @@ function clearRoomAllMaps(roomId: string): void {
   clearBarterSilent(roomId);
   escortContracts.clearSilent(roomId);
   refitContracts.clearSilent(roomId);
-  // [F3: modules in the shipyard ladder, and trading them between
-  // captains] And the module market's rows, silent for the reason the two
+  // And the module market's rows, silent for the reason the two
   // boards above are: the room row is already gone, so there is nobody
   // left in a channel to broadcast an empty board to.
   moduleTrades.clearSilent(roomId);
-  // [D5: Aroma: the Bazaar Rumor] The bazaar's rows, which belong to the
-  // voyage that ended with the room. Silent like the two boards above it,
+  // The bazaar's rows, which belong to the
+  // voyage that ended with the harbor. Silent like the two boards above it,
   // because the room row is already gone and there is nobody left in the
   // channel to broadcast an empty board to.
   clearBazaarSilent(roomId);
-  // [D7: the draft, and switching] And the path draft's two maps, silent for
+  // And the path draft's two maps, silent for
   // the reason the boards above are: the room row is already gone, so there
   // is nobody standing in a draft to hand a null view to and nobody to tell
   // that a switch is forgotten.
@@ -161,13 +160,13 @@ function clearRoomAllMaps(roomId: string): void {
   clearMutedUsers(roomId);
   clearSessionChat(roomId);
   // The detail questions waiting on captains in this harbor, which are
-  // questions about a room that no longer exists.
+  // questions about a harbor that no longer exists.
   forgetDetailRequests(roomId);
-  // [B4: the log surfaces] And the voyage's log, which belongs to the room
+  // And the voyage's log, which belongs to the harbor
   // that held it. Dropped rather than written down, because a log is a
   // surface a table reads while it sails and there is no table left.
   clearVoyageLog(roomId);
-  // [I1: the telemetry spine] And the voyage the spine was holding, which
+  // And the voyage the spine was holding, which
   // is dropped and not written, because every caller that reaches this
   // function with a voyage still open has already written it. The reaper
   // writes an emptied record before it calls this, and the REST leave
@@ -178,16 +177,15 @@ function clearRoomAllMaps(roomId: string): void {
   dropVoyageTelemetry(roomId);
 }
 
-// [D3: Convoy: the Escort Contract] [D4: Loom: the Refit] [F3: modules in
-// the shipyard ladder, and trading them between captains] What a departure
-// takes off the room's three consent boards, in one callback because a
+// What a departure
+// takes off the harbor's three consent boards, in one callback because a
 // departure is one event rather than three.
 //
 // It lives here rather than in any board module because a board module
 // knows one kind, and this is the only place that knows all three: the rule
 // it applies is the factory's (see removeUser in ./consent, which is where
 // the two conditions and the reason for each are written), and what is left
-// for this function to say is which boards the room is holding.
+// for this function to say is which boards the harbor is holding.
 function removeUserConsentBoards(
   io: Server,
   roomId: string,
@@ -218,13 +216,13 @@ function buildDepartureCleanup(): DepartureCleanup {
 // A socket that then disconnects is repaired later by the departure
 // grace timer, which is the other place clearRoomAllMaps is called from.
 // A captain who leaves through the button and stays on the page is not:
-// their socket never drops, so no timer is ever armed, and the room they
+// their socket never drops, so no timer is ever armed, and the harbor they
 // just destroyed would leave its board and its conversation sitting in
 // memory until the process restarted. The client's leave always sends
 // room:leave straight after that route call, so this is where the check
 // can be made.
 //
-// [I1: the telemetry spine] A room that is gone because its last seat was
+// A harbor that is gone because its last seat was
 // given up is a voyage that stopped, and this is the only place the last
 // captain's own Leave can be noticed: the REST route that took the seat
 // runs in a different copy of this module and cannot see the accumulator,
@@ -282,7 +280,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     // that module's import graph (the presence module imports it).
     socket.data.locale = handshakeLocale;
 
-    // [J2: the mute and the report] The socket's own frame budget, put in
+    // The socket's own frame budget, put in
     // front of every handler below. It goes here, before the auto
     // authentication on the next line, so that not even the auth frame can
     // arrive uncounted: the middleware runs per incoming packet, and a
@@ -331,7 +329,7 @@ export function attachRealtime(httpServer: HttpServer): Server {
     wireStatusHeartbeat(io, socket);
     wirePhaseReady(io, socket);
     wirePulse(socket);
-    wireLegReport(socket);
+    wireRoundReport(socket);
     wireObjective(io, socket);
     wireAudit(io, socket);
     wireMaroon(io, socket);

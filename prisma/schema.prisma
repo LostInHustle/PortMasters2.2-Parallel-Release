@@ -3,6 +3,18 @@
 // Prisma schema covering accounts, sessions, rooms, membership, per
 // player game state, chat, captain legacy, merits, convoy ventures,
 // loans, voyage chronicles, captain rivals, and house standings.
+//
+// A note on the columns nothing reads yet. Several tables carry a
+// createdAt or an updatedAt that no query asks for, and one carries a
+// drawnAt and an earnedAt that are written on purpose and read by
+// nobody. They are kept rather than dropped because of how the schema
+// reaches a live database: the start command pushes this file with
+// `prisma db push`, which refuses to drop a column unless the command
+// also carries --accept-data-loss, and a start command that accepts
+// data loss on every deploy is a worse trade than a few columns that
+// cost a row nothing. The day the owner wants them gone, the migration
+// is one deliberate deploy with a backup behind it, and the flag goes
+// back off in the same hour.
 // =====================================================================
 
 generator client {
@@ -65,7 +77,7 @@ model Room {
   hostId    String
   isPublic  Boolean  @default(true)
   createdAt DateTime @default(now())
-  // [I1: the telemetry spine] When the lobby opened for the voyage that is
+  // When the lobby opened for the voyage that is
   // next to sail. createdAt above is the harbor's birthday and never moves,
   // which is the wrong end of the fill time for a table that replays in the
   // same room: a restart reopens the lobby without touching the birthday,
@@ -78,7 +90,7 @@ model Room {
   currentRound Int    @default(1)
   currentPhase String @default("0")
   voyageEpoch  Int    @default(0)
-  // [H5: the quota rung] How many captains the voyage now under way was
+  // How many captains the voyage now under way was
   // dealt to, written in the same update that sets `started` and cleared
   // in the one that restarts the voyage. It is the fleet's size as a fact
   // of the voyage rather than of the harbor: membership can change mid
@@ -99,7 +111,7 @@ model Room {
   // founding mode, which is what every room created before this column
   // existed is playing.
   mode         String @default("classic")
-  // [H9: the unlock code] Which phrase opened this harbor, by its id in
+  // Which phrase opened this harbor, by its id in
   // src/lib/unlock.ts, or the empty string for a room chartered without
   // one. Written once at creation beside difficulty and mode, for the same
   // reason: it is a property of the room rather than of any account, so
@@ -153,8 +165,10 @@ model GameState {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
+  // The unique serves every userId lookup on its own, because its
+  // leftmost column is userId. A second index on userId would be the
+  // same tree twice.
   @@unique([userId, roomId])
-  @@index([userId])
   @@index([roomId])
 }
 
@@ -198,7 +212,6 @@ model VoyageRole {
 
   @@unique([roomId, userId])
   @@index([roomId])
-  @@index([userId])
 }
 
 model CaptainLegacy {
@@ -208,8 +221,16 @@ model CaptainLegacy {
   renownXP         Int    @default(0)
   voyagesCompleted Int    @default(0)
   seaMasterCrowns  Int    @default(0)
-  bestScore        Int    @default(0)
+  // The captain's best voyage Reputation. The name on disk is still the
+  // old one, because the column is a column and a rename in the database
+  // is a rename in every save a captain has ever made. The word the
+  // column carried was wrong rather than absent: it holds a Reputation,
+  // and everything a captain reads already calls it that.
+  bestReputation   Int    @default(0) @map("bestScore")
   consecutiveSolventVoyages Int @default(0)
+  // The per tier breakdown, as a JSON blob. The keys inside it are data
+  // rather than columns, so the reader in ../legacy reads the old key
+  // and the new one, and the writer writes the new one.
   statsByDifficulty String @default("{}")
   checkInCount    Int     @default(0)
   lastCheckInDate String?
@@ -227,8 +248,10 @@ model CaptainMerit {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // The unique serves every userId lookup on its own, because its
+  // leftmost column is userId. A second index on userId would be the
+  // same tree twice.
   @@unique([userId, meritId])
-  @@index([userId])
 }
 
 model ConvoyVenture {
@@ -287,7 +310,11 @@ model Loan {
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([roomId, voyageEpoch])
+  // The loans of a harbor are cleared by harbor, so the index is on the
+  // harbor alone. The voyage epoch is read in the room's own code and
+  // compared there, never in a where clause, so putting it in the index
+  // would only make the tree wider.
+  @@index([roomId])
 }
 
 // =====================================================================
@@ -311,22 +338,22 @@ model VoyageChronicle {
   borrowCount     Int
   crowned         Boolean @default(false)
   bankrupt        Boolean @default(false)
-  // [H7: Maroon and the Harbormaster] Whether the harbor voted this
+  // Whether the harbor voted this
   // captain ashore. Its own column rather than a comment in the body text
   // because the chronicle viewer tags the row with it and because the
-  // epic's evaluation reads maroon outcomes back by query, the same way it
+  // design's evaluation reads maroon outcomes back by query, the same way it
   // reads bankrupt ones. Written from the server's record of the vote, so
   // unlike bankrupt it never depends on what a client reported.
   marooned        Boolean @default(false)
   merchantRating  String
   headline        String
   body            String
-  // [H2: the fleet commission] The measurement half of Ocean Gambit's
+  // The measurement half of Ocean Gambit's
   // objective, recorded where every other voyage outcome already is.
   // objectiveTrace is JSON text for the same reason GameState.data is: the
-  // per leg detail is one document, walked rather than joined, and nothing
+  // per round detail is one document, walked rather than joined, and nothing
   // reads it by query. Its consumer today is the smoke run's fleet
-  // commission suite, which asserts a finished voyage's counters; the H2
+  // commission suite, which asserts a finished voyage's counters; the
   // launch gate's evaluation is the reader these columns were built for
   // and it has not landed yet, so no report script parses the trace.
   // A row is per captain, so the total in it is the harbor's as that one
@@ -336,7 +363,7 @@ model VoyageChronicle {
   objectiveId     String   @default("")
   objectiveMet    Boolean  @default(false)
   objectiveTrace  String   @default("")
-  // [F7: the combination instrument] The durable cards this captain ended
+  // The durable cards this captain ended
   // the voyage holding, as a JSON array of ids (the milestone boons, the
   // bolted on modules and the charter). JSON text for the trace's reason:
   // the pair matrix is read by the report script, never by a query, and
@@ -345,22 +372,23 @@ model VoyageChronicle {
   // forged finish writes empty here, the same reading every other
   // measurement from an unreadable save gets.
   heldCards       String   @default("")
-  // [H4: the Broker] Whether this captain won their own voyage, decided by
+  // Whether this captain won their own voyage, decided by
   // evaluateVictory in src/lib/game/victory.ts at the moment the voyage
   // concluded, and the alignment they sailed under, recorded right beside
   // it. Both are private: a chronicle row is read only by the captain it
   // belongs to (see /api/chronicle), and the reveal at the table is a later
-  // slice. They are stored here rather than broadcast because the epic's
-  // evaluation reads them back: every win rate band in the plan is a query
-  // over alignment and won on rows from finished voyages, including the
-  // honest side's, which nothing could measure before this column existed.
+  // broadcast. They are stored here rather than broadcast because the
+  // design's evaluation reads them back: every win rate band in the design
+  // is a query over alignment and won on rows from finished voyages,
+  // including the honest side's, which nothing could measure before this
+  // column existed.
   // Empty alignment in Classic, where no hand was dealt.
   alignment       String   @default("")
   won             Boolean  @default(false)
-  // [H5: the quota rung] How many captains the voyage that wrote this row
+  // How many captains the voyage that wrote this row
   // was dealt to, copied from Room.voyageSeats as the conclusion writes
   // it. The rung scales the commission by that number, so an outcome
-  // recorded without it cannot be grouped by table size, and the plan's
+  // recorded without it cannot be grouped by table size, and the design's
   // gate is a claim about table size: the same rate at four, five and six
   // seats. 0 for every voyage that sailed before the rung existed, which
   // reads as the anchor band and is the honest reading of the board those
@@ -408,17 +436,17 @@ model CaptainRival {
   @@index([roomId])
 }
 
-// [I1: the telemetry spine] One voyage, as the spine saw it: the record the
+// One voyage, as the spine saw it: the record the
 // accumulator in src/server/realtime/telemetry.ts writes when a voyage
 // stops, however it stops.
 //
 // The body is JSON text for the same reason GameState.data and
 // objectiveTrace are: a record is one document, read whole by a reader that
 // walks its events, and never joined against. The columns beside it are the
-// header the plan asks to be queryable without opening the document: which
+// header the design asks to be queryable without opening the document: which
 // mode and difficulty the voyage was chartered with, the rung it was judged
-// on, how it ended, the leg it ended at, and when it ran. A dashboard that
-// wanted "the abandon rate by leg" would group by these rather than parse
+// on, how it ended, the round it ended at, and when it ran. A dashboard that
+// wanted "the abandon rate by round" would group by these rather than parse
 // four thousand events per voyage.
 //
 // One row per voyage, written once. roomId is deliberately a bare string
@@ -452,7 +480,9 @@ model VoyageTelemetry {
   // reason Room.mode is: the set grows with the vocabulary, and a new
   // outcome must not need a migration to be storable.
   outcome     String
-  leg         Int
+  // Stored under the older column name so ledgers written before the round
+  // vocabulary keep reading; the field and every reader use round.
+  round       Int      @map("leg")
   startedAt   DateTime
   endedAt     DateTime
   record      String
@@ -462,7 +492,7 @@ model VoyageTelemetry {
   @@index([endedAt])
 }
 
-// [J2: the mute and the report] One captain's report of another, filed from
+// One captain's report of another, filed from
 // the harbor roster and read later by a person rather than by the game.
 //
 // Three bare strings with no relations on them, and the reasons are written
@@ -489,11 +519,10 @@ model VoyageTelemetry {
 // one row rather than two, which is honest: they are the same harbor
 // session and the same pair of captains.
 //
-// No reason field, deliberately. The plan puts a moderation console after
-// this feature, and a free text field either side of a wire is a field
-// nobody has read the private information review for. What the row carries
-// is who, about whom, in which voyage, and when, which is what a person
-// opening a conversation needs and what a later reader can trust.
+// No reason field, deliberately. A free text field either side of a wire is
+// a field nobody has read the private information review for. What the row
+// carries is who, about whom, in which voyage, and when, which is what a
+// person opening a conversation needs and what a later reader can trust.
 model Report {
   id           String   @id @default(cuid())
   roomId       String
@@ -508,5 +537,4 @@ model Report {
   @@unique([reporterId, targetUserId, roomId, voyageEpoch])
   @@index([roomId])
   @@index([targetUserId])
-  @@index([createdAt])
 }

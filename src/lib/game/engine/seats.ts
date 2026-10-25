@@ -1,5 +1,5 @@
 // =====================================================================
-// [H7: Maroon and the Harbormaster] What happens to a seat that fails.
+// What happens to a seat that fails.
 //
 // Two ways to fail a voyage stop a captain from winning it, and this is
 // the one place either of them is applied. The harbor votes a captain
@@ -9,7 +9,7 @@
 // What the two share is that neither of them removes the seat, which is
 // the pillar the mode is built on rather than a mercy: a table that can
 // shrink is a table where the last two rounds are played by fewer people
-// than the first, and the whole design of Ocean Gambit is what a room
+// than the first, and the whole design of Ocean Gambit is what a harbor
 // does with a captain it can see and does not trust. A bankrupt captain
 // still holds a card, still votes, still trades at the table and still
 // answers the audit's questions. A marooned captain keeps all of that and
@@ -33,7 +33,7 @@ import { ITEMS } from "../constants/goods";
 import { modeConfig } from "../mode";
 import { maroonKeptGold } from "../maroon";
 import type { GameState } from "../types";
-import { t } from "@/lib/game/i18n";
+import { line, type LedgerLine } from "@/lib/game/ledger";
 import { unequipModuleAccounting } from "./boons";
 
 /**
@@ -47,7 +47,7 @@ import { unequipModuleAccounting } from "./boons";
  * and the voyage carries on with the harbor's mark on them. What that
  * mark costs them is decided at the end, by the verdict and the crown.
  */
-export function failSeat(state: GameState, logs: string[]): void {
+export function failSeat(state: GameState, logs: LedgerLine[]): void {
   // The mark is written once and the line is said once. In a mode that
   // ends here the second case cannot arise; in the other one it can, and
   // it will, because a captain with nothing left fails the next settlement
@@ -56,7 +56,7 @@ export function failSeat(state: GameState, logs: string[]): void {
   // bankruptcy rather than as the same mark being held against them.
   if (!state.bankrupt) {
     logs.push(
-      t(
+      line(
         "🏴 Bankrupt: the harbor marks it against this captain's name for the rest of the voyage.",
       ),
     );
@@ -69,7 +69,7 @@ export function failSeat(state: GameState, logs: string[]): void {
 }
 
 /**
- * The harbor votes a captain ashore, and they stay in the room.
+ * The harbor votes a captain ashore, and they stay in the harbor.
  *
  * The ship goes to the harbor with everything bolted to it and everything
  * in its hold, which is the price of the vote being real. Undoing the
@@ -86,9 +86,9 @@ export function failSeat(state: GameState, logs: string[]): void {
  * hull that no longer exists is a debt the mode wants them to have to
  * think about.
  */
-export function maroonSeat(state: GameState, logs: string[]): void {
+export function maroonSeat(state: GameState, logs: LedgerLine[]): void {
   // A broadcast can reach a client more than once: a rejoin is handed the
-  // room's whole maroon again, and React's development build runs an
+  // harbor's whole maroon again, and React's development build runs an
   // effect twice on purpose. The mark itself is the guard, and it has to
   // be, because this function takes half a captain's Gold.
   if (state.marooned) return;
@@ -100,16 +100,16 @@ export function maroonSeat(state: GameState, logs: string[]): void {
   state.shipLevel = 0;
   for (const item of ITEMS) state.inventory[item] = 0;
   state.marooned = true;
-  logs.push(t("🏝️ The harbor has voted to maroon this captain."));
+  logs.push(line("🏝️ The harbor has voted to maroon this captain."));
   logs.push(
-    t(
+    line(
       "⚖️ The ship and its hold are forfeit. The harbor takes {taken} Gold and leaves {kept} Gold aboard.",
       { taken, kept },
     ),
   );
   logs.push(
-    t(
-      "🧭 The Harbormaster's hand: once a leg, one port's prices answer to this captain.",
+    line(
+      "🧭 The Harbormaster's hand: once a round, one port's prices answer to this captain.",
     ),
   );
 }

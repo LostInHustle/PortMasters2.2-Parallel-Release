@@ -1,27 +1,8 @@
-// =====================================================================
-// The voyage's spine: what happens at the end of a round, how the phases
-// chain into one another, and how a voyage begins, concludes and restarts.
-//
-// Everything here is orchestration. Each function's job is to call into
-// the subsystems in the right order and move state.phase along, which is
-// why this module imports from nearly every sibling and none of them
-// import back. That one way flow is deliberate: the subsystems stay
-// independently testable, and the sequencing lives in exactly one place.
-//
-// nextPhase and snapToCheckpoint are the two dispatch tables. The first
-// advances a captain one step from wherever they are; the second drops a
-// captain straight onto a given round and phase, which is what lets
-// someone joining a room mid voyage land where everyone else already is
-// rather than back at round 1.
-//
-// Where nextPhase steps TO is not written here. It comes from the room's
-// mode, through the lap in ./mode.ts, so the same engine runs a different
-// leg for a different voyage without a single branch on which mode it is.
-// Every departure below does its own content work and names no successor;
-// the handoff at the bottom of nextPhase is the only thing that decides
-// where a phase leads, and it asks the lap.
-// =====================================================================
+// Voyage orchestration: round close, phase handoff, startup and restart.
+// Successor phases come from the mode's lap, not from names in this file.
+// Subsystems are called here and never import back.
 import { APP_NAME } from "../constants/brand";
+import { line, rule, type LedgerLine } from "@/lib/game/ledger";
 import { t } from "@/lib/game/i18n";
 import { endgameRatingFor } from "../constants/reputation";
 import { closesRound, isGatedPhase, lapSuccessor } from "../checkpoint";
@@ -29,7 +10,7 @@ import { tickGarments } from "../garments";
 import { tickSpoilage } from "../foods";
 import { heldFlagsOf } from "../held-cards";
 import { modeConfig } from "../mode";
-import { isLegPhase, normalizePhase, phaseFace } from "../phases";
+import { isRoundPhase, normalizePhase, phaseFace } from "../phases";
 import { normalizeStandingOrders } from "../standing";
 import {
   createInitialGameState,
@@ -45,87 +26,64 @@ import { completeMarket, startMarket } from "./market";
 import { noteSettlementMilestones } from "./milestones";
 import { startOrders } from "./orders";
 import { resolvePirateAttack } from "./pirates";
-import { calcIncomeTax, incomeTaxRate } from "./pricing";
+import { calcIncomeTax, formatTaxRate, incomeTaxRate } from "./pricing";
 import { failSeat } from "./seats";
 import { standingBoonId, workStandingOrders } from "./standing";
 import { payMaintenance, payWages, processProduction } from "./workers";
 
-// merchantRatingForScore lives in ../constants/reputation.ts so the
-// MERCHANT_RATINGS table and the lookup that scans it sit beside each other
-// and so the merit in ../merits.ts can read both from the same module without
-// dragging in the engine's lifecycle. The barrel (../engine.ts) exports it
-// from there.
-
-function endRound(state: GameState, logs: string[]) {
+function endRound(state: GameState, logs: LedgerLine[]) {
   logs.push(
-    t("\n📊=== Round {state.currentRound} Settlement ===", {
+    line("\n📊=== Round {state.currentRound} Settlement ===", {
       "state.currentRound": state.currentRound,
     }),
   );
   logs.push(
-    t("💰 Revenue this round: {state.roundRevenue} Gold", {
+    line("💰 Revenue this round: {state.roundRevenue} Gold", {
       "state.roundRevenue": state.roundRevenue,
     }),
   );
+  // Wages and maintenance are separate settlement lines and are not part of
+  // roundCosts, or Total Cost would count them twice.
   const totalCost =
     state.roundCosts + state.maintenanceCosts + state.workerWages;
-  logs.push(t("💸 Total Cost this round: {totalCost} Gold", { totalCost }));
-  // The indent is the ledger's own nesting, not the row's, so it stays
-  // outside the read.
+  logs.push(line("💸 Total Cost this round: {totalCost} Gold", { totalCost }));
   logs.push(
-    "   " +
-      t("🔧 Maintenance: {state.maintenanceCosts} Gold", {
-        "state.maintenanceCosts": state.maintenanceCosts,
-      }),
+    line(
+      "🔧 Ship Maintenance Fee: {state.maintenanceCosts} Gold",
+      { "state.maintenanceCosts": state.maintenanceCosts },
+      "   ",
+    ),
   );
-  // A Materials line sat here, reading a materialCosts field that nothing in
-  // the engine ever wrote, so it printed 0 Gold every round of every voyage.
-  // Field and line are both gone, and the goods and freight spending they
-  // stood in front of is inside roundCosts above, counted there once: wages
-  // and maintenance used to be added into roundCosts as well as summed here,
-  // which charged them twice against the tax base this ledger feeds.
-  // This row carries its own indent, unlike the maintenance row above.
   logs.push(
-    t("   👥 Wages: {state.workerWages} Gold", {
+    line("   👥 Wages: {state.workerWages} Gold", {
       "state.workerWages": state.workerWages,
     }),
   );
   const preTax = state.roundRevenue - totalCost;
-  logs.push(t("📈 Pretax Profit: {preTax} Gold", { preTax }));
+  logs.push(line("📈 Pretax Profit: {preTax} Gold", { preTax }));
   const tax = calcIncomeTax(state, preTax);
   if (tax > 0) {
     state.money -= tax;
     state.incomeTaxPaid += tax;
-    // The rate the ledger reports has to be the rate that was charged, so
-    // this reads the same reader calcIncomeTax charges through (see
-    // incomeTaxRate) rather than repeating the numbers. Written out
-    // twice, the two agree right up until someone changes the tax, at
-    // which point the receipt starts lying about a charge that is still
-    // being taken. The module factors are part of that rate: the receipt
-    // used to print the bare base, so a Smuggler's Hold round showed ten
-    // percent while the charge took twelve, and a Tax Evasion round
-    // showed ten while the charge took five.
-    const rate = incomeTaxRate(state) * 100;
+    // Use the same rate reader as the charge and the same formatter as the
+    // advisor, so the receipt cannot disagree with the tax actually taken.
+    const rate = formatTaxRate(incomeTaxRate(state));
     logs.push(
-      t("🏛️ Income Tax Paid ({rate}%): {tax} Gold", {
-        rate: rate.toFixed(0),
+      line("🏛️ Income Tax Paid ({rate}%): {tax} Gold", {
+        rate,
         tax,
       }),
     );
-  } else logs.push(t("🏛️ No profit, no income tax due"));
+  } else logs.push(line("🏛️ No profit, no income tax due"));
+  // vatPaid is the voyage total; VAT is withheld when an order settles.
   if (state.vatPaid > 0)
     logs.push(
-      t("🧾 VAT Paid this round: {state.vatPaid} Gold", {
+      line("🧾 VAT withheld so far: {state.vatPaid} Gold", {
         "state.vatPaid": state.vatPaid,
       }),
     );
 
-  // [F4: boons at milestone moments] The round's flags are rebuilt from
-  // the held boons rather than emptied, because a boon taken from a
-  // moment is permanent for the voyage: the round draft's flags expire
-  // with the round they were drafted in, and the held effects are the
-  // ones this write carries into the next one (see heldFlagsOf in
-  // ../held-cards and the merge in applyBoon for the other end).
+  // Rebuild from held boons. Round-drafted flags expire with the round.
   state.modifierFlags = heldFlagsOf(state);
   state.marketDemandTags = [];
   state.revealedIntel = [];
@@ -140,174 +98,104 @@ function endRound(state: GameState, logs: string[]) {
     return;
   }
   logs.push(
-    t("\n🔄=== Preparing for Round {state.currentRound} ===", {
+    line("\n🔄=== Preparing for Round {state.currentRound} ===", {
       "state.currentRound": state.currentRound,
     }),
   );
-  state.phase = "harbor";
   state.purchaseCount = 0;
   state.orderCount = 0;
   state.resourceCards = [];
   state.customerCards = [];
   state.purchasedCards = [];
   state.completedOrders = [];
-  // The one entry onto the lap still named rather than read, and it is named
-  // because it is not a handoff. Nothing was left behind to hand off from: a
-  // round is beginning, and every mode begins one at the boon draft today. It
-  // also takes no GameContext, so it could not ask the lap even if a mode
-  // wanted to open somewhere else. A mode that opens its round at a different
-  // phase is the change that threads ctx down to here.
+  // Every mode begins its round at the boon draft today, and this call takes
+  // no context, so it is named rather than read from the lap.
   startBoonDrafting(state, logs);
 }
 
-// The work of leaving Orders, which is a log line and nothing
-// else. Where that leads is the lap's business, not this function's.
-//
-// Private so the lap stays the only caller: a second caller is exactly the
-// second code path that would keep its own opinion about what comes next.
-function completeOrders(state: GameState, logs: string[]) {
-  if (state.orderCount === 0) logs.push(t("⏭️ Trading skipped"));
+function completeOrders(state: GameState, logs: LedgerLine[]) {
+  if (state.orderCount === 0) logs.push(line("⏭️ Trading skipped"));
   else
     logs.push(
-      t("✅ Trading ended, completed {state.orderCount} trades", {
+      line("✅ Trading ended, completed {state.orderCount} trades", {
         "state.orderCount": state.orderCount,
       }),
     );
 }
 
-// Opens Resolve, the phase that turns the round's work into gold: production
-// is applied first, and the pirates, the wages and the maintenance each wait
-// for their own press of the same phase (see nextPhase above, which walks
-// them in that order).
-//
-// Named for the phase it opens rather than for its position in the leg: a
-// function called startPhase3 that opens Resolve is a name a reader has to
-// translate.
-function startResolve(state: GameState, logs: string[]) {
+// Production runs first. Pirates, wages and maintenance each wait for their
+// own press of Resolve, in that order.
+function startResolve(state: GameState, logs: LedgerLine[]) {
   state.phase = "resolve";
-  logs.push(t("\n👥=== Processing Worker Production ==="));
+  logs.push(line("\n👥=== Processing Artisan Production ==="));
   processProduction(state, logs);
 }
 
-// Moved to ./engine/pirates and forwarded so existing imports of
-// `@/lib/game/engine` keep working. Imported below as well, since
-// nextPhase and snapToCheckpoint still dispatch to resolvePirateAttack.
-
-// Pays wages then maintenance in one confirmed step (the financial aid
-// request, if a captain needed one, has already happened by the time this
-// is called), failing the seat only if either still can't be covered.
-// Replaces the old split where wages were deducted the instant Resolve
-// started and only maintenance waited for a click, since that split left no
-// room for a captain to react before wages alone could force a bankruptcy.
-//
-// Both failures hand off to ./seats, which is the one place a seat's fate
-// is decided: what happens next depends on the mode rather than on this
-// step (see ModeConfig.bankruptcyIsFinal), and the classic terminal
-// transition is now one of its branches rather than four lines written
-// out here twice.
-//
-// Like every other departure here, it stops when the books are settled. It
-// used to end by opening the shipyard phase by name, which was one of the
-// seven copies of the phase order the lap now holds instead.
-//
-// Private for the same reason as completeOrders above: the settlement panel
-// reaches it through nextPhase now, so nothing outside this module names it.
-function finishSettlement(state: GameState, logs: string[]) {
-  // [C3: garments and the cold] The cold is settled with the books, which is
-  // where the plan puts it: decay and the check tick inside settlement, on
-  // the deterministic resolve step, and the module reads the round rather
-  // than a clock. It sits above the wage bill because it is a fact about the
-  // leg that just ended rather than a charge for it, so the wear and the
-  // frostbite are read before the numbers they are not part of.
+function finishSettlement(state: GameState, logs: LedgerLine[]) {
+  // Cold and spoilage tick during deterministic settlement and use the round
+  // number, never a clock. Milestones follow their evidence. Wages are paid
+  // before maintenance, and failSeat decides what bankruptcy means in this mode.
   tickGarments(state, logs);
-  // [C4: three foods, spoilage and the split hold] The pantry is settled
-  // beside the wardrobe and for the same reasons: the plan says spoilage
-  // and decay "both tick inside settlement, so both must be part of the
-  // deterministic resolve step and neither may read a clock", and the leg
-  // number is the only clock either of them has. It sits below the clothes
-  // rather than above them because the wear is about the leg that just
-  // ended and the rot is about what was carried through it, which is the
-  // same kind of fact a line later.
   tickSpoilage(state, logs);
-  // [F4: boons at milestone moments] The settlement sweep: the cold leg
-  // and the crossed rung are both facts this settlement just produced,
-  // so the moments they deal are noticed here, beside the ticks above
-  // who wrote their evidence, and never at a screen (see
-  // noteSettlementMilestones in ./milestones).
   noteSettlementMilestones(state, logs);
-  logs.push(t("\n💰=== Paying Worker Wages ==="));
+  logs.push(line("\n💰=== Paying Artisan Wages ==="));
   const wageResult = payWages(state, logs);
   if (wageResult === "bankruptcy") return failSeat(state, logs);
   logs.push(
-    t("\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance ===", {
-      "state.currentRound": state.currentRound,
-    }),
+    line(
+      "\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance Fee ===",
+      {
+        "state.currentRound": state.currentRound,
+      },
+    ),
   );
   const maintResult = payMaintenance(state, logs);
   if (maintResult === "bankruptcy") return failSeat(state, logs);
 }
 
-function startDusk(state: GameState, logs: string[]) {
+function startDusk(state: GameState, logs: LedgerLine[]) {
   state.phase = "dusk";
   logs.push(
-    t("\n🚢=== Round {state.currentRound} · Dusk: Shipyard & Modules ===", {
+    line("\n🚢=== Round {state.currentRound} · Dusk: Shipyard & Modules ===", {
       "state.currentRound": state.currentRound,
     }),
   );
 }
 
-// Passing on the shipyard. All this has to do is say so.
-//
-// It used to call endRound itself, because the shipyard is the phase that
-// closes the round today. That made the round close a fact about the number
-// four: a mode whose lap ended anywhere else would have run out of phases and
-// never settled a round at all. Closing is now the handoff's job, driven by
-// whether the lap says this is its last entry, so a longer leg settles on its
-// own closing phase without the engine being told which one that is.
-function skipUpgrade(logs: string[]) {
-  logs.push(t("⏭️ Skipped Shipyard Actions"));
+function skipUpgrade(logs: LedgerLine[]) {
+  logs.push(line("⏭️ Skipped Shipyard Actions"));
 }
 
-function endGame(state: GameState, logs: string[]) {
+function endGame(state: GameState, logs: LedgerLine[]) {
   state.gameOver = true;
   state.phase = "endgame";
-  logs.push("\n" + "=".repeat(50));
-  logs.push(t("🎮 {APP_NAME} · Game Over!", { APP_NAME }));
+  logs.push(rule("=", 50, "\n"));
+  logs.push(line("⚓ {APP_NAME} · Voyage Ended!", { APP_NAME }));
   logs.push(
-    t("💰 Final Funds: {state.money} Gold", { "state.money": state.money }),
+    line("💰 Final Gold: {state.money}", { "state.money": state.money }),
   );
   logs.push(
-    t("🏆 Final Reputation: {state.score}", { "state.score": state.score }),
+    line("🏆 Final Reputation: {state.score}", { "state.score": state.score }),
   );
   logs.push(
-    t("🧾 Total Taxes Paid: {taxesPaid} Gold", {
+    line("🧾 Total Taxes Paid: {taxesPaid} Gold", {
       taxesPaid: state.vatPaid + state.incomeTaxPaid,
     }),
   );
   logs.push(
-    t("📈 Rank: {rating}", {
-      rating: endgameRatingFor(state.score, state.defaultedDebt),
+    line("📈 Rank: {rating}", {
+      rating: (locale) =>
+        endgameRatingFor(state.score, state.defaultedDebt, locale),
     }),
   );
-  logs.push("=".repeat(50));
+  logs.push(rule());
 }
 
-// A voyage restarted by the host, or by the room rolling into a new one.
-// Everything the new voyage is seeded with, including the captain's pledged
-// House, arrives as one VoyageSetup; see createInitialGameState for what
-// each field means and what it falls back to.
-//
-// [B3: standing orders] The standing orders are the one thing here that
-// survives the wipe, and the reason is the plan's own sentence about them:
-// a captain configures them once. A host restarting a voyage is not the
-// captain changing their mind, and a set that had to be rewritten after
-// every restart would be a set nobody keeps. Read before the assign,
-// because the assign is what erases it, and read back through the same
-// normalizer every load uses so the carried set is a fresh object rather
-// than a reference shared with the abandoned voyage.
+// Standing orders survive a host restart: read before the assign that would
+// erase them, then normalize so the new voyage does not share the old object.
 export function restartGame(
   state: GameState,
-  logs: string[],
+  logs: LedgerLine[],
   setup: VoyageSetup = {},
 ) {
   const orders = state.standingOrders;
@@ -317,75 +205,48 @@ export function restartGame(
   showWelcome(state, logs);
 }
 
-export function showWelcome(state: GameState, logs: string[]) {
+export function showWelcome(state: GameState, logs: LedgerLine[]) {
   state.phase = "harbor";
-  logs.push("=".repeat(50));
-  logs.push(t("⚓ Welcome to {APP_NAME}!", { APP_NAME }));
-  logs.push(t("🚢 Sail across ports, build your business empire!"));
-  logs.push(t("👥 Hire artisans to craft valuable goods for higher profits!"));
-  logs.push("=".repeat(50));
+  logs.push(rule());
+  logs.push(line("⚓ Welcome to {APP_NAME}!", { APP_NAME }));
+  logs.push(line("🚢 Sail across ports, build your business empire!"));
+  logs.push(
+    line("👥 Hire artisans to craft valuable goods for higher profits!"),
+  );
+  logs.push(rule());
 }
 
-// Advances a captain one step from wherever they are.
-//
-// Everything in here is the work of LEAVING a phase. Not one branch names the
-// phase it leads to, because that is the lap's business: the handoff at the
-// bottom reads the mode's own order and opens whatever comes next. Two modes
-// can therefore run two different legs through this same function, and a third
-// one only has to be described in ./mode.ts.
-//
-// The switch falls through to the handoff for every phase whose departure is a
-// ready check step. The harbor is the pier, where nothing advances without the
-// host setting sail, and Dawn is the boon draft, where the departure is the
-// captain choosing a boon rather than confirming they are done. Leaving either
-// one from here would let a single captain start the voyage or skip their own
-// boon, so they return instead of falling through. The boon draft hands off
-// through lockInBoon below, which is the only caller that knows a boon was
-// actually chosen.
-//
-// [B1: the six phase leg, as data] There are six cases here now, one per
-// phase of the leg, where there used to be a case per checkpoint including
-// bartering and artisan management. The artisan bench settles nothing of its
-// own, so folding it into Market removed a case rather than adding one; the
-// bartering case is the Parley case with a new name, because the exchange it
-// closes is the same exchange.
-//
-// [W2: the path draft] And a seventh case beside them, which breaks rather
-// than settling anything: the draft's seat has no work of its own to commit
-// at the departure, because the whole of its work happened on the server
-// before the room was told to move. The picks were laid as they were taken,
-// the settled path rides the view this client already read (see
-// applyDraftPath), and the departure is the lap's own step off the seat.
-export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
-  // Read through the same normalizer the load heal uses (see heal-save):
-  // a token this build does not speak moves as the phase it means rather
-  // than falling to the default below, where the seat would advance
-  // nothing while the ready check refuses it.
+// Each branch does the work of leaving a phase; none names its successor.
+// Harbor and Dawn are not generic departures: the host sets sail, and a boon
+// must be picked. Those return instead of falling through to the handoff.
+// The path draft has no departure work of its own; the server settles it, and
+// the handoff below opens the successor on the lap.
+export function nextPhase(
+  state: GameState,
+  ctx: GameContext,
+  logs: LedgerLine[],
+) {
   const from = normalizePhase(state.phase);
   switch (from) {
     case "path_draft":
+      // No departure work: the settle is the departure, and the handoff
+      // below opens the seat that follows the draft on this mode's lap.
       break;
     case "market":
-      // Leaving the market settles the port purchase half of the phase. The
-      // artisan half settles nothing: the phase exists so every captain buys
-      // and sets their crew before the manifest is drawn, and production runs
-      // at settlement either way.
+      // Port purchases settle here. The artisan bench has no separate settlement:
+      // it exists so crew can be set before the manifest is drawn.
       completeMarket(state, logs);
       break;
-    // Leaving the Parley no longer settles anything: the offer board
-    // outlives the phase now, and an offer still open on it is
-    // released when the board itself drops it, wherever the voyage happens
-    // to be by then. See the onRefund contract in src/lib/use-barter.ts.
     case "parley":
+      // Offers outlive Parley; an open offer is released by the board, not here.
       completeParley(logs);
       break;
     case "orders":
       completeOrders(state, logs);
       break;
     case "resolve":
-      // The raid is resolved first and the books are settled on the next
-      // press, so this one departure takes two steps.
       if (!state.pirateAttackResolved) {
+        // Resolve takes two presses: the raid first, then the books.
         resolvePirateAttack(state, logs);
         return;
       }
@@ -397,28 +258,16 @@ export function nextPhase(state: GameState, ctx: GameContext, logs: string[]) {
     default:
       return;
   }
-  // A settlement that bankrupted the captain ends the voyage on the spot
-  // in the mode that treats insolvency as final, and there is then no next
-  // phase to open. In the other mode the seat sails on, so this guard does
-  // not fire and the lap carries the captain into the shipyard like every
-  // other settlement: the flag is what the voyage now reads them by, not
-  // the phase.
+  // A bankruptcy can end the voyage here, leaving no next phase to open.
   if (state.gameOver) return;
   handOff(state, ctx, logs, from);
 }
 
-// Opens whatever the mode's lap puts after `from`, or settles the round when
-// `from` was the lap's last phase.
-//
-// The last phase of a lap is the one that closes the round, and closing a
-// round is not a step to a successor: endRound settles the books, rolls the
-// round over and opens the next one (or ends the voyage). Reading that off
-// the lap rather than off a phase name is what keeps settling a property of
-// the mode, so a lap that closes somewhere else still settles.
+// The lap's closing phase settles the round; otherwise open its successor.
 function handOff(
   state: GameState,
   ctx: GameContext,
-  logs: string[],
+  logs: LedgerLine[],
   from: Phase,
 ) {
   if (closesRound(state.mode, from)) {
@@ -430,53 +279,23 @@ function handOff(
   enterPhase(state, ctx, logs, next);
 }
 
-// Locks in a boon and then leaves the draft the way the lap says to.
-//
-// This is the one departure that cannot be expressed as "I am done with this
-// phase", because what the captain chose is the work. It lives here rather
-// than in ./boons beside selectBoon for the reason the whole module is shaped
-// this way: only the spine may name a successor, and a sibling that imported
-// the spine back would close the one way flow that keeps the subsystems
-// independently testable.
+// Choosing a boon is the departure, so it cannot use the generic press.
 export function lockInBoon(
   state: GameState,
   ctx: GameContext,
   boonId: string,
-  logs: string[],
+  logs: LedgerLine[],
 ) {
   if (!selectBoon(state, boonId, logs)) return;
   handOff(state, ctx, logs, "dawn");
 }
 
-// How many presses the auto commit will spend trying to leave one seat. The
-// longest departure in the leg is Resolve, which takes two (the raid, then the
-// books), so this is that plus a margin rather than a number tuned to anything.
+// Resolve takes two presses (the raid, then the books), plus margin.
 const AUTO_COMMIT_PRESSES = 3;
 
-// Whether a generic "I am done with this seat" press has a departure to make
-// from where this captain stands.
-//
-// The room gates five seats, and every one of them is left by doing the seat's
-// work and then stepping off it: the market settles, the parley closes, the
-// orders are counted, the raid and then the books are settled, the yard is
-// skipped. Three seats are not left that way and have no generic departure at
-// all. The pier is left by the host setting sail, which is an order rather
-// than a vote. Dawn is left by choosing: a boon is not confirmed, it is
-// picked, so the only departure from it is lockInBoon with a card in hand.
-// And the draft's seat [W2] is left by the deal settling rather than by any
-// captain's press: the server announces the advance when every seat holds a
-// card, so a ready vote here would be a promise about a step that is not the
-// room's to take early. A captain standing anywhere else (inside the module
-// draft, at the terminal screens) is not standing at a seat the room is
-// waiting on at all.
-//
-// This is asked before a ready vote rather than after one, because the vote is
-// a promise the whole table pays for. The room announces the advance once
-// every captain has readied, and each client then runs the transition it was
-// holding: a captain who readies with nothing that can move leaves the room
-// holding a full ready set that no departure will carry out, which is a table
-// where the bar reads "2/2 ready" and the voyage never proceeds. A press that
-// cannot move is refused instead of sent.
+// Only seats left by a generic "done" press qualify. A ready vote that
+// cannot move would leave the harbor at a full ready count, so check this
+// before the vote and refuse rather than sending it.
 export function canLeavePhase(state: {
   mode: unknown;
   phase: Phase;
@@ -490,23 +309,11 @@ export function canLeavePhase(state: {
   );
 }
 
-// The generic departure: the seat's own work, then the lap's step off it.
-//
-// This is the loop autoCommit has always run, named and lifted out of it so
-// the press a captain makes by hand and the press the clock makes for them are
-// one routine rather than two copies of one. It walks rather than naming a
-// phase because two seats take more than one press to leave (Resolve is the
-// raid and then the books), and the cap is what makes a departure that will
-// not move a captain who stands still instead of a loop that never ends.
-//
-// Returns whether the seat was actually left. The false answer is a real one
-// and its callers check it: a captain standing where canLeavePhase says no,
-// or in a seat whose departure failed, is a captain whose press must not be
-// sent to the room.
+// Walk because Resolve needs two presses. Returns whether the phase changed.
 export function leavePhase(
   state: GameState,
   ctx: GameContext,
-  logs: string[],
+  logs: LedgerLine[],
 ): boolean {
   if (!canLeavePhase(state)) return false;
   const from = state.phase;
@@ -517,57 +324,25 @@ export function leavePhase(
   return false;
 }
 
-// The clock's departure: what a captain who was holding nothing commits when
-// the seat they were standing in runs out. [B3] What a captain who wrote
-// standing orders commits is their own instructions, and the defaults below
-// are what a captain who wrote nothing (or switched their set off) gets.
-//
-// [B2: hard timers, the server as timekeeper] The server announces the same
-// advance it announces for a unanimous ready set, and every client that was
-// waiting on a choice runs the choice it was holding; this is what the clients
-// that were holding nothing run instead. It is a real departure rather than a
-// skip, because a seat is left by its own defaults either way: the first boon
-// on the board, a canceled module draft, or the settlement's own order of
-// business. A captain who closed the laptop has still played the leg, by the
-// same rules everyone else played it by.
-//
-// It walks the seat rather than naming a phase, in the same spirit as
-// nextPhase above: two seats take more than one press to leave (Resolve is the
-// raid and then the books), and a captain standing in the module draft is
-// inside Dusk rather than at a seat of its own. That walk is leavePhase, one
-// definition under this one and the one a captain's own press makes; the cap
-// it carries is what makes a departure that will not move a captain who
-// stands still instead of a loop that never ends, and the room's clock is what
-// tries again.
-export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
-  // The draft and the swap are the two phases that are inside a seat rather
-  // than a seat: the room's checkpoint waits at Dusk while a captain is in
-  // one, and Dusk is what the clock ran out on.
+// Fallback for a captain holding nothing: cancel a parked module draft, then
+// apply standing orders if enabled and supported, then leave the seat.
+export function autoCommit(
+  state: GameState,
+  ctx: GameContext,
+  logs: LedgerLine[],
+) {
+  // Those phases sit inside Dusk. Cancel first so leavePhase sees a gated seat.
   if (state.phase === "module_draft" || state.phase === "module_swap") {
     cancelModuleDraft(state);
   }
-  // [B3: standing orders] The captain's own instructions, or null when they
-  // switched them off. Read once, here, rather than at each seat below, so
-  // the rollback the plan asks for is one decision in one place: with the
-  // switch off, every branch here behaves exactly as the engine's own
-  // defaults and the written set is left on the record untouched.
-  //
-  // The mode is asked in front of the captain's own switch rather than
-  // beside it, and the two are different questions: the switch is the
-  // captain saying they do not want their seat played for them, and the
-  // mode is whether this voyage has such a page at all. The shipped voyage
-  // does not, so a set left on a Classic save is unread rather than
-  // rewritten, which is the same way the rolled back switch reads it.
+  // Both the mode and the captain's switch must allow standing orders. A set
+  // left on a save for a mode without them is left untouched.
   const orders =
     modeConfig(state.mode).standingOrders && state.standingOrders.enabled
       ? state.standingOrders
       : null;
-  // Dawn is left by choosing, so its fallback is the board's first offer. The
-  // list is dealt deterministically by draftBoons, so the boon a captain who
-  // is not there takes is the same boon everyone watching their seat sees
-  // them take. An order that was written for a boon this round did not deal
-  // falls back the same way rather than reaching into the catalogue, which is
-  // the whole of what standingBoonId decides.
+  // Dawn is left by choosing. The fallback is the first deterministic offer,
+  // or the captain's standing order when it names a card in this round's pool.
   if (state.phase === "dawn") {
     const boonId =
       (orders ? standingBoonId(state, orders) : null) ??
@@ -576,62 +351,26 @@ export function autoCommit(state: GameState, ctx: GameContext, logs: string[]) {
     lockInBoon(state, ctx, boonId, logs);
     return;
   }
-  // [W2: the path draft] The draft's seat is left by the deal settling
-  // rather than by a press, which is why the generic departure below cannot
-  // carry it: canLeavePhase refuses this seat on purpose, so that no ready
-  // vote can promise the room a step only the settle may take. The
-  // departure still runs here, because this function is what a client runs
-  // when the room's own advance frame arrives, and that frame only ever
-  // comes after settleDraft has put every seat's path in its captain's
-  // hands. The step off is the lap's, the same one a ready set would have
-  // taken, and no standing order has anything to do at this seat.
+  // The server settles the draft; the advance frame is the departure.
   if (state.phase === "path_draft") {
     nextPhase(state, ctx, logs);
     return;
   }
-  // The three seats whose work is a set of presses rather than the departure
-  // itself: the captain's instructions do what they can, and the departure
-  // below then leaves the seat on the lap's own terms, exactly as it does for
-  // a captain who pressed everything by hand. That departure is leavePhase,
-  // which is the same one a captain's own press makes: this function was the
-  // only place it was written down, and a second copy of it beside the press
-  // is how the two came to disagree about which seats can be left at all.
-  //
-  // The cancel above is why the guard inside leavePhase is read after it
-  // rather than before: a captain the clock found inside the module draft has
-  // just been put back at Dusk, which is a seat the room gates and which this
-  // departure can therefore leave.
   if (orders) workStandingOrders(state, orders, logs);
   leavePhase(state, ctx, logs);
 }
 
-// Opens a phase directly, without moving the round.
-//
-// This is the lower half of snapToCheckpoint and the upper half of the lap
-// handoff above, which is why it is one function rather than two switches:
-// a captain catching up to the room and a captain stepping forward through
-// their own voyage have to land in exactly the same state, and the only way
-// to be sure of that is for both to run this.
-//
-// The value comes off a wire or out of a save, so it is normalized before it
-// is read: a room that still holds one of the older checkpoint names, or a
-// save written by an older build, opens the phase that name means rather than
-// falling through to nothing and leaving the captain where they were. The pier
-// falls through on purpose, because the pier is where a voyage waits: nothing
-// in catching up to the room may replace the host's own order to set sail.
+// Shared by normal handoffs and checkpoint snaps so both land in the same
+// state. Input can come from a save or the wire, so normalize it first. The
+// pier is deliberately left unchanged.
 function enterPhase(
   state: GameState,
   ctx: GameContext,
-  logs: string[],
+  logs: LedgerLine[],
   phaseStr: string,
 ): void {
   switch (normalizePhase(phaseStr)) {
     case "path_draft":
-      // [W2] Nothing on the captain's own sheet belongs to this seat, the
-      // way the pier belongs to the host: the hand was dealt and answered
-      // on the server, and the path lands the moment the settled view is
-      // read (see applyDraftPath). So entering it is standing in it, and
-      // the state is the whole of what there is to set.
       state.phase = "path_draft";
       return;
     case "dawn":
@@ -662,38 +401,23 @@ export function snapToCheckpoint(
   ctx: GameContext,
   round: number,
   phaseStr: string,
-  logs: string[],
+  logs: LedgerLine[],
 ): void {
   state.currentRound = round;
   enterPhase(state, ctx, logs, phaseStr);
 }
 
-// Human readable label for the current phase (for the multiplayer status
-// panel and the player detail popup). Takes just the two fields it needs
-// rather than a full GameState so it can also describe the lighter weight
-// snapshot used for someone else's detail popup.
-//
-// The words come from the phase's own face in ../phases, which is the single
-// place a phase is described, so the status panel, the voyage rail and the
-// log headers all say the same thing about the same phase. A phase of the leg
-// is qualified by the round it is in, because "Resolve" alone does not tell a
-// captain how far along the voyage they are; the pier and the phases that are
-// not steps of the leg (drafting a module, the two terminals) read as
-// themselves, since none of them is a station a round passes through.
+// Labels come from the phase's face. Round phases also carry the round, since
+// the phase name alone does not show voyage progress.
 export function phaseLabel(state: {
   phase: GameState["phase"];
   currentRound: GameState["currentRound"];
 }): string {
   const face = phaseFace(state.phase);
-  // The compound leaves here as one sentence: the round's frame is read the
-  // same way and the already spoken label is handed to it as a value. The
-  // status frame still carries phaseLabel, because the wire contract pins
-  // the pass-through (the smoke battery checks it), but every surface that
-  // prints another captain's phase derives it again from the frame's own
-  // phase and round, so each reader reads their own language rather than
-  // whichever captain reported last.
+  // Recomposed at the reader rather than trusting the reporting captain's
+  // language. The status frame still carries phaseLabel for the wire contract.
   const label = t(face.label);
-  return isLegPhase(state.phase)
+  return isRoundPhase(state.phase)
     ? t("R{round} · {label}", { round: state.currentRound, label })
     : label;
 }

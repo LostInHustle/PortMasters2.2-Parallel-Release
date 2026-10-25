@@ -2,11 +2,10 @@
 // [Bilingual Harbor: the language pack and its readers] The one place
 // the tree asks what language it is printing in. Every captain facing
 // string ships twice: the English the source carries, and the Mandarin
-// that arrives with this pack (./zh.json, lifted from
-// docs/BILINGUAL_HARBOR.md once its sentence tables were verified row by
-// row). The readers here are the whole switch, the same shape the card
-// layer took when it carried two strings per card and let cardText pick:
-// one door rather than a hunt through every screen.
+// that arrives with this pack (./zh.json, the file the mapping document
+// points at). The readers here are the whole switch, the same shape the
+// card layer took when it let cardText pick: one door rather than a hunt
+// through every screen.
 //
 // The book is keyed by the English itself. A call site passes the string
 // it would have printed (t("Harbor")), the file holds the pairing
@@ -21,17 +20,15 @@
 //
 // Two reads need saying out loud. The first is that the flat text map
 // keeps the earlier leaf where the file carries one English string
-// twice. Six strings repeat: four are a term layer beside its UI label,
-// identical in both languages, so the pair is a seam nobody can feel
-// (Sea Master, Hold, Cargo, Stores), and two genuinely differ. The
-// leader sentence's two readings end up one reading on screen, the
-// earlier leaf wins, and the file keeps the later row as the
-// translator's record. The second is "Market": that one word is the
-// market phase's chip and it is also the market tab, the two read
-// differently in Mandarin, and no text keyed map can tell those call
-// sites apart. They ask by id through tId() instead, the file keeps both
-// leaves (phase.market.label and ui.market), and the collision never
-// reaches a screen.
+// twice. One such pair ships today: `phase.market.label` and `ui.market`
+// are both `Market` in English, and the surfaces that need them apart ask
+// for the second by id so it can read `集市` while the phase label reads
+// `开市`. The flat map serves the earlier leaf, and the id reader serves
+// the card layer. The second is the read by id. A card's Mandarin is not
+// written beside its English in the record, it is written here, so a card
+// is asked for by the id the pool knows it by (card.<id>.name and
+// card.<id>.desc) rather than by the text it prints. The two doors answer
+// different questions, and the card layer asks the second.
 //
 // Missing entries fail open: an English string with no leaf prints
 // itself, in either language, because a missing row is a gap in the pack
@@ -53,15 +50,17 @@ type Leaf = { readonly en: string; readonly zh: string };
 // the reason the reads below test for undefined rather than falsy.
 export type Params = Record<string, string | number>;
 
-// The two languages the tree prints, read from the pack's side. The card
-// layer names the same pair as Language (./constants/cards), and the
-// lift keeps the two the same pair by hand rather than by import,
-// because the pack has to exist before any card does.
-export type Locale = "en" | "zh";
+// The two languages the tree prints, as the list the picker offers and
+// the checks walk. The list is the one place a language is named and the
+// type is read off it, so a third language added here is one the tree
+// knows about rather than one the type does not: the same rule the
+// Houses and the Ages keep their lists by.
+//
+// The card layer names the same pair as Language (./constants/cards) and
+// takes this list for it, so the two cannot come apart either.
+export const LOCALES = ["en", "zh"] as const;
 
-// The pair as a list, for the picker that offers it and the checks that
-// walk it.
-export const LOCALES: readonly Locale[] = ["en", "zh"];
+export type Locale = (typeof LOCALES)[number];
 
 // The language a fresh process prints in, and the language a captain
 // lands on before a pick is stored.
@@ -87,7 +86,9 @@ export const LOCALE_COOKIE_NAME = "pm_locale";
  * with it.
  */
 export function isLocale(value: unknown): value is Locale {
-  return value === "en" || value === "zh";
+  return (
+    typeof value === "string" && (LOCALES as readonly string[]).includes(value)
+  );
 }
 
 // The file, as groups of leaves. One cast for the whole walk: the json
@@ -199,18 +200,30 @@ export function tFor(locale: Locale, en: string, params?: Params): string {
 /**
  * The leaf an id names, in the language this process prints.
  *
- * The read for the English strings the flat text map cannot answer
- * alone, which today is the one word Market: the market phase's chip and
- * the market tab read differently in Mandarin, so those two call sites
- * ask by id (phase.market.label and ui.market) while every other call
- * site keeps the everyday t(). An id no group carries answers the id
- * itself, the same honest line cardName takes for a card the pool does
- * not know.
+ * The door for the strings the flat text map cannot answer, which today
+ * are a card's own words: the Mandarin for a card is written in this
+ * file (card.<id>.name and card.<id>.desc) rather than in the record
+ * beside the English, so a card is asked for by the id the pool knows it
+ * by. An id no group carries answers the id itself, the same honest
+ * line cardName takes for a card the pool does not know.
  */
 export function tId(id: string, params?: Params): string {
+  return tIdFor(current, id, params);
+}
+
+/**
+ * The leaf an id names, in a language the caller names.
+ *
+ * The same door as tId, for a caller that knows which language it wants
+ * rather than which language the process prints: the card layer asks for
+ * a card's words in the language a ledger line is quoting, while the
+ * tree's own language is whatever the captain picked. A missing id
+ * answers itself here as it does there.
+ */
+export function tIdFor(locale: Locale, id: string, params?: Params): string {
   const leaf = BY_ID.get(id);
   if (leaf === undefined) return id;
-  return interpolate(current === "zh" ? leaf.zh : leaf.en, params);
+  return interpolate(locale === "zh" ? leaf.zh : leaf.en, params);
 }
 
 /**

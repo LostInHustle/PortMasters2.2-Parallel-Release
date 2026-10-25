@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { MUTED_NOTICE } from "@/lib/game/constants/copy";
 import { t } from "@/lib/game/i18n";
 import type { Barter } from "./game/phases/PhaseShared";
+import type { LedgerAct } from "@/lib/game/ledger";
 import { MessageList, type StreamItem } from "./chat/MessageList";
 import { Composer } from "./chat/Composer";
 
@@ -21,12 +22,12 @@ import { Composer } from "./chat/Composer";
 export type ChatTrade = {
   barter: Barter;
   game: GameState;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
+  act: LedgerAct;
   members: PublicUser[];
   colorFor?: (item: string) => string | undefined;
   // Set on a private thread: the captain this conversation is with, who the
   // composer addresses its offers to. The caller leaves it off when that
-  // captain is not in the room, since a board offer naming an outsider is
+  // captain is not in the harbor, since a board offer naming an outsider is
   // one the server would refuse.
   defaultTarget?: PublicUser;
 };
@@ -37,8 +38,8 @@ export type ChatTrade = {
 // holds the socket, the requests it listens for and the history it seeds
 // from, and hands each of the two ends only what it draws.
 /**
- * A self contained chat surface. Three modes: room, messages broadcast to a
- * room channel (socket `chat:room`); lobby, messages broadcast to the harbor
+ * A self contained chat surface. Three modes: harbor, messages broadcast to a
+ * harbor channel (socket `chat:harbor`); lobby, messages broadcast to the harbor
  * square every captain in the lobby is standing in (socket `chat:lobby`); dm,
  * 1 to 1 messages with another user (socket `chat:dm`).
  *
@@ -46,7 +47,7 @@ export type ChatTrade = {
  * the parent: the Lobby fetches it over REST, a session hands over what the
  * server hydrated on join, because a session conversation is never written
  * down and so has nowhere to be fetched from later. The two public channels
- * split the same way on the server, where a room's chat dies with the voyage
+ * split the same way on the server, where a harbor's chat dies with the voyage
  * and the square's is written down. Live messages arrive over the socket.
  * Mine uses the celadon pm-grad-chat, others get a soft black tint so the
  * conversation reads as two sides of a brush.
@@ -73,9 +74,9 @@ export function ChatPanel({
   other?: PublicUser;
   initialMessages?: ChatMessage[];
   trade?: ChatTrade;
-  // [MANIFEST 14: Harbor Watch] Set only for the room mode instance, only
+  // Set only for the harbor mode instance, only
   // while the host has muted this captain. A muted captain keeps reading
-  // room chat live same as anyone; they just can't post to it until the
+  // harbor chat live same as anyone; they just can't post to it until the
   // voyage ends, which is enforced again server side regardless of this
   // prop, so a stale client can never actually post past the block.
   disabled?: boolean;
@@ -209,7 +210,7 @@ export function ChatPanel({
             ],
       );
     };
-    // A room whose conversation the host has just wiped. The messages on
+    // A harbor whose conversation the host has just wiped. The messages on
     // screen belong to the voyage that was just thrown away, so they go with
     // it. Offers are board state and are untouched by a restart, so they are
     // left to the barter board's own update.
@@ -217,7 +218,7 @@ export function ChatPanel({
       if (data.roomId !== roomId) return;
       setMessages([]);
     };
-    // [MANIFEST 14: Harbor Watch] Defensive: the disabled prop (driven by
+    // Defensive: the disabled prop (driven by
     // GameRoom.tsx's own room:members tracking) already hides the input
     // the moment a mute takes effect, so this should be unreachable in
     // ordinary use. It only ever fires for a stale client, a tab whose
@@ -264,10 +265,10 @@ export function ChatPanel({
     if (!content) return;
     setInput("");
     if (mode === "room" && roomId) {
-      // Optimistic echo handled by server broadcast to room (including self).
+      // Optimistic echo handled by server broadcast to harbor (including self).
       socket?.emit("chat:room", { roomId, content });
     } else if (mode === "lobby") {
-      // The same echo, from the square rather than from a room.
+      // The same echo, from the square rather than from a harbor.
       socket?.emit("chat:lobby", { content });
     } else if (mode === "dm" && other) {
       socket?.emit("chat:dm", { recipientId: other.id, content });

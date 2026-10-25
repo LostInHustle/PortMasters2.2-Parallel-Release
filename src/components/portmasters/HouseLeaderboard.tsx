@@ -16,10 +16,10 @@ import {
 /**
  * Great Houses Leaderboard. A richer view of the harbor wide house
  * standings, showing each house's rank, total crowns, voyages, and best
- * score, with visual progress bars for comparison.
+ * Reputation, with visual progress bars for comparison.
  *
  * The house with the most crowns leads. Ties are broken by total
- * voyages, then by best score.
+ * voyages, then by best Reputation.
  */
 
 export function HouseLeaderboard({
@@ -29,11 +29,11 @@ export function HouseLeaderboard({
   standings: HouseStanding[];
   myHouseId?: string | null;
 }) {
-  // Sort: most crowns, then most voyages, then best score
+  // Sort: most crowns, then most voyages, then best Reputation
   const ranked = [...standings].sort((a, b) => {
     if (b.crowns !== a.crowns) return b.crowns - a.crowns;
     if (b.voyages !== a.voyages) return b.voyages - a.voyages;
-    return b.bestScore - a.bestScore;
+    return b.bestReputation - a.bestReputation;
   });
 
   // Only the crown bar is drawn to scale, so only the crown maximum is
@@ -136,7 +136,7 @@ export function HouseLeaderboard({
                       <Ship className="h-2.5 w-2.5" /> {s.voyages}
                     </span>
                     <span className="flex items-center gap-0.5">
-                      <Star className="h-2.5 w-2.5" /> {s.bestScore}
+                      <Star className="h-2.5 w-2.5" /> {s.bestReputation}
                     </span>
                   </div>
                 </div>
@@ -178,8 +178,8 @@ export function HouseLeaderboard({
             icon={Ship}
           />
           <SummaryStat
-            label={t("Top Score")}
-            value={Math.max(...ranked.map((s) => s.bestScore))}
+            label={t("Top Reputation")}
+            value={Math.max(...ranked.map((s) => s.bestReputation))}
             icon={TrendingUp}
           />
         </div>

@@ -3,7 +3,7 @@
 // =====================================================================
 // A harbor's top bar.
 //
-// Three kinds of thing sit in it. The room's own identity: its name, the
+// Three kinds of thing sit in it. The harbor's own identity: its name, the
 // code a captain reads out to a friend, and how many are aboard. The
 // suggestion button, which reads the phase and offers this captain a next
 // move. And the four controls that belong to the captain's own session
@@ -11,7 +11,7 @@
 // sounds, the settings, and the notifications.
 //
 // Nothing here decides anything. Every switch below is a value and a
-// callback handed in by the room, which owns the state, so this file is
+// callback handed in by the harbor, which owns the state, so this file is
 // only ever the arrangement of the bar.
 // =====================================================================
 
@@ -52,7 +52,7 @@ export function HarborTopBar({
   me,
   onLeave,
 }: {
-  /** The room this bar stands over: the name it shows and the code it copies. */
+  /** The harbor this bar stands over: the name it shows and the code it copies. */
   room: Pick<RoomDetail, "name" | "code">;
   memberCount: number;
   onCopyCode: () => void;
@@ -97,7 +97,7 @@ export function HarborTopBar({
           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end">
-          <AgeBanner variant="pill" className="hidden md:inline-flex" />
+          <AgeBanner className="hidden md:inline-flex" />
           <div className="relative hidden sm:block">
             <ActionSuggester game={game} />
           </div>
@@ -181,7 +181,7 @@ export function HarborTopBar({
             <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
             {/* Below the sm width the Leave button is its glyph alone,
                 with the name kept in the title and the aria label: the
-                labelled button and the divider before it were the last
+                labeled button and the divider before it were the last
                 two things pushing the bar's controls onto a second row
                 on a phone, and a second row of chrome is a second row
                 of board the captain cannot see. */}

@@ -2,10 +2,10 @@
 // PortMasters 2.2 Parallel Release: the harbor's unlock table
 //
 // One data record per phrase, the same shape ./game/mode.ts and
-// ./game/difficulty.ts use, and for the same reason: an unlock is a ROOM
+// ./game/difficulty.ts use, and for the same reason: an unlock is a HARBOR
 // property. A host types the phrase while charting the harbor, the room
 // row remembers which code opened it, and every captain who reads that
-// room afterwards reads the same record.
+// harbor afterwards reads the same record.
 //
 // Never per account, and that is a design decision rather than a
 // simplification. If one player holds the phrase and another does not,
@@ -14,7 +14,7 @@
 // nothing to give away. What the phrase buys is a moment, not a fence.
 //
 // The phrase is therefore not a secret in the way a password is, and the
-// plan says so: it is seeded in the world, a voyage log hands it to the
+// design says so: it is seeded in the world, a voyage log hands it to the
 // captain who earned it and the manual prints it for whoever goes
 // looking. It is read here, beside the mode it opens, so the route that
 // opens the door and the manual that prints the string are reading one
@@ -26,16 +26,16 @@ import type { GameMode } from "./game/mode";
 // The harbor's line below is read at the moment it is built rather than
 // stored, so the rumor a captain is handed follows the language the log
 // it lands in prints in. The table above keeps its English values: a
-// label is read where it is rendered (the room card wraps its own read)
+// label is read where it is rendered (the harbor card wraps its own read)
 // and the phrase is what a host types, which the normalizer below only
 // accepts in one form.
-import { t } from "./game/i18n";
+import { getLocale, tFor, type Locale } from "./game/i18n";
 
 export type UnlockId = "second_ledger";
 
 interface UnlockConfig {
   // What the interface calls a harbor that was opened with this phrase.
-  // Read on the room card, so a captain joining one can see that the
+  // Read on the harbor card, so a captain joining one can see that the
   // table they are walking into was opened rather than found.
   label: string;
   // The mode this phrase opens. One phrase opens one mode, which is what
@@ -48,7 +48,7 @@ interface UnlockConfig {
   phrase: string;
   // The line the manual prints, phrase and all. Written here rather than
   // in the manual for the reason above: the guide a captain can open and
-  // the string the plan is distributed through are the same sentence, so
+  // the string the design is distributed through are the same sentence, so
   // no reader can be handed a stale copy of it.
   manual: string;
 }
@@ -63,7 +63,7 @@ export const UNLOCKS: Record<UnlockId, UnlockConfig> = {
     // key rather than a riddle: what the phrase buys is the moment of
     // being handed something, not a hunt for it.
     manual:
-      "One harbor is sealed as well as hard. It opens with a phrase, and the phrase is the second ledger, entered when the room is charted.",
+      "One harbor is sealed as well as hard. It opens with a phrase, and the phrase is the second ledger, entered when the harbor is charted.",
   },
 };
 
@@ -74,7 +74,7 @@ export const UNLOCK_ORDER: readonly UnlockId[] = ["second_ledger"];
 // The completed voyage whose log hands the phrase over, counted per
 // captain.
 //
-// Ten is the count the plan names, and it is also the count the account
+// Ten is the count the design names, and it is also the count the account
 // already marks for itself (CENTURY_CLUB_VOYAGES in ./game/merits.ts banks
 // on the same voyage), so the rumor rides a moment a captain is already
 // celebrating rather than asking for a ceremony of its own. The two
@@ -129,13 +129,22 @@ export function unlockForPhrase(value: unknown): UnlockId | null {
 // so the number a captain is told and the number the rule waits for are
 // the same constant: a threshold that moved would move the words with it.
 // The phrase is read through the pack like a name rather than passed
-// raw, so the line names the door the way the guide and the room card
+// raw, so the line names the door the way the guide and the harbor card
 // name it.
-export function unlockLineFor(voyagesCompleted: number): string | null {
+//
+// The language is a parameter because the server composes this line once,
+// for a captain's chronicle, and stores it: the caller that knows which
+// language that captain reads passes it, while a client-side read keeps
+// the default and follows the picker.
+export function unlockLineFor(
+  voyagesCompleted: number,
+  locale: Locale = getLocale(),
+): string | null {
   if (voyagesCompleted !== UNLOCK_EARNED_AT) return null;
   const unlock = UNLOCKS[UNLOCK_ORDER[0]];
-  return t(
+  return tFor(
+    locale,
     "The harbor keeps one door shut, and {UNLOCK_EARNED_AT} completed voyages is what opens it: the phrase is {unlock.phrase}, and the guide has the line for whoever asks.",
-    { UNLOCK_EARNED_AT, "unlock.phrase": t(unlock.phrase) },
+    { UNLOCK_EARNED_AT, "unlock.phrase": tFor(locale, unlock.phrase) },
   );
 }

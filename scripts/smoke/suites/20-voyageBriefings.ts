@@ -6,7 +6,7 @@ import { tipsText } from "@/lib/game/constants/tips";
 import { tFor } from "@/lib/game/i18n";
 import type { GameMode } from "@/lib/game/mode";
 import { MODES, MODE_ORDER } from "@/lib/game/mode";
-import { isLegPhase, phaseFace } from "@/lib/game/phases";
+import { isRoundPhase, phaseFace } from "@/lib/game/phases";
 import type { Phase } from "@/lib/game/types";
 import {
   CARRIES_A_DASH,
@@ -28,12 +28,12 @@ export async function voyageBriefingsSuite(): Promise<void> {
   // shape of a round is true, so a briefing that disagrees with its own
   // lap is a lie only a player can catch. The bug this section was
   // written for is a real one rather than a hypothetical. The Gambit
-  // briefing numbered four legs and listed five, and the pill above it
+  // briefing numbered four phases and listed five, and the pill above it
   // printed a fourth number of its own that matched neither.
   //
   // A mode briefs in one of two shapes, and each is held to the lap
   // from the side it can be held from. A line is prose, so it is read
-  // through its words: every leg of the mode's own lap has to be named
+  // through its words: every round of the mode's own lap has to be named
   // by some step of the sentence, and the steps have to run in the order
   // the engine walks them. A chart is data, so it is read through the
   // checkpoints it names. Both claims are the same claim about the lap.
@@ -52,18 +52,18 @@ export async function voyageBriefingsSuite(): Promise<void> {
       ...(briefing.kind === "line"
         ? [briefing.text]
         : [
-            ...briefing.legs.flatMap((leg) => {
-              // A chart prints the phase's own face over each leg (see
+            ...briefing.phases.flatMap((round) => {
+              // A chart prints the phase's own face over each round (see
               // PHASE_FACES), so the words a mode hands a captain are those
-              // plus what the mode itself says the leg decides.
-              const face = phaseFace(leg.phase);
+              // plus what the mode itself says the round decides.
+              const face = phaseFace(round.phase);
               return [
                 face.icon,
                 face.gradient,
                 face.label,
                 face.short,
-                leg.body,
-                leg.setsUp,
+                round.body,
+                round.setsUp,
               ];
             }),
             briefing.closes,
@@ -75,7 +75,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
     "no line a mode hands a captain carries an en dash, an em dash or a doubled hyphen",
   );
   // A field left blank is copy that renders as an empty row, which no
-  // other check in this file would see: a missing body reads as a leg
+  // other check in this file would see: a missing body reads as a round
   // with nothing to say rather than as a record that lost a string.
   check(
     modeCopy.every((line) => line.trim().length > 0),
@@ -89,7 +89,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
   // identifiers rather than sentences, and the phase labels, which are
   // shared with the rail rather than written by the mode. What is in it is
   // every sentence a mode writes about itself: what it is, what it costs
-  // to fail, what it changes, and what each leg of its round decides.
+  // to fail, what it changes, and what each round of its round decides.
   const modeProse = MODE_ORDER.flatMap((mode) => {
     const { tagline, summary, failureRule, differences, briefing } =
       MODES[mode];
@@ -101,7 +101,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
       ...(briefing.kind === "line"
         ? [briefing.text]
         : [
-            ...briefing.legs.flatMap((leg) => [leg.body, leg.setsUp]),
+            ...briefing.phases.flatMap((round) => [round.body, round.setsUp]),
             briefing.closes,
           ]),
     ];
@@ -216,7 +216,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
 
   // The two surfaces a captain meets before the first round, which are
   // components rather than functions and so are read as source rather
-  // than rendered: the lobby's manual and the room's Welcome screen. Each
+  // than rendered: the lobby's manual and the harbor's Welcome screen. Each
   // one takes the mode and prints the record's own fields, and neither
   // states a mode's rules in words of its own. The sentence named in the
   // second check is the one the manual used to carry: it told every crew,
@@ -331,30 +331,30 @@ export async function voyageBriefingsSuite(): Promise<void> {
   );
 
   // Where a mode's briefing puts a thing, as the words it prints for its
-  // own legs. A line is split on its own arrow; a chart is its leg order.
+  // own rounds. A line is split on its own arrow; a chart is its phase order.
   // Both are the mode saying this comes before that, which is the claim
   // the checks further down hold it to.
   const briefingOrder = (mode: GameMode): string[] => {
     const { briefing } = MODES[mode];
     return briefing.kind === "line"
       ? briefing.text.split("→").map((step) => step.trim())
-      : briefing.legs.map((leg) => phaseFace(leg.phase).label);
+      : briefing.phases.map((round) => phaseFace(round.phase).label);
   };
 
   // A line's own arithmetic, which the numbers used to carry and which
-  // B1 moved onto the names: with the numerals retired, a sentence about
+  // now lives on the names: with the numerals retired, a sentence about
   // the shape of a round is held to the same claim the chart is, read
-  // through its words. Each step must name one leg of the mode's own lap,
+  // through its words. Each step must name one round of the mode's own lap,
   // in the order the engine walks them, and the words are the faces
   // rather than typed here, so a phase renamed in the table renames the
   // check with it. An icon and a colon are the only things a step may
   // put in front of the name, which is what keeps this from passing on a
-  // sentence that names the right legs in the wrong order.
+  // sentence that names the right rounds in the wrong order.
   for (const mode of MODE_ORDER) {
     const { briefing } = MODES[mode];
     if (briefing.kind !== "line") continue;
     const steps = briefingOrder(mode);
-    const lap = lapPhases(mode).filter(isLegPhase);
+    const lap = lapPhases(mode).filter(isRoundPhase);
     check(
       steps.length === lap.length &&
         lap.every((phase, index) =>
@@ -365,24 +365,24 @@ export async function voyageBriefingsSuite(): Promise<void> {
   }
 
   // A chart's hold on the lap, which is not arithmetic but identity:
-  // every leg names the checkpoint it is, and the legs have to be the
+  // every round names the checkpoint it is, and the phases have to be the
   // mode's own lap, once each and in the order the engine walks them.
   // This is what keeps a chart honest the day a mode moves a phase, and
   // it is the reason the harbor is dropped rather than listed: waiting
-  // to set sail is not a leg a captain pays for, which is the same
+  // to set sail is not a round a captain pays for, which is the same
   // reason the voyage timeline leaves it off its rail.
   for (const mode of MODE_ORDER) {
     const { briefing } = MODES[mode];
     if (briefing.kind !== "flow") continue;
-    const legs = briefing.legs.map((leg) => leg.phase);
-    const lap = lapPhases(mode).filter(isLegPhase);
+    const rounds = briefing.phases.map((round) => round.phase);
+    const lap = lapPhases(mode).filter(isRoundPhase);
     check(
-      legs.length === lap.length &&
-        legs.every((phase, index) => phase === lap[index]),
+      rounds.length === lap.length &&
+        rounds.every((phase, index) => phase === lap[index]),
       `the ${MODES[mode].badge} chart covers its own lap once each, in the order the engine walks it`,
     );
     check(
-      new Set(legs).size === legs.length,
+      new Set(rounds).size === rounds.length,
       "and draws no checkpoint on it twice",
     );
   }
@@ -401,7 +401,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
     // follows a phase renamed in the face table rather than pinning the
     // old word here. Read as "the step that names this phase" rather than
     // as equality with the whole step, because the two shapes say
-    // different amounts: a chart's leg is the name alone, while a line's
+    // different amounts: a chart's round is the name alone, while a line's
     // step is an icon, the name and a phrase about it, and this check is
     // about which comes first rather than about how much each one says.
     // What is asserted is the order, which is what the two modes disagree

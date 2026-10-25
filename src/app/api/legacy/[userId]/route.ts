@@ -1,8 +1,8 @@
 // GET /api/legacy/[userId]: another captain's public Captain's Legacy
 // summary (Renown level and XP, lifetime voyages, Sea Master crowns,
-// best score, Great House pledge). Deliberately not room scoped, same as
-// the DM history route this mirrors: Renown is an account wide, cross
-// room stat, and none of these fields are sensitive, so any signed in
+// best Reputation, Great House pledge). Deliberately not harbor scoped,
+// same as the DM history route this mirrors: Renown is an account wide, cross
+// harbor stat, and none of these fields are sensitive, so any signed in
 // captain can look up any other captain's standing, the same way a
 // public game profile works. Still requires being signed in, just not
 // shared membership. The check in state stays private to the owner.

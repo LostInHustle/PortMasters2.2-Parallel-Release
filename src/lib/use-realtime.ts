@@ -8,7 +8,7 @@ import { useLanguage } from "@/lib/use-language-preference";
 /**
  * App wide realtime connection + presence. The socket is a singleton; this
  * hook attaches listeners for presence/auth and returns the live socket so
- * components can subscribe to room / chat / game status events.
+ * components can subscribe to harbor / chat / game status events.
  *
  * `onSessionLost` is called with the reason when the server refuses this
  * connection's credentials. That happens when a session runs out with the

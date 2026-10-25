@@ -6,6 +6,8 @@
 // of the run lives beside this one and imports from it.
 // =====================================================================
 import { loadServerConfig } from "@/lib/config";
+import type { Locale } from "@/lib/game/i18n";
+import { renderLine, renderLedger, type LedgerLine } from "@/lib/game/ledger";
 import type { GameMode } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import { createInitialGameState } from "@/lib/game/types";
@@ -16,7 +18,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Socket } from "socket.io-client";
 import { connect } from "socket.io-client";
-import { walkSrc } from "../walk-src";
+import { walkSrc, withoutComments } from "../walk-src";
 
 export const BASE =
   process.env.SMOKE_BASE_URL ?? `http://localhost:${loadServerConfig().port}`;
@@ -60,10 +62,11 @@ export const CARRIES_A_HYPHEN = new RegExp(
   `[-${String.fromCharCode(0x2013, 0x2014)}]|-{2}`,
 );
 
-// The tree walk lives in ../walk-src: one implementation for the suites,
-// the harness, and the build gates, exported again here so a suite that
-// already imports its helpers from this file keeps one import.
-export { walkSrc };
+// The tree walk and the comment stripper live in ../walk-src: one
+// implementation for the suites, the harness, and the build gates, exported
+// again here so a suite that already imports its helpers from this file
+// keeps one import.
+export { walkSrc, withoutComments };
 
 /**
  * The same rule, read off a file rather than off a claim about it. Whole
@@ -87,34 +90,14 @@ export function carriesADash(relative: string): boolean {
 }
 
 /**
- * A component's source with its comments taken out, for a check about what
- * a screen prints rather than about what its file says.
- *
- * The two are different on purpose in this tree: a comment here quotes the
- * sentence it replaced, because that is what makes a repair readable a year
- * later, so a check that read the raw file would fail on the note that
- * explains the fix. Only the shapes this tree actually writes are stripped,
- * which makes this the codebase's own convention rather than a parser: a
- * JSX comment, a block comment, and a line whose first characters are two
- * slashes. A URL inside a string survives all three, since none of them
- * matches a line that begins with anything else.
- */
-export function withoutComments(source: string): string {
-  return source
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/^[ \t]*\/\/.*$/gm, " ");
-}
-
-/**
  * Runs a read with one environment switch set, and always puts the switch
  * back the way it found it, including when the read throws: a leaked value
  * would make every check after this one read a build the operator did not
  * ask for.
  *
  * One helper rather than one per feature, because the survival layer is
- * two switches over one family (the Larder in C1, crew loss in C2) and a
- * second copy of this try/finally is how one of them ends up restoring the
+ * two switches over one family (the Larder and crew loss) and a second
+ * copy of this try/finally is how one of them ends up restoring the
  * wrong value. The variable name is passed in rather than closed over for
  * the same reason: the check that reads a switch has to name the one it is
  * actually testing.
@@ -125,7 +108,7 @@ export function withoutComments(source: string): string {
 // read them in Gambit: a check that held a switch on in the shipped mode
 // would be checking that a Classic table received a system the mode does
 // not have, which is the bug the mode boundary exists to prevent rather
-// than the behaviour any of them are about. CLASSIC is read by the one
+// than the behavior any of them are about. CLASSIC is read by the one
 // block that holds the boundary itself, at the end of the family.
 export const GAMBIT: GameMode = "ocean_gambit";
 
@@ -181,7 +164,7 @@ export function withEnv<T>(
   }
 }
 
-// [H9: the unlock code] The phrase every sealed harbor in this file is
+// The phrase every sealed harbor in this file is
 // opened with, read out of the table rather than typed here. A suite that
 // spelled the words itself would be testing its own copy of them rather
 // than the one a host types, and would go on passing after the table had
@@ -203,6 +186,46 @@ export function check(condition: boolean, description: string): void {
   }
   console.log(`  FAIL  ${description}`);
   failures.push(description);
+}
+
+/**
+ * The ledger read as the sentences a captain reads.
+ *
+ * The engine hands a suite the material a line is made of (see
+ * src/lib/game/ledger), never a finished sentence, because a sentence
+ * frozen at the write is a sentence frozen in one language. A suite that
+ * wants to know what a line says asks this, so the reading happens here
+ * and in one place, and no suite has to know how a line is built.
+ *
+ * English is the default, because the English literals are what the
+ * suites pin: the pack is keyed by them, so reading in English is
+ * reading the literal the source carries. A suite that wants to prove a
+ * line reads in another language names that language here, which is the
+ * door the ledger's own language regression suite comes through.
+ */
+export function ledgerSentences(
+  logs: readonly LedgerLine[],
+  locale: Locale = "en",
+): string[] {
+  return renderLedger(locale, logs);
+}
+
+/**
+ * The lines of a ledger whose sentences say what the check is looking for.
+ *
+ * The one place a suite keeps some of a ledger rather than all of it. A
+ * line is held as material (see src/lib/game/ledger), so a suite that
+ * wants the lines about one thing asks for them here, by what they say,
+ * and the lines that match come back still held as material: a suite can
+ * carry them on into another accumulator and read them again in another
+ * language.
+ */
+export function ledgerLines(
+  logs: readonly LedgerLine[],
+  needle: string,
+  locale: Locale = "en",
+): LedgerLine[] {
+  return logs.filter((entry) => renderLine(locale, entry).includes(needle));
 }
 
 export async function call<T>(
@@ -352,7 +375,7 @@ export function openAuthedSocket(captain: Captain): Promise<Socket> {
 }
 
 /**
- * [J1: the private information review] The shapes a hidden field takes on
+ * The shapes a hidden field takes on
  * the wire, and the sweep that reads for them.
  *
  * The private information sections used to look for the one hidden card's

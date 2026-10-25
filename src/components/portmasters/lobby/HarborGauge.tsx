@@ -7,7 +7,7 @@
 // The row is three cells side by side, so the cell's shape lives here
 // rather than three times over in the markup: one icon at one size, one
 // quiet label, one tabular figure. A call site picks the icon and its
-// colour and nothing else. It is the figure half of the argument
+// color and nothing else. It is the figure half of the argument
 // ./CardHead makes for the headings above them.
 // =====================================================================
 
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 // One cell of the masthead's gauge row. Three of these sit side by side under
 // a hairline, so the shape lives here rather than three times over in the
 // markup: one icon at one size, one quiet label, one tabular figure. A call
-// site picks the icon and its colour and nothing else.
+// site picks the icon and its color and nothing else.
 export function Gauge({
   icon: Icon,
   tone,

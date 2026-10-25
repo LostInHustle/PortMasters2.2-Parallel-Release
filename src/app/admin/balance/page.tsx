@@ -3,7 +3,7 @@
 // =====================================================================
 // /admin/balance: the balance dashboard.
 //
-// [I3: the dashboard, and the front page number] Its own route under
+// Its own route under
 // /admin rather than a tab on the console, because it belongs to a
 // different job: the console is about accounts, and this is about whether
 // the mode itself is healthy. Somebody on balance duty opens this page,
@@ -33,28 +33,28 @@ import { PageSplash } from "@/components/ui/page-splash";
 type Status = "loading" | "gate" | "dashboard";
 
 export default function AdminBalancePage() {
-  // This route renders outside the harbor room, so it subscribes to the
+  // This route renders outside the harbor harbor, so it subscribes to the
   // captain's language at its own root: a flip redraws the splash and the
   // dashboard under it rather than waiting for the next route change.
   useLanguage();
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     api
       .me()
       .then((res) => {
-        if (cancelled) return;
+        if (canceled) return;
         // A signed in captain who is not an operator gets the gate card,
         // which is where they find that out: signing in there goes through
         // the same role check the console uses.
         setStatus(res.user && res.user.role === "admin" ? "dashboard" : "gate");
       })
       .catch(() => {
-        if (!cancelled) setStatus("gate");
+        if (!canceled) setStatus("gate");
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
 

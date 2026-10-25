@@ -1,7 +1,7 @@
 // =====================================================================
-// Realtime layer: the reveal, and the room's record of it.
+// Realtime layer: the reveal, and the harbor's record of it.
 //
-// [H8: the reveal and the replay ledger] The end of an Ocean Gambit
+// The end of an Ocean Gambit
 // voyage is the one moment the mode's central secret stops being one. The
 // cards were dealt at departure, defended all the way to the wire, and
 // every rule in the mode was written so that no frame carried an
@@ -10,7 +10,7 @@
 // built by the conclusion, once, out of the verdicts and the readings that
 // conclusion has already made, and it is emitted from here.
 //
-// In memory, like every other per room record in this directory, and for
+// In memory, like every other per harbor record in this directory, and for
 // the same reason: the voyage it describes has ended, so it is read by
 // captains who reload onto a finished table and by nobody during play. The
 // durable record is the Chronicle row each captain already has, written in
@@ -22,13 +22,13 @@ import { VoyageReveal } from "@/types/realtime/voyage";
 import type { Server } from "socket.io";
 import { roomChannel } from "./channel";
 
-// One room's reveal, for as long as the finished voyage stands. There is
-// exactly one per room: a voyage concludes once, and only a restart, which
+// One harbor's reveal, for as long as the finished voyage stands. There is
+// exactly one per harbor: a voyage concludes once, and only a restart, which
 // begins a new voyage, can put a different one here.
 const roomReveals = new Map<string, VoyageReveal>();
 
 /**
- * The reveal reaches the room, and is kept for everyone who arrives after.
+ * The reveal reaches the harbor, and is kept for everyone who arrives after.
  *
  * Both halves are the feature rather than one being a courtesy. The
  * broadcast is the moment the table has been waiting an hour for, and the
@@ -41,7 +41,7 @@ export function recordReveal(io: Server, reveal: VoyageReveal): void {
   io.to(roomChannel(reveal.roomId)).emit("voyage:reveal", reveal);
 }
 
-// The room's reveal, for a joiner to be handed. Null for a harbor whose
+// The harbor's reveal, for a joiner to be handed. Null for a harbor whose
 // voyage has not concluded, which is what a restarted voyage reads as and
 // what every Classic harbor is, since no cards were dealt there and the
 // conclusion builds nothing.
@@ -49,7 +49,7 @@ export function revealFor(roomId: string): VoyageReveal | null {
   return roomReveals.get(roomId) ?? null;
 }
 
-// Wipes a room's reveal. Called on room:restart and when a room is deleted
+// Wipes a harbor's reveal. Called on room:restart and when a harbor is deleted
 // after its last member departs.
 //
 // Not load bearing the way clearAudits and clearMaroons are, since a

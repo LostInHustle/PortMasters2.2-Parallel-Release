@@ -22,7 +22,7 @@ export const PUBLIC_USER_SELECT = {
 } as const;
 
 /**
- * The room shape every read of a harbor asks for: the roster, each row
+ * The harbor shape every read of a harbor asks for: the roster, each row
  * carrying the public side of its captain, and the host. Four reads want
  * it (the harbor list, one harbor, the harbor a captain is standing in,
  * and the row a create hands back) and each of them goes on to draw the

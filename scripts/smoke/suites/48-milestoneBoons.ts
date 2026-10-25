@@ -53,7 +53,7 @@ import { selectBoon } from "@/lib/game/engine/boons";
 import { calcVAT, explainVAT } from "@/lib/game/engine/pricing";
 import { pirateChance } from "@/lib/game/engine/pirates";
 import { hireWorker } from "@/lib/game/engine/workers";
-import { COLD_LEG_WARMTH } from "@/lib/game/constants/garments";
+import { COLD_ROUND_WARMTH } from "@/lib/game/constants/garments";
 import { legIsCold, shortOfWarmth, warmthScore } from "@/lib/game/garments";
 import { feedCrew } from "@/lib/game/larder";
 import { milestoneBoonsOn } from "@/lib/game/flags";
@@ -71,22 +71,24 @@ import { PRODUCT_PRICES } from "@/lib/game/constants/goods";
 import { readStoredRecord, TELEMETRY_EVENT_CAP } from "@/lib/game/telemetry";
 import {
   closeVoyageTelemetry,
-  noteLegReport,
+  noteRoundReport,
   noteTelemetry,
   openVoyageTelemetry,
 } from "@/server/realtime/telemetry";
 import { db } from "@/lib/db";
 import {
   CARRIES_A_DASH,
-  CLASSIC,
-  GAMBIT,
   carriesADash,
   check,
+  CLASSIC,
+  GAMBIT,
+  ledgerSentences,
   suffix,
   switchFor,
   voyageState,
   withEnv,
 } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function milestoneBoonsSuite(): Promise<void> {
   // A voyage that has lost a hand, which is the one moment every block
@@ -97,7 +99,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     return state;
   };
 
-  // A cold leg and a mild one, found by asking the weather rule rather
+  // A cold round and a mild one, found by asking the weather rule rather
   // than written down as numbers that were cold once. 4242 is the epoch
   // the launch gates' own weather checks sail under, so the two suites
   // read the same calendar.
@@ -113,7 +115,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
   const coldRound = findRound(true);
   const mildRound = findRound(false);
 
-  // A cold leg that has just been settled: the round stamped by the tick
+  // A cold round that has just been settled: the round stamped by the tick
   // and nothing else written yet, which is exactly the evidence the cold
   // moment's arm reads.
   const coldAt = (round: number) => {
@@ -153,8 +155,8 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   check(
     MILESTONE_TRIGGERS.join() ===
-      "crew_loss,pathbound_order,renown_rung,cold_leg,mandate",
-    "the five triggers are the plan's five in the plan's order, so the vocabulary can be held against the plan text line by line",
+      "crew_loss,pathbound_order,renown_rung,cold_round,mandate",
+    "the five triggers are the design's five in the design's order, so the vocabulary can be held against the design text line by line",
   );
 
   check(
@@ -298,9 +300,9 @@ export async function milestoneBoonsSuite(): Promise<void> {
     MILESTONE_BOONS.every(
       (card) =>
         cardWeight(card, voyageState()) > 0 &&
-        cardWeight(card, voyageState({ mode: CLASSIC })) > 0,
+        cardWeight(card, voyageState({ mode: CLASSIC })) === 0,
     ),
-    "every moment card weighs in for both modes, because the five are content the pool carries for every voyage rather than a system only the experimental mode runs",
+    "every moment card weighs in for the voyage that can deal it and nowhere else: the five are the Gambit release's moments, and Classic, which never arms one, carries no weight for them",
   );
 
   check(
@@ -414,7 +416,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     const unTicked = coldAt(coldRound);
     unTicked.garmentsTickRound = 0;
     const answered = coldAt(coldRound);
-    answered.milestonesAnswered.cold_leg = coldRound;
+    answered.milestonesAnswered.cold_round = coldRound;
     const bitten = coldAt(coldRound);
     bitten.money = 1000;
     hireWorker(bitten, "weaver", []);
@@ -423,12 +425,12 @@ export async function milestoneBoonsSuite(): Promise<void> {
     check(
       coldRound > 0 &&
         mildRound > 0 &&
-        milestoneDue(ticked, "cold_leg") &&
-        !milestoneDue(unTicked, "cold_leg") &&
-        !milestoneDue(answered, "cold_leg") &&
-        !milestoneDue(bitten, "cold_leg") &&
-        !milestoneDue(mild, "cold_leg"),
-      "a cold leg survived with zero frostbite is a moment, and every other way to read the same facts is not: no settlement tick, a hand already bitten by that leg, the same leg answered, and a mild one that was never cold at all",
+        milestoneDue(ticked, "cold_round") &&
+        !milestoneDue(unTicked, "cold_round") &&
+        !milestoneDue(answered, "cold_round") &&
+        !milestoneDue(bitten, "cold_round") &&
+        !milestoneDue(mild, "cold_round"),
+      "a cold round survived with zero frostbite is a moment, and every other way to read the same facts is not: no settlement tick, a hand already bitten by that round, the same round answered, and a mild one that was never cold at all",
     );
   });
 
@@ -443,7 +445,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
       hand[0] === "steady_watch" &&
       hand.every((id) => MILESTONE_BOONS.some((card) => card.id === id)) &&
       hand.join() === again.join(),
-    "a moment's table is the anchor card its own trigger is named for first and two more drawn off the family pool, and the seed leaves the round out, so a room advance, a checkpoint or a reload deals the same three cards",
+    "a moment's table is the anchor card its own trigger is named for first and two more drawn off the family pool, and the seed leaves the round out, so a harbor advance, a checkpoint or a reload deals the same three cards",
   );
 
   const holding = fallen();
@@ -464,8 +466,39 @@ export async function milestoneBoonsSuite(): Promise<void> {
   classicFallen.crewLost = [{ name: "Old Salt", round: 1 }];
   check(
     milestoneChoices(spent, "crew_loss").length === 0 &&
-      milestoneChoices(classicFallen, "crew_loss").length === CARDS_PER_OFFER,
-    "and a family whose every card is held deals nothing rather than a short table, while the founding mode's captain, who can never be offered one, would still be dealt the full three by the same reader",
+      milestoneChoices(classicFallen, "crew_loss").length === 0,
+    "and a family whose every card is held deals nothing rather than a short table, while the founding mode's captain is dealt nothing either, because the moments are Ocean Gambit's and a Classic voyage never reaches the family",
+  );
+
+  // Route Mastery promises a quarter more on pathbound orders. Only the
+  // Loom and the Aroma pools reach the manifest, so the card must not be
+  // dealt to a captain whose path deals no such order: the table would be
+  // offering a promise no order of theirs could keep. Every other moment
+  // card is held here, so the draw can only answer with this one.
+  const onlyRouteLeft = voyageState();
+  onlyRouteLeft.heldBoons = MILESTONE_BOONS.filter(
+    (card) => card.id !== "route_mastery",
+  ).map((card) => card.id);
+  const routeFor = (path: PathId | null) => {
+    onlyRouteLeft.path = path;
+    return milestoneChoices(onlyRouteLeft, "crew_loss", {
+      ignoreBudget: true,
+    }).map((card) => card.id);
+  };
+  const routeNull = routeFor(null);
+  const routeLoom = routeFor("loom");
+  const routeAroma = routeFor("aroma");
+  const routeConvoy = routeFor("convoy");
+  const routeFree = routeFor("free_captain");
+  const routeQuartermaster = routeFor("quartermaster");
+  check(
+    routeNull.length === 0 &&
+      routeConvoy.length === 0 &&
+      routeFree.length === 0 &&
+      routeQuartermaster.length === 0 &&
+      routeLoom.join() === "route_mastery" &&
+      routeAroma.join() === "route_mastery",
+    `Route Mastery is dealt only where a pathbound order can follow: the Loom and the Aroma reach the manifest and receive it, while a pathless captain, the Convoy and the Free Captain (no order pool) and the Quartermaster (pantry goods that never become board orders) are offered nothing rather than a card that can never pay (null ${routeNull.length}, convoy ${routeConvoy.length}, free ${routeFree.length}, quartermaster ${routeQuartermaster.length}, loom ${routeLoom.join() || "none"}, aroma ${routeAroma.join() || "none"})`,
   );
 
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
@@ -484,7 +517,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "0", () => {
       check(
         !milestonePending(waiting),
-        "and with the switch off a moment already queued is simply not drawn, which is the plan's rollback: the data stays and the moment does not arrive",
+        "and with the switch off a moment already queued is simply not drawn, which is the design's rollback: the data stays and the moment does not arrive",
       );
     });
   });
@@ -507,7 +540,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   const marks = normalizeMilestonesAnswered({
     crew_loss: 2,
-    cold_leg: 0,
+    cold_round: 0,
     renown_rung: -1,
     mandate: 1.5,
     rogue: 3,
@@ -516,7 +549,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
   check(
     marks.crew_loss === 2 &&
       marks.pathbound_order === 1 &&
-      marks.cold_leg === undefined &&
+      marks.cold_round === undefined &&
       marks.renown_rung === undefined &&
       !("mandate" in marks) &&
       !("rogue" in marks) &&
@@ -527,13 +560,13 @@ export async function milestoneBoonsSuite(): Promise<void> {
   // ========== D. The writes ==========
 
   const switchedOff = fallen();
-  const offLogs: string[] = [];
+  const offLogs: LedgerLine[] = [];
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "0", () => {
     queueMilestoneMoment(switchedOff, offLogs, "crew_loss");
   });
   const foundingFallen = voyageState({ mode: CLASSIC });
   foundingFallen.crewLost = [{ name: "Old Salt", round: 1 }];
-  const foundingLogs: string[] = [];
+  const foundingLogs: LedgerLine[] = [];
   queueMilestoneMoment(foundingFallen, foundingLogs, "crew_loss");
   check(
     switchedOff.milestoneOffers.length === 0 &&
@@ -546,13 +579,17 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
     const armed = fallen();
-    const logs: string[] = [];
+    const logs: LedgerLine[] = [];
     queueMilestoneMoment(armed, logs, "crew_loss");
     const dealt = milestoneChoices(armed, "crew_loss").map((card) => card.id);
     check(
       armed.milestoneOffers.join() === "crew_loss" &&
-        logs.some((line) => line.includes(MILESTONE_MOMENTS.crew_loss.title)) &&
-        logs.some((line) => line.includes(MILESTONE_MOMENTS.crew_loss.line)) &&
+        ledgerSentences(logs).some((line) =>
+          line.includes(MILESTONE_MOMENTS.crew_loss.title),
+        ) &&
+        ledgerSentences(logs).some((line) =>
+          line.includes(MILESTONE_MOMENTS.crew_loss.line),
+        ) &&
         dealt.length === CARDS_PER_OFFER &&
         dealt.every(
           (id) =>
@@ -564,14 +601,15 @@ export async function milestoneBoonsSuite(): Promise<void> {
     queueMilestoneMoment(armed, logs, "crew_loss");
     check(
       armed.milestoneOffers.length === 1 &&
-        logs.filter((line) => line.includes(MILESTONE_MOMENTS.crew_loss.title))
-          .length === 1 &&
+        ledgerSentences(logs).filter((line) =>
+          line.includes(MILESTONE_MOMENTS.crew_loss.title),
+        ).length === 1 &&
         dealt.every((id) => armed.cardTally[id]?.offered === 1),
       "and the guard keeps a moment already waiting from being armed a second time, which is what makes every re entered sweep idempotent",
     );
 
     const drained = fallen();
-    const drainedLogs: string[] = [];
+    const drainedLogs: LedgerLine[] = [];
     drained.heldBoons = MILESTONE_BOONS.map((card) => card.id);
     queueMilestoneMoment(drained, drainedLogs, "crew_loss");
     check(
@@ -586,7 +624,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
     const answering = fallen();
-    const logs: string[] = [];
+    const logs: LedgerLine[] = [];
     queueMilestoneMoment(answering, logs, "crew_loss");
     const card = milestoneChoices(answering, "crew_loss")[0];
     const took = answerMilestone(answering, card.id, logs);
@@ -598,15 +636,27 @@ export async function milestoneBoonsSuite(): Promise<void> {
         answering.modifierFlags.steady_rations === 1 &&
         answering.cardTally[card.id]?.picked === 1 &&
         answering.milestonesAnswered.crew_loss === 1 &&
-        logs.some((line) => line.includes(cardLead(card.id))) &&
+        ledgerSentences(logs).some((line) =>
+          line.includes(cardLead(card.id)),
+        ) &&
         !milestonePending(answering),
       "answering takes exactly the card the screen drew: the anchor card is dealt first and a press on it holds it, folds its flag into the round's flags, counts the pick, moves the mark and drops the moment off the queue",
     );
 
     const refusing = fallen();
-    const refuseLogs: string[] = [];
+    const refuseLogs: LedgerLine[] = [];
     queueMilestoneMoment(refusing, refuseLogs, "crew_loss");
-    const refusedWrong = answerMilestone(refusing, "cold_hardened", refuseLogs);
+    // The moment draws from the whole family, so a particular boon is not
+    // guaranteed to sit off the table. The stale click has to name a card
+    // this moment does not deal, which is derived here rather than assumed:
+    // a pool or seed change moved Cold Hardened onto the table once and
+    // turned this check red without the answer path changing at all.
+    const dealt = milestoneChoices(refusing, "crew_loss");
+    const stale =
+      MILESTONE_BOONS.find(
+        (card) => !dealt.some((offered) => offered.id === card.id),
+      )?.id ?? "not_a_milestone_boon";
+    const refusedWrong = answerMilestone(refusing, stale, refuseLogs);
     const quiet =
       refusing.milestoneOffers.length === 1 &&
       refusing.heldBoons.length === 0 &&
@@ -620,21 +670,21 @@ export async function milestoneBoonsSuite(): Promise<void> {
           milestoneChoices(refusing, "crew_loss")[0].id,
           refuseLogs,
         ) &&
-        !answerMilestone(refusing, "cold_hardened", refuseLogs),
+        !answerMilestone(refusing, stale, refuseLogs),
       "a press is validated against the same derived table the screen drew, so a stale click on a card this moment does not deal is refused with the moment left standing, and an answer with no moment waiting is refused as well",
     );
   });
 
   withEnv("NEXT_PUBLIC_MILESTONE_BOONS", "1", () => {
     const dawn = fallen();
-    const dawnLogs: string[] = [];
+    const dawnLogs: LedgerLine[] = [];
     startBoonDrafting(dawn, dawnLogs);
     const armed = dawn.milestoneOffers.join() === "crew_loss";
     startBoonDrafting(dawn, dawnLogs);
     check(
       armed &&
         dawn.milestoneOffers.length === 1 &&
-        dawnLogs.filter((line) =>
+        ledgerSentences(dawnLogs).filter((line) =>
           line.includes(MILESTONE_MOMENTS.crew_loss.title),
         ).length === 1 &&
         milestoneChoices(dawn, "crew_loss").every(
@@ -648,9 +698,10 @@ export async function milestoneBoonsSuite(): Promise<void> {
     withEnv("NEXT_PUBLIC_GARMENTS", "1", () => {
       const settled = coldAt(coldRound);
       settled.score = 60;
-      const settleLogs: string[] = [];
+      const settleLogs: LedgerLine[] = [];
       noteSettlementMilestones(settled, settleLogs);
-      const ordered = settled.milestoneOffers.join() === "cold_leg,renown_rung";
+      const ordered =
+        settled.milestoneOffers.join() === "cold_round,renown_rung";
       // The two tables can overlap on a card (a moment deals from the
       // family, not from a private shelf), so the count that proves the
       // second entry is quiet is the whole tally held still rather than any
@@ -660,15 +711,15 @@ export async function milestoneBoonsSuite(): Promise<void> {
       check(
         ordered &&
           settled.milestoneOffers.length === 2 &&
-          settleLogs.filter((line) =>
-            line.includes(MILESTONE_MOMENTS.cold_leg.title),
+          ledgerSentences(settleLogs).filter((line) =>
+            line.includes(MILESTONE_MOMENTS.cold_round.title),
           ).length === 1 &&
-          settleLogs.filter((line) =>
+          ledgerSentences(settleLogs).filter((line) =>
             line.includes(MILESTONE_MOMENTS.renown_rung.title),
           ).length === 1 &&
           JSON.stringify(settled.cardTally) === talliedOnce &&
           Object.keys(settled.cardTally).length > 0,
-        "the settled books deal the cold leg first, because its evidence is the freshest thing in the ledger, and the crossed rung second, and a second entry into the same settlement leaves both alone",
+        "the settled books deal the cold round first, because its evidence is the freshest thing in the ledger, and the crossed rung second, and a second entry into the same settlement leaves both alone",
       );
     });
   });
@@ -695,14 +746,14 @@ export async function milestoneBoonsSuite(): Promise<void> {
         board.path = pathOrderOf(pathCard, board.mode);
         stockHold(board, pathCard);
         board.money = 1000;
-        const boardLogs: string[] = [];
+        const boardLogs: LedgerLine[] = [];
         completeOrder(board, pathCard.id, boardLogs);
         check(
           board.milestoneOffers.join() === "pathbound_order" &&
-            boardLogs.some((line) =>
+            ledgerSentences(boardLogs).some((line) =>
               line.includes(MILESTONE_MOMENTS.pathbound_order.title),
             ) &&
-            boardLogs.some((line) =>
+            ledgerSentences(boardLogs).some((line) =>
               line.includes(MILESTONE_MOMENTS.pathbound_order.line),
             ),
           "the first order filled along the captain's own path arms its moment at the fill itself, after the ledger has already said what the order paid",
@@ -720,11 +771,13 @@ export async function milestoneBoonsSuite(): Promise<void> {
     const first = objective.resources[0];
     delivering.inventory[first.type] =
       (delivering.inventory[first.type] ?? 0) + first.required;
-    const deliveryLogs: string[] = [];
+    const deliveryLogs: LedgerLine[] = [];
     deliverToObjective(delivering, objective, deliveryLogs);
     const ledgerFirst =
-      deliveryLogs.findIndex((line) => line.includes("Fleet Commission")) <
-      deliveryLogs.findIndex((line) =>
+      ledgerSentences(deliveryLogs).findIndex((line) =>
+        line.includes("Fleet Commission"),
+      ) <
+      ledgerSentences(deliveryLogs).findIndex((line) =>
         line.includes(MILESTONE_MOMENTS.mandate.title),
       );
     answerMilestone(
@@ -741,7 +794,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
         delivering.heldBoons.length === 1 &&
         delivering.milestoneOffers.length === 0 &&
         ledgerFirst &&
-        deliveryLogs.filter((line) =>
+        ledgerSentences(deliveryLogs).filter((line) =>
           line.includes(MILESTONE_MOMENTS.mandate.title),
         ).length === 1,
       "the first delivery to the fleet's commission arms its moment after the commission's own ledger line, and every delivery after the answered first one is quiet",
@@ -756,7 +809,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     rolling.pirateAttackResolved = true;
     rolling.heldBoons = ["steady_watch"];
     rolling.modifierFlags = { steady_rations: 1, vat_discount: 0.5 };
-    const rollLogs: string[] = [];
+    const rollLogs: LedgerLine[] = [];
     const ctx = {
       seedBase: `smoke:milestones:${suffix}`,
       harborId: "harbor-a",
@@ -788,13 +841,13 @@ export async function milestoneBoonsSuite(): Promise<void> {
       return state;
     };
     const plain = makeCrew(3, 5);
-    const plainLogs: string[] = [];
+    const plainLogs: LedgerLine[] = [];
     const fedPlain = feedCrew(plain, plainLogs);
     const saved = makeCrew(3, 5, 1);
-    const savedLogs: string[] = [];
+    const savedLogs: LedgerLine[] = [];
     const fedSaved = feedCrew(saved, savedLogs);
     const floored = makeCrew(1, 2, 5);
-    const floorLogs: string[] = [];
+    const floorLogs: LedgerLine[] = [];
     const fedFloor = feedCrew(floored, floorLogs);
     check(
       fedPlain &&
@@ -803,9 +856,15 @@ export async function milestoneBoonsSuite(): Promise<void> {
         plain.larder === 2 &&
         saved.larder === 3 &&
         floored.larder === 1 &&
-        plainLogs.some((line) => line.includes("eats 3 rations")) &&
-        savedLogs.some((line) => line.includes("eats 2 rations")) &&
-        floorLogs.some((line) => line.includes("eats 1 ration")),
+        ledgerSentences(plainLogs).some((line) =>
+          line.includes("eats 3 rations"),
+        ) &&
+        ledgerSentences(savedLogs).some((line) =>
+          line.includes("eats 2 rations"),
+        ) &&
+        ledgerSentences(floorLogs).some((line) =>
+          line.includes("eats 1 ration"),
+        ),
       "Steady Watch is read at the pantry: three hands cost three rations with nothing held and two with the boon, the saving floors at one so a lone hand still eats rather than starving on a boon, and the ledger line says what was saved",
     );
   });
@@ -822,8 +881,8 @@ export async function milestoneBoonsSuite(): Promise<void> {
         shortOfWarmth(bare) &&
         shortOfWarmth(once) &&
         !shortOfWarmth(twice) &&
-        COLD_LEG_WARMTH === 2,
-      "Cold Hardened is read where the cold is judged: the score the crew freezes against counts it as warmth beside the garments, and the leg still bites through one of it and not through two because the leg asks for the two the constant states",
+        COLD_ROUND_WARMTH === 2,
+      "Cold Hardened is read where the cold is judged: the score the crew freezes against counts it as warmth beside the garments, and the round still bites through one of it and not through two because the round asks for the two the constant states",
     );
   });
 
@@ -916,7 +975,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
 
   const drafting = voyageState();
   drafting.heldBoons = ["steady_watch"];
-  const draftLogs: string[] = [];
+  const draftLogs: LedgerLine[] = [];
   startBoonDrafting(drafting, draftLogs);
   const pick = drafting.boonChoices[0];
   selectBoon(drafting, pick.id, draftLogs);
@@ -946,7 +1005,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
   ] as unknown as MilestoneTrigger[];
   saved.milestonesAnswered = {
     crew_loss: 2,
-    cold_leg: 0,
+    cold_round: 0,
     renown_rung: 1.5,
     mandate: 1,
   };
@@ -956,7 +1015,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
       saved.milestoneOffers.join() === "mandate" &&
       saved.milestonesAnswered.crew_loss === 2 &&
       saved.milestonesAnswered.mandate === 1 &&
-      saved.milestonesAnswered.cold_leg === undefined &&
+      saved.milestonesAnswered.cold_round === undefined &&
       saved.milestonesAnswered.renown_rung === undefined,
     "the load path heals all three fields through the same readers the rest of the save uses: the unknown, the repeated and the round draft's own leave the held list, the queue reads once per trigger, and the marks keep only the answers that mean something",
   );
@@ -975,7 +1034,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     "and a save written before the moments existed loads as a voyage that has met none of them rather than as one carrying a hole",
   );
 
-  // ========== G. The leg report's losses ==========
+  // ========== G. The round report's losses ==========
 
   // The wire itself cannot be driven from in process (the socket handler
   // reaches its captain through a listener map this suite cannot see), so
@@ -995,7 +1054,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
   try {
     const roomA = `${roomPrefix}a`;
     openVoyageTelemetry(roomFacts(roomA), []);
-    noteLegReport(roomA, "u-a", 1, {
+    noteRoundReport(roomA, "u-a", 1, {
       ordersDealt: 3,
       ordersFilled: 2,
       distinctGoods: 2,
@@ -1008,18 +1067,19 @@ export async function milestoneBoonsSuite(): Promise<void> {
     const storedA =
       rowsA.length === 1 ? readStoredRecord(rowsA[0].record) : null;
     const reportA = storedA?.events.find(
-      (event) => event.name === "leg_report",
+      (event) => event.name === "round_report",
     );
-    const lossesA = reportA?.name === "leg_report" ? reportA.crewLosses : null;
+    const lossesA =
+      reportA?.name === "round_report" ? reportA.crewLosses : null;
     const captainA = storedA?.captains.find((line) => line.userId === "u-a");
     check(
       storedA !== null && lossesA === 2 && captainA?.crewLost === true,
-      "a leg that lost two hands carries the count on its own wire line and marks the captain who suffered it, so a reader can count the losses and the captains they belonged to out of the same record",
+      "a round that lost two hands carries the count on its own wire line and marks the captain who suffered it, so a reader can count the losses and the captains they belonged to out of the same record",
     );
 
     const roomB = `${roomPrefix}b`;
     openVoyageTelemetry(roomFacts(roomB), []);
-    noteLegReport(roomB, "u-b", 1, {
+    noteRoundReport(roomB, "u-b", 1, {
       ordersDealt: 1,
       ordersFilled: 1,
       distinctGoods: 1,
@@ -1032,18 +1092,19 @@ export async function milestoneBoonsSuite(): Promise<void> {
     const storedB =
       rowsB.length === 1 ? readStoredRecord(rowsB[0].record) : null;
     const reportB = storedB?.events.find(
-      (event) => event.name === "leg_report",
+      (event) => event.name === "round_report",
     );
-    const lossesB = reportB?.name === "leg_report" ? reportB.crewLosses : null;
+    const lossesB =
+      reportB?.name === "round_report" ? reportB.crewLosses : null;
     const captainB = storedB?.captains.find((line) => line.userId === "u-b");
     check(
       lossesB === 0 && captainB?.crewLost === false,
-      "a leg that reports zero losses keeps the honest zero on the wire and leaves the captain unmarked, because the mark is for a captain the voyage actually saw lose a hand rather than for one who sent the field",
+      "a round that reports zero losses keeps the honest zero on the wire and leaves the captain unmarked, because the mark is for a captain the voyage actually saw lose a hand rather than for one who sent the field",
     );
 
     const roomC = `${roomPrefix}c`;
     openVoyageTelemetry(roomFacts(roomC), []);
-    noteLegReport(roomC, "u-c", 1, {
+    noteRoundReport(roomC, "u-c", 1, {
       ordersDealt: 1,
       ordersFilled: 1,
       distinctGoods: 1,
@@ -1055,7 +1116,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     const storedC =
       rowsC.length === 1 ? readStoredRecord(rowsC[0].record) : null;
     const reportC = storedC?.events.find(
-      (event) => event.name === "leg_report",
+      (event) => event.name === "round_report",
     );
     const wroteKey =
       reportC !== undefined &&
@@ -1071,7 +1132,7 @@ export async function milestoneBoonsSuite(): Promise<void> {
     for (let i = 0; i < TELEMETRY_EVENT_CAP; i++) {
       noteTelemetry(roomD, "message_sent", { actor: "u-d" });
     }
-    noteLegReport(roomD, "u-d", 1, {
+    noteRoundReport(roomD, "u-d", 1, {
       ordersDealt: 1,
       ordersFilled: 1,
       distinctGoods: 1,
@@ -1088,9 +1149,9 @@ export async function milestoneBoonsSuite(): Promise<void> {
       storedD !== null &&
         storedD.truncated &&
         storedD.events.length === TELEMETRY_EVENT_CAP &&
-        storedD.events.every((event) => event.name !== "leg_report") &&
+        storedD.events.every((event) => event.name !== "round_report") &&
         captainD?.crewLost === true,
-      "a voyage whose events have filled to the cap drops the leg's own line and keeps the captain's loss mark, so the one captain a full record would otherwise have forgotten is still named on it",
+      "a voyage whose events have filled to the cap drops the round's own line and keeps the captain's loss mark, so the one captain a full record would otherwise have forgotten is still named on it",
     );
   } finally {
     await db.voyageTelemetry.deleteMany({
@@ -1102,16 +1163,16 @@ export async function milestoneBoonsSuite(): Promise<void> {
   });
   check(
     leftovers === 0,
-    "and the synthetic rooms this suite sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
+    "and the synthetic harbors this suite sailed are deleted rather than left in the operator's table, with the count read back rather than assumed",
   );
 
   const repoRoot = join(import.meta.dirname, "..", "..", "..");
   const wiring = readFileSync(
-    join(repoRoot, "src", "server", "realtime", "wiring", "leg-report.ts"),
+    join(repoRoot, "src", "server", "realtime", "wiring", "round-report.ts"),
     "utf8",
   );
   const hook = readFileSync(
-    join(repoRoot, "src", "lib", "use-leg-report.ts"),
+    join(repoRoot, "src", "lib", "use-round-report.ts"),
     "utf8",
   );
   check(

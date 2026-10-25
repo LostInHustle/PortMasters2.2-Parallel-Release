@@ -1,10 +1,10 @@
 /**
  * The launch gate report.
  *
- * Prints the plan's sixteen launch gates against the window the balance
+ * Prints the sixteen launch gates against the window the balance
  * dashboard reads (src/server/telemetry-window.ts, the last three hundred
  * Ocean Gambit voyages on this database), and with them the ship decision
- * goal I4 asks for, taken by src/lib/game/gates.ts. The run's own claim is
+ * taken by src/lib/game/gates.ts. The run's own claim is
  * that every one of the sixteen is in band over at least three hundred
  * recorded voyages, and a claim of that shape has to be readable without
  * opening a browser and without writing a query.
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
 
   console.log("\nOcean Gambit launch gates");
   console.log(
-    `\nThe last ${verdict.required} recorded voyages on this database, against the plan's floor of ${verdict.required}.`,
+    `\nThe last ${verdict.required} recorded voyages on this database, against the launch floor of ${verdict.required}.`,
   );
   console.log(
     `Window: ${voyages} voyages, ${captains} captains, sample rate ${Math.round(
@@ -107,10 +107,10 @@ async function main(): Promise<void> {
     );
   }
 
-  // The plan's tie break, printed on every run rather than only when it is
-  // needed. The plan asks for the rule to be written down before the run
-  // starts, and a rule that first appears in the report of the run that
-  // broke is a rule discovered at the worst possible moment.
+  // The tie break, printed on every run rather than only when it is
+  // needed. The rule is written down before the run starts, and a rule that
+  // first appears in the report of the run that broke is a rule discovered
+  // at the worst possible moment.
   for (const id of LAUNCH_PRIORITY) {
     const gate = verdict.gates.find((candidate) => candidate.id === id);
     console.log(

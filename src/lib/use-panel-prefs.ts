@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Which of the room's foldable panels a captain has folded away. Purely a
+// Which of the harbor's foldable panels a captain has folded away. Purely a
 // client side rendering choice, the same reasoning the colorblind toggle
 // follows: read once on mount, write on fold, no server round trip and no
 // new trust boundary, since this never changes what any other captain
@@ -26,7 +26,7 @@ type RoomPanel = "left" | "roster" | "chat";
 
 type PanelPrefs = Record<RoomPanel, boolean>;
 
-// true means folded. Every panel opens expanded, which is the room a
+// true means folded. Every panel opens expanded, which is the harbor a
 // captain saw before this record existed.
 const OPEN: PanelPrefs = { left: false, roster: false, chat: false };
 

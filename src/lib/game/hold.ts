@@ -1,15 +1,15 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: the split hold.
 //
-// [C4: three foods, spoilage and the split hold] This module is the
-// capacity model the plan asks for and the one C1's own header promised:
-// "the capacity model is C4's to build, and the clause lands there, on the
-// single capacity read the split hold introduces". It is that read, in
-// two halves and one arithmetic, and everything here is a count rather
-// than a rule about eating: what a hold holds, what is in it, and what is
-// left. The policy above the arithmetic, the switch and the quarter a
-// hungry crew costs, is read in ./larder, which is where the shortage it
-// depends on already lives.
+// This module is the capacity model the design asks for and the one the
+// Larder's own header promised: "the capacity model is the split hold's
+// to build, and the clause lands there, on the single capacity read the
+// split hold introduces". It is that read, in two halves and one
+// arithmetic, and everything here is a count rather than a rule about
+// eating: what a hold holds, what is in it, and what is left. The policy
+// above the arithmetic, the switch and the quarter a hungry crew costs,
+// is read in ./larder, which is where the shortage it depends on already
+// lives.
 //
 // Three readings shape the module, and each is worth the sentence.
 //
@@ -56,7 +56,7 @@ import type { GameState } from "./types";
  * Both switches, and the order matters: the capacity model is a rule
  * about provisions, so a table without the provisions layer plays the
  * base game exactly, whatever the split switch says. With both on, the
- * hold is two capacities; with either off, every room this module
+ * hold is two capacities; with either off, every harbor this module
  * answers is unbounded and food is capped by the Larder's own ceiling in
  * ./larder, which is what this game has always done.
  */
@@ -69,8 +69,9 @@ export function holdCapacityOn(mode: unknown): boolean {
  *
  * The quarter is a parameter rather than a read, and that is the whole
  * reason this function takes an argument instead of a state: the shortage
- * that costs the quarter is C1's rule and lives in ./larder, and a copy
- * of it here would be a second answer to a question that already has one.
+ * that costs the quarter is the Larder's rule and lives in ./larder, and
+ * a copy of it here would be a second answer to a question that already
+ * has one.
  * The caller that knows the crew is hungry passes it; the arithmetic of
  * what a quarter off comes to lives here beside the capacity it comes off.
  */
@@ -113,7 +114,7 @@ export function usedStoreSlots(state: Pick<GameState, "larderLots">): number {
 /**
  * The whole hold, for whoever wants to divide by it.
  *
- * One number, because the plan's utilization reading asks one question:
+ * One number, because the design's utilization reading asks one question:
  * how much of the ship is carrying something. The halves are separate
  * capacities and stay separate everywhere a rule decides what fits, which
  * is the split's own point, and they are one number here because a
@@ -136,13 +137,13 @@ export function storesSlots(): number {
  * Exact rather than conservative: a meal of produce costs a third of a
  * slot, so a hold with a third of a slot free takes exactly one more
  * meal of it, and that is the answer a captain deciding whether to buy
- * one more leg should get. Floored, because a hold with room for two and
+ * one more round should get. Floored, because a hold with room for two and
  * a half meals of salt fish takes two.
  *
  * Deliberately not clamped at zero from above: a hold over its ceiling
- * (see the module header) answers with a negative room, and the reader
+ * (see the module header) answers with a negative harbor, and the reader
  * that cares clamps it. Callers deciding whether something fits ask
- * whether the room is at least what they want, which a negative answers
+ * whether the harbor is at least what they want, which a negative answers
  * correctly.
  */
 export function storeRoomMeals(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import {
   Settings,
   Volume2,
@@ -19,6 +19,7 @@ import {
   ModalOverlay,
   ModalSheet,
 } from "@/components/ui/modal-overlay";
+import { Switch } from "@/components/ui/switch";
 import {
   notifCategoryPref,
   setNotifCategoryPref,
@@ -203,7 +204,7 @@ export function SettingsModal({
                 />
               </Section>
 
-              {/* Notifications. [W3: the status convention] The "room"
+              {/* Notifications. The "room"
                   category has exactly one writer, the harbor chat push in
                   GameRoom (see the chat:room handler), so the description
                   names that one thing. The label matches the panel the
@@ -245,7 +246,7 @@ export function SettingsModal({
               <Section icon={Keyboard} title={t("Shortcuts")}>
                 <div className="rounded-lg bg-black/5 p-3 text-xs text-muted-foreground dark:bg-white/5">
                   {t(
-                    "Press ? or F2 in a game room to see all keyboard shortcuts.",
+                    "Press ? or F2 in a harbor to see all keyboard shortcuts.",
                   )}
                 </div>
               </Section>
@@ -294,22 +295,16 @@ function ToggleRow({
         <div className="text-sm font-medium">{label}</div>
         <div className="text-[11px] text-muted-foreground">{description}</div>
       </div>
-      <button
-        onClick={onChange}
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          checked ? "bg-celadon" : "bg-black/20 dark:bg-white/20",
-        )}
-        role="switch"
-        aria-checked={checked}
+      {/* The one switch in the app (see @/components/ui/switch), in the
+          size these rows are read at. It was a control of this screen's
+          own, and a switch that looks one way in the lobby and another
+          way here is two things a captain has to learn. */}
+      <Switch
+        size="lg"
+        checked={checked}
+        onCheckedChange={onChange}
         aria-label={label}
-      >
-        <motion.span
-          className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm"
-          animate={{ left: checked ? "calc(100% - 1.375rem)" : "0.125rem" }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-        />
-      </button>
+      />
     </div>
   );
 }

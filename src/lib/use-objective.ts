@@ -6,7 +6,7 @@
 // Three separate facts live in this hook and it is worth keeping them
 // apart, because two of them are numbers and the screen shows one.
 //
-//   The objective is drawn locally, from the harbor id, the voyage epoch
+//   The objective is drawn locally, from the room id, the voyage epoch
 //   and the size of the fleet the voyage was dealt to, which is the whole
 //   trick: the server never has to tell anyone what the commission is,
 //   because every captain can work it out from values they already hold
@@ -29,17 +29,17 @@
 //
 //   The press is the one thing here that is not decided on this side. The
 //   goods it would move are worked out locally, against the board this
-//   screen holds, and offered to the room as the standing they would leave
+//   screen holds, and offered to the harbor as the standing they would leave
 //   this captain on; what comes back is what the commission accepted of it,
 //   and only that much leaves the hold (see deliverToObjective). Two
 //   clients that read the board before either press read the same board, so
-//   the room is the only thing that can say whose press was first, and
+//   the harbor is the only thing that can say whose press was first, and
 //   asking it is what stops two simultaneous handovers being paid twice.
 //
 // The fleet's size comes in as an argument rather than being counted here,
 // and it is the one input that can be unknown for a moment (see
-// use-game-session): a voyage's seats are pinned on the room at departure,
-// and until the room has answered, the board on screen is the founding one
+// use-game-session): a voyage's seats are pinned on the harbor at departure,
+// and until the harbor has answered, the board on screen is the founding one
 // and the button below is shut. Shut rather than absent is the point. A
 // captain who hands goods over against a board the fleet is not working
 // would report a delivery against a quota nobody set, and the commission
@@ -73,6 +73,7 @@ import {
   OBJECTIVE_DELIVERY_PHASE,
 } from "@/lib/game/engine";
 import { normalizeMode } from "@/lib/game/mode";
+import type { LedgerAct } from "@/lib/game/ledger";
 import type { GameContext, GameState } from "@/lib/game/types";
 import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
 
@@ -82,13 +83,18 @@ import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
 // and rebuilds the harbor's board from nothing.
 const REPORT_HEARTBEAT_MS = 8000;
 
+// The board of a captain who has not been told anything yet. One board for
+// all of them, so that the tally read from it is one tally and not a new
+// one on every render.
+const EMPTY_TOTAL: Record<string, number> = {};
+
 export function useObjective(
   socket: Socket | null,
   roomId: string | null,
   game: GameState,
   ctx: GameContext,
-  act: (fn: (g: GameState, logs: string[]) => void) => void,
-  // The size the voyage was dealt to, or null while the room has not said.
+  act: LedgerAct,
+  // The size the voyage was dealt to, or null while the harbor has not said.
   // Both the draw and the delivery button are gated on it, and both read it
   // from here rather than from the roster, which drifts.
   seats: number | null,
@@ -110,14 +116,18 @@ export function useObjective(
     [mode, ctx.harborId, game.voyageEpoch, seats],
   );
 
-  // Stamped with its room, exactly as the private log is, so a captain who
+  // Stamped with its harbor, exactly as the private log is, so a captain who
   // sails straight from one harbor into another is never shown the
   // previous harbor's board.
   const [held, setHeld] = useState<{
     roomId: string;
     total: Record<string, number>;
   } | null>(null);
-  const total = held?.roomId === roomId ? held.total : {};
+  // The empty board, one board for every captain who has not been told
+  // anything yet. A fresh empty object on every render would be a board
+  // that looked new to everything downstream of it, and the tally read
+  // from it would be a new tally on every render too.
+  const total = held?.roomId === roomId ? held.total : EMPTY_TOTAL;
 
   // This captain's own contribution, as the report carries it. Held in a
   // ref as well because both things that report it outlive the render they
@@ -129,19 +139,25 @@ export function useObjective(
     deliveredRef.current = delivered;
   }, [delivered]);
 
-  // The commission as this screen knows it: the room's board and this
+  // The commission as this screen knows it: the harbor's board and this
   // captain's own record merged good by good into the higher, which is one
   // read rather than three. The bar, the count on the button and the goods
   // the press itself would take are all measured against it, so the
   // promise the button makes and the payment behind it cannot drift apart,
   // and a press is judged against the fullest reading of the commission
   // this screen holds rather than against one captain's share of it.
-  const taken = higherObjectiveTally(total, delivered);
+  // The tally the harbor is working to, held until the board or the
+  // delivery changes. It is read by the progress below and by the press,
+  // so a tally rebuilt on every render made both of them new as well.
+  const taken = useMemo(
+    () => higherObjectiveTally(total, delivered),
+    [total, delivered],
+  );
 
   // The same read kept for the answer to a press, which arrives a frame or
   // two after the render the press was made in: what a press proposes is
   // read at the press, and what a refusal is told about the commission is
-  // read when the room answers. A ref for the reason the hold above is one,
+  // read when the harbor answers. A ref for the reason the hold above is one,
   // and written above the listener below rather than after it, so the
   // listener answers with the board as it stands when the answer lands.
   const takenRef = useRef(taken);
@@ -163,7 +179,7 @@ export function useObjective(
       setHeld({ roomId, total: clampObjectiveTally(objective, data.total) });
     };
     // The answer to this captain's own press, and it is the only frame that
-    // moves goods: what the room accepted is what leaves the hold, and a
+    // moves goods: what the harbor accepted is what leaves the hold, and a
     // grant that accepted nothing is the refusal rather than a different
     // frame (see the engine's own sentence for a take of nothing).
     const onGranted = (data: {
@@ -228,10 +244,10 @@ export function useObjective(
 
   // The trace the evaluation reads, written once per round rather than on
   // every move: what matters months later is how close the fleet stood in
-  // each leg, so the last value a round reached is the value worth keeping.
+  // each round, so the last value a round reached is the value worth keeping.
   const totalJson = JSON.stringify(total);
   useEffect(() => {
-    if (!objective || Object.keys(total).length === 0) return;
+    if (!objective || totalJson === "{}") return;
     const snapshot = JSON.parse(totalJson) as Record<string, number>;
     act((g) => {
       const last = g.objectiveTrace[g.objectiveTrace.length - 1];
@@ -258,10 +274,13 @@ export function useObjective(
   // size unknown the board on screen is the founding one, and handing goods
   // over against it would spend them on a quota the fleet is not working.
   // A press in flight reads as nothing deliverable, the rule the audit's
-  // button is shut by: the room is deciding what that press takes, and the
+  // button is shut by: the harbor is deciding what that press takes, and the
   // count behind a second press would come off a board the first one is
   // about to move.
-  const progress = objective ? objectiveProgress(objective, taken) : null;
+  const progress = useMemo(
+    () => (objective ? objectiveProgress(objective, taken) : null),
+    [objective, taken],
+  );
   const deliverable =
     objective &&
     !inFlight &&
@@ -273,14 +292,14 @@ export function useObjective(
         )
       : 0;
 
-  // The press. It asks the room before the goods move: what is offered is
+  // The press. It asks the harbor before the goods move: what is offered is
   // the standing this press would leave this captain on, good by good,
   // which is the number a report carries because it is the same number. The
   // take itself is the goods that standing is short of, read against the
-  // board this screen holds, and the room holds it to what the commission
-  // has actually left. With no socket there is no room to ask, so this
+  // board this screen holds, and the harbor holds it to what the commission
+  // has actually left. With no socket there is no harbor to ask, so this
   // captain's own reading of the board is the whole of what there is to
-  // judge by, which is what the press was before there was a room to ask.
+  // judge by, which is what the press was before there was a harbor to ask.
   const deliver = useCallback(() => {
     if (!objective || inFlight) return;
     if (!socket || !roomId) {
@@ -305,5 +324,10 @@ export function useObjective(
     taken,
   ]);
 
-  return { objective, progress, deliverable, deliver };
+  // The answer, held to one identity until something inside it changes.
+  // The panel that draws the objective takes this whole object as a prop.
+  return useMemo(
+    () => ({ objective, progress, deliverable, deliver }),
+    [objective, progress, deliverable, deliver],
+  );
 }

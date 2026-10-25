@@ -13,7 +13,7 @@
 // Everything here takes a Renown Level as a plain number and imports
 // nothing but constants, so the identical functions run on a client
 // deciding whether to draw a button and on the server deciding whether to
-// honour the click.
+// honor the click.
 //
 // An unknown level is always passed in as a number that fails, never left
 // undefined. The roster on the wire carries a captain whose client never
@@ -75,7 +75,7 @@ export function flexibleOffersLeft(
 // trade to happen between them. Both ends are checked, so this answers
 // the same way whoever is asking: the captain posting and the captain
 // accepting are held to one standard, which is what keeps the feature
-// alive in a mixed room rather than letting the least established captain
+// alive in a mixed harbor rather than letting the least established captain
 // at the table veto it for everyone.
 export function bothFlexibleBarterUnlocked(
   myRenownLevel: number,

@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 type AgeVisual = {
   /** The filled form, for the pill and the seal. */
   gradient: string;
-  /** The same colour as text, for the headings in the banner and dialog. */
+  /** The same color as text, for the headings in the banner and dialog. */
   ink: string;
   icon: typeof TrendingUp;
 };
@@ -52,71 +52,10 @@ const AGE_VISUALS: Record<AgeId, AgeVisual> = {
   },
 };
 
-// How long the Age still holds, in the plainest words that stay true.
-//
-// The figure is read once when the banner mounts and does not tick, which
-// is the same trade the Ages hook already makes for a fortnight long
-// cycle. The phrasing below is chosen so a stale figure still reads
-// honestly: below two days it shows exact hours, and above that the days
-// are rounded, so the coarseness never shows at the scale anyone reads it.
-function remainingLabel(until: Date): string {
-  const ms = until.getTime() - Date.now();
-  if (ms <= 0) return t("handing over now");
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours < 1) return t("under an hour remaining");
-  if (hours < 48) {
-    return t("{hours} {hourWord} remaining", {
-      hours,
-      hourWord: hours === 1 ? "hour" : "hours",
-    });
-  }
-  // Two days or more, so the plural is the only form this can take.
-  return t("{daysLeft} days remaining", {
-    daysLeft: Math.round(ms / 86_400_000),
-  });
-}
-
-export function AgeBanner({
-  variant = "pill",
-  className,
-}: {
-  variant?: "pill" | "full";
-  className?: string;
-}) {
-  const { age, nextChange } = useAges();
+export function AgeBanner({ className }: { className?: string }) {
+  const { age } = useAges();
   const [expanded, setExpanded] = useState(false);
   const visual = AGE_VISUALS[age.id];
-  const Icon = visual.icon;
-
-  if (variant === "full") {
-    return (
-      <div className={cn("pm-glass pm-crackle pm-panel", className)}>
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              "pm-seal flex items-center justify-center",
-              visual.gradient,
-            )}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className={cn("font-display text-sm font-bold", visual.ink)}>
-                {t(age.name)}
-              </h3>
-              <span className="text-[10px] text-muted-foreground">
-                {remainingLabel(nextChange)}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              {t(age.description)}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

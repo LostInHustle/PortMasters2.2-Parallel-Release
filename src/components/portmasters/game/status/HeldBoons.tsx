@@ -14,7 +14,7 @@ import { useState } from "react";
  * heldBoonCards). The effect line is the card's own English description,
  * which is the sentence the overlay that dealt it printed.
  *
- * [W3: the status convention] The line lives on the tooltip and behind a
+ * The line lives on the tooltip and behind a
  * tap rather than in the row, because a rail counts its rows and five
  * full descriptions would be a paragraph in the middle of it. The tap is
  * the half a hover title cannot do: a touch screen never fires a title,
@@ -56,7 +56,7 @@ function HeldChip({
 }
 
 /**
- * [F4: boons at milestone moments] What the moments have left in this
+ * What the moments have left in this
  * captain's hands, at the top of the captain's own rail.
  *
  * A row on the rail rather than a card in the stage, for the reason the
@@ -65,7 +65,7 @@ function HeldChip({
  * the chip because the two answer the same question in the same words,
  * what this captain carries for the rest of the voyage.
  *
- * [F6: charters at leg four] The voyage's charter rides the same row,
+ * The voyage's charter rides the same row,
  * read through the same held card readers (see heldCharterCard) and
  * wearing the same chip: it is a card this captain took and carries for
  * the rest of the voyage, which is exactly what this row answers. It is
@@ -79,7 +79,7 @@ function HeldChip({
  * It draws nothing when nothing is held, which covers two ordinary
  * screens: a captain early in a voyage, and every screen in a harbor that
  * never arms a moment. The boons half is deliberately not read through
- * the switch either: the plan's rollback keeps held boons riding for the
+ * the switch either: the design's rollback keeps held boons riding for the
  * voyage (see milestoneBoonsOn), so a row hidden behind it would be a
  * screen lying about effects the captain still holds.
  */

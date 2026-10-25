@@ -5,10 +5,10 @@
 // painted beside them both said the commission was Filled. The mechanism
 // was one fact read in the wrong place. The met flag each row carried was
 // decided from what that captain's own client had written down, and a
-// client that missed the final leg, reloaded through it or joined late
+// client that missed the final round, reloaded through it or joined late
 // ends holding a record that stops short of the fill. The row then said
 // unmet while the ledger under it, which merges every captain's record by
-// max per good per leg, painted Filled. Read from the rule's own contract
+// max per good per round, painted Filled. Read from the rule's own contract
 // (see victory.ts), the flag was never a per captain fact: the card
 // promises the fleet's goal, so the caller computes the answer once for
 // the voyage and writes the same one to every row.
@@ -18,16 +18,16 @@
 // row. This article holds down the arithmetic under it and both branches
 // live:
 //
-//   - a voyage where exactly one client kept the leg that filled the
+//   * a voyage where exactly one client kept the round that filled the
 //     commission. Every row reads met, the captain whose own record stops
 //     short wins the card the fix restored, and the frame, the rows and a
 //     merge recomputed here by hand all tell one story;
-//   - a voyage where no client kept a record at all. Every row reads
+//   * a voyage where no client kept a record at all. Every row reads
 //     unmet, and the Pirate card pays for the first time in a concluded
 //     voyage: a pirate who ends solvent and standing wins the failure,
 //     which is the branch no earlier article's fixture could reach because
 //     every one of them filled the commission.
-//   - a voyage whose purse the conclusion's own sweeps pay out after the
+//   * a voyage whose purse the conclusion's own sweeps pay out after the
 //     verdict was once read. The open venture force failed at the close
 //     refunds its half, the client reports the settled total the way its
 //     own beacon would, and the purse goal the finished total missed by
@@ -104,7 +104,7 @@ async function chronicleRows(roomId: string, count: number) {
 
 // Two captains, a private Gambit harbor, and the voyage under way: what
 // every live half below starts from. The commission is drawn here exactly
-// as the server draws it at conclusion, from the room's own id, the epoch
+// as the server draws it at conclusion, from the harbor's own id, the epoch
 // it sails under and the seat count pinned at departure, which is what
 // makes the rows' objectiveId a check rather than a hope.
 async function openVoyage(
@@ -181,7 +181,7 @@ const finish = (
     roomId,
     round: 6,
     phase: "endgame",
-    phaseLabel: "Voyage Complete",
+    phaseLabel: "Voyage Ended",
     gold,
     reputation,
     shipLevel: 2,
@@ -189,8 +189,8 @@ const finish = (
   });
 
 export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
-  // ---- The arithmetic, against a commission of this article's own ----
-  // The flag the fix decides is the last leg of this merge, so the
+  // ========== The arithmetic, against a commission of this article's own ==========
+  // The flag the fix decides is the last round of this merge, so the
   // merge's four load bearing properties are held down first, off a
   // commission drawn for them and no harbor at all.
   const commission = drawObjective("the-fleets-own-outcome");
@@ -200,7 +200,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     fullBoard[r.type] = r.required;
     oneShort[r.type] = Math.max(0, r.required - 1);
   }
-  const leg = (
+  const round = (
     round: number,
     delivered: Record<string, number>,
   ): ObjectiveTraceEntry => ({
@@ -208,8 +208,8 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     at: 1_756_000_000_000 + round,
     delivered,
   });
-  const staleRecord = [leg(5, oneShort)];
-  const filledRecord = [leg(6, fullBoard)];
+  const staleRecord = [round(5, oneShort)];
+  const filledRecord = [round(6, fullBoard)];
   const lastMet = (traces: ObjectiveTraceEntry[][]): boolean => {
     const merged = fleetTrace(traces);
     return objectiveProgress(
@@ -219,7 +219,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   };
   check(
     lastMet([staleRecord, filledRecord]),
-    "one client's record of the fill fills the merge even when every other record of the voyage stops a leg short",
+    "one client's record of the fill fills the merge even when every other record of the voyage stops a round short",
   );
   check(
     !lastMet([staleRecord]),
@@ -229,11 +229,11 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     !lastMet([]),
     "while a voyage nobody kept a record of is an empty merge and an unmet commission rather than a default either way",
   );
-  const sameLeg = fleetTrace([staleRecord, [leg(5, fullBoard)]]);
+  const sameRound = fleetTrace([staleRecord, [round(5, fullBoard)]]);
   check(
-    sameLeg.length === 1 &&
-      objectiveProgress(commission, sameLeg[0]?.delivered ?? {}).met,
-    "and two records of one leg are one leg carrying the larger of the two, so a client that reloaded cannot walk the fleet's record backwards",
+    sameRound.length === 1 &&
+      objectiveProgress(commission, sameRound[0]?.delivered ?? {}).met,
+    "and two records of one round are one round carrying the larger of the two, so a client that reloaded cannot walk the fleet's record backwards",
   );
   check(
     JSON.stringify(fleetTrace([staleRecord, filledRecord])) ===
@@ -241,8 +241,8 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     "and the merge answers the same whichever order the records arrive in, because the reveal is read after the last report rather than in arrival order",
   );
 
-  // ---- A record that stops short, beside one that filled ----
-  // The field report's own shape: one client missed the final leg and the
+  // ========== A record that stops short, beside one that filled ==========
+  // The field report's own shape: one client missed the final round and the
   // other kept it. The first captain's own goal is a purse or standing
   // goal their finish clears outright, so the only thing between them and
   // their card is which record the flag is read from, which is exactly
@@ -261,8 +261,8 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
       `the deck for ${stale.objective.id} dealt no pair this article can sail on, stopping here.`,
     );
   }
-  const missedLeg = stale.crew[0];
-  const keptLeg = stale.crew[1];
+  const missedRound = stale.crew[0];
+  const keptRound = stale.crew[1];
 
   // The two records the voyage leaves. The short one stops one short of
   // every good, so it can never be the record a fill is read from, and
@@ -300,14 +300,14 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
 
   // The hand and the saves, written the way the harbor would have them:
   // the two cards off the drawn deck, and each captain's own record of
-  // the commission, one of them ending a leg short of the other.
+  // the commission, one of them ending a round short of the other.
   await db.voyageRole.upsert({
     where: {
-      roomId_userId: { roomId: stale.roomId, userId: missedLeg.captain.id },
+      roomId_userId: { roomId: stale.roomId, userId: missedRound.captain.id },
     },
     create: {
       roomId: stale.roomId,
-      userId: missedLeg.captain.id,
+      userId: missedRound.captain.id,
       role: "honest",
       flourish: carried.id,
     },
@@ -315,23 +315,23 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   });
   await db.voyageRole.upsert({
     where: {
-      roomId_userId: { roomId: stale.roomId, userId: keptLeg.captain.id },
+      roomId_userId: { roomId: stale.roomId, userId: keptRound.captain.id },
     },
     create: {
       roomId: stale.roomId,
-      userId: keptLeg.captain.id,
+      userId: keptRound.captain.id,
       role: "honest",
       flourish: held.id,
     },
     update: { role: "honest", flourish: held.id },
   });
   const wroteMissed = await writeSave(
-    missedLeg.captain.cookie,
+    missedRound.captain.cookie,
     stale.roomId,
     missedSave,
   );
   const wroteKept = await writeSave(
-    keptLeg.captain.cookie,
+    keptRound.captain.cookie,
     stale.roomId,
     keptSave,
   );
@@ -341,14 +341,14 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   );
 
   const revealed = waitForEvent<VoyageReveal>(
-    missedLeg.socket,
+    missedRound.socket,
     "voyage:reveal",
     (p) => p?.roomId === stale.roomId,
     30000,
   );
-  finish(missedLeg, stale.roomId, missedGold, missedRep);
+  finish(missedRound, stale.roomId, missedGold, missedRep);
   await wait(300);
-  finish(keptLeg, stale.roomId, keptGold, keptRep);
+  finish(keptRound, stale.roomId, keptGold, keptRep);
   const frame = await revealed;
   check(frame !== null, "the voyage concludes and the reveal is announced");
 
@@ -365,11 +365,11 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     rows.every((row) => row.objectiveMet === true),
     "and every row reading the fill, because the fleet's outcome is one answer rather than each client's own view of it",
   );
-  const missedRow = rows.find((row) => row.userId === missedLeg.captain.id);
-  const keptRow = rows.find((row) => row.userId === keptLeg.captain.id);
+  const missedRow = rows.find((row) => row.userId === missedRound.captain.id);
+  const keptRow = rows.find((row) => row.userId === keptRound.captain.id);
   check(
     missedRow?.won === true,
-    "the captain whose client missed the last leg wins the card they were dealt, which is the verdict the field report lost",
+    "the captain whose client missed the last round wins the card they were dealt, which is the verdict the field report lost",
   );
   check(
     keptRow?.won === true,
@@ -377,7 +377,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   );
   // The row keeps the observation its own client made: the merge belongs
   // to the verdict, and a record rewritten by it would be the ship's log
-  // claiming a leg its keeper never saw.
+  // claiming a round its keeper never saw.
   check(
     JSON.parse(missedRow?.objectiveTrace ?? "[]").length === 1 &&
       JSON.parse(missedRow?.objectiveTrace ?? "[]")[0]?.round === 5,
@@ -387,9 +387,11 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   // The frame, and the independent recomputation both rows are held to.
   const frameCaptains: RevealedCaptain[] = frame?.captains ?? [];
   const missedReveal = frameCaptains.find(
-    (c) => c.userId === missedLeg.captain.id,
+    (c) => c.userId === missedRound.captain.id,
   );
-  const keptReveal = frameCaptains.find((c) => c.userId === keptLeg.captain.id);
+  const keptReveal = frameCaptains.find(
+    (c) => c.userId === keptRound.captain.id,
+  );
   check(
     missedReveal?.won === missedRow?.won && keptReveal?.won === keptRow?.won,
     "the reveal frame and the rows agree about both verdicts, because they were written from the one answer",
@@ -413,14 +415,14 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   const ledger = frame?.fleetTrace ?? [];
   check(
     ledger.length === 2,
-    "the ledger carries the voyage leg by leg rather than only its ending, one entry per leg the two records between them saw",
+    "the ledger carries the voyage round by round rather than only its ending, one entry per round the two records between them saw",
   );
   check(
     objectiveProgress(
       stale.objective,
       ledger[ledger.length - 1]?.delivered ?? {},
     ).met,
-    "with the last leg the frame carries painting the commission filled under both verdicts",
+    "with the last round the frame carries painting the commission filled under both verdicts",
   );
   const missedEnding = readEnding(missedSave, {
     gold: missedGold,
@@ -452,7 +454,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     "and both verdicts are the rule's own answer, read from the hand merge rather than from either client's view",
   );
 
-  // ---- A voyage nobody kept a record of ----
+  // ========== A voyage nobody kept a record of ==========
   // The other branch, which needs a voyage of its own: no client recorded
   // anything, so the merge is empty and every row reads unmet. The Pirate
   // card pays on this branch and only this one, and no concluded voyage in
@@ -571,7 +573,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   );
   check(
     (emptyFrame?.fleetTrace ?? []).length === 0,
-    "and the ledger empty under them, because a voyage nobody kept a record of has no legs to draw",
+    "and the ledger empty under them, because a voyage nobody kept a record of has no rounds to draw",
   );
   const pirateEnding = readEnding(pirateSave, {
     gold: pirateGold,
@@ -598,7 +600,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     "and both verdicts are the rule's own answer on the empty record, read from the commission neither client filled",
   );
 
-  // ---- The purse the voyage's own sweeps pay ----
+  // ========== The purse the voyage's own sweeps pay ==========
   // The bug cycle's own shape, fixed in the conclusion this article
   // guards: the win condition was judged on the money a captain held one
   // beat before the conclusion paid them. The conclusion's own sweeps
@@ -619,7 +621,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
   const settlingDeck = flourishDeck(settling.objective.id);
   // The regression's goal is planted rather than searched for, because
   // the draw decides the commission and only half the decks carry a
-  // purse: half the rooms this article could open have no goal the
+  // purse: half the harbors this article could open have no goal the
   // settled refund could clear. The row the conclusion reads resolves
   // any flourish this build still prints (see cardsFromRows), and a
   // purse is about Gold rather than about the commission's goods, so it

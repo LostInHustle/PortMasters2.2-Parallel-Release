@@ -43,15 +43,9 @@ export async function conversationTheVoyageKeepsSuite(
   thirdSocket: Socket;
 }> {
   const { code, guest, guestSocket, host, hostId, hostSocket, roomId } = inputs;
-  let third: {
-    id: string;
-    token: string;
-    cookie: string;
-    username: string;
-  };
   // The third captain exists for one reason: a private thread is only
   // private if a captain who is not in it cannot be handed it.
-  third = await signUp("third");
+  const third = await signUp("third");
   const thirdJoined = await call<{ room: { id: string } }>("/api/rooms/join", {
     method: "POST",
     cookie: third.cookie,
@@ -68,10 +62,10 @@ export async function conversationTheVoyageKeepsSuite(
   );
   hostSocket.emit("chat:room", { roomId: roomId, content: harborLine });
   const heard = await heardHarbor;
-  check(heard !== null, "a line in the harbor chat reaches the room");
+  check(heard !== null, "a line in the harbor chat reaches the harbor");
   check(
     heard?.message?.sender?.id === hostId,
-    "and is labelled with who said it",
+    "and is labeled with who said it",
   );
 
   const heardDm = waitForEvent<WireMessage>(
@@ -96,14 +90,14 @@ export async function conversationTheVoyageKeepsSuite(
   check(dmAtHost?.mine === true, "marked as theirs");
 
   // The claim under test: a session conversation is held in the server's
-  // memory and nowhere else. Anything written down for this room, or
+  // memory and nowhere else. Anything written down for this harbor, or
   // between these two captains, would be a trace of the voyage.
   const storedForRoom = await db.message.count({
     where: { roomId: roomId },
   });
   check(
     storedForRoom === 0,
-    "nothing said in the session was written against the room",
+    "nothing said in the session was written against the harbor",
   );
   const storedBetween = await db.message.count({
     where: {
@@ -151,7 +145,7 @@ export async function conversationTheVoyageKeepsSuite(
   check(thirdSeen !== null, "the third captain joined the harbor channel");
   check(
     (thirdSeen?.harbor ?? []).some((m) => m.content === harborLine),
-    "the harbor chat belongs to the room, so they see it",
+    "the harbor chat belongs to the harbor, so they see it",
   );
   check(
     (thirdSeen?.direct ?? []).length === 0,

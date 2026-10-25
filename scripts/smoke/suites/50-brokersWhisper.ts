@@ -6,7 +6,8 @@ import {
   snapToCheckpoint,
 } from "@/lib/game/engine";
 import { cardById } from "@/lib/game/cards";
-import { check, voyageState } from "../harness";
+import { check, ledgerSentences, voyageState } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 // The rumor's promise, held end to end. The boards below are dealt through
 // the real lifecycle rather than written out by hand: snapToCheckpoint runs
@@ -23,13 +24,15 @@ export async function brokersWhisperSuite(): Promise<void> {
 
   const early = whisperState("early");
   const moneyBefore = early.state.money;
-  const buyLogs: string[] = [];
+  const buyLogs: LedgerLine[] = [];
   purchaseIntel(early.state, buyLogs);
   const rumors = early.state.revealedIntel.map((i) => ({ ...i }));
   check(
     rumors.length > 0 &&
       early.state.money < moneyBefore &&
-      buyLogs.some((line) => line.includes("Broker's Whisper")),
+      ledgerSentences(buyLogs).some((line) =>
+        line.includes("Broker's Whisper"),
+      ),
     `a rumor bought on the Market screen is billed and revealed (${rumors.length} rumor${rumors.length === 1 ? "" : "s"} for ${moneyBefore - early.state.money} Gold)`,
   );
   snapToCheckpoint(early.state, early.ctx, 1, "orders", []);
@@ -40,23 +43,25 @@ export async function brokersWhisperSuite(): Promise<void> {
           c.demandPort === i.port && c.resources.some((r) => r.type === i.item),
       ),
     ),
-    "every whisper a captain paid for is dealt as an order at the harbour it named for the good it named, so the Broker's word is always good about both halves of what it sold",
+    "every whisper a captain paid for is dealt as an order at the harbor it named for the good it named, so the Broker's word is always good about both halves of what it sold",
   );
 
   const afterBoard = whisperState("late");
   snapToCheckpoint(afterBoard.state, afterBoard.ctx, 1, "orders", []);
   const afterMoney = afterBoard.state.money;
   const afterIntel = afterBoard.state.revealedIntel.length;
-  const afterLogs: string[] = [];
+  const afterLogs: LedgerLine[] = [];
   purchaseIntel(afterBoard.state, afterLogs);
   check(
     afterBoard.state.money === afterMoney &&
       afterBoard.state.revealedIntel.length === afterIntel &&
-      afterLogs.some((line) => line.includes("only deals during Market")),
+      ledgerSentences(afterLogs).some((line) =>
+        line.includes("only deals during Market"),
+      ),
     "a press that arrives after the board is dealt is refused rather than billed, because an order it promised could never appear once the board is down",
   );
 
-  // ---- The network's own fee ----
+  // ========== The network's own fee ==========
   // The bug cycle's own shape: the fee was billed once per paid reveal,
   // while the button that led to the press displayed one price and the
   // guard above it checked that same one. A hull carrying the Brokers'

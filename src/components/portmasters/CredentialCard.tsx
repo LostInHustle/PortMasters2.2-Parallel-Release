@@ -127,7 +127,7 @@ export interface DoorProps {
   onDismissNotice?: () => void;
 }
 
-interface CredentialCardProps {
+interface CredentialCardProps extends DoorProps {
   /** The fields of each tab, in the order that tab draws them. */
   fields: { login: CredentialFieldSpec[]; register: CredentialFieldSpec[] };
   /** The block above the form: the door's own logo and name. */
@@ -138,15 +138,11 @@ interface CredentialCardProps {
    * this is a slot rather than a boolean.
    */
   backdrop?: ReactNode;
-  /** Why the captain is back at this card rather than where they were. */
-  notice?: string | null;
-  onDismissNotice?: () => void;
   /** The tab's own trip to the server, answering with the captain it made. */
   submit: (
     mode: CredentialMode,
     values: Record<string, string>,
   ) => Promise<{ user: PublicUser; token: string }>;
-  onAuthed: (user: PublicUser, token: string) => void;
   /** The two submit labels and the icon each carries, one pair a tab. */
   labels: { login: string; register: string };
   icons: { login: ReactNode; register: ReactNode };
@@ -157,11 +153,12 @@ interface CredentialCardProps {
    */
   accent: string;
   /**
-   * The sentence under the form, which is the door's own. The card draws
-   * the small print around it, the same size and spacing under both
-   * doors, so a call site hands over the sentence and nothing else.
+   * The sentence under the form, which is the door's own and optional.
+   * The console's door says where its accounts come from; the captain's
+   * door has nothing extra to say. The card draws the small print when a
+   * sentence is handed over, the same size and spacing under both doors.
    */
-  footer: ReactNode;
+  footer?: ReactNode;
 }
 
 export function CredentialCard({
@@ -315,9 +312,11 @@ export function CredentialCard({
             </form>
           </Tabs>
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
-            {footer}
-          </p>
+          {footer && (
+            <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+              {footer}
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

@@ -8,12 +8,12 @@ import { PanelHeader } from "../PanelHeader";
 /**
  * The roster panel's heading: what the panel is, and how many captains are
  * in the harbor. The count is stated here, in one place, so the pill and
- * the list under it can never disagree about the size of the room.
+ * the list under it can never disagree about the size of the harbor.
  *
  * The head itself is the shared PanelHeader, which the captain's rail and
  * the chat wear too: the three panels a captain folds are folded the same
  * way, in the same place, with the same mark. `collapsed` and `onToggle`
- * travel straight through, because the fold is owned by the room rather
+ * travel straight through, because the fold is owned by the harbor rather
  * than by this file (see usePanelPrefs in GameRoom): on the wide layout
  * folding the roster hands its width to the chat beside it, and below the
  * breakpoint it collapses to this head.

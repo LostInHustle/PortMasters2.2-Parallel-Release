@@ -24,15 +24,11 @@ import {
 } from "../bazaar";
 import { getCheckpoint } from "../checkpoint";
 import { noteVoyageLog } from "../voyage-log";
-
-// The refusal the desk answers with when the switch is off. The constant
-// keeps its English value; the read below wraps it in tFor so the refusal
-// answers in the language of the captain who pressed.
-const BAZAAR_OFF = "The bazaar is not running in this harbor.";
+import { makeFail, marketOffRefusal } from "./fail";
 
 export function wireBazaar(io: Server, socket: Socket): void {
   //
-  // [D5: Aroma: the Bazaar Rumor] The desk's two frames, and the shape of
+  // The desk's two frames, and the shape of
   // the feature shows in what this server is and is not authoritative
   // about.
   //
@@ -46,22 +42,22 @@ export function wireBazaar(io: Server, socket: Socket): void {
   // It is authoritative about the four things a row has to be true about
   // for the feature to work at all. A rumor is spoken at the Parley, so
   // the table hears it and so the market it moves is the next one. It is
-  // spoken in a leg that has a leg after it, so the market it names is one
+  // spoken in a round that has a round after it, so the market it names is one
   // this voyage opens rather than a settlement that never comes. It
   // names a good the coming market actually trades, so a lean always lands
   // on a price rather than on nothing. And it respects the cooldown, which
-  // is measured off the room's own rows rather than off a counter a client
+  // is measured off the harbor's own rows rather than off a counter a client
   // could carry: the wait between two of one captain's rumors is a fact
-  // about this room's voyage, and it is the one rule in this feature that
+  // about this harbor's voyage, and it is the one rule in this feature that
   // a doctored client could otherwise simply not obey.
   //
   // Where the direction travels is the last of it, and the server is what
   // makes that work: the publish broadcast and the state request both go
   // through the payload builder, which strips a standing row's direction
   // from every reader but its publisher (see publicRumors). There is no
-  // frame in this feature that carries a live direction to the room, and
+  // frame in this feature that carries a live direction to the harbor, and
   // the delivery is held rather than trusted here: bazaar:update is the
-  // private scan's eighth rule, which refuses a board that reaches a room
+  // private scan's eighth rule, which refuses a board that reaches a harbor
   // channel (see scripts/private-scan.ts).
   socket.on("bazaar:state:request", async (payload: { roomId?: string }) => {
     const s = seated(socket, payload);
@@ -81,11 +77,9 @@ export function wireBazaar(io: Server, socket: Socket): void {
       const s = seated(socket, payload);
       if (!s) return;
       const { roomId } = s;
-      const fail = (error: string): void => {
-        socket.emit("bazaar:error", { roomId, error });
-      };
+      const fail = makeFail(socket, roomId, "bazaar:error");
       if (!bazaarRumorsOn(s.mode)) {
-        fail(tFor(s.locale, BAZAAR_OFF));
+        fail(marketOffRefusal("bazaar", s.locale));
         return;
       }
       // The lean itself, checked before anything is read: a row whose
@@ -110,11 +104,11 @@ export function wireBazaar(io: Server, socket: Socket): void {
       // The order between the two reads is part of that rule rather than
       // an accident of how the handler grew. The room's row is read first
       // because it is the read that waits on the database, and the
-      // checkpoint is read last because its leg and its phase are what
+      // checkpoint is read last because its round and its phase are what
       // every check below judges and what the row gets written with: a
       // checkpoint read before the wait would be a checkpoint a phase
       // change could have moved during it, and the refusal below would
-      // then be deciding against the seat the room has already left. Both
+      // then be deciding against the seat the harbor has already left. Both
       // reads stay ahead of every check, and nothing between the last one
       // and publishBazaarRumor below yields.
       const room = await db.room.findUnique({
@@ -131,9 +125,9 @@ export function wireBazaar(io: Server, socket: Socket): void {
         );
         return;
       }
-      // The one leg a rumor has nothing to land on. A row is a claim about
-      // the port one leg ahead, so a row written in the closing leg would
-      // lean a market this voyage never opens: the settlement the plan's
+      // The one round a rumor has nothing to land on. A row is a claim about
+      // the port one round ahead, so a row written in the closing round would
+      // lean a market this voyage never opens: the settlement the design's
       // own Rollback note asks to be skipped cleanly rather than left half
       // applied, paid for with the publisher's whole cooldown. Read off the
       // voyage's length rather than off the tier, because the two answer
@@ -147,7 +141,7 @@ export function wireBazaar(io: Server, socket: Socket): void {
         return;
       }
       // The good is read against the market the rumor will move, which is
-      // the next one, and against the room's own tier rather than against
+      // the next one, and against the harbor's own tier rather than against
       // the catalogue: see bazaarGoods for why the two lists are one list.
       if (!rumorGoodAllowed(payload?.good, room?.difficulty, cp.round + 1)) {
         fail(tFor(s.locale, "The next port does not trade that good."));
@@ -167,7 +161,7 @@ export function wireBazaar(io: Server, socket: Socket): void {
         direction,
         round: cp.round,
       });
-      // [B4: the log surfaces] The room's line, which carries the good and
+      // The harbor's line, which carries the good and
       // the captain and deliberately not the direction: the log is public
       // the instant it is written, and the direction is not public until
       // the market answers the row (see VoyageLogFacts for this kind).

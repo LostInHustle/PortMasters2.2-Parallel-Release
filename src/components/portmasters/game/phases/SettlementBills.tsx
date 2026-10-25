@@ -8,20 +8,20 @@ import {
   wagesDue,
 } from "@/lib/game/engine";
 import { listJoiner, t } from "@/lib/game/i18n";
+import { crewSize } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
-import {
-  PhaseError,
-  PhaseHeading,
-  ReadyFooter,
-  type PhasePanelProps,
-} from "./PhaseShared";
+import { PhaseHeading, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
+import { Notice } from "../../shared";
 import { HarborAid } from "./SettlementAid";
 import { LoanBacking } from "./SettlementBacking";
+import { LedgerRow } from "../status/Rows";
 
 // One line of a bill: a name on the left and a figure on the right, in the
 // size that section prints. The settle screen had six of these written out
-// by hand, three of them in the same block.
+// by hand, three of them in the same block, and they are the ledger line
+// the Ship and Dues tabs draw (see LedgerRow), so the bill borrows it
+// rather than keeping a second one of its own.
 function BillRow({
   size = "text-[13px]",
   className,
@@ -34,10 +34,9 @@ function BillRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex justify-between py-0.5", size, className)}>
-      <span>{label}</span>
+    <LedgerRow size={size} className={className} label={label}>
       {children}
-    </div>
+    </LedgerRow>
   );
 }
 
@@ -72,7 +71,7 @@ export function SettlementBills({
   // breath later.
   const bill = wageBill(game);
   const wages = wagesDue(game);
-  const nWorkers = bill.reduce((sum, b) => sum + b.count + b.sponsored, 0);
+  const nWorkers = crewSize(game);
   const sponsored = bill.reduce((sum, b) => sum + b.sponsored, 0);
   const maintCost = maintenanceDue(game);
   const totalDue = wages + maintCost;
@@ -85,7 +84,7 @@ export function SettlementBills({
   // force pay variant is the destructive call: the captain cannot cover
   // wages plus maintenance, has either no open aid request or no captain
   // willing to back them in time, and is about to go bankrupt the moment
-  // they confirm. The two wear different colours so the consequence shows
+  // they confirm. The two wear different colors so the consequence shows
   // before the label is read: the settlement fill for the calm one, and
   // the alarm red for the one that cannot be taken back and must not be
   // tapped by reflex.
@@ -126,7 +125,7 @@ export function SettlementBills({
           {t("⏳ Bills Due This Round")}
         </h3>
         <BillRow
-          label={t("👥 Worker Wages ({count} worker{pluralS})", {
+          label={t("👥 Artisan Wages ({count} artisan{pluralS})", {
             count: nWorkers,
             pluralS: nWorkers !== 1 ? "s" : "",
           })}
@@ -161,9 +160,19 @@ export function SettlementBills({
             {t("{contract.fee} Gold", { "contract.fee": maintCost })}
           </span>
         </BillRow>
+        {(game.modifierFlags.voyage_dues_discount ?? 0) > 0 && (
+          <div className="text-[11px] text-muted-foreground pl-2.5">
+            {t(
+              "↳ {card} halves the Dues this round: wages and maintenance both",
+              {
+                card: cardName("quiet_account"),
+              },
+            )}
+          </div>
+        )}
         {game.maintenancePenalty > 0 && (
           <div className="text-[11px] text-muted-foreground pl-2.5">
-            {t("↳ Base {base}g + {card} penalty {penalty}g", {
+            {t("↳ Base {base} Gold + {card} penalty {penalty} Gold", {
               base: game.fixedCost,
               card: cardName("overdrive_engine"),
               penalty: game.maintenancePenalty,
@@ -183,7 +192,7 @@ export function SettlementBills({
 
       <div className="rounded-xl bg-resolve/[0.03] border border-resolve/15 p-3.5 my-3.5">
         <h3 className="font-semibold mb-2">{t("💹 Balance Summary")}</h3>
-        <BillRow label={t("Current Funds")}>
+        <BillRow label={t("Current Gold")}>
           <span className="text-gain font-bold">
             {t("{contract.fee} Gold", { "contract.fee": game.money })}
           </span>
@@ -200,7 +209,7 @@ export function SettlementBills({
         </BillRow>
         <BillRow label={t("Round Revenue")}>
           <span className="text-gain">
-            +{game.roundRevenue} {t("Gold")}
+            {t("+{amount} Gold", { amount: game.roundRevenue })}
           </span>
         </BillRow>
       </div>
@@ -217,18 +226,20 @@ export function SettlementBills({
       <LoanBacking game={game} backing={backing} myUserId={myUserId} />
 
       {backing.error && (
-        <PhaseError
+        <Notice
           message={backing.error}
           onDismiss={backing.clearError}
           className="mb-3.5"
+          size="sm"
         />
       )}
 
       {aid.error && (
-        <PhaseError
+        <Notice
           message={aid.error}
           onDismiss={aid.clearError}
           className="mb-3.5"
+          size="sm"
         />
       )}
 

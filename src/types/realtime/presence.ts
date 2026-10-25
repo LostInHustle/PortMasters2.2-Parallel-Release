@@ -19,13 +19,13 @@ export type PublicUser = {
   avatarHue: number;
 };
 
-// A public user plus the room they are currently seated in (or null when
+// A public user plus the harbor they are currently seated in (or null when
 // they are adrift in the lobby). This is the shape the presence channel
 // broadcasts; mirroring it here lets the client presence hook and the
 // server presence map agree on the wire format.
 export type OnlineUser = PublicUser & { roomId: string | null };
 
-// The same public user, used as the row in a room roster. The joinedAt
+// The same public user, used as the row in a harbor roster. The joinedAt
 // stamp lives on the membership row and is included wherever the lobby
-// or the room panel needs to render it.
+// or the harbor panel needs to render it.
 export type RoomMemberLive = PublicUser & { joinedAt?: string };

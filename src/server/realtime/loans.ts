@@ -37,7 +37,7 @@ export function broadcastLoans(io: Server, roomId: string): void {
   });
 }
 
-// Writes for a room are chained rather than fired independently, because
+// Writes for a harbor are chained rather than fired independently, because
 // each one is two round trips and they are not commutative. Two races
 // were reachable without this: a loan granted and repaid in quick
 // succession issued its delete while its own create was still in flight,
@@ -46,9 +46,9 @@ export function broadcastLoans(io: Server, roomId: string): void {
 // on the next restart. And a pledge accepted immediately after the loan
 // was granted issued an update against a row that did not exist yet.
 //
-// Keyed by room rather than by loan: the volume is a handful of writes
+// Keyed by harbor rather than by loan: the volume is a handful of writes
 // per voyage, so the coarser key costs nothing and also orders
-// clearLoans, which deletes by room.
+// clearLoans, which deletes by harbor.
 const loanWriteChain = new Map<string, Promise<unknown>>();
 
 function persistLoanWrite(
@@ -118,7 +118,7 @@ export function updateLoan(roomId: string, loan: LoanRecord): void {
 export function clearLoans(io: Server, roomId: string): void {
   if (!roomOutstandingLoans.has(roomId)) return;
   roomOutstandingLoans.delete(roomId);
-  persistLoanWrite(roomId, `clear for room ${roomId}`, () =>
+  persistLoanWrite(roomId, `clear for harbor ${roomId}`, () =>
     db.loan.deleteMany({ where: { roomId } }),
   );
   broadcastLoans(io, roomId);
@@ -178,7 +178,7 @@ export function resolveBackingFor(
 // Rebuilds the ledger when the process starts. Without this the table
 // would be write only and the durability it exists for would never
 // arrive: a restart mid voyage would still forget every loan, every
-// pledge and every redirect. Loans whose room has moved on to a later
+// pledge and every redirect. Loans whose harbor has moved on to a later
 // voyage are dropped rather than restored, the same scoping
 // ConvoyVenture uses, so a restarted voyage never inherits the last
 // one's debts.
@@ -231,8 +231,8 @@ export async function hydrateLoans(): Promise<void> {
   }
 }
 
-// Wipes the ledger for a room without broadcasting or persisting. Called
-// when the room itself is being torn down (last member departed) and
+// Wipes the ledger for a harbor without broadcasting or persisting. Called
+// when the harbor itself is being torn down (last member departed) and
 // the Loan rows went with it on cascade.
 export function clearLoansSilent(roomId: string): void {
   roomOutstandingLoans.delete(roomId);

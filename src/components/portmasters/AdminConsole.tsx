@@ -52,7 +52,7 @@
 // header, the tools and the register's frame all stand still and only the
 // register scrolls inside its frame, so an operator a thousand rows deep
 // can still see the title, the search and the way out. The shell is the
-// room's own shape (see GameRoom). Below lg nothing is pinned and the
+// harbor's own shape (see GameRoom). Below lg nothing is pinned and the
 // document scrolls, which is what a hand expects, and the unpinned card
 // list is drawn there anyway.
 //
@@ -65,19 +65,17 @@
 // everything ticked anywhere in the register.
 // =====================================================================
 
-import {
-  AdminAccount,
-  AdminBulkAction,
-  AdminBulkReport,
-} from "@/types/realtime/admin";
+import { AdminAccount } from "@/types/realtime/admin";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import type { PublicUser } from "@/lib/api";
 import { NO_LONGER_AN_ADMINISTRATOR } from "@/lib/game/constants/copy";
 import { t } from "@/lib/game/i18n";
 import { useRealtime } from "@/lib/use-realtime";
 import { READING_THE_REGISTER, useAdmin } from "@/lib/use-admin";
-import { Avatar, Notice, OnlineDot, Th } from "@/components/portmasters/shared";
+import { Notice, Th } from "@/components/portmasters/shared";
+import { AccountCard, CHECKBOX, RosterRow } from "./admin/AdminRow";
+import { ConsoleButton } from "./admin/AdminControls";
+import { announceBulk, plural } from "./admin/AdminBulkNotice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,15 +100,7 @@ import {
 } from "lucide-react";
 import { APP_NAME } from "@/lib/game/constants/brand";
 
-// The tick box, native rather than rebuilt, tinted with the same token the
-// administrator pill beside it wears. There is no Checkbox component in
-// this tree and one control does not earn one: the browser's own box is
-// the thing an operator's hand already knows, and accent-color is the one
-// part of it that needs saying.
-const CHECKBOX =
-  "h-4 w-4 cursor-pointer accent-admin disabled:cursor-not-allowed disabled:opacity-40";
-
-// The width at which the register has room to be a table, and the reason
+// The width at which the register has harbor to be a table, and the reason
 // it is 52rem rather than a round number out of the scale: the table below
 // is sized by its own content, and against this roster its floor, the
 // narrowest it can get before a cell's text starts to break, measures 817
@@ -159,16 +149,6 @@ const FILTERS: Record<
   online: { label: "Online", keeps: (a) => a.online },
   admins: { label: "Admins", keeps: (a) => a.role === "admin" },
   banned: { label: "Banned", keeps: (a) => a.bannedAt !== null },
-};
-
-// How a finished bulk action reads. The verb is the console's own word for
-// the action, which is the word on the button that was pressed, so the
-// sentence that comes back describes what the operator just did.
-const BULK_VERB: Record<AdminBulkAction, string> = {
-  ban: "Banned",
-  unban: "Unbanned",
-  grant: "Granted administrator to",
-  purge: "Deleted",
 };
 
 export function AdminConsole({
@@ -327,6 +307,20 @@ export function AdminConsole({
   // rather than two that have to be kept in step.
   const bulkCount = bulkTargets.length;
 
+  // The seven facts a row and a card both read off one account, written once
+  // so the two registers cannot come to describe the same account differently.
+  const accountRowProps = (a: AdminAccount) => ({
+    isSelf: a.id === me.id,
+    busy: pending.includes(a.id),
+    selected: ticked.has(a.id),
+    onToggle: () => toggleOne(a.id),
+    onAct: act,
+    onPurge: () => {
+      setConfirmText("");
+      setPurgeTarget(a);
+    },
+  });
+
   return (
     <div className="pm-canvas flex min-h-screen w-full flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       {/* The column, and the thing every width decision below reads. It
@@ -369,7 +363,7 @@ export function AdminConsole({
                       )}
                 </p>
               </div>
-              {/* The console's one neighbour: the balance dashboard reads
+              {/* The console's one neighbor: the balance dashboard reads
                 the two measurement tables rather than the account rows, so
                 it is a page of its own. It lives one level down from here
                 and this is the way in. */}
@@ -477,7 +471,7 @@ export function AdminConsole({
               a state of the register below it and not a third panel. The
               buttons keep their chips: four actions for a moment's work
               should be found at a glance, which is the one place on this
-              screen a chip still earns its colour. */}
+              screen a chip still earns its color. */}
           {selected.length > 0 && (
             <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-black/[0.06] bg-black/[0.03] px-2 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
               <span className="px-1 text-xs font-medium">
@@ -613,15 +607,7 @@ export function AdminConsole({
                           <RosterRow
                             key={a.id}
                             account={a}
-                            isSelf={a.id === me.id}
-                            busy={pending.includes(a.id)}
-                            selected={ticked.has(a.id)}
-                            onToggle={() => toggleOne(a.id)}
-                            onAct={act}
-                            onPurge={() => {
-                              setConfirmText("");
-                              setPurgeTarget(a);
-                            }}
+                            {...accountRowProps(a)}
                           />
                         ))}
                       </tbody>
@@ -633,22 +619,14 @@ export function AdminConsole({
                   table has no room. The two are drawn from the register
                   rather than from each other, and the pieces they share
                   are shared: an account's role, its status and its four
-                  actions are one component each, so a card and a row can
-                  never come to describe the same account differently. */}
+                  actions are one component each, so the two layouts cannot
+                  drift in how they draw one. */}
                 <ul className="pm-scroll @min-[52rem]:hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                   {visible.map((a) => (
                     <AccountCard
                       key={a.id}
                       account={a}
-                      isSelf={a.id === me.id}
-                      busy={pending.includes(a.id)}
-                      selected={ticked.has(a.id)}
-                      onToggle={() => toggleOne(a.id)}
-                      onAct={act}
-                      onPurge={() => {
-                        setConfirmText("");
-                        setPurgeTarget(a);
-                      }}
+                      {...accountRowProps(a)}
                     />
                   ))}
                 </ul>
@@ -691,12 +669,13 @@ export function AdminConsole({
           </DialogHeader>
 
           <div className="mt-2 space-y-1.5">
-            <Label className="text-sm font-medium">
+            <Label htmlFor="purge-confirm" className="text-sm font-medium">
               {t("Type {purgeTargetHandle} to confirm", {
                 purgeTargetHandle: purgeTarget?.username ?? "",
               })}
             </Label>
             <Input
+              id="purge-confirm"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={purgeTarget?.username ?? ""}
@@ -753,10 +732,11 @@ export function AdminConsole({
                 confirmation for a selection is the count. It is a number
                 the operator can only produce by looking at what they
                 ticked, and the server holds the two against each other. */}
-            <Label className="text-sm font-medium">
+            <Label htmlFor="bulk-purge-confirm" className="text-sm font-medium">
               {t("Type {bulkCount} to confirm", { bulkCount })}
             </Label>
             <Input
+              id="bulk-purge-confirm"
               value={bulkConfirm}
               onChange={(e) => setBulkConfirm(e.target.value)}
               placeholder={String(bulkCount)}
@@ -785,466 +765,4 @@ export function AdminConsole({
       </Dialog>
     </div>
   );
-}
-
-// What an operator is told once a bulk action is over. Every account in the
-// selection is answered separately, so a selection wider than what the
-// action applies to is normal rather than a failure, and the sentence says
-// how far it got: a clean run is one line, a partial one counts itself and
-// lists what was left behind and why. That list is the whole reason the
-// report exists, so it is shown at length rather than summarised.
-function announceBulk(report: AdminBulkReport): void {
-  // Both the verb and the sentence are read here rather than at module
-  // scope: the report arrives after the operator's press, and the words
-  // have to answer in whatever language the console is printing by then.
-  const verb = t(BULK_VERB[report.action]);
-  const line =
-    report.skipped.length === 0
-      ? t("{verb} {report.applied} {accountWord}.", {
-          verb,
-          "report.applied": report.applied,
-          accountWord: plural(report.applied),
-        })
-      : t("{verb} {report.applied} of {report.requested} accounts.", {
-          verb,
-          "report.applied": report.applied,
-          "report.requested": report.requested,
-        });
-  if (report.skipped.length === 0) {
-    toast.success(line);
-    return;
-  }
-  toast.warning(line, {
-    description: report.skipped.join(" "),
-    // Long enough to read a list of refusals, since that list is the only
-    // place a skipped account is ever explained.
-    duration: 10000,
-  });
-}
-
-function plural(count: number): string {
-  return count === 1 ? "account" : "accounts";
-}
-
-// The four actions an operator can take on one account. Named here rather
-// than at each row, so the callback the page hands down is typed once and a
-// fifth action would be a fifth name in one place.
-type AccountActionFn = (
-  action: "ban" | "unban" | "grant" | "revoke",
-  userId: string,
-) => void;
-
-// What a table row and a card are both given. They are the same seven
-// facts, which is what lets the two be drawn from one register without
-// either of them deciding anything the other does not.
-type AccountRowProps = {
-  account: AdminAccount;
-  isSelf: boolean;
-  busy: boolean;
-  selected: boolean;
-  onToggle: () => void;
-  onAct: AccountActionFn;
-  onPurge: () => void;
-};
-
-// What one account is, as three pieces both presentations draw. They are
-// separate components rather than markup written twice because a table row
-// and a card that each decided for themselves how an administrator is
-// labelled would be two answers to one question, and the day the answers
-// differed the register would say two things about one account.
-function RoleChip({ isAdmin }: { isAdmin: boolean }) {
-  if (!isAdmin) {
-    return (
-      <span className="text-[11px] text-muted-foreground">{t("Captain")}</span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-admin/10 px-2 py-0.5 text-[11px] font-medium text-admin">
-      <ShieldCheck className="h-3 w-3" /> {t("Administrator")}
-    </span>
-  );
-}
-
-// A banned account is never also shown as online: the ban is the fact an
-// operator has to act on, and the last thing an account did before it is
-// not. That is why these are one choice rather than two chips side by side.
-function StatusChip({
-  isBanned,
-  online,
-}: {
-  isBanned: boolean;
-  online: boolean;
-}) {
-  if (isBanned) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-alarm/10 px-2 py-0.5 text-[11px] font-medium text-alarm">
-        <Ban className="h-3 w-3" /> {t("Banned")}
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-      <OnlineDot online={online} size={7} />
-      {online ? t("Online") : t("Away")}
-    </span>
-  );
-}
-
-// The three things an operator can do to one account, in the one place
-// they are decided, so a row and a card offer the same three in the same
-// order with the same guards. Skipped entirely while an action on this
-// account is in flight, because a second press during one is a second
-// request.
-//
-// They are words rather than chips (see RowButton): a register holds a
-// wall of them, and a wall of chips is a wall of boxes. The row actions
-// were the widest column on the register when they wore their chips, and
-// drawing them as quiet words took the table's own floor from 881 pixels
-// to 817, which is the measurement the threshold above is built on.
-function AccountActions({
-  account,
-  isSelf,
-  busy,
-  onAct,
-  onPurge,
-}: {
-  account: AdminAccount;
-  isSelf: boolean;
-  busy: boolean;
-  onAct: AccountActionFn;
-  onPurge: () => void;
-}) {
-  const isAdmin = account.role === "admin";
-  const isBanned = account.bannedAt !== null;
-  // Banning, demoting and deleting your own account would be a way to lock
-  // yourself out of the console with one click, and none of them is ever
-  // what was meant. The server refuses all three as well.
-  const selfTitle = isSelf ? t("Not available on your own account") : undefined;
-
-  if (busy) {
-    return (
-      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-    );
-  }
-  return (
-    <>
-      {isBanned ? (
-        <RowButton
-          label={t("Unban")}
-          onClick={() => onAct("unban", account.id)}
-        />
-      ) : (
-        <RowButton
-          label={t("Ban")}
-          disabled={isSelf}
-          title={selfTitle}
-          onClick={() => onAct("ban", account.id)}
-        />
-      )}
-      {isAdmin ? (
-        <RowButton
-          label={t("Revoke admin")}
-          disabled={isSelf}
-          title={selfTitle}
-          onClick={() => onAct("revoke", account.id)}
-        />
-      ) : (
-        <RowButton
-          label={t("Grant admin")}
-          // A banned account cannot open the console, so the role would be
-          // a promise the console cannot keep.
-          disabled={isBanned}
-          title={isBanned ? t("Unban the account first") : undefined}
-          onClick={() => onAct("grant", account.id)}
-        />
-      )}
-      <RowButton
-        label={t("Delete")}
-        tone="danger"
-        disabled={isSelf}
-        title={selfTitle}
-        onClick={onPurge}
-      />
-    </>
-  );
-}
-
-// One account's action, drawn as a quiet word. No chip stands behind it
-// until the cursor arrives, because a row carries three of these and nine
-// hundred rows carry a wall of boxes otherwise. The chip treatment
-// (ConsoleButton, below) is kept for the selection bar, where four
-// buttons are a moment's and want to be seen; in the register the rows'
-// own rhythm is the frame and the words are the content.
-//
-// The span around the label is not decoration: the width probe counts the
-// words drawn per row by reading button spans, so a bare text child would
-// read as a button with no word on it.
-function RowButton({
-  label,
-  onClick,
-  disabled,
-  title,
-  tone,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  tone?: "danger";
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title ?? label}
-      aria-label={label}
-      className={`pm-tool pm-pressable ${
-        tone === "danger"
-          ? "text-alarm hover:bg-alarm/10"
-          : "text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/10"
-      } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
-    >
-      <span>{label}</span>
-    </button>
-  );
-}
-
-// One account's identity, as the two lines both presentations lead with:
-// the name with the administrator mark beside it, and under them the
-// handle with the day the account was made. Neither of the folded facts
-// earns a column of its own: the joined date is a qualification on a name
-// rather than a fact an operator scans for, and the role is the exception
-// worth marking, so a column that said "Captain" down nine hundred rows
-// was paying a column's width to say nothing.
-function AccountIdentity({ account }: { account: AdminAccount }) {
-  return (
-    <div className="min-w-0">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-medium">{account.displayName}</span>
-        {account.role === "admin" && <RoleChip isAdmin />}
-      </div>
-      {/* Wrapped rather than truncated, and that is a width decision as
-          much as a typographic one. A cell of nowrap text has a minimum
-          width of the whole string, so a handle and a date held on one
-          unbroken line set the floor for the entire table and were what
-          pushed it past the column it stands in. Left free to wrap, the
-          floor is the longest word in it and the table gives the cell
-          whatever room is left over. */}
-      <div className="break-words text-[11px] text-muted-foreground">
-        {account.username} · {formatJoined(account.createdAt)}
-      </div>
-    </div>
-  );
-}
-
-// One account as a row of the table.
-function RosterRow({
-  account,
-  isSelf,
-  busy,
-  selected,
-  onToggle,
-  onAct,
-  onPurge,
-}: AccountRowProps) {
-  const isBanned = account.bannedAt !== null;
-  return (
-    <tr className="border-b border-black/[0.04] transition-colors last:border-0 hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]">
-      <td className="w-px py-2.5 pl-4 pr-3">
-        <SelectBox account={account} selected={selected} onToggle={onToggle} />
-      </td>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <Avatar
-            hue={account.avatarHue}
-            name={account.displayName}
-            size={28}
-            sm={32}
-          />
-          <AccountIdentity account={account} />
-        </div>
-      </td>
-      <td className="whitespace-nowrap px-4 py-2.5">
-        <StatusChip isBanned={isBanned} online={account.online} />
-      </td>
-      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
-        {account.roomsHosted}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
-        {account.seatsHeld}
-      </td>
-      <td className="py-2.5 pl-4 pr-3">
-        <div className="flex items-center justify-end gap-1">
-          <AccountActions
-            account={account}
-            isSelf={isSelf}
-            busy={busy}
-            onAct={onAct}
-            onPurge={onPurge}
-          />
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// The same account as a card, for every width the table cannot be drawn at.
-//
-// The actions are the reason the card exists. A table row once put five of
-// them in a column 267 pixels wide and had none of the words fit until the
-// window reached 1280, which is a width the column itself never changed at,
-// so on a phone an operator pressed one of five bare icons and found out
-// afterwards which one it was. A card has the width to say what its buttons
-// do, and says it at every size the card is drawn at.
-//
-// Everything on the card hangs off one column, the identity's own: the
-// name, the handle, the counts and the actions all start at the same left
-// edge, so the eye reads down a single line. Indenting the facts to clear
-// the avatar would be 64 pixels of alignment a narrow card cannot afford.
-function AccountCard({
-  account,
-  isSelf,
-  busy,
-  selected,
-  onToggle,
-  onAct,
-  onPurge,
-}: AccountRowProps) {
-  const isBanned = account.bannedAt !== null;
-  return (
-    <li className="border-b border-black/[0.04] px-4 py-3 last:border-0 dark:border-white/[0.06]">
-      <div className="flex items-start gap-3">
-        <div className="pt-0.5">
-          <SelectBox
-            account={account}
-            selected={selected}
-            onToggle={onToggle}
-          />
-        </div>
-        <Avatar
-          hue={account.avatarHue}
-          name={account.displayName}
-          size={28}
-          sm={32}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate text-sm font-medium">
-              {account.displayName}
-            </span>
-            <RoleChip isAdmin={account.role === "admin"} />
-            <StatusChip isBanned={isBanned} online={account.online} />
-          </div>
-          <p className="mt-0.5 break-words text-[11px] text-muted-foreground">
-            {account.username} · {formatJoined(account.createdAt)}
-          </p>
-
-          {/* The two counts, then the actions at the far end of the same
-              line: the facts an operator reads, and then the things they
-              do about them. */}
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="text-[11px] tabular-nums text-muted-foreground">
-              {account.roomsHosted}{" "}
-              {account.roomsHosted === 1 ? "harbor" : "harbors"} ·{" "}
-              {account.seatsHeld} {account.seatsHeld === 1 ? "seat" : "seats"}
-            </span>
-            <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <AccountActions
-                account={account}
-                isSelf={isSelf}
-                busy={busy}
-                onAct={onAct}
-                onPurge={onPurge}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </li>
-  );
-}
-
-// The tick box, which both presentations carry: the row's first cell and the
-// card's first control. One component so the label a screen reader reads is
-// the same sentence in both.
-function SelectBox({
-  account,
-  selected,
-  onToggle,
-}: {
-  account: AdminAccount;
-  selected: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <input
-      type="checkbox"
-      checked={selected}
-      onChange={onToggle}
-      aria-label={t("Select {account.displayName}", {
-        "account.displayName": account.displayName,
-      })}
-      title={t("Select {account.displayName}", {
-        "account.displayName": account.displayName,
-      })}
-      className={CHECKBOX}
-    />
-  );
-}
-
-// The console's other button: a chip, kept for the selection bar and the
-// empty register, where a handful of buttons stand together for a moment
-// and want to be found. The register's own rows use RowButton instead.
-//
-// The word here is not conditional either, and that is a width lesson this
-// screen paid for twice. A row once held five chip buttons whose words
-// appeared at a viewport breakpoint of 1280, while the column the row was
-// drawn in was capped at 1024 whatever the window did, so the breakpoint
-// read the wrong number: on a 1024 desktop the five buttons were bare
-// icons with room to spare, and past 1280 the words arrived and pushed the
-// table 60 pixels wider than the column it stood in. The table is now
-// drawn only where a worded row fits (see the threshold above), and the
-// words are never dropped at any width the table or the cards draw at.
-function ConsoleButton({
-  icon,
-  label,
-  onClick,
-  disabled,
-  title,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  tone?: "danger";
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title ?? label}
-      aria-label={label}
-      className={`pm-tool pm-pressable bg-black/[0.05] dark:bg-white/10 ${
-        tone === "danger" ? "text-alarm" : "text-foreground"
-      } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-// The day an account was made, in the browser's own locale and with no
-// time attached: an operator is asking how long someone has been around,
-// not to the second when.
-function formatJoined(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return t("Unknown");
-  return at.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }

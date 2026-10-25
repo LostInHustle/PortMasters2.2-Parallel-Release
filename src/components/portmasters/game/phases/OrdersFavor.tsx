@@ -72,25 +72,11 @@ export function BrokerFavor({
           {!favorOpen ? (
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span>
-                {/* The glyph is the panel's and stays outside the read.
-                    Both halves carry the source's &apos; entity, so both
-                    are read as HTML and the browser decodes them to the
-                    apostrophe JSX used to print. */}
-                <strong>
-                  🤝{" "}
-                  <span
-                    dangerouslySetInnerHTML={{
-                      __html: t("Broker&apos;s Favor"),
-                    }}
-                  />
-                </strong>{" "}
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: t(
-                      "(once per voyage): summon a guaranteed buyer for as much of a good as you choose from your hold. The bigger the ask, the bigger the Broker&apos;s cut.",
-                    ),
-                  }}
-                />
+                {/* The glyph is the panel's and stays outside the read. */}
+                <strong>🤝 {t("Broker's Favor")}</strong>{" "}
+                {t(
+                  "(once per voyage): summon a guaranteed buyer for as much of a good as you choose from your hold. The bigger the ask, the bigger the Broker's cut.",
+                )}
               </span>
               <Button
                 size="sm"
@@ -206,17 +192,11 @@ export function BrokerFavor({
                   {t("of {favorHeld} in your hold", { favorHeld })}
                 </span>
               </div>
-              {/* The pack carries this sentence with the source's &apos;
-                  entity, so it is read as HTML and the browser decodes it
-                  to the same apostrophe JSX used to print. */}
-              <p
-                className="text-muted-foreground"
-                dangerouslySetInnerHTML={{
-                  __html: t(
-                    "A bigger ask pays out more, but the Broker&apos;s cut grows with it too, so a single favor can never swing the whole voyage.",
-                  ),
-                }}
-              />
+              <p className="text-muted-foreground">
+                {t(
+                  "A bigger ask pays out more, but the Broker's cut grows with it too, so a single favor can never swing the whole voyage.",
+                )}
+              </p>
               <div className="flex gap-2">
                 <Button
                   size="sm"

@@ -1,7 +1,7 @@
 // POST /api/auth/logout
-// Logging out means leaving every room this account was sitting in, not
+// Logging out means leaving every harbor this account was sitting in, not
 // just ending the browser session. Otherwise a player who logs out
-// without first clicking Leave stays a permanent member, and a room
+// without first clicking Leave stays a permanent member, and a harbor
 // they were the only one left in never gets cleaned up.
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";

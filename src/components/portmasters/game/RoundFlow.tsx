@@ -6,61 +6,61 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/game/i18n";
 import { phaseFace } from "@/lib/game/phases";
-import type { RoundLeg } from "@/lib/game/mode";
+import type { BriefingPhase } from "@/lib/game/mode";
 import { Term } from "../Term";
 
 /**
  * One mode's round, drawn as the flow it is.
  *
- * Every leg stands on the rail in the order the engine walks them,
- * wearing the fill of the phase it is, and the leg a captain is reading
- * opens the line underneath: what that leg decides for the legs after it.
+ * Every round stands on the rail in the order the engine walks them,
+ * wearing the fill of the phase it is, and the round a captain is reading
+ * opens the line underneath: what that phase decides for the phases after it.
  *
  * The rail is deliberately complete rather than a stepper that shows one
- * leg at a time. This panel is read before the voyage begins, to work out
+ * round at a time. This panel is read before the voyage begins, to work out
  * what the mode is asking for, and a shape that has to be walked one
  * click at a time cannot be taken in at a glance or held in the head
  * while a decision is made. What the click buys is the consequence line,
  * and the reading is meant to move back and forth along the rail rather
  * than once down it.
  *
- * Every leg's body is always shown, and only the consequence line is the
- * one the focus picks. Hiding a leg's body behind a click would leave the
+ * Every round's body is always shown, and only the consequence line is the
+ * one the focus picks. Hiding a round's body behind a click would leave the
  * chart unreadable to a captain who never clicks, and this is the panel
  * they meet before they know what the mode is.
  *
- * Nothing here decides what a round is: the legs arrive from the mode
- * record, and the smoke suite holds them to the lap. See RoundLeg.
+ * Nothing here decides what a round is: the phases arrive from the mode
+ * record, and the smoke suite holds them to the lap. See BriefingPhase.
  */
 export function RoundFlow({
-  legs,
+  phases,
   closes,
 }: {
-  legs: readonly RoundLeg[];
+  phases: readonly BriefingPhase[];
   closes: string;
 }) {
-  // The first leg is open on arrival, because some leg has to be: a rail
+  // The first round is open on arrival, because some round has to be: a rail
   // with nothing under it opens as a list of rows and never shows a
   // captain that the rows answer to a click.
   const [focused, setFocused] = useState(0);
-  const held = legs[focused];
+  const held = phases[focused];
 
   return (
     <div className="mt-2">
       <ol>
-        {legs.map((leg, index) => {
+        {phases.map((phase, index) => {
           const open = index === focused;
-          // A leg stands for the phase the engine walks, and what a phase is
+          // A round stands for the phase the engine walks, and what a phase is
           // called, wears and shows is the phase's own business (see
           // PHASE_FACES). The mode record says what a phase decides; it does
           // not say what to call it a second time.
-          const face = phaseFace(leg.phase);
+          const face = phaseFace(phase.phase);
           return (
-            <li key={leg.phase}>
+            <li key={phase.phase}>
               {/* Three columns rather than a flex row, because the rail
                   below has to be told what to line up with and a column is
                   how it is told: the tile column is exactly as wide as the
-                  tile, so the rail is centred on it by being centred in
+                  tile, so the rail is centered on it by being centered in
                   its own column, with no offset arithmetic to rot.
 
                   The button carries no vertical padding for the same
@@ -88,13 +88,13 @@ export function RoundFlow({
                   >
                     {index + 1}
                   </span>
-                  {/* The rail between two legs, drawn rather than written,
-                      so the legs read as one run instead of seven rows. It
+                  {/* The rail between two phases, drawn rather than written,
+                      so the phases read as one run instead of seven rows. It
                       is the rest of the tile column, less the 2px that
                       keeps the line off the tile's own edge, and it
                       reaches the row's bottom, which is where the next
                       tile's top is. */}
-                  {index < legs.length - 1 && (
+                  {index < phases.length - 1 && (
                     <span
                       aria-hidden
                       className="mt-0.5 w-px flex-1 bg-sea/25"
@@ -103,7 +103,7 @@ export function RoundFlow({
                 </span>
                 <span className="min-w-0 py-1.5">
                   {/* The phase's name is a term wherever the rail draws it:
-                      the four leg names a captain meets before any briefing
+                      the four round names a captain meets before any briefing
                       (Dawn, Parley, Resolve, Dusk) carry their own entries
                       now, and a name without one falls back to plain text,
                       so the wrap is the rail saying these words are the
@@ -115,7 +115,7 @@ export function RoundFlow({
                     </Term>
                   </span>
                   <span className="block text-xs leading-snug text-muted-foreground">
-                    {t(leg.body)}
+                    {t(phase.body)}
                   </span>
                 </span>
                 <ChevronRight
@@ -130,7 +130,7 @@ export function RoundFlow({
         })}
       </ol>
 
-      {/* What the leg in hand decides for the ones after it. The glyph
+      {/* What the round in hand decides for the ones after it. The glyph
           says where the line came from, so the sentence does not have to
           carry a label on top of being a sentence. */}
       <AnimatePresence mode="wait" initial={false}>

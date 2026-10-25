@@ -1,8 +1,9 @@
 "use client";
 
 import { AidRequest } from "@/types/realtime/boards";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
+import { refusalHandler } from "@/lib/refusals";
 
 export type GrantedLoan = {
   requestId: string;
@@ -21,7 +22,7 @@ export type RepaidLoan = {
   fromName: string;
 };
 
-// The receipt for a repayment I sent: the room found the loan and closed
+// The receipt for a repayment I sent: the harbor found the loan and closed
 // it, so this client's own debt can move. It carries the debt rather than
 // the Gold because the amount is this captain's own ledger, recorded here
 // when the loan was granted, and the debt id says which one this closes.
@@ -41,7 +42,7 @@ export type RedirectedLoanClosed = {
 /**
  * Resolve's shared "I'm short, can someone help" board: a thin relay
  * around the aid:* socket events, kept separate from GameState the same
- * way useBarter is, since an open request is real room wide state no
+ * way useBarter is, since an open request is real harbor wide state no
  * single client's deterministic engine can compute on its own. This hook
  * only tracks the board and tells the caller when a loan is granted or
  * repaid; the actual Gold effect (debit the helper, credit the borrower,
@@ -54,8 +55,8 @@ export type RedirectedLoanClosed = {
  * the two apart from the `role` argument rather than comparing ids itself.
  *
  * `onRepaymentSettled` fires on the client that asked to repay, once the
- * room has closed the loan, and it is the only thing that ever moves a
- * debt on this side: the press asks, and the loan is the room's to close
+ * harbor has closed the loan, and it is the only thing that ever moves a
+ * debt on this side: the press asks, and the loan is the harbor's to close
  * (a voyage that ended or a seat that was written off can have taken it
  * already, in which case the press is refused rather than answered and
  * nothing here moves). A refusal arrives as this hook's `error`, which is
@@ -117,21 +118,24 @@ export function useAid(
       if (data.roomId !== roomId) return;
       onRedirectedClosedRef.current?.(data);
     };
-    const onHelpFail = (data: {
-      roomId: string;
-      requestId: string;
-      reason: string;
-    }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.reason);
-    };
-    const onPostError = (data: { roomId: string; error: string }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.error);
-    };
+    // The two refusals this hook can show, read through the one guard
+    // (see ./refusals): a help press the harbor turned away and a post it
+    // would not take are both this hook's own sentence, and each wire
+    // words its own refusal in its own field.
+    const onHelpFail = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; requestId: string; reason: string }) =>
+        data.reason,
+    );
+    const onPostError = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; error: string }) => data.error,
+    );
     // The two answers a repayment gets. Both are spoken, because the
     // borrower's client applies nothing on its own: the receipt is what
-    // moves the debt, and the refusal is what says the room has none to
+    // moves the debt, and the refusal is what says the harbor has none to
     // close rather than leaving the press waiting on an answer that is
     // never coming.
     const onRepaySettled = (data: RepaymentSettled & { roomId: string }) => {
@@ -142,10 +146,11 @@ export function useAid(
     // travels with it: only one refusal is held at a time, so the sentence
     // is the whole of what a screen draws and the press it answers is the
     // only one it can be about.
-    const onRepayFail = (data: { roomId: string; reason: string }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.reason);
-    };
+    const onRepayFail = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; reason: string }) => data.reason,
+    );
 
     socket.on("aid:update", onUpdate);
     socket.on("aid:granted", onGrantedEvent);
@@ -196,12 +201,12 @@ export function useAid(
     [socket, roomId],
   );
 
-  // Repaying only asks, the same way helping does: the room holds the
-  // loan, so the room says whether it can be closed, and the caller
+  // Repaying only asks, the same way helping does: the harbor holds the
+  // loan, so the harbor says whether it can be closed, and the caller
   // applies nothing until the receipt arrives. The forced settlement at
   // the end of a voyage asks through this same call, where the local
   // debts were already closed and a receipt finds nothing to move. The
-  // debt and the amount are the whole of what the room needs: it holds
+  // debt and the amount are the whole of what the harbor needs: it holds
   // the loan, so it already knows who lent it.
   const repay = useCallback(
     (amount: number, debtId: string) => {
@@ -212,13 +217,16 @@ export function useAid(
     [socket, roomId],
   );
 
-  return {
-    requests,
-    error,
-    clearError: () => setError(null),
-    post,
-    cancel,
-    help,
-    repay,
-  };
+  // The dismiss, named rather than written inline, so that it is one
+  // function across renders and the answer below can be held to one
+  // identity.
+  const clearError = useCallback(() => setError(null), []);
+
+  // The answer, held to one identity until something inside it changes.
+  // The board that draws the aid requests takes this whole object as a
+  // prop.
+  return useMemo(
+    () => ({ requests, error, clearError, post, cancel, help, repay }),
+    [requests, error, clearError, post, cancel, help, repay],
+  );
 }

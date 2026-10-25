@@ -14,7 +14,6 @@ import {
 } from "@/lib/game/constants/supplies";
 import {
   cargoCapacity,
-  crewSize,
   legRationCost,
   onShortRations,
   provisionAffordable,
@@ -30,9 +29,10 @@ import {
 } from "@/lib/game/hold";
 import { survivalLayerOn } from "@/lib/game/flags";
 import { t } from "@/lib/game/i18n";
+import { crewSize } from "@/lib/game/types";
 import {
   bargeLeftAtPort,
-  bargePortAtLeg,
+  bargePortAtRound,
   bargePurseRations,
   bargeRationPrice,
   bargeRoomMeals,
@@ -41,6 +41,7 @@ import {
 import { Utensils } from "lucide-react";
 import { FoldRow } from "../FoldRow";
 import { Term } from "../../Term";
+import { PanelLabel } from "../../shared";
 import {
   HuePanel,
   PanelNote,
@@ -53,7 +54,7 @@ import {
  * and how long what is aboard lasts.
  *
  * The keeping half is read from the lot rather than from the food, because
- * two captains holding the same meals of the same salt fish can be a leg
+ * two captains holding the same meals of the same salt fish can be a round
  * apart on when it turns and only their own lots know which. A food that
  * is not aboard has no age to report, so its row answers with what the
  * food keeps rather than with what this pantry holds, which is the number
@@ -67,15 +68,15 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
   });
   if (spec.keeps === null) return t("{density}, keeps forever", { density });
   if (meals <= 0)
-    return t("{density}, keeps {spec.keeps} legs", {
+    return t("{density}, keeps {spec.keeps} rounds", {
       density,
       "spec.keeps": spec.keeps,
     });
   if (legsLeft === null) return density;
   if (legsLeft <= 0) return t("{density}, turns at this Dusk", { density });
-  return t("{density}, turns after {legs} leg{pluralS}", {
+  return t("{density}, keeps {rounds} round{pluralS}, then turns", {
     density,
-    legs: legsLeft,
+    rounds: legsLeft,
     pluralS: legsLeft === 1 ? "" : "s",
   });
 }
@@ -91,15 +92,15 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
  * cannot feed the people who will work it was ordered into that mistake by
  * the screen rather than by a decision they made.
  *
- * It buys in legs, and a leg is the whole unit: the same one the crew eats
- * one of at each Dawn, and the same one this phase is. Asking for a leg the
+ * It buys in rounds, and a round is the whole unit: the same one the crew eats
+ * one of at each Dawn, and the same one this phase is. Asking for a round the
  * stores have no room for or the purse cannot cover buys as much of it as
  * it can rather than refusing outright (see provisionFood), so the buttons
  * below describe what is about to happen instead of gating on it. The one
  * case that is refused is a purchase that would come to nothing, and that
  * is written on the button rather than left as a click with no answer.
  *
- * [C4: three foods, spoilage and the split hold] One row per food, and the
+ * One row per food, and the
  * row is the whole decision the sea added: a meal costs the same whichever
  * food it is (see FOODS in ./constants), so what a captain is choosing
  * between is space and time, and the row prints both. The keeping figure
@@ -115,7 +116,7 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
  * the hunger warning rather than above it, so a hungry crew's alarm is
  * never behind a click: what the fold hides is the buying, not the state,
  * and the header above both carries the larder count and the price of a
- * leg that the buying is about.
+ * round that the buying is about.
  *
  * The hold's two halves are printed only when the split is on (see
  * holdCapacityOn), because they are the split: with it off there is one
@@ -123,8 +124,8 @@ function keeping(food: FoodId, meals: number, legsLeft: number | null): string {
  * the header line reads exactly as it read before this feature, which is
  * the shape every part of the survival layer keeps when its switch is off.
  *
- * [E1: the Supply Barge] One row at the foot of the panel is not a port
- * counter at all: the anonymous vendor the plan builds as the fallback for
+ * One row at the foot of the panel is not a port
+ * counter at all: the anonymous vendor the design builds as the fallback for
  * a table that never took the Quartermaster. It is drawn here rather than
  * on a board of its own because it is the same decision one rung worse,
  * and a captain should meet it while looking at the prices it is worse
@@ -158,13 +159,13 @@ export function Provisions({
     (food) => provisionRoom(game, food) > 0,
   );
   const batches = Math.floor(mealsOf(game, "Produce") / PRESERVE_MEALS_IN);
-  // [E1: the Supply Barge] The fallback, read the way the rows above are:
+  // The fallback, read the way the rows above are:
   // the port and the lot come off the voyage's own numbers, the price off
   // the constants, and what a press would actually buy is held to the same
   // ceilings the sale applies, two of them through the sale's own readers
   // (see bargeRoomMeals and bargePurseRations), so the cost on the button
   // is the cost the captain is charged.
-  const bargePort = bargePortAtLeg(game);
+  const bargePort = bargePortAtRound(game);
   const bargePrice = bargeRationPrice();
   const bargeLeft = bargeLeftAtPort(game);
   const bargeRoom = bargeRoomMeals(game);
@@ -177,19 +178,20 @@ export function Provisions({
 
   return (
     <HuePanel tone="larder">
-      {/* The stats live on the header row (W4): the label, the one line
+      {/* The stats live on the header row: the label, the one line
           that says what the panel is, and the five figures a captain
           checks before buying were two stacked rows that said one thing,
           and the panel that leads with its numbers is the shape every
           other desk on this screen already wears. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <span className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-larder">
+        <PanelLabel
+          as="span"
+          tone="text-larder"
+          note={t("one ration a head, eaten at each Dawn")}
+        >
           <Utensils className="h-3.5 w-3.5" />
           {t("Provisions")}
-          <span className="font-normal text-muted-foreground ml-1">
-            {t("one ration a head, eaten at each Dawn")}
-          </span>
-        </span>
+        </PanelLabel>
         <PanelStat
           label={<Term term="Larder">{t("Larder")}</Term>}
           value={game.larder}
@@ -240,7 +242,7 @@ export function Provisions({
         <PanelStat label={t("Crew")} value={crew} />
         {crew > 0 && (
           <span className="text-[11px] text-muted-foreground">
-            {t("a leg of rations costs {legCost} Gold", { legCost })}
+            {t("a round of rations costs {legCost} Gold", { legCost })}
           </span>
         )}
       </div>
@@ -264,8 +266,8 @@ export function Provisions({
             {FOODS_DRAW_ORDER.map((food) => {
               const line = aboard.get(food);
               const room = provisionRoom(game, food);
-              const fillLegs = Math.min(room, affordable);
-              const oneLeg = Math.min(1, room, affordable);
+              const fillRounds = Math.min(room, affordable);
+              const oneRound = Math.min(1, room, affordable);
               return (
                 <div
                   key={food}
@@ -291,28 +293,28 @@ export function Provisions({
                   <Button
                     size="sm"
                     className="h-7 rounded-lg px-2.5 text-[11px]"
-                    variant={oneLeg > 0 ? "default" : "secondary"}
-                    disabled={oneLeg <= 0}
+                    variant={oneRound > 0 ? "default" : "secondary"}
+                    disabled={oneRound <= 0}
                     onClick={() => act((g, l) => provisionFood(g, food, 1, l))}
                   >
                     {FOODS[food].icon}{" "}
-                    {oneLeg > 0
-                      ? t("Buy 1 Leg ({legCost}💰)", { legCost })
+                    {oneRound > 0
+                      ? t("Buy 1 round ({legCost}💰)", { legCost })
                       : t("Buy Rations")}
                   </Button>
                   <Button
                     size="sm"
                     className="h-7 rounded-lg px-2.5 text-[11px]"
-                    variant={fillLegs > 1 ? "default" : "secondary"}
-                    disabled={fillLegs <= 1}
+                    variant={fillRounds > 1 ? "default" : "secondary"}
+                    disabled={fillRounds <= 1}
                     onClick={() =>
-                      act((g, l) => provisionFood(g, food, fillLegs, l))
+                      act((g, l) => provisionFood(g, food, fillRounds, l))
                     }
                   >
-                    {fillLegs > 1
-                      ? t("Fill ({legs} Legs, {gold}💰)", {
-                          legs: fillLegs,
-                          gold: fillLegs * legCost,
+                    {fillRounds > 1
+                      ? t("Fill ({rounds} Rounds, {gold}💰)", {
+                          rounds: fillRounds,
+                          gold: fillRounds * legCost,
                         })
                       : t("Fill")}
                   </Button>
@@ -338,7 +340,7 @@ export function Provisions({
         </FoldRow>
       </div>
 
-      {/* [E1: the Supply Barge] The fallback, and it is drawn last on this
+      {/* The fallback, and it is drawn last on this
           panel because that is what it is: the row a captain reads after
           the three foods above have turned out not to be enough. Nothing
           here is decided on the screen. The port and the lot are drawn from
@@ -347,7 +349,7 @@ export function Provisions({
           the same three ceilings the sale applies, so a press cannot cost
           more than the label said.
 
-          The one thing it does say out loud is the premium. The plan's
+          The one thing it does say out loud is the premium. The design's
           own iteration clause is that the Barge exists so a table gets
           fleeced once and fights over the card next time, and a captain
           who cannot see the price they are paying cannot be fleeced by
@@ -360,7 +362,7 @@ export function Provisions({
           title={t("Supply Barge")}
           gist={
             bargeLeft < 1
-              ? t("The barge has nothing left for you this leg.")
+              ? t("The barge has nothing left for you this round.")
               : t(
                   "An unnamed trader on the quay: {bargePrice} Gold a ration against the port's {RATION_PRICE}.",
                   { bargePrice, RATION_PRICE },
@@ -409,10 +411,10 @@ export function Provisions({
             <p className="text-[10px] text-muted-foreground mt-1.5">
               {bargeLeft < 1
                 ? t(
-                    "The barge has nothing left for you this leg, and it is a fresh lot tomorrow.",
+                    "The barge has nothing left for you this round, and it is a fresh lot tomorrow.",
                   )
                 : t(
-                    "{bargeLeft} ration{pluralS} {beWord} left for you this leg.",
+                    "{bargeLeft} ration{pluralS} {beWord} left for you this round.",
                     {
                       bargeLeft,
                       pluralS: bargeLeft === 1 ? "" : "s",
@@ -437,7 +439,7 @@ export function Provisions({
       )}
       {crew > 0 && anyRoom && affordable === 0 && (
         <PanelNote tone="alarm">
-          {t("Not enough Gold for a leg of rations.")}
+          {t("Not enough Gold for a round of rations.")}
         </PanelNote>
       )}
     </HuePanel>

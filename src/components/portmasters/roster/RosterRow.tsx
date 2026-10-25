@@ -62,17 +62,15 @@ export function RosterRow({
   peekLoading: boolean;
   peekSnapshot: PlayerDetailData | null;
 }) {
-  // [H7: Maroon and the Harbormaster] The two marks a failed
-  // voyage leaves on a seat, read through the one place that
-  // states the rule (see seatMarks). Both are read from the
-  // broadcast status for the reason the bankruptcy mark always
-  // was: in Ocean Gambit a failed seat sails on, so the phase
-  // alone would badge nobody.
+  // The two marks a failed voyage leaves on a seat, read through the one
+  // place that states the rule (see seatMarks). Both are read from the
+  // broadcast status for the reason the bankruptcy mark always was: in
+  // Ocean Gambit a failed seat sails on, so the phase alone would badge
+  // nobody.
   const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(status);
-  // [MANIFEST: Partial Sight] The target's Renown level arrives
-  // with the roster status when the server reports it. If it is
-  // missing, we treat it as zero, which makes canSeeDetail return
-  // false and the peek button stays hidden.
+  // The target's Renown level arrives with the roster status when the
+  // server reports it. If it is missing, we treat it as zero, which makes
+  // canSeeDetail return false and the peek button stays hidden.
   const theirRenownLevel = status?.renownLevel ?? 0;
   const canPeek = canSeeDetail(myRenownLevel, theirRenownLevel);
   return (
@@ -187,22 +185,19 @@ export function RosterRow({
             <Anchor className="h-3 w-3" /> {t("Ashore")}
           </Pill>
         )}
-        {/* [C1: the Larder and Short Rations] The plan asks for
-            the shortage to be visible to the fleet, not just to
-            the captain living it, and this is the board the
-            fleet reads. It wears the meaning red rather than
-            the Larder's own hue: the Larder's colour names the
-            panel on the Market screen, while a status is drawn
-            from the meaning half of the palette wherever it
-            appears (see Pill). Not folded into seatMarks, which
-            is about the two marks that write a seat off: a
-            hungry captain is neither of those, and a badge that
-            rode writtenOff would quietly take them out of the
-            running for a vote they are still entitled to.
-            [W3: the status convention] The pill carries the way
-            back in its own visible text rather than in a title
-            alone, because a fleet reading this board may be
-            reading it on a touch screen, where a title never
+        {/* The shortage is visible to the fleet, not just to the
+            captain living it, and this is the board the fleet reads.
+            It wears the meaning red rather than the Larder's own
+            hue: the Larder's color names the panel on the Market
+            screen, while a status is drawn from the meaning half of
+            the palette wherever it appears (see Pill). Not folded
+            into seatMarks, which is about the two marks that write a
+            seat off: a hungry captain is neither of those, and a
+            badge that rode writtenOff would quietly take them out of
+            the running for a vote they are still entitled to. The
+            pill carries the way back in its own visible text rather
+            than in a title alone, because a fleet reading this board
+            may be reading it on a touch screen, where a title never
             fires. */}
         {status?.shortRations && (
           <span title={hungryTooltip()}>
@@ -212,10 +207,9 @@ export function RosterRow({
           </span>
         )}
 
-        {/* [MANIFEST: Partial Sight] Read only peek at a partner's
-            banded cargo. Hidden on my own row, on a bankrupt
-            captain's row, and whenever the trust threshold is not
-            met. */}
+        {/* Read only peek at a partner's banded cargo. Hidden on my
+            own row, on a bankrupt captain's row, and whenever the
+            trust threshold is not met. */}
         {!isMe && !isBankrupt && canPeek && (
           <PeekButton
             targetName={member.displayName}
@@ -225,8 +219,8 @@ export function RosterRow({
           />
         )}
 
-        {/* [MANIFEST 14: Harbor Watch] Host only, never on my own
-            row: the host can mute anyone else, never themselves. */}
+        {/* Host only, never on my own row: the host can mute anyone
+            else, never themselves. */}
         {viewerIsHost && !isMe && (
           <IconButton
             onClick={(e) => {
@@ -251,13 +245,12 @@ export function RosterRow({
           </IconButton>
         )}
 
-        {/* [J2: the mute and the report] Every captain on every
-            other captain's row, host or not, because this is the
-            remedy for a harbor somebody else is running and a mode
-            that seats strangers needs one. It settles once it has
-            been used, since the server writes one row per pair per
-            voyage and a second raise would only earn a notice that
-            it was already on the record. */}
+        {/* Every captain on every other captain's row, host or not,
+            because this is the remedy for a harbor somebody else is
+            running and a mode that seats strangers needs one. It
+            settles once it has been used, since the server writes one
+            row per pair per voyage and a second raise would only earn
+            a notice that it was already on the record. */}
         {!isMe && (
           <IconButton
             disabled={reported}

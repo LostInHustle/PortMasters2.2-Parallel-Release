@@ -27,18 +27,18 @@ import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
 export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
-  // [H9] The harbor's one locked door, and the reason it is a phrase
-  // rather than a permission: what the phrase buys a captain is a moment,
+  // The harbor's one locked door, and the reason it is a phrase rather
+  // than a permission: what the phrase buys a captain is a moment,
   // not a fence, and an entitlement kept per account would make the first
   // question at every table an administrative check. This section walks
-  // the whole loop the plan asks for. It reads the table first, because a
+  // the whole loop the feature holds. It reads the table first, because a
   // suite that spelled the words itself would be testing its own copy of
   // them. Then it earns the phrase the way a captain does, on a tenth
   // completed voyage, reads it back out of the log that voyage left
   // behind, and opens a sealed table with it from an account that has
   // never sailed ten of anything.
 
-  // ---- The table, read before anything is typed ----
+  // ========== The table, read before anything is typed ==========
   for (const id of UNLOCK_ORDER) {
     const unlock = UNLOCKS[id];
     check(
@@ -80,7 +80,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
     `the harbor's line is handed over on the voyage that reaches ${UNLOCK_EARNED_AT} and on no other, and it carries both the count it was granted at and the phrase itself rather than a hint at it`,
   );
 
-  // ---- The voyage that earns it ----
+  // ========== The voyage that earns it ==========
   // Three seats, because the line has three cases to tell apart: the
   // captain whose tenth voyage this is, a captain on their first voyage
   // who must not be handed it, and a captain sitting at ten who forges
@@ -167,7 +167,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
       roomId: unlLogId,
       round: 8,
       phase: "endgame",
-      phaseLabel: "Voyage Complete",
+      phaseLabel: "Voyage Ended",
       shipLevel: 1,
       gameOver: true,
       marooned: false,
@@ -231,7 +231,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
     "which the count behind it says first: a forged voyage leaves the count exactly where it found it",
   );
 
-  // ---- The door ----
+  // ========== The door ==========
   const unlAsk = (cookie: string, body: Record<string, unknown>) =>
     call<{
       room?: {
@@ -253,7 +253,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
   const unlSealed = await unlAsk(unlNew.cookie, { mode: "ocean_gambit" });
   check(
     unlSealed.status === 403 && typeof unlSealed.body?.error === "string",
-    "a sealed voyage refuses a host who brought no phrase, with an answer rather than a room",
+    "a sealed voyage refuses a host who brought no phrase, with an answer rather than a harbor",
   );
   const unlMistyped = await unlAsk(unlNew.cookie, {
     mode: "ocean_gambit",
@@ -299,11 +299,11 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
   );
   check(
     unlTaken.status === 200 && unlTaken.body.room.unlock === "second_ledger",
-    "and every captain who walks in afterwards is told which door the room was opened through, because the door belongs to the room rather than to whoever opened it",
+    "and every captain who walks in afterwards is told which door the harbor was opened through, because the door belongs to the harbor rather than to whoever opened it",
   );
 
   // The voyage runs and then restarts, which is the one handler that
-  // rewrites the room's voyage settings. The door is not one of them, so a
+  // rewrites the harbor's voyage settings. The door is not one of them, so a
   // harbor that reopens is still the harbor it was opened as, which is
   // what the lobby card a captain reads it off promises either way.
   const unlGateSocket = await openAuthedSocket(unlNew);

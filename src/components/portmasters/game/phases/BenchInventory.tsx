@@ -8,7 +8,7 @@ import { ItemIcon } from "../../shared";
 import { HuePanel, PanelHeading, type PhasePanelProps } from "./PhaseShared";
 
 // One column of the inventory block: a heading and the goods under it, each
-// row a glyph, a name and the count, in the good's own colour.
+// row a glyph, a name and the count, in the good's own color.
 function InventoryColumn({
   title,
   items,
@@ -27,7 +27,7 @@ function InventoryColumn({
         <div key={r} className="flex items-center text-[11px] py-0.5">
           <ItemIcon item={r} className="mr-1.5 h-3.5 w-3.5" />
           <span className="flex-1" style={{ color: colorFor(r) }}>
-            {r}
+            {t(r)}
           </span>
           <b style={{ color: colorFor(r) }}>{inventory[r] || 0}</b>
         </div>

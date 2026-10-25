@@ -6,12 +6,12 @@
 // build's own design (a single DIFFICULTIES record plus difficultyRules
 // helpers), rebuilt around this release's own systems.
 //
-// Difficulty is a ROOM property (see Room.difficulty in prisma/schema.prisma):
+// Difficulty is a HARBOR property (see Room.difficulty in prisma/schema.prisma):
 // the host picks it once, and every captain in the harbor resolves the same
 // tier. Because the tier and the round number are the only inputs to every
-// selector here, and both are identical for everyone in a room, each
+// selector here, and both are identical for everyone in a harbor, each
 // captain's seeded market and orders keep their own personal draw while the
-// structure (how many cards, how likely a raid) stays consistent room wide.
+// structure (how many cards, how likely a raid) stays consistent harbor wide.
 //
 // The "fair_winds" tier is the founding game: 8 rounds, a flat 0.2 raid
 // chance, a 0.1 escort fee, 6 cards on each board, no mandates and no
@@ -31,10 +31,10 @@ export type Difficulty = "fair_winds" | "open_waters" | "monsoon";
 export const DEFAULT_DIFFICULTY: Difficulty = "fair_winds";
 
 export interface DifficultyConfig {
-  // Display metadata, read by the lobby switch, the room card chip, and the
+  // Display metadata, read by the lobby switch, the harbor card chip, and the
   // in game status chip, so copy and numbers never drift from one source.
   name: string;
-  // [F1: the tag vocabulary, and the two tag rule] What water this charter
+  // What water this charter
   // is, in the vocabulary of ./constants/tags, read by the rule module
   // against the two numbers in this same record that make two of the tags
   // checkable rather than authored: a charter carries armed exactly when
@@ -109,7 +109,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     icon: "🌤️",
     tagline: "A gentle passage for new captains.",
     summary:
-      "Eight rounds on the founding trade. A short, legible voyage with room to learn the rhythm before the money runs tight.",
+      "A gentle passage on the founding trade. A short, legible voyage with room to learn the rhythm before the money runs tight.",
     rounds: 8,
     startingGold: 100,
     maintenance: 15,
@@ -132,7 +132,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     icon: "🌊",
     tagline: "The full trade opens as the harbor grows busy.",
     summary:
-      "Twelve rounds. The charter opens twice and the market swells from six cards to ten, with pirates that begin to bite past the midpoint.",
+      "The charter opens twice and the market swells from six cards to ten, with pirates that begin to bite past the midpoint.",
     rounds: 12,
     startingGold: 100,
     maintenance: 18,
@@ -155,7 +155,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
     icon: "⛈️",
     tagline: "A long, adversarial haul for seasoned captains.",
     summary:
-      "Sixteen rounds, back loaded and unforgiving. The market swells to eleven cards, the largest imperial mandates fall late, and a corrupt broker may leak your position to the pirates.",
+      "Back loaded and unforgiving. The market swells to eleven cards, the largest imperial mandates fall late, and a corrupt broker may leak your position to the pirates.",
     rounds: 16,
     startingGold: 90,
     maintenance: 22,
@@ -190,7 +190,7 @@ interface MandateTemplate {
 }
 
 // A mandate is deliberately fixed data with no randomness, so every captain in
-// a room is dealt the identical commission without disturbing their own seeded
+// a harbor is dealt the identical commission without disturbing their own seeded
 // market. Mandates are also exempt from VAT (they are an imperial commission,
 // not a taxed sale), which is why the engine flags them isProductOrder: false.
 export const MANDATE_TEMPLATES: readonly MandateTemplate[] = [
@@ -246,9 +246,6 @@ export function difficultyConfig(value: unknown): DifficultyConfig {
 // their place by computing something (a midpoint, an accumulation, a
 // normalization) rather than forwarding a field.
 
-// Card counts for both boards on a given round: the base plus every charter
-// bump the voyage has reached by now. Mirrors the accumulation of the
-// original's tier unlocks / phaseOptionCount, expressed as card density.
 // The highest content tier whose charter has opened by this round. Everything
 // tier gated (goods, ports, artisans, boons, modules, market breadth) keys off
 // this one number, so they can never disagree about what is available.
@@ -292,7 +289,7 @@ export function marketCountsFor(
 // Which content tier's Silk Road Charter opens on exactly this round, if
 // any, so the caller can announce what actually arrived rather than a
 // generic banner. (Named for the Silk Road Charter, the schedule's own
-// event, so it cannot be read as the leg four charter cards' switch.)
+// event, so it cannot be read as the round four charter cards' switch.)
 function silkRoadCharterTierOpeningOn(
   value: unknown,
   roundNo: number,

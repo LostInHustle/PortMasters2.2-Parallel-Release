@@ -3,8 +3,8 @@
 // spend before they read it.
 //
 // The socket layer counts its frames (see server/realtime/inbound-limit.ts,
-// which the private information review's F3 entry records), but the REST
-// doors counted nothing: a password, a setup code or a new account could
+// which the private information review records), but the REST doors counted
+// nothing: a password, a setup code or a new account could
 // be tried at whatever rate the host allowed, and a sign in naming a real
 // account costs a synchronous scrypt on the event loop that serves every
 // live socket as well (see server.ts: one process, one port, one server).

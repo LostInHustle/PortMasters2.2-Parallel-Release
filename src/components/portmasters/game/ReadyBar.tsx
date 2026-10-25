@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Check, Clock, Hourglass } from "lucide-react";
 
 /* Seconds at which the countdown stops reading as information and starts
-   reading as a warning. It is a colour choice rather than a rule: the room
+   reading as a warning. It is a color choice rather than a rule: the harbor
    moves when the server says it does, whatever this is drawn as. */
 const URGENT_SECONDS = 10;
 
@@ -22,7 +22,7 @@ export function ReadyBar({
   ready: ReadyState | null;
   members: PublicUser[];
   /**
-   * [B2: hard timers, the server as timekeeper] The room's clock, when one is
+   * The harbor's clock, when one is
    * running. Optional because a caller that has no clock to hand in (the
    * pier, a server with the clock switched off, a screen that drew this
    * before the deadline arrived) should be able to say so by saying nothing
@@ -36,7 +36,7 @@ export function ReadyBar({
   const readySet = new Set(ready.readyUserIds);
   const secondsLeft = clock?.secondsLeft;
   const urgent = secondsLeft !== undefined && secondsLeft <= URGENT_SECONDS;
-  // How much of the leg is left, as a whole percent, for the bar beside the
+  // How much of the round is left, as a whole percent, for the bar beside the
   // countdown. It shrinks rather than fills, which is the one reading that
   // says "this phase is ending" at a glance. Clamped rather than trusted: the
   // share comes off two published numbers, and a server that somehow
@@ -67,7 +67,7 @@ export function ReadyBar({
             urgent ? "text-warn" : "text-muted-foreground",
           )}
           title={t(
-            "This leg ends when the clock does, whether or not every captain has readied.",
+            "This round ends when the clock does, whether or not every captain has readied.",
           )}
         >
           <Clock className="h-3 w-3" />

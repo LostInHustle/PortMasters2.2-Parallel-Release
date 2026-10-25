@@ -4,8 +4,10 @@ import { VoyageChronicle } from "@/types/realtime/voyage";
 import { motion } from "framer-motion";
 import { Anchor, ChevronDown, Crown, Skull } from "lucide-react";
 import { t } from "@/lib/game/i18n";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { Pill } from "../shared";
 import { cn, formatTime } from "@/lib/utils";
+import { useLanguage } from "@/lib/use-language-preference";
 import { ChronicleDetail } from "./ChronicleDetail";
 
 export function ChronicleRow({
@@ -19,6 +21,7 @@ export function ChronicleRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { locale } = useLanguage();
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -32,11 +35,12 @@ export function ChronicleRow({
       {/* Clickable header */}
       <button onClick={onToggle} className="w-full p-4 text-left">
         <div className="mb-2 flex items-center gap-2">
-          {/* The tier word is the slug with its underscores opened up, and it
-              reads through the pack, which carries the lowercase spelling of
-              each tier for this pill (the capitalized names are the lobby
-              picker's). */}
-          <Pill tone="sea">{t(chronicle.difficulty.replace(/_/g, " "))}</Pill>
+          {/* The tier name is read from the same table the lobby picker and
+              the voyage header use, so the pill always wears the name the
+              captain chose the voyage by. */}
+          <Pill tone="sea">
+            {t(difficultyConfig(chronicle.difficulty).name)}
+          </Pill>
           <Pill tone="due">
             {t("{rounds} rounds", { rounds: chronicle.rounds })}
           </Pill>
@@ -56,7 +60,7 @@ export function ChronicleRow({
             </Pill>
           )}
           <span className="ml-auto text-xs text-muted-foreground">
-            {formatTime(chronicle.createdAt)}
+            {formatTime(chronicle.createdAt, locale)}
           </span>
           <motion.span
             animate={{ rotate: expanded ? 180 : 0 }}

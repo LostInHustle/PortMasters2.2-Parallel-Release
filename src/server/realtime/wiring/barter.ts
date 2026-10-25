@@ -12,7 +12,7 @@ import {
   flexibleOffersLeft,
 } from "@/lib/game/engine/barterAccess";
 import { tFor } from "@/lib/game/i18n";
-import { auditSpentLeg, auditSpentReason } from "../audit";
+import { auditSpentRound, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";
 import {
   authoritativeRenownLevel,
@@ -122,7 +122,7 @@ export function wireBarter(io: Server, socket: Socket): void {
       // carries both surfaces and nothing in the frame itself tells
       // them apart. So the claim is pinned down rather than taken on
       // faith: an offer that says it is an exchange offer is only
-      // accepted while the room is actually sitting in the Parley
+      // accepted while the harbor is actually sitting in the Parley
       // phase, which is the only time the Captain's Exchange is on
       // screen. A chat composer claiming to be the exchange board to
       // slip past the gate is therefore refused rather than believed,
@@ -140,12 +140,12 @@ export function wireBarter(io: Server, socket: Socket): void {
           );
           return;
         }
-        // The audit's price is the rest of that leg's Parley, so the
+        // The audit's price is the rest of that round's Parley, so the
         // spend closes this board on the tick it lands rather than on
-        // the advance that follows it (see auditSpentLeg). Flexible
+        // the advance that follows it (see auditSpentRound). Flexible
         // offers are not gated on the phase and are not gated here: they
         // travel the chat road, and no parley clock ever priced them.
-        if (auditSpentLeg(roomId, cp.round)) {
+        if (auditSpentRound(roomId, cp.round)) {
           refuse(auditSpentReason("The exchange opens", s.locale));
           return;
         }
@@ -214,14 +214,14 @@ export function wireBarter(io: Server, socket: Socket): void {
         createdAt: new Date().toISOString(),
       };
       setBarterOffers(roomId, [...barterList(roomId), offer]);
-      // [I1: the telemetry spine] One offer standing, counted in the
+      // One offer standing, counted in the
       // units its poster just escrowed, which is the side the filled and
       // expired lines count as well.
       noteTelemetry(roomId, "offer_posted", {
         actor: s.userId,
         goods: offer.offerAmount,
       });
-      // [B4: the log surfaces] And the room's own line for it. The whole
+      // And the harbor's own line for it. The whole
       // trade travels rather than only the side that was escrowed,
       // because a captain reading the log is asking what was on offer
       // and not how much of it the board was holding.
@@ -277,16 +277,16 @@ export function wireBarter(io: Server, socket: Socket): void {
         return;
       }
 
-      // The audit's spend closes the leg's trading the moment the count
-      // carries (see auditSpentLeg), and a standing exchange offer is
+      // The audit's spend closes the round's trading the moment the count
+      // carries (see auditSpentRound), and a standing exchange offer is
       // trading the same as a fresh one: without this gate an offer
-      // posted before the carry could settle into the very leg the room
+      // posted before the carry could settle into the very round the harbor
       // voted to close. Flexible offers are not gated here or at the
       // post, for the reason the post handler gives: they travel the
       // chat road, and no parley clock ever priced them.
       if (!opening.offer.flexible) {
         const cp = await getCheckpoint(roomId);
-        if (auditSpentLeg(roomId, cp.round)) {
+        if (auditSpentRound(roomId, cp.round)) {
           fail(auditSpentReason("The exchange opens", s.locale));
           return;
         }
@@ -385,7 +385,7 @@ export function wireBarter(io: Server, socket: Socket): void {
       };
       socket.emit("barter:fulfilled", fulfilled);
       emitToUser(io, offer.fromUserId, "barter:fulfilled", fulfilled);
-      // [I1: the telemetry spine] One offer taken off the board, and the
+      // One offer taken off the board, and the
       // only event a peer trade produces: the accept path is where a
       // trade between two captains actually settles, so counting it here
       // and nowhere else keeps a reader from adding one trade up twice.
@@ -395,7 +395,7 @@ export function wireBarter(io: Server, socket: Socket): void {
         actor: s.userId,
         goods: offer.offerAmount,
       });
-      // [B4: the log surfaces] The room's line for the same settlement,
+      // The harbor's line for the same settlement,
       // naming both captains: the record above counts an offer taken off
       // the board, and this says who took it from whom, which is the
       // thing a table talks about afterwards.

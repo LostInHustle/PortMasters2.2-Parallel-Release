@@ -2,11 +2,11 @@
 //
 // The first read the operator surface has on REST, and it is read only in
 // the strongest sense: it opens two tables that hold finished voyage
-// facts, reduces them, and writes nothing. Nothing here reads a room, a
-// seat, a save or a socket, so the page it feeds cannot slow a voyage
-// down, which is the plan's rollback for goal I3 as a property of the
-// code rather than a promise in a document. The window itself lives in
-// src/server/telemetry-window.ts, which the launch gate report reads as
+// facts, reduces them, and writes nothing. Nothing here reads a harbor, a
+// seat, a save or a socket, so the page it feeds cannot slow a voyage down,
+// which is the design's rollback for the balance dashboard as a property
+// of the code rather than a promise in a document. The window itself lives
+// in src/server/telemetry-window.ts, which the launch gate report reads as
 // well, so the page and the report answer for one set of voyages.
 //
 // The gate is the account row, checked here at the moment the reading is
@@ -42,7 +42,7 @@ export async function GET() {
   // The reading composes in the reader's own language: this route serves a
   // captain's browser, so it hands readDashboard the request's locale rather
   // than letting the process reader answer in English (the CLI report and
-  // the oracle call it without one and keep the process reader).
+  // the smoke suites call it without one and keep the process reader).
   const locale = await requestLocale();
   return NextResponse.json({ reading: readDashboard(input, locale) });
 }

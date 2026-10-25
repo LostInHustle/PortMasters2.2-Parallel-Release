@@ -12,11 +12,11 @@
 // before anyone has been picked.
 //
 // Below the lg breakpoint this rail leads and the harbor board follows
-// it, the way the game room's chat column leads. Stacked last, the
+// it, the way the harbor's chat column leads. Stacked last, the
 // conversation sat under the whole board, and its depth grew with every
 // harbor the fleet had open, so it read as absent rather than as simply
 // further down. The board is one short scroll away instead, and a captain
-// scrolling a room list is reading anyway. Above the breakpoint nothing
+// scrolling a harbor list is reading anyway. Above the breakpoint nothing
 // moves.
 //
 // It reads the roster and the thread and decides nothing of its own:
@@ -65,7 +65,7 @@ export function HarborRail({
   dmHistory: ChatMessage[];
 }) {
   // On a wide window the rail holds still while the harbor board beside it
-  // scrolls, the same shape the game room's rail has: who is about and the
+  // scrolls, the same shape the harbor's rail has: who is about and the
   // conversation with them are things a captain glances at rather than
   // reads top to bottom, and having them travel up the screen every time
   // the board moved made glancing back at them a scroll of its own.
@@ -74,7 +74,7 @@ export function HarborRail({
   // window too short for both panels it scrolls inside its own cap rather
   // than pushing the board off the screen.
   //
-  // The offset is the lobby's masthead rather than the game room's topbar:
+  // The offset is the lobby's masthead rather than the harbor's topbar:
   // this screen keeps its header stuck to the top of a page that scrolls,
   // so the rail has to start below it or it parks underneath the tabs.
   return (

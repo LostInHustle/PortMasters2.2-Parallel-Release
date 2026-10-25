@@ -50,7 +50,7 @@ function Standings({
             {s.bankrupt && (
               <Skull className="h-3.5 w-3.5 text-alarm shrink-0" />
             )}
-            {/* [H7: Maroon and the Harbormaster] The other way a
+            {/* The other way a
                 voyage can go wrong, and a different icon rather
                 than a second use of the skull: a captain can be
                 put ashore and still be solvent, and the standings
@@ -116,24 +116,16 @@ export function EndgameResults({
           <div className="text-lg font-bold flex items-center justify-center gap-2">
             <Crown className="h-5 w-5" /> {t("Crowned Sea Master!")}
           </div>
-          {/* The pack carries the apostrophe as an entity, so the answer
-              goes back to the renderer as HTML rather than as text. */}
-          <div
-            className="text-xs opacity-80 mt-0.5"
-            dangerouslySetInnerHTML={{
-              __html: t("Highest Reputation in this harbor&apos;s voyage."),
-            }}
-          />
+          <div className="text-xs opacity-80 mt-0.5">
+            {t("Highest Reputation in this harbor's voyage.")}
+          </div>
         </div>
       )}
       {mine?.brokersFavorUnlocked && (
         <div className="rounded-xl border-2 border-favor/40 bg-favor/5 px-4 py-3 text-center">
-          <div
-            className="text-lg font-bold text-favor flex items-center justify-center gap-2"
-            dangerouslySetInnerHTML={{
-              __html: t("🤝 Broker&apos;s Favor Unlocked!"),
-            }}
-          />
+          <div className="text-lg font-bold text-favor flex items-center justify-center gap-2">
+            {t("🤝 Broker's Favor Unlocked!")}
+          </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {t(
               "Renown Level {BROKERS_FAVOR_UNLOCK_LEVEL} reached. Starting next voyage, call one in from the Trade Manifest to summon a guaranteed buyer.",
@@ -153,14 +145,15 @@ export function EndgameResults({
             {/* The merit's own name and description are read where they
                 print, the way the merits showcase reads them. */}
             <div className="text-lg font-bold flex items-center justify-center gap-2">
-              <MeritIcon id={merit.id} className="h-5 w-5" /> Captain&apos;s
-              Merit: {t(merit.name)}
+              <MeritIcon id={merit.id} className="h-5 w-5" />{" "}
+              {t("Captain's Merit: ")}
+              {t(merit.name)}
             </div>
             <div className="text-xs opacity-80 mt-0.5">{t(merit.desc)}</div>
           </div>
         );
       })}
-      {/* [H8: the reveal and the replay ledger] The cards come down
+      {/* The cards come down
           before the standings, because the reveal is what the evening
           was for and the standings are the record of it. A harbor that
           dealt no cards, which is every Classic harbor, is sent no

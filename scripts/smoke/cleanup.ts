@@ -7,7 +7,7 @@
 // through the same connection the run proved it shared before it created
 // anything (see the interlock in ./index.ts).
 //
-// The captains and the harbor ids arrive as arguments because they are
+// The captains and the room ids arrive as arguments because they are
 // nullable until the article that made them has run, and this has to be
 // able to read them either way.
 // =====================================================================
@@ -66,7 +66,7 @@ export async function cleanupSuite(
       // The telemetry rows and the report rows are the two things a
       // deleted harbor does not take with it, and deliberately so: both
       // models carry a bare roomId rather than a foreign key, because
-      // both have to outlive the room they describe. The two deletes
+      // both have to outlive the harbor they describe. The two deletes
       // above have just removed every harbor this run created, so the
       // rows left pointing at a harbor that no longer exists are this
       // run's, and the database is put back the way it was found.

@@ -4,7 +4,8 @@ import { VoyageChronicle } from "@/types/realtime/voyage";
 import { motion } from "framer-motion";
 import { Coins, Star, TrendingUp, Trophy } from "lucide-react";
 import { t } from "@/lib/game/i18n";
-import { ChronicleStat } from "./ChronicleStat";
+import { merchantRatingLabel } from "@/lib/game/constants/reputation";
+import { FigureTile } from "./FigureTile";
 import { ChronicleLoans } from "./ChronicleLoans";
 
 export function ChronicleDetail({ chronicle }: { chronicle: VoyageChronicle }) {
@@ -22,31 +23,35 @@ export function ChronicleDetail({ chronicle }: { chronicle: VoyageChronicle }) {
         </p>
 
         {/* Visual stats grid. The labels are read here, at the composer,
-            because ChronicleStat prints whatever label it is handed. */}
+            because the tile prints whatever label it is handed. */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <ChronicleStat
+          <FigureTile
             icon={Trophy}
             label={t("Peak Rep")}
             value={chronicle.peakReputation}
             tone="due"
+            size="compact"
           />
-          <ChronicleStat
+          <FigureTile
             icon={TrendingUp}
             label={t("Final Rep")}
             value={chronicle.finalReputation}
             tone="sea"
+            size="compact"
           />
-          <ChronicleStat
+          <FigureTile
             icon={Coins}
             label={t("Final Gold")}
             value={chronicle.finalGold}
             tone="gain"
+            size="compact"
           />
-          <ChronicleStat
+          <FigureTile
             icon={Star}
             label={t("Best Trade")}
             value={chronicle.largestTrade}
             tone="gold"
+            size="compact"
           />
         </div>
 
@@ -55,13 +60,15 @@ export function ChronicleDetail({ chronicle }: { chronicle: VoyageChronicle }) {
           borrowCount={chronicle.borrowCount}
         />
 
-        {/* Merchant rating */}
+        {/* Merchant rating. The column holds the bare English label, the
+            one every row written so far carries, so it is read into the
+            captain's language here rather than printed as it is stored. */}
         <div className="rounded-xl bg-black/5 dark:bg-white/5 p-3">
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
             {t("Merchant Rating")}
           </div>
           <div className="mt-0.5 text-sm font-semibold">
-            {chronicle.merchantRating}
+            {merchantRatingLabel(chronicle.merchantRating)}
           </div>
         </div>
       </div>

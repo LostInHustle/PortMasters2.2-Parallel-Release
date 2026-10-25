@@ -12,7 +12,7 @@ import type { Server, Socket } from "socket.io";
 import { seated } from "../auth";
 import { roomChannel } from "../channel";
 import { hasDocksWinner, setDocksWinner } from "../docks";
-import { sockets } from "../presence";
+import { broadcastRoomSystem } from "../presence";
 
 export function wireDocks(io: Server, socket: Socket): void {
   socket.on("docks:claim", (payload: { roomId?: string }) => {
@@ -27,24 +27,17 @@ export function wireDocks(io: Server, socket: Socket): void {
       winnerName: s.user.displayName,
       reward: WORD_ON_THE_DOCKS_REWARD,
     });
-    // The notice is read by the whole table, so it goes to every socket
-    // in the harbor in that captain's own language rather than as one
-    // broadcast. The docks:won frame above carries structure only, so it
-    // stays a single send.
-    for (const [socketId, state] of sockets) {
-      if (state.roomId !== roomId) continue;
-      io.to(socketId).emit("room:system", {
-        roomId,
-        content: tFor(
-          state.locale,
-          "Word on the Docks: {s.user.displayName} was first to complete {WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage, and pockets {WORD_ON_THE_DOCKS_REWARD} Gold for it.",
-          {
-            "s.user.displayName": s.user.displayName,
-            WORD_ON_THE_DOCKS_THRESHOLD,
-            WORD_ON_THE_DOCKS_REWARD,
-          },
-        ),
-      });
-    }
+    // The docks:won frame carries structure only; its sentence is per captain.
+    broadcastRoomSystem(io, roomId, (locale) =>
+      tFor(
+        locale,
+        "Word on the Docks: {s.user.displayName} was first to complete {WORD_ON_THE_DOCKS_THRESHOLD} trade orders this voyage, and pockets {WORD_ON_THE_DOCKS_REWARD} Gold for it.",
+        {
+          "s.user.displayName": s.user.displayName,
+          WORD_ON_THE_DOCKS_THRESHOLD,
+          WORD_ON_THE_DOCKS_REWARD,
+        },
+      ),
+    );
   });
 }

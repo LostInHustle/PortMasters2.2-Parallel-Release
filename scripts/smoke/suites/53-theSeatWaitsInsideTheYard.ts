@@ -8,18 +8,18 @@
 // waiting roster asked the lap whether that phase was gated without first
 // folding it onto the seat the screen stands inside. A name the lap does
 // not list answers no, so the draft captain was dropped from the ready
-// check; the moment every remaining captain had voted, the room announced
+// check; the moment every remaining captain had voted, the harbor announced
 // the departure, and the draft captain's own client, which folds the seat
 // the other way in every guard it has (checkpointRank and the advance
 // guard both read seatOf), followed the announcement and autoCommit
-// cancelled the draft and left Dusk under their hands. Read from the other
+// canceled the draft and left Dusk under their hands. Read from the other
 // seat the same frame is the upgrade half of the report: a captain readied
-// and the room moved while the mate was still changing modules.
+// and the harbor moved while the mate was still changing modules.
 //
 // The answer is the fold the lap already states. A captain in the draft or
 // the swap is standing at Dusk (PHASE_FACES places both screens inside
 // it), so the roster waits on them exactly as it waits on a captain
-// standing at the seat itself. The two screens draw the room's bar, so
+// standing at the seat itself. The two screens draw the harbor's bar, so
 // the captain being waited on can see the wait and its countdown, and the
 // clock still moves a table whose captain never comes back (the fire
 // counts the active roster, not this one).
@@ -28,7 +28,7 @@
 // live harbor: the fold reads the way the lap says in both modes, the
 // pier and both terminals stay excluded, a ready set minus the draft
 // captain moves nothing and keeps the bar whole, an act at the seat
-// itself moves nothing, and both votes at the seat still move the room.
+// itself moves nothing, and both votes at the seat still move the harbor.
 
 import { isGatedPhase } from "@/lib/game/checkpoint";
 import { seatOf } from "@/lib/game/phases";
@@ -92,7 +92,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   }
 
   // The live half. Two captains, a private Gambit harbor, and raw sockets
-  // on purpose: this article measures the room's own frames.
+  // on purpose: this article measures the harbor's own frames.
   const tag = "yard";
   const first = await signUp(`${tag}a`);
   const second = await signUp(`${tag}b`);
@@ -199,7 +199,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   const stood = await stand({ round: 1, phase: "dusk" });
   check(stood, "both captains stand at Dusk, the seat the yard hangs off");
 
-  // The mate votes. The room must hold for the captain still at the seat,
+  // The mate votes. The harbor must hold for the captain still at the seat,
   // which the checkout above already kept whole before the fold landed.
   const beforeMate = counts();
   crew[1].socket.emit("phase:ready", { roomId: room, round: 1, phase: "dusk" });
@@ -224,7 +224,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   await wait(2500);
   check(
     counts().every((count, i) => count === beforeDraft[i]),
-    "opening the module draft moves nothing, because the room waits on the captain inside the yard",
+    "opening the module draft moves nothing, because the harbor waits on the captain inside the yard",
   );
   check(
     roster().length === 2 && roster().includes(crew[0].captain.id),
@@ -253,7 +253,7 @@ export async function theSeatWaitsInsideTheYardSuite(
     "an upgrade at the seat moves nothing either, so neither half of the report was a gap in the seat's own rules",
   );
 
-  // Liveness: the draft captain is back, both vote, and the room moves.
+  // Liveness: the draft captain is back, both vote, and the harbor moves.
   const expected = counts().map((count) => count + 1);
   crew[0].socket.emit("phase:ready", { roomId: room, round: 1, phase: "dusk" });
   await settled(
@@ -270,32 +270,32 @@ export async function theSeatWaitsInsideTheYardSuite(
 
   // the vote the reload left standing, and the screen that withdraws it
   //
-  // The fold above is what makes the room wait on a captain inside the
+  // The fold above is what makes the harbor wait on a captain inside the
   // yard, and read on its own it also counted a captain who had already
-  // voted at the seat and then walked back into the yard: the room left
+  // voted at the seat and then walked back into the yard: the harbor left
   // the moment the rest of the table had voted, and the draft captain's
-  // own client ran the catch up every client runs for a seat the room has
+  // own client ran the catch up every client runs for a seat the harbor has
   // moved past, which cancels a module draft under the hands of the
   // captain still reading it. That is the field report again, one seat
   // over from the one above, and the way in is the path a captain can
   // walk without a doctored client: a vote lives on the server while the
   // client that cast it can come back with no memory of the wait, so a
   // captain who readies, reloads their tab and walks back into the yard
-  // is standing in the draft with a vote the room is still holding.
+  // is standing in the draft with a vote the harbor is still holding.
   //
-  // The room's answer is that the newer of the two things a captain has
+  // The harbor's answer is that the newer of the two things a captain has
   // said wins: a report naming the yard's own screen withdraws the vote
   // that was cast at the seat, and the vote comes back the way every vote
-  // at a seat does (see withdrawVoteForAScreen). The leg below is walked
+  // at a seat does (see withdrawVoteForAScreen). The round below is walked
   // on reports rather than on votes, so the departure above is behind it
   // and this seat starts with a clear ready set.
-  const nextLeg: Seat = { round: 2, phase: "dusk" };
-  report(crew[0], nextLeg);
-  const stoodAgain = await stand(nextLeg);
+  const nextRound: Seat = { round: 2, phase: "dusk" };
+  report(crew[0], nextRound);
+  const stoodAgain = await stand(nextRound);
   check(
     stoodAgain &&
       heard.every((mine, i) => mine.advances.length === expected[i]),
-    "reporting onto the next leg's seat moves the room the way any report does and announces nothing, because a report is a captain saying where they stand rather than a vote they cast",
+    "reporting onto the next round's seat moves the harbor the way any report does and announces nothing, because a report is a captain saying where they stand rather than a vote they cast",
   );
 
   crew[0].socket.emit("phase:ready", { roomId: room, round: 2, phase: "dusk" });
@@ -334,11 +334,11 @@ export async function theSeatWaitsInsideTheYardSuite(
 
   // And the release, which is the other half of the claim: the yard is
   // done, the captain is back at the seat, and their vote carries the
-  // room out. The vote is cast at the seat after the report that puts
+  // harbor out. The vote is cast at the seat after the report that puts
   // them there, which is the order every client runs (see the stand
-  // helper in the lap walk of scripts/smoke.ts).
+  // helper in this article's own lap walk).
   const released = counts().map((count) => count + 1);
-  report(crew[0], nextLeg);
+  report(crew[0], nextRound);
   crew[0].socket.emit("phase:ready", { roomId: room, round: 2, phase: "dusk" });
   await settled(
     () => heard.every((mine, i) => mine.advances.length === released[i]),
@@ -349,6 +349,6 @@ export async function theSeatWaitsInsideTheYardSuite(
       heard.every(
         (mine) => mine.advances[mine.advances.length - 1].phase === "dusk",
       ),
-    "and a swap that completes releases the room: with the captain back at the seat and both votes standing, the departure the yard held is announced to every captain",
+    "and a swap that completes releases the harbor: with the captain back at the seat and both votes standing, the departure the yard held is announced to every captain",
   );
 }

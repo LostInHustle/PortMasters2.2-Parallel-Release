@@ -1,16 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import { Geist, Geist_Mono, Noto_Serif_SC } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { requestLocale } from "@/lib/api-auth";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/game/constants/brand";
-import {
-  DEFAULT_LOCALE,
-  isLocale,
-  LOCALE_COOKIE_NAME,
-  tFor,
-  type Locale,
-} from "@/lib/game/i18n";
+import { tFor } from "@/lib/game/i18n";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 const notoSerif = Noto_Serif_SC({
-  variable: "--font-display",
+  variable: "--font-display-family",
   subsets: ["latin"],
   weight: ["500", "700"],
 });
@@ -56,20 +50,22 @@ const SITE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
 // own name filled in, because the name is a name and never translates.
 //
 // The link preview and the social card carry the sentence WITHOUT the
-// name, which is the plain APP_DESCRIPTION they have always carried; the
-// pack carries only the named spelling (shell.001), so those two fields
-// keep the shipped constant unwired rather than gaining a prefix their
-// card has never shown.
+// name, which is the plain APP_DESCRIPTION they have always carried, so
+// the pack stores that unnamed spelling as its own row beside the named
+// one (shell.001 and shell.021). Both fields read it in the captain's
+// language, the same way the search description does, so a shared link
+// unfolds in the language its captain reads rather than in the build's
+// default.
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await shellLocale();
+  const locale = await requestLocale();
   // The meta description, with the build's own name in front. The social
-  // fields below carry the same sentence without the name (see the note
-  // above the function).
+  // fields below carry the same sentence without the name.
   const about = tFor(
     locale,
     "{APP_NAME}: A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
     { APP_NAME },
   );
+  const social = tFor(locale, APP_DESCRIPTION);
   return {
     metadataBase: new URL(SITE_URL),
     title: APP_NAME,
@@ -85,12 +81,12 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       siteName: APP_NAME,
       title: APP_NAME,
-      description: APP_DESCRIPTION,
+      description: social,
     },
     twitter: {
       card: "summary_large_image",
       title: APP_NAME,
-      description: APP_DESCRIPTION,
+      description: social,
     },
   };
 }
@@ -113,11 +109,11 @@ export const viewport: Viewport = {
 // renders them), so the cookie is the only reading it can make, and the
 // shipped language stands wherever the cookie is absent or names a
 // language this pack cannot print.
-async function shellLocale(): Promise<Locale> {
-  const store = await cookies();
-  const value = store.get(LOCALE_COOKIE_NAME)?.value;
-  return isLocale(value) ? value : DEFAULT_LOCALE;
-}
+//
+// The reading itself is the shared one (see requestLocale in
+// @/lib/api-auth), which is where every route reads the same cookie the
+// same way. The shell used to read it a second time, here, and two
+// readers of one cookie are two places for the fallback to drift.
 
 export default async function RootLayout({
   children,
@@ -127,7 +123,7 @@ export default async function RootLayout({
   // The document's own language, for a screen reader, a search engine and
   // the browser's font fallback, follows the same cookie the words do:
   // "en" is what it has always been for an English captain.
-  const locale = await shellLocale();
+  const locale = await requestLocale();
   return (
     <html lang={locale} suppressHydrationWarning>
       <body

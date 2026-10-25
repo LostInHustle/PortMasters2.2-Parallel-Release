@@ -1,60 +1,17 @@
-// =====================================================================
-// Realtime layer: the path draft, and the book of switches.
+// Realtime layer: the path draft and the harbor's per-voyage path books.
 //
-// [D7: the draft, and switching] The room's half of the plan's clause. The
-// rule it deals by is pure and lives in src/lib/game/draft.ts; what is here
-// is the part that cannot be pure, which is why it is here rather than
-// there: a hand of cards is private information and the client cannot be
-// trusted to deal it. So the deck is built and shuffled in this process,
-// the pass is resolved in this process, and a captain is sent their own
-// hand and nobody else's, through the same emitToUser the private channel
-// uses. No frame that reaches a room carries a card nobody has played yet.
+// Cards are private, so the deck is built, shuffled and dealt in this
+// process. A captain receives only their own hand, and no frame carries a
+// card nobody has played. The draft is a seat of its own before Dawn: the
+// departure deals and pins the harbor there, and the settle is this
+// module's own announcement rather than a ready vote. There is no timer on
+// the draft; steps close when every seat answers. DRAFT_WATCH_MS exists
+// only for a seat whose last socket dropped, and its fire lays that
+// captain's first card so a vanished captain cannot hold the table forever.
 //
-// Where the draft sits in the voyage is a seat of its own [W2], and it is
-// stated here because the seat did not always exist. The deal still happens
-// on the departure, in the same breath as the alignment deal, but the room
-// now stops there: a dealing Gambit lap carries the draft's seat between
-// the pier and Dawn (see checkpointPhaseOrder in src/lib/game/mode.ts), the
-// server pins the room to it at departure (see ./wiring/start-voyage), and
-// the round's first leg phase opens only once every seat holds a path. The
-// step off the seat is this module's own announcement rather than a ready
-// vote, because the departure is the settle: settleDraft tells the
-// checkpoint to move the room (see announceDraftComplete in ./checkpoint),
-// and every captain's client runs that step the same way it runs any
-// announced one. The engine reads a path live off the save
-// (pathCargoModifier, lockedBehind), so everything the path does begins
-// the moment the save holds it, which is the moment the settled view is
-// read.
-//
-// Nothing in the feature is a countdown, and nothing shows anyone a timer.
-// The steps close when every seat has answered, and a captain who is still
-// connected holds the table however long they take: the room waits for its
-// captains, not for a clock. The one clock left is the absence watch below,
-// which exists for the seat that is gone rather than slow. When a seat's
-// last socket drops, the room gives it DRAFT_WATCH_MS to come back and then
-// lays the first card of that captain's own hand for them (the same
-// DRAFT_AUTO_PICK the old auto keep used), because a table held forever for
-// a captain who is gone is a voyage that never sails.
-//
-// The book of switches is the module's other half. It is the room's own
-// record of who has changed their papers this voyage, which is the half of
-// that rule the server can enforce: the fee, the forfeiture and the once a
-// voyage stamp all live in the captain's own save, but a publication that
-// anyone could ask for twice is a fleet log nobody can trust, so the book
-// is kept where the frames are written. It is a Map rather than a table
-// for the plan's own reason: "draft state is transient per voyage, so
-// nothing durable is at risk."
-//
-// [F6: charters at leg four] The module keeps a second book beside the
-// switches: who is sailing on what. The draft's own seats carry each
-// captain's path while the draft runs, but the seats are dropped the
-// moment it settles, and the charter take filed at leg four needs the path
-// long after that, so the settled paths move into a map of their own (see
-// pathsByRoom and heldPathOf). A switch moves that map with it, and both
-// endings drop it, which is the switches' own lifetime above and the same
-// reason: the captain's save is the durable copy of their papers, and the
-// room's copy of either fact lasts exactly one voyage.
-// =====================================================================
+// Two books outlive the draft seats: switch allowances (the server's half
+// of once per voyage) and settled paths (needed by the round four charter
+// take). Both last one voyage and are dropped at either ending.
 import { DraftStep, DraftView, PathSwitched } from "@/types/realtime/draft";
 import { randomUUID } from "node:crypto";
 import type { Server } from "socket.io";
@@ -77,18 +34,12 @@ import { emitToUser, userSockets } from "./presence";
 import { noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
 
-// The one sentence a pick off the board is refused with, said once because
-// the guard below answers it from two checks (the shape of the index and
-// the card it names), and the captain only ever reads whichever fired
-// first. The constant keeps its English, and the read below is what
-// translates it.
+// The one refusal sentence for a pick that names no card in hand; the guard
+// answers it from two checks and the captain sees whichever fired first.
 const PICK_OFF_BOARD = "That is not one of the cards in front of you.";
 
-// One captain's seat in a live draft. The kept cards are the ones this
-// captain has already taken from the beats that are behind them, in the
-// order they took them: the first keep is the card they chose off their
-// dealt three, the second is the card they chose off the two passed to
-// them, and the last step chooses between those two.
+// One captain's seat in a live draft. kept holds the cards taken from steps
+// already behind them, in order; path is set at settlement.
 interface DraftSeat {
   userId: string;
   name: string;
@@ -96,21 +47,14 @@ interface DraftSeat {
   path: PathId | null;
 }
 
-// A room's draft, while it is being dealt.
-//
-// `hands` and `picks` are indexed by seat and always the same length as
-// `seats`, which is the invariant the whole module leans on: a hand
-// belongs to a seat, a pick belongs to the same seat, and a step is
-// resolved by walking that one index. `openedAt` is when the deck was
-// dealt rather than when a step began, because the plan's reading is the
-// time to complete the draft and not the time to answer one card.
+// A harbor's draft. hands and picks are indexed by seat and always match
+// seats.length; a step resolves by walking that index. openedAt is the deal
+// time, since draft duration is measured to completion, not per card.
 interface Draft {
   roomId: string;
   seats: DraftSeat[];
-  // The seating order is the room's own roster order, which is also the
-  // order the pass follows: left is the next seat in it, wrapping at the
-  // end, so every captain at the table agrees about which way the cards
-  // travelled without being told.
+  // Roster order, and the order the pass follows: the next seat left,
+  // wrapping, so every captain agrees which way cards travelled.
   hands: PathId[][];
   picks: (number | null)[];
   step: Exclude<DraftStep, "done">;
@@ -119,45 +63,27 @@ interface Draft {
 
 const drafts = new Map<string, Draft>();
 
-// The absence watches, one per room at most.
-//
-// A watch exists for the seat that is gone, never for one that is slow:
-// it is armed when a draft seat's last socket drops (and when a deal
-// seats a captain who holds no socket at all), it waits DRAFT_WATCH_MS,
-// and its fire lays the first card of that captain's own hand for every
-// seat that is still gone. A captain who comes back inside the window
-// changes nothing anybody is told: the fire simply finds their socket
-// alive again and leaves their card to them, which is the same check the
-// departure grace makes and for the same reason (see armDeparture in
-// ./presence).
-//
-// The map is keyed by room rather than by seat because a step resolves
-// for the whole table at once: one watch per room looking at every seat
-// is one timer to reason about rather than one per captain, and the fire
-// below answers "who is gone" from the presence map fresh rather than
-// from whoever happened to trip the arming.
+// Absence watches, at most one per harbor. Armed when a draft seat's last
+// socket drops (or a deal seats a captain with no socket), it waits
+// DRAFT_WATCH_MS and then lays the first card of that captain's hand for
+// every seat still gone. A captain who reconnects inside the window changes
+// nothing because the fire rechecks presence. One watch per harbor because a
+// step resolves for the whole table at once.
 const draftWatches = new Map<string, NodeJS.Timeout>();
 
 function disarmDraftWatch(roomId: string): void {
   disarmTimer(draftWatches, roomId);
 }
 
-// Whether this seat's last socket is gone. The one reading of presence
-// this module makes, expressed as the whole test rather than as an access
-// to the map's shape, so the day presence grows a second condition (a
-// socket state stronger than "connected") this module is told about it
-// by a compile error rather than by a bug.
+// Whether a seat has no live socket. Kept as a single test so a future
+// presence rule is a compile error here, not a silent bug.
 function seatAway(userId: string): boolean {
   return (userSockets.get(userId)?.size ?? 0) === 0;
 }
 
-// Arms the room's absence watch, unless one is already running or the
-// room has nothing left to wait on. Called from the three moments a seat
-// can be gone with its card still in front of it: the deal (a captain who
-// lost their connection before the host set sail), a last socket dropping
-// (the ordinary case, see noteDraftAway), and a step turning over (the
-// new step's cards are in front of seats that were already gone when it
-// dealt, and the fire that turned it over has nothing left to lay).
+// Arms the absence watch unless one is running or no seat with a card in
+// front of it is away. Called at the deal, on a last socket drop, and when a
+// step turns over (its new cards may already face absent seats).
 function armDraftWatch(io: Server, roomId: string): void {
   if (draftWatches.has(roomId)) return;
   const draft = drafts.get(roomId);
@@ -175,21 +101,12 @@ function armDraftWatch(io: Server, roomId: string): void {
   draftWatches.set(roomId, timer);
 }
 
-// The watch's fire: every seat that is still gone has its first card laid.
-//
-// "First" is the card the seat was dealt rather than a card of the
-// server's choosing (see DRAFT_AUTO_PICK), and the laying runs through
-// takeDraftPick, which is the same door a captain's own press comes
-// through: a laid card closes the step when it is the last one out, turns
-// the step over, and settles the draft when the turn was the last, so the
-// fire has no rules of its own to keep in step with the pick's. The loop
-// reads the step again after every card because one fire can carry a table
-// through all three steps when everyone but a present handful is gone,
-// and it stops when there is no seat left to lay for. The bound is the
-// whole draft's worth of cards: three steps of one card a seat, which no
-// fire can exceed by construction, and the loop is written to the bound
-// anyway so a rule that ever breaks that construction stops the fire
-// rather than spinning it.
+// Every still-absent seat has its first card laid. Lays through
+// takeDraftPick, the same door a captain's press uses, so closing a step,
+// turning it over and settling follow the normal path. The loop re-reads
+// state after each card because one fire can carry a table through all three
+// steps; its bound is one card per seat per step, written explicitly so a
+// rule change stops the fire instead of spinning it.
 function fireDraftWatch(io: Server, roomId: string): void {
   draftWatches.delete(roomId);
   const draft = drafts.get(roomId);
@@ -205,33 +122,21 @@ function fireDraftWatch(io: Server, roomId: string): void {
       draft.seats[seat].userId,
       DRAFT_AUTO_PICK,
       draft.step,
-      // The seat this lays for holds no socket, so no refusal this call
-      // could hand back has a reader; the shipped language stands in for
-      // the one nobody is here to name.
+      // This seat has no socket, so no refusal has a reader; the default
+      // locale stands in.
       DEFAULT_LOCALE,
     );
     if (!drafts.has(roomId)) return;
   }
-  // Unreachable while a draft is three steps of one card a seat, and the
-  // arm below is here for the day that stops being true: a seat still gone
-  // with its card still in front of it gets another window rather than
-  // being dropped.
+  // Should not happen with three one-card steps; if it does, give the
+  // remaining absent seats another window rather than dropping them.
   armDraftWatch(io, roomId);
 }
 
-/**
- * A draft seat's last socket has dropped: the room gives it a window to
- * come back, and the absence watch is that window.
- *
- * Called by the disconnect frame for every captain leaving the room, which
- * is why the test is written the way it is: most disconnects have nothing
- * to do with a draft, so the seat is looked up first and a captain who is
- * not in one (or has already laid their card for this step, or whose
- * draft has settled) arms nothing. The watch takes a fresh look at
- * presence rather than trusting this call, so a reconnect inside the
- * window needs no cancellation frame of its own: the fire simply finds
- * the socket alive and leaves the seat alone.
- */
+// A draft seat's last socket dropped. Most disconnects have nothing to do
+// with a draft, so a captain not in one, already answered, or in a settled
+// draft arms nothing. The watch rechecks presence, so reconnecting inside
+// the window needs no cancellation.
 export function noteDraftAway(
   io: Server,
   roomId: string,
@@ -244,64 +149,25 @@ export function noteDraftAway(
   armDraftWatch(io, roomId);
 }
 
-// The room's book of switches: who has changed their papers this voyage.
-//
-// What is kept is the allowance and not the change, which is the whole of
-// what the one reader of it asks (see recordPathSwitch): the path a switch
-// took up rides the frame and the log line the caller validated, so a book
-// that held the path as well would be a second copy of a fact nothing
-// reads back. A set of ids is also the honest shape of the lifetime, which
-// is this process and this voyage: the book is dropped when the voyage is
-// (see clearPathVoyage), while the stamp the same switch writes lives on
-// in the captain's own save after a restart. Those are the two halves of
-// "once per voyage", and each half is written down where it is kept: this
-// book here and its one reader below, the save's in applyPathSwitch
-// across the wire.
+// The harbor's book of switch allowances: who has switched this voyage.
+// Only the allowance is kept; the path rides the caller's frame and log
+// line. Dropped with the voyage. The durable half of once per voyage is the
+// stamp in the captain's save.
 const switchesByRoom = new Map<string, Set<string>>();
 
-// [F6: charters at leg four] The room's book of paths: who is sailing on
-// what this voyage.
-//
-// The draft's seats hold the same fact while the draft runs, and this
-// book is where it lives after the seats go: settleDraft deletes them the
-// moment every seat holds a path, and the charter take filed at leg four
-// is attributed long after that. The book is written at the settle, moved
-// by a switch, and dropped by both endings, which is the switches' own
-// lifetime above. A late arrival is not in it and reads null, which the
-// take's reader treats as an unattributable take rather than a guess: the
-// deal skipped them (see dealPaths), so a path for them would be a path
-// the table never dealt.
+// The harbor's book of settled paths, kept after draft seats are deleted
+// because the round four charter take still needs them. Written at the settle,
+// moved by a switch, dropped at either ending. A late arrival reads null,
+// which the take treats as unattributable rather than guessing.
 const pathsByRoom = new Map<string, Map<string, PathId>>();
 
-/**
- * The deal, on the moment a voyage sets sail.
- *
- * Dealt against the roster the departure pinned and nothing else, for the
- * reason the fleet's own size is pinned there (see voyageSeats in the
- * caller): membership can change mid voyage and a deck cannot be redealt
- * around it. A captain who joins a voyage already under way is therefore
- * not in this draft and sails pathless, which is the same reading the
- * harbor gives every pathbound card to a captain holding no path, and the
- * same one the alignment deal takes about a late arrival.
- *
- * Idempotent, like the alignment deal and for the same reason: a double
- * start must not deal a table a second hand it has already read. The whole
- * deal is one draw off a seed minted here and dropped, because the deck's
- * order is the private half of this feature and a seed a client could know
- * is a hand a client could read.
- *
- * A build with the switch off deals nothing at all, which leaves every
- * captain pathless and every pathbound card locked, exactly the voyage
- * this tree sailed before the feature existed.
- *
- * It answers whether a draft stands on the room when it returns, because
- * the caller pins the room to the draft's seat before dealing: the seat is
- * left by the settle and by nothing else, so a departure whose deal
- * declined to seat anybody would be a table standing forever at a seat
- * with no cards on it. The answer never changes for the ordinary deal; it
- * is the empty one, and the double start, that the caller reads it for
- * (see the guard in ./wiring/start-voyage).
- */
+// Deals paths when a voyage sets sail, against the departure roster and
+// nothing else: membership can change mid voyage, a deck cannot. A late
+// joiner sails pathless. Idempotent, so a double start cannot deal a second
+// hand. The deck is one draw from a seed that is discarded; a client that
+// knew the seed could read the hands. Returns whether a draft stands,
+// because the caller pins the harbor to the draft seat and a deal that
+// seated nobody would strand the table there.
 export async function dealPaths(
   io: Server,
   roomId: string,
@@ -317,10 +183,8 @@ export async function dealPaths(
     select: { id: true, displayName: true },
   });
   const names = new Map(rows.map((user) => [user.id, user.displayName]));
-  // Seated in the roster's own order, with a member the user table cannot
-  // name left out rather than seated under a placeholder: the seating order
-  // is what the pass follows, and a seat nobody can be named at is a seat
-  // the table would hand cards to and never hear from.
+  // Seated in roster order. A member the user table cannot name is left
+  // out; a placeholder seat would receive cards the table never hears from.
   const seated: { userId: string; name: string }[] = [];
   for (const userId of roster) {
     const name = names.get(userId);
@@ -337,58 +201,31 @@ export async function dealPaths(
     step: "first",
     openedAt: Date.now(),
   };
-  // Read a second time rather than trusted from the top, with nothing
-  // awaited since the first read. The names read above is a database
-  // call, and a database call is somewhere a second deal can get in: two
-  // departures in one tick both find no draft, both wait on that line,
-  // and both go on to seat the table. A deal that arrives here to find
-  // one already standing hands its deck to nobody, which costs the deal
-  // that lost the race nothing but the draw, and the draft that stays is
-  // the one the settle and the absence watch both already know.
+  // Re-read with nothing awaited since the first check. The names lookup
+  // awaits, so two departures can race here; the loser's deck is discarded
+  // and the draft already known to the settle and the watch stands.
   if (drafts.has(roomId)) return true;
   drafts.set(roomId, draft);
-  // A departure seats the roster as it stands, and a member whose tab
-  // closed moments before the host set sail is in that roster while
-  // holding no socket, so the deal can hand cards to a seat that is
-  // already away. The arm is the same one a live disconnect trips, asked
-  // here because no socket is left to trip it (see armDraftWatch).
+  // A roster member whose tab closed before departure holds no socket, so
+  // no disconnect will arm the watch for them.
   armDraftWatch(io, roomId);
   sendDraftViews(io, draft);
   return true;
 }
 
-/**
- * The draft as one captain should see it, or null where there is none for
- * them.
- *
- * Null is three answers that are one answer on the wire: no draft is
- * running, this captain is not in the draft that is, or the draft is
- * over. The client draws nothing for all three, which is what a frame of
- * null means (see the draft:update listener), so the request that answers
- * with this never has to explain which of them it was.
- */
+// The draft as one captain sees it, or null when no draft is running, they
+// are not in it, or it is over. The client draws nothing for all three.
 export function draftViewFor(roomId: string, userId: string): DraftView | null {
   const draft = drafts.get(roomId);
   if (draft) {
     const seat = draft.seats.findIndex((held) => held.userId === userId);
     if (seat >= 0) return draftView(draft, seat);
   }
-  // [bug cycle: a seat the settle left behind] The draft is gone, and the
-  // book is the only copy of what this captain took. The settled view is
-  // emitted to sockets and the draft is deleted in the same breath, so a
-  // captain whose socket was dark from the last pick through the settle
-  // was sent the result into nothing and every later request answered
-  // null: their save never learned the path the fleet was told, while the
-  // room's own book and the charter take went on attributing one. The
-  // book still holds it (settleDraft writes it before the seats go), so
-  // the reader answers from there: a settled view whose hand is the one
-  // card the seat took. The client applies the path and draws nothing,
-  // which is the whole of what a settled view is for (see PathDraft),
-  // and the engine's own guard refuses a save that already holds a path
-  // (see applyDraftPath), so a captain who heard the frame live reads a
-  // repeat as a frame to drop rather than an identity to overwrite. A
-  // late arrival and a wiped voyage are not in the book and still read
-  // null, which is what those two screens draw.
+  // The draft is gone; the paths book is the only copy of what this captain
+  // took. A captain whose socket was dark through the settle never received
+  // the settled view, so answer with one built from the book. The client
+  // applies the path and drops a repeat; the engine refuses a save that
+  // already holds one.
   const held = heldPathOf(roomId, userId);
   if (!held) return null;
   return {
@@ -401,32 +238,11 @@ export function draftViewFor(roomId: string, userId: string): DraftView | null {
   };
 }
 
-/**
- * One captain's card, laid down: the pick their step has been waiting for.
- *
- * Null means the pick was taken. A sentence means it was refused, and the
- * sentences are the four ways a pick can be wrong: no draft to pick in, no
- * seat in this draft, a step the table has already left, or a card that is
- * not in front of them. A second pick from the same captain is refused as
- * well, because a step is answered once and the first answer is the one the
- * table has been shown.
- *
- * The pick is an index rather than a path for the reason keepFrom gives:
- * a deck with a floor can hand one captain two cards of the same path, so
- * "keep the Quartermaster" does not name a card. And an index is only a
- * card against one hand, which is why the answer names the step it was read
- * off rather than letting the room assume: the hands change when a step
- * turns over, and an answer that crossed a turnover would otherwise be
- * counted against cards this captain was never shown and settle them on a
- * paper they never chose. The client stamps every press with the step it
- * was answering (see keep in @/lib/use-path-draft), and the room's own
- * absence watch lays through this same door naming the step it is laying
- * for (see fireDraftWatch), so there is no pick anywhere without its step.
- *
- * The refused sentences are composed in the locale the caller names,
- * which is the language of the captain whose press was refused: the
- * caller passes the sender's own.
- */
+// One card laid. Returns null on success, a sentence on refusal: no draft,
+// no seat, a stale step, a card not in hand, or a second pick. The pick is
+// an index because two cards can name the same path, and the step is checked
+// because hands change on turnover; an answer from before a turnover must
+// not settle a card the captain never saw. Refusals use the caller's locale.
 export function takeDraftPick(
   io: Server,
   roomId: string,
@@ -445,9 +261,8 @@ export function takeDraftPick(
   if (draft.picks[seat] !== null) {
     return tFor(locale, "Your card is already laid down.");
   }
-  // The type guard is the caller's rather than keepFrom's, and it is what
-  // lets the index be stored as the number it was checked to be; keepFrom
-  // repeats the check so the rule itself stays total for any caller.
+  // Checked here so the index can be stored as a number; keepFrom repeats
+  // the check so the rule stays total.
   if (typeof pick !== "number" || !Number.isInteger(pick)) {
     return tFor(locale, PICK_OFF_BOARD);
   }
@@ -455,34 +270,21 @@ export function takeDraftPick(
     return tFor(locale, PICK_OFF_BOARD);
   }
   draft.picks[seat] = pick;
-  // A step closes when the last captain has answered, and that is the only
-  // thing that closes one: there is no clock to stand down. A watch armed
-  // for a gone seat is left to fire against the step it was armed for if
-  // the step is somehow answered before it does, which is harmless on
-  // purpose: the fire looks the seats up fresh and lays nothing for a
-  // table with no card left in front of anybody (see fireDraftWatch).
+  // A step closes when the last pick lands; there is no clock. A watch armed
+  // before this is harmless: it rechecks seats and lays nothing.
   if (draft.picks.every((held) => held !== null)) {
     advanceDraft(io, draft);
     return null;
   }
-  // Somebody is still reading their cards, so the table is told how many,
-  // which is the whole of what the wait is made of. It is a count and
-  // never a card, so it is the one thing about a live step that can go to
-  // every captain in it.
+  // Tell the table how many captains are still choosing. Only a count, never
+  // a card.
   sendDraftViews(io, draft);
   return null;
 }
 
-// One step into the next: the picks are resolved into keeps, the cards the
-// table did not keep travel the way the plan's sentence says, and the
-// whole table is told where the draft now stands.
-//
-// The three steps are the rule's own arithmetic and each one is a line:
-// the first keep passes the two it left behind to the seat on the left,
-// the second keep discards the one it left behind, and the last choose
-// settles the path (see the header of src/lib/game/draft.ts for what the
-// passing rule means and why the captain chooses which of their two
-// papers to sail on).
+// Resolves one step into the next: picks become keeps, unkept cards pass
+// left or are discarded per step, and every client receives the new view.
+// The last step settles the path.
 function advanceDraft(io: Server, draft: Draft): void {
   const rests: PathId[][] = [];
   const finals: (PathId | undefined)[] = [];
@@ -491,11 +293,8 @@ function advanceDraft(io: Server, draft: Draft): void {
       draft.hands[seat],
       draft.picks[seat] ?? DRAFT_AUTO_PICK,
     );
-    // A hand is never empty and a pick is refused unless it names a card
-    // in one, so this cannot answer null. The guard is here rather than an
-    // assertion because the alternative to carrying on is a crash on the
-    // departure of a voyage: the seat keeps whatever it already kept, and
-    // the settle below skips a seat with nothing at all.
+    // A hand is never empty and picks are validated, so this is unreachable
+    // in practice; keep the seat's existing path rather than crash a voyage.
     if (!chosen) {
       rests.push([]);
       finals.push(draft.seats[seat].kept[0]);
@@ -518,48 +317,29 @@ function advanceDraft(io: Server, draft: Draft): void {
   draft.hands =
     draft.step === "second"
       ? passLeft(rests)
-      : // The last step is the two cards this captain kept, in the order
-        // they kept them, so the choose is between their own two papers
-        // and nothing anybody else did can change either of them.
+      : // Last step: choose between the two cards this captain kept.
         draft.seats.map((seat) => [...seat.kept]);
   draft.picks = draft.seats.map(() => null);
   // The new step's cards are in front of every seat, and a seat that was
-  // already gone when the step turned over never dropped a socket inside
-  // it, so nothing would otherwise arm its watch: the deal below is why
-  // the arm is asked here as well. A table that is entirely present arms
-  // nothing, which is the ordinary case and the whole of why this line
-  // costs the room no timer at all.
+  // The new step may already face absent seats, so ask for the watch again.
+  // A fully present table arms nothing.
   armDraftWatch(io, draft.roomId);
   sendDraftViews(io, draft);
 }
 
-// The draft's end: every seat holds a path, the fleet is told what each of
-// them took, and the room's draft state goes.
-//
-// The publication is two facts rather than one, and the pair is the plan's
-// ask read twice. The log line is the record the fleet reads back at Dusk
-// ("a visible history" is the shape every market in this epic takes), and
-// the frame is the same news as it happens. Both carry the captain's name
-// and the path and nothing else, because a path is what the whole table
-// can see of it: the cards that led there are gone the moment they are
-// played, and nothing here could tell anyone what they were.
-//
-// The save is the last thing written and this module does not write it.
-// What a captain sails on is applied by their own client when it reads the
-// settled view (see applyDraftPath), which is the line every
-// client authoritative fact in this build draws, and the reason the draft
-// can end on a server that has never read a save.
+// Ends the draft: every seat with a path is stored, the fleet is told, and
+// the draft state is dropped. The log line and the frame carry only the
+// captain's name and path; the cards behind the choice are never published.
+// The save is applied later by each client from the settled view, so the
+// server never writes a save.
 function settleDraft(
   io: Server,
   draft: Draft,
   finals: readonly (PathId | undefined)[],
 ): void {
   const seconds = Math.max(0, Math.round((Date.now() - draft.openedAt) / 1000));
-  // [F6: charters at leg four] The settled paths move into the room's own
-  // book as they are written onto the seats, because this is the last
-  // moment the seats holding them exist (see pathsByRoom). The book is
-  // opened before the walk and stored after it, so a seat with nothing to
-  // settle simply contributes no entry.
+  // The seats holding paths are about to disappear; capture them in the
+  // harbor's book first. A seat with no path contributes nothing.
   const paths = pathsByRoom.get(draft.roomId) ?? new Map<string, PathId>();
   for (let seat = 0; seat < draft.seats.length; seat += 1) {
     const held = draft.seats[seat];
@@ -573,12 +353,8 @@ function settleDraft(
       captain: held.name,
       path,
     });
-    // [I1: the telemetry spine] The draft's own reading, filed per captain
-    // because a captain is what every other event in this record is filed
-    // against. The seconds are the table's rather than this captain's, and
-    // are the same number on every seat of one draft: the plan's reading
-    // is the time the interface took, and a reader takes any one of them
-    // rather than adding them up.
+    // Filed per captain; seconds is the table's draft duration, the same on
+    // every seat, so a reader takes one rather than summing.
     noteTelemetry(draft.roomId, "path_taken", {
       actor: held.userId,
       path,
@@ -588,37 +364,17 @@ function settleDraft(
   pathsByRoom.set(draft.roomId, paths);
   disarmDraftWatch(draft.roomId);
   drafts.delete(draft.roomId);
-  // [W2: the path draft] And with every seat settled, the room is told to
-  // leave the seat. The announcement comes after the settled views and the
-  // two records above rather than before them, because it is the frame
-  // that lets every client run its departure, and a client that ran the
-  // departure before reading its own settled view would step off the seat
-  // holding no path. Socket order carries that promise on one connection,
-  // and the announcement is awaited by nothing: it lives in the checkpoint
-  // module because the moving of a room is that module's business (see
-  // announceDraftComplete).
+  // Announce after the settled views: the announcement triggers departures,
+  // and a client that left before reading its settled view would step off
+  // with no path. Not awaited; moving a harbor is the checkpoint's business.
   void announceDraftComplete(io, draft.roomId);
 }
 
-/**
- * One captain's change of papers, recorded in the room's book and published
- * to the fleet.
- *
- * Answers false when the book already holds a switch for this captain, and
- * the caller turns that into the refusal the fleet would otherwise be lied
- * to about: the plan's clause is "once per voyage", and this is the half of
- * that sentence the server can keep. The other half is the captain's own
- * save (see applyPathSwitch in @/lib/game/engine/draft), which is where the
- * fee is paid, the orders are forfeited and the window is judged, because
- * the purse and the manifest are the captain's own and this server has
- * never read either.
- *
- * The three publications are one act and happen together: the frame the
- * room watches, the log line the fleet reads back, and the measurement.
- * All three are written from the row the caller validated, so a switch
- * cannot be measured without being announced or announced without being
- * recorded.
- */
+// Records a change of papers and publishes it. False when this captain
+// already switched this voyage; the caller turns that into a refusal. The
+// server enforces only the once-per-voyage half; the fee, forfeiture and
+// window live in the captain's save. Frame, log line and measurement are
+// written together from the validated row.
 export function recordPathSwitch(
   io: Server,
   roomId: string,
@@ -628,12 +384,8 @@ export function recordPathSwitch(
   if (book.has(row.userId)) return false;
   book.add(row.userId);
   switchesByRoom.set(roomId, book);
-  // [F6: charters at leg four] The paths book moves with the switch, so a
-  // charter take read later in the voyage attributes the papers the
-  // captain is sailing on as they stand then rather than as they were
-  // dealt. It is written here rather than beside the frame below because
-  // the book is the room's record of the change and the frame, the log
-  // line and the measurement are publications of it.
+  // The paths book follows the switch so a later charter take attributes the
+  // papers being sailed now rather than the ones dealt.
   const paths = pathsByRoom.get(roomId) ?? new Map<string, PathId>();
   paths.set(row.userId, row.path);
   pathsByRoom.set(roomId, paths);
@@ -657,20 +409,9 @@ export function recordPathSwitch(
   return true;
 }
 
-/**
- * [F6: charters at leg four] The path one captain is sailing under, as
- * the room's own book has it.
- *
- * The one reader of the paths book above, and it exists because the
- * charter take filed at leg four has to attribute a path the draft's own
- * seats no longer hold (see settleDraft). Null is three answers that are
- * one answer to its caller: no book is open for this room (a voyage
- * before its departure and after either ending), the captain is not in it
- * (a late arrival the deal skipped), or the seat settled holding nothing.
- * All three are takes the caller cannot attribute, and it drops them
- * rather than filling in a path, because a guessed field on an operator
- * measurement is worse than a missing one.
- */
+// The path this captain is sailing under, from the harbor's book. Null means
+// no book, no entry (a late arrival), or nothing settled; callers drop an
+// unattributable take rather than guessing.
 export function heldPathOf(roomId: string, userId: string): PathId | null {
   return pathsByRoom.get(roomId)?.get(userId) ?? null;
 }
@@ -681,28 +422,18 @@ function draftView(draft: Draft, seat: number): DraftView {
     roomId: draft.roomId,
     step: draft.seats[seat].path !== null ? "done" : draft.step,
     hand: draft.hands[seat] ?? [],
-    // The count is of the captains who still have a card in front of them,
-    // which includes the reader: a captain who has answered sees the table
-    // as one smaller, which is the same thing everyone else sees.
+    // Counts captains with a card still in front of them, including the
+    // reader.
     open: draft.picks.filter((held) => held === null).length,
-    // Whether this seat's own card is down, which the count above cannot
-    // say and the reader's screen needs: a captain whose tab went dark
-    // mid step comes back to a hand the room has already laid a card from
-    // (see fireDraftWatch), and a screen that does not know that offers
-    // the cards again and answers a press with "Your card is already laid
-    // down." The field is the reader's own pick and never a card, so it
-    // tells the table nothing its count does not already.
+    // The reader's own pick, so a captain whose card was auto-laid while
+    // away is not offered the cards again.
     picked: draft.picks[seat] !== null,
     path: draft.seats[seat].path,
   };
 }
 
-// Every seat's own hand, to that seat's own sockets. The loop is over the
-// draft's seats rather than over the presence map, because a draft reaches
-// the captains it was dealt to and no one else: a spectator in the room and
-// a captain who joined after the deal are both sent nothing, which is the
-// privacy rule stated as an iteration rather than as a filter applied after
-// the fact.
+// Sends each seat its own hand, iterating seats rather than presence, so
+// spectators and late joiners receive nothing.
 function sendDraftViews(io: Server, draft: Draft): void {
   for (let seat = 0; seat < draft.seats.length; seat += 1) {
     emitToUser(
@@ -714,18 +445,9 @@ function sendDraftViews(io: Server, draft: Draft): void {
   }
 }
 
-/**
- * Everything this module holds for a voyage goes, and the seats that were
- * standing in the draft are told so.
- *
- * A null view is the close signal, and it is one frame rather than two
- * (see DraftView on the wire): a draft that is over by settlement sends the
- * settled view and a draft that is over by a wipe sends nothing at all, and
- * the client reads the first as a path and the second as a draft to put
- * away. Reached by the two endings a voyage has: the host wiping it, which
- * makes it a new voyage with no paths dealt and no switch spent, and the
- * conclusion, where the harbor goes back to the pier.
- */
+// Drops everything this module holds for a voyage. Live draft seats get a
+// null view as the close signal; a settled draft already sent its paths and
+// a wiped one sends nothing.
 export function clearPathVoyage(io: Server, roomId: string): void {
   const draft = drafts.get(roomId);
   if (draft) {
@@ -736,13 +458,11 @@ export function clearPathVoyage(io: Server, roomId: string): void {
     }
   }
   switchesByRoom.delete(roomId);
-  // [F6: charters at leg four] The paths book goes with the switches, on
-  // the same reading and for the same reason: both are the room's copies
-  // of papers the captain's own save still holds.
+  // The paths book goes with the switches; both are harbor copies.
   pathsByRoom.delete(roomId);
 }
 
-// The same clear for a room that is being torn down, where there is nobody
+// The same clear for a harbor that is being torn down, where there is nobody
 // left in the channel to tell.
 export function clearPathVoyageSilent(roomId: string): void {
   const draft = drafts.get(roomId);

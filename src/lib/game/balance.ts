@@ -1,14 +1,14 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: reading the mode's win rates.
 //
-// [H5: the quota rung] The epic's gate is a claim about numbers: an honest
+// The design's gate is a claim about numbers: an honest
 // captain wins the share of voyages WIN_RATE_TARGETS records below, with a
 // Broker's and a Pirate's bands beside it, and none of those rates moves
-// when the table grows from four seats to five to six. Before H4
-// nothing could check that, because a voyage concluded without recording
-// who was dealt what. Now every finished voyage leaves its alignment and
-// its verdict on a Chronicle row, so the claim is a query, and this module
-// is the query: rows in, a reading of every band out.
+// when the table grows from four seats to five to six. Before this was
+// recorded, nothing could check that, because a voyage concluded without
+// recording who was dealt what. Now every finished voyage leaves its
+// alignment and its verdict on a Chronicle row, so the claim is a query,
+// and this module is the query: rows in, a reading of every band out.
 //
 // It is pure and it owns no database, the way ./victory.ts owns no socket:
 // the reader below is arithmetic over rows, and the script that fetches
@@ -41,7 +41,7 @@ export type VoyageOutcome = {
   seats: number;
 };
 
-// The plan's targets, in percent, and the reason this reader exists rather
+// The design's targets, in percent, and the reason this reader exists rather
 // than a hand written query in a planning document: a target that lives
 // only in prose is retyped into every report that judges against it, and
 // the one that gets retyped wrong is the one nobody notices.
@@ -155,7 +155,7 @@ export function readSwings(readings: readonly BandReading[]): SwingReading[] {
 
 // Where a rate sits against its role's target. A rate is judged in whole
 // percent, matching the targets, so a rate that rounds to the floor is in
-// band: 52.4% against a floor of 52 is a rate the plan asked for, and
+// band: 52.4% against a floor of 52 is a rate the design asked for, and
 // failing it on a hundredth of a percent would be a gate nobody can pass.
 export type BandVerdict = "in" | "under" | "over" | "unplayed";
 
@@ -165,7 +165,7 @@ export function bandVerdict(
 ): BandVerdict {
   if (rate === null) return "unplayed";
   // Rounded before it is compared, which is the whole reason the comment
-  // above says whole percent: a rate of 51.6 is a rate the plan asked for,
+  // above says whole percent: a rate of 51.6 is a rate the design asked for,
   // and 19.4 is not, and neither is decided by the hundredth of a point
   // that division left behind. It is also what keeps the boundaries honest
   // under floating point, where 0.58 * 100 is a whisker under 58.
@@ -178,7 +178,7 @@ export function bandVerdict(
 
 /**
  * A rate as the report and the dashboard both print one: one decimal
- * place, which is the resolution the plan's gates are written at.
+ * place, which is the resolution the design's gates are written at.
  *
  * It lives beside the reader that produces rates rather than in either
  * place that shows them, because the command line report and the balance

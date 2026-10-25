@@ -9,7 +9,6 @@ import {
   Ship,
   TrendingUp,
   BookOpen,
-  X,
   Loader2,
   Star,
 } from "lucide-react";
@@ -20,7 +19,11 @@ import type { CaptainLegacySummary } from "@/lib/game/legacy";
 import { Avatar, Pill } from "./shared";
 import { HOUSE_TINT, HOUSE_TINT_FALLBACK } from "./house-colors";
 import { renownTitleForLevel } from "@/lib/game/legacy";
-import { ModalOverlay, ModalSheet } from "@/components/ui/modal-overlay";
+import {
+  ModalOverlay,
+  ModalSheet,
+  ModalClose,
+} from "@/components/ui/modal-overlay";
 import { cn } from "@/lib/utils";
 import { StatsTab } from "./profile/StatsTab";
 import { ChroniclesTab } from "./profile/ChroniclesTab";
@@ -51,14 +54,14 @@ export function CaptainProfileModal({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let canceled = false;
     const load = async () => {
       const [legacyRes, chronRes, rivalRes] = await Promise.all([
         api.getLegacy().catch(() => ({ legacy: null, checkIn: null })),
         api.listChronicles().catch(() => ({ chronicles: [] })),
         api.listRivals().catch(() => ({ rivals: [] })),
       ]);
-      if (cancelled) return;
+      if (canceled) return;
       setData({
         legacy: legacyRes.legacy,
         chronicles: chronRes.chronicles ?? [],
@@ -68,7 +71,7 @@ export function CaptainProfileModal({
     };
     void load();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [open]);
 
@@ -135,13 +138,13 @@ export function CaptainProfileModal({
                     </div>
                   )}
                 </div>
-                <button
+                {/* The one rule the caller adds: a heading of any length
+                    beside it must not squeeze the circle. */}
+                <ModalClose
+                  label={t("Close profile")}
                   onClick={() => onOpenChange(false)}
-                  className="pm-pressable shrink-0 rounded-full p-2 hover:bg-black/5 dark:hover:bg-white/10"
-                  aria-label={t("Close profile")}
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                  className="shrink-0"
+                />
               </div>
             </div>
 

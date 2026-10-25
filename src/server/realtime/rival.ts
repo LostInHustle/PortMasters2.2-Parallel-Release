@@ -22,7 +22,7 @@ export type RivalStanding = {
 };
 
 // Writes one CaptainRival row for every unordered pair of finishers.
-// A forged finisher still appears in the standings (the room is never
+// A forged finisher still appears in the standings (the harbor is never
 // broken), but their rival rows record them as a tie rather than a
 // win or loss, so a doctored save can't inflate a rivalry record.
 export async function recordRivalOutcomes(

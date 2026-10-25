@@ -7,10 +7,12 @@ import {
   hireWorker,
   leavePhase,
   unlockedWorkerRoster,
+  wagesDue,
 } from "@/lib/game/engine";
 import { t } from "@/lib/game/i18n";
 import { phaseFace } from "@/lib/game/phases";
 import { unlockedProducts } from "@/lib/game/pools";
+import { crewSize } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
 import {
@@ -62,8 +64,8 @@ export function WorkerMgmt({
       return owner === r.id || (r.id === "master" && owner === "weaver");
     }),
   }));
-  const totalWages = roster.reduce((sum, r) => sum + r.due, 0);
-  const nW = roster.reduce((sum, r) => sum + r.list.length, 0);
+  const totalWages = wagesDue(game);
+  const nW = crewSize(game);
   // The phase the wage bill lands in, named through its face rather than
   // typed into the sentence below, so the note and the tile above it cannot
   // come apart. Read through the pack here, at the composer, because both
@@ -77,7 +79,7 @@ export function WorkerMgmt({
       </div>
       <p className="text-center text-sm text-muted-foreground mb-4">
         {t(
-          "💰 Current Funds: {game.money} Gold | 📦 See Inventory on the left",
+          "💰 Current Gold: {game.money} Gold | 📦 See Inventory on the left",
           { "game.money": game.money },
         )}
       </p>
@@ -97,14 +99,14 @@ export function WorkerMgmt({
       )}
 
       <HuePanel tone="market" className="p-4 mb-4">
-        <PanelHeading>{t("🔨 Hire Workers")}</PanelHeading>
+        <PanelHeading>{t("🔨 Hire Artisans")}</PanelHeading>
         <div className="text-xs space-y-1 mb-3">
           {roster.map((r) => (
             <div key={r.id} className={artisanTint(r.id)}>
               <strong className="pm-artisan-ink">
                 {r.icon} <Term term={r.label}>{t(r.label)}</Term>
               </strong>
-              :{" "}
+              {t(": ")}
               {r.tasks
                 .map((task) => {
                   const mats = Object.entries(RECIPES[task].materials)
@@ -113,17 +115,17 @@ export function WorkerMgmt({
                   return t("{t}({mats})", { t: t(task), mats });
                 })
                 .join(t(" or "))}
-              ,{" "}
+              {t(", ")}
               <span className="text-due">
                 {t("{cost} Gold/round", { cost: r.cost })}
               </span>
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue: a three colour
+        {/* Each hire button wears its own craft's hue: a three color
             cycle puts the same saturated green on the first, fourth and
             seventh artisan, so a row of seven reads as one repeating
-            stripe and the colour tells you nothing about which artisan
+            stripe and the color tells you nothing about which artisan
             you are about to hire. */}
         <div className="flex flex-wrap justify-center gap-2">
           {roster.map((r) => (

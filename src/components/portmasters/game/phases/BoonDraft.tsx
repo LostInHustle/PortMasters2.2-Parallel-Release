@@ -48,7 +48,7 @@ export function BoonDraft({
         <CancelReadyButton phaseSync={phaseSync}>
           {t("↩️ Choose a different Boon")}
         </CancelReadyButton>
-        {/* [F5: public offers] The ledger follows a captain who has
+        {/* The ledger follows a captain who has
             locked in, because the wait is exactly when the table's other
             picks are worth reading: the room is still choosing, and what
             each seat kept is the news. */}
@@ -104,9 +104,9 @@ export function BoonDraft({
           );
         })}
       </DraftGrid>
-      {/* [F5: public offers] And the ledger under the cards, live as the
+      {/* And the ledger under the cards, live as the
           table locks in: a captain choosing stares at the same board the
-          rest of the room is reading, which is the plan's teach the pool
+          rest of the room is reading, which is the design's teach the pool
           by watching clause. It draws nothing until a first pick lands. */}
       <OpenBoons
         game={game}

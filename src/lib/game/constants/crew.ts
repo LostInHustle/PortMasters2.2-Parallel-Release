@@ -88,24 +88,24 @@ export const WAGES: Record<string, number> = Object.fromEntries(
   WORKER_TYPES.map((w) => [w.id, w.wage]),
 );
 
-// [C2: crew loss by name] The two things the loss rule needs, kept here
+// The two things the loss rule needs, kept here
 // beside the provisions above for the reason every number in this file is
 // kept here: the run is a rule of the same family as the ration price, and
 // the pool is content the way WORKER_TYPES is, so a balance pass or a
 // content pass both find theirs where they already look.
 //
-// The run is the plan's own number, and it is written down rather than
-// inlined where it is read: "two consecutive legs on Short Rations costs a
+// The run is the design's own number, and it is written down rather than
+// inlined where it is read: "two consecutive rounds on Short Rations costs a
 // crew member" is the rule, so a later tune that moved it to three should
-// cost one edit with the plan's own sentence as the note beside it.
+// cost one edit with the design's own sentence as the note beside it.
 //
-// The pool is the crew's names, and the plan asks for names that read as
+// The pool is the crew's names, and the design asks for names that read as
 // people rather than identifiers. It also says the pool is worth a content
 // pass of its own once the mechanic is proven, which is the shape this
 // list is written to: short enough for a log line, no repeats, and wide
 // enough that a voyage never reaches the end of it. Every name is a single
 // word so the sentences that carry one stay sentences.
-export const CREW_LOSS_AFTER_HUNGRY_LEGS = 2;
+export const CREW_LOSS_AFTER_HUNGRY_ROUNDS = 2;
 
 export const CREW_NAMES: string[] = [
   "Ada",

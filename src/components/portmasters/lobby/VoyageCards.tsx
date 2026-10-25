@@ -18,7 +18,7 @@
 // Neither control takes pm-pressable. Its hover lift scales a control by
 // 1.04, which suits a 2rem tool in the masthead and not a card half a
 // panel wide, where the growth would reach past its own gap and onto its
-// neighbour. They take the focus ring the Button primitive uses instead.
+// neighbor. They take the focus ring the Button primitive uses instead.
 // =====================================================================
 
 import { AlertTriangle, KeyRound } from "lucide-react";
@@ -37,7 +37,7 @@ type VoyageOption<T extends string> = {
   tagline: string;
   summary: string;
   experimental: boolean;
-  // [H9: the unlock code] Whether this voyage has to be opened with a
+  // Whether this voyage has to be opened with a
   // phrase. Read from the mode record rather than from the unlock table,
   // because the question the card answers is about the voyage it is
   // offering and the table only says which doorway that is.
@@ -103,7 +103,7 @@ export function VoyageCards<T extends string>({
                       {t("Experimental")}
                     </Pill>
                   )}
-                  {/* [H9: the unlock code] The seal, beside the state above
+                  {/* The seal, beside the state above
                       rather than in it. A card can wear both, and they say
                       different things: one is how finished the voyage is
                       and one is how a host gets into it. The key is the
@@ -134,7 +134,7 @@ export function VoyageCards<T extends string>({
                     <span>{t("Still being built.")}</span>
                   </span>
                 )}
-                {/* Not a caution, so not the caution's colour: a sealed
+                {/* Not a caution, so not the caution's color: a sealed
                     voyage is finished, and what it asks for is a phrase
                     rather than patience. The line names the ask and the
                     field under the cards is where it is answered. */}

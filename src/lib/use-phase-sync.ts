@@ -20,34 +20,26 @@ import {
   openingPhase,
 } from "@/lib/game/checkpoint";
 import { normalizePhase, seatOf } from "@/lib/game/phases";
-import {
-  phaseClockLabel,
-  secondsRemaining,
-  type PhaseClock,
-} from "@/lib/phase-clock";
 import { api } from "@/lib/api";
-// The ready line below is read at the moment it is composed, so the rail
-// and the control bar word the room's count in the captain's own
-// language.
+import type { PhaseDeadline } from "@/lib/phase-clock";
+import type { LedgerAct, LedgerWrite } from "@/lib/game/ledger";
 import { t } from "@/lib/game/i18n";
 import type {
   PhaseAdvanceFrame,
   PhaseReadyFrame,
 } from "@/types/realtime/phase";
 
-// The ready frame's shape lives with the protocol rather than here (see
-// PhaseReadyFrame in @/types/realtime/phase): the server builds this frame
-// and this hook reads it, and a frame written out at both ends is a frame
-// that can drift. The alias keeps this module's consumers on the same name
-// they have always read.
+// The frame shape lives in @/types/realtime/phase so the server and this
+// hook cannot drift. The alias keeps the historical name.
 export type ReadyState = PhaseReadyFrame;
 
-/**
- * The room's ready count as a sentence, so the rail and the control bar
- * cannot word the same number two ways. The verb is English glue with no
- * row of its own; the pack's Mandarin reads the count without one, which
- * is why the row drops the token.
- */
+// The frame plus the moment this client saw it. The server armed the
+// deadline before the frame arrived, so the countdown is measured from our
+// receipt (see @/lib/use-phase-clock), not from a render.
+type ObservedReady = ReadyState & { observedAt: number };
+
+// One sentence for the ready count, so the rail and the control bar cannot
+// word it two ways.
 export function readyLine(readyCount: number, requiredCount: number): string {
   return t("{readyCount} of {requiredCount} captains {haveWord} readied.", {
     readyCount,
@@ -56,24 +48,18 @@ export function readyLine(readyCount: number, requiredCount: number): string {
   });
 }
 
-// Rank comes from the shared @/lib/game/checkpoint module so the client and
-// the realtime layer never drift on phase order, and a phase value that
-// arrives off the wire is read through @/lib/game/phases for the same reason.
+// Phase order and wire values are read through the shared checkpoint and
+// phases modules so client and realtime never drift.
 
-// Everything this hook is handed, as one object rather than as eight
-// positions. The call site names each value it passes, and the two that
-// used to sit beside each other in the list as bare strings (authed and
-// the caller's own captain id) can no longer be handed over the wrong way
-// round by a reader who did not count the commas.
+// Options as one object, so callers name values instead of relying on
+// positional strings.
 type PhaseSyncOptions = {
   roomId: string;
   socket: Socket | null;
   game: GameState;
-  act: (fn: (g: GameState, logs: string[]) => void) => void;
-  // The voyage's own seed identity, which autoCommit needs because a departure
-  // is where a boon or a market is drawn from it. Handed in rather than
-  // derived here: it belongs to the session, and this hook has never known
-  // anything about how a voyage seeds.
+  act: LedgerAct;
+  // Session seed identity. autoCommit needs it because a departure draws a
+  // boon or a market from it; this hook does not derive it.
   ctx: GameContext;
   authed: boolean;
   myUserId: string;
@@ -81,30 +67,18 @@ type PhaseSyncOptions = {
 };
 
 /**
- * Gates the recurring "everyone advances together" phase transitions
- * (locking in a boon, then leaving each of the leg's other five phases)
- * behind a room wide ready check. Calling `markReady` no longer runs the
- * transition immediately. It tells the server "I'm done here," and the
- * actual engine call only fires once every other room member has done
- * the same, via the `phase:advance` broadcast. Each client runs the exact
- * same deterministic transition locally, so everyone lands on the same
- * next phase without the server needing to know any game rules.
+ * Gates shared phase transitions behind a harbor wide ready check.
+ * `markReady` only tells the server this captain is done; the engine call
+ * fires when the `phase:advance` broadcast arrives and every client runs
+ * the same deterministic transition locally.
  *
- * Starting the voyage itself is not part of that vote. The harbor is a
- * one time, host only action, handled by `startGame` below and answered
- * with a dedicated `room:started` broadcast rather than `phase:advance`,
- * since nobody but the host called anything and there is no per client
- * pending action to resume. Every client just runs startBoonDrafting()
- * the moment they hear it.
+ * Starting the voyage is not part of the vote: the host emits `room:start`
+ * and everyone runs the opener on `room:started`.
  *
- * [B2: hard timers, the server as timekeeper] The room's clock arrives on the
- * same ready state, and it makes the vote a race rather than a gate: the
- * server announces the advance when the clock runs out whether or not everyone
- * has readied. A captain who was waiting on a choice runs the choice they were
- * holding; a captain who was holding nothing runs the engine's autoCommit,
- * which leaves the seat by its own defaults. Both are the same deterministic
- * transition the room has always run, so every client still lands in the same
- * place, and only one of them had to be there to press the button.
+ * The server is the timekeeper. When the clock runs out it announces the
+ * advance whether or not everyone readied; a captain holding a choice runs
+ * it, and an idle captain runs autoCommit's defaults. Both are the same
+ * deterministic transition, so all clients still land together.
  */
 export function usePhaseSync({
   roomId,
@@ -117,84 +91,52 @@ export function usePhaseSync({
   startingGoldBonus = 0,
 }: PhaseSyncOptions) {
   const [waiting, setWaiting] = useState(false);
-  const [ready, setReady] = useState<ReadyState | null>(null);
+  const [ready, setReady] = useState<ObservedReady | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  const pendingFn = useRef<((g: GameState, logs: string[]) => void) | null>(
-    null,
-  );
+  const pendingFn = useRef<LedgerWrite | null>(null);
 
-  // Keep the latest game snapshot available to the listeners below
-  // without subscribing them again on every change.
+  // Latest snapshot for the listeners, without resubscribing them.
   const gameRef = useRef(game);
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
 
-  // Same pattern as gameRef: this only settles once the captain's
-  // CaptainLegacy row has loaded (see useGameSession), a moment after
-  // this hook first mounts, so onRestarted below needs the current value
-  // without the whole effect resubscribing every time it changes.
+  // Same pattern: the legacy row loads after mount, so onRestarted reads
+  // the current value without resubscribing the effect.
   const goldBonusRef = useRef(startingGoldBonus);
   useEffect(() => {
     goldBonusRef.current = startingGoldBonus;
   }, [startingGoldBonus]);
 
-  // [B2: hard timers, the server as timekeeper] The reading the countdown is
-  // drawn against, and the ticker that keeps it moving.
-  //
-  // The reading is state rather than a Date.now() taken inside the render,
-  // because a render has to happen for a number to change: this is what makes
-  // the countdown tick, and a clock whose ticker stopped would leave a stale
-  // number standing rather than quietly reading its way to correctness on
-  // some unrelated render.
-  //
-  // The ticker runs only while the room has a clock. A lobby, a harbor that
-  // has not set sail and a server with the clock switched off all leave this
-  // effect doing nothing, which is what keeps a captain sitting in a lobby
-  // from waking up once a second for nothing. The arithmetic itself is not
-  // here: it comes from @/lib/phase-clock, which reads the two published
-  // numbers and nothing else.
-  const [clockNow, setClockNow] = useState(() => Date.now());
-  const phaseEndsAt = ready?.phaseEndsAt ?? null;
-  useEffect(() => {
-    if (phaseEndsAt === null) return;
-    const id = setInterval(() => setClockNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [phaseEndsAt]);
+  // Deadline, seat budget, and the moment this client saw them. Carried as
+  // numbers; the ticker lives in use-phase-clock so the shared harbor hook
+  // does not redraw every screen once a second.
+  const phaseDeadline = useMemo<PhaseDeadline | null>(
+    () =>
+      ready
+        ? {
+            endsAt: ready.phaseEndsAt,
+            total: ready.phaseSeconds,
+            observedAt: ready.observedAt,
+          }
+        : null,
+    [ready],
+  );
 
   useEffect(() => {
     if (!socket) return;
 
     const onReadyUpdate = (data: PhaseReadyFrame) => {
       if (data.roomId !== roomId) return;
-      setReady(data);
-      // The clock's reading is stamped in the same batch as the deadline it
-      // belongs to, so the countdown's first frame after a seat begins is
-      // drawn against the moment that seat's deadline arrived rather than
-      // against the reading the last tick happened to leave behind.
-      setClockNow(Date.now());
+      // Stamp the deadline and its observation together, at the frame's
+      // arrival, so the countdown starts from when this seat learned of it.
+      setReady({ ...data, observedAt: Date.now() });
       const g = gameRef.current;
 
-      // The room's lap, taken rather than assumed. A rank is an index inside
-      // one mode's phase order, so a comparison between a captain's seat and
-      // the room's seat only means anything while both are read the same way;
-      // a client whose own mode disagrees with the room's is not behind or
-      // ahead of the table, it is playing a different leg, and every guard
-      // below answers null or nonsense for it. That is a livelock rather than
-      // a stumble, because the two laps of this release differ by one
-      // adjacent swap (Orders and Parley, see ./game/mode): a step forward in
-      // one lap is backward in the other, so each captain's report of the
-      // seat they moved to is discarded as stale, the checkpoint never moves,
-      // and the room's own cure hands the same dead announcement back to the
-      // table.
-      //
-      // The room is the authority here for the reason it is at load: the mode
-      // decides the order this captain's phases run in, and the room is what
-      // everyone is synchronizing to (see refreshVoyageFacts, where the
-      // room's mode beats the save's). A room's mode is fixed at its creation
-      // and no event changes it, so in a healthy room this line never fires;
-      // it is here because the alternative is an assumption that four guards
-      // silently rest on.
+      // Read both ranks in the harbor's lap. A captain whose mode disagrees
+      // would compare different phase orders and livelock (the two laps
+      // differ by one adjacent swap), so the harbor's mode wins. A harbor's
+      // mode is fixed at creation, so in a healthy harbor this never fires.
       const roomMode =
         data.mode === undefined ? g.mode : normalizeMode(data.mode);
       if (roomMode !== g.mode) {
@@ -203,21 +145,9 @@ export function usePhaseSync({
         });
       }
 
-      // Desync catch up. When the room's synchronized checkpoint has
-      // moved ahead of us (we missed a phase:advance broadcast because of
-      // a transport blip, common on tunnelled connections), execute the
-      // pending transition right now instead of staying stuck waiting
-      // forever. The pending function was stored by markReady, and since
-      // every client runs the same deterministic transition, executing
-      // it locally catches us up by exactly one phase, the one the room
-      // just left. If the room somehow advanced multiple phases (extremely
-      // rare), the next phase:ready_update heartbeat will trigger another
-      // catch up step.
-      // Both ranks are read in the room's own lap, which is what the frame
-      // above just settled: comparing them inside one lap is the only way the
-      // comparison means anything, and the lap it is done in is the one the
-      // room is keeping rather than the one this client happened to be
-      // holding.
+      // Desync catch-up: the harbor's checkpoint is ahead, so a broadcast
+      // was missed. Run the pending transition locally, which advances
+      // exactly one phase; a later ready_update repeats the step if needed.
       const serverRank = checkpointRank(
         roomMode,
         data.round,
@@ -236,49 +166,23 @@ export function usePhaseSync({
           act(fn);
           return;
         }
-        // Only a seat the room waits at is a seat the room can have run
-        // out, and the pier is the one seat on the lap nobody readies out
-        // of (see isGatedPhase). The frame that carries a captain off the
-        // pier is room:started, which lays the opening seat out itself,
-        // and that deal lands by an act rather than by this render: a room
-        // that departs while this snapshot still reads the pier would
-        // otherwise read as a room that moved past this captain, and the
-        // fallback below would commit the cards the deal just laid out
-        // before they ever render. One room move, applied once.
+        // Only a gated seat can have been run out. The pier is excluded:
+        // room:started lays out the opening deal, and committing here would
+        // consume those cards before they render.
         if (!isGatedPhase(roomMode, seatOf(g.phase))) return;
-        // [B2: hard timers, the server as timekeeper] Nobody here was
-        // waiting on anything to happen: this captain was idle when the
-        // room's clock ran the seat out, and the advance that carried the
-        // transition to everyone else never arrived, which is the same
-        // transport blip this catch up exists for. The room is past them and
-        // it is not coming back for them, so what catches them up is the
-        // departure the clock gives a captain who is not there: the seat's
-        // own defaults, run through the engine exactly as the advance
-        // broadcast runs them.
+        // Idle captain at a seat the clock ran out: leave by the engine's
+        // defaults, exactly as the advance broadcast does.
         pendingFn.current = null;
         setWaiting(false);
         act((state, logs) => autoCommit(state, ctx, logs));
         return;
       }
-      // A terminal is not behind anybody: bankruptcy and the endgame screen
-      // are the two phases with no rank at all, and a captain sitting at one
-      // has left the voyage rather than fallen behind it. The personal
-      // screens do have a rank, and the fold that gives them one is what
-      // makes this catch up work for a captain who was reading a module card
-      // when the room moved on: they are standing in Dusk, so the room's move
-      // to the next round is a move past them and is healed here exactly like
-      // any other missed broadcast.
+      // Terminals have no rank; personal screens fold into Dusk, so a move
+      // to the next round still reads as a move past them.
 
-      // Self heal a dropped ready vote. A vote emitted the instant a flaky
-      // transport blips (common on tunnelled or long polling connections)
-      // can reach the server stamped against the pre reconnect socket, fail
-      // that handler's `roomId === s.roomId` check, and be silently
-      // dropped, leaving the room stuck at "n minus 1 of n ready" forever
-      // with no error and the local button still showing "Waiting". So
-      // whenever the server hands us the authoritative roster: if we still
-      // intend to be ready for the checkpoint the room is actually on, but
-      // we aren't in it, assert it again. phase:ready is idempotent (a Set
-      // add), so sending it again when we're already counted is harmless.
+      // Re-send a ready vote dropped by a transport blip; otherwise the
+      // harbor can sit at n minus 1 of n with no error. phase:ready is
+      // idempotent, so repeating it is harmless.
       if (
         pendingFn.current &&
         myUserId &&
@@ -293,10 +197,8 @@ export function usePhaseSync({
         });
       }
     };
-    // The advance frame lives with the protocol beside the ready frame
-    // (see PhaseAdvanceFrame in @/types/realtime/phase), and its three
-    // market hands are applied below before the market is drawn, so
-    // genResourceCard prices the cards the server's numbers say.
+    // Apply the advance's market leans before the market draws, so
+    // genResourceCard prices the server's numbers.
     const onAdvance = (data: PhaseAdvanceFrame) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
@@ -307,21 +209,11 @@ export function usePhaseSync({
       );
       const clientRank = checkpointRank(g.mode, g.currentRound, g.phase);
       if (advanceRank === null) return;
-      // Stale advance for a checkpoint we've already passed, ignore. The one
-      // case that reads oddly here is the personal screens, and it reads
-      // correctly once the fold is in mind: a captain in the module draft or
-      // the swap picker is standing in Dusk, so their rank is Dusk's rank,
-      // which is the seat this advance is leaving, and the frame is theirs to
-      // take rather than one to refuse as stale (see [B2] below). A terminal
-      // is the only thing with no rank, and the line above is what refuses a
-      // frame naming one.
+      // Ignore an advance already passed. Personal screens sit in Dusk and
+      // still take the frame; a terminal has no rank and was refused above.
       if (clientRank !== null && advanceRank < clientRank) return;
-      // We are leaving the market phase for good this round (purchasedCards
-      // and resourceCards are about to be cleared by the pending
-      // completeMarket below), so this is the one moment this captain's own
-      // draw can still be read and handed to the server for next round's
-      // pulse. A captain who bought nothing still reports an empty tally,
-      // exactly like everyone else who sits this round out.
+      // Last moment this captain's market draw is readable before
+      // completeMarket clears it. Report the tally, including zero.
       if (g.phase === "market") {
         socket.emit("harbor:pulse:report", {
           roomId,
@@ -329,9 +221,8 @@ export function usePhaseSync({
           tally: tallyPurchasesByResource(g),
         });
       }
-      // Exact match (normal case) or advance is ahead (we missed an
-      // earlier advance, ngrok drop, etc.). Either way, execute the
-      // pending transition if one is waiting.
+      // Exact match, or ahead because an earlier advance was missed. Run
+      // the held transition if there is one.
       const fn = pendingFn.current;
       pendingFn.current = null;
       setWaiting(false);
@@ -342,20 +233,10 @@ export function usePhaseSync({
         });
         return;
       }
-      // The same reading the catch up above makes, for the same reason: the
-      // seat has to be one the room waits at before its fallback can be
-      // this captain's to run. The held transition above is untouched: a
-      // captain only holds one by having pressed at the seat they stand in.
+      // Same gate before the timeout fallback can run.
       if (!isGatedPhase(g.mode, seatOf(g.phase))) return;
-      // [B2: hard timers, the server as timekeeper] And when there is no
-      // pending transition, this is the room's clock having run the seat out
-      // while this captain was idle. Nobody chose anything here, so the seat
-      // is left by its own defaults, which the engine works out from the
-      // phase it is standing in: the first boon on the board, a canceled
-      // module draft, or the settlement's own order of business. It is the
-      // same departure every other captain is running, and the same harbor
-      // pulse rides it, so the round that opens next is drawn the same way
-      // for everybody.
+      // No held transition: the clock ran the seat out. Apply the leans
+      // and let the engine commit the seat's own defaults.
       act((state, logs) => {
         applyMarketLeans(state, data);
         autoCommit(state, ctx, logs);
@@ -364,19 +245,10 @@ export function usePhaseSync({
     const onStarted = (data: { roomId: string }) => {
       if (data.roomId !== roomId) return;
       const g = gameRef.current;
-      // Only the captains still sitting in the lobby need to act on this;
-      // anyone who has already moved on (a late reconnect, say) ignores it.
+      // Late reconnects have already left the lobby.
       if (g.currentRound !== 1 || g.phase !== "harbor") return;
-      // Setting sail runs the engine's own opener for the phase the room's
-      // checkpoint was just set to, read off the room's own lap (see
-      // openingPhase in @/lib/game/checkpoint) rather than named here, the
-      // same way the server pinned it: the seat a dealing Gambit build
-      // opens at is the path draft, and every other build opens at the boon
-      // draft, and snapToCheckpoint is the one entry that opens either.
-      //
-      // This is the same direct entry endRound makes at the top of each later
-      // round; both are round openers, not handoffs, so there is no phase
-      // behind them to hand off from.
+      // Run the opener for the phase the server pinned (openingPhase),
+      // same direct entry endRound uses; there is no phase to hand off.
       act((state, logs) =>
         snapToCheckpoint(state, ctx, 1, openingPhase(state.mode), logs),
       );
@@ -384,15 +256,9 @@ export function usePhaseSync({
     const onError = (data: { roomId: string; error: string }) => {
       if (data.roomId === roomId) setStartError(data.error);
     };
-    // The host's "restart the voyage" went through. Every captain still in
-    // the room, not just whoever clicked it, drops back to a fresh run, and
-    // any ready vote in flight no longer means anything.
-    //
-    // Refetch the captain's legacy before restarting so the starting gold
-    // bonus reflects any Renown gained from the voyage that just concluded.
-    // Without this, goldBonusRef (set once on mount from useGameSession)
-    // carries the pre voyage Renown level and the bonus never updates until
-    // the captain leaves and rejoins the room.
+    // Restart drops every captain to a fresh run. Refetch legacy first so
+    // the starting gold bonus reflects Renown just earned, not the value
+    // captured at mount.
     const onRestarted = async (data: {
       roomId: string;
       voyageEpoch?: number;
@@ -413,31 +279,23 @@ export function usePhaseSync({
         house = legacy.houseId;
         goldBonusRef.current = bonus;
       } catch {
-        // If the fetch fails (network blip, server restart), fall back to
-        // the last known bonus rather than blocking the restart entirely.
+        // Network blip: keep the last known bonus rather than block.
       }
-      // Stamp the room's bumped voyage epoch (from the server) onto the fresh
-      // voyage so its market, orders, and intel reroll into a brand new one.
-      // If the payload somehow lacks it, advance locally so content still
-      // changes. Preserve the captain's current Renown level when the legacy
-      // refetch failed, so restartGame never silently relocks a Renown skill.
+      // Stamp the server's voyage epoch so market, orders, and intel
+      // reroll; bump locally if it is missing. Keep the current Renown when
+      // the refetch failed, so no skill is silently relocked.
       act((state, logs) =>
         restartGame(state, logs, {
           startingGoldBonus: bonus,
           renownLevel: level ?? state.renownLevel,
           voyageEpoch: data.voyageEpoch ?? state.voyageEpoch + 1,
-          // The room's tier is the source of truth; if the payload lacks it,
-          // keep the captain's current tier rather than silently resetting it.
+          // Harbor's tier is authoritative; otherwise keep the captain's.
           difficulty: normalizeDifficulty(data.difficulty ?? state.difficulty),
-          // Same rule for the mode, and it has to be the same rule rather
-          // than falling back to the default: a captain whose state was
-          // rebuilt on the founding lap inside an experimental harbor would
-          // be running a different phase order than the room for the whole
-          // rest of the voyage, and nothing downstream would say so.
+          // Same for mode. Falling back to the default here would leave a
+          // rebuilt captain on a different phase order all voyage.
           mode: normalizeMode(data.mode ?? state.mode),
-          // A refetch that failed leaves this null, and the new voyage keeps
-          // the House the captain was already sailing under rather than
-          // dropping a pledge because of one bad request.
+          // A failed refetch keeps the current House rather than dropping
+          // a pledge over one bad request.
           houseId: house ?? state.houseId,
         }),
       );
@@ -449,16 +307,9 @@ export function usePhaseSync({
     socket.on("room:restarted", onRestarted);
     socket.on("room:error", onError);
 
-    // Only request phase state once the socket is authenticated, otherwise
-    // the server silently drops the request (requireAuth returns null) and
-    // the ready state never initialises. Same race fix as GameRoom's
-    // room:join effect: without this, a fast mount and slow auth path means
-    // the client never hears who's readied up.
-    //
-    // `authed` is a dependency, so the effect runs again the moment it flips
-    // and this line is what answers the deferred case. A second effect used
-    // to sit below doing the same emit, which meant every ordinary mount
-    // asked twice and the answer was applied twice.
+    // Request state only after auth; an unauthenticated request is dropped
+    // silently. `authed` is a dependency, so this line answers the
+    // deferred case when it flips.
     if (authed) {
       socket.emit("phase:state:request", { roomId });
     }
@@ -470,20 +321,11 @@ export function usePhaseSync({
       socket.off("room:restarted", onRestarted);
       socket.off("room:error", onError);
     };
-  }, [socket, roomId, act, authed, myUserId]);
+  }, [socket, roomId, act, authed, myUserId, ctx]);
 
-  // [B3: standing orders] The second half of a market's report to the room.
-  //
-  // A captain's tally goes out on the advance frame, read from the state as
-  // it stood when the room moved them, which for a captain who was sitting
-  // there is everything they bought. A market their standing orders played
-  // buys afterwards, inside the same act, so those lots are not in that
-  // report and cannot be: the state the report reads is the state before the
-  // work. The engine leaves the delta on the state instead and this carries
-  // it, against the same round and on the same frame the first half used,
-  // because the server accumulates reports rather than replacing them (see
-  // addPulseReport in src/server/realtime/pulse.ts). A round nobody's orders
-  // bought in sets nothing and this does nothing.
+  // Standing orders buy after the advance tally is read, so their delta
+  // rides _pendingPulseTally. The server accumulates reports rather than
+  // replacing them; a round with no order purchases sets nothing.
   useEffect(() => {
     const tally = game._pendingPulseTally;
     if (!tally || !socket) return;
@@ -497,10 +339,9 @@ export function usePhaseSync({
     });
   }, [game._pendingPulseTally, game.currentRound, socket, roomId, act]);
 
-  // The vote itself, in one place: the two presses below differ only in what
-  // they ask before sending it. Both return whether the vote went out.
+  // One vote path; the two presses differ only in what they check first.
   const sendReady = useCallback(
-    (fn: (g: GameState, logs: string[]) => void) => {
+    (fn: LedgerWrite) => {
       if (!socket) return false;
       pendingFn.current = fn;
       setWaiting(true);
@@ -514,24 +355,17 @@ export function usePhaseSync({
     [socket, roomId, game.currentRound, game.phase],
   );
 
-  // The press that commits a choice: locking in a boon, where the choice is
-  // the departure itself, so there is nothing to check and nothing to
-  // refuse. See markReady below for the press that has no choice in it.
+  // Committing a choice needs no extra check; the choice is the departure.
   const markChoiceReady = useCallback(
-    (fn: (g: GameState, logs: string[]) => void) => sendReady(fn),
+    (fn: LedgerWrite) => sendReady(fn),
     [sendReady],
   );
 
   const markReady = useCallback(
-    (fn: (g: GameState, logs: string[]) => void) => {
-      // The seat has to have a departure before a press can be a promise the
-      // table can keep. The room announces the advance once every captain has
-      // readied, and each client then runs the transition it was holding, so
-      // a captain who readies in a seat no departure can leave (the pier,
-      // Dawn, a personal or terminal screen) leaves the room holding a full
-      // ready set that nothing carries out. The press is refused here, before
-      // anything is sent, and the caller says why. See canLeavePhase in the
-      // engine's lifecycle for which seats those are and why each one is.
+    (fn: LedgerWrite) => {
+      // A seat must have a departure for a vote to mean anything; otherwise
+      // the harbor fills a ready set nothing can carry out. canLeavePhase
+      // names the seats that qualify.
       if (!canLeavePhase(gameRef.current)) return false;
       return sendReady(fn);
     },
@@ -551,10 +385,8 @@ export function usePhaseSync({
     socket.emit("room:start", { roomId });
   }, [socket, roomId]);
 
-  // Host only: reopens the room (so new captains can join again) and
-  // resets every member's voyage, not just the caller's. The server is
-  // the source of truth for the "started" flag; this only asks it to flip
-  // it back.
+  // Host only: reopens the harbor and resets every member's voyage. The
+  // server owns the started flag.
   const restartVoyage = useCallback(() => {
     if (!socket) return;
     socket.emit("room:restart", { roomId });
@@ -563,44 +395,16 @@ export function usePhaseSync({
   const readyCount = ready?.readyUserIds.length ?? 0;
   const requiredCount = ready?.requiredUserIds.length ?? 0;
 
-  // [B2: hard timers, the server as timekeeper] What a screen draws beside
-  // the room's ready count, or null when no clock is running. Derived from
-  // the reading above rather than computed where it is drawn, so every panel
-  // that shows a countdown shows the same one: the room's own deadline, read
-  // once, in one place.
-  const secondsLeft =
-    phaseEndsAt === null ? null : secondsRemaining(phaseEndsAt, clockNow);
-  // Memoized for the reason the whole answer below is: callers hold these
-  // in dependency lists, and an object rebuilt every render re-runs their
-  // effects every render.
-  const phaseClock: PhaseClock | null = useMemo(
-    () =>
-      secondsLeft === null
-        ? null
-        : {
-            secondsLeft,
-            label: phaseClockLabel(secondsLeft),
-            // How long the seat was given, which is what a progress bar
-            // needs and a countdown does not. Null when the server did not
-            // publish one, which a screen reads as "no bar to draw" rather
-            // than as a full or an empty one.
-            total: ready?.phaseSeconds ?? null,
-          },
-    [secondsLeft, ready?.phaseSeconds],
-  );
-
-  // The hook's answer, held to one identity until something inside it
-  // changes. Consumers keep it in dependency lists (GameRoom's keyboard
-  // effect, and Parley's audit reveal above every other), and a fresh
-  // literal every render re-ran those on every render: Parley's reveal
-  // re-sent phase:ready once per render until the leg moved.
+  // One identity until something inside changes; consumers keep this in
+  // dependency lists, and a fresh literal would re-run their effects every
+  // render.
   return useMemo(
     () => ({
       waiting,
       ready,
       readyCount,
       requiredCount,
-      phaseClock,
+      phaseDeadline,
       markReady,
       markChoiceReady,
       cancelReady,
@@ -613,7 +417,7 @@ export function usePhaseSync({
       ready,
       readyCount,
       requiredCount,
-      phaseClock,
+      phaseDeadline,
       markReady,
       markChoiceReady,
       cancelReady,

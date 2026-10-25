@@ -25,11 +25,12 @@ import {
 } from "@/lib/game/standing";
 import type { GameState, Phase } from "@/lib/game/types";
 import { createInitialGameState } from "@/lib/game/types";
-import { GAMBIT, carriesADash, check } from "../harness";
+import { carriesADash, check, GAMBIT, ledgerSentences } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function standingOrdersSuite(): Promise<void> {
-  // [B3: standing orders] The evaluation for this slice, and the one the
-  // plan asks to be testable with no server: what the room's clock plays
+  // Standing orders, and the rule that has to be testable with no server:
+  // what the harbor's clock plays
   // for a captain who is not standing at their seat is a pure engine
   // function taking a state and a record. Every check below drives it
   // through the entry point the clock itself uses, autoCommit, so what is
@@ -106,8 +107,8 @@ export async function standingOrdersSuite(): Promise<void> {
     state.inventory = {};
     return state;
   };
-  const took = (logs: string[], needle: string) =>
-    logs.some((line) => line.includes(needle));
+  const took = (logs: readonly LedgerLine[], needle: string) =>
+    ledgerSentences(logs).some((line) => line.includes(needle));
 
   // The record itself, and what a captain who wrote nothing holds.
   check(
@@ -165,7 +166,7 @@ export async function standingOrdersSuite(): Promise<void> {
       everyGood.buy.every((line) => line.maxPrice === 1),
     `and one line per good is the whole of what a list can say, however long the list it was read from was (${goods.length} goods)`,
   );
-  // [D4: Loom: the Refit] The line the board can never answer. Rags is
+  // The line the board can never answer. Rags is
   // cargo the Loom's bench buys off the quay rather than a good the port
   // merchant trades, so an instruction naming one would be a line the
   // merchant could never fill, and the reader drops it the same way it
@@ -184,8 +185,8 @@ export async function standingOrdersSuite(): Promise<void> {
       MAX_STANDING_BUYS < ITEMS.length,
     "a shopping list cannot name a rag, because a standing order buys a card and the merchant's cards are dealt from the goods the merchant trades, so the hold's catalogue and the board's are two lists rather than one",
   );
-  // A set the captain wrote and then switched off is the rollback the
-  // plan asks for, and it is measured against this one record below.
+  // A set the captain wrote and then switched off is the rollback, and it
+  // is measured against this one record below.
   const ordersWritten: StandingOrders = {
     ...quiet,
     boon: BOONS[0].id,
@@ -213,7 +214,7 @@ export async function standingOrdersSuite(): Promise<void> {
   );
 
   // Dawn, the one seat whose work is a choice rather than a press. The
-  // draft is the one board in the leg drawn with live randomness rather
+  // draft is the one board in the round drawn with live randomness rather
   // than from the captain's seed, so every fixture below reads the hand
   // the state under test was actually dealt rather than a hand taken
   // from some other state and hoped for.
@@ -225,7 +226,7 @@ export async function standingOrdersSuite(): Promise<void> {
       "The standing order checks need a draft holding more than one boon on it, or the written choice cannot be told apart from the board's own first offer.",
     );
   orderedDawn.standingOrders = { ...quiet, boon: writtenPick.id };
-  const orderedDawnLogs: string[] = [];
+  const orderedDawnLogs: LedgerLine[] = [];
   autoCommit(orderedDawn, standingCtx, orderedDawnLogs);
   check(
     took(orderedDawnLogs, cardText(writtenPick).name) &&
@@ -248,7 +249,7 @@ export async function standingOrdersSuite(): Promise<void> {
       "The standing order checks need a catalogue boon that is not on the drawn board, or the fallback they measure cannot be told apart from a written choice.",
     );
   missedDawn.standingOrders = { ...quiet, boon: offBoard.id };
-  const missedDawnLogs: string[] = [];
+  const missedDawnLogs: LedgerLine[] = [];
   autoCommit(missedDawn, standingCtx, missedDawnLogs);
   check(
     took(missedDawnLogs, cardText(missedFirst).name) &&
@@ -268,12 +269,12 @@ export async function standingOrdersSuite(): Promise<void> {
     boon: rollbackPick.id,
     enabled: false,
   };
-  const rollbackDawnLogs: string[] = [];
+  const rollbackDawnLogs: LedgerLine[] = [];
   autoCommit(rollbackDawn, standingCtx, rollbackDawnLogs);
   check(
     took(rollbackDawnLogs, cardText(rollbackFirst).name) &&
       !took(rollbackDawnLogs, cardText(rollbackPick).name),
-    "and with the switch off the same written boon is passed over too, which is the rollback the plan asks for",
+    "and with the switch off the same written boon is passed over too, which is the rollback the design asks for",
   );
 
   // Market. The purse is deep enough that affordability is not what is
@@ -302,7 +303,7 @@ export async function standingOrdersSuite(): Promise<void> {
   });
 
   const whole = roomy(deal("market"));
-  const wholeLogs: string[] = [];
+  const wholeLogs: LedgerLine[] = [];
   const wholeBoard = whole.resourceCards.map((card) => card.id);
   whole.standingOrders = listFrom(boardTops(whole).tops, 0);
   autoCommit(whole, standingCtx, wholeLogs);
@@ -313,15 +314,15 @@ export async function standingOrdersSuite(): Promise<void> {
       took(wholeLogs, "Standing orders at the port board"),
     `orders pricing every good at the top the board itself asks buy the whole board and pay for it out of the captain's purse (${wholeBoard.length} lots)`,
   );
-  // [C4: three foods, spoilage and the split hold] The same order on the
-  // ship every captain actually starts in, with the tree's own opening
+  // The same order on the ship every captain actually starts in, with the
+  // tree's own opening
   // stock in the hold: the list still buys what the hold has room for,
   // and every lot it could not take is refused for room rather than for
   // price, which is the split hold's own rule arriving through the seat
   // that shops with nobody sitting at it. The board weighs twenty slots
   // against fourteen free, so this is not a corner of the draw.
   const crowded = deepPurse(deal("market"));
-  const crowdedLogs: string[] = [];
+  const crowdedLogs: LedgerLine[] = [];
   const crowdedBoard = crowded.resourceCards.map((card) => card.id);
   const largestLot = Math.max(
     ...crowded.resourceCards.map((card) =>
@@ -330,7 +331,7 @@ export async function standingOrdersSuite(): Promise<void> {
   );
   crowded.standingOrders = listFrom(boardTops(crowded).tops, 0);
   autoCommit(crowded, standingCtx, crowdedLogs);
-  const crowdedRefusals = crowdedLogs.filter((line) =>
+  const crowdedRefusals = ledgerSentences(crowdedLogs).filter((line) =>
     line.includes("No room in the hold"),
   ).length;
   check(
@@ -357,7 +358,7 @@ export async function standingOrdersSuite(): Promise<void> {
     `and a list priced a gold under those tops buys exactly the lots whose every unit is under them, leaving the rest of the board alone (${underTops.length} of ${choosy.resourceCards.length})`,
   );
   const nothingPriced = roomy(deal("market"));
-  const nothingPricedLogs: string[] = [];
+  const nothingPricedLogs: LedgerLine[] = [];
   nothingPriced.standingOrders = listFrom(boardTops(nothingPriced).floors, 1);
   autoCommit(nothingPriced, standingCtx, nothingPricedLogs);
   check(
@@ -368,7 +369,7 @@ export async function standingOrdersSuite(): Promise<void> {
   );
   const broke = deal("market");
   broke.money = 0;
-  const brokeLogs: string[] = [];
+  const brokeLogs: LedgerLine[] = [];
   broke.standingOrders = listFrom(boardTops(broke).tops, 0);
   autoCommit(broke, standingCtx, brokeLogs);
   check(
@@ -424,9 +425,9 @@ export async function standingOrdersSuite(): Promise<void> {
   // Holding the engine to this is what makes the check about the rule
   // rather than about the engine agreeing with itself.
   //
-  // [D2] The one thing the model does not restate is the pathbound lock,
+  // The one thing the model does not restate is the pathbound lock,
   // because the lock is not a rule about the hold: it is asked through
-  // lockedBehind, the same reader the trade board greys a card with and
+  // lockedBehind, the same reader the trade board grays a card with and
   // the same one the engine's own guard asks, so a card this model would
   // cover and the engine would refuse cannot slip past here having been
   // checked nowhere.
@@ -445,7 +446,7 @@ export async function standingOrdersSuite(): Promise<void> {
   };
   const bare = deal("orders");
   for (const good of goods) bare.inventory[good] = 0;
-  const bareLogs: string[] = [];
+  const bareLogs: LedgerLine[] = [];
   bare.standingOrders = { ...quiet, fill: "all" };
   autoCommit(bare, standingCtx, bareLogs);
   check(
@@ -457,7 +458,7 @@ export async function standingOrdersSuite(): Promise<void> {
   );
   const filledHold = deal("orders");
   const { order: firstOrder, hold: loadedHold } = loadFor(filledHold);
-  const filledHoldLogs: string[] = [];
+  const filledHoldLogs: LedgerLine[] = [];
   filledHold.standingOrders = { ...quiet, fill: "all" };
   autoCommit(filledHold, standingCtx, filledHoldLogs);
   check(
@@ -471,21 +472,21 @@ export async function standingOrdersSuite(): Promise<void> {
   // The same loaded hold as the fixture above, so the order left
   // standing below is the switch's doing and not an empty hold's.
   loadFor(skipping);
-  const skippingLogs: string[] = [];
+  const skippingLogs: LedgerLine[] = [];
   skipping.standingOrders = { ...quiet, fill: "none" };
   autoCommit(skipping, standingCtx, skippingLogs);
   check(
     skipping.completedOrders.length === 0 &&
       skipping.totalOrdersCompleted === 0 &&
       !took(skippingLogs, "Standing orders at the trade board"),
-    `and the trade board's default is still to fill nothing, which is the seat [B2] shipped (the hold was loaded for it, and it is left standing)`,
+    `and the trade board's default is still to fill nothing, which is the seat standing orders shipped (the hold was loaded for it, and it is left standing)`,
   );
-  // [D2] The two seats below are the same board and the same hold, one
+  // The two seats below are the same board and the same hold, one
   // environment value apart in nothing at all: the only difference is the
   // path the captain sails. It is the check the lock was put inside
-  // canFillOrder for, since that function is the one judgement the hand
+  // canFillOrder for, since that function is the one judgment the hand
   // and the seat both go through (see workStandingOrders), and the one
-  // the board greys its cards with.
+  // the board grays its cards with.
   const pathboundSeat = (withPath: boolean) => {
     const state = deal("orders");
     const card = state.customerCards.find((o) => o.isPathOrder);
@@ -515,7 +516,7 @@ export async function standingOrdersSuite(): Promise<void> {
   // the engine's own: an order to upgrade that cannot be paid for does
   // nothing and costs nothing.
   const yard = deepPurse(deal("dusk"));
-  const yardLogs: string[] = [];
+  const yardLogs: LedgerLine[] = [];
   yard.standingOrders = { ...quiet, shipyard: "upgrade" };
   autoCommit(yard, standingCtx, yardLogs);
   check(
@@ -524,18 +525,18 @@ export async function standingOrdersSuite(): Promise<void> {
   );
   const poor = deal("dusk");
   poor.money = 0;
-  const poorLogs: string[] = [];
+  const poorLogs: LedgerLine[] = [];
   poor.standingOrders = { ...quiet, shipyard: "upgrade" };
   autoCommit(poor, standingCtx, poorLogs);
   check(
     poor.shipLevel === 0 &&
-      took(poorLogs, "Gold to upgrade the ship") &&
+      took(poorLogs, "Gold for the hull upgrade") &&
       !took(poorLogs, "Standing orders at the shipyard"),
     "and a yard the purse cannot pay for is refused by the engine rather than by the order, so a written upgrade costs a captain nothing",
   );
   const topped = deepPurse(deal("dusk"));
   topped.shipLevel = MAX_SHIP_LEVEL;
-  const toppedLogs: string[] = [];
+  const toppedLogs: LedgerLine[] = [];
   topped.standingOrders = { ...quiet, shipyard: "upgrade" };
   autoCommit(topped, standingCtx, toppedLogs);
   check(
@@ -554,7 +555,7 @@ export async function standingOrdersSuite(): Promise<void> {
     absent.purchasedCards.length === 0 &&
       absent._pendingPulseTally === undefined &&
       absent.phase !== "market",
-    "a captain who wrote nothing is played exactly as [B2] played them: no lot bought, no report added, and the seat left on the lap's own terms",
+    "a captain who wrote nothing is played exactly as standing orders played them: no lot bought, no report added, and the seat left on the lap's own terms",
   );
   const played = deepPurse(deal("market"));
   played.standingOrders = listFrom(boardTops(played).tops, 0);

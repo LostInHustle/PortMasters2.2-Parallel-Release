@@ -46,18 +46,18 @@ import {
   HuePanel,
   PanelHeading,
   PanelTitle,
-  PhaseError,
   ReadyFooter,
   StationStrip,
   type PhasePanelProps,
 } from "./PhaseShared";
+import { Notice } from "../../shared";
 
 // The Parley panel: the Captain's Exchange, and with it the two votes the
 // table carries and the three markets that sell on the same terms the
 // exchange does. Named for the phase it is (see @/lib/game/phases), the
 // same way Market.tsx and Orders.tsx are, rather than for bartering, which
 // is the activity half this screen shares with a chat composer and not the
-// seat the room waits on.
+// seat the harbor waits on.
 //
 // The screen wears two stations rather than one stack ten sections deep:
 // the exchange, the two votes, the fleet's ledger and the three markets
@@ -65,7 +65,7 @@ import {
 // window and make the phase read as a wall. It is the same shape
 // Market.tsx uses and for the reasons written there: the station is local
 // state rather than a phase value or a saved field, so a captain who
-// switches stations has told the room nothing, and the wait a ready vote
+// switches stations has told the harbor nothing, and the wait a ready vote
 // opened does not split again.
 //
 // What is traded splits; what belongs to the whole table does not. The
@@ -167,7 +167,7 @@ export function Parley({
     auditCardShown(game, audit) || maroonCardShown(game, maroon) || ledgerShown;
   const businessOpen = bizOpen ?? anyLive;
   //
-  // A live vote's gist carries the room's own count when the server has
+  // A live vote's gist carries the harbor's own count when the server has
   // said one, which is the sentence that answers the question the fold is
   // closed over: not just that a vote is open but how far along it is. The
   // count comes off the tally frame (see VoteCensus), so the fold's
@@ -203,27 +203,27 @@ export function Parley({
   // table above says.
   const stations = STATIONS.map((s) => ({ ...s, label: t(s.label) }));
 
-  // [H6: the Manifest Audit] The leg this screen is on ends the moment the
+  // The round this screen is on ends the moment the
   // vote carries, so the captain reads the finding on the strip above and
   // this phase, which the audit just spent, closes behind it.
   //
   // It closes the way every phase closes: by marking ready. That is the
   // whole reason this belongs in the component rather than in the realtime
-  // layer. A server that emptied the checkpoint's ready set on the room's
+  // layer. A server that emptied the checkpoint's ready set on the harbor's
   // behalf would move the checkpoint while every client sat waiting to be
-  // told to move, which is a room stuck forever; here each client runs the
-  // one transition it already knows, and the room advances through the
+  // told to move, which is a harbor stuck forever; here each client runs the
+  // one transition it already knows, and the harbor advances through the
   // protocol it was already using.
   //
   // The guards are the ones that keep a stale finding from spending a
-  // later leg: the reveal carries the leg it was made in, so a captain who
-  // reloads in leg seven is shown the finding without being pushed out of
+  // later round: the reveal carries the round it was made in, so a captain who
+  // reloads in round seven is shown the finding without being pushed out of
   // a Parley the harbor never voted to end.
   // The dependency below is the press itself rather than the phaseSync
   // record it came from. That record changes whenever anything in it does,
   // waiting flipping true on the back of this very press included, and
   // running the effect again there sent the vote a second time. The press
-  // changes only when the room, the round or the phase does, which is
+  // changes only when the harbor, the round or the phase does, which is
   // exactly when this effect should look again.
   const revealedRound = audit.reveal?.round;
   const { markReady } = phaseSync;
@@ -250,14 +250,14 @@ export function Parley({
         />
       )}
 
-      {/* [H7: Maroon and the Harbormaster] The console sits above the fold
+      {/* The console sits above the fold
           because it belongs to one captain and it is the reason this
           screen is open for them: everything under it is the table's
           business, and this is theirs. It renders nothing at all for a
           captain the harbor has not put ashore. */}
       <HarbormasterConsole game={game} maroon={maroon} />
 
-      {/* [H6: the Manifest Audit, H7: Maroon, F5: public offers] The
+      {/* The
           harbor's business, behind one fold: the two votes and the
           fleet's ledger are one row rather than up to three panels, two
           of them folds of their own, between the strip and the board.
@@ -267,7 +267,7 @@ export function Parley({
           outcome) and each stays inside this fold until its window has
           passed the voyage by, so a mode's headline mechanic is still
           explained to the first captain who opens the row. The ledger is
-          the plan's evaluation surface, where the table argues about
+          the design's evaluation surface, where the table argues about
           what each seat passed on, so it sits where the argument happens
           rather than where the picks were made, and it draws nothing at
           all until a first pick lands. */}
@@ -423,26 +423,26 @@ export function Parley({
           </HuePanel>
 
           {barter.error && (
-            <PhaseError
+            <Notice
               message={barter.error}
               onDismiss={barter.clearError}
               className="mb-4"
+              size="sm"
             />
           )}
         </>
       ) : (
         <>
-          {/* [D3: Convoy: the Escort Contract] The protection market, the
+          {/* The protection market, the
               other thing sold at this table, on the same terms the
-              exchange sells on: a price agreed in the open, and one leg
+              exchange sells on: a price agreed in the open, and one round
               of it. It draws nothing at all in a build with the switch
               off. */}
           <EscortMarket game={game} escort={escort} me={me} members={members} />
 
-          {/* [F3: modules in the shipyard ladder, and trading them between
-              captains] The module market, on the same terms as the two
+          {/* The module market, on the same terms as the two
               above it, a price agreed in the open, for a card rather
-              than a leg of cover. It draws nothing at all in a build
+              than a round of cover. It draws nothing at all in a build
               with the switch off. */}
           <ModuleMarket
             game={game}
@@ -451,7 +451,7 @@ export function Parley({
             members={members}
           />
 
-          {/* [D5: Aroma: the Bazaar Rumor] The desk, the third of the
+          {/* The desk, the third of the
               port's trades. It draws nothing at all in a build with the
               switch off, and a captain who holds no path of their own
               still reads the board below the desk. */}

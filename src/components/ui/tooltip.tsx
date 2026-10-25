@@ -36,7 +36,7 @@ function TooltipTrigger({
 
 // A panel floats over every surface in the app, so it paints a pair of its
 // own and derives the muted text inside it from that same pair. The page's
-// muted-foreground is the wrong colour for a panel: against the panel it
+// muted-foreground is the wrong color for a panel: against the panel it
 // measures about 1.2:1 in either theme, which is what made the secondary
 // lines of a hover unreadable. Deriving it here rather than at each call
 // site means no later tooltip can miss it.

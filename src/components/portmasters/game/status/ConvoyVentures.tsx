@@ -17,9 +17,9 @@ import type { GameState } from "@/lib/game/types";
 import { useConvoy } from "@/lib/use-convoy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X } from "lucide-react";
+import { Notice, PanelLabel } from "../../shared";
 
-// [MANIFEST 04: Convoy Ventures] Lives in the Dues tab, right beside
+// Lives in the Dues tab, right beside
 // Outstanding Loans, since both are peer to peer Gold commitments a captain
 // is tracking against the rest of the harbor.
 export function ConvoyVentures({
@@ -81,26 +81,23 @@ export function ConvoyVentures({
 
   return (
     <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">
-      <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
+      <PanelLabel tone="text-muted-foreground" className="mb-1">
         {t("━━ Ventures ━━")}
-      </div>
+      </PanelLabel>
 
       {/* The refusal is about one press, so it is handed back on request
           rather than left standing over the board until the next press
-          replaces it (see the hook's clearError). */}
+          replaces it (see the hook's clearError). It is the shared notice
+          rather than a box of this panel's own, which is what its sibling
+          in this rail already draws, so a refusal reads the same wherever
+          in the rail it lands. */}
       {convoy.error && (
-        <div className="mb-1.5 flex items-start gap-1.5 rounded bg-alarm/5 px-2 py-1 text-[10px] text-alarm">
-          <p className="flex-1">{convoy.error}</p>
-          <button
-            type="button"
-            onClick={convoy.clearError}
-            className="-mr-0.5 shrink-0 rounded-full p-0.5 transition-colors hover:bg-alarm/10"
-            title={t("Dismiss")}
-            aria-label={t("Dismiss")}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
+        <Notice
+          message={convoy.error}
+          onDismiss={convoy.clearError}
+          className="mb-1.5"
+          size="sm"
+        />
       )}
 
       {convoy.locked ? (
@@ -117,10 +114,14 @@ export function ConvoyVentures({
         <>
           <div className="mb-2 flex items-end gap-1.5">
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground">
+              <label
+                htmlFor="venture-target"
+                className="mb-0.5 block text-[9px] text-muted-foreground"
+              >
                 {t("Target Gold")}
               </label>
               <Input
+                id="venture-target"
                 type="number"
                 min={CONVOY_VENTURE_MIN_TARGET}
                 max={CONVOY_VENTURE_MAX_TARGET}
@@ -133,10 +134,14 @@ export function ConvoyVentures({
               />
             </div>
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground">
+              <label
+                htmlFor="venture-rounds"
+                className="mb-0.5 block text-[9px] text-muted-foreground"
+              >
                 {t("Rounds to fill")}
               </label>
               <Input
+                id="venture-rounds"
                 type="number"
                 min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
                 max={maxRoundsAhead}

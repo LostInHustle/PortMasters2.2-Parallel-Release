@@ -3,21 +3,22 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { lapPhases } from "@/lib/game/checkpoint";
-import { isLegPhase, phaseFace } from "@/lib/game/phases";
+import { t } from "@/lib/game/i18n";
+import { isRoundPhase, phaseFace } from "@/lib/game/phases";
 import { leftTheVoyage } from "@/lib/seatMarks";
 import type { GameMode } from "@/lib/game/mode";
-import type { LegPhase, Phase } from "@/lib/game/types";
+import type { RoundPhase, Phase } from "@/lib/game/types";
 
 /**
- * The phase strip of the rail: the steps of the leg, with the one the
- * room is standing on lit.
+ * The phase strip of the rail: the steps of the round, with the one the
+ * harbor is standing on lit.
  *
  * The phases cycle, and where they cycle TO is not written here. The
- * order is the room's mode (see src/lib/game/mode.ts), the same lap the
+ * order is the harbor's mode (see src/lib/game/mode.ts), the same lap the
  * ready check and the engine walk, because the two modes run these same
  * phases in a different order. A copy of the order kept here instead
  * would be invisible in the one place it matters: a captain mid round
- * on the experimental leg would see the rail point at the phase they
+ * on the experimental round would see the rail point at the phase they
  * had already finished while nothing in the engine was wrong, only the
  * picture of it.
  *
@@ -26,25 +27,25 @@ import type { LegPhase, Phase } from "@/lib/game/types";
  * the steps alone.
  *
  * The names and glyphs come from the phase's own face rather than from a
- * table here ([B1]: one face per phase, so the rail, the dispatcher and
- * a mode's briefing chart cannot disagree about what a phase is called
- * or drawn as). What is left here is the drawing.
+ * table here: one face per phase, so the rail, the dispatcher and a
+ * mode's briefing chart cannot disagree about what a phase is called or
+ * drawn as. What is left here is the drawing.
  *
  * Personal sub states (module_draft, module_swap) and terminals
  * (bankruptcy, endgame) are folded into their parent step for the
- * timeline display, since they never become room checkpoints.
+ * timeline display, since they never become harbor checkpoints.
  */
 
 // Which step of the rail a captain is standing on.
 //
-// A phase of the leg is its own step. The shipyard's two sub states are work
+// A phase of the round is its own step. The shipyard's two sub states are work
 // done inside Dusk, which is why they fold there rather than drawing a step
-// of their own for something the room is not waiting on. The pier is not a
-// step of the leg at all, and the two terminals have left the leg behind:
+// of their own for something the harbor is not waiting on. The pier is not a
+// step of the round at all, and the two terminals have left the round behind:
 // both answer null, which the rail draws as "no step is lit" (and, for the
 // terminals, as the closing banner instead of the strip).
-function railStep(phase: Phase): LegPhase | null {
-  if (isLegPhase(phase)) return phase;
+function railStep(phase: Phase): RoundPhase | null {
+  if (isRoundPhase(phase)) return phase;
   switch (phase) {
     case "module_draft":
     case "module_swap":
@@ -63,12 +64,12 @@ export function VoyageTimeline({
   mode: GameMode;
   className?: string;
 }) {
-  // The lap, minus the pier: the rail draws the steps of the leg, and the
+  // The lap, minus the pier: the rail draws the steps of the round, and the
   // harbor is where a voyage waits rather than a step anybody takes. Read
-  // off the leg flag on each phase's face rather than off a second list of
-  // exclusions, so a phase that stops being leg work stops being drawn.
+  // off the round flag on each phase's face rather than off a second list of
+  // exclusions, so a phase that stops being round work stops being drawn.
   const steps = lapPhases(mode)
-    .filter((phase) => isLegPhase(phase))
+    .filter((phase) => isRoundPhase(phase))
     .map((phase) => ({ phase, ...phaseFace(phase) }));
   const currentKey = railStep(phase);
   const currentIndex = steps.findIndex((p) => p.phase === currentKey);
@@ -118,7 +119,7 @@ export function VoyageTimeline({
                     repeat: isCurrent ? Infinity : 0,
                     ease: "easeInOut",
                   }}
-                  title={p.label}
+                  title={t(p.label)}
                 >
                   <span className="text-sm">{p.icon}</span>
                 </motion.div>
@@ -130,7 +131,7 @@ export function VoyageTimeline({
                       : "text-muted-foreground",
                   )}
                 >
-                  {p.short}
+                  {t(p.short)}
                 </span>
               </div>
             );
@@ -146,7 +147,7 @@ export function VoyageTimeline({
             phase === "bankruptcy" ? "bg-alarm/5 text-alarm" : "pm-grad-voyage",
           )}
         >
-          {terminalFace.icon} {terminalFace.label}
+          {terminalFace.icon} {t(terminalFace.label)}
         </div>
       )}
     </div>

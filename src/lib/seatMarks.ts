@@ -2,7 +2,7 @@
 // The marks a failed voyage leaves on a seat, and the questions the two
 // ends of the wire ask about them.
 //
-// Three panels read a captain's marks off the room's live status: the
+// Three panels read a captain's marks off the harbor's live status: the
 // roster, the fleet ticker, and the maroon vote's list of who may be put
 // ashore. Each of them used to spell the rule out for itself, which is
 // how the ticker and the roster came to disagree with each other the
@@ -42,7 +42,7 @@
 //                  without ending their voyage (see
 //                  modeConfig.bankruptcyIsFinal in @/lib/game/mode).
 //
-// Read through the roster as well: the room stops counting a seat that
+// Read through the roster as well: the harbor stops counting a seat that
 // leftTheVoyage, and keeps counting one that is merely written off (see
 // activeRosterSet in src/server/realtime/checkpoint, and
 // readFinishedCaptains in src/server/realtime/conclusion/voyage for the
@@ -60,10 +60,6 @@ type SeatMarks = {
   bankrupt: boolean;
   // Put ashore by a vote of the harbor, and still sailing.
   marooned: boolean;
-  // Neither may be named in the maroon vote: what the two marks share
-  // is that the voyage is over for them as a race, while every other
-  // part of the seat stays.
-  writtenOff: boolean;
 };
 
 // A majority of the harbor voted this seat ashore. The flag is the only
@@ -74,7 +70,7 @@ function maroonedMark(status: SeatStatus | undefined): boolean {
 }
 
 // The voyage wrote this seat off as bankrupt, by either signal the two
-// modes use. Both are read rather than whichever one this room's mode
+// modes use. Both are read rather than whichever one this harbor's mode
 // writes, for the reason both ends of the wire already read them: a
 // status from a client older than the flag carries the phase and nothing
 // else, and a reader that took only the flag would let that captain be
@@ -102,7 +98,5 @@ export function leftTheVoyage(status: SeatStatus | undefined): boolean {
 }
 
 export function seatMarks(status: SeatStatus | undefined): SeatMarks {
-  const bankrupt = bankruptMark(status);
-  const marooned = maroonedMark(status);
-  return { bankrupt, marooned, writtenOff: bankrupt || marooned };
+  return { bankrupt: bankruptMark(status), marooned: maroonedMark(status) };
 }

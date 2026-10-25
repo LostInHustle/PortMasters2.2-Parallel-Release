@@ -1,4 +1,5 @@
 import {
+  DIFFICULTIES,
   difficultyConfig,
   mandateRounds,
   type Difficulty,
@@ -6,7 +7,7 @@ import {
 } from "../difficulty";
 // The two pieces of copy below state how long the voyage runs, and that is
 // the mode's number rather than the tier's alone: a mode whose length is
-// pinned sails the same legs on every tier (see voyageLegs in ./mode), so
+// pinned sails the same rounds on every tier (see voyageRounds in ./mode), so
 // the tier's ladder would have the guide quoting a voyage the captain is
 // not sailing. Read through the one selector, which returns the tier's own
 // ladder for the founding mode and so leaves its copy byte for byte what it
@@ -16,9 +17,15 @@ import {
 // record itself: its badge, its tagline, its round, the rule for a failed
 // seat and the list of what it changes. Copy about a mode is only safe
 // beside the mode, so it lives in ./mode and these surfaces render it.
-import { modeConfig, MODES, voyageRoundsFor, type GameMode } from "../mode";
+import {
+  modeConfig,
+  MODES,
+  voyageRoundsFor,
+  type GameMode,
+  type BriefingPhase,
+} from "../mode";
 // The phase faces are what a round is called and drawn with, and they are
-// read here rather than typed: the record names a leg by its phase, and the
+// read here rather than typed: the record names a round by its phase, and the
 // name a captain reads is the face's rather than the mode's. One import and
 // nothing back, since ./phases reads nothing but the phase types.
 import { phaseFace } from "../phases";
@@ -50,7 +57,7 @@ import { getLocale, listJoiner, t, tFor, type Locale } from "@/lib/game/i18n";
 
 // =====================================================================
 // Player facing copy. The wording is preserved from the original game; the
-// numbers are not baked in any more, because they now depend on the room's
+// numbers are not baked in any more, because they now depend on the harbor's
 // difficulty tier (see ./difficulty). Every figure a captain could act on
 // (voyage length, raid odds, escort fee, mandate rounds) is derived from the
 // tier's config, so the guide can never quote a number the engine doesn't use.
@@ -61,7 +68,7 @@ import { getLocale, listJoiner, t, tFor, type Locale } from "@/lib/game/i18n";
 // the one every surface quotes: a second copy of a string that answers a
 // press is a second answer to what the press did.
 export const HOST_ONLY_RESTART = "Only the host can restart the voyage.";
-export const STALE_OFFER = "That offer belongs to an earlier leg.";
+export const STALE_OFFER = "That offer belongs to an earlier round.";
 // The two refusals the priced wires share when a press arrives against a
 // board that moved: the offer has gone, or it was aimed at another captain.
 // One sentence each, because four copies of one refusal are four chances
@@ -70,17 +77,17 @@ export const OFFER_ALREADY_GONE = "That offer has already gone.";
 export const OFFER_FOR_ANOTHER_CAPTAIN =
   "That offer was addressed to another captain.";
 // The two busy refusals the consent markets share between their wires and
-// their panels: the seller already at the bench this leg, and the buyer
+// their panels: the seller already at the bench this round, and the buyer
 // already under cover. One sentence each, because a panel and a wire
 // teaching two phrasings of one rule is how a table learns to distrust
 // the pair.
 export const REFIT_ALREADY_TAKEN =
-  "That captain has already taken on a refit this leg.";
-export const LEG_ALREADY_COVERED = "You are already covered for this leg.";
-// The refusal both doors into a room answer with, the socket's join
+  "That captain has already taken on a refit this round.";
+export const ROUND_ALREADY_COVERED = "You are already covered for this round.";
+// The refusal both doors into a harbor answer with, the socket's join
 // handler and the REST save route: one sentence, so a stranger knocking
 // at either door hears the same thing.
-export const NOT_A_ROOM_MEMBER = "Not a member of that room";
+export const NOT_A_HARBOR_MEMBER = "Not a member of that harbor";
 // The barter rule both composing surfaces state before a post, the trade
 // form on the boards and the one on a chat: the good offered and the good
 // asked for cannot be the same.
@@ -112,14 +119,14 @@ export const MUTED_NOTICE =
   "The host has muted you in the harbor chat for the rest of this voyage.";
 // The departure button's label, shared by the control bar and the harbor
 // screen's own start button: two spellings of one action on two screens of
-// one room is how a table learns to distrust the pair. The solo labels
+// one harbor is how a table learns to distrust the pair. The solo labels
 // stay distinct on purpose, because a harbor of one is practicing rather
 // than racing, and both screens say so.
 export const START_VOYAGE = "Start the Voyage";
 export const RENOWN_BONUS_LINE =
   "Each Renown level grants a small Gold bonus at the start of your next fresh voyage";
 // The refusal a wire answers when the captain it was aimed at is not
-// visible to the room. The two chat handlers and the four trading wires
+// visible to the harbor. The two chat handlers and the four trading wires
 // all say this one sentence, spelled the long way on purpose: the smoke
 // run asserts it word for word, so the shorter form the wires drifted
 // into is the one that left.
@@ -196,6 +203,41 @@ function escortPct(cfg: DifficultyConfig): string {
 type TutorialStep = { title: string; content: string };
 
 /**
+ * One round of a mode's briefing, read: the phase's own face, and the two
+ * lines the mode says about it.
+ *
+ * The tutorial charts the round and the guide prints it, and both read the
+ * same round, so the reading lives here rather than in each of them. A mode
+ * that changes what it says about a phase changes it in one place, and
+ * the chart and the guide cannot end up describing the same phase two ways.
+ *
+ * The words are read here rather than at each use, because the guide and
+ * the tutorial are read at the moment they are drawn and the mode's own
+ * words are read the same way: what a captain sees is what the record
+ * says, in the language they are reading in.
+ */
+type BriefingStep = {
+  phase: string;
+  icon: string;
+  label: string;
+  body: string;
+  setsUp: string;
+};
+
+function briefingSteps(phases: readonly BriefingPhase[]): BriefingStep[] {
+  return phases.map((phase) => {
+    const face = phaseFace(phase.phase);
+    return {
+      phase: phase.phase,
+      icon: face.icon,
+      label: t(face.label),
+      body: t(phase.body),
+      setsUp: t(phase.setsUp),
+    };
+  });
+}
+
+/**
  * One round, as the tutorial renders it: the mode's own briefing, in the
  * shape the mode chose to brief in.
  *
@@ -204,8 +246,8 @@ type TutorialStep = { title: string; content: string };
  * copy of the lap for every mode that might move it.
  *
  * The accent is the phase's own CSS variable, named after the phase, which
- * is the pairing the palette already holds for all six of them, so a leg
- * added to a chart is drawn in its own colour without a table of them
+ * is the pairing the palette already holds for all six of them, so a round
+ * added to a chart is drawn in its own color without a table of them
  * living here. Classic's line keeps the accent its cards wore.
  */
 function roundStepHtml(mode: GameMode): string {
@@ -216,24 +258,23 @@ function roundStepHtml(mode: GameMode): string {
       { "briefing.text": t(briefing.text) },
     );
   }
-  const legs = briefing.legs
-    .map((leg) => {
-      const face = phaseFace(leg.phase);
+  const steps = briefingSteps(briefing.phases)
+    .map((step) => {
       return `  ${t(
-        '<div style="background:color-mix(in oklch, var(--w-{leg.phase}) 12%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-{leg.phase});color:var(--foreground)">\n    <strong>{face.icon} {face.label}</strong><br>\n    <span style="font-size:13px">{leg.body}</span><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{leg.setsUp}</span>\n  </div>',
+        '<div style="background:color-mix(in oklch, var(--w-{step.phase}) 12%, transparent);border-radius:6px;padding:10px;border-left:3px solid var(--w-{step.phase});color:var(--foreground)">\n    <strong>{face.icon} {face.label}</strong><br>\n    <span style="font-size:13px">{step.body}</span><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{step.setsUp}</span>\n  </div>',
         {
-          "leg.phase": leg.phase,
-          "face.icon": face.icon,
-          "face.label": t(face.label),
-          "leg.body": t(leg.body),
-          "leg.setsUp": t(leg.setsUp),
+          "step.phase": step.phase,
+          "face.icon": step.icon,
+          "face.label": step.label,
+          "step.body": step.body,
+          "step.setsUp": step.setsUp,
         },
       )}`;
     })
     .join("\n");
   return t(
-    '<div style="display:grid;gap:8px;margin:12px 0">\n{legs}\n</div>\n<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0">{briefing.closes}</p>',
-    { legs, "briefing.closes": t(briefing.closes) },
+    '<div style="display:grid;gap:8px;margin:12px 0">\n{steps}\n</div>\n<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0">{briefing.closes}</p>',
+    { steps, "briefing.closes": t(briefing.closes) },
   );
 }
 
@@ -244,17 +285,16 @@ function roundStepHtml(mode: GameMode): string {
  * both say the same thing about the round because both read it from the
  * record: a mode that moves a phase moves both, and neither can be left
  * describing the lap of the other mode. The chart keeps its two lines per
- * leg here, where there is room for them, and a mode that briefs in one
+ * round here, where there is room for them, and a mode that briefs in one
  * sentence prints the sentence, which is the shape that mode chose.
  */
 function roundLines(mode: GameMode): string {
   const { briefing } = modeConfig(mode);
   if (briefing.kind === "line") return t(briefing.text);
-  const legs = briefing.legs.map((leg) => {
-    const face = phaseFace(leg.phase);
-    return `• ${face.icon} ${t(face.label)}: ${t(leg.body)}\n  ${t(leg.setsUp)}`;
-  });
-  return [...legs, t(briefing.closes)].join("\n");
+  const steps = briefingSteps(briefing.phases).map(
+    (step) => `• ${step.icon} ${step.label}: ${step.body}\n  ${step.setsUp}`,
+  );
+  return [...steps, t(briefing.closes)].join("\n");
 }
 
 /**
@@ -334,13 +374,18 @@ export function tutorialSteps(
 ): TutorialStep[] {
   const cfg = difficultyConfig(difficulty);
   const rounds = voyageRoundsFor(mode, difficulty);
-  const mandates = mandateRounds(cfg);
+  // The tier's schedule is written against Classic's ladder. A mode that
+  // shortens the voyage keeps only the mandates it will actually reach:
+  // Ocean Gambit runs twelve rounds, so Monsoon's round sixteen mandate
+  // never fires there, and a guide naming it would promise a commission
+  // the voyage ends before.
+  const mandates = mandateRounds(cfg).filter((round) => round <= rounds);
   const play = modeConfig(mode);
   return [
     {
       title: t("⚓ Welcome aboard"),
       content: t(
-        '<p>{APP_NAME} puts you on the ancient Silk Road: one voyage of {rounds} rounds, limited gold, and a lot of merchants trying to outmaneuver you at every port.</p>\n<p>You are sailing <strong>{play.badge}</strong>: {play.tagline}</p>\n<p>These waters are <strong>{cfg.name}</strong>: {cfg.tagline}</p>\n<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the things that catch new captains out most.</p>\n<p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>',
+        '<p>{APP_NAME} puts you on the ancient Silk Road: one voyage of {rounds} rounds, limited Gold, and a lot of merchants trying to outmaneuver you at every port.</p>\n<p>You are sailing <strong>{play.badge}</strong>: {play.tagline}</p>\n<p>These waters are <strong>{cfg.name}</strong>: {cfg.tagline}</p>\n<p>The rules are easy to pick up, but money is tight early on and a string of bad calls compounds quickly. This covers the things that catch new captains out most.</p>\n<p style="color:var(--muted-foreground);font-size:13px">Two minutes to read. Saves a lot of frustrated restarts.</p>',
         {
           APP_NAME,
           rounds,
@@ -354,7 +399,7 @@ export function tutorialSteps(
     {
       title: t("🏆 What you're playing for"),
       content: t(
-        "<p>After {rounds} rounds, the captain with the highest Reputation wins the title of <strong>Sea Master</strong>. Reputation comes from trade profits and fulfilled orders.</p>\n<p>{play.failureRule}</p>\n<p>Starting gold is <strong>{cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>",
+        "<p>After {rounds} rounds, the captain with the highest Reputation wins the title of <strong>Sea Master</strong>. Reputation comes from trade profits and fulfilled orders.</p>\n<p>{play.failureRule}</p>\n<p>Starting Gold is <strong>{cfg.startingGold}</strong>. That is enough to get going, but not enough to be careless with.</p>",
         {
           rounds,
           "play.failureRule": t(play.failureRule),
@@ -365,7 +410,7 @@ export function tutorialSteps(
     {
       title: t("🔄 How a round runs"),
       content: t(
-        '<p>A round is one lap of the voyage, and this voyage runs {rounds} of them. Each round walks the phases below in the order your voyage puts them:</p>\n{roundSteps}\n<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> readies you for the next phase without clicking (the room sails on once every captain is ready), and a voyage is one whole run of these rounds rather than a round of its own.</p>',
+        '<p>A round is one lap of the voyage, and this voyage runs {rounds} of them. Each round walks the phases below in the order your voyage puts them:</p>\n{roundSteps}\n<p style="font-size:12px;color:var(--muted-foreground);margin:4px 0 0"><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+N</kbd> readies you for the next phase without clicking (the harbor sails on once every captain is ready), and a voyage is one whole run of these rounds rather than a round of its own.</p>',
         { rounds, roundSteps: roundStepHtml(mode) },
       ),
     },
@@ -376,7 +421,7 @@ export function tutorialSteps(
     {
       title: t("🏪 Market: Buying"),
       content: t(
-        '<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain\'s rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>',
+        '<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain\'s rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand whisper and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>',
       ),
     },
     {
@@ -393,7 +438,7 @@ export function tutorialSteps(
       title: t("📋 Orders: Filling trade orders"),
       content:
         t(
-          '<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the shipping fee. Your take is whatever is left after fees and tax.</p>\n<p>You can fill as many orders as your cargo allows while Orders is open.</p>\n<div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  📌 <strong>Finished goods</strong> ({tier0List}) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.\n</div>\n',
+          '<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the freight cost. Your take is whatever is left after fees and tax.</p>\n<p>You can fill as many orders as your cargo allows while Orders is open.</p>\n<div style="background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  📌 <strong>Finished goods</strong> ({tier0List}) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.\n</div>\n',
           {
             tier0List: PRODUCTS_TIER0.map((x) => t(x)).join(listJoiner()),
           },
@@ -411,7 +456,7 @@ export function tutorialSteps(
     {
       title: t("⚠️ The artisan trap"),
       content: t(
-        '<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new captains is this:</p>\n<div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">\n  Assign a task this round.<br>Wages come due at Resolve either way.\n</div>\n<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers ({weaverWage}g), Master Weavers ({masterWage}g), and Sachet Makers ({sachetWage}g) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough gold to cover at least two rounds of wages alongside your other bills.</p>',
+        '<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new captains is this:</p>\n<div style="background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7">\n  Assign a task this round.<br>Wages come due at Resolve either way.\n</div>\n<p style="font-size:13px;color:var(--muted-foreground);line-height:1.6">Weavers ({weaverWage} Gold), Master Weavers ({masterWage} Gold), and Sachet Makers ({sachetWage} Gold) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough Gold to cover at least two rounds of wages alongside your other bills.</p>',
         {
           weaverWage: wageOf("weaver"),
           masterWage: wageOf("master"),
@@ -427,24 +472,29 @@ export function tutorialSteps(
           { raidKind: raidCopy(cfg), escortShare: escortPct(cfg) },
         ) +
         (cfg.brokerCorruption
-          ? `<p>${t("In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.")}</p>`
+          ? `<p>${t("In these waters a broker can be corrupt. The whisper you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.")}</p>`
           : "") +
         t(
-          '\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 {ESCORT_SHARE_RULE} Often worth it once your funds are already thin.\n</div>',
+          '\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 {ESCORT_SHARE_RULE} Often worth it once your Gold is already low.\n</div>',
           { ESCORT_SHARE_RULE: t(ESCORT_SHARE_RULE) },
         ),
     },
     {
       title: t("Resolve: Settlement"),
       content: t(
-        '<p>Once the pirates are dealt with, two bills come due:</p>\n<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">\n  <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">🔧</div>\n    <strong>Ship Maintenance</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">15 to 22 Gold each round, set by the waters you sail</span>\n  </div>\n  <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Dues</strong> tab of your captain\'s rail shows exactly what is owed. Check it before spending anything.</p>\n<p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn\'t the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they\'ve got the Gold to spare. Just repay it before the voyage\'s last round ends, or it comes out of your funds automatically and goes straight to them.</p>',
-        { ARTISAN_WAGE_MIN, ARTISAN_WAGE_MAX },
+        '<p>Once the pirates are dealt with, two bills come due:</p>\n<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">\n  <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">🔧</div>\n    <strong>Ship Maintenance Fee</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{MAINTENANCE_MIN} to {MAINTENANCE_MAX} Gold each round, set by the waters you sail</span>\n  </div>\n  <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Dues</strong> tab of your captain\'s rail shows exactly what is owed. Check it before spending anything.</p>\n<p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn\'t the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they\'ve got the Gold to spare. Just repay it before the voyage\'s last round ends, or it comes out of your Gold automatically and goes straight to them.</p>',
+        {
+          ARTISAN_WAGE_MIN,
+          ARTISAN_WAGE_MAX,
+          MAINTENANCE_MIN,
+          MAINTENANCE_MAX,
+        },
       ),
     },
     {
       title: t("🚢 You are ready"),
       content: t(
-        '<p>Keep these points in mind as you play:</p>\n<ul style="padding-left:18px;line-height:2.1;font-size:14px">\n  <li>Start with raw material orders. Fast money, no complications.</li>\n  <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>\n  <li>Hire artisans only when you can cover <strong>two full rounds of wages</strong>.</li>\n  <li>Dusk ship upgrades compound quickly. Do not skip them.</li>\n  <li>Caught short by pirates or a bad round? When other captains are aboard, ask the harbor for a loan before you assume the voyage is over.</li>\n  <li>Every voyage\'s final Reputation becomes Renown on your account, forever, win or lose. Check your Captain\'s Legacy any time from the Lobby.</li>\n  <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your voyage &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>\n</ul>\n<div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border:2px solid var(--gain);color:var(--foreground);border-radius:8px;padding:12px;text-align:center;margin-top:14px">\n  <strong style="font-size:15px">Good winds and good margins, Captain. ⚓</strong>\n</div>',
+        '<p>Keep these points in mind as you play:</p>\n<ul style="padding-left:18px;line-height:2.1;font-size:14px">\n  <li>Start with raw material orders. Fast money, no complications.</li>\n  <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>\n  <li>Hire artisans only when you can cover <strong>two full rounds of wages</strong>.</li>\n  <li>Dusk hull upgrades compound quickly. Do not skip them.</li>\n  <li>Caught short by pirates or a bad round? When other captains are aboard, ask the harbor for a loan before you assume the voyage is over.</li>\n  <li>Every voyage\'s final Reputation becomes Renown on your account, forever, win or lose. Check your Captain\'s Legacy any time from the Lobby.</li>\n  <li><kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">Ctrl+S</kbd> saves your voyage &nbsp;·&nbsp; <kbd style="background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px">F1</kbd> opens the full guide.</li>\n</ul>\n<div style="background:color-mix(in oklch, var(--gain) 14%, transparent);border:2px solid var(--gain);color:var(--foreground);border-radius:8px;padding:12px;text-align:center;margin-top:14px">\n  <strong style="font-size:15px">Good winds and good margins, Captain. ⚓</strong>\n</div>',
       ),
     },
   ];
@@ -464,6 +514,16 @@ const wageOf = (id: string): number =>
 // with it rather than leaving a last fortnight's figure in a sentence.
 const ARTISAN_WAGE_MIN = Math.min(...WORKER_TYPES.map((w) => w.wage));
 const ARTISAN_WAGE_MAX = Math.max(...WORKER_TYPES.map((w) => w.wage));
+// The maintenance range the same card prints, read off the tier table the
+// Resolve bill charges from. The two ends are the gentlest and harshest
+// waters, so a retuned bill moves the card rather than leaving a figure
+// from a previous balance pass in the guide.
+const MAINTENANCE_MIN = Math.min(
+  ...Object.values(DIFFICULTIES).map((d) => d.maintenance),
+);
+const MAINTENANCE_MAX = Math.max(
+  ...Object.values(DIFFICULTIES).map((d) => d.maintenance),
+);
 const workerLine = (id: string, makes: string): string => {
   const w = WORKER_TYPES.find((x) => x.id === id);
   return t("• {workerLabel} ({workerWage} Gold/Round): Makes {makes}", {
@@ -533,7 +593,11 @@ function shortcutLines(): string {
 export function guideText(mode: GameMode, difficulty: Difficulty): string {
   const cfg = difficultyConfig(difficulty);
   const rounds = voyageRoundsFor(mode, difficulty);
-  const mandates = mandateRounds(cfg);
+  // Only the mandates this voyage reaches, for the reason the tutorial's
+  // own list gives (see tutorialSteps above): the tier's schedule is
+  // written against Classic's ladder, and Ocean Gambit's twelve rounds end
+  // before Monsoon's last entry.
+  const mandates = mandateRounds(cfg).filter((round) => round <= rounds);
   const play = modeConfig(mode);
   // The mode's own list, printed only by a mode that has one, which is
   // what its empty array says: the founding voyage differs from itself
@@ -574,7 +638,7 @@ ${t("Finished Goods: {productPrices}", {
   productPrices: priceRangeLine(PRODUCTS_TIER0),
 })}
 
-${t("👥 Worker System:")}
+${t("👥 Artisan System:")}
 ${workerLine("weaver", "Linen or Cotton Clothes")}
 ${workerLine("master", "Linen, Cotton or Brocade")}
 ${workerLine("sachet_maker", "Sachets")}
@@ -591,14 +655,14 @@ ${t(
 )}
 
 ${t("🔮 Broker's Whisper:")}
-${t('• Market: Click "Broker\'s Rumor Board" to open the window')}
-${t('• Spend {INTEL_COST} Gold to buy a "rumor" about Orders demand', {
+${t('• Market: Click "Broker\'s Whisper Board" to open the window')}
+${t("• Spend {INTEL_COST} Gold to buy a Broker's Whisper about Orders demand", {
   INTEL_COST,
 })}
-${t("• Revealed intel guarantees matching orders will appear")}
-${t("• A rumor is always true and always delivered, on every tier")}${
+${t("• Each revealed whisper guarantees a matching order will appear")}
+${t("• A whisper is always true and always delivered, on every tier")}${
     cfg.brokerCorruption
-      ? `\n${t("• Here a broker may still be corrupt: you get the true rumor, but your position leaks and this round's raid risk rises, and the log tells you when")}`
+      ? `\n${t("• Here a broker may still be corrupt: you get the true whisper, but your position leaks and this round's raid risk rises, and the log tells you when")}`
       : ""
   }
 
@@ -609,8 +673,8 @@ ${t("• An offer can't be an item for itself, and both amounts must be whole nu
 ${t("• You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it")}
 ${t('• Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it')}
 
-${t("🔧 Ship Modules:")}
-${t("• Dusk: Upgrade your ship to unlock Module Slots")}
+${t("🔧 Modules:")}
+${t("• Dusk: Upgrade your hull to unlock Module Slots")}
 ${t("• Draft powerful modules to create unique synergies")}
 ${t("• Swap modules to adapt to your current voyage!")}
 
@@ -676,9 +740,9 @@ ${t(
 ${t("🆘 Financial Aid:")}
 ${t("• Can't cover this round's wages or maintenance? When other captains are aboard, ask the harbor for a loan, right on the settlement screen")}
 ${t("• Any captain with enough Gold can lend it to you on the spot; it's in your hands immediately")}
-${t("• Repay it any time before the voyage's last round ends, or it's taken from your funds automatically and handed to your lender")}
+${t("• Repay it any time before the voyage's last round ends, or it's taken from your Gold automatically and handed to your lender")}
 ${t("• Still short when the voyage finishes? That unpaid loan is what bankrupts you, not the round it was borrowed in")}
-${t("• Lending Gold raises your own reputation, scaled to how much you lent")}
+${t("• Lending Gold raises your own Reputation, scaled to how much you lent")}
 
 ${t("🛡️ Backing:")}
 ${t("• Every outstanding loan in your harbor is visible on the settlement screen, to everyone, not just the lender and borrower")}

@@ -1,7 +1,7 @@
 "use client";
 
 // =====================================================================
-// The Direct tab of the room's chat panel: one captain, or the list to
+// The Direct tab of the harbor's chat panel: one captain, or the list to
 // pick one from.
 //
 // It is here rather than inside ChatPanel because it is a switch around
@@ -9,7 +9,7 @@
 // conversation to ChatPanel and puts a header naming that captain above
 // it, and with nobody picked it draws the roster there is to choose from.
 // Both halves are addressed to one captain's own screen, so nothing here
-// ever reaches the room channel.
+// ever reaches the harbor channel.
 // =====================================================================
 
 import type { Socket } from "socket.io-client";

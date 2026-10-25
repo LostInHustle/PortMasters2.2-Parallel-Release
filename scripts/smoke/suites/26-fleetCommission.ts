@@ -31,6 +31,7 @@ import { claimObjectiveRoom } from "@/server/realtime/presence";
 import {
   call,
   check,
+  ledgerSentences,
   openAuthedSocket,
   voyageState,
   waitForEvent,
@@ -39,6 +40,7 @@ import type { WireHistory } from "../wire";
 import type { Server } from "socket.io";
 import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 export async function fleetCommissionSuite(
   run: SmokeRun,
@@ -94,7 +96,7 @@ export async function fleetCommissionSuite(
   // authoring rule, about every captain hearing the same board, and about
   // a doctored report not moving it.
 
-  // ---- The deck, which needs no sockets ----
+  // ========== The deck, which needs no sockets ==========
   const foundingTier = new Set<string>([...RESOURCES_TIER0, ...PRODUCTS_TIER0]);
   const openingHold = Object.values(STARTING_STOCK).reduce(
     (sum, held) => sum + held,
@@ -142,9 +144,9 @@ export async function fleetCommissionSuite(
     "a run of voyages pulls more than one entry off the deck",
   );
 
-  // ---- The board, over the wire ----
+  // ========== The board, over the wire ==========
   // A socket holds one harbor at a time, so the four captains sail back
-  // into the Gambit room to report there. The commission is drawn here
+  // into the Gambit harbor to report there. The commission is drawn here
   // the way both the server and a client draw it, from the harbor and
   // the voyage, which is also what makes the clamp check below a
   // statement about the two of them agreeing.
@@ -269,7 +271,7 @@ export async function fleetCommissionSuite(
         JSON.stringify(["roomId", "total"])
       );
     }),
-    "and every frame of it carries exactly a room and a total, nothing else",
+    "and every frame of it carries exactly a harbor and a total, nothing else",
   );
   const secretPattern = new RegExp(`\\b${secret}\\b`);
   check(
@@ -310,8 +312,8 @@ export async function fleetCommissionSuite(
     "and loads back with the tally and the trace it was given",
   );
 
-  // [J1: the private information review] The save path's one bound,
-  // which exists because a save is read by the harbor rather than only
+  // The save path's one bound, which exists because a save is read by the
+  // harbor rather than only
   // by the captain who wrote it: the conclusion parses every blob at the
   // table and the Manifest Audit samples one of them, so an enormous
   // save is paid for by six captains, on the code path that has to
@@ -388,9 +390,9 @@ export async function fleetCommissionSuite(
   // left, both are paid, and the wire board clamps back to the quota
   // afterwards and hides it: the fleet gives twice for one commission and
   // every screen reads right. The repair is a frame in each direction. A
-  // press asks the room first (objective:handover, carrying the standing
+  // press asks the harbor first (objective:handover, carrying the standing
   // the press would leave this captain on, which is the same payload a
-  // report carries because it is the same number), the room answers that
+  // report carries because it is the same number), the harbor answers that
   // socket alone with what it accepted of it (objective:granted, the
   // accepted standing good by good), and only what came back moves. Both
   // settles inside those answers run in one stretch with nothing awaited,
@@ -459,7 +461,7 @@ export async function fleetCommissionSuite(
       nextCommission.resources.every(
         (r) => (raced.total[r.type] ?? 0) <= r.required,
       ),
-    "and the board the room hears is what those two grants came to, at the quota the commission named and never past it",
+    "and the board the harbor hears is what those two grants came to, at the quota the commission named and never past it",
   );
 
   // The same press sent a second time by the captain whose first one was
@@ -508,7 +510,7 @@ export async function fleetCommissionSuite(
       seated[0].frames.every((frame) => frame.event !== "objective:granted") &&
       seated[3].frames.every((frame) => frame.event !== "objective:granted") &&
       seated[3].frames.some((frame) => frame.event === "objective:progress"),
-    "the answer to a press reaches the socket that pressed and nowhere else: the room, the other tab of the same captain, and the captains who did not press all hear the board move without hearing whose press moved it",
+    "the answer to a press reaches the socket that pressed and nowhere else: the harbor, the other tab of the same captain, and the captains who did not press all hear the board move without hearing whose press moved it",
   );
   check(
     grantedFrames.length > 0 &&
@@ -519,18 +521,18 @@ export async function fleetCommissionSuite(
           JSON.stringify(["granted", "roomId"])
         );
       }),
-    "and every answer carries exactly a room and the rows it granted, nothing else",
+    "and every answer carries exactly a harbor and the rows it granted, nothing else",
   );
   check(
     grantedFrames.every((frame) => !secretPattern.test(frame.text)),
     `and none of them names the ${secret}, on any socket`,
   );
 
-  // ========== The room's own board, driven directly ==========
+  // ========== The harbor's own board, driven directly ==========
   // Two of the claims above cannot be read off a socket at the instant
   // they are made. The first is what the raw lines behind the board hold:
   // the board is one line per captain summed, and the wire only ever
-  // carries the sum. The second is the claim a room's board is held under
+  // carries the sum. The second is the claim a harbor's board is held under
   // while one press settles, which is memory in the server process rather
   // than anything it sends.
   //
@@ -540,7 +542,7 @@ export async function fleetCommissionSuite(
   // The commission is not one of the copies: it is drawn from the harbor,
   // the voyage epoch and the table size, and this process reads the same
   // three values the server does, so the arithmetic below is the
-  // arithmetic the room is running.
+  // arithmetic the harbor is running.
   const quietIo = {
     to: () => ({ emit: () => undefined }),
   } as unknown as Server;
@@ -585,7 +587,7 @@ export async function fleetCommissionSuite(
     nextCommission.resources.every(
       (r) => (rawLines[r.type] ?? 0) <= r.required,
     ),
-    "and the raw lines the room keeps are held to the commission good by good: no captain's line and no sum of them passes the quota",
+    "and the raw lines the harbor keeps are held to the commission good by good: no captain's line and no sum of them passes the quota",
   );
   check(
     nextCommission.resources.every(
@@ -619,10 +621,10 @@ export async function fleetCommissionSuite(
     "and a line that re-reports the standing it already holds moves nothing, by report or by press: one commission is answered once however many frames carry it",
   );
 
-  // And a press that proposes less than the standing the room already holds
-  // for that captain, which is what a client whose own record lags the room
+  // And a press that proposes less than the standing the harbor already holds
+  // for that captain, which is what a client whose own record lags the harbor
   // sends. It is still answered, because a press is answered with the
-  // standing the room accepts and a repeat has to land on the number the
+  // standing the harbor accepts and a repeat has to land on the number the
   // first one set (the check above). What it cannot do is lift a raw line
   // the merge already holds: the acceptance is capped by the standing plus
   // the remaining, and the remaining here is nothing, so the line and the
@@ -638,13 +640,13 @@ export async function fleetCommissionSuite(
       nextCommission.resources.every(
         (r) => (linesNow()[r.type] ?? 0) === (rawLines[r.type] ?? 0),
       ),
-    "a press below the standing the room already holds for that captain is answered but lifts no raw line, so a lagging record cannot move the filled board",
+    "a press below the standing the harbor already holds for that captain is answered but lifts no raw line, so a lagging record cannot move the filled board",
   );
 
   // The claim itself, which a restart waits on before it clears the board
   // for a new voyage (see the room:restart handler). Held for the length
   // of one settle, and read twice: a press that arrives while it is held
-  // waits rather than settling under it, and the room is free again the
+  // waits rather than settling under it, and the harbor is free again the
   // moment the work that held it lets go.
   const releaseClaim = await claimObjectiveRoom(gambitRoomId);
   let settledUnderClaim = false;
@@ -659,7 +661,7 @@ export async function fleetCommissionSuite(
   await new Promise((resolve) => setTimeout(resolve, 200));
   check(
     !settledUnderClaim,
-    "a press that arrives while the room's commission claim is held waits for it rather than settling under it",
+    "a press that arrives while the harbor's commission claim is held waits for it rather than settling under it",
   );
   releaseClaim();
   await waitingOnClaim;
@@ -671,7 +673,7 @@ export async function fleetCommissionSuite(
     "and it settles the moment the claim is let go, finding the board the claim was holding: every quota reached and nothing left for it to take",
   );
 
-  // And the claim is handed back while the room lives, which is the one
+  // And the claim is handed back while the harbor lives, which is the one
   // way a lock like this fails loudly: a claim that was never released
   // leaves every later press waiting for a signal nobody holds. The proof
   // is the next claim being granted rather than waited for.
@@ -681,7 +683,7 @@ export async function fleetCommissionSuite(
   ]);
   check(
     reclaimed !== null,
-    "and every claim above was handed back when its work finished, so the next press in the room is not left standing behind a claim nobody holds",
+    "and every claim above was handed back when its work finished, so the next press in the harbor is not left standing behind a claim nobody holds",
   );
   if (reclaimed) reclaimed();
   // The suite's own copy of the board goes with the drive above, so a
@@ -691,7 +693,7 @@ export async function fleetCommissionSuite(
   // The two halves of the restart guard, which no frame can show: the
   // clear a restart runs is taken under the same claim a press holds, so a
   // line accepted against the dead voyage cannot be seeded into the fresh
-  // board, and both entry points take it before they read the room. Read
+  // board, and both entry points take it before they read the harbor. Read
   // off the files rather than driven, because the restart is a frame on a
   // live socket and the order two frames in one tick settle in is not this
   // suite's to call; 51-charters reads its own wiring the same way.
@@ -716,7 +718,7 @@ export async function fleetCommissionSuite(
   );
   // The client's own half, which is the half the field report was about:
   // the press asks rather than applying itself, and what moves the goods
-  // is the answer the room sent back. A needle rather than a drive for the
+  // is the answer the harbor sent back. A needle rather than a drive for the
   // reason the two above are: the press lives in a React hook, and the
   // suite has no browser to press it in.
   check(
@@ -728,7 +730,7 @@ export async function fleetCommissionSuite(
   // The panel's own half of the same claim, and the half a captain reads:
   // the button is not drawn at all once the fleet has met the commission,
   // and the strip says why in its place, so there is no press left to make
-  // against a board the room would refuse. A needle for the same reason
+  // against a board the harbor would refuse. A needle for the same reason
   // the hook above is one: the panel is React and this suite has no
   // browser to press it in.
   const objectivePanel = readFileSync(
@@ -747,7 +749,7 @@ export async function fleetCommissionSuite(
       objectivePanel.includes(
         "The commission is met, and nothing more is owed.",
       ),
-    "the panel withdraws the button when the commission is met rather than leaving a press the room would refuse",
+    "the panel withdraws the button when the commission is met rather than leaving a press the harbor would refuse",
   );
 
   // ========== Where the commission stops, and what it refuses ==========
@@ -765,7 +767,7 @@ export async function fleetCommissionSuite(
   // drives both. The board is the harbor's acceptance and is driven over
   // two sockets here, one handover each with nothing awaited between the
   // two emits, which is the simultaneous pair. The goods and the Gold move
-  // in the captain's own engine against the board the room last reported,
+  // in the captain's own engine against the board the harbor last reported,
   // and no socket can press another captain's Deliver button, so that half
   // is driven the way 48-theMilestoneBoons drives the same function: the
   // state and the board handed to deliverToObjective directly.
@@ -860,7 +862,7 @@ export async function fleetCommissionSuite(
   );
 
   // The same refusal as a press rather than a report, from the captain the
-  // board owes nothing: the room has nothing left of any good, so what
+  // board owes nothing: the harbor has nothing left of any good, so what
   // comes back is an answer with no rows in it at all, and the goods stay
   // where they are. The engine's half of this, and the sentence a captain
   // reads, are driven below.
@@ -902,7 +904,7 @@ export async function fleetCommissionSuite(
     exactlyCaptain.inventory[r.type] = r.required;
   }
   const exactPurse = exactlyCaptain.money;
-  const exactLogs: string[] = [];
+  const exactLogs: LedgerLine[] = [];
   deliverToObjective(exactlyCaptain, engineObjective, exactLogs, {});
   check(
     engineObjective.resources.every(
@@ -923,7 +925,7 @@ export async function fleetCommissionSuite(
     lateCaptain.inventory[r.type] = spare;
   }
   const latePurse = lateCaptain.money;
-  const lateLogs: string[] = [];
+  const lateLogs: LedgerLine[] = [];
   deliverToObjective(lateCaptain, engineObjective, lateLogs, filledBoard);
   check(
     engineObjective.resources.every(
@@ -931,7 +933,7 @@ export async function fleetCommissionSuite(
     ) &&
       lateCaptain.money === latePurse &&
       Object.keys(lateCaptain.objectiveDelivered).length === 0 &&
-      lateLogs.some((line) =>
+      ledgerSentences(lateLogs).some((line) =>
         line.includes("already filled, and nothing was taken"),
       ),
     `a handover to a commission the fleet has already filled takes nothing: the ${spare} of each good stays in the hold, no Gold is paid, and the captain is told the commission is filled`,
@@ -949,7 +951,7 @@ export async function fleetCommissionSuite(
   const oneLeft: Record<string, number> = { ...filledBoard };
   oneLeft[owedLast.type] = owedLast.required - 1;
   const partialPurse = partialCaptain.money;
-  const partialLogs: string[] = [];
+  const partialLogs: LedgerLine[] = [];
   deliverToObjective(partialCaptain, engineObjective, partialLogs, oneLeft);
   check(
     partialCaptain.objectiveDelivered[owedLast.type] === 1 &&
@@ -958,7 +960,9 @@ export async function fleetCommissionSuite(
       engineObjective.resources
         .filter((r) => r.type !== owedLast.type)
         .every((r) => partialCaptain.inventory[r.type] === r.required) &&
-      partialLogs.some((line) => line.includes(`${owedLast.type}×1`)),
+      ledgerSentences(partialLogs).some((line) =>
+        line.includes(`${owedLast.type}×1`),
+      ),
     `a captain offering ${owedLast.required} ${owedLast.type} where one is still owed has exactly that one taken and is paid for one, and the rest of the hold stays aboard`,
   );
 
@@ -973,10 +977,10 @@ export async function fleetCommissionSuite(
   for (const r of engineObjective.resources) {
     secondCaptain.inventory[r.type] = r.required;
   }
-  const sequentialLogs: string[] = [];
+  const sequentialLogs: LedgerLine[] = [];
   deliverToObjective(secondCaptain, engineObjective, sequentialLogs, oneLeft);
   const afterFirst = secondCaptain.money;
-  const secondLogs: string[] = [];
+  const secondLogs: LedgerLine[] = [];
   deliverToObjective(secondCaptain, engineObjective, secondLogs, filledBoard);
   check(
     secondCaptain.objectiveDelivered[owedLast.type] === 1 &&
@@ -985,17 +989,17 @@ export async function fleetCommissionSuite(
       engineObjective.resources
         .filter((r) => r.type !== owedLast.type)
         .every((r) => secondCaptain.inventory[r.type] === r.required) &&
-      secondLogs.some((line) =>
+      ledgerSentences(secondLogs).some((line) =>
         line.includes("already filled, and nothing was taken"),
       ),
     "a second handover that arrives once the commission is filled is refused against the board the first one left, so two captains hand over one commission between them and not two",
   );
 
   // ========== A granted press, in the captain's own engine ==========
-  // The room's half of the pair above is the board; this is the captain's
+  // The harbor's half of the pair above is the board; this is the captain's
   // half, and it is the half the field report was about, because the goods
   // and the Gold move where the press was made. A press now carries the
-  // accepted standing the room sent back (see recordObjectiveHandover in
+  // accepted standing the harbor sent back (see recordObjectiveHandover in
   // @/server/realtime/objective and grantedTaking in
   // @/lib/game/engine/objectives), so each check below hands
   // deliverToObjective an answer of its own and reads what the hold did
@@ -1012,7 +1016,7 @@ export async function fleetCommissionSuite(
     answeredNothing.inventory[r.type] = r.required;
   }
   const answeredPurse = answeredNothing.money;
-  const answeredLogs: string[] = [];
+  const answeredLogs: LedgerLine[] = [];
   deliverToObjective(
     answeredNothing,
     engineObjective,
@@ -1026,10 +1030,10 @@ export async function fleetCommissionSuite(
     ) &&
       answeredNothing.money === answeredPurse &&
       Object.keys(answeredNothing.objectiveDelivered).length === 0 &&
-      answeredLogs.some((line) =>
+      ledgerSentences(answeredLogs).some((line) =>
         line.includes("already filled, and nothing was taken"),
       ),
-    "a press the room answered with no rows takes nothing, pays nothing, and is told the commission is filled",
+    "a press the harbor answered with no rows takes nothing, pays nothing, and is told the commission is filled",
   );
 
   // The granted rows are cumulative, so what leaves the hold is the
@@ -1043,7 +1047,7 @@ export async function fleetCommissionSuite(
   partWay.objectiveDelivered[partGood.type] = partStanding;
   partWay.inventory[partGood.type] = partGood.required;
   const partPurse = partWay.money;
-  const partLogs: string[] = [];
+  const partLogs: LedgerLine[] = [];
   deliverToObjective(
     partWay,
     engineObjective,
@@ -1073,7 +1077,7 @@ export async function fleetCommissionSuite(
   const stillAboard = shrunkenGood.required - 1;
   shrunk.inventory[shrunkenGood.type] = stillAboard;
   const shrunkPurse = shrunk.money;
-  const shrunkLogs: string[] = [];
+  const shrunkLogs: LedgerLine[] = [];
   deliverToObjective(
     shrunk,
     engineObjective,
@@ -1087,7 +1091,7 @@ export async function fleetCommissionSuite(
     shrunk.objectiveDelivered[shrunkenGood.type] === stillAboard &&
       shrunk.inventory[shrunkenGood.type] === 0 &&
       shrunk.money - shrunkPurse === stillAboard * shrunkenGood.price &&
-      shrunkLogs.some((line) =>
+      ledgerSentences(shrunkLogs).some((line) =>
         line.includes(`${shrunkenGood.type}×${stillAboard}`),
       ),
     `an answer for ${shrunkenGood.required} ${shrunkenGood.type} to a captain holding ${stillAboard} takes the ${stillAboard} that are aboard and is paid for those alone`,
@@ -1104,10 +1108,10 @@ export async function fleetCommissionSuite(
     doubled.inventory[r.type] = r.required;
     grantedRows[r.type] = r.required;
   }
-  const doubledLogs: string[] = [];
+  const doubledLogs: LedgerLine[] = [];
   deliverToObjective(doubled, engineObjective, doubledLogs, {}, grantedRows);
   const paidOnce = doubled.money;
-  const againLogs: string[] = [];
+  const againLogs: LedgerLine[] = [];
   deliverToObjective(doubled, engineObjective, againLogs, {}, grantedRows);
   check(
     engineObjective.resources.every(
@@ -1115,17 +1119,17 @@ export async function fleetCommissionSuite(
     ) &&
       engineObjective.resources.every((r) => doubled.inventory[r.type] === 0) &&
       doubled.money === paidOnce &&
-      againLogs.some((line) =>
+      ledgerSentences(againLogs).some((line) =>
         line.includes("already filled, and nothing was taken"),
       ),
     "and an answer applied twice moves goods and Gold once: the second application finds the standing already reached and the hold empty of what the commission asks for",
   );
 
-  // ---- What a concluded voyage leaves behind ----
+  // ========== What a concluded voyage leaves behind ==========
   // The measurement half of the mode, and the one thing here no other
   // part of this file reaches: a voyage that ends writes the commission
-  // onto its Chronicle rows, and a slice about telemetry that never
-  // exercises the write would be claiming something it never checked.
+  // onto its Chronicle rows, and a telemetry check that never exercises
+  // the write would be claiming something it never checked.
   //
   // One captain ends holding a trace that met the commission and the
   // others end holding nothing. The fill is a fact about the fleet, so
@@ -1153,7 +1157,7 @@ export async function fleetCommissionSuite(
   // captain table above left a newer one behind for every captain here,
   // seated in a harbor this one is not. So each finisher is handed a
   // fresh socket seated in this harbor, which is both the newest socket
-  // the server keeps for that captain and the one bound to this room,
+  // the server keeps for that captain and the one bound to this harbor,
   // and the report goes out from there. A report from any of the seats
   // taken earlier is refused, which is the rule under test rather than
   // an obstacle to it.
@@ -1225,7 +1229,7 @@ export async function fleetCommissionSuite(
       roomId: gambitRoomId,
       round: 5,
       phase: "endgame",
-      phaseLabel: "Voyage Complete",
+      phaseLabel: "Voyage Ended",
       gold: 40,
       reputation: 30,
       shipLevel: 2,
@@ -1275,7 +1279,7 @@ export async function fleetCommissionSuite(
   const hostChronicle = chronicles.find((row) => row.userId === gambitHost.id);
   check(
     JSON.parse(hostChronicle?.objectiveTrace ?? "[]").length === 1,
-    "and carries the per leg trace rather than dropping it",
+    "and carries the per round trace rather than dropping it",
   );
   check(
     hostChronicle?.objectiveMet === true &&
@@ -1283,7 +1287,7 @@ export async function fleetCommissionSuite(
     "reading the fleet's outcome once from the merged record, so the trace one client kept fills the commission on every row",
   );
 
-  // ---- What the voyage decided about each card ----
+  // ========== What the voyage decided about each card ==========
   // The other half of the victory rules above: the card a captain sailed
   // under and whether the rule says they won it, read back off the rows
   // the conclusion wrote. The hand is the one written a few lines up, so
@@ -1320,7 +1324,7 @@ export async function fleetCommissionSuite(
     "and a Pirate wins nothing on a voyage the record shows filled, because the card only pays for a failure the fleet's own record does not show",
   );
 
-  // The mode is a room property the server reads for itself, so the
+  // The mode is a harbor property the server reads for itself, so the
   // other half of the guard is that a Classic harbor has no board at
   // all, whatever it is sent.
   const boardRefused: string[] = [];

@@ -1,9 +1,10 @@
 "use client";
 
-import { t } from "@/lib/game/i18n";
+import { listJoiner, t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { ItemIcon } from "../../shared";
+import { FigureTile } from "../../profile/FigureTile";
 
 // The wrapper that carries an artisan type's own hue to everything nested
 // inside it (see the .pm-artisan-* rules in globals.css). Composed from the
@@ -19,7 +20,7 @@ export function artisanTint(id: string) {
 /**
  * The title a phase screen leads with, at the size and weight every one of
  * them sets it: the glyph and the name, a line of margin under it, and the
- * phase's own colour. The margin and the colour are the two things a screen
+ * phase's own color. The margin and the color are the two things a screen
  * legitimately decides for itself, so they are props.
  *
  * The brush face is optional because two screens (the artisan bench and the
@@ -74,9 +75,9 @@ export function PanelTitle({
 }
 
 /**
- * The heading of a box inside a screen: the centred line the artisan bench
+ * The heading of a box inside a screen: the centered line the artisan bench
  * opens its four boxes with. The hue is the caller's, because the payroll
- * box keeps the colour that means a cost while the other three wear the
+ * box keeps the color that means a cost while the other three wear the
  * screen's own.
  */
 export function PanelHeading({
@@ -122,7 +123,7 @@ const HUE_TONES = {
  * card, a faint border and fill in the hue of whatever is speaking, and the
  * box model the caller asks for. The padding is a prop because the four
  * port board panels and the wardrobe do not pick the same one, and
- * normalising them would be a layout change.
+ * normalizing them would be a layout change.
  */
 export function HuePanel({
   tone,
@@ -136,35 +137,6 @@ export function HuePanel({
   return (
     <div className={cn("rounded-xl border", HUE_TONES[tone], className)}>
       {children}
-    </div>
-  );
-}
-
-/**
- * The small label a hue panel leads with: the glyph and the name in the
- * panel's own hue, with an optional plain sentence trailing it.
- */
-export function PanelLabel({
-  tone,
-  children,
-  note,
-}: {
-  tone: string;
-  children: React.ReactNode;
-  note?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-1.5 text-[10px] font-semibold tracking-wide",
-        tone,
-        "mb-1.5",
-      )}
-    >
-      {children}
-      {note && (
-        <span className="font-normal text-muted-foreground ml-1">{note}</span>
-      )}
     </div>
   );
 }
@@ -192,7 +164,7 @@ export function SummaryHeading({
 
 /**
  * A line under a panel: the larder is full, the hold carries no clothes, a
- * hand is out of action. One size and one indent, in either the quiet grey
+ * hand is out of action. One size and one indent, in either the quiet gray
  * or the alarm red, because a panel with two of these reads as a stack of
  * them.
  */
@@ -246,22 +218,31 @@ export function PanelStat({
  * The total a panel closes on: a rule across the top, a quiet name on the
  * left and the figure on the right. The hue of the rule is the panel's, the
  * same way its opening label is.
+ *
+ * The space above the rule and the size the row is printed at are the
+ * caller's, because the places that close on a total sit at their own
+ * depths and print at their own sizes, and a total that borrowed another
+ * one's would either crowd the rows above it or read smaller than the
+ * figures it is closing on.
  */
 export function PanelTotal({
   tone,
   label,
   children,
+  className,
 }: {
   tone: string;
   label: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <div
       className={cn(
-        "mt-2 pt-2 border-t",
+        "pt-2 border-t",
         tone,
-        "flex items-center justify-between text-[11px]",
+        "flex items-center justify-between",
+        className,
       )}
     >
       {label}
@@ -271,28 +252,14 @@ export function PanelTotal({
 }
 
 /**
- * A figure and its name, in the tile the settle and conclude screens count
- * in: the risk of a raid, and the crew that came home. Six of them across
- * the two screens, all but the number and its colour the same.
+ * The tile the settle and conclude screens count in: the risk of a raid,
+ * and the crew that came home. It is the one tile the whole app draws a
+ * figure in, at the scale those two screens read at, and it used to be
+ * written out again here with its own frame, its own padding and its own
+ * caption size. The scale is the tile's default, so a screen that counts
+ * in it does not have to name a scale.
  */
-export function StatTile({
-  value,
-  valueClassName,
-  label,
-}: {
-  value: React.ReactNode;
-  valueClassName?: string;
-  label: React.ReactNode;
-}) {
-  return (
-    <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 p-2">
-      <div className={cn("font-display text-lg font-bold", valueClassName)}>
-        {value}
-      </div>
-      <div className="text-[9px] text-muted-foreground">{label}</div>
-    </div>
-  );
-}
+export { FigureTile };
 
 /**
  * The station strip, shared by the two panels that hold more than one
@@ -378,21 +345,17 @@ export function IntelBanner({
         "px-3.5 py-2.5 mb-3.5 text-xs",
       )}
     >
-      {/* The banner's own line is one read of the row as HTML: the pack
-          carries the apostrophe as an entity, so the answer is handed back
-          to the renderer rather than printed as text. */}
-      <strong
-        dangerouslySetInnerHTML={{
-          __html: t("🗣️ Broker&apos;s Whispers active this round:"),
-        }}
-      />{" "}
-      {game.revealedIntel.map((i, idx) => (
-        <span key={idx}>
-          {idx > 0 && ", "}
-          <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} ({i.port})
-        </span>
-      ))}
-      <span className="text-muted-foreground"> {note}</span>
+      <strong>{t("🗣️ Broker's Whispers active this round:")}</strong>
+      <span className="ml-1">
+        {game.revealedIntel.map((i, idx) => (
+          <span key={idx}>
+            {idx > 0 && listJoiner()}
+            <ItemIcon item={i.item} className="h-3.5 w-3.5" />{" "}
+            {t("{item} ({port})", { item: t(i.item), port: t(i.port) })}
+          </span>
+        ))}
+      </span>
+      <span className="ml-1 text-muted-foreground">{note}</span>
     </div>
   );
 }
@@ -408,22 +371,34 @@ export function IntelBanner({
  * own on one desk and not on the next. `direct` is the barter board's third
  * tone, which the other two have no use for: an offer aimed at one captain
  * rather than at the table is tinted sea.
+ *
+ * The row lays its parts out on one line or stacks them, because a desk
+ * row is not one shape: the market rows put the offer beside the buttons
+ * that answer it, and the rumor row puts its chip line over the footnote
+ * that explains it. The stacking is a prop rather than a second row
+ * component, because the tint and the frame are the same on both and two
+ * components would be two chances for them to drift.
  */
 export function PathDeskRow({
   mine,
   direct = false,
   className,
+  stack = false,
   children,
 }: {
   mine: boolean;
   direct?: boolean;
   className?: string;
+  /** Whether the row's own parts sit under one another rather than on one
+      line. */
+  stack?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-md px-3 py-2 text-xs border gap-2",
+        "rounded-md px-3 py-2 text-xs border",
+        !stack && "flex items-center justify-between gap-2",
         mine
           ? "bg-due/[0.06] border-due/20"
           : direct
@@ -445,7 +420,7 @@ export function PathDeskRow({
  *
  * The name is optional because an offer can outlive the captain it was aimed
  * at: the row stays on the desk with its aim still on it, and the member it
- * named is no longer in the room to be named. "a captain" is what the escort
+ * named is no longer in the harbor to be named. "a captain" is what the escort
  * row's own sentence already calls that captain, so the two agree rather
  * than the chip inventing a second way to say it.
  */

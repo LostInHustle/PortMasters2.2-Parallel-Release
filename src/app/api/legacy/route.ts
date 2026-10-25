@@ -1,5 +1,5 @@
 // GET /api/legacy: the current user's persistent Captain's Legacy summary
-// (Renown level and XP, lifetime voyages, Sea Master crowns, best score,
+// (Renown level and XP, lifetime voyages, Sea Master crowns, best Reputation,
 // Great House pledge). This data is written in three places, the voyage
 // conclusion check in the realtime layer, the check in route, and the
 // Great House pledge in the house route; this route is read only.

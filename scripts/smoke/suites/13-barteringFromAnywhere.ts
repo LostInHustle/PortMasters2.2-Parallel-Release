@@ -62,7 +62,7 @@ export async function barteringFromAnywhereSuite(inputs: {
 
   // The same captain, the same lack of Renown, posting an exchange
   // offer. The Captain's Exchange is not Renown gated at all, so what
-  // turns this one away is only that the room is not sitting in the
+  // turns this one away is only that the harbor is not sitting in the
   // Parley, which is the one time that board is on screen. That check is
   // what stops a chat composer claiming to be the exchange board to slip
   // past the gate above, and it is why the claim is pinned here rather
@@ -260,7 +260,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // Once a trade completes, the poster's other flexible offers go with
   // it. They promised the goods that have just left their hold, and
   // they share the one allowance, so leaving them up would advertise a
-  // swap that can no longer be honoured.
+  // swap that can no longer be honored.
   check(
     !(settled?.offers ?? []).some((o) => o.id === second?.id),
     "and the poster's other flexible offers are retired along with it",
@@ -356,7 +356,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // goods out of its hold the moment the press lands, before the frame is
   // even sent (see the engine's postBarterOffer, and why the escrow works
   // that way). So a refusal has to be able to say which post it refused,
-  // or a press made as the leg turns destroys the goods outright: out of
+  // or a press made as the round turns destroys the goods outright: out of
   // the hold, never on the board, gone for the voyage. This is that
   // frame, and the echo is the whole reason it carries anything.
   const refusedPostEcho = waitForEvent<{
@@ -410,7 +410,7 @@ export async function barteringFromAnywhereSuite(inputs: {
       boardsHook.includes(
         'refundBarterOffer(g, post.offerItem, post.offerAmount, l, "refusal")',
       ),
-    "a refused post's own escrow goes back to the hold, so a press the room turned away returns the goods it escrowed",
+    "a refused post's own escrow goes back to the hold, so a press the harbor turned away returns the goods it escrowed",
   );
   // The other half of that return, and the one a refusal can lose on its
   // own: a refund that lands while this captain's voyage is still loading
@@ -418,7 +418,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // the goods exactly as quietly as a refusal with no refund at all. So the
   // refusal goes through the same held queue the board's own drop does, and
   // the queue replays in arrival order, which is what keeps two answers to
-  // one captain in the order the room sent them.
+  // one captain in the order the harbor sent them.
   check(
     boardsHook.includes("heldReceipts.current.push(apply)") &&
       boardsHook.split("heldReceipts.current.push(").length - 1 === 2 &&
@@ -428,7 +428,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   );
   // The withdrawal's half of the same escrow rule, and the second bug this
   // article holds down: a buyer's accept can already be on the wire when
-  // the poster presses Cancel, and the room may have sold the offer by
+  // the poster presses Cancel, and the harbor may have sold the offer by
   // then. A refund taken at the moment of the press would pay the poster
   // twice for one offer, once in goods and once in the price, so there is
   // exactly one place a refund can come from and it is the board dropping
@@ -437,16 +437,16 @@ export async function barteringFromAnywhereSuite(inputs: {
   const refundSites = barterHook.split("onRefundRef.current(").length - 1;
   check(
     refundSites === 1 && barterHook.includes('socket.emit("barter:cancel"'),
-    "a withdrawal asks the room and refunds nothing itself, so the sale that won the race and the refund can never both pay",
+    "a withdrawal asks the harbor and refunds nothing itself, so the sale that won the race and the refund can never both pay",
   );
 
   // ========== The harbor's other peer board: one loan ==========
-  // Gold between two captains is the second thing the room routes between
-  // players, and it settles by the same shape as the goods above: the room
-  // holds the record and each side applies what the room says. What is
+  // Gold between two captains is the second thing the harbor routes between
+  // players, and it settles by the same shape as the goods above: the harbor
+  // holds the record and each side applies what the harbor says. What is
   // checked is the repayment's two answers, because a repayment used to be
   // applied to the borrower's own book on the spot and sent on their own
-  // word: a loan the room had already closed took the Gold locally, paid
+  // word: a loan the harbor had already closed took the Gold locally, paid
   // the lender nothing, and left the press unanswered, with nothing on
   // either screen to say which had happened.
   const loanAsked = waitForEvent<{
@@ -491,7 +491,7 @@ export async function barteringFromAnywhereSuite(inputs: {
     "and the lender is told the same loan rather than one of their own making",
   );
 
-  // The repayment itself. The borrower asks and the room answers: the
+  // The repayment itself. The borrower asks and the harbor answers: the
   // receipt is what lets their client move the debt and the Gold, and it
   // is the frame the old shape of this press never had, which is why a
   // closed loan used to cost a captain their Gold in silence.
@@ -516,14 +516,14 @@ export async function barteringFromAnywhereSuite(inputs: {
   });
   check(
     (await receiptForPayer) !== null,
-    "a repayment is answered with a receipt naming the debt the room closed, so the payer can apply it on the room's word rather than their own",
+    "a repayment is answered with a receipt naming the debt the harbor closed, so the payer can apply it on the harbor's word rather than their own",
   );
   check(
     (await repaidToLender)?.amount === 5,
     "and the lender is paid the amount the loan was for",
   );
 
-  // The same press again, against a loan the room no longer holds. This is
+  // The same press again, against a loan the harbor no longer holds. This is
   // the audit's own second file: the loan can be gone (a voyage that
   // ended, a seat that was written off) while the borrower's own book
   // still lists the debt, and the press has to be refused rather than
@@ -540,7 +540,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   const staleRepay = await refusedRepay;
   check(
     staleRepay !== null && staleRepay.debtId === undefined,
-    "a repayment of a loan the room no longer holds is refused rather than left unanswered, and the refusal carries no debt id because the client holds one refusal at a time rather than a row per debt",
+    "a repayment of a loan the harbor no longer holds is refused rather than left unanswered, and the refusal carries no debt id because the client holds one refusal at a time rather than a row per debt",
   );
   check(
     Boolean(staleRepay?.reason?.includes("no longer outstanding")),
@@ -551,7 +551,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // the escrow needles above are: the press is a React callback. The press
   // asks and applies nothing, the receipt is what runs the engine, and the
   // engine function is not reachable from the press at all, which is the
-  // whole fix: a debt the room has closed cannot be debited twice or
+  // whole fix: a debt the harbor has closed cannot be debited twice or
   // debited for nothing.
   const aidHook = readFileSync(
     join(repoRoot, "src", "lib", "use-aid.ts"),
@@ -562,13 +562,13 @@ export async function barteringFromAnywhereSuite(inputs: {
     "utf8",
   );
   check(
-    gameRoom.includes("aid.repay(debt.amount, debtId)") &&
+    gameRoom.includes("aidRepay(debt.amount, debtId)") &&
       !gameRoom.includes("repayLoan") &&
       boardsHook.includes("repayLoan(g, settled.debtId, l)") &&
       aidHook.includes('socket.on("aid:repay:ok"'),
-    "a repayment moves the debt on the receipt the room sends back and nowhere else, so the Gold follows a loan the room is actually holding",
+    "a repayment moves the debt on the receipt the harbor sends back and nowhere else, so the Gold follows a loan the harbor is actually holding",
   );
-  // The wire carries the debt and the amount and nothing else. The room
+  // The wire carries the debt and the amount and nothing else. The harbor
   // holds the loan, so it already knows who lent it, and a lender id sent
   // from the client would only be a second copy of that fact to disagree
   // with the book the press is judged against.
@@ -576,7 +576,7 @@ export async function barteringFromAnywhereSuite(inputs: {
     aidHook.includes('socket.emit("aid:repay", { roomId, amount, debtId })') &&
       !aidHook.includes("lenderId") &&
       !gameRoom.includes("debt.counterpartyId, debt.amount"),
-    "a repayment names the debt alone, so no client supplied lender can disagree with the loan the room is actually holding",
+    "a repayment names the debt alone, so no client supplied lender can disagree with the loan the harbor is actually holding",
   );
 
   // ========== Dismissing a refusal ==========

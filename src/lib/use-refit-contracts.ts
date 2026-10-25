@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
 import type { RefitContract } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
@@ -21,7 +21,7 @@ const CHANNEL = {
 } as const;
 
 /**
- * The room's refit board, as one captain sees it.
+ * The harbor's refit board, as one captain sees it.
  *
  * The board, the per captain filtering and the report that fires when a
  * refit this captain is party to moves past the offer stage are the shared
@@ -85,12 +85,18 @@ export function useRefitContracts(
     [socket, roomId, clearError],
   );
 
-  return {
-    refits,
-    error,
-    clearError,
-    post,
-    accept,
-    cancel,
-  };
+  // The answer, held to one identity until something inside it changes.
+  // The panel that draws the refit board takes this whole object as a
+  // prop.
+  return useMemo(
+    () => ({
+      refits,
+      error,
+      clearError,
+      post,
+      accept,
+      cancel,
+    }),
+    [refits, error, clearError, post, accept, cancel],
+  );
 }

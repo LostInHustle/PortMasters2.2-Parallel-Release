@@ -113,6 +113,11 @@ export function useSound() {
       return 50;
     }
   });
+  // The confirm tone's own handle, so a captain who switches sound off
+  // again before it lands does not get a tone for a setting they have
+  // already left.
+  const toneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const ambientRef = useRef<{
     osc: OscillatorNode;
     osc2: OscillatorNode;
@@ -123,6 +128,21 @@ export function useSound() {
   // The volume as a 0 to 1 multiplier, used by both the ambient bed
   // and the UI feedback tones.
   const volumeScale = volume / 100;
+  // The scale the bed is built at, kept in a ref so a volume move ramps
+  // the live bed in the effect below rather than tearing the oscillators
+  // down and rebuilding them.
+  const volumeScaleRef = useRef(volumeScale);
+  useEffect(() => {
+    volumeScaleRef.current = volumeScale;
+  }, [volumeScale]);
+
+  // A timer that outlives the panel has nothing to sound.
+  useEffect(
+    () => () => {
+      if (toneTimer.current) clearTimeout(toneTimer.current);
+    },
+    [],
+  );
 
   // Manage the ambient bed
   useEffect(() => {
@@ -172,7 +192,7 @@ export function useSound() {
     osc2.start();
     // Ramp to the volume scaled ambient gain
     gain.gain.linearRampToValueAtTime(
-      AMBIENT_BASE_GAIN * volumeScale,
+      AMBIENT_BASE_GAIN * volumeScaleRef.current,
       ctx.currentTime + 2,
     );
 
@@ -189,10 +209,8 @@ export function useSound() {
         // best effort
       }
     };
-    // volumeScale is derived from volume, so we depend on volume here
-    // to ramp the gain again when the slider moves. But we do NOT want to
-    // tear down and rebuild the whole ambient bed on every volume
-    // change, so we handle volume changes in a separate effect below.
+    // The build reads the scale through a ref and the effect below ramps
+    // the live bed, so a volume move never tears down the oscillators.
   }, [enabled]);
 
   // Update the ambient bed gain when volume changes (without rebuilding
@@ -212,20 +230,29 @@ export function useSound() {
   }, [volumeScale]);
 
   const toggle = useCallback(() => {
-    setEnabled((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        // private browsing
-      }
-      if (next) {
-        // Play a confirm tone so the user hears that sound is now on
-        setTimeout(() => playTone("confirm", volumeScale), 100);
-      }
-      return next;
-    });
-  }, [volumeScale]);
+    // The next state, read from the one the harbor holds. A state updater
+    // that carries side effects is a side effect a development build runs
+    // twice, so the write and the tone are done here rather than inside
+    // one.
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, String(next));
+    } catch {
+      // private browsing
+    }
+    if (next) {
+      // The confirm tone, so the captain hears that sound is now on. It
+      // waits a beat so that it lands after the bed rather than under it,
+      // and the handle is kept so the tone can be called off if the
+      // captain switches sound back off straight away.
+      if (toneTimer.current) clearTimeout(toneTimer.current);
+      toneTimer.current = setTimeout(() => {
+        toneTimer.current = null;
+        playTone("confirm", volumeScale);
+      }, 100);
+    }
+  }, [enabled, volumeScale]);
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, Math.round(v)));

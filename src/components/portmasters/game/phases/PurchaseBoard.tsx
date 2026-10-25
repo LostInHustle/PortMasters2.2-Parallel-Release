@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import {
   basePriceRange,
+  cardLineUnitPrice,
   explainCardPrice,
   getCardFinalCost,
   purchaseCard,
@@ -21,6 +22,18 @@ import {
 } from "./PhaseShared";
 
 type MarketCard = GameState["resourceCards"][number];
+
+// The recipe a product card was drawn from, named when the board is read
+// rather than when the card was dealt. A save written before the card kept
+// its recipe as a list still carries the rendered sentence, so that string
+// is the fallback when there is no list to read.
+function materialDetailsText(ref: MarketCard["resources"][number]): string {
+  if (ref.materialList)
+    return ref.materialList
+      .map((m) => t("{m}×{a}", { m: t(m.type), a: m.amount }))
+      .join(" + ");
+  return ref.materialDetails ?? "";
+}
 
 /**
  * One card on the port board: a port's offer, its goods at this round's
@@ -73,7 +86,7 @@ function PurchaseCard({
               ? t("✅ Purchased")
               : t("🛒 Buy ({cost}💰)", { cost: finalCost })}
           </Button>
-          {/* Why a greyed Buy is greyed, said beside it. The one reason a
+          {/* Why a grayed Buy is grayed, said beside it. The one reason a
               card refuses that is not already on the button is the purse,
               and the shortfall is a number this card can read: the price
               it already printed and the purse it already checked. A
@@ -98,7 +111,12 @@ function PurchaseCard({
         // direction and "price" says what moved, so nothing on this
         // board needs a hover.
         const range = basePriceRange(r.type);
-        const unitPrice = r.price ?? 0;
+        // The line's settled unit price, not the list price: the stack
+        // charges the card total, so a boon or module can bring the
+        // captain's price below the harbor's list while the Unit line
+        // still showed the list. The Deal mark reads the same settled
+        // number the Buy button will charge for this line's share.
+        const unitPrice = Math.round(cardLineUnitPrice(game, c, i) * 10) / 10;
         const isDeal = range !== undefined && unitPrice < range[0];
         const isPricey = range !== undefined && unitPrice > range[1];
         // flex-wrap matters here: the good name and the mark chips
@@ -154,7 +172,7 @@ function PurchaseCard({
         <div className="text-[10px] text-muted-foreground pl-6">
           {t("📦 Mat Cost: {gold} Gold ({details})", {
             gold: c.resources[0].materialCost,
-            details: c.resources[0].materialDetails ?? "",
+            details: materialDetailsText(c.resources[0]),
           })}
         </div>
       ) : null}
@@ -181,12 +199,12 @@ function PurchaseCard({
  * why it is a map and a grid and very little else.
  *
  * The columns it deals are the stage's, not the window's. The board is
- * drawn in the middle column of the room, so a breakpoint read off the
+ * drawn in the middle column of the harbor, so a breakpoint read off the
  * window answers a question nobody asked: at a window wide enough for the
- * old three across rule the stage is still a single column of the room, and
+ * old three across rule the stage is still a single column of the harbor, and
  * three cards dealt into it wrapped every goods line and every chip they
- * had. The stage is a container (see the room's own note), so this measures
- * the room it is actually drawn in: one column while the stage cannot hold
+ * had. The stage is a container (see the harbor's own note), so this measures
+ * the harbor it is actually drawn in: one column while the stage cannot hold
  * two cards, two while it can, and three once each card still has the width
  * the goods rows want. The bottom margin is the panel rhythm the rest of
  * this screen keeps, because each panel here carries its own.

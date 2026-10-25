@@ -2,8 +2,8 @@
 
 // =====================================================================
 // A card's head: one icon, one title, and whatever controls belong to
-// that card on the right. The icon takes its colour from the call site,
-// because colour is how a card says which part of the harbor it is.
+// that card on the right. The icon takes its color from the call site,
+// because color is how a card says which part of the harbor it is.
 //
 // It exists so every heading in the lobby is written once: a heading grown
 // by hand nudges to fit its own card and drifts out of line the moment the

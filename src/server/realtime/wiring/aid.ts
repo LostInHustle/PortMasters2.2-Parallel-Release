@@ -127,7 +127,7 @@ export function wireAid(io: Server, socket: Socket): void {
       const amount = payload?.amount;
       const debtId = payload?.debtId;
       // Both answers are spoken. The borrower's client applies nothing on
-      // its own, since the debt is the room's to close and the loan can be
+      // its own, since the debt is the harbor's to close and the loan can be
       // gone by the time the press lands, so a silent return would leave
       // the press unanswered and the two books disagreeing about a debt
       // nobody could then settle. The receipt names the debt it closed,

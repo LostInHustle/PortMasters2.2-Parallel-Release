@@ -1,8 +1,8 @@
-// GET /api/rooms/[id]: room detail (members, recent room chat)
-// Returns the room plus the last 100 public room chat messages. DMs are
+// GET /api/rooms/[id]: harbor detail (members, recent harbor chat)
+// Returns the harbor plus the last 100 public harbor chat messages. DMs are
 // scoped to recipientId not null and never appear here.
 import { NextResponse } from "next/server";
-import { ROOM_NOT_FOUND } from "@/lib/api";
+import { HARBOR_NOT_FOUND } from "@/lib/api";
 import { db, ROOM_WITH_MEMBERS, PUBLIC_USER_SELECT } from "@/lib/db";
 import {
   getCurrentUser,
@@ -25,7 +25,7 @@ export async function GET(
     where: { id },
     include: {
       // The harbor a captain is looking at: the same roster and host every
-      // other read of a room asks for, with the room's own chat beside it.
+      // other read of a harbor asks for, with the harbor's own chat beside it.
       ...ROOM_WITH_MEMBERS,
       messages: {
         where: { recipientId: null },
@@ -42,7 +42,7 @@ export async function GET(
   if (!room) {
     const locale = await requestLocale();
     return NextResponse.json(
-      { error: tFor(locale, ROOM_NOT_FOUND) },
+      { error: tFor(locale, HARBOR_NOT_FOUND) },
       { status: 404 },
     );
   }

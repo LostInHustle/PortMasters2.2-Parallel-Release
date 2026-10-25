@@ -91,10 +91,10 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
           // reloads into a reopened lobby draws the founding board for
           // the epoch waiting to start rather than the dead voyage's.
           voyageSeats: 0,
-          // [I1: the telemetry spine] The reopened lobby's clock starts
+          // The reopened lobby's clock starts
           // now. Room.createdAt is the harbor's birthday and never moves,
           // so a voyage dealt from this reopened table would otherwise
-          // report a fill time counting every hour since the room was
+          // report a fill time counting every hour since the harbor was
           // first chartered; the record's openedAt reads this column at
           // departure instead (see openVoyageTelemetry).
           lobbyOpenedAt: new Date(),
@@ -106,7 +106,7 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // below, and the next departure deals a fresh hand.
       await clearAlignments(roomId);
       roomCheckpoints.delete(roomId);
-      // [B2: hard timers, the server as timekeeper] The clock the ended
+      // The clock the ended
       // voyage was running, stopped with the seat it belonged to. A
       // reopened harbor is the pier, and the pier has no clock: leaving
       // this timer alive would have it fire into a lobby nobody is
@@ -118,34 +118,33 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       clearAdvanceWatch(roomId);
       clearRoomStatuses(roomId);
       clearBarter(io, roomId);
-      // [D3: Convoy: the Escort Contract] And the market's board, which
+      // And the market's board, which
       // belongs to the voyage that just ended rather than to the one
-      // about to start: a contract is a promise about a leg, and the new
-      // voyage's legs are not the old one's.
+      // about to start: a contract is a promise about a round, and the new
+      // voyage's rounds are not the old one's.
       escortContracts.clear(io, roomId);
-      // [D4: Loom: the Refit] And the bench's, which is the same sentence
+      // And the bench's, which is the same sentence
       // about the same kind of object: a refit is work promised on a
-      // garment in a leg, and the legs of the voyage about to start are
+      // garment in a round, and the rounds of the voyage about to start are
       // not the ones it was promised in.
       refitContracts.clear(io, roomId);
-      // [F3: modules in the shipyard ladder, and trading them between
-      // captains] And the module market's, which is the same sentence
+      // And the module market's, which is the same sentence
       // about the same kind of object: a listing is a promise about a
-      // module in a leg, and the legs of the voyage about to start are
+      // module in a round, and the rounds of the voyage about to start are
       // not the ones it was promised in.
       moduleTrades.clear(io, roomId);
-      // [D5: Aroma: the Bazaar Rumor] And the bazaar's rows, which are the
+      // And the bazaar's rows, which are the
       // fourth board that belongs to the voyage that just ended and the
       // only one of the four that is not a promise. A row is load bearing
       // in a way a listing is not: it is what a captain's cooldown is
       // measured from, so a row left standing here would refuse the
-      // publisher in the voyage about to start, for legs they did not
+      // publisher in the voyage about to start, for rounds they did not
       // speak in, which is the one bug in this feature that reads as the
       // button being broken rather than as a rule. The board goes with it,
       // so a reopened harbor opens on a bazaar nobody has spoken at, and
-      // the leg passed is the one the harbor just reopened on: the rows
+      // the round passed is the one the harbor just reopened on: the rows
       // are already gone by the time the frame is built, so it carries the
-      // empty board and the leg is only what the send is personalized by.
+      // empty board and the round is only what the send is personalized by.
       clearBazaar(io, roomId, restarted.currentRound);
       // A restarted voyage is a new voyage, so the flexible allowance
       // starts over with it.
@@ -158,14 +157,14 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // tally merges by max, so a zero report leaves the old number
       // standing and the new voyage would inherit the old one's board.
       //
-      // The clear takes the room's commission claim first, and that is the
+      // The clear takes the harbor's commission claim first, and that is the
       // half that makes it a clear rather than a race: a report raises its
       // line against the commission it read, and one whose read is still in
       // flight here would raise that line into the fresh board a moment
       // after this ran, where no report of zero can ever take it back out
       // again (see claimObjectiveRoom in ../presence). So this waits for
-      // the reports standing in the room to finish, and a report that
-      // arrives behind this claim reads the room again and finds the new
+      // the reports standing in the harbor to finish, and a report that
+      // arrives behind this claim reads the harbor again and finds the new
       // voyage's commission rather than the dead one's.
       const releaseObjective = await claimObjectiveRoom(roomId);
       try {
@@ -176,10 +175,10 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // And the audit goes with them, for the harsher version of the same
       // reason: the reveal is the flag that makes the audit once per
       // voyage, so a new voyage that kept the old one would start having
-      // already spent it, and the room's first vote would vanish with no
+      // already spent it, and the harbor's first vote would vanish with no
       // frame to explain why.
       clearAudits(roomId);
-      // [F5: public offers] And the fleet's ledger, which is the same
+      // And the fleet's ledger, which is the same
       // sentence one step milder than the audit's: it holds no once per
       // voyage flag and refuses nothing on its own, but it holds the
       // ended voyage's picks by captain, and a new voyage that kept them
@@ -189,7 +188,7 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // And the maroon, which is the same flag with a ship behind it: the
       // result is what makes the vote once a voyage and what tells the
       // server who the Harbormaster is, and the shift is the market the
-      // new voyage's first leg would otherwise be priced against.
+      // new voyage's first round would otherwise be priced against.
       clearMaroons(roomId);
       // And the reveal, which is the ledger the ended voyage was written
       // up in. It holds no flag, so a new voyage that kept it would not
@@ -209,13 +208,13 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       if (clearSessionChat(roomId))
         io.to(roomChannel(roomId)).emit("chat:cleared", { roomId });
       if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
-      // [B4: the log surfaces] A restarted voyage is a new voyage, so the
+      // A restarted voyage is a new voyage, so the
       // log that belonged to the old one goes with the conversation above.
       // Clients drop their own copy on the frame below, which is the same
       // signal the chat clear rides, so the two ends cannot disagree
       // about which voyage they are keeping.
       clearVoyageLog(roomId);
-      // [D7: the draft, and switching] And the path draft's two maps. A
+      // And the path draft's two maps. A
       // restarted voyage deals a fresh hand for the reason the alignment
       // cards are redealt at the top of this handler: the draft that was
       // running belongs to the voyage that just ended. The seats still
@@ -223,11 +222,11 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
       // rather than the silent one, and the book of switches goes with it,
       // so a reopened harbor hands every captain their one switch back.
       clearPathVoyage(io, roomId);
-      // [I1: the telemetry spine] The voyage that was under way stops
+      // The voyage that was under way stops
       // here, and it stops by the host's hand rather than by an ending,
       // which is the outcome this record carries. Written before the
-      // frame that tells the room it is over, so a record exists by the
-      // time any captain can ask the room what just happened, and
+      // frame that tells the harbor it is over, so a record exists by the
+      // time any captain can ask the harbor what just happened, and
       // deliberately not awaited: the write is a measurement, and a slow
       // disk is not allowed to hold up a table waiting to play again.
       void closeVoyageTelemetry(
@@ -240,9 +239,9 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
         voyageEpoch: restarted.voyageEpoch,
         difficulty: restarted.difficulty,
         // Rides along for the same reason difficulty does. A restart resets
-        // the voyage but not the harbor, so the mode is whatever the room
+        // the voyage but not the harbor, so the mode is whatever the harbor
         // was created with, and every captain rebuilding their state here
-        // has to rebuild it on the lap the room is actually keeping. The
+        // has to rebuild it on the lap the harbor is actually keeping. The
         // restart deliberately cannot change it: a host switching laps
         // between voyages would be switched out from under the table, so
         // the mode is fixed at creation exactly as the tier is.

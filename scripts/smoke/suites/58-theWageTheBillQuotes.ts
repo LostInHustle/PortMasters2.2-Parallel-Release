@@ -1,7 +1,8 @@
 // PortMasters 2.2 Parallel Release, smoke run: The wage the bill quotes.
 
 import { getHireCost, hireWorker, payWages, wageBill } from "@/lib/game/engine";
-import { check, voyageState } from "../harness";
+import { check, ledgerSentences, voyageState } from "../harness";
+import type { LedgerLine } from "@/lib/game/ledger";
 
 /**
  * One roster, one bill, five readers: payWages charges it, and four
@@ -22,9 +23,9 @@ import { check, voyageState } from "../harness";
  * paths run on.
  */
 export async function theWageTheBillQuotesSuite(): Promise<void> {
-  const logs: string[] = [];
+  const logs: LedgerLine[] = [];
 
-  // ---- A. The bill read before the run is the bill the run charges ----
+  // ========== A. The bill read before the run is the bill the run charges ==========
   // Two hands of one trade, the first taken on the pledge: the reader
   // must count them apart, because only one of them pays.
   const g = voyageState();
@@ -45,7 +46,7 @@ export async function theWageTheBillQuotesSuite(): Promise<void> {
 
   const billTotal = firstBill.reduce((sum, b) => sum + b.due, 0);
   const before = g.money;
-  const wageLogs: string[] = [];
+  const wageLogs: LedgerLine[] = [];
   const paid = payWages(g, wageLogs);
   check(
     paid === true &&
@@ -54,14 +55,14 @@ export async function theWageTheBillQuotesSuite(): Promise<void> {
     "and the run charges the figure that was quoted, to the Gold: what every screen reads before the settle and what the payroll takes out of the purse are one number rather than two readings of one bench",
   );
   check(
-    wageLogs.some(
+    ledgerSentences(wageLogs).some(
       (line) =>
         line === "🪷 Jade Pavilion covers the wage for 1 Weaver this round.",
     ),
     "and the pledge is named on the run that spends it, in the engine's own sentence, so the sheet's annotation and the ledger's line cannot describe two different waivers",
   );
 
-  // ---- B. The pledge covers one run, not one service ----
+  // ========== B. The pledge covers one run, not one service ==========
   // The same bench a round later: the waiver is spent, the hand is not.
   const nextBill = wageBill(g);
   const quotedAfter = nextBill.find((b) => b.id === "weaver");
@@ -73,7 +74,7 @@ export async function theWageTheBillQuotesSuite(): Promise<void> {
     "so the next bill folds the covered hand back in at its full wage, because the pledge covers a captain's first payroll run rather than that artisan for the rest of the voyage",
   );
   const secondBefore = g.money;
-  const secondLogs: string[] = [];
+  const secondLogs: LedgerLine[] = [];
   const again = payWages(g, secondLogs);
   check(
     again === true &&
@@ -81,7 +82,7 @@ export async function theWageTheBillQuotesSuite(): Promise<void> {
     "and the run after it charges what the folded bill quoted, which is the second half of the same promise: one reader, every run",
   );
 
-  // ---- C. A trade with nothing to charge still says why ----
+  // ========== C. A trade with nothing to charge still says why ==========
   // The settle sheet's own case: a bench of one, and that one is the
   // pledge hire. The bill reads 0 Gold, the run takes nothing, and the
   // reason is still spoken, because a waiver a screen cannot explain is a
@@ -99,12 +100,12 @@ export async function theWageTheBillQuotesSuite(): Promise<void> {
     "a trade whose only hand is sponsored reads as owing nothing rather than as absent: the settle sheet draws 0 Gold beside a roster of one instead of hiding the trade it just hired",
   );
   const lonelyBefore = lonely.money;
-  const lonelyLogs: string[] = [];
+  const lonelyLogs: LedgerLine[] = [];
   const lonelyPaid = payWages(lonely, lonelyLogs);
   check(
     lonelyPaid === true &&
       lonely.money === lonelyBefore &&
-      lonelyLogs.some(
+      ledgerSentences(lonelyLogs).some(
         (line) =>
           line ===
           "🪷 Jade Pavilion covers the wage for 1 Master Weaver this round.",

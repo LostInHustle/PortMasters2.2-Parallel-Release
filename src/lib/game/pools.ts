@@ -1,7 +1,7 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: unlocked content pools
 //
-// What a captain can actually see this round, given the room's difficulty
+// What a captain can actually see this round, given the harbor's difficulty
 // and how far the voyage has run. ./constants owns the content, ./difficulty
 // owns the schedule, and this module is the one place the two meet: keeping
 // it separate is what lets constants/ read difficulty copy without the two
@@ -117,13 +117,14 @@ export function unlockedResourceDraw(
 // Whether a good arrived with a charter rather than being part of the founding
 // trade. Used by the charter scoped boon and module effects, which pay out on
 // the new lane's goods only.
+//
+// The answer is the two wave readers below, added together, because the
+// waves are what the goods arrived with. It used to name the four lists
+// itself, which meant the schedule could gain a wave and this reader
+// would not hear of it: a fifth list would have had to be added here as
+// well as down there, and the two would have had to agree.
 export function isCharterGood(item: string): boolean {
-  return (
-    (RESOURCES_TIER1 as readonly string[]).includes(item) ||
-    (PRODUCTS_TIER1 as readonly string[]).includes(item) ||
-    (RESOURCES_TIER2 as readonly string[]).includes(item) ||
-    (PRODUCTS_TIER2 as readonly string[]).includes(item)
-  );
+  return isTier1CharterGood(item) || isTier2CharterGood(item);
 }
 
 // The goods of each charter wave, told apart.
@@ -144,11 +145,11 @@ export function isCharterGood(item: string): boolean {
 // list alone, so half of each wave paid nothing while the card promised the
 // wave.
 //
-// [F2: the card record, and the mode weighting field] These two readers stay
+// These two readers stay
 // here rather than becoming tag reads, and that is the one place in the
-// engine F1's rule does not reach: which wave a good arrived with is the
-// schedule's fact and not the good's, so a tag would be the same good tagged
-// two ways in two rooms (see the same note in ./engine/orders).
+// engine the tag rule does not reach: which wave a good arrived with is
+// the schedule's fact and not the good's, so a tag would be the same good
+// tagged two ways in two harbors (see the same note in ./engine/orders).
 export function isTier1CharterGood(item: string): boolean {
   return (
     (RESOURCES_TIER1 as readonly string[]).includes(item) ||

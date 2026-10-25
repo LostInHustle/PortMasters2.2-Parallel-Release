@@ -22,4 +22,4 @@ export const SHIP_UPGRADE_LADDER: readonly number[] = [15, 25, 40];
 // lives directly on the initial GameState (see createInitialGameState in
 // ../types.ts), and the upgrade ladder above is seeded onto it from here;
 // the intel cost per Broker rumor is derived on the fly from whether the
-// Broker's Network module is equipped (see getIntelCost in ./engine/pricing.ts).
+// Broker's Network module is equipped (see getIntelCost in ../engine/pricing.ts).

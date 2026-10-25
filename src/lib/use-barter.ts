@@ -1,24 +1,16 @@
 "use client";
 
 import { BarterOffer } from "@/types/realtime/boards";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
+import { refusalHandler } from "@/lib/refusals";
 
-// Forwarded so the Parley panel can import the wire shape
-// from the same place it imports the hook. The canonical home is
-// @/types/realtime so the realtime layer and the client hook share
-// one definition.
+// Re-exported so the Parley panel imports the wire shape from the same
+// place as the hook.
 export type { BarterOffer };
 
-/**
- * What a post carries, and what it takes with it.
- *
- * Both surfaces post through the one call, and both take the offered
- * goods out of the hold before they do (the engine's post escrows on the
- * spot, which stops one stock from being promised twice). So the shape a
- * post is sent in is also the shape of the escrow a refused one hands
- * back, which is what this type is read for.
- */
+// A post and the escrow it holds. Both surfaces escrow before sending,
+// so a refused post is handed back in this same shape.
 export type PostedOffer = {
   offerItem: string;
   offerAmount: number;
@@ -28,18 +20,9 @@ export type PostedOffer = {
   flexible?: boolean;
 };
 
-/**
- * Whether a post and something the room said about one are the same
- * offer. A refusal frame echoes the fields the poster sent and a board
- * row carries the same fields on the offer it made, so those fields are
- * all a match can read: the room mints the offer id after the post is
- * accepted, and a refusal names an offer that never got one.
- *
- * Two offers of one shape are indistinguishable and are allowed to exist,
- * since posting is free and a captain may advertise the same intent in
- * several places. One refusal answers one waiting post, so the escrow
- * that goes back is exactly one post's worth.
- */
+// A refusal echoes the fields that were sent, and the id is minted only
+// after acceptance, so these fields are all a match can read. Duplicate
+// shapes are allowed; one refusal still returns exactly one post's escrow.
 function sameShape(post: PostedOffer, other: Partial<PostedOffer>): boolean {
   return (
     post.offerItem === other.offerItem &&
@@ -51,12 +34,8 @@ function sameShape(post: PostedOffer, other: Partial<PostedOffer>): boolean {
   );
 }
 
-/**
- * The post a refusal is about, taken out of the ones still waiting. The
- * frame names the offer it refused, so what comes back is the escrow that
- * post took; a frame that names nothing falls back to the oldest post
- * still waiting, which is the only thing it can then be about.
- */
+// Take the refused post out of the waiting list. A frame that names
+// nothing falls back to the oldest waiting post.
 function takeRefusedPost(
   pending: PostedOffer[],
   refused: Partial<PostedOffer>,
@@ -66,14 +45,8 @@ function takeRefusedPost(
   return post ?? null;
 }
 
-/**
- * The other way a post's wait ends: the room listed it. A post the room
- * accepted comes back as an offer of mine on the board, and from that
- * moment its escrow has a home on the board and nothing is owed back, so
- * it leaves the waiting list. Only this captain's own fresh rows are
- * handed here, since an offer that was already up when a post went out
- * answers that post no more than it answered its own.
- */
+// The other end of a post's wait: the harbor listed it. Only fresh rows
+// count; an offer already on the board answers no post.
 function dropConfirmedPosts(
   pending: PostedOffer[],
   board: readonly BarterOffer[],
@@ -85,55 +58,25 @@ function dropConfirmedPosts(
 }
 
 /**
- * The room's shared open offer board: a thin relay around the barter:*
- * socket events, kept separate from GameState the same way
- * usePlayerDetail is, since an open offer is real room wide state no
- * single client's deterministic engine can compute on its own. This hook
- * only tracks the board; the actual inventory effect (escrow on post,
- * credit and debit on a completed trade, escrow returned on a departure)
- * is the caller's job via the engine functions in
- * src/lib/game/engine.ts.
+ * The shared open offer board: a thin relay around barter:* events,
+ * separate from GameState because no single client can compute harbor
+ * wide state. This hook tracks the board only; the caller applies the
+ * inventory effects through the engine.
  *
- * One hook, both surfaces. The Captain's Exchange at the Parley
- * and the composer on a chat post into the same board through the same
- * call, and differ only in the `flexible` flag they carry: that flag is
- * what the server reads to decide whether the Renown gate and the
- * flexible allowance apply. Nothing in this hook enforces either one, so
- * a screen that draws both surfaces from here cannot invent a rule the
- * server does not have.
+ * Both surfaces post here and differ only in `flexible`, which the server
+ * reads to apply the Renown gate and allowance. Nothing here enforces
+ * either rule.
  *
- * `onFulfilled` fires once for every trade involving me, on both sides:
- * as the accepter (pay the requested item, receive the offered one) and
- * as the original poster (receive the requested item, the offered side
- * was already escrowed away when the offer was posted). The caller tells
- * the two apart by comparing `accepterId` against its own user id.
+ * `onFulfilled` fires on both sides of a trade; compare `accepterId` to
+ * tell them apart.
  *
- * `onRefund` fires with an offer of mine that is holding escrow which now
- * has to come back, and there is exactly one route by which that ever
- * happens: the board stops listing the offer. A withdrawal I asked for is
- * a departure the board confirms, and a sweep when the voyage moves on is
- * another, and the two are the same event to this hook. So the refund is
- * deliberately not taken at the moment of the press: a sale can win the
- * race to an offer a captain is trying to withdraw, and taking the escrow
- * back then would pay the poster twice for it, once in goods and once in
- * the price. Waiting one round trip is what keeps the refund and the
- * fulfilled payment mutually exclusive, since barter:fulfilled always
- * arrives before the update that drops the offer and marks its id
- * settled.
+ * `onRefund` fires when a held offer leaves the board, whether withdrawn
+ * or swept. Refunds deliberately wait for that update: a sale can win the
+ * race to a withdrawal, and refunding at the press would pay the poster
+ * twice. barter:fulfilled always arrives before the update that drops the
+ * offer and marks it settled.
  *
- * Noticing rather than being told is what makes this safe to run in every
- * phase. An offer can only ever be reported here if this client saw it on
- * the board first, addressed to itself, so the report is bounded by the
- * server's own view and a stale or repeated broadcast cannot invent one.
- * The board also arrives whole on every join, which is what makes a
- * reload mid voyage come back with the right escrow ledger.
- *
- * `onPostRefused` fires with a post of mine the room turned away. That
- * post's offered goods are already out of my hold (the caller escrows
- * before it posts, and the engine's own post is what takes them), so this
- * is the one route by which a refusal gives them back. Without it a press
- * made as the leg turns leaves the goods off the board, out of the hold,
- * and gone for the voyage.
+ * `onPostRefused` returns the escrow of a post the harbor rejected.
  */
 export function useBarter(
   socket: Socket | null,
@@ -145,33 +88,20 @@ export function useBarter(
 ) {
   const [offers, setOffers] = useState<BarterOffer[]>([]);
   const [error, setError] = useState<string | null>(null);
-  // How many of my own flexible offers others have already taken this
-  // voyage, as the server counts them. Held as a count rather than as
-  // "offers left" because the allowance depends on my Renown level, which
-  // the server deliberately does not repeat back to me here: I already
-  // hold the authoritative level on my own voyage state, and
-  // engine/barterAccess is what turns the pair into an answer, so both
-  // screens read the same policy the server enforces.
-  //
-  // It says nothing about the Captain's Exchange, which is never
-  // rationed, so only the flexible composer on a chat reads this.
+  // Accepted flexible offers, as the server counts them. The allowance
+  // also needs the Renown level from voyage state, which engine/barterAccess
+  // combines, so both screens read the server's policy. Only the flexible
+  // composer reads this.
   const [flexibleOffersAccepted, setFlexibleOffersAccepted] = useState(0);
 
-  // My own offers exactly as the board last reported them. Never tracked
-  // separately from a broadcast, so the server stays the single source of
-  // truth for what is still open and there is no second opinion here that
-  // could drift from it. It doubles as the escrow ledger: an offer that
-  // was in here and is not any more has left the board, and whatever it
-  // was holding has to come back.
+  // This captain's offers exactly as the board last reported them, which
+  // doubles as the escrow ledger. No separate tracking means no second
+  // source that can drift.
   const myOpenRef = useRef<Map<string, BarterOffer>>(new Map());
 
-  // Offer ids that left the board for a reason the caller has already
-  // handled, so their disappearance must not be read as a sweep. Without
-  // this, a filled offer looks exactly like a swept one, and the poster
-  // of a completed trade would be paid for the sale and handed back the
-  // collateral as well. Only ids still on the board are worth keeping,
-  // and the set is pruned to those on every update, so it can never grow
-  // past the number of offers this captain has open at once.
+  // Ids already handled after leaving the board, so a filled offer is not
+  // mistaken for a sweep and paid back as well as sold. Pruned on every
+  // update to offers still listed.
   const settledRef = useRef<Set<string>>(new Set());
 
   const onFulfilledRef = useRef(onFulfilled);
@@ -187,10 +117,8 @@ export function useBarter(
     onPostRefusedRef.current = onPostRefused;
   }, [onPostRefused]);
 
-  // The posts this client has sent that the room has not answered yet, in
-  // the order they went out, each one holding the shape its escrow was
-  // taken in. One answer takes one of them: the oldest, the one a
-  // refusal's frame names, or the one a board row matches.
+  // Unanswered posts in send order, each holding the shape its escrow was
+  // taken in. One answer removes one.
   const pendingPostsRef = useRef<PostedOffer[]>([]);
 
   useEffect(() => {
@@ -205,9 +133,7 @@ export function useBarter(
       setOffers(data.offers);
       setFlexibleOffersAccepted(data.flexibleOffersAccepted ?? 0);
       const next = new Map<string, BarterOffer>();
-      // The rows this client had not seen a moment ago, which is how a
-      // post of mine is answered the other way: the room listing it. Read
-      // against the board as it was before this update replaces it.
+      // Rows not seen before this update: how a post is confirmed listed.
       const fresh: BarterOffer[] = [];
       for (const o of data.offers) {
         if (o.fromUserId !== myUserId) continue;
@@ -232,27 +158,19 @@ export function useBarter(
       accepterName: string;
     }) => {
       if (data.roomId !== roomId) return;
-      // The server sends this before the board update that drops the
-      // offer, so by the time that update is read the id is already here.
+      // Sent before the board update drops the offer, so the id is known
+      // before the sweep is read.
       settledRef.current.add(data.offer.id);
       onFulfilledRef.current(data.offer, data.accepterId);
     };
-    const onAcceptFail = (data: {
-      roomId: string;
-      offerId: string;
-      reason: string;
-    }) => {
-      if (data.roomId !== roomId) return;
-      setError(data.reason);
-    };
-    // A post the room turned away. The frame names the offer it refused
-    // (see the post handler in src/server/realtime/wiring/barter), which
-    // is what lets the escrow that has to come back be found rather than
-    // guessed at. The sentence is the frame's own and lands in this hook's
-    // error state, which a voyage arriving does not replace, so it is the
-    // one thing here that needs no holding; the post's own amounts go back
-    // to the hold through the caller, which holds that write until the
-    // voyage has arrived.
+    const onAcceptFail = refusalHandler(
+      roomId,
+      setError,
+      (data: { roomId: string; offerId: string; reason: string }) =>
+        data.reason,
+    );
+    // A refused post. The frame names the offer, so its escrow can be
+    // found rather than guessed; the error sentence lands as sent.
     const onPostError = (data: {
       roomId: string;
       error: string;
@@ -283,17 +201,9 @@ export function useBarter(
     };
   }, [socket, roomId, myUserId]);
 
-  // The whole offer rather than a row of positional arguments, because
-  // `flexible` has to travel with it: that flag is the one thing that
-  // decides whether the offer is held to the Renown gate and the flexible
-  // allowance or is a plain Captain's Exchange offer with neither.
-  //
-  // The post is written down as it goes out, and the refusal standing from
-  // an earlier press is cleared first, so a refusal cannot outlive the
-  // situation it was about. The caller has already taken the offered goods
-  // out of its hold (that is what posting means), so the wait for an
-  // answer is the only thing that can give them back, and an answer can
-  // arrive before this call has returned to the caller.
+  // The whole offer object, because `flexible` must travel with it. Clear
+  // the previous refusal, then record the post before sending; the caller
+  // has already escrowed, so an answer can arrive before this returns.
   const post = useCallback(
     (offer: PostedOffer) => {
       if (!socket) return;
@@ -304,13 +214,9 @@ export function useBarter(
     [socket, roomId],
   );
 
-  // Withdrawing only asks, and clears the previous refusal first. The goods
-  // come back the way a swept offer's do, when the board stops listing it,
-  // and never at this moment: a buyer's accept can already be on the wire,
-  // and paying the goods back on an offer the room has just sold would pay
-  // the poster twice. So nothing is refunded and nothing is marked settled
-  // here: the refund a departure earns is decided by what the board
-  // reported, the same rule for every offer that leaves it.
+  // Withdraw only asks. The refund comes when the board drops the offer,
+  // never here: a buyer's accept may already be on the wire, and refunding
+  // now would pay the poster twice.
   const cancel = useCallback(
     (offer: BarterOffer) => {
       if (!socket) return;
@@ -329,13 +235,21 @@ export function useBarter(
     [socket, roomId],
   );
 
-  return {
-    offers,
-    error,
-    clearError: () => setError(null),
-    flexibleOffersAccepted,
-    post,
-    cancel,
-    accept,
-  };
+  // Stable across renders so the returned object can keep one identity.
+  const clearError = useCallback(() => setError(null), []);
+
+  // One identity until something inside changes; the board takes this
+  // whole object as a prop.
+  return useMemo(
+    () => ({
+      offers,
+      error,
+      clearError,
+      flexibleOffersAccepted,
+      post,
+      cancel,
+      accept,
+    }),
+    [offers, error, clearError, flexibleOffersAccepted, post, cancel, accept],
+  );
 }

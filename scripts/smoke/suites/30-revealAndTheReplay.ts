@@ -28,13 +28,13 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   revPirate: { id: string; token: string; cookie: string; username: string };
   revRoomId: string;
 }> {
-  // H8, and the reason the mode is worth playing: a voyage spends an
-  // hour defending one secret and then turns every card face up at once.
+  // The reveal, and the reason the mode is worth playing: a voyage spends
+  // an hour defending one secret and then turns every card face up at once.
   // This section sails a harbor of its own to watch that happen, and it
   // has to be one of its own. A reveal names every alignment at its
   // table, which is exactly what the sweep in the private information
   // spine above forbids in the harbor that sweep is watching, so putting
-  // the two in one room would mean weakening the sharpest check in this
+  // the two in one harbor would mean weakening the sharpest check in this
   // file to make room for the feature that needs the rule relaxed.
   //
   // The hand is written rather than drawn, the way the fleet commission's
@@ -118,11 +118,11 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   );
   check(
     revHeld().length === 0,
-    "and a voyage in flight tells the room nothing about any of them, however loud its own ending will be",
+    "and a voyage in flight tells the harbor nothing about any of them, however loud its own ending will be",
   );
 
   // The commission this harbor is working on, drawn here the way every
-  // client draws it: from the room's own id, epoch and pinned size, with
+  // client draws it: from the harbor's own id, epoch and pinned size, with
   // no captain's name anywhere in the seed. The flourish comes off that
   // commission's own deck for the same reason, since a goal about the
   // goods a fleet is not being asked for is a goal the mode never deals.
@@ -165,7 +165,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   );
 
   // The commission's own goods, so every figure below is one the board
-  // could have carried. What a leg is short by is read off the drawn
+  // could have carried. What a round is short by is read off the drawn
   // commission rather than written down, because the quotas scale with
   // the fleet that was dealt them, and a hard coded number would be a
   // full delivery at one table size and short of it at another.
@@ -173,7 +173,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   // The two captains who keep a trace disagree about what the fleet had
   // handed over, which is the case the merge exists for: their clients
   // wrote the harbor's number down at different moments, and the ledger
-  // reads the higher of the two at every leg.
+  // reads the higher of the two at every round.
   const [revA, revB] = revObjective.resources;
   const revShortA = Math.max(0, revA.required - 1);
   const revShortB = Math.max(0, revB.required - 1);
@@ -193,7 +193,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   // The merchant's record ends with one good filled and none of the
   // second, which is a commission the fleet fell short of, and a short
   // commission is the one thing that decides the Pirate's voyage. The
-  // met flag is read from this captain's own last recorded leg, so the
+  // met flag is read from this captain's own last recorded round, so the
   // shortfall is arranged here rather than hoped for.
   const revFilled = await revSave(revHonest.cookie, {
     objectiveDelivered: { [revA.type]: revA.required },
@@ -201,7 +201,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
       { [revA.type]: 2 },
       { [revA.type]: revA.required },
     ),
-    // An order fulfillment, so the ledger has a trade with a name, a leg
+    // An order fulfillment, so the ledger has a trade with a name, a round
     // and a port on it rather than only a total.
     orderFills: [
       {
@@ -331,7 +331,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
       roomId: revRoomId,
       round: 6,
       phase: "endgame",
-      phaseLabel: "Voyage Complete",
+      phaseLabel: "Voyage Ended",
       gold,
       reputation,
       shipLevel: 2,
@@ -361,7 +361,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   const revPaid = revSeen.get(revPirate.id)?.[0];
   check(
     revPaid?.roomId === revRoomId,
-    "a concluded voyage turns every card over to the room",
+    "a concluded voyage turns every card over to the harbor",
   );
   check(
     revArrived(),
@@ -444,21 +444,21 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
 
   // The curve. Two clients kept a record of the same commission and
   // disagreed about it, and what goes on the wire is one story rather
-  // than two: the higher figure at each leg, in leg order.
+  // than two: the higher figure at each round, in round order.
   check(
     revPaid?.fleetTrace.length === 2 &&
       revPaid.fleetTrace[0]?.round === 1 &&
       revPaid.fleetTrace[1]?.round === 3,
-    "the fleet's commission is read back leg by leg, in the order the voyage sailed it",
+    "the fleet's commission is read back round by round, in the order the voyage sailed it",
   );
   check(
     revPaid?.fleetTrace[0]?.delivered[revA.type] === 4,
-    "and a leg two clients recorded differently reads as the further along of the two",
+    "and a round two clients recorded differently reads as the further along of the two",
   );
   check(
     revPaid?.fleetTrace[1]?.delivered[revA.type] === revA.required &&
       revPaid?.fleetTrace[1]?.delivered[revB.type] === revShortB,
-    "while the last leg is neither captain's copy of it, taking one good from the merchant's record and the other from the pirate's",
+    "while the last round is neither captain's copy of it, taking one good from the merchant's record and the other from the pirate's",
   );
   check(
     revOf(revHonest)?.delivered[revA.type] === revA.required &&
@@ -484,7 +484,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
     revBack !== null &&
       revBack.captains.length === revCrew.length &&
       revBack.captains.some((row) => row.userId === revPirate.id),
-    "a captain who reloads onto the finished voyage is handed the same ledger the room watched",
+    "a captain who reloads onto the finished voyage is handed the same ledger the harbor watched",
   );
 
   // And a restarted voyage hands nobody the last one's cards, which is

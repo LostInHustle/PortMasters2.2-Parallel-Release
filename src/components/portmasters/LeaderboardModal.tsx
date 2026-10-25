@@ -21,7 +21,7 @@ import { t } from "@/lib/game/i18n";
 const HOUSE_ICON = new Map(HOUSES.map((h) => [h.id, h.icon]));
 
 type SortKey =
-  "renownXP" | "seaMasterCrowns" | "bestScore" | "voyagesCompleted";
+  "renownXP" | "seaMasterCrowns" | "bestReputation" | "voyagesCompleted";
 
 // The four ways the harbor can be sorted, one row each: the button that
 // picks it, the field on an entry it reads, and the two labels it prints.
@@ -50,11 +50,11 @@ const SORT_OPTIONS: {
     format: (e) => `${e.seaMasterCrowns}`,
   },
   {
-    key: "bestScore",
+    key: "bestReputation",
     label: "Best Rep",
     caption: "Best Rep",
     icon: Trophy,
-    format: (e) => `${e.bestScore}`,
+    format: (e) => `${e.bestReputation}`,
   },
   {
     key: "voyagesCompleted",
@@ -82,11 +82,11 @@ export function LeaderboardModal({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let canceled = false;
     const load = async () => {
       try {
         const { leaderboard } = await api.getLeaderboard();
-        if (cancelled) return;
+        if (canceled) return;
         setEntries(leaderboard);
       } catch {
         // best effort
@@ -95,7 +95,7 @@ export function LeaderboardModal({
     };
     void load();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [open]);
 
@@ -118,8 +118,8 @@ export function LeaderboardModal({
           <div className="pm-seigaiha absolute inset-0 opacity-20 pointer-events-none" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* The colour of the leaderboard chip in the top bar, so
-                  the dialog wears the colour of the control that opened
+              {/* The color of the leaderboard chip in the top bar, so
+                  the dialog wears the color of the control that opened
                   it. The medals further down are left alone on purpose:
                   there they are ranks, and a first place should look like
                   one. */}

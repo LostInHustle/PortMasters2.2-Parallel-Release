@@ -32,7 +32,7 @@ export const USERNAME_HINT =
   "{USERNAME_MIN} to {USERNAME_MAX} chars, letters, numbers, underscore";
 /** Refused with this sentence when the name breaks the pattern. */
 export const USERNAME_ERROR =
-  "Username may only contain letters, numbers and underscores";
+  "Captain name may only contain letters, numbers and underscores";
 
 export const PASSWORD_MIN = 6;
 export const PASSWORD_MAX = 72;

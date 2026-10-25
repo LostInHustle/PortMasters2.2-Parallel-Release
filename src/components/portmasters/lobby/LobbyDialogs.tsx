@@ -1,19 +1,6 @@
 "use client";
 
-// =====================================================================
-// The harbor screen's four dialogs, in one place.
-//
-// The dialogs are gathered here as named units that take what they draw and
-// hand back what they were asked to do, so the lobby's return is the screen
-// rather than the screen plus four overlays. A dialog is a small self
-// contained screen with a title, a body and one thing it can do, and inline
-// next to fifteen hundred lines of board and rail it is hard to see where
-// one ends and the next begins.
-//
-// None of them owns state. Every one of them is opened, filled and closed
-// by the lobby, which is the only thing that knows where the data came
-// from, so a dialog here is a pure function of its props.
-// =====================================================================
+// The lobby's four dialogs. Each is presentational; the lobby owns their state.
 
 import { VoyageChronicle } from "@/types/realtime/voyage";
 import { HouseStanding } from "@/types/realtime/standings";
@@ -26,11 +13,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { BookOpen, Gift, Landmark, Loader2, Star } from "lucide-react";
+import {
+  BookOpen,
+  Gift,
+  Landmark,
+  Loader2,
+  Star,
+  type LucideIcon,
+} from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { Pill } from "@/components/portmasters/shared";
 import { RENOWN_BONUS_LINE } from "@/lib/game/constants/copy";
 import { t } from "@/lib/game/i18n";
+import { useLanguage } from "@/lib/use-language-preference";
 import { CaptainLegacyCard } from "@/components/portmasters/CaptainLegacyCard";
 import { HouseLeaderboard } from "@/components/portmasters/HouseLeaderboard";
 import {
@@ -40,6 +35,28 @@ import {
 import type { CaptainLegacySummary, HouseId } from "@/lib/game/legacy";
 import type { CheckInStatus } from "@/lib/game/checkin";
 import { HOUSES, type House } from "@/lib/game/engine";
+
+function DialogHeading({
+  icon: Icon,
+  tone,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  tone: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2 font-display">
+        <Icon className={cn("h-5 w-5", tone)} />
+        {t(title)}
+      </DialogTitle>
+      <DialogDescription>{t(description)}</DialogDescription>
+    </DialogHeader>
+  );
+}
 
 // Renown, and what it does on the next fresh voyage. The paragraph under
 // the card is the rule as a captain needs it, and it names no number of
@@ -62,22 +79,12 @@ export function LegacyDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display">
-            <Star className="h-5 w-5 text-legacy" />
-            {/* The pack carries this row with the source's &apos; entity, so
-                it is read as HTML and the browser decodes it to the same
-                apostrophe JSX used to print. */}
-            <span
-              dangerouslySetInnerHTML={{ __html: t("Captain&apos;s Legacy") }}
-            />
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "Renown carries across every voyage this account ever sails, in any harbor.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
+        <DialogHeading
+          icon={Star}
+          tone="text-legacy"
+          title="Captain's Legacy"
+          description="Renown carries across every voyage this account ever sails, in any harbor."
+        />
         <CaptainLegacyCard legacy={legacy} className="p-5" />
         <p className="text-xs text-muted-foreground leading-relaxed">
           {t(
@@ -109,17 +116,12 @@ export function CheckInDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display">
-            <Gift className="h-5 w-5 text-checkin" />
-            {t("Daily Check In")}
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "Claim a Renown reward each day. The 7 day cycle picks up where you left off, even after a missed day, and restarts once Day 7 is claimed.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
+        <DialogHeading
+          icon={Gift}
+          tone="text-checkin"
+          title="Daily Check In"
+          description="Claim a Renown reward each day. The 7 day cycle picks up where you left off, even after a missed day, and restarts once Day 7 is claimed."
+        />
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
           {checkIn.rewards.map((xp, i) => {
             const day = i + 1;
@@ -167,7 +169,7 @@ export function CheckInDialog({
   );
 }
 
-// The harbour master's ledger of finished voyages, newest first, with
+// The harbormaster's ledger of finished voyages, newest first, with
 // headline, body, and creation date.
 export function ChronicleDialog({
   open,
@@ -180,27 +182,16 @@ export function ChronicleDialog({
   loading: boolean;
   chronicles: VoyageChronicle[];
 }) {
+  const { locale } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display">
-            <BookOpen className="h-5 w-5 text-chronicles" />
-            {t("Voyage Chronicles")}
-          </DialogTitle>
-          <DialogDescription>
-            {/* An entity row like the legacy title above: the pack keeps the
-                source's &apos; and the HTML read decodes it for both
-                languages. */}
-            <span
-              dangerouslySetInnerHTML={{
-                __html: t(
-                  "The Harbormaster&apos;s ledger of your finished voyages, newest first.",
-                ),
-              }}
-            />
-          </DialogDescription>
-        </DialogHeader>
+        <DialogHeading
+          icon={BookOpen}
+          tone="text-chronicles"
+          title="Voyage Chronicles"
+          description="The Harbormaster's ledger of your finished voyages, newest first."
+        />
         <ScrollArea className="pm-scroll-capped max-h-[60vh] pr-2">
           {loading ? (
             <div className="py-8 flex items-center justify-center text-muted-foreground text-sm">
@@ -225,7 +216,7 @@ export function ChronicleDialog({
                       {c.headline}
                     </span>
                     <span className="text-[10px] text-muted-foreground shrink-0">
-                      {formatDate(c.createdAt)}
+                      {formatDate(c.createdAt, locale)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
@@ -265,17 +256,12 @@ export function HousesDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto pm-scroll">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display">
-            <Landmark className="h-5 w-5 text-houses" />
-            {t("Great Houses")}
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "Pledge to one House. Its perk applies on your next fresh voyage. Switch any time between voyages.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
+        <DialogHeading
+          icon={Landmark}
+          tone="text-houses"
+          title="Great Houses"
+          description="Pledge to one House. Its perk applies on your next fresh voyage. Switch any time between voyages."
+        />
         <div className="space-y-2">
           {loading ? (
             <div className="py-8 flex items-center justify-center text-muted-foreground text-sm">
@@ -324,7 +310,7 @@ export function HousesDialog({
                         <span>·</span>
                         <span>⛵ {standing.voyages}</span>
                         <span>·</span>
-                        <span>★ {standing.bestScore}</span>
+                        <span>★ {standing.bestReputation}</span>
                       </div>
                     )}
                   </div>

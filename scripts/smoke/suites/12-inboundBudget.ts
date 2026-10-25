@@ -17,8 +17,8 @@ export async function inboundBudgetSuite(
   },
 ): Promise<void> {
   const { guestSocket, third } = inputs;
-  // [J2: the mute and the report] The one thing in the realtime layer
-  // that decides whether to read a frame. It is checked here rather than
+  // The one thing in the realtime layer that decides whether to read a
+  // frame. It is checked here rather than
   // in a unit test because what it has to be true of is the app's own
   // client: the budget was read off that client's cadences, and the way
   // to know it is set above them is to run the frames the app itself

@@ -3,7 +3,7 @@
 //
 // The conclusion, the reveal and the chronicle.
 //
-// Three readings of one finished voyage, from the standings the room is shown
+// Three readings of one finished voyage, from the standings the harbor is shown
 // as it ends, through the ledger of cards and verdicts, to the row the
 // chronicle viewer reads back later. The reveal is the one frame allowed to
 // carry an alignment, and it may because the voyage is over by the time it is
@@ -35,7 +35,7 @@ export type StandingRow = {
   reputation: number;
   crowned: boolean;
   bankrupt: boolean;
-  // [H7: Maroon and the Harbormaster] Whether the harbor put this captain
+  // Whether the harbor put this captain
   // ashore. Read beside bankrupt rather than folded into it because the
   // standings say what happened to a captain, and the two are different
   // things that can both be true of one seat.
@@ -46,10 +46,10 @@ export type StandingRow = {
   newMerits: string[];
 };
 
-// [H8: the reveal and the replay ledger] One captain's card, flipped.
+// One captain's card, flipped.
 //
 // This is the one frame in the mode that carries an alignment to the whole
-// room, and the reason it may is that the voyage is over by the time it is
+// harbor, and the reason it may is that the voyage is over by the time it is
 // built: there is nothing left for the secret to protect. It is emitted by
 // the conclusion and by nothing else, and handed to a captain who reloads
 // after it by the same room:join hand out the audit's reveal uses.
@@ -97,7 +97,7 @@ export type RevealedCaptain = {
   delivered: Record<string, number>;
   // What this captain was seen to trade, from the order fulfillments their
   // own client recorded, oldest first. The window is the audit's
-  // (AUDIT_WINDOW), so on a long voyage this is the closing legs rather
+  // (AUDIT_WINDOW), so on a long voyage this is the closing rounds rather
   // than all of it, which is everything that is durably kept.
   fills: OrderFill[];
 };
@@ -105,17 +105,17 @@ export type RevealedCaptain = {
 // The reveal, as the conclusion builds it and as a rejoining captain is
 // handed it. The card, the verdicts and the marks for every finisher, plus
 // the two things a ledger needs to tell the story of the evening: what the
-// fleet handed over, leg by leg, and what each captain handed over
+// fleet handed over, round by round, and what each captain handed over
 // themselves.
 export type VoyageReveal = {
   roomId: string;
   // The commission this harbor was working on, resolved rather than
   // seeded, because the ledger draws the board at the size the voyage
   // sailed at and a client redrawing it would have to know the rung.
-  // Drawn by the server from the room's own epoch and pinned seats, which
+  // Drawn by the server from the harbor's own epoch and pinned seats, which
   // is what keeps it the board the fleet was actually working against.
   objective: Objective;
-  // The commission's progress leg by leg, merged across every captain's
+  // The commission's progress round by round, merged across every captain's
   // record of it. Empty for a harbor whose captains never watched a board.
   fleetTrace: ObjectiveTraceEntry[];
   // Every finisher, in the order the standings arrive in.

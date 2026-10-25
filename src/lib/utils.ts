@@ -17,21 +17,40 @@ export function memberRowClass(isMe: boolean): string {
 // A short clock reading for a timestamp, in the reader's own locale. The
 // one place the interface turns a Date into a time of day, so every
 // screen shows the same style.
-export function formatTime(d: Date | string): string {
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+// The Intl tag behind each language the tree prints. Kept as plain
+// strings rather than imported from ./game/i18n so this file stays a
+// leaf: every screen and every shadcn primitive imports cn from here, and
+// none of them should pull the language pack in for that.
+function intlLocale(locale?: "en" | "zh"): string | undefined {
+  if (locale === "zh") return "zh-CN";
+  if (locale === "en") return "en-US";
+  // A caller that named no language keeps the reader's own locale, which
+  // is the reading this pair had before the pick was handed in.
+  return undefined;
 }
 
-// The calendar day a timestamp falls on, again in the reader's locale.
+// A clock time, in the language the screen is printing. A Chinese screen
+// reading 12:57 PM because the operating system is American is the same
+// mismatch the pack fixes for words, so the caller's pick decides the
+// format rather than the machine's.
+export function formatTime(d: Date | string, locale?: "en" | "zh"): string {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleTimeString(intlLocale(locale), {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// The calendar day a timestamp falls on, in the same language format.
 // Sits beside formatTime above so the two date formats a captain ever
 // sees come from one file.
-export function formatDate(d: Date | string): string {
+export function formatDate(d: Date | string, locale?: "en" | "zh"): string {
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString();
+  return date.toLocaleDateString(intlLocale(locale));
 }
 
 // Forwarded from ./rooms so the Lobby and GameRoom can keep importing
 // normalizeRoomName from "@/lib/utils" as the original single process build
-// did. The function itself lives in ./rooms beside the room code that also
+// did. The function itself lives in ./rooms beside the harbor code that also
 // uses it.
 export { normalizeRoomName } from "./rooms";

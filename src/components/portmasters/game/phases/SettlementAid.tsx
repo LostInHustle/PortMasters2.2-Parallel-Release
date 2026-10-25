@@ -3,16 +3,20 @@
 import { Button } from "@/components/ui/button";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { t } from "@/lib/game/i18n";
-import { cn } from "@/lib/utils";
 import { useLiveAmount } from "@/lib/use-live-amount";
 import { HandCoins } from "lucide-react";
 import { type PhasePanelProps } from "./PhaseShared";
+import {
+  SettlementDesk,
+  SettlementDeskAction,
+  SettlementDeskRow,
+} from "./SettlementDesk";
 
 /**
  * What happens to a loan nobody repays, as the one sentence every surface
  * that shows a loan renders: the ask this desk posts, the list of asks
  * beside it, and the Dues tab on the rail. The round is the voyage's own
- * last one, read off maxRounds, so the sentence names the leg this voyage
+ * last one, read off maxRounds, so the sentence names the round this voyage
  * settles on rather than a figure typed in beside it, and the borrower and
  * the lender read one wording of one rule. The sentence reads through the
  * pack here, at the composer all three surfaces share, so the wording and
@@ -94,14 +98,11 @@ export function HarborAid({
                     { "myRequest.amount": myRequest.amount },
                   )}
                 </span>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-7 px-2.5 text-[10px] rounded shrink-0"
+                <SettlementDeskAction
+                  label={t("Cancel")}
+                  destructive
                   onClick={() => aid.cancel()}
-                >
-                  {t("Cancel")}
-                </Button>
+                />
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -137,46 +138,31 @@ export function HarborAid({
       )}
 
       {otherRequests.length > 0 && (
-        <div className="rounded-xl border border-black/10 dark:border-white/10 bg-background/50 p-3.5 my-3.5">
-          <h3 className="font-semibold mb-2 text-sm">
-            {t("🆘 Captains Asking for Help")}
-          </h3>
-          <div className="space-y-1.5">
-            {otherRequests.map((r) => {
-              const canHelp = game.money >= r.amount;
-              return (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between rounded-md px-3 py-2 text-xs border border-black/5 dark:border-white/10 bg-background/60 gap-2"
-                >
-                  <span>
-                    {/* The name is the captain's own, so the sentence reads
-                        plain: React escapes whatever arrives in {fromName}. */}
-                    {t("{fromName} needs {amount} Gold", {
-                      fromName: r.fromName,
-                      amount: r.amount,
-                    })}
-                  </span>
-                  <Button
-                    size="sm"
-                    className={cn(
-                      "h-7 px-2.5 text-[10px] rounded shrink-0",
-                      canHelp && "pm-grad-resolve",
-                    )}
-                    variant={canHelp ? "default" : "secondary"}
-                    disabled={!canHelp}
-                    onClick={() => aid.help(r.id)}
-                  >
-                    {t("🤝 Lend {amount} Gold", { amount: r.amount })}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            {loanSettleLine(game.maxRounds)}
-          </p>
-        </div>
+        <SettlementDesk
+          title={t("🆘 Captains Asking for Help")}
+          note={loanSettleLine(game.maxRounds)}
+        >
+          {otherRequests.map((r) => {
+            const canHelp = game.money >= r.amount;
+            return (
+              <SettlementDeskRow key={r.id}>
+                <span>
+                  {/* The name is the captain's own, so the sentence reads
+                      plain: React escapes whatever arrives in {fromName}. */}
+                  {t("{fromName} needs {amount} Gold", {
+                    fromName: r.fromName,
+                    amount: r.amount,
+                  })}
+                </span>
+                <SettlementDeskAction
+                  label={t("🤝 Lend {amount} Gold", { amount: r.amount })}
+                  available={canHelp}
+                  onClick={() => aid.help(r.id)}
+                />
+              </SettlementDeskRow>
+            );
+          })}
+        </SettlementDesk>
       )}
     </>
   );

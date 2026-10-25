@@ -1,9 +1,9 @@
 // =====================================================================
-// [F1: the tag vocabulary, and the two tag rule] The reading half of the
+// The reading half of the
 // vocabulary: what every entry in the game is tagged with, and the rule
-// that holds the assignments to the plan's line.
+// that holds the assignments to the design's line.
 //
-// The rule is the second half of this goal and the plan is explicit about
+// The rule is the second half of this goal and the design is explicit about
 // where it lives: the two tag maximum is enforced by validation at load
 // time rather than by review, because a rule that depends on people
 // remembering it is not a rule. This module is that validation. The walk
@@ -19,14 +19,14 @@
 //
 //   1. Every tag on every entry is one of the twelve. A typo is not a
 //      near miss here, it is a tag no effect will ever name.
-//   2. No entry carries more than two, which is the plan's rule.
-//   3. No entry carries none, because the plan says every good, module,
+//   2. No entry carries more than two, which is the design's rule.
+//   3. No entry carries none, because the design says every good, module,
 //      boon and charter carries a set and an empty set is not one. The
 //      type cannot express one (TagList is one tag or two), so this clause
 //      is what holds a subject that did not come through the compiler: a
 //      row read out of a content file, or one an author cast past the
 //      type. It is also the shape a missing row takes when the content
-//      validator in G4 reads the expansions.
+//      validator reads the expansions.
 //   4. No entry carries the same tag twice. Counting it once would make
 //      a two tag ceiling that a three tag entry could pass.
 //   5. Every tag of the twelve is carried by something. A tag nothing
@@ -35,7 +35,7 @@
 //   6. No (kind, id) appears twice, since a duplicate id would shadow the
 //      entry it collides with on every read below.
 //   7. Every garment carries cold, read against the wardrobe's own table
-//      in ./constants/garments. A cold leg asks the wardrobe for warmth,
+//      in ./constants/garments. A cold round asks the wardrobe for warmth,
 //      so the goods that answer it are the goods tagged for it, and a
 //      garment added without its tag is a garment the cold rule can see
 //      and the cards cannot name.
@@ -103,7 +103,7 @@ export type TaggingSubject = {
   entries: readonly TaggedEntry[];
   /** The goods the wardrobe keeps a warmth rating for (see GARMENTS). */
   garments: readonly string[];
-  /** How many legs each pantry food stays food for, null meaning never. */
+  /** How many rounds each pantry food stays food for, null meaning never. */
   keepings: Record<string, number | null>;
   /** Each difficulty's raid escalation and corrupt broker, off its record. */
   difficulties: Record<string, { stepsUp: boolean; corrupt: boolean }>;
@@ -112,11 +112,11 @@ export type TaggingSubject = {
 /**
  * The subject this tree ships, walked from the content itself.
  *
- * The order is the plan's own with the pantry beside the goods it is
+ * The order is the design's own with the pantry beside the goods it is
  * carried with: goods, foods, modules, boons, charters, difficulties.
  * Cards are walked module first, boon second and charter third because
- * that is the order the plan lists them in, and the order is kept for the
- * reason the vocabulary keeps the plan's: two lists a reader compares
+ * that is the order the design lists them in, and the order is kept for the
+ * reason the vocabulary keeps the design's: two lists a reader compares
  * should not need a second alphabet.
  *
  * Every catalogue item is walked, so an item added tomorrow is read by the
@@ -261,7 +261,7 @@ export function validateTagging(
   for (const garment of garments) {
     if (!cold.has(garment)) {
       findings.push(
-        `"${garment}" is a garment and carries no cold tag, so the wardrobe answers a cold leg the cards cannot name.`,
+        `"${garment}" is a garment and carries no cold tag, so the wardrobe answers a cold round the cards cannot name.`,
       );
     }
   }
@@ -279,18 +279,18 @@ export function validateTagging(
   }
   for (const kept of pantry.filter((e) => e.tags.includes("preserved"))) {
     for (const turning of pantry.filter((e) => e.tags.includes("perishable"))) {
-      const keptLegs = keepings[kept.id] ?? null;
-      const turningLegs = keepings[turning.id] ?? null;
-      if (keptLegs === null || turningLegs === null) continue;
-      if (keptLegs < turningLegs) {
+      const keptRounds = keepings[kept.id] ?? null;
+      const turningRounds = keepings[turning.id] ?? null;
+      if (keptRounds === null || turningRounds === null) continue;
+      if (keptRounds < turningRounds) {
         findings.push(
           t(
-            '"{kept.id}" is preserved and keeps {keptLegs} legs while "{turning.id}" is perishable and keeps {turningLegs}, so the tag and the keeping disagree.',
+            '"{kept.id}" is preserved and keeps {keptRounds} rounds while "{turning.id}" is perishable and keeps {turningRounds}, so the tag and the keeping disagree.',
             {
               "kept.id": kept.id,
-              keptLegs,
+              keptRounds,
               "turning.id": turning.id,
-              turningLegs,
+              turningRounds,
             },
           ),
         );

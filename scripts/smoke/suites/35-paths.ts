@@ -22,28 +22,26 @@ import { join } from "node:path";
 
 export async function pathsSuite(): Promise<void> {
   // =====================================================================
-  // [D1: the path configuration module, and the naming change]
+  // The path configuration module, and the naming change
   //
-  // The plan asks for one record per path carrying crest, signature
-  // ability, goods, order pool, cargo modifier and Renown ceiling, in the
-  // shape the difficulty ladder already uses, so that adding or retuning
-  // a path is one entry and no other server code to touch. What is held
-  // below is that record read as a record: the facts it claims, the
-  // properties that make it one source of truth, and the naming change it
-  // carried, which is the half of this slice a later reader is likeliest
-  // to undo by accident.
+  // One record per path carries crest, signature ability, goods, order
+  // pool, cargo modifier and Renown ceiling, in the shape the difficulty
+  // ladder already uses, so that adding or retuning a path is one entry and
+  // no other server code to touch. What is held below is that record read
+  // as a record: the facts it claims, the properties that make it one
+  // source of truth, and the naming change it carried, which is the half a
+  // later reader is likeliest to undo by accident.
   //
   // Nothing here talks to the server, because there is no server side to
   // this feature: a path is content, and the module holding it reads no
   // clock, no database and no socket. Every check is also written to
-  // survive the day a sixth path is added, because the plan's own
-  // evaluation adds one to prove that no other module has to move, and a
-  // suite that failed on that edit would itself be the second place the
-  // paths are listed.
+  // survive the day a sixth path is added, since a sixth path is the proof
+  // that no other module has to move, and a suite that failed on that edit
+  // would itself be the second place the paths are listed.
   // =====================================================================
-  // The plan's five, with the names the plan gives them, read through
-  // pathConfig rather than off the record behind it, so the check
-  // exercises the door every other module reads them through.
+  // The five paths, with the names they carry, read through pathConfig
+  // rather than off the record behind it, so the check exercises the door
+  // every other module reads them through.
   const PLAN_PATHS: ReadonlyArray<readonly [PathId, string]> = [
     ["convoy", "Convoy"],
     ["loom", "Loom"],
@@ -53,7 +51,7 @@ export async function pathsSuite(): Promise<void> {
   ];
   check(
     PLAN_PATHS.every(([id, name]) => pathConfig(id)?.name === name),
-    "the plan's five paths are all in the record and carry the plan's own names, read through the same door every other module reads them through",
+    "the design's five paths are all in the record and carry the design's own names, read through the same door every other module reads them through",
   );
   check(
     PATH_IDS.join(",") === Object.keys(PATHS).join(",") &&
@@ -61,24 +59,24 @@ export async function pathsSuite(): Promise<void> {
     "and the id list is the record's own keys rather than a second list written out beside it, which is what makes a sixth path one entry here and a sixth path everywhere else",
   );
 
-  // Names and crests, the two things a locked card wears. The board D2
-  // builds greys three of them at once, so two paths sharing either make
+  // Names and crests, the two things a locked card wears. The pathbound
+  // order board grays three of them at once, so two paths sharing either make
   // two cards nobody can tell apart.
   const pathNames = PATH_IDS.map((id) => PATHS[id].name);
   const pathCrests = PATH_IDS.map((id) => PATHS[id].crest);
   check(
     pathNames.every((name) => name.length > 0) &&
       new Set(pathNames).size === pathNames.length,
-    "no two paths print the same name, so a locked card cannot be labelled for one path and stamped for another",
+    "no two paths print the same name, so a locked card cannot be labeled for one path and stamped for another",
   );
   check(
     pathCrests.every((crest) => crest.length > 0) &&
       new Set(pathCrests).size === pathCrests.length,
-    "and no two wear the same crest, for the same reason read from the other end: a repeated glyph makes two of the three greyed cards the same card",
+    "and no two wear the same crest, for the same reason read from the other end: a repeated glyph makes two of the three grayed cards the same card",
   );
 
   // The hold, which is where a path's structural poverty or plenty lives.
-  // Convoy's is the plan's own account of the path: the cannons that make
+  // Convoy's is the record's own account of the path: the cannons that make
   // its contract worth buying are cargo it cannot carry, so the number is
   // the subtraction of those two constants rather than a literal typed
   // beside it, and it is read against them here so a retune of either
@@ -102,13 +100,13 @@ export async function pathsSuite(): Promise<void> {
     ["loom", "aroma", "free_captain"].every(
       (id) => PATHS[id as PathId].cargoModifier === 1,
     ),
-    "and every path the plan claims nothing about carries exactly one, which is a value rather than an absent field: one means the hold is the hold",
+    "and every path the design claims nothing about carries exactly one, which is a value rather than an absent field: one means the hold is the hold",
   );
 
   // The ceilings, read off the ladder the profile and the merits already
-  // read. The plan gives one relation between the five and no numbers, so
-  // what is held here is that relation against the ladder rather than the
-  // numbers it currently works out to.
+  // read. The record gives one relation between the five and no numbers,
+  // so what is held here is that relation against the ladder rather than
+  // the numbers it currently works out to.
   const ladderRungs = RENOWN_TITLES.map((title) => title.minLevel);
   check(
     PATH_IDS.every((id) => ladderRungs.includes(PATHS[id].renownCeiling)),
@@ -124,7 +122,7 @@ export async function pathsSuite(): Promise<void> {
     PLAN_PATHS.filter(([id]) => id !== "quartermaster").every(
       ([id]) => PATHS[id].renownCeiling === besideCeiling,
     ) && besideCeiling < RENOWN_MAX_LEVEL,
-    "and the four beside it cap one rung beneath, which is the plan's only other word on the subject and is read off the ladder rather than written in twice",
+    "and the four beside it cap one rung beneath, which is the design's only other word on the subject and is read off the ladder rather than written in twice",
   );
 
   // The goods, read against the tables they were sourced from rather than
@@ -138,11 +136,11 @@ export async function pathsSuite(): Promise<void> {
     "each order path's goods are its own table read rather than retyped, so a fourth garment or a wider commodity list reaches the record without an edit inside it",
   );
 
-  // The pools, and with them the lock reason D2 computes rather than
-  // writes onto a card. The three errand paths bring the board an order
-  // of their own and the two action paths do not, which is a reading of
-  // the plan rather than a gap: selling a contract and borrowing an order
-  // are actions, and a board that greyed a card for them would have
+  // The pools, and with them the lock reason the board computes rather
+  // than writes onto a card. The three errand paths bring the board an
+  // order of their own and the two action paths do not, which is by design
+  // rather than a gap: selling a contract and borrowing an order
+  // are actions, and a board that grayed a card for them would have
   // invented an errand the design never gave them.
   const catalogue = new Set<string>([
     ...ITEMS,
@@ -156,13 +154,13 @@ export async function pathsSuite(): Promise<void> {
     ) &&
       PATHS.convoy.orderPool.length === 0 &&
       PATHS.free_captain.orderPool.length === 0,
-    "the three paths whose ability is an errand carry an order pool and the two whose ability is an action carry none, which is where D2's three greyed cards are drawn from",
+    "the three paths whose ability is an errand carry an order pool and the two whose ability is an action carry none, which is where the pathbound order board's three grayed cards are drawn from",
   );
   check(
     PATH_IDS.every((id) =>
       PATHS[id].orderPool.every((good) => catalogue.has(good)),
     ),
-    "and every good a pool names is a good the catalogue knows, so the board can never grey a card for an order nobody could fill",
+    "and every good a pool names is a good the catalogue knows, so the board can never gray a card for an order nobody could fill",
   );
   const claimed = new Map<string, number>();
   for (const id of PATH_IDS) {
@@ -175,13 +173,13 @@ export async function pathsSuite(): Promise<void> {
     "and no good is claimed by two paths at once, because lockingPathFor answers with the first pool holding it and a good in two would make that answer depend on the record's order",
   );
 
-  // The reader, which is the whole of what D2 calls and the one place a
-  // locked card's reason comes from.
+  // The reader, which is the whole of what the board calls and the one
+  // place a locked card's reason comes from.
   check(
     lockingPathFor("Brocade") === "loom" &&
       lockingPathFor("Silk") === "aroma" &&
       lockingPathFor("Salt Fish") === "quartermaster",
-    "a good finds its locking path by being looked up in the pools rather than by a label written onto the card, so what the board greys out and what the card says cannot come apart",
+    "a good finds its locking path by being looked up in the pools rather than by a label written onto the card, so what the board grays out and what the card says cannot come apart",
   );
   check(
     lockingPathFor("") === null && lockingPathFor("sachet") === null,
@@ -189,7 +187,7 @@ export async function pathsSuite(): Promise<void> {
   );
   check(
     [...catalogue].some((good) => lockingPathFor(good) === null),
-    "and the catalogue still holds goods no path claims, which is what keeps the board's ordinary orders ordinary and the locked ones the exception D2 greys out",
+    "and the catalogue still holds goods no path claims, which is what keeps the board's ordinary orders ordinary and the locked ones the exception the pathbound order board grays out",
   );
 
   // The door every other module reads a saved value through, and the
@@ -232,8 +230,9 @@ export async function pathsSuite(): Promise<void> {
     "and the record reads no environment value and reaches for no server module, so retuning a path is an edit to one file rather than a deploy",
   );
 
-  // The copy, under the house rule. A signature line is what D2 prints on
-  // a locked card, so it is a string a captain reads in the strictest
+  // The copy, under the house rule. A signature line is what the board
+  // prints on a locked card, so it is a string a captain reads in the
+  // strictest
   // sense, and the two modules the sweep wrote hold the rule in their
   // comments as well as in their copy.
   check(

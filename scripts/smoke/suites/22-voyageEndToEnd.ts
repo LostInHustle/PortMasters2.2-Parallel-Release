@@ -1,10 +1,10 @@
-// PortMasters 2.2 Parallel Release, smoke run: A voyage end to end on the six phase leg.
+// PortMasters 2.2 Parallel Release, smoke run: A voyage end to end on the six phase round.
 
 import { db } from "@/lib/db";
 import { lapPhases } from "@/lib/game/checkpoint";
 import type { GameMode } from "@/lib/game/mode";
 import { voyageRoundsFor } from "@/lib/game/mode";
-import { isLegPhase, normalizePhase, phaseFace } from "@/lib/game/phases";
+import { isRoundPhase, normalizePhase, phaseFace } from "@/lib/game/phases";
 import type { Phase } from "@/lib/game/types";
 import {
   LEDGER_PHRASE,
@@ -20,20 +20,20 @@ import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
 export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
-  // [B1: the six phase leg, as data] The plan's evaluation for this slice,
-  // read over live sockets rather than off the tables. A whole voyage has
+  // The six phase round, as data, read over live sockets rather than off the
+  // tables. A whole voyage has
   // to reach every seat of the lap, and both captains have to be told the
   // same checkpoint at every transition. What this catches that no data
   // check can is a phase that does not register with the checkpoint
-  // protocol at all: the room sits at it forever, and that shows up here
+  // protocol at all: the harbor sits at it forever, and that shows up here
   // as a harbor that never arrived rather than as one that is quietly
   // wrong.
   //
-  // Classic sails its whole voyage, which is the run the evaluation names.
+  // Classic sails its whole voyage, which is the run the check follows.
   // Gambit sails one full round: enough to prove its own order drives the
   // same protocol, without spending twelve rounds of wall clock on a lap
-  // the leg clock section above already holds to the data. Between them,
-  // every seat of both laps is walked by the room itself.
+  // the round clock section above already holds to the data. Between them,
+  // every seat of both laps is walked by the harbor itself.
   //
   // Each captain here is brand new and holds exactly one socket, which
   // matters rather than being tidy: the status handler ignores a frame
@@ -135,8 +135,8 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     // The run this walk is here to make, written out of the mode's own
     // lap: every seat of the round, repeated for as many rounds as the
     // voyage is long. Nothing about the order is typed in below, so a lap
-    // that changed order would change what the room is expected to walk.
-    const lap = lapPhases(mode).filter(isLegPhase);
+    // that changed order would change what the harbor is expected to walk.
+    const lap = lapPhases(mode).filter(isRoundPhase);
     const expected: LapStep[] = [];
     for (let round = 1; round <= rounds; round++) {
       for (const phase of lap) expected.push({ round, phase });
@@ -162,11 +162,11 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
         phase: step.phase,
       });
     };
-    // The room's whole protocol, in the order a client runs it: stand
-    // where you are, hear the room standing there too, then say you are
+    // The harbor's whole protocol, in the order a client runs it: stand
+    // where you are, hear the harbor standing there too, then say you are
     // done. The middle step is not politeness. A ready vote is judged
     // against the checkpoint the server is holding, so a vote that
-    // overtakes the report which put the room at this seat is refused as
+    // overtakes the report which put the harbor at this seat is refused as
     // out of step: the harbor would be short a vote, and the walk would
     // have stalled on its own haste rather than on anything the lap does.
     const stand = async (step: LapStep) => {
@@ -208,10 +208,10 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     };
 
     // The claim the ready check makes, held once at the voyage's first
-    // seat: a vote from one captain alone does not move the room. Without
+    // seat: a vote from one captain alone does not move the harbor. Without
     // this the walk would pass on a build that advanced the harbor on any
     // vote at all, since every later step sends both. The voyage opens
-    // with the room already standing at this seat, because room:start put
+    // with the harbor already standing at this seat, because room:start put
     // it there and said so, so the frame this waits on is already
     // recorded rather than still to come.
     const first = expected[0];
@@ -234,7 +234,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     // inbound budget (see src/server/realtime/inbound-limit.ts) earns a
     // socket ten frames a second back on top of its burst of thirty, and
     // one step here costs each seat two frames, the report that moves the
-    // room and the vote that releases it. A walk that steps as fast as
+    // harbor and the vote that releases it. A walk that steps as fast as
     // the server answers runs at twice the rate the budget pays out: it
     // drains the burst, and every frame after that is refused without a
     // word, which on this side of the wire looks exactly like a lap that
@@ -255,8 +255,8 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
       `the ${label} harbor reached every seat of its lap (the walk reached ${reached} of ${expected.length})`,
     );
 
-    // Where the room went, as the two captains heard it. The advance frames
-    // are the server naming the checkpoint the room is leaving, once per
+    // Where the harbor went, as the two captains heard it. The advance frames
+    // are the server naming the checkpoint the harbor is leaving, once per
     // transition, so the sequence they form is the voyage's shape.
     const walked = (seat: (typeof crew)[number]) =>
       seat.frames
@@ -271,16 +271,16 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
       walked(crew[1]).join(" ") === want.join(" "),
       "with the second captain told the same thing at every one of them",
     );
-    // Not just the same phase, the same frames: every broadcast the room
+    // Not just the same phase, the same frames: every broadcast the harbor
     // made, in the order it made them. Two clients that agree on the
     // phase but heard a different number of transitions would mean one of
-    // them was being carried by a catch up path rather than by the room,
-    // which is the failure the rollback clause of [B1] is about.
+    // them was being carried by a catch up path rather than by the harbor,
+    // which is the failure the rollback rule is about.
     check(
       JSON.stringify(crew[0].frames) === JSON.stringify(crew[1].frames),
       `both captains heard the same ${label} frames, in the same order, for the whole voyage`,
     );
-    // And the room waited for both of them at every seat rather than
+    // And the harbor waited for both of them at every seat rather than
     // advancing around a captain it had stopped counting.
     const requiredBoth = crew[0].frames
       .filter((frame) => frame.event === "phase:ready_update")
@@ -296,7 +296,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     );
 
     // The terminal is not a seat. A voyage that has finished reports
-    // endgame, which no lap lists, so the room's checkpoint stays on the
+    // endgame, which no lap lists, so the harbor's checkpoint stays on the
     // last phase it actually walked rather than following a captain onto a
     // screen the rest of the harbor is not standing on.
     const last = expected[expected.length - 1];
@@ -319,7 +319,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     check(
       settled?.currentRound === last.round &&
         normalizePhase(settled?.currentPhase) === last.phase,
-      `and a finished ${label} voyage leaves the room where the lap last stood rather than on the endgame screen`,
+      `and a finished ${label} voyage leaves the harbor where the lap last stood rather than on the endgame screen`,
     );
   };
 

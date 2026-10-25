@@ -93,7 +93,7 @@ export function Composer({
 }) {
   // The trade board's own refusal, drawn on the strip the press was made
   // from: the handshake button and the composer it opens both live here, so
-  // a post the room turns away is read where the captain pressed rather
+  // a post the harbor turns away is read where the captain pressed rather
   // than in a panel they may never open. The sentence is the frame's own,
   // carried through the hook and never rebuilt, and the dismissal is the
   // hook's own clearError.

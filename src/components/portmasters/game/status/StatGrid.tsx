@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { t } from "@/lib/game/i18n";
 import { hungryMarkerLabel, hungryTooltip } from "@/lib/game/status-copy";
-import { cn } from "@/lib/utils";
+import { FigureTile } from "../../profile/FigureTile";
 
 /**
- * The four headline numbers of the pinned rail: funds, reputation, and then
+ * The four headline numbers of the pinned rail: Gold, reputation, and then
  * whatever the voyage is charging the captain at this moment, which is what
  * round end will take while a voyage is under way and the ship's class
  * before it starts. A Larder cell joins them while the provisions layer is
@@ -15,11 +15,15 @@ import { cn } from "@/lib/utils";
  * exists.
  *
  * The cells sit two to a row rather than four, because the rail is a rail:
- * four across the width that leaves the stage the room it needs gives each
+ * four across the width that leaves the stage the harbor it needs gives each
  * cell about fifty pixels, and the longest label in the set ("Reputation")
  * is wider than that on its own, so every cell would break its own word in
  * half. Two rows of two cost the pinned block one row of height and read as
  * a proper readout rather than as four abbreviations.
+ *
+ * The cells are the one tile at its rail scale, wash, figure and caption
+ * included, because the rail used to keep its own copy of that shape and
+ * the larder's cell was a second copy of the copy.
  */
 export function StatGrid({
   money,
@@ -42,7 +46,7 @@ export function StatGrid({
   larder: number;
   shortRations: boolean;
 }) {
-  // [W3: the status convention] The hungry cell's sentence opens on a tap,
+  // The hungry cell's sentence opens on a tap,
   // which is the rail's one reveal idiom (the held cards under this grid
   // open the same way), so the why and the way back reach a touch screen
   // rather than living in a hover title.
@@ -51,58 +55,57 @@ export function StatGrid({
   return (
     <div>
       <div className="grid grid-cols-2 gap-1.5">
-        <Stat
-          label={t("Funds")}
+        <FigureTile
+          size="readout"
+          label={t("Gold")}
           value={t("{money}", { money })}
-          className="text-gold-ink"
+          valueClassName="text-gold-ink"
         />
-        <Stat
+        <FigureTile
+          size="readout"
           label={t("Reputation")}
           value={t("{score}", { score })}
-          className="text-favor"
+          valueClassName="text-favor"
         />
         {showObligations ? (
-          <Stat
+          <FigureTile
+            size="readout"
             label={t("Due")}
             value={`${pendTotal}`}
-            className={cn(safe ? "text-foreground" : "text-alarm")}
+            valueClassName={safe ? "text-foreground" : "text-alarm"}
           />
         ) : (
-          <Stat
+          <FigureTile
+            size="readout"
             label={t("Ship")}
             value={t("Lv {n}", { n: shipLevel })}
-            className="text-sea"
+            valueClassName="text-sea"
           />
         )}
-        {/* [C1: the Larder and Short Rations] Drawn only when the layer
+        {/* Drawn only when the layer
             is running, so a voyage with the switch off shows the same
             three columns at the same width it always had rather than a
-            fourth cell reporting a number no rule moves. [W3: the status
-            convention] The cell swaps its label to the state's own words
-            and opens the full sentence on a tap: colour alone is a
+            fourth cell reporting a number no rule moves. The cell swaps its label to the state's own words
+            and opens the full sentence on a tap: color alone is a
             readout only a captain who already knows the rule can read,
             and a hover never shows on a touch screen. */}
         {larderOn &&
           (shortRations ? (
-            <button
-              type="button"
-              onClick={() => setOpen((was) => !was)}
-              aria-expanded={open}
+            <FigureTile
+              size="readout"
+              label={hungryMarkerLabel()}
+              value={larder}
+              valueClassName="text-alarm"
+              onPress={() => setOpen((was) => !was)}
+              expanded={open}
               title={hungryTooltip()}
-              className="w-full rounded-lg bg-black/[0.03] px-2 py-1.5 text-center dark:bg-white/[0.05]"
-            >
-              <div className="text-[15px] font-bold leading-tight text-alarm">
-                {larder}
-              </div>
-              <div className="text-[9px] text-muted-foreground">
-                {hungryMarkerLabel()}
-              </div>
-            </button>
+            />
           ) : (
-            <Stat
+            <FigureTile
+              size="readout"
               label={t("Larder")}
               value={t("{larder}", { larder })}
-              className="text-larder"
+              valueClassName="text-larder"
             />
           ))}
       </div>
@@ -111,25 +114,6 @@ export function StatGrid({
           {hungryTooltip()}
         </p>
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className="rounded-lg bg-black/[0.03] px-2 py-1.5 text-center dark:bg-white/[0.05]">
-      <div className={cn("text-[15px] font-bold leading-tight", className)}>
-        {value}
-      </div>
-      <div className="text-[9px] text-muted-foreground">{label}</div>
     </div>
   );
 }

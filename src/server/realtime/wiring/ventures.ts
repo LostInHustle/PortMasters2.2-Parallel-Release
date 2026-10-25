@@ -24,7 +24,7 @@ import {
 import { tFor } from "@/lib/game/i18n";
 import { voyageRoundsFor } from "@/lib/game/mode";
 import { seated } from "../auth";
-import { sockets } from "../presence";
+import { broadcastRoomSystem } from "../presence";
 import {
   broadcastVentures,
   destroyOtherOpenVentures,
@@ -95,7 +95,7 @@ export function wireVentures(io: Server, socket: Socket): void {
       // The voyage's own length rather than the tier's, because the
       // deadline below has to fall inside the voyage in front of the
       // caller: on a mode with a length of its own the tier's number
-      // describes a different voyage (see voyageLegs in ./mode).
+      // describes a different voyage (see voyageRounds in ./mode).
       const voyageRounds = voyageRoundsFor(room.mode, room.difficulty);
       const bounds = computeVentureDeadlineBounds(
         room.currentRound,
@@ -137,23 +137,18 @@ export function wireVentures(io: Server, socket: Socket): void {
         },
       });
       await broadcastVentures(io, roomId);
-      // The posting goes to the whole room, so it goes to every socket
-      // still in the harbor, each in its captain's own language.
-      for (const [socketId, state] of sockets) {
-        if (state.roomId !== roomId) continue;
-        io.to(socketId).emit("room:system", {
-          roomId,
-          content: tFor(
-            state.locale,
-            "{s.user.displayName} posted a Venture: {targetGold} Gold needed by Round {deadlineRound}.",
-            {
-              "s.user.displayName": s.user.displayName,
-              targetGold,
-              deadlineRound,
-            },
-          ),
-        });
-      }
+      // The posting goes to the whole harbor, each in their own language.
+      broadcastRoomSystem(io, roomId, (locale) =>
+        tFor(
+          locale,
+          "{s.user.displayName} posted a Venture: {targetGold} Gold needed by Round {deadlineRound}.",
+          {
+            "s.user.displayName": s.user.displayName,
+            targetGold,
+            deadlineRound,
+          },
+        ),
+      );
     },
   );
 

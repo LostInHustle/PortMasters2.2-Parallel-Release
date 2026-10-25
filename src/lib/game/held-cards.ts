@@ -1,6 +1,5 @@
 // =====================================================================
-// [F4: boons at milestone moments, F6: charters at leg four, F7: the
-// power budget] The cards a captain holds, and the flags they write, and
+// The cards a captain holds, and the flags they write, and
 // the weight the two of them add up to.
 //
 // The moments that hand boons out live in ./milestones and the voyage's
@@ -29,9 +28,10 @@
 // Everything here is a pure read or a pure heal of the save. Nothing
 // mutates and no clock is read.
 // =====================================================================
-import { cardById } from "./cards";
+import { cardById, cardRunsInMode } from "./cards";
 import { HELD_POWER_CAP } from "./constants/cards";
 import type { CardRecord } from "./constants/cards";
+import { normalizeIdList } from "./id-list";
 import type { GameState, ModifierKey } from "./types";
 
 // ========== The save ==========
@@ -41,7 +41,7 @@ import type { GameState, ModifierKey } from "./types";
  * pool can still answer for.
  *
  * Three kinds of entry are dropped rather than kept. An id the pool does
- * not know is a retired card, which is the plan's own rollback read as a
+ * not know is a retired card, which is the design's own rollback read as a
  * load rule ("any boon that grants a durable effect has to be unwound
  * through the same normalization path the rest of the state uses"). An id
  * that is not a boon at all is a write that never came from the answer
@@ -51,15 +51,27 @@ import type { GameState, ModifierKey } from "./types";
  * durable by accident, which is the one way this field can lie about the
  * record it was written from. A repeat is dropped the same way, because
  * the merge below would read it twice for nothing.
+ *
+ * What a list is, and what an entry of it may be, is read by the one
+ * reader every list of ids shares (see normalizeIdList in ./id-list), so
+ * this healing and the voyage's queued moments cannot drift on what a
+ * save is allowed to say.
  */
-export function normalizeHeldBoons(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
+export function normalizeHeldBoons(
+  raw: unknown,
+  mode?: GameState["mode"],
+): string[] {
   const held: string[] = [];
-  for (const id of raw) {
-    if (typeof id !== "string" || held.includes(id)) continue;
+  for (const id of normalizeIdList(raw)) {
     const card = cardById(id);
     if (card === null || card.kind !== "boon") continue;
     if (card.trigger === "boon_draft") continue;
+    // A mode is handed in by the load path, which is the one place a
+    // voyage's mode can change under cards it already holds (a save made
+    // in Ocean Gambit rejoined in a Classic room). A card the new mode
+    // does not run is dropped here rather than left to write its flag
+    // into a voyage that could never offer it.
+    if (mode !== undefined && !cardRunsInMode(card, mode)) continue;
     held.push(id);
   }
   return held;
@@ -75,13 +87,18 @@ export function normalizeHeldBoons(raw: unknown): string[] {
  * reading of it. An id the pool does not know is a retired card and an
  * id that is not a charter at all is a write from somewhere else; both
  * drop to null, the same reading normalizeHeldBoons gives a retired
- * boon, and that shared reading is what makes the plan's rollback
+ * boon, and that shared reading is what makes the design's rollback
  * clause true word for word ("reverts with the pool").
  */
-export function normalizeCharter(raw: unknown): string | null {
+export function normalizeCharter(
+  raw: unknown,
+  mode?: GameState["mode"],
+): string | null {
   if (typeof raw !== "string") return null;
   const card = cardById(raw);
-  return card?.kind === "charter" ? raw : null;
+  if (card?.kind !== "charter") return null;
+  if (mode !== undefined && !cardRunsInMode(card, mode)) return null;
+  return raw;
 }
 
 // ========== The held cards ==========
@@ -137,17 +154,32 @@ export function heldCharterCard(
  * validator rather than by the merge order here (see the one owner per
  * key clause in ./cards), so the spread that uses this can put either
  * side first and be right.
+ *
+ * Where the state carries a mode, a card the mode does not run writes
+ * nothing. That is the same gate every offer answers (see cardRunsInMode
+ * in ./cards), read here for the durable half: a save rejoined under the
+ * other mode has its held ids healed against that mode (see
+ * normalizeHeldBoons above), and a state that never went through the heal
+ * still merges as the mode it is sailing under rather than as the voyage
+ * the cards were taken in.
  */
 export function heldFlagsOf(
-  state: Pick<GameState, "heldBoons" | "charter">,
+  state: Pick<GameState, "heldBoons" | "charter"> & {
+    mode?: GameState["mode"];
+  },
 ): Partial<Record<ModifierKey, number>> {
   const flags: Partial<Record<ModifierKey, number>> = {};
   for (const card of heldBoonCards(state)) {
+    if (state.mode !== undefined && !cardRunsInMode(card, state.mode)) continue;
     if (card.effect.kind !== "flags") continue;
     Object.assign(flags, card.effect.flags);
   }
   const charter = heldCharterCard(state);
-  if (charter !== null && charter.effect.kind === "flags") {
+  if (
+    charter !== null &&
+    (state.mode === undefined || cardRunsInMode(charter, state.mode)) &&
+    charter.effect.kind === "flags"
+  ) {
     Object.assign(flags, charter.effect.flags);
   }
   return flags;
@@ -156,7 +188,7 @@ export function heldFlagsOf(
 // ========== The budget ==========
 
 /**
- * [F7: the power budget] The weight the durable set is carrying: every
+ * The weight the durable set is carrying: every
  * held milestone boon, every bolted on module, and the voyage's charter,
  * summed through the pool.
  *
@@ -165,28 +197,38 @@ export function heldFlagsOf(
  * round draft's id, a retired card or a repeat is not power here for the
  * same reason it is not power after a reload, and there is one
  * implementation of that reading instead of two that could drift. The
- * modules are read off the hull the captain carries (a duplicate from the
- * draft's fallback pool is two bolted on modules and counts twice). A
- * card the pool cannot answer for is skipped, so a save that never went
- * through the heal still reads honestly here.
+ * mode travels through when the state carries one, so a card the mode
+ * does not run is not power here either. The modules are read off the
+ * hull the captain carries (a duplicate from the draft's fallback pool is
+ * two bolted on modules and counts twice). A card the pool cannot answer
+ * for is skipped, so a save that never went through the heal still reads
+ * honestly here.
  */
 export function heldPower(
-  state: Pick<GameState, "heldBoons" | "equippedModules" | "charter">,
+  state: Pick<GameState, "heldBoons" | "equippedModules" | "charter"> & {
+    mode?: GameState["mode"];
+  },
 ): number {
   let power = 0;
-  for (const id of normalizeHeldBoons(state.heldBoons)) {
+  for (const id of normalizeHeldBoons(state.heldBoons, state.mode)) {
     power += cardById(id)?.power ?? 0;
   }
   for (const mod of state.equippedModules) {
+    if (state.mode !== undefined && !cardRunsInMode(mod, state.mode)) continue;
     power += mod.power;
   }
   const charter = heldCharterCard(state);
-  if (charter !== null) power += charter.power;
+  if (
+    charter !== null &&
+    (state.mode === undefined || cardRunsInMode(charter, state.mode))
+  ) {
+    power += charter.power;
+  }
   return power;
 }
 
 /**
- * [F7: the power budget] The total the durable set reads once this card
+ * The total the durable set reads once this card
  * has landed on it, with the card being displaced given up first.
  *
  * The one reading of the swap arithmetic: the sentence a refused install

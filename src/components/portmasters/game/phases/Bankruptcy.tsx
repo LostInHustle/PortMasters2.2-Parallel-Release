@@ -12,16 +12,15 @@ import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
 
 /**
- * [MANIFEST 07: Bequest Routing] Extends the already shipped Silent
- * Partner panel below: at the moment bankruptcy is reached, a captain
- * with open loans still owed to them can designate one still active
- * captain in the room to receive future repayments instead of an inert
- * number nobody can spend.
+ * Extends the Silent Partner panel below: at the moment bankruptcy is
+ * reached, a captain with open loans still owed to them can designate
+ * one still active captain in the harbor to receive future repayments
+ * instead of an inert number nobody can spend.
  *
- * [Spectator Mode Enhancement] A bankrupt captain can watch the rest of
- * the harbor finish the voyage. The live standings board shows every
- * still active captain's current phase, Gold, and Reputation, updating
- * in real time as they play.
+ * A bankrupt captain can watch the rest of the harbor finish the
+ * voyage. The live standings board shows every still active captain's
+ * current phase, Gold, and Reputation, updating in real time as they
+ * play.
  *
  * The ended branch carries the host's own restart when the rest of the
  * harbor has finished too, the same call the control bar and the Endgame
@@ -41,9 +40,9 @@ export function Bankruptcy({
   PhasePanelProps,
   "game" | "members" | "backing" | "me" | "roster" | "room"
 > & {
-  // The host's own restart, wired from the room's one handler, so this
+  // The host's own restart, wired from the harbor's one handler, so this
   // panel offers the same call the control bar and the Endgame screen
-  // offer rather than a second path of its own. onLeave is the room's
+  // offer rather than a second path of its own. onLeave is the harbor's
   // leave flow, for a captain who would rather set out for a new harbor
   // than wait on the host.
   onRestart?: () => void;
@@ -85,12 +84,12 @@ export function Bankruptcy({
         💥
       </motion.div>
       <PhaseHeading layout="mb-1" tone="text-alarm" brush>
-        {t("Ship Fleet Bankrupt!")}
+        {t("Your Ship Is Bankrupt!")}
       </PhaseHeading>
       <p className="mb-4 text-sm text-muted-foreground">
         {game.money <= 0
-          ? t("Funds depleted, unable to pay essential operational costs")
-          : t("Insufficient funds to cover maintenance and wages")}
+          ? t("Gold depleted, unable to pay essential operational costs")
+          : t("Not enough Gold to cover maintenance and wages")}
       </p>
 
       {/* Final stats */}
@@ -101,7 +100,7 @@ export function Bankruptcy({
             {game.currentRound - 1}/{game.maxRounds}
           </b>
         </div>
-        <div className="text-muted-foreground">{t("Final Funds:")}</div>
+        <div className="text-muted-foreground">{t("Final Gold:")}</div>
         <div>
           <b>{t("{contract.fee} Gold", { "contract.fee": game.money })}</b>
         </div>
@@ -147,7 +146,9 @@ export function Bankruptcy({
                       {t("Owed by")}{" "}
                       <b className="text-foreground">{l.counterpartyName}</b>
                     </span>
-                    <span className="font-bold text-gain">{l.amount}g</span>
+                    <span className="font-bold text-gain">
+                      {t("{contract.fee} Gold", { "contract.fee": l.amount })}
+                    </span>
                   </div>
                   {candidates.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -231,6 +232,15 @@ export function Bankruptcy({
               </div>
             ))}
           </div>
+          {!isHost && onLeave && (
+            <Button
+              variant="secondary"
+              className="mt-3 rounded-xl px-8"
+              onClick={onLeave}
+            >
+              {t("⚓ Sail Again")}
+            </Button>
+          )}
         </motion.div>
       )}
 
@@ -274,7 +284,7 @@ export function Bankruptcy({
       <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <Anchor className="h-3 w-3" />
         {t(
-          "Click any captain in the Harbor Roster to peek at their cargo and workers",
+          "Click any captain in the Harbor Roster to peek at their cargo and artisans",
         )}
       </div>
     </div>

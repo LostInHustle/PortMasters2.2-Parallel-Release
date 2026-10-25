@@ -10,7 +10,7 @@
 // which is how a route states its own message: write the sentence into the
 // schema rather than branching here. The optional third argument is for the
 // routes that deliberately answer with one sentence whatever was wrong,
-// which is right for a sign in and wrong for a room code.
+// which is right for a sign in and wrong for a harbor code.
 // =====================================================================
 
 import { NextRequest, NextResponse } from "next/server";

@@ -1,7 +1,7 @@
 // =====================================================================
 // Realtime layer: voyage conclusion and Captain's Legacy.
 //
-// Fires once per room, the moment every current member has reported
+// Fires once per harbor, the moment every current member has reported
 // reaching either endgame or bankruptcy: the whole harbor's voyage is
 // over for everyone still seated in it. Whoever reached endgame (not
 // bankrupt) with the highest reported Reputation is crowned Sea Master.
@@ -12,15 +12,15 @@
 // purpose.
 //
 // concludedRooms guards against firing twice for the same voyage;
-// room:restart clears it so a room that plays again can conclude, and
+// room:restart clears it so a harbor that plays again can conclude, and
 // be crowned, again.
 //
 // NEW for the manifest: records one VoyageChronicle row per finisher
 // (using buildChronicle from chronicle.ts) and CaptainRival rows
 // for every pair of finishers (using recordRivalOutcomes from rival.ts).
 //
-// [H8: the reveal and the replay ledger] And flips the cards: the whole
-// hand, every verdict and the fleet's commission leg by leg go out as one
+// And flips the cards: the whole
+// hand, every verdict and the fleet's commission round by round go out as one
 // voyage:reveal frame after the standings, in the one mode where a hand
 // was dealt (see ./reveal.ts).
 // =====================================================================
@@ -70,7 +70,7 @@ export async function maybeConcludeVoyage(
   // the check at the door, both come back to a voyage where every captain
   // has finished, and both go on to conclude it. One voyage that concludes
   // twice writes two chronicles, banks a second crown's worth of Renown,
-  // records every rival row twice and sends the whole room two copies of
+  // records every rival row twice and sends the whole harbor two copies of
   // every frame this function ends with. Nothing between this check and
   // the claim below yields, so the captain who loses the race reads the
   // set here and leaves.
@@ -79,7 +79,7 @@ export async function maybeConcludeVoyage(
 
   // The watch on the last announcement of this voyage, stood down. The
   // promise it guards is that a report naming a later seat will move the
-  // room's checkpoint, and the leg a voyage ends on keeps that promise in
+  // harbor's checkpoint, and the round a voyage ends on keeps that promise in
   // the other currency: every captain who finished is standing on a phase
   // no lap contains, which has no rank and so can never move anything. Left
   // armed, it would fire a quarter minute after the crown was handed out
@@ -90,11 +90,11 @@ export async function maybeConcludeVoyage(
   const run = await readVoyageRun(roomId);
   await resolveOpenVentures(io, roomId, run.room);
   sweepAbsentBorrowerLoans(io, roomId, finished);
-  // The room's own sweeps just paid out: an escrow came back to its poster
+  // The harbor's own sweeps just paid out: an escrow came back to its poster
   // when the trade board cleared, an open venture refunded its half, and a
   // loan the harbor had written off settled at zero. Every one of those
   // lands in the captain's own client and comes back on that client's next
-  // broadcast, so the verdicts below wait one beat for the room to speak
+  // broadcast, so the verdicts below wait one beat for the harbor to speak
   // again before the numbers they are judged on are read. Without that
   // beat, every purse in the harbor would be read one moment before the
   // voyage paid it out, while the captain's own screen was already showing
@@ -106,10 +106,10 @@ export async function maybeConcludeVoyage(
   // rewrites a beat after the change.
   const harbor = await readHarborSaves(roomId);
   closeVoyageRecord(roomId, harbor.peerTradeProfits);
-  // The finished roster, read back once the room has had its beat. The
+  // The finished roster, read back once the harbor has had its beat. The
   // numbers every verdict below is judged on are therefore the numbers
   // the captains' clients just reported, which are the numbers their own
-  // endgame screens are showing. A room whose members left during the
+  // endgame screens are showing. A harbor whose members left during the
   // beat keeps the reading taken at the door, which is the only reading
   // there is.
   const settled = (await readFinishedCaptains(roomId)) ?? finished;

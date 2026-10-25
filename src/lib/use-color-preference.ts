@@ -9,7 +9,7 @@ import { COLORS, COLORS_COLORBLIND_SAFE } from "@/lib/game/constants/brand";
 // boundary, since this never changes what any other captain sees.
 const COLORBLIND_SAFE_KEY = "portmasters_colorblind_safe";
 
-// Every panel that colours a good's name takes `colorFor` as an optional
+// Every panel that colors a good's name takes `colorFor` as an optional
 // prop, so a caller that has not wired the preference through still renders
 // correctly. Each one used to inline the same fallback expression, which put
 // six copies of "the default palette is COLORS" across the components and

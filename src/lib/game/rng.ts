@@ -3,7 +3,7 @@
 // to ask for twice and get the same answer: the port market, the trade
 // orders, and the round's intel pool.
 //
-// The seed carries the captain's own id as well as the room's (see the
+// The seed carries the captain's own id as well as the harbor's (see the
 // seedBase in useGameSession), so a draw is reproducible per captain
 // rather than shared by the table. Two captains in one harbor sail
 // different markets and are dealt different orders, and reloading a tab

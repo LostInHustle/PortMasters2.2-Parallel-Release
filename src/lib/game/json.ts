@@ -1,15 +1,16 @@
 // =====================================================================
-// PortMasters 2.2 Parallel Release: the parse two defensive readers share.
+// PortMasters 2.2 Parallel Release: the parse the defensive readers share.
 //
-// Two columns in this game hold JSON that was written by earlier runs of
+// Three columns in this game hold JSON that was written by earlier runs of
 // this server and can come back malformed or hand edited: a venture's
-// contributions (see parseVentureContributions in ./convoy) and the
-// ledger's per difficulty breakdown (see parseStatsByDifficulty in
-// ./legacy). Both readers are deliberately defensive, and both need the
-// same first question answered before their own field checks begin: did
-// this column parse into an object at all? The answer here is null rather
-// than an empty record, because what a malformed row degrades to is each
-// caller's own answer and neither belongs to the parse.
+// contributions (see parseVentureContributions in ./convoy), the ledger's
+// per difficulty breakdown (see parseStatsByDifficulty in ./legacy), and a
+// captain's save blob (see parseSave in src/server/realtime). Each reader is
+// deliberately defensive, and all need the same first question answered
+// before their own field checks begin: did this column parse into an object
+// at all? The answer here is null rather than an empty record, because what
+// a malformed row degrades to is each caller's own answer and neither
+// belongs to the parse.
 // =====================================================================
 
 /**

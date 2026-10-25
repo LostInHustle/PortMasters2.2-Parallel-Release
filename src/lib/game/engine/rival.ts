@@ -3,7 +3,7 @@
 //
 // The engine itself is single captain: it never knows who else is in the
 // harbor, only what its own captain is doing. The multiplayer layer tracks
-// meetings between two captains separately, and to summarise "how did Lin
+// meetings between two captains separately, and to summarize "how did Lin
 // and Wei do against each other across this voyage" it needs one shared
 // shape for a recorded meeting and one fold over a list of them. Both live
 // here so the rest of the engine never has to reason about pairs of ids.

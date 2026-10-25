@@ -15,16 +15,18 @@ import { APP_NAME } from "@/lib/game/constants/brand";
 import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
 import { tipsHeading, tipsText } from "@/lib/game/constants/tips";
 import type { Difficulty } from "@/lib/game/difficulty";
-import { getLocale, t } from "@/lib/game/i18n";
+import { t } from "@/lib/game/i18n";
+import { useLanguage } from "@/lib/use-language-preference";
 // The two modals below that quote a voyage's length take the mode as well
 // as the tier, because the length is the voyage's rather than the tier's
-// alone (see voyageLegs in src/lib/game/mode). The caller reads both off
+// alone (see voyageRounds in src/lib/game/mode). The caller reads both off
 // the state the captain is sailing, which is what keeps the copy and the
 // voyage it describes the same voyage.
 import type { GameMode } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import { getIntelCost } from "@/lib/game/engine";
 import { cn, formatTime } from "@/lib/utils";
+import { RichText } from "../RichText";
 import { CloseFooter } from "./CloseFooter";
 import {
   Sparkles,
@@ -50,7 +52,7 @@ import type { NotificationItem } from "@/lib/use-notifications";
  * The badge comes in as a node rather than as an icon plus a class,
  * because the two headings do not wear theirs the same way: the Guide
  * puts its book on a gradient tile, and the Advice leaves the bulb as a
- * plain coloured icon.
+ * plain colored icon.
  */
 function TextModal({
   open,
@@ -166,6 +168,7 @@ export function NotificationHistoryModal({
   onOpenChange: (v: boolean) => void;
   items: NotificationItem[];
 }) {
+  const { locale } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -176,7 +179,7 @@ export function NotificationHistoryModal({
           </DialogTitle>
           <DialogDescription className="sr-only">
             {t(
-              "Every ledger update, harbor message, and direct message this session",
+              "Every ledger update, harbor message, and direct message from this voyage",
             )}
           </DialogDescription>
         </DialogHeader>
@@ -203,7 +206,7 @@ export function NotificationHistoryModal({
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
                     <span className="text-base">{n.icon}</span> {n.title}
                     <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {formatTime(new Date(n.at))}
+                      {formatTime(new Date(n.at), locale)}
                     </span>
                   </div>
                   <div className="space-y-0.5">
@@ -238,7 +241,7 @@ export function RumorBoardModal({
   game: GameState;
   onBuy: () => void;
 }) {
-  // The rumor price is derived, through getIntelCost (see
+  // The whisper price is derived, through getIntelCost (see
   // engine/pricing), from whether the Broker's Network module is
   // equipped, so the modal cannot show a price the engine would not
   // charge.
@@ -251,15 +254,15 @@ export function RumorBoardModal({
             <span className="pm-grad-rumors inline-flex h-7 w-7 items-center justify-center rounded-lg">
               <Sparkles className="h-4 w-4" />
             </span>
-            {t("Broker's Rumor Board")}
+            {t("Broker's Whisper Board")}
           </DialogTitle>
           <DialogDescription>
-            {t("Spend gold to reveal what Orders will ask for!")}
+            {t("Spend Gold to reveal what Orders will ask for!")}
           </DialogDescription>
         </DialogHeader>
-        {/* The button greys outside Market because the engine refuses the
-            press there (see purchaseIntel): a rumor bought after the board
-            is dealt could never be honoured, and a dialog left open across
+        {/* The button grays outside Market because the engine refuses the
+            press there (see purchaseIntel): a whisper bought after the board
+            is dealt could never be honored, and a dialog left open across
             the rest of the lap is exactly how that press happens. */}
         <div className="flex flex-col items-center my-2 gap-1.5">
           <Button
@@ -267,7 +270,7 @@ export function RumorBoardModal({
             onClick={onBuy}
             disabled={game.phase !== "market"}
           >
-            {t("🔮 Buy Rumor ({intelCost}💰)", { intelCost })}
+            {t("🔮 Buy a Whisper ({intelCost}💰)", { intelCost })}
           </Button>
           {game.phase !== "market" && (
             <p className="text-[11px] text-muted-foreground">
@@ -279,7 +282,7 @@ export function RumorBoardModal({
           {game.revealedIntel.length ? (
             <>
               <div className="font-semibold text-rumors text-sm mb-1.5">
-                {t("📜 Revealed Intel:")}
+                {t("📜 Revealed Whispers:")}
               </div>
               {game.revealedIntel.map((i, idx) => (
                 <div key={idx} className="text-[13px] py-0.5">
@@ -293,7 +296,7 @@ export function RumorBoardModal({
           ) : (
             <div className="text-muted-foreground text-center py-5 text-sm">
               {t(
-                "✨ No rumors revealed yet... Spend gold to listen to the Broker's whispers.",
+                "✨ No whispers revealed yet... Spend Gold to listen to the Broker.",
               )}
             </div>
           )}
@@ -309,22 +312,36 @@ export function RumorBoardModal({
 }
 
 /**
- * Host only confirmation before a restart goes out over the wire. A
- * restart resets every captain currently in the harbor back to round one,
- * not just whoever clicks the button, and reopens the room to new joins,
- * so it's worth one extra click to make sure that's actually intended.
+ * The dialog that asks before a thing that cannot be undone: the restart
+ * that resets the harbor and the leave that writes a seat off. The two
+ * had been written out twice line for line, down to the alarm chip and
+ * the pair of buttons, and two copies of a destructive confirm is how one
+ * of them drifts into a friendly one without anybody deciding to. The
+ * parts that differ are the four the caller hands over: the glyph, the
+ * question, the sentence under it, and the name of the press that goes
+ * through.
  *
- * Wears the vermilion gradient so the consequence reads at a glance: a
- * restart is the most destructive action in the room, and the destructive
- * accent is what surfaces that without needing the body copy to land first.
+ * The chip wears the alarm wash and the alarm ink together, so the glyph
+ * inside inherits the color rather than being told it, and the confirm
+ * press wears the same alarm against the background: the dialog that
+ * takes rather than gives is the one that says so before it is answered.
  */
-export function RestartConfirmModal({
+function ConfirmDialog({
   open,
   onOpenChange,
+  icon: Icon,
+  title,
+  description,
+  confirmLabel,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** The glyph the chip carries. The chip sizes the box it sits in. */
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  confirmLabel: string;
   onConfirm: () => void;
 }) {
   return (
@@ -332,19 +349,12 @@ export function RestartConfirmModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {/* The one dialog in the session that takes rather than gives:
-                restarting sends every captain back to round one and cannot
-                be undone, so it wears the colour that means a loss. */}
-            <span className="bg-alarm/5 inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <RotateCcw className="h-4 w-4 text-alarm" />
+            <span className="bg-alarm/5 inline-flex h-7 w-7 items-center justify-center rounded-lg text-alarm">
+              <Icon className="h-4 w-4" />
             </span>
-            {t("Restart the voyage?")}
+            {title}
           </DialogTitle>
-          <DialogDescription>
-            {t(
-              "Every captain currently in this harbor goes back to round one: gold, cargo, workers, and ship upgrades all reset. The harbor also reopens, so new captains can join again. This can't be undone.",
-            )}
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="flex justify-end gap-2 mt-2">
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -357,11 +367,47 @@ export function RestartConfirmModal({
               onConfirm();
             }}
           >
-            {t("Restart for Everyone")}
+            {confirmLabel}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Host only confirmation before a restart goes out over the wire. A
+ * restart resets every captain currently in the harbor back to round one,
+ * not just whoever clicks the button, and reopens the harbor to new joins,
+ * so it's worth one extra click to make sure that's actually intended.
+ *
+ * Wears the vermilion gradient so the consequence reads at a glance: a
+ * restart is the most destructive action in the harbor, and the destructive
+ * accent is what surfaces that without needing the body copy to land
+ * first. It is the one dialog in the session that takes rather than
+ * gives, so it wears the color that means a loss.
+ */
+export function RestartConfirmModal({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      icon={RotateCcw}
+      title={t("Restart the voyage?")}
+      description={t(
+        "Every captain currently in this harbor goes back to round one: Gold, cargo, artisans, and hull upgrades all reset. The harbor also reopens, so new captains can join again. This can't be undone.",
+      )}
+      confirmLabel={t("Restart for Everyone")}
+      onConfirm={onConfirm}
+    />
   );
 }
 
@@ -381,37 +427,17 @@ export function LeaveConfirmModal({
   onConfirm: () => void;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="bg-alarm/5 inline-flex h-7 w-7 items-center justify-center rounded-lg">
-              <DoorOpen className="h-4 w-4 text-alarm" />
-            </span>
-            {t("Leave the voyage?")}
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "The harbor sails on without you: your seat is written off, and the gold and cargo you were carrying go with it. You can start or join a new harbor right away. This can't be undone.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-end gap-2 mt-2">
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            {t("Cancel")}
-          </Button>
-          <Button
-            className="bg-alarm text-background"
-            onClick={() => {
-              onOpenChange(false);
-              onConfirm();
-            }}
-          >
-            {t("Leave the Voyage")}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      icon={DoorOpen}
+      title={t("Leave the voyage?")}
+      description={t(
+        "The harbor sails on without you: your seat is written off, and the Gold and cargo you were carrying go with it. You can start or join a new harbor right away. This can't be undone.",
+      )}
+      confirmLabel={t("Leave the Voyage")}
+      onConfirm={onConfirm}
+    />
   );
 }
 
@@ -422,14 +448,13 @@ export function TutorialModal({
   difficulty,
 }: VoyageReadingProps) {
   const [step, setStep] = useState(0);
-  // The step copy is composed for the language in force when it is built
-  // (see tutorialSteps), so the language is part of the memo's own key: a
-  // flip rebuilds the steps rather than leaving the last one on screen.
-  const locale = getLocale();
-  const steps = useMemo(
-    () => tutorialSteps(mode, difficulty),
-    [mode, difficulty, locale],
-  );
+  const { locale } = useLanguage();
+  // tutorialSteps composes its copy through t(), so a locale change must
+  // rebuild the steps. The reference below makes that dependency explicit.
+  const steps = useMemo(() => {
+    void locale;
+    return tutorialSteps(mode, difficulty);
+  }, [mode, difficulty, locale]);
   const total = steps.length;
   const s = steps[step];
   const pct = Math.round(((step + 1) / total) * 100);
@@ -467,9 +492,9 @@ export function TutorialModal({
           </DialogDescription>
         </DialogHeader>
         <Progress value={pct} className="h-1.5 shrink-0" />
-        <div
+        <RichText
           className="min-h-0 flex-1 overflow-y-auto pr-1 text-[13.5px] leading-relaxed text-foreground [&_p]:mb-2 [&_div]:mb-1"
-          dangerouslySetInnerHTML={{ __html: s.content }}
+          html={s.content}
         />
         <div className="shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-3 pt-3 border-t">
           <Button
@@ -493,7 +518,7 @@ export function TutorialModal({
               className="justify-self-end pm-grad-guide"
               onClick={close}
             >
-              {t("🚢 Set Sail!")}
+              {t("Done")}
             </Button>
           ) : (
             <Button

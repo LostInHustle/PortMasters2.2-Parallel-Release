@@ -36,6 +36,8 @@ import {
 } from "@/lib/game/i18n";
 import PACK from "@/lib/game/i18n/zh.json";
 import { CARDS } from "@/lib/game/cards";
+import { MODES } from "@/lib/game/mode";
+import { DIFFICULTIES } from "@/lib/game/difficulty";
 import {
   CARRIES_A_DASH,
   check,
@@ -68,7 +70,7 @@ type Leaf = { id: string; group: string; en: string; zh: string };
 export async function theBilingualHarborSuite(): Promise<void> {
   const book = PACK as unknown as Record<string, unknown>;
 
-  // ---- A. The book, read independently and held to its contract ----
+  // ========== A. The book, read independently and held to its contract ==========
   const groupNames = Object.keys(book).filter((group) => group !== "$meta");
   const leaves: Leaf[] = [];
   const shapeProblems: string[] = [];
@@ -117,7 +119,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     if (!en.trim() && !zh.trim()) continue;
     // The dash rule reads the words with the style carriers taken out:
     // `--` is how a CSS custom property is read, so the var() calls the
-    // guide fragments wrap their colours in are the same exemption the
+    // guide fragments wrap their colors in are the same exemption the
     // tree wide rule documents, not typography.
     const styleFree = (text: string) =>
       text.replace(/var\(--[^)]*\)/g, "var()");
@@ -151,7 +153,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     "and the house rule holds over both languages of the whole book: no dash and no doubled hyphen anywhere a captain could read one, the same line every spoken article in this run is held to",
   );
 
-  // ---- B. The readers, walked over every leaf ----
+  // ========== B. The readers, walked over every leaf ==========
   setLocale(DEFAULT_LOCALE);
   const englishProblems = leaves.filter(({ en }) => t(en) !== en);
   check(
@@ -194,7 +196,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     "and a call site's own values land in the Mandarin under the same names the English uses, so a sentence with a count or a name in it reads whole in both languages and a token renamed on one side is caught here rather than on a screen",
   );
 
-  // ---- C. The one word two surfaces read differently ----
+  // ========== C. The one word two surfaces read differently ==========
   const uiMarket = leaves.find(
     (leaf) => leaf.group === "ui" && leaf.id === "ui.market",
   );
@@ -218,7 +220,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     "and a string or an id the book does not carry prints itself rather than vanishing, in either language: a missing row is a gap in the pack somebody can see and fix, never a sentence quietly shortened",
   );
 
-  // ---- D. The readers' own edges ----
+  // ========== D. The readers' own edges ==========
   check(
     LOCALES.join(",") === "en,zh" &&
       DEFAULT_LOCALE === "en" &&
@@ -243,7 +245,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     "and the one substitution reads a zero as a value rather than a blank, keeps a token no call filled on the page as written, and returns a plain string untouched, which together are the whole of what every captain facing line goes through",
   );
 
-  // ---- E. The call sites, held to the book ----
+  // ========== E. The call sites, held to the book ==========
   // The three spellings the wiring uses, each read as the complete double
   // quoted literal it is: t and tId take the string first, tFor takes it
   // after the locale. A literal that does not parse as a JSON string is
@@ -311,6 +313,15 @@ export async function theBilingualHarborSuite(): Promise<void> {
     }
     scanned++;
   }
+  // A failure is useful only if it names the rows that are missing, so the
+  // walk prints them before the check records the failure.
+  if (missing.length > 0) {
+    console.log(`  missing (${missing.length}):`);
+    for (const entry of missing.slice(0, 40)) console.log(`    ${entry}`);
+    if (missing.length > 40) {
+      console.log(`    and ${missing.length - 40} more`);
+    }
+  }
   check(
     missing.length === 0,
     "and every string and id the tree hands the readers today exists in the book, so the completeness of the pack is a property of the source rather than a promise (" +
@@ -318,7 +329,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
       " files walked)",
   );
 
-  // ---- F. The card records, held to their rows ----
+  // ========== F. The card records, held to their rows ==========
   // A card carries its own pair of strings in the record, which is what
   // every screen in fact prints (see cardText in ./game/cards), and the
   // book's cards group is the same pair written down for the mapping
@@ -351,5 +362,87 @@ export async function theBilingualHarborSuite(): Promise<void> {
     "and every card record and its row in the book carry the same two strings, both languages, with no row left behind by a card the pool no longer carries, so the book's cards group is a mirror of the records rather than a plan they have outgrown (" +
       CARDS.length +
       " records mirrored)",
+  );
+
+  // ========== G. The records, held to their rows ==========
+  // A string can reach the readers without being a literal at the call
+  // site: the mode record and the difficulty record carry their own
+  // English, and the screens hand those to t() by name, so the walk in
+  // section E cannot see them at all. The records are walked here
+  // instead, field by field, and every word they carry has to exist in
+  // the book. This is the drift the Ocean Gambit's own differences used
+  // to carry: a record that said "room" where the book said "harbor"
+  // printed its English in both languages, which is the shape of bug a
+  // pack cannot see from inside itself.
+  //
+  // What the readers are given is prose, and what they are not is an
+  // id: the icon a card wears, the phase a round names, the kind a
+  // briefing is, the tags a tier carries and the order a mode walks are
+  // all read as ids and are named as such here, so a record that grows
+  // a new kind of field is caught by the field name rather than by a
+  // list of values that would have to be rewritten by hand.
+  const RECORD_IDS = new Set([
+    "icon",
+    "kind",
+    "phase",
+    "tags",
+    "checkpointPhaseOrder",
+  ]);
+
+  const prose = (
+    value: unknown,
+    path: string,
+    field: string,
+    out: { path: string; text: string }[],
+  ): void => {
+    if (typeof value === "string") {
+      if (!RECORD_IDS.has(field)) out.push({ path, text: value });
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) =>
+        prose(item, path + "[" + index + "]", field, out),
+      );
+      return;
+    }
+    if (value && typeof value === "object") {
+      for (const [key, item] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        prose(item, path + "." + key, key, out);
+      }
+    }
+  };
+
+  const recordProse: { path: string; text: string }[] = [];
+  for (const [key, mode] of Object.entries(MODES)) {
+    prose(mode, "mode." + key, "", recordProse);
+  }
+  for (const [key, cfg] of Object.entries(DIFFICULTIES)) {
+    prose(cfg, "difficulty." + key, "", recordProse);
+  }
+
+  // The detector's own proof, on a record shaped like the ones the tree
+  // holds: a word the book does not carry is named, and an icon is not
+  // a word and is left alone.
+  const proofProse: { path: string; text: string }[] = [];
+  prose({ badge: ABSENT, icon: "🌤" }, "proof", "", proofProse);
+  check(
+    proofProse.length === 1 &&
+      proofProse[0].text === ABSENT &&
+      proofProse[0].path === "proof.badge",
+    "the walk that holds the records to the book has been watched fire: handed a record carrying one word the pack does not know beside one icon, it names the word and leaves the icon alone",
+  );
+
+  const recordMissing = recordProse.filter((row) => !firstWins.has(row.text));
+  check(
+    recordMissing.length === 0,
+    "and every word the mode and difficulty records carry exists in the book, so a record that is retuned without its row is named here rather than printing its English in a Chinese column (" +
+      recordProse.length +
+      " record words walked, " +
+      Object.keys(MODES).length +
+      " modes and " +
+      Object.keys(DIFFICULTIES).length +
+      " tiers)",
   );
 }

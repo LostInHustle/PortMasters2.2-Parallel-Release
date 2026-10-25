@@ -2,7 +2,7 @@
  * The band report.
  *
  * Prints every Ocean Gambit win rate band, per role and per table size,
- * against the targets in src/lib/game/balance.ts. The epic's gate is a
+ * against the targets in src/lib/game/balance.ts. The launch gate is a
  * claim about these numbers, so the numbers have to be readable without
  * writing a query: this reads the outcomes out of the same window the
  * balance page and the launch gate read (see readOperatorWindow in

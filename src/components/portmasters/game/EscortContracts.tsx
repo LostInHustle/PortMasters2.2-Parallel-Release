@@ -6,7 +6,7 @@ import { PrivateOffer } from "@/components/portmasters/game/PrivateOffer";
 import type { PublicUser } from "@/lib/api";
 import {
   ESCORT_OFFER_DEATH,
-  LEG_ALREADY_COVERED,
+  ROUND_ALREADY_COVERED,
   STALE_OFFER,
   consentFeeRule,
   feeShortfallLine,
@@ -36,20 +36,20 @@ import type { Escort } from "./phases/PhaseShared";
 // id is a constant the paths table carries, so the record is there in every
 // build this compiles in, and the assertion is only the type checker asking
 // for a proof it cannot see through a lookup by value (see pathConfig).
-const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH)!;
+const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH);
 
 /**
- * [D3: Convoy: the Escort Contract] The protection market, drawn at the
- * Parley table beside the Captain's Exchange because that is where the plan
- * puts it: one leg of cover, sold by a Convoy captain to one other captain
- * at a price the two of them agree, and read by the room for the rest of
- * the leg.
+ * The protection market, drawn at the
+ * Parley table beside the Captain's Exchange because that is where the design
+ * puts it: one round of cover, sold by a Convoy captain to one other captain
+ * at a price the two of them agree, and read by the harbor for the rest of
+ * the round.
  *
  * Everything a captain can do here is a socket frame and nothing else. The
  * Gold moves on the two clients that agreed to it, through applyEscortSide,
  * and the board this panel draws is the server's own view of who has
  * offered what: a panel that decided any of this by itself would be a
- * second market the room could not see.
+ * second market the harbor could not see.
  *
  * The three things this panel owes a captain are the three the market kept
  * failing to say, and each is read rather than written twice. What the deal
@@ -66,10 +66,10 @@ const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH)!;
  * refused.
  *
  * The rules the buttons carry are the server's, not this file's. A captain
- * is covered once a leg, which is the shared primitive's bound read
+ * is covered once a round, which is the shared primitive's bound read
  * on the buyer's side (see consentPartyBusy); a fee is paid by the buyer at
  * the handshake, which is the one condition this market asks of a purse
- * (see canPayFee); and an offer belongs to the leg it was posted in,
+ * (see canPayFee); and an offer belongs to the round it was posted in,
  * so a board that lags a checkpoint shows the refusal before a click
  * instead of after one.
  */
@@ -90,15 +90,16 @@ export function EscortMarket({
   // constant, which is the shape the rules of hooks exist to forbid.
   const [fee, setFee] = useState(CONSENT_FEE_MIN);
   const [targetId, setTargetId] = useState("");
+  const clearEscortError = escort.clearError;
 
-  // A refusal belongs to the leg it was answered in. The board hook keeps
-  // the last one it heard (see use-consent-board), and a leg's board is
+  // A refusal belongs to the round it was answered in. The board hook keeps
+  // the last one it heard (see use-consent-board), and a round's board is
   // replaced wholesale where its error line is not, so a refusal from the
-  // Parley that just closed would sit over the next one: the leg is the
+  // Parley that just closed would sit over the next one: the round is the
   // key, and the line goes when it turns.
   useEffect(() => {
-    escort.clearError();
-  }, [game.currentRound, escort.clearError]);
+    clearEscortError();
+  }, [game.currentRound, clearEscortError]);
 
   if (!escortContractsOn(game.mode)) return null;
 
@@ -113,7 +114,7 @@ export function EscortMarket({
   // The two shares of a raid, both read from the one number the raid roll
   // reads rather than spelled into the sentence below: the guns beat off
   // escortCoverage of it and the seller's Gold answers the rest, which is
-  // the plan's "your cannons decide how much you actually eat" said as two
+  // the design's "your cannons decide how much you actually eat" said as two
   // readings of one constant.
   const beatenOff = `${Math.round(escortCoverage() * 100)}%`;
   const eaten = `${Math.round((1 - escortCoverage()) * 100)}%`;
@@ -128,7 +129,7 @@ export function EscortMarket({
         </>
       }
       intro={t(
-        "One leg of protection, sold by a Convoy captain at a price the two of them agree. The buyer pays the fee at the handshake, and it is the seller's cannons that answer the raid: {beatenOff} of it is beaten off, and the remaining {eaten} is deducted from the seller's Gold. The cover lasts the leg it was sold for and no other, and a raid that never comes costs the seller nothing. {ESCORT_OFFER_DEATH}",
+        "One round of protection, sold by a Convoy captain at a price the two of them agree. The buyer pays the fee at the handshake, and it is the seller's cannons that answer the raid: {beatenOff} of it is beaten off, and the remaining {eaten} is deducted from the seller's Gold. The cover lasts the round it was sold for and no other, and a raid that never comes costs the seller nothing. {ESCORT_OFFER_DEATH}",
         { beatenOff, eaten, ESCORT_OFFER_DEATH: t(ESCORT_OFFER_DEATH) },
       )}
     >
@@ -140,7 +141,7 @@ export function EscortMarket({
           <PrivateOffer
             lead={
               <span className="text-muted-foreground">
-                {t("One leg of cover for")}
+                {t("One round of cover for")}
               </span>
             }
             fee={fee}
@@ -189,7 +190,7 @@ export function EscortMarket({
                 "Nothing is on the market yet. Name a price and post the first offer, or wait and let a buyer come to you.",
               )
             : t(
-                "No protection is on offer this Parley. Only a Convoy captain at this table can sell one leg of cover, so their offer is what you are waiting for. An offer aimed at one captain waits on that captain, and an offer aimed at the table is any captain's to take.",
+                "No protection is on offer this Parley. Only a Convoy captain at this table can sell one round of cover, so their offer is what you are waiting for. An offer aimed at one captain waits on that captain, and an offer aimed at the table is any captain's to take.",
               )}
         </MarketEmpty>
       ) : (
@@ -219,14 +220,14 @@ export function EscortMarket({
  * belongs to the captain the row is waiting on: the seller cancels, and the
  * captain it was addressed to takes it or turns it down. An open offer is
  * taken by whoever presses first, which is the whole of what "offered to
- * the harbor" means. An agreement is the leg's cover, and a claim is that
+ * the harbor" means. An agreement is the round's cover, and a claim is that
  * cover spent, and neither has anything left to press. A row that was
  * turned down stays for the seller to read (see the handler in
  * src/server/realtime/wiring/escort-contracts.ts) and carries no action at
  * all.
  *
  * Three refusals, in the order the server asks them, shown before the click
- * rather than after it: the leg moved, this captain is already covered, or
+ * rather than after it: the round moved, this captain is already covered, or
  * this captain cannot pay the fee. The last one is the market's one
  * condition on a purse, and it is asked here because the purse is this
  * client's own and the server has never read one: a buyer who pressed
@@ -263,7 +264,7 @@ function ContractRow({
     : stale
       ? t(STALE_OFFER)
       : covered
-        ? t(LEG_ALREADY_COVERED)
+        ? t(ROUND_ALREADY_COVERED)
         : !canPayFee(game, contract.fee)
           ? feeShortfallLine(hold, contract.fee)
           : null;
@@ -308,11 +309,11 @@ function ContractRow({
  * answers to the question a captain actually has, which is what may I do
  * about this: an offer addressed to me waits on my press, an offer of mine
  * waits on somebody else's, an agreement is done, and a claim is spent.
- * The tone is the panel's only bit of colour of its own, and it answers the
+ * The tone is the panel's only bit of color of its own, and it answers the
  * same question: due when the next move is this captain's, sea otherwise.
  *
- * The leg is read before the status, because an offer is the one row whose
- * whole life is a leg and a Parley rather than a handshake: a board that
+ * The round is read before the status, because an offer is the one row whose
+ * whole life is a round and a Parley rather than a handshake: a board that
  * arrives a frame behind the checkpoint carries the row an offer that was
  * never taken expires as, and a row that still said it was waiting on
  * somebody would be inviting a press the market would refuse.
@@ -327,7 +328,7 @@ function stateOf(
   const who = contract.buyerName ?? t("a captain");
   if (contract.status === "offered") {
     if (expired) {
-      return { label: t("Expired with the leg"), waits: false };
+      return { label: t("Expired with the round"), waits: false };
     }
     if (mine) {
       return {
@@ -407,13 +408,13 @@ function seatLine(
   me: PublicUser,
   round: number,
 ): string | null {
-  const forLeg = contracts.filter((c) => c.round === round);
-  const waiting = forLeg.find(
+  const forRound = contracts.filter((c) => c.round === round);
+  const waiting = forRound.find(
     (c) => c.status === "offered" && c.buyerUserId === me.id,
   );
   if (waiting) {
     return t(
-      "⏳ {sellerName} offers you one leg of cover for {fee} Gold. You are the one who answers: taking it pays the fee at the handshake, and turning it down leaves the row for them to read.",
+      "⏳ {sellerName} offers you one round of cover for {fee} Gold. You are the one who answers: taking it pays the fee at the handshake, and turning it down leaves the row for them to read.",
       { sellerName: waiting.sellerName, fee: waiting.fee },
     );
   }
@@ -421,53 +422,53 @@ function seatLine(
   // spent cover is not a standing one: the buyer of a claimed contract
   // reads what the guns did rather than a line that still says they are
   // being covered for a raid that already came.
-  const spent = forLeg.find(
+  const spent = forRound.find(
     (c) => c.buyerUserId === me.id && c.status === "claimed",
   );
   if (spent) {
     return t(
-      "✅ Your cover was spent this leg: {spent.sellerName}'s guns answered the raid and your Gold stayed where it was.",
+      "✅ Your cover was spent this round: {spent.sellerName}'s guns answered the raid and your Gold stayed where it was.",
       { "spent.sellerName": spent.sellerName },
     );
   }
-  const covered = forLeg.find(
+  const covered = forRound.find(
     (c) => c.buyerUserId === me.id && c.status === "agreed",
   );
   if (covered) {
     return t(
-      "✅ You are covered this leg by {covered.sellerName} for {covered.fee} Gold, paid at the handshake. A raid on your hold meets their cannons, and what their guns do not beat off comes out of their Gold.",
+      "✅ You are covered this round by {covered.sellerName} for {covered.fee} Gold, paid at the handshake. A raid on your hold meets their cannons, and what their guns do not beat off comes out of their Gold.",
       {
         "covered.sellerName": covered.sellerName,
         "covered.fee": covered.fee,
       },
     );
   }
-  const carrying = forLeg.find(
+  const carrying = forRound.find(
     (c) =>
       c.sellerUserId === me.id &&
       (c.status === "agreed" || c.status === "claimed"),
   );
   if (carrying) {
     return t(
-      "🛡️ You are covering {buyerName} this leg for {carrying.fee} Gold, already paid to you. Your Gold answers the raid their hold does not.",
+      "🛡️ You are covering {buyerName} this round for {carrying.fee} Gold, already paid to you. Your Gold answers the raid their hold does not.",
       {
         buyerName: carrying.buyerName ?? t("a captain"),
         "carrying.fee": carrying.fee,
       },
     );
   }
-  const standing = forLeg.filter(
+  const standing = forRound.filter(
     (c) => c.status === "offered" && c.sellerUserId === me.id,
   );
   if (standing.length === 1) {
     const [one] = standing;
     return one.buyerUserId
       ? t(
-          "🛡️ Your offer stands: {one.fee} Gold for one leg of cover for {buyerName}. It waits on them.",
+          "🛡️ Your offer stands: {one.fee} Gold for one round of cover for {buyerName}. It waits on them.",
           { "one.fee": one.fee, buyerName: one.buyerName ?? t("a captain") },
         )
       : t(
-          "🛡️ Your offer stands: {one.fee} Gold for one leg of cover, open to every captain here. The first to take it gets it.",
+          "🛡️ Your offer stands: {one.fee} Gold for one round of cover, open to every captain here. The first to take it gets it.",
           { "one.fee": one.fee },
         );
   }
@@ -480,12 +481,12 @@ function seatLine(
       },
     );
   }
-  const refused = forLeg.find(
+  const refused = forRound.find(
     (c) => c.status === "declined" && c.sellerUserId === me.id,
   );
   if (refused) {
     return t(
-      "🚫 {buyerName} turned down your offer of {refused.fee} Gold. Nothing is owed either way, and the row stays until the leg turns.",
+      "🚫 {buyerName} turned down your offer of {refused.fee} Gold. Nothing is owed either way, and the row stays until the round turns.",
       {
         buyerName: refused.buyerName ?? t("A captain"),
         "refused.fee": refused.fee,
@@ -513,16 +514,16 @@ function contractLine(contract: EscortContract, me: PublicUser): string {
   const fee = t("{contract.fee} Gold", { "contract.fee": contract.fee });
   if (contract.status === "offered") {
     return mine
-      ? t("You are selling one leg of cover for {fee}", { fee })
-      : t("{sellerName} sells one leg of cover for {fee}", {
+      ? t("You are selling one round of cover for {fee}", { fee })
+      : t("{sellerName} sells one round of cover for {fee}", {
           sellerName: contract.sellerName,
           fee,
         });
   }
   if (contract.status === "agreed") {
     return mine
-      ? t("You are covering {other} for {fee} this leg", { other, fee })
-      : t("{contract.sellerName} is covering {who} for {fee} this leg", {
+      ? t("You are covering {other} for {fee} this round", { other, fee })
+      : t("{contract.sellerName} is covering {who} for {fee} this round", {
           "contract.sellerName": contract.sellerName,
           who,
           fee,

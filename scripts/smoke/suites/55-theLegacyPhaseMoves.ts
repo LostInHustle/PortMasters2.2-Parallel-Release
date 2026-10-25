@@ -14,8 +14,8 @@ import { check, voyageState } from "../harness";
  * means. Left raw, the token falls through nextPhase's default with
  * nothing advancing while the ready check refuses the seat, which is the
  * wedge this article exists to keep closed. The contract itself (the
- * legacy table and the heal moving together) is the oracle's tripwire in
- * scripts/smoke.ts; what is held here is the moving.
+ * legacy table and the heal moving together) is the contract this article
+ * holds; what is held here is the moving.
  *
  * The two live faces are here for the other half: a save written mid
  * yard carries a phase that is real, and the heal must pass it through

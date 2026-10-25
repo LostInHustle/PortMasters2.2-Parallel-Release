@@ -1,7 +1,7 @@
 // =====================================================================
 // PortMasters 2.2 Parallel Release: Captain's Legacy
 // Persistent, cross voyage progression tied to a captain's account
-// rather than any single room. A voyage's Gold, cargo, and ship level
+// rather than any single harbor. A voyage's Gold, cargo, and ship level
 // always reset (see the restart flow in
 // src/server/realtime/wiring/restart-voyage.ts), but the Reputation
 // banked on the way to the voyage's final round is now worth something
@@ -84,7 +84,7 @@ export function renownTitleForLevel(level: number): string {
 // stake of 100. Applied once, in createInitialGameState (see
 // src/lib/game/types.ts): it only ever changes a captain's own starting
 // Gold, never the deterministic per round market and order seed shared
-// across the room, so it can't desync one captain's view of the harbor
+// across the harbor, so it can't desync one captain's view of the harbor
 // from anyone else's.
 const RENOWN_GOLD_PER_LEVEL = 3;
 const RENOWN_GOLD_CAP = 60;
@@ -97,15 +97,15 @@ export function renownStartingGoldBonus(level: number): number {
 }
 
 // ========== Per difficulty breakdown ==========
-// Sea Master crowns and best score split by the tier they were earned on (see
-// Room.difficulty and src/lib/game/difficulty.ts). The account level
-// seaMasterCrowns and bestScore stay the all tier totals; this is the breakdown
-// behind them, so a crown won in a storm reads as the rarer thing it is, and a
-// future leaderboard can be segmented per tier rather than ranking every tier
-// against each other in one list. Keyed by plain string rather than the
-// Difficulty union so this module stays free of any difficulty import and
+// Sea Master crowns and best Reputation split by the tier they were earned on
+// (see Room.difficulty and src/lib/game/difficulty.ts). The account level
+// seaMasterCrowns and bestReputation stay the all tier totals; this is the
+// breakdown behind them, so a crown won in a storm reads as the rarer thing it
+// is, and a future leaderboard can be segmented per tier rather than ranking
+// every tier against each other in one list. Keyed by plain string rather than
+// the Difficulty union so this module stays free of any difficulty import and
 // tolerates a tier that no longer exists in the config.
-type DifficultyStats = { crowns: number; bestScore: number };
+type DifficultyStats = { crowns: number; bestReputation: number };
 type StatsByDifficulty = Record<string, DifficultyStats>;
 
 // Deliberately defensive: this parses a free form JSON column that rows
@@ -114,6 +114,13 @@ type StatsByDifficulty = Record<string, DifficultyStats>;
 // voyage conclusion write, which runs for every finisher at once. The parse
 // itself is the shared one (see parseJsonObject in ./json); what follows is
 // this column's own field checks.
+//
+// The key the column carries is read under both its old name and its new
+// one. The column is a JSON blob, so the name inside it is data rather than
+// a column, and a blob written before the rename still says bestScore. The
+// old name is read as well as the new one so that a captain whose voyages
+// were finished under the old name keeps the numbers those voyages earned,
+// and the writer below writes the new name from here on.
 export function parseStatsByDifficulty(
   raw: string | null | undefined,
 ): StatsByDifficulty {
@@ -123,16 +130,23 @@ export function parseStatsByDifficulty(
   const out: StatsByDifficulty = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!value || typeof value !== "object") continue;
-    const v = value as { crowns?: unknown; bestScore?: unknown };
+    const v = value as {
+      crowns?: unknown;
+      bestReputation?: unknown;
+      bestScore?: unknown;
+    };
+    const best =
+      typeof v.bestReputation === "number" && Number.isFinite(v.bestReputation)
+        ? v.bestReputation
+        : typeof v.bestScore === "number" && Number.isFinite(v.bestScore)
+          ? v.bestScore
+          : 0;
     out[key] = {
       crowns:
         typeof v.crowns === "number" && Number.isFinite(v.crowns)
           ? v.crowns
           : 0,
-      bestScore:
-        typeof v.bestScore === "number" && Number.isFinite(v.bestScore)
-          ? v.bestScore
-          : 0,
+      bestReputation: best,
     };
   }
   return out;
@@ -145,12 +159,12 @@ export function recordVoyageInStats(
   difficulty: string,
   voyage: { crowned: boolean; reputation: number },
 ): StatsByDifficulty {
-  const prior = stats[difficulty] ?? { crowns: 0, bestScore: 0 };
+  const prior = stats[difficulty] ?? { crowns: 0, bestReputation: 0 };
   return {
     ...stats,
     [difficulty]: {
       crowns: prior.crowns + (voyage.crowned ? 1 : 0),
-      bestScore: Math.max(prior.bestScore, voyage.reputation),
+      bestReputation: Math.max(prior.bestReputation, voyage.reputation),
     },
   };
 }
@@ -163,18 +177,20 @@ export function recordVoyageInStats(
 // account has ever earned, shown for any captain, not just the viewer,
 // the same as every other field here. houseId is the captain's chosen
 // Great House (see ./engine/houses.ts), null until they pick one.
-export type HouseId = "jade_pavilion" | "vermilion_gate" | "golden_lotus";
-
-// The three Houses as a value rather than only as a type, so a route can
-// validate or iterate over them without retyping the literals. The tuple is
-// what keeps it honest: it is typed to the union above and to a fixed length,
-// so adding a House to one and forgetting the other is a compile error rather
-// than a House that silently fails validation somewhere.
-export const HOUSE_IDS: readonly [HouseId, HouseId, HouseId] = [
+// The Houses as a value rather than only as a type, so a route can validate
+// or iterate over them without retyping the literals. This list is the one
+// place a House is named, and the type is read off it, so the two cannot
+// come apart: a House added here is a House the union knows about, and the
+// engine's own table is typed against this list, so a House added there and
+// forgotten here is a compile error rather than a House that silently fails
+// validation somewhere.
+export const HOUSE_IDS = [
   "jade_pavilion",
   "vermilion_gate",
   "golden_lotus",
-];
+] as const;
+
+export type HouseId = (typeof HOUSE_IDS)[number];
 
 // Coerces a stored houseId string (or null) into the HouseId union, or null.
 // Anything stale or hand edited falls back to null rather than poisoning a
@@ -190,7 +206,7 @@ export type CaptainLegacySummary = {
   renownXP: number;
   voyagesCompleted: number;
   seaMasterCrowns: number;
-  bestScore: number;
+  bestReputation: number;
   // How many voyages in a row this captain has finished without going
   // bankrupt. Two screens read it: the profile card prints it, and the
   // Difficulty Advisor suggests moving up a tier once it reaches three.
@@ -205,7 +221,7 @@ export const DEFAULT_LEGACY_SUMMARY: CaptainLegacySummary = {
   renownXP: 0,
   voyagesCompleted: 0,
   seaMasterCrowns: 0,
-  bestScore: 0,
+  bestReputation: 0,
   consecutiveSolventVoyages: 0,
   meritIds: [],
   statsByDifficulty: {},
@@ -222,7 +238,7 @@ export type LegacySummarySource = {
   renownXP: number;
   voyagesCompleted: number;
   seaMasterCrowns: number;
-  bestScore: number;
+  bestReputation: number;
   consecutiveSolventVoyages: number;
   statsByDifficulty: string;
   houseId: string | null;
@@ -247,7 +263,7 @@ export function toLegacySummary(
     renownXP: row.renownXP,
     voyagesCompleted: row.voyagesCompleted,
     seaMasterCrowns: row.seaMasterCrowns,
-    bestScore: row.bestScore,
+    bestReputation: row.bestReputation,
     consecutiveSolventVoyages: row.consecutiveSolventVoyages,
     meritIds,
     statsByDifficulty: parseStatsByDifficulty(row.statsByDifficulty),

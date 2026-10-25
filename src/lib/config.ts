@@ -21,7 +21,7 @@ const DEFAULT_PORT = 8080;
 const DEFAULT_HOST = "0.0.0.0";
 
 // The share of voyages the telemetry spine records, as a fraction of one.
-// The plan asks for sampling to be configuration from the first day
+// The design asks for sampling to be configuration from the first day
 // rather than bolted on later, on the grounds that volume is the only
 // thing about telemetry that ever needs turning down. 1 records every
 // voyage, which is the default because a table this small has no volume
@@ -29,7 +29,7 @@ const DEFAULT_HOST = "0.0.0.0";
 // is expected to be under load.
 const DEFAULT_TELEMETRY_SAMPLE_RATE = 1;
 
-// [B2: hard timers, the server as timekeeper] The multiplier on every
+// The multiplier on every
 // phase's authored budget, as a positive fraction of one. 1 runs the
 // budgets the phases are written with (see PHASE_FACES in
 // src/lib/game/phases.ts) and a smaller number shortens every phase, which
@@ -88,11 +88,8 @@ const ServerConfigSchema = z.object({
     // The empty case is already reported above. Short circuiting here keeps
     // a blank value from producing two complaints about the same line.
     .refine(
-      (value) =>
-        value === "" ||
-        value.startsWith("file:") ||
-        value.startsWith("postgres"),
-      "DATABASE_URL must start with file: for SQLite, or name a Postgres database.",
+      (value) => value === "" || value.startsWith("file:"),
+      "DATABASE_URL must start with file: and name a SQLite database.",
     ),
 });
 

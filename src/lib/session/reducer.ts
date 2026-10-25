@@ -15,6 +15,7 @@ import {
 } from "@/lib/game/types";
 import { showWelcome, snapToCheckpoint } from "@/lib/game/engine";
 import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
+import type { LedgerLine } from "@/lib/game/ledger";
 import type { Difficulty } from "@/lib/game/difficulty";
 import type { GameMode } from "@/lib/game/mode";
 import type { HouseId } from "@/lib/game/legacy";
@@ -31,7 +32,10 @@ const LEDGER_LINE_CAP = 500;
 // mounting a component or a browser.
 export type SessionState = {
   game: GameState;
-  logs: string[];
+  // The captain's ledger, held as material rather than as sentences, so
+  // that a line is read in the language the reader is holding rather than
+  // in the language the voyage began in. See @/lib/game/ledger.
+  logs: LedgerLine[];
   // The lines a single APPLY just added, before the LEDGER_LINE_CAP trim
   // (below) drops entries off the front. GameRoom's toast effect used to
   // infer "what's new" by diffing state.logs.length against a remembered
@@ -40,17 +44,17 @@ export type SessionState = {
   // again, so the diff read as "nothing new" for every action from then on,
   // even though each one was still landing in the ledger. Handing the
   // actual new lines out of the reducer sidesteps length entirely.
-  newLines: string[];
+  newLines: LedgerLine[];
   loaded: boolean;
   saving: boolean;
   lastSavedAt: number | null;
 };
 
 export type Action =
-  | { type: "INIT"; game: GameState; logs: string[] }
+  | { type: "INIT"; game: GameState; logs: LedgerLine[] }
   | {
       type: "APPLY";
-      fn: (g: GameState, logs: string[]) => void;
+      fn: (g: GameState, logs: LedgerLine[]) => void;
       postDraft?: boolean;
     }
   | {
@@ -61,13 +65,13 @@ export type Action =
       renownLevel?: number;
       voyageEpoch?: number;
       difficulty?: Difficulty;
-      // The room's mode, so a brand new voyage in an experimental harbor is
+      // The harbor's mode, so a brand new voyage in an experimental harbor is
       // stamped with that mode rather than the founding one. Omitted by any
       // caller that does not know it, which lands on the default.
       mode?: GameMode;
       houseId?: HouseId | null;
     }
-  | { type: "SET_SAVING"; saving: boolean; at: number };
+  | { type: "SET_SAVING"; saving: boolean; at?: number };
 
 export function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
@@ -88,13 +92,13 @@ export function reducer(state: SessionState, action: Action): SessionState {
         mode: action.mode,
         houseId: action.houseId ?? null,
       });
-      const logs: string[] = [];
+      const logs: LedgerLine[] = [];
       showWelcome(g, logs);
       // A genuinely new captain (no save of their own yet) joins wherever
-      // the room's checkpoint already is, instead of always at round 1.
+      // the harbor's checkpoint already is, instead of always at round 1.
       // The phase is normalized before it is compared, because this is a
       // room row read off the wire and a voyage that was already sailing
-      // when the six phase leg landed has one of the older names in it: read
+      // when the six phase round landed has one of the older names in it: read
       // raw, that name would not match the pier and a captain would be
       // snapped onto a checkpoint they were already standing on.
       const cp = action.checkpoint;
@@ -118,7 +122,11 @@ export function reducer(state: SessionState, action: Action): SessionState {
       return { ...state, game, logs, newLines };
     }
     case "SET_SAVING":
-      return { ...state, saving: action.saving, lastSavedAt: action.at };
+      return {
+        ...state,
+        saving: action.saving,
+        lastSavedAt: action.at ?? state.lastSavedAt,
+      };
     default:
       return state;
   }

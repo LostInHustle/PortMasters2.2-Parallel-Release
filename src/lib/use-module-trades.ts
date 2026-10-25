@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
 import type { ModuleTrade } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
@@ -21,7 +21,7 @@ const CHANNEL = {
 } as const;
 
 /**
- * The room's module market, as one captain sees it.
+ * The harbor's module market, as one captain sees it.
  *
  * The board, the per captain filtering and the report that fires when a
  * trade this captain is party to moves past the offer stage are the shared
@@ -90,12 +90,18 @@ export function useModuleTrades(
     [socket, roomId, clearError],
   );
 
-  return {
-    moduleTrades,
-    error,
-    clearError,
-    post,
-    accept,
-    cancel,
-  };
+  // The answer, held to one identity until something inside it changes.
+  // The panel that draws the trade board takes this whole object as a
+  // prop.
+  return useMemo(
+    () => ({
+      moduleTrades,
+      error,
+      clearError,
+      post,
+      accept,
+      cancel,
+    }),
+    [moduleTrades, error, clearError, post, accept, cancel],
+  );
 }
