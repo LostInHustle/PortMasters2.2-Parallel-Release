@@ -17,61 +17,82 @@ export type TelemetryOutcome = "concluded" | "restarted" | "emptied";
 // Event families. Only instrumented families appear here.
 type TelemetryFamily = "loop" | "market" | "social" | "business";
 
+/**
+ * The readings a round report carries, shared by the wire payload and the
+ * telemetry record so the two cannot drift: the orders the round dealt and
+ * the ones it filled, the number of different goods the captain's hold
+ * closed it carrying, and each switched block's own figures.
+ *
+ * Every optional block is absent together when the switch that gives it
+ * meaning is off, so a zero never has to be distinguished from an
+ * unmeasured round. holdSlots is absent when the split hold was not in
+ * play, because a hold with no size has no utilization, and the meal
+ * counts are recorded only when the survival layer is on. Fee ratios are
+ * left to readers rather than stored twice, and buyer-side numbers are
+ * deliberately omitted.
+ *
+ * See RoundReport in src/types/realtime/objectives.ts for the wire shape
+ * that adds the room, the round and the charter around these readings.
+ */
+export type RoundReportReadings = {
+  // Expired orders are dealt minus filled. A measurement of play, not a
+  // score, and nothing in the game reads it.
+  ordersDealt: number;
+  ordersFilled: number;
+  distinctGoods: number;
+  // The captain's own reading of the hold closed this round: how many
+  // slots were carrying something, and how many meals of each food were
+  // aboard. The slots belong to the split hold, the meal counts to the
+  // survival layer.
+  holdSlots?: number;
+  grainMeals?: number;
+  saltFishMeals?: number;
+  produceMeals?: number;
+  // Escort Contracts: settled, fees earned, Gold absorbed. Absent together
+  // when the switch is off; a round sailed without the market reports no
+  // market rather than a market of zeroes.
+  escortSold?: number;
+  escortFeesEarned?: number;
+  escortAbsorbed?: number;
+  // Loom: refits sold, fees earned, rags rewoven. coldRound is the round's
+  // weather, and it is a truth rather than a tally: a fair round reports
+  // false rather than reporting nothing, and the reader comparing one
+  // round's takings with the next needs to know which rounds were cold.
+  refitsSold?: number;
+  refitFeesEarned?: number;
+  ragsRewoven?: number;
+  coldRound?: boolean;
+  // Module trades: sold, fees earned, the design's module trade volume read
+  // at the seller's end. Absent together when the market is off.
+  modulesSold?: number;
+  moduleFeesEarned?: number;
+  // Borrows spent this voyage, a count of the once a voyage allowance. A
+  // voyage that never borrowed reports zero rather than nothing, because
+  // zero is a reading of the allowance and not an absence of the feature.
+  // Rides the path orders switch, so a build without locks reports nothing.
+  opportunistBorrows?: number;
+  // Voyage totals rather than round figures: foodSpend covers all food
+  // spending and bargeSpend the vendor's share. Both move together and are
+  // absent together, so a reader dividing one by the other never has to
+  // guess which of the two it is holding. A reader takes the last report
+  // per captain rather than summing rounds.
+  foodSpend?: number;
+  bargeSpend?: number;
+  // Voyage total crew losses, used to cohort voyages for the retention
+  // read. Rides the loss rule's switch, so a round without it reports
+  // nothing.
+  crewLosses?: number;
+};
+
 // Event names and payloads. Every event carries its own round because records
 // are read by round. One happening is one event, so a settled trade is
 // recorded once, as the fill, never again as a trade line.
 export interface TelemetryPayloads {
   // A round closed and the next opened; this is the spine's clock.
   round_advanced: { round: number };
-  // Client-reported once per round per captain: orders dealt, orders filled,
-  // distinct goods, and hold readings. Expired orders are dealt minus
-  // filled. It is a measurement of play, not a score, and nothing in the
-  // game reads it.
-  //
-  // holdSlots is absent when the split hold was not in play, because a hold
-  // with no size has no utilization; the meal counts are recorded when the
-  // survival layer is on. All four are absent together when that layer is
-  // off. Escort, Loom and module fields follow the same rule, so a zero
-  // never has to be distinguished from an unmeasured round. Fee ratios are
-  // left to readers rather than stored twice, and buyer-side numbers are
-  // deliberately omitted.
-  round_report: {
-    round: number;
-    actor: string;
-    ordersDealt: number;
-    ordersFilled: number;
-    distinctGoods: number;
-    holdSlots?: number;
-    grainMeals?: number;
-    saltFishMeals?: number;
-    produceMeals?: number;
-    // Escort Contracts: settled, fees earned, Gold absorbed. Absent together
-    // when the switch is off.
-    escortSold?: number;
-    escortFeesEarned?: number;
-    escortAbsorbed?: number;
-    // Loom: refits sold, fees earned, rags rewoven. coldRound is the round's
-    // weather and is not behind the switch, since a fair round says false.
-    refitsSold?: number;
-    refitFeesEarned?: number;
-    ragsRewoven?: number;
-    coldRound?: boolean;
-    // Module trades: sold, fees earned. Absent together when the market is
-    // off.
-    modulesSold?: number;
-    moduleFeesEarned?: number;
-    // Borrows spent this voyage. Rides the path orders switch, so a build
-    // without locks reports nothing rather than zero.
-    opportunistBorrows?: number;
-    // Voyage totals rather than round figures: foodSpend covers all food
-    // spending and bargeSpend the vendor's share. A reader takes the last
-    // report per captain rather than summing rounds.
-    foodSpend?: number;
-    bargeSpend?: number;
-    // Voyage total crew losses, used to cohort voyages. Rides the loss
-    // rule's switch, so a round without it reports nothing.
-    crewLosses?: number;
-  };
+  // Client-reported once per round per captain: the readings shared with the
+  // wire report (see RoundReportReadings) plus the actor read off the socket.
+  round_report: { round: number; actor: string } & RoundReportReadings;
   // A round clock expired and the harbor moved on. ready is who had readied,
   // required who the phase waited on; the pair is the tuning signal. A round
   // with nobody in it writes nothing, since its clock does not fire.

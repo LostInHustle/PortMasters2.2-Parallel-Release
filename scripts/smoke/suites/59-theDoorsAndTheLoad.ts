@@ -46,7 +46,7 @@ import type { LedgerLine } from "@/lib/game/ledger";
  * operator, the purse's reader missing the fallback its sibling had, and
  * two log lines quoting a constant or a unit rather than the effect the
  * engine actually applied. Each check below pins the repaired reading
- * and, where the old behavior was a lie a captain could read, pins its
+ * and, where the old behaviour was a lie a captain could read, pins its
  * absence too.
  *
  * The states are built by hand in the manner of the articles beside

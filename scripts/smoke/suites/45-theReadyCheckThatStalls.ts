@@ -372,7 +372,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   // The cure with its two halves held apart: the votes that were cast are
   // still counted, and the lock is gone. The first is read off the ready
   // state the harbor rebroadcasts, and the second can only be read off the
-  // behavior it exists for, so a captain reports the seat again and the
+  // behaviour it exists for, so a captain reports the seat again and the
   // harbor has to announce it a second time.
   check(
     heard[0].standing?.round === 1 &&

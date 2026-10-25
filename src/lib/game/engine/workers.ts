@@ -1,5 +1,5 @@
 // Artisan hiring, dismissal, assignments, production and the two round end
-// bills. Roster behavior is driven by WORKER_TYPES, and every wage path uses
+// bills. Roster behaviour is driven by WORKER_TYPES, and every wage path uses
 // getHireCost so hire, payroll and severance agree.
 import { ICONS } from "../constants/brand";
 import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";

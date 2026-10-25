@@ -498,15 +498,19 @@ export async function powerBudgetSuite(): Promise<void> {
 
   // ========== E. The yard ==========
 
+  const freshHull = voyageState();
+  freshHull.shipLevel = 1;
   check(
-    moduleDraftPossible(voyageState()),
-    "a fresh hull's yard always has something to deal, which is the screen this gate must never shut on a captain who has taken nothing",
+    moduleDraftPossible(freshHull),
+    "a hull with its first slot open always has something the yard can deal, which is the screen this gate must never shut on a captain who has taken nothing",
   );
 
   // A hull at the cap with a free slot: every module the pool holds
   // weighs two or more, so nothing fits on top. The two bolted modules
   // and the four heaviest boons take ten and eleven, and the factor
-  // takes the rest.
+  // takes the rest. The swap arm still opens the door: every card can be
+  // weighed over either five power module, which is the field report's
+  // point about judging the hull before the captain can change it.
   const cappedYard = () => {
     const state = voyageState();
     state.shipLevel = 3;
@@ -520,20 +524,26 @@ export async function powerBudgetSuite(): Promise<void> {
     state.charter = "the_factor";
     return state;
   };
-  const shutYard = cappedYard();
-  const shutDealable = moduleDraftPossible(shutYard);
-  startModuleDrafting(shutYard);
+  const cappedOpenYard = cappedYard();
+  const cappedDealable = moduleDraftPossible(cappedOpenYard);
+  startModuleDrafting(cappedOpenYard);
+  const cappedPicks = cappedOpenYard._draftChoices ?? [];
   check(
-    heldPower(shutYard) === HELD_POWER_CAP &&
-      !shutDealable &&
-      shutYard._draftChoices?.length === 0,
-    "a hull at the cap with room for one more module reads shut: the Draft button's own question answers no, and the draft the button no longer opens would have dealt nothing anyway",
+    heldPower(cappedOpenYard) === HELD_POWER_CAP &&
+      cappedDealable &&
+      cappedPicks.length === CARDS_PER_OFFER &&
+      cappedPicks.every((card) => moduleFitsHull(cappedOpenYard, card)) &&
+      cappedPicks.every((card) => !powerBudgetAllows(cappedOpenYard, card)) &&
+      cappedOpenYard.phase === "module_draft",
+    "a hull at the cap with room for one more module is not shut: the door's own question answers yes and the draft deals three seats, even though every seat would overrun the cap on top of the hold and only the swap arm, weighing the card over a five power module, lets the hull take it",
   );
 
   // The open slotted hull at twenty four, which is the shape the roll's
   // filter is read on: two bolted modules leave the third slot open, and
   // the ten power of boons and the four power charter leave exactly the
-  // two power cards able to fill it.
+  // two power cards able to fill it on top. The swap arm is wider: a card
+  // can also replace either five power module, so the roll is expected to
+  // deal at least one card the open slot alone would refuse.
   const openAt24 = () => {
     const state = voyageState();
     state.shipLevel = 3;
@@ -555,27 +565,64 @@ export async function powerBudgetSuite(): Promise<void> {
       card.kind === "module" && card.modes.ocean_gambit > 0 && card.power >= 3,
   );
   check(
-    midPicks.length > 0 &&
-      midPicks.every((card) => card.power <= 2) &&
+    midPicks.length === CARDS_PER_OFFER &&
+      midPicks.every((card) => moduleFitsHull(midYard, card)) &&
+      midPicks.some((card) => !powerBudgetAllows(midYard, card)) &&
       poolHeavier,
-    "the yard roll deals only what the hull can take: at twenty four every three power module is filtered out before the draw while the pool demonstrably holds some, so every seat the draft deals is a card that can actually be bolted on, including the one the boundary check below installs",
+    "the yard roll deals what the hull can take by either path: at twenty four every seat fits, and at least one seat is a card the open slot alone would refuse, because the swap arm weighs it over a five power module; the pool demonstrably holds heavier cards, so the wider filter is not passing everything",
   );
 
-  const refusalLogs: LedgerLine[] = [];
   const overPick = openAt24();
-  const phaseBefore = overPick.phase;
   overPick._draftChoices = [cardOf("overdrive_engine")];
-  handleModuleSelect(overPick, 0, refusalLogs);
+  const overLogs: LedgerLine[] = [];
+  handleModuleSelect(overPick, 0, overLogs);
   check(
-    ledgerSentences(refusalLogs).some((line) =>
-      line.includes("would put your hull at 27 power"),
-    ) &&
-      ledgerSentences(refusalLogs).some((line) =>
+    overPick._newModule?.id === "overdrive_engine" &&
+      overPick.phase === "module_swap" &&
+      overPick.equippedModules.length === 2 &&
+      (overPick._draftChoices ?? []).some(
+        (card) => card.id === "overdrive_engine",
+      ) &&
+      !ledgerSentences(overLogs).some((line) =>
+        line.includes("would put your hull at"),
+      ),
+    "a three power module the open slot refuses at twenty four is not turned away: the pick parks it for the swap screen, where a five power module can make room, the hull keeps its two modules, and the table keeps the card until a slot is confirmed",
+  );
+
+  // The floor under the routing: a full hull whose heaviest module still
+  // cannot make room for a five power card. The refusal prints the best
+  // case total, after that replacement, rather than the open slot's total.
+  const heavyYard = voyageState();
+  heavyYard.shipLevel = 3;
+  heavyYard.equippedModules.push(
+    cardOf("brokers_network"),
+    cardOf("overdrive_engine"),
+    cardOf("artisans_workshop"),
+  );
+  heavyYard.heldBoons.push(
+    "cold_hardened",
+    "route_mastery",
+    "steady_watch",
+    "harbor_credit",
+    "fleet_colors",
+  );
+  heavyYard.charter = "the_factor";
+  heavyYard._draftChoices = [cardOf("tax_evasion")];
+  const heavyLogs: LedgerLine[] = [];
+  const heavyPhase = heavyYard.phase;
+  handleModuleSelect(heavyYard, 0, heavyLogs);
+  check(
+    heldPower(heavyYard) === HELD_POWER_CAP &&
+      !moduleFitsHull(heavyYard, cardOf("tax_evasion")) &&
+      ledgerSentences(heavyLogs).some((line) =>
+        line.includes("would put your hull at 28 power"),
+      ) &&
+      ledgerSentences(heavyLogs).some((line) =>
         line.includes(`a hull carries at most ${HELD_POWER_CAP}`),
       ) &&
-      overPick.equippedModules.length === 2 &&
-      overPick.phase === phaseBefore,
-    "the install path is the floor under the roll's screen: a draft holding a three power module at twenty four is refused with the number a captain can check, the hull keeps its two modules, and the phase is left where it stands so another seat can be taken",
+      heavyYard.equippedModules.length === 3 &&
+      heavyYard.phase === heavyPhase,
+    "and a card the hull cannot take by either path is still refused with the best case number: a full hull at the cap whose heaviest module is three power reads twenty eight for a five power card, the hull keeps its three modules, and the phase stays where it stands so another seat can be taken",
   );
 
   const boundaryPick = openAt24();
@@ -629,17 +676,14 @@ export async function powerBudgetSuite(): Promise<void> {
 
   // [field report: the batch that would not change] The draft's once a
   // round swap, which is the second half of the field report against this
-  // market. The reroll used to be the round's own draw run a second time
-  // over the same candidates, and the candidates are the fitting pool
-  // less what the hull already carries, so a full hull at a table whose
-  // pool it has already seen in full had exactly one outcome left and the
-  // swap re served the batch it was pressed to replace: the screen said a
-  // fresh batch was coming and the same three cards stayed on it. What
-  // the checks below hold is the shape of the repair: a swap draws
-  // what the round has not shown, a swap that cannot fill three seats
-  // from the unseen cards tops up from the table it replaces rather than
-  // dealing an empty seat, and a yard with nothing left to deal refuses
-  // in words with the round's one use unspent.
+  // market. The reroll used to draw fresh cards and then append the
+  // carried ones in their old seats, so a short draw changed one seat and
+  // left the other two where they were. It also asked only whether a fresh
+  // card existed, so a hull whose fitting pool was entirely on the table
+  // and aboard read a disabled button until a replacement freed a card.
+  // What the checks below hold is the repair: the press fills all three
+  // seats, arranges them so no card keeps its old seat, and treats a same
+  // set re-seat as a real press that says the yard had nothing new.
   const trioOf = (state: GameState): string[] =>
     (state._draftChoices ?? []).map((card) => card.id);
   const sortedTrio = (state: GameState): string =>
@@ -722,13 +766,14 @@ export async function powerBudgetSuite(): Promise<void> {
       sortedTrio(toppedUp) !== [...toppedBefore].sort().join("|") &&
       toppedAfter.length === 3 &&
       repeats.length === 1 &&
+      toppedAfter.every((id, seat) => id !== toppedBefore[seat]) &&
       toppedAfter.every(
         (id) =>
           cardById(id)?.kind === "module" &&
           toppedUp.equippedModules.every((card) => card.id !== id),
       ) &&
       ledgerSentences(toppedLogs).some((line) => line.includes("fresh batch")),
-    "a swap on a hull that has seen most of the pool tops up rather than dealing short: two seats come from the cards this hull has never been shown and one from the batch being replaced, so even the swap that cannot fill three seats from the unseen cards hands back a different batch of three real modules",
+    "a swap on a hull that has seen most of the pool tops up rather than dealing short: two seats come from cards this hull has never been shown and one from the batch being replaced, and the carried card moves to a new seat, so every one of the three choices changes even when the pool cannot supply three new cards",
   );
 
   // [field report: the batch that would not change] The promise the three
@@ -769,8 +814,18 @@ export async function powerBudgetSuite(): Promise<void> {
         fuzzFailures.push(`trial ${trial}: one seat dealt twice`);
       if (!dealt.every((id) => moduleFitsHull(randomHull, cardOf(id))))
         fuzzFailures.push(`trial ${trial}: a seat this hull cannot take`);
-      if (sortedTrio(randomHull) === [...replaced].sort().join("|"))
-        fuzzFailures.push(`trial ${trial}: the trio the press replaced`);
+      if (dealt.some((id, seat) => id === replaced[seat]))
+        fuzzFailures.push(`trial ${trial}: a seat that kept its card`);
+      if (
+        !ledgerSentences(fuzzLogs).some(
+          (line) =>
+            line.includes("fresh batch") ||
+            line.includes("Re-dealt the same module choices"),
+        )
+      )
+        fuzzFailures.push(
+          `trial ${trial}: a press that did not name its batch`,
+        );
     } else {
       if (
         !ledgerSentences(fuzzLogs).some(
@@ -790,7 +845,7 @@ export async function powerBudgetSuite(): Promise<void> {
     console.log(`    [swap fuzz] ${fuzzFailures.slice(0, 3).join("; ")}`);
   check(
     fuzzFailures.length === 0,
-    "and the swap keeps that promise over two hundred random hulls: wherever the button is dealable the press hands back a whole batch of three distinct seats that all fit this hull and never the trio it replaced, and wherever it is not the press is refused in words with the table and the round's one use left standing",
+    "and the swap keeps that promise over two hundred random hulls: wherever the button is dealable the press hands back a whole batch of three distinct seats that all fit this hull, every seat changes its card, and the log names whether the yard found new cards or re-seated the old ones, and wherever it is not the press is refused in words with the table and the round's one use left standing",
   );
 
   // The same press at the two rungs of the ladder a hull can still have
@@ -821,6 +876,7 @@ export async function powerBudgetSuite(): Promise<void> {
         after.length === CARDS_PER_OFFER &&
         sortedTrio(hull) !== [...before].sort().join("|") &&
         after.every((id) => !before.includes(id)) &&
+        after.every((id, seat) => id !== before[seat]) &&
         after.every(
           (id) =>
             hull.equippedModules.every((card) => card.id !== id) &&
@@ -828,7 +884,7 @@ export async function powerBudgetSuite(): Promise<void> {
         ) &&
         ledgerSentences(logs).some((line) => line.includes("fresh batch")),
     ),
-    "a swap on a hull with an open slot deals a genuinely new batch of three whatever rung it stands on: the level one hull and the level two hull each draw seats the round never showed, none of them a card the hull already carries, and every one a card the fit test would let that hull bolt on",
+    "a swap on a hull with an open slot deals a genuinely new batch of three whatever rung it stands on: the level one hull and the level two hull each draw seats the round never showed, none of them a card the hull already carries, every seat changes, and every one is a card the fit test would let that hull bolt on",
   );
 
   // The press on a hull standing exactly at the cap, which is the hull
@@ -849,13 +905,14 @@ export async function powerBudgetSuite(): Promise<void> {
       cappedBefore.length === CARDS_PER_OFFER &&
       cappedAfter.length === CARDS_PER_OFFER &&
       cappedAfter.filter((id) => cappedBefore.includes(id)).length === 1 &&
+      cappedAfter.every((id, seat) => id !== cappedBefore[seat]) &&
       cappedAfter.every(
         (id) =>
           cappedSwap.equippedModules.every((card) => card.id !== id) &&
           moduleFitsHull(cappedSwap, cardOf(id)),
       ) &&
       cappedSwap.moduleSwapUsed,
-    "a hull standing exactly at the cap still swaps to a whole batch, and every seat of it is a card that hull can actually take: the seats are read through the same fit test the roll screens with, so a card the cap would refuse is never dealt, and the batch is one seat from the table being replaced rather than the same three cards again",
+    "a hull standing exactly at the cap still swaps to a whole batch, and every seat of it is a card that hull can actually take: the seats are read through the same fit test the roll screens with, so a card the cap would refuse is never dealt, the one carried card moves to a new seat, and no seat shows the card it held before",
   );
 
   // The corner the top up behind the fresh draw cannot reach. A Parley
@@ -883,9 +940,10 @@ export async function powerBudgetSuite(): Promise<void> {
       tradedOut.moduleSwapUsed &&
       tradedAfter.length === CARDS_PER_OFFER &&
       sortedTrio(tradedOut) !== [...tradedBefore].sort().join("|") &&
+      tradedAfter.every((id, seat) => id !== tradedBefore[seat]) &&
       tradedAfter.every((id) => moduleFitsHull(tradedOut, cardOf(id))) &&
       ledgerSentences(tradedLogs).some((line) => line.includes("fresh batch")),
-    "a table the round's own trades have emptied onto the hull still deals a whole batch: the three landed cards leave just the two modules this round never showed, and the swap falls back to the fitting pool the round's own roll reads when the unseen cards run out rather than dealing two seats and calling it a swap",
+    "a table the round's own trades have emptied onto the hull still deals a whole batch: the three landed cards leave just the two modules this round never showed, the swap falls back to the fitting pool the round's own roll reads for the third seat, and the landed card it re-deals moves to a new seat so no choice is left where it was",
   );
 
   // The last resort reads the pool by id, so the duplicate a hull may
@@ -914,18 +972,20 @@ export async function powerBudgetSuite(): Promise<void> {
     twinAfter.length === CARDS_PER_OFFER &&
       new Set(twinAfter).size === CARDS_PER_OFFER &&
       twinAfter.every((id) => moduleFitsHull(twinSwap, cardOf(id))) &&
+      twinAfter.every((id, seat) => id !== twinBefore[seat]) &&
       twinSwap.equippedModules.filter((card) => card.id === "brokers_network")
         .length === 2 &&
       twinSwap.equippedModules.length === 7 &&
       twinSwap.moduleSwapUsed,
-    "a hull carrying the same module twice never draws it twice in one batch: the pools a swap reads hold cards rather than copies, so one id fills at most one seat, every seat of the batch is distinct and fit for this hull, and the swap leaves both copies bolted where they were",
+    "a hull carrying the same module twice never draws it twice in one batch: the pools a swap reads hold cards rather than copies, so one id fills at most one seat, every seat of the batch is distinct, fit for this hull, and different from the card it held, and the swap leaves both copies bolted where they were",
   );
 
   // A Classic hull carrying three of the six modules that mode runs:
   // the round's table is the whole of what is left, so every module the
-  // yard could deal this hull is on the screen already. The press is
-  // refused in words and the round keeps its use, because a swap that
-  // handed back the same three cards is not a swap the yard performed.
+  // yard could deal this hull is on the screen already. The press re-seats
+  // the same three rather than refusing, which is the field report's
+  // "swap disabled until a replacement frees a card" shape: the button is
+  // enabled, all three choices move, and the log tells the truth.
   const classicHeld = ["smugglers_hold", "bulk_hauler", "artisans_workshop"];
   const collapsed = voyageState({ mode: CLASSIC });
   collapsed.shipLevel = 3;
@@ -936,32 +996,62 @@ export async function powerBudgetSuite(): Promise<void> {
     .filter((id) => !classicHeld.includes(id))
     .sort()
     .join("|");
-  const collapsedBefore = sortedTrio(collapsed);
+  const collapsedBefore = trioOf(collapsed);
   const collapsedPossible = moduleSwapPossible(collapsed);
   const collapsedLogs: LedgerLine[] = [];
   swapModuleChoices(collapsed, collapsedLogs);
+  const collapsedAfter = trioOf(collapsed);
   check(
-    collapsedBefore === collapsedLeftover &&
-      !collapsedPossible &&
-      !collapsed.moduleSwapUsed &&
-      sortedTrio(collapsed) === collapsedBefore &&
+    [...collapsedBefore].sort().join("|") === collapsedLeftover &&
+      collapsedPossible &&
+      collapsed.moduleSwapUsed &&
+      [...collapsedAfter].sort().join("|") === collapsedLeftover &&
+      collapsedAfter.length === CARDS_PER_OFFER &&
+      collapsedAfter.every((id, seat) => id !== collapsedBefore[seat]) &&
       ledgerSentences(collapsedLogs).some((line) =>
-        line.includes("nothing new"),
+        line.includes("Re-dealt the same module choices"),
       ),
-    "the reported collapse reads as a refusal rather than as a repeat: a Classic hull the round has shown every module it could be dealt draws a disabled swap and a press that is answered in words, the table stays where it was, and the once a round use is still the captain's to spend on a round where the yard has something to deal",
+    "the reported collapse re-seats the table rather than refusing it: a Classic hull the round has shown every module it could be dealt draws an enabled swap, the press spends the round's use, all three cards move to different seats, and the log says the yard had nothing new rather than claiming a fresh batch",
   );
 
-  // The three refusals as the captain reads them, held here rather than
-  // as fragments: a press that changes nothing has to say why, and the
-  // sentence is the whole of what the captain gets back for it. The
-  // collapse above is the third one, read off its own press.
+  // The refusal is still reachable when the hull's own trades push it past
+  // the cap between the roll and the press: no fitting card is left to fill
+  // the third seat, so the press names the three ways forward and keeps the
+  // round's use. This is the sentence a dry press writes, held whole rather
+  // than as fragments.
+  const overCap = voyageState();
+  overCap.shipLevel = 3;
+  overCap.equippedModules.push(
+    cardOf("smugglers_hold"),
+    cardOf("bulk_hauler"),
+    cardOf("artisans_workshop"),
+  );
+  startModuleDrafting(overCap);
+  overCap.heldBoons.push(
+    "cold_hardened",
+    "route_mastery",
+    "steady_watch",
+    "harbor_credit",
+    "fleet_colors",
+    "deep_sea_escort_pact",
+  );
+  overCap.charter = "the_factor";
+  const dryPossible = moduleSwapPossible(overCap);
+  const dryBefore = trioOf(overCap);
+  const dryLogs: LedgerLine[] = [];
+  swapModuleChoices(overCap, dryLogs);
   check(
-    ledgerSentences(collapsedLogs).some(
-      (line) =>
-        line ===
-        "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next round.",
-    ) && !CARRIES_A_DASH.test(ledgerSentences(collapsedLogs).join(" ")),
-    "the refusal a dry pool writes names the three ways forward in one sentence, and every line the press wrote is free of dashes like the rest of the game's copy",
+    !dryPossible &&
+      heldPower(overCap) > HELD_POWER_CAP &&
+      trioOf(overCap).join("|") === dryBefore.join("|") &&
+      !overCap.moduleSwapUsed &&
+      ledgerSentences(dryLogs).some(
+        (line) =>
+          line ===
+          "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next round.",
+      ) &&
+      !CARRIES_A_DASH.test(ledgerSentences(dryLogs).join(" ")),
+    "the refusal a dry pool writes names the three ways forward in one sentence: a hull pushed past the cap between the roll and the press has no fitting card left for a third seat, the table stays where it was, the round's use is unspent, and every line the press wrote is free of dashes like the rest of the game's copy",
   );
 
   // The press the field report's own screen makes twice: two dispatches in
@@ -1224,7 +1314,7 @@ export async function powerBudgetSuite(): Promise<void> {
 
   // The draft's swap button is the fourth surface that gates a click, and
   // the sentence under its disabled state is the one a captain reads when
-  // the yard has nothing new to deal (see moduleSwapPossible).
+  // the fitting pool cannot fill a whole batch (see moduleSwapPossible).
   const draftPanel = flat(
     sourceOf("src/components/portmasters/game/phases/ModuleDraft.tsx"),
   );
@@ -1391,9 +1481,12 @@ export async function powerBudgetSuite(): Promise<void> {
       !("rollModuleChoices" in engineBarrel) &&
       !("swapCandidates" in engineBarrel) &&
       !("rerollModuleChoices" in engineBarrel) &&
+      !("arrangeModuleSeats" in engineBarrel) &&
       !("moduleFitsHull" in engineBarrel) &&
+      !("moduleInstallsDirectly" in engineBarrel) &&
+      !("moduleSwapsIn" in engineBarrel) &&
       !("heaviestEquipped" in engineBarrel) &&
       !("powerRefusal" in engineBarrel),
-    "only the two door questions cross the engine's barrel, the draft's and the swap's: the roll, the swap's own draw and its two candidate halves, the hull test, the heaviest slot and the refusal sentence stay in the yard's module, so a caller meets the cap the way the panel does",
+    "only the two door questions cross the engine's barrel, the draft's and the swap's: the roll, the swap's own draw and seat arrangement, its two candidate halves, the hull test and its two arms, the heaviest slot and the refusal sentence stay in the yard's module, so a caller meets the cap the way the panel does",
   );
 }

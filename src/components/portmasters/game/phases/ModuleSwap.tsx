@@ -22,8 +22,9 @@ import {
  * new module landing where that one sat, so replacing a heavy module can
  * be allowed while replacing a light one is not, and the disabled rows
  * say why before the click (the engine refuses the same picks as the
- * floor under this). The roll's filter promised the card fits over the
- * heaviest module on the hull, so at least one row here always fits.
+ * floor under this). A card is parked here only when it fits over the
+ * heaviest module on the hull, so at least one row always fits, even when
+ * the open slot's own arithmetic refused the card on the draft screen.
  *
  * The harbor's bar is drawn under the header for the reason the draft's is:
  * this screen is a seat the ready check waits on, and the captain standing

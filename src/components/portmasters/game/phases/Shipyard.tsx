@@ -49,11 +49,13 @@ export function Shipyard({
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
     : 0;
   const affordable = game.money >= upgCost;
-  // The draft's door reads the roll's own
-  // predicate, so a hull the cap has shut is told before the click rather
-  // than dealt an empty table: the button disables and the line below it
-  // says which of the two reasons it is, the same way every other
-  // disabled control on this panel is explained beside itself.
+  // The draft's door reads the roll's own predicate, which asks both ways a
+  // card can reach the hull: straight into an open slot, or over the side in
+  // a swap that gives up the heaviest module. Only a hull the cap has shut
+  // even after a replacement is told before the click rather than dealt an
+  // empty table: the button disables and the line below it says why, the
+  // same way every other disabled control on this panel is explained beside
+  // itself.
   const draftDealable = moduleDraftPossible(game);
   const canDraft = game.shipLevel > 0 && draftDealable;
   // The level guard rides along because a hull below its first upgrade has
@@ -192,7 +194,7 @@ export function Shipyard({
           {game.shipLevel > 0 && !draftDealable && (
             <PanelNote className="text-center text-[11px]">
               {t(
-                "Every module the yard could deal would pass this hull's {HELD_POWER_CAP} power. Selling one at the Parley table makes room.",
+                "Every module the yard could deal would put this hull past its {HELD_POWER_CAP} power, by install or by swap. Selling one at the Parley table makes room.",
                 { HELD_POWER_CAP },
               )}
             </PanelNote>

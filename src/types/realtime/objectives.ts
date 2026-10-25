@@ -13,6 +13,8 @@
 // harbor receives is a sum that names nobody.
 // =====================================================================
 
+import type { RoundReportReadings } from "@/lib/game/telemetry";
+
 /** What one captain reports to the harbor: their own running total. */
 export type ObjectiveReportPayload = {
   roomId: string;
@@ -20,9 +22,9 @@ export type ObjectiveReportPayload = {
 };
 
 /**
- * What one captain reports about a round they
- * played: the orders it dealt them, the ones they filled, and the number
- * of different goods their hold closed it carrying.
+ * What one captain reports about a round they played: the readings declared
+ * once on the telemetry record, plus the room it is filed against, the
+ * captain's own round, and the charter they hold.
  *
  * The actor is deliberately not a field. The captain sending this is the
  * captain it is about, and the server reads them off the socket rather
@@ -31,100 +33,29 @@ export type ObjectiveReportPayload = {
  * round it was playing; the server bounds it against the voyage before
  * recording anything.
  *
- * The four optional fields
- * are the captain's own reading of the hold they closed the round with: how
- * many slots of the ship were carrying something, and how many meals of
- * each food were aboard. They are optional on the wire rather than
- * defaulted, because they mean something only under the switches that
- * create them: the slots belong to the split hold, the meal counts to the
- * survival layer, and a round sailed without those carrying a zero would be
- * a report of an empty ship rather than of an unmeasured one. The server
- * keeps a field it can read, drops one it cannot, and bounds both (see
- * the telemetry:round handler).
+ * The readings are shared with the telemetry record rather than written
+ * twice, because the two shapes are the same claim seen from either end of
+ * the wire (see RoundReportReadings in src/lib/game/telemetry.ts). The
+ * rule that a switched-off block is absent rather than zero is described
+ * there too, once.
  */
 export type RoundReport = {
   roomId: string;
   round: number;
-  ordersDealt: number;
-  ordersFilled: number;
-  distinctGoods: number;
-  holdSlots?: number;
-  grainMeals?: number;
-  saltFishMeals?: number;
-  produceMeals?: number;
-  // The Convoy's own figures for the round,
-  // sent only when the switch that gives them meaning is on, for the reason
-  // the four above are: a round sailed without the market reports no market
-  // rather than a market of zeroes.
-  escortSold?: number;
-  escortFeesEarned?: number;
-  escortAbsorbed?: number;
-  // The bench's own figures, sent only when the switch
-  // that gives them meaning is on, exactly as the three above are. The
-  // fourth is the round's weather rather than the bench's trade, and it rides
-  // a different switch: a Loom is poor in fair weather and busy in cold, so
-  // the reader comparing one round's takings with the next needs to know which
-  // rounds were cold, and that reading belongs to the wardrobe rather than to
-  // the bench. It is a truth rather than a tally, so a fair round reports false
-  // rather than reporting nothing.
-  refitsSold?: number;
-  refitFeesEarned?: number;
-  ragsRewoven?: number;
-  coldRound?: boolean;
-  // The market's own two figures, sent only when the switch that gives them
-  // meaning is on, exactly as the two blocks above are sent: a round sailed
-  // without the market reports no market rather than a market of zeroes.
-  // The first is the design's "module trade volume between captains" read at
-  // the seller's end, and the second is what the volume was worth.
-  modulesSold?: number;
-  moduleFeesEarned?: number;
-  // How many borrows this voyage has spent,
-  // sent only when the switch that gives the ability meaning is on, exactly
-  // as the three blocks above are sent. It is a count of the once a voyage
-  // allowance rather than a round's takings, which is what the design's
-  // evaluation needs: the usage rate is a share of voyages, so a reader
-  // counts the voyages that spent one against the voyages that could have.
-  // A voyage that never borrowed reports a zero here rather than reporting
-  // nothing, because zero is a reading of the allowance and not an absence
-  // of the feature.
-  opportunistBorrows?: number;
-  // The voyage's two food counters, sent only when
-  // the switch that gives them meaning is on, for the reason every block
-  // above is: a round sailed with no provisions layer has no food spending
-  // to divide. They are the voyage's running totals rather than the round's,
-  // because the design's share is a share of a voyage's food spending, and
-  // they are the front page number read as a fraction: what the table
-  // spent on food at its ports, and how much of that went to the vendor.
-  // Both move together and are absent together, so a reader dividing one
-  // by the other never has to guess which of the two it is holding.
-  foodSpend?: number;
-  bargeSpend?: number;
-  // The voyage's crew losses so far, sent
-  // only when the switch that gives them meaning is on, exactly as the
-  // four blocks above are sent: a round sailed without the loss rule has no
-  // losses to report. It is the voyage's running total rather than the
-  // round's, because the design's evaluation reads retention across a voyage:
-  // the captains who lost a hand are one cohort and the captains who did
-  // not are the other, and what is compared is how many of each finished
-  // the voyage. One number is enough to sort a captain into a cohort, and
-  // the server keeps it as the boolean that sort needs rather than a tally
-  // nobody reads (see the crewLost captain line in
-  // src/lib/game/telemetry.ts).
-  crewLosses?: number;
-  // The one claim of this report that is not a
-  // number: the id of the charter this captain holds. It is sent on every
-  // round once the moment has been answered and only while the switch that
-  // gives the moment meaning is on, because the report is also the frame a
-  // reload files: a captain who answered at round four, sailed to round nine
-  // and only then had their screen restored has no other way to be
-  // recorded, and the server writes the take once per voyage whatever the
-  // client sends (see noteCharterTaken). The report keeps no copy of it.
-  // The server validates the id against the pool, attaches the path and
-  // the alignment from its own books rather than trusting a claim about
-  // them, and drops the take it cannot attribute on both, so this field
-  // can only ever name the card the captain actually holds.
+  // The one claim of this report that is not a number: the id of the
+  // charter this captain holds. It is sent on every round once the moment
+  // has been answered and only while the switch that gives the moment
+  // meaning is on, because the report is also the frame a reload files: a
+  // captain who answered at round four, sailed to round nine and only then
+  // had their screen restored has no other way to be recorded, and the
+  // server writes the take once per voyage whatever the client sends (see
+  // noteCharterTaken). The report keeps no copy of it. The server validates
+  // the id against the pool, attaches the path and the alignment from its
+  // own books rather than trusting a claim about them, and drops the take
+  // it cannot attribute on both, so this field can only ever name the card
+  // the captain actually holds.
   charter?: string;
-};
+} & RoundReportReadings;
 
 /**
  * The harbor's total, summed server side and sent to the whole harbor.

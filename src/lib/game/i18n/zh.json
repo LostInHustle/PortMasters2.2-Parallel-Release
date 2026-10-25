@@ -1910,6 +1910,10 @@
       "en": "🔄 Swapped Module Choices for a fresh batch",
       "zh": "🔄 换了一批新的模块"
     },
+    "engine.372": {
+      "en": "🔄 Re-dealt the same module choices; the yard has nothing new for this hull",
+      "zh": "🔄 重新发放了同样的模块选择；船坞没有这艘船体没见过的新模块"
+    },
     "engine.051": {
       "en": "❌ That seat is no longer on your hull, so there is nothing there to replace. Back to Draft and take the card again: the yard fits it to the hull as it stands.",
       "zh": "❌ 那个槽位已经不在你的船体上，那里没有可切换的东西。回到抽取，重新拿一次牌：船坞会按船体现在的样子装上它。"
@@ -5954,8 +5958,8 @@
       "zh": "🆘 等待船长借给你{myRequest.amount}金币..."
     },
     "residual.182": {
-      "en": "Every module the yard could deal would pass this hull's {HELD_POWER_CAP} power. Selling one at the Parley table makes room.",
-      "zh": "船坞能给到的模块，每一件都超过这条船体{HELD_POWER_CAP}点的承载上限。到洽谈桌卖掉一件，就腾出了位置。"
+      "en": "Every module the yard could deal would put this hull past its {HELD_POWER_CAP} power, by install or by swap. Selling one at the Parley table makes room.",
+      "zh": "船坞能给到的模块，无论是安装还是切换，每一件都会让这条船体超过{HELD_POWER_CAP}点的承载上限。到洽谈桌卖掉一件，就腾出了位置。"
     },
     "residual.183": {
       "en": "🚢 Ship Level: {game.shipLevel} | ⚓ Discount: {shipDiscount} Gold",

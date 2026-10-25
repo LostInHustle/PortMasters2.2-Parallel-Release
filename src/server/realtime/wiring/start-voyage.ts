@@ -37,7 +37,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
     // database calls below, and both go on to move the harbor, open its
     // records and deal its table: a voyage announced twice, with the two
     // deals colliding on the alignment table's own key (see
-    // dealAlignments, whose fresh read is the second line of defense here).
+    // dealAlignments, whose fresh read is the second line of defence here).
     // A claim is only a claim if it is taken before the first await, so
     // it is taken here, and everything it guards, the refusals included,
     // is answered inside the finally that releases it.

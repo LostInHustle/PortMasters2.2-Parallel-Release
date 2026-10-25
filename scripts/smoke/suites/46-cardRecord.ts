@@ -502,7 +502,12 @@ export async function cardRecordSuite(): Promise<void> {
       cardOrThrow("emergency_loan").effect.kind === "flags",
     "and the one boon that pays on the spot pays what its record says, once, at the moment it is applied: the flag it leaves behind is what the endgame summary prints, so the gold and the line about the gold come from the same authored number",
   );
+  // A full hull is the shape that parks a pick: one slot, one module in it,
+  // and a table of cards the swap arm can fit over that module. A hull with
+  // no slots at all has no way to take a card, so it is not a draft screen.
   const yard = voyageState();
+  yard.shipLevel = 1;
+  yard.equippedModules.push(cardOrThrow("smugglers_hold"));
   startModuleDrafting(yard);
   check(
     yard.phase === "module_draft" &&
@@ -522,7 +527,7 @@ export async function cardRecordSuite(): Promise<void> {
   check(
     parked !== undefined &&
       drafted &&
-      yard.shipLevel === 0 &&
+      yard.shipLevel === 1 &&
       yard.phase === "module_swap" &&
       yard._newModule?.id === parked.id &&
       (yard._draftChoices ?? []).length === CARDS_PER_OFFER,
@@ -553,6 +558,8 @@ export async function cardRecordSuite(): Promise<void> {
   // the pool, once rolled, is fixed for the round, and backing out and
   // reopening reshows the same trio.
   const backedOut = voyageState();
+  backedOut.shipLevel = 1;
+  backedOut.equippedModules.push(cardOrThrow("smugglers_hold"));
   startModuleDrafting(backedOut);
   const firstTrio = (backedOut._draftChoices ?? [])
     .map((card) => card.id)

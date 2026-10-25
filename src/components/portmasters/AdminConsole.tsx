@@ -307,6 +307,20 @@ export function AdminConsole({
   // rather than two that have to be kept in step.
   const bulkCount = bulkTargets.length;
 
+  // The seven facts a row and a card both read off one account, written once
+  // so the two registers cannot come to describe the same account differently.
+  const accountRowProps = (a: AdminAccount) => ({
+    isSelf: a.id === me.id,
+    busy: pending.includes(a.id),
+    selected: ticked.has(a.id),
+    onToggle: () => toggleOne(a.id),
+    onAct: act,
+    onPurge: () => {
+      setConfirmText("");
+      setPurgeTarget(a);
+    },
+  });
+
   return (
     <div className="pm-canvas flex min-h-screen w-full flex-col lg:h-[100dvh] lg:min-h-0 lg:overflow-hidden">
       {/* The column, and the thing every width decision below reads. It
@@ -593,15 +607,7 @@ export function AdminConsole({
                           <RosterRow
                             key={a.id}
                             account={a}
-                            isSelf={a.id === me.id}
-                            busy={pending.includes(a.id)}
-                            selected={ticked.has(a.id)}
-                            onToggle={() => toggleOne(a.id)}
-                            onAct={act}
-                            onPurge={() => {
-                              setConfirmText("");
-                              setPurgeTarget(a);
-                            }}
+                            {...accountRowProps(a)}
                           />
                         ))}
                       </tbody>
@@ -620,15 +626,7 @@ export function AdminConsole({
                     <AccountCard
                       key={a.id}
                       account={a}
-                      isSelf={a.id === me.id}
-                      busy={pending.includes(a.id)}
-                      selected={ticked.has(a.id)}
-                      onToggle={() => toggleOne(a.id)}
-                      onAct={act}
-                      onPurge={() => {
-                        setConfirmText("");
-                        setPurgeTarget(a);
-                      }}
+                      {...accountRowProps(a)}
                     />
                   ))}
                 </ul>

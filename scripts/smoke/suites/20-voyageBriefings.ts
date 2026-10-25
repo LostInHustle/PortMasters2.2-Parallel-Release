@@ -156,7 +156,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
   // The lines are data rather than literals, so nothing in the source
   // spells them and the walk that holds every call site literal to the
   // pack cannot see them; the readers fail open on purpose, which is the
-  // right behavior at runtime and the wrong thing to trust here, so an
+  // right behaviour at runtime and the wrong thing to trust here, so an
   // untranslated line would print its English on a Mandarin screen with
   // nothing to say so. Each one is read the way a Mandarin screen reads
   // it, through the readers themselves, and has to come back in Mandarin

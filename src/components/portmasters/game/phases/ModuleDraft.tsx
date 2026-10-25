@@ -9,6 +9,7 @@ import {
   moduleSwapPossible,
   swapModuleChoices,
 } from "@/lib/game/engine";
+import { powerBudgetAllows } from "@/lib/game/held-cards";
 import { t } from "@/lib/game/i18n";
 import { PanelNote } from "./PhasePanels";
 import {
@@ -41,11 +42,11 @@ export function ModuleDraft({
 }: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
   const picks = game._draftChoices ?? [];
   // The swap's button reads the swap's own predicate, the way the
-  // shipyard's door reads the draft's (see moduleSwapPossible): a hull the
-  // round has shown every card it could be dealt gets a disabled button
-  // and the line below it saying why, rather than a press that redraws the
-  // table it is already looking at and charges the round's one use for the
-  // privilege.
+  // shipyard's door reads the draft's (see moduleSwapPossible): a press
+  // that can fill all three seats is offered even when the fitting pool has
+  // no unseen card, because the same cards seated in new places still change
+  // every choice on the table. Only a yard that cannot fill a batch is
+  // disabled, and the line below says why.
   const swapDealable = moduleSwapPossible(game);
   const canSwap = !game.moduleSwapUsed && swapDealable;
   return (
@@ -91,7 +92,9 @@ export function ModuleDraft({
                   name={text.name}
                   desc={text.desc}
                   actionLabel={
-                    moduleSlotsOpen(game) > 0 ? t("✅ Install") : t("🔄 Swap")
+                    moduleSlotsOpen(game) > 0 && powerBudgetAllows(game, card)
+                      ? t("✅ Install")
+                      : t("🔄 Swap")
                   }
                   actionClassName="pm-grad-module-draft"
                   onSelect={() => act((g, l) => handleModuleSelect(g, i, l))}

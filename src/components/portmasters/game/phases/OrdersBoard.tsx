@@ -127,7 +127,7 @@ function OrderCard({
   // holding the path would open.
   const tone = locked
     ? "border-dashed border-black/25 dark:border-white/25 bg-background/40 opacity-75"
-    : // Harbour gold, filled rather than outlined. The intel
+    : // Harbor gold, filled rather than outlined. The intel
       // "Guaranteed" highlight wears the same hue as a thin outline,
       // so filled versus outlined keeps the two distinguishable
       // without relying on hue alone.

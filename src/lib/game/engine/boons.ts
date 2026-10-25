@@ -273,15 +273,42 @@ function swapCandidates(state: GameState): {
   };
 }
 
+// Seat a drawn batch so no card keeps the seat it held on the table being
+// replaced. The field report's second half was exactly this: the old top up
+// appended carried cards in their old places, so one press changed one seat
+// and left the other two where they were. With three seats a derangement
+// always exists, and the backtrack is small enough to read as the rule.
+function arrangeModuleSeats(
+  picks: CardRecord[],
+  previous: CardRecord[],
+): CardRecord[] | null {
+  const oldSeat = new Map(previous.map((card, seat) => [card.id, seat]));
+  const used = new Array(picks.length).fill(false);
+  const seats: CardRecord[] = [];
+  const place = (seat: number): boolean => {
+    if (seat === picks.length) return true;
+    for (let i = 0; i < picks.length; i++) {
+      if (used[i] || oldSeat.get(picks[i].id) === seat) continue;
+      used[i] = true;
+      seats[seat] = picks[i];
+      if (place(seat + 1)) return true;
+      used[i] = false;
+    }
+    return false;
+  };
+  return place(0) ? seats : null;
+}
+
 // The top up uses even weights because the pool's weights already chose these
 // cards once. A Parley trade can empty both draw pools between the roll and
 // the press, so the final fallback refills from the fitting pool instead of
-// returning a short table.
+// returning a short table. The seats are arranged last, after the batch is
+// complete, so every press that changes the table changes every seat.
 function rerollModuleChoices(
   state: GameState,
   fresh: Array<[CardRecord, number]>,
   carried: CardRecord[],
-): CardRecord[] {
+): CardRecord[] | null {
   const picks = drawOffer(fresh, CARDS_PER_OFFER);
   const seats = CARDS_PER_OFFER - picks.length;
   if (seats > 0) {
@@ -300,20 +327,32 @@ function rerollModuleChoices(
       .map(([card]) => [card, 1] as [CardRecord, number]);
     picks.push(...drawOffer(pool, rest));
   }
-  for (const card of picks) noteCardOffer(state.cardTally, card);
-  return picks;
+  if (picks.length < CARDS_PER_OFFER) return null;
+  const seatsDealt = arrangeModuleSeats(picks, state._draftChoices ?? []);
+  if (!seatsDealt) return null;
+  for (const card of seatsDealt) noteCardOffer(state.cardTally, card);
+  return seatsDealt;
 }
 
-// With an open slot, weigh the card against the current hold. With no open
-// slot, the swap may drop the heaviest module, so that is the comparison.
-// The panel disables and both install paths refuse, making this both the
-// screen and the floor. Exported for the power budget suite.
-export function moduleFitsHull(state: GameState, card: CardRecord): boolean {
+// The two ways a card can reach the hull: straight into an open slot, or
+// over the side in a swap that gives up the heaviest module aboard. A hull
+// with an open slot can still be closed to the direct path by the cap while
+// the swap path stays open, which is the shape the field report named: the
+// draft must not judge the hull before the captain has had the chance to
+// replace something.
+function moduleInstallsDirectly(state: GameState, card: CardRecord): boolean {
+  return moduleSlotsOpen(state) > 0 && powerBudgetAllows(state, card);
+}
+
+function moduleSwapsIn(state: GameState, card: CardRecord): boolean {
   const heaviest = heaviestEquipped(state);
-  if (moduleSlotsOpen(state) > 0) {
-    return powerBudgetAllows(state, card);
-  }
-  return powerBudgetAllows(state, card, heaviest);
+  return heaviest !== null && powerBudgetAllows(state, card, heaviest);
+}
+
+// The union is the door's question and the roll's filter. It is exported for
+// the power budget suite; the two arms stay private to the yard.
+export function moduleFitsHull(state: GameState, card: CardRecord): boolean {
+  return moduleInstallsDirectly(state, card) || moduleSwapsIn(state, card);
 }
 
 function heaviestEquipped(state: GameState): CardRecord | null {
@@ -325,7 +364,9 @@ function heaviestEquipped(state: GameState): CardRecord | null {
 }
 
 // Shared refusal text for both install paths, using the same total reader as
-// the panels so every displayed sum agrees.
+// the panels so every displayed sum agrees. The draft's pick passes the
+// heaviest module as the displaced card, because that is the most room the
+// hull can make; a card refused against that total cannot be taken at all.
 function powerRefusal(
   state: GameState,
   card: CardRecord,
@@ -342,18 +383,25 @@ function powerRefusal(
   );
 }
 
-// Read-only check for whether any fitting module exists.
+// Read-only check for whether any module can reach the hull by either path.
+// The door stays shut only when the cap closes both the open slot and the
+// heaviest replacement, which is the one case the Shipyard note explains.
 export function moduleDraftPossible(state: GameState): boolean {
   return offerPool("module", state).some(([card]) =>
     moduleFitsHull(state, card),
   );
 }
 
-// Read-only check for a swap, using the same candidate halves as the press.
+// Read-only check for whether the press can fill all three seats. A seat may
+// be filled by an unseen card, one from the replaced table, or, when a trade
+// has emptied the table onto the hull, a fitting card the hull now carries;
+// the fitting pool therefore answers the question, not the fresh half alone.
+// A same set re-seat is dealable: every seat still changes.
 export function moduleSwapPossible(state: GameState): boolean {
   return (
     (state._draftChoices?.length ?? 0) > 0 &&
-    swapCandidates(state).fresh.length > 0
+    offerPool("module", state).filter(([card]) => moduleFitsHull(state, card))
+      .length >= CARDS_PER_OFFER
   );
 }
 
@@ -366,8 +414,10 @@ export function startModuleDrafting(state: GameState) {
   state.phase = "module_draft";
 }
 
-// One free reroll per round. If there is nothing fresh to deal, refuse and
-// leave the use unspent.
+// One free reroll per round. A press that cannot fill all three seats is
+// refused and leaves the use unspent; a press that can is always spent, even
+// when the fitting pool has no unseen card, because the re-seat changes every
+// choice on the table. The log names which of the two it was.
 export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
   if (state.moduleSwapUsed) {
     logs.push(line("❌ You've already swapped your module choices this round"));
@@ -378,7 +428,8 @@ export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
     return;
   }
   const { fresh, carried } = swapCandidates(state);
-  if (fresh.length === 0) {
+  const cards = rerollModuleChoices(state, fresh, carried);
+  if (!cards) {
     logs.push(
       line(
         "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next round.",
@@ -386,13 +437,24 @@ export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
     );
     return;
   }
-  state._draftChoices = rerollModuleChoices(state, fresh, carried);
+  const before = new Set((state._draftChoices ?? []).map((card) => card.id));
+  const sameSet = cards.every((card) => before.has(card.id));
+  state._draftChoices = cards;
   state.moduleSwapUsed = true;
-  logs.push(line("🔄 Swapped Module Choices for a fresh batch"));
+  logs.push(
+    sameSet
+      ? line(
+          "🔄 Re-dealt the same module choices; the yard has nothing new for this hull",
+        )
+      : line("🔄 Swapped Module Choices for a fresh batch"),
+  );
 }
 
 // Defense in depth for the power cap. A refusal leaves the phase in place so
-// the captain can take another seat or back out.
+// the captain can take another seat or back out. A card that only fits by
+// swap is routed to the picker even when a slot is open, because the open
+// slot's arithmetic is the one that failed; the refusal prints the best case
+// total, which is the total after replacing the heaviest module aboard.
 export function handleModuleSelect(
   state: GameState,
   idx: number,
@@ -401,10 +463,10 @@ export function handleModuleSelect(
   const mod = state._draftChoices?.[idx];
   if (!mod) return;
   if (!moduleFitsHull(state, mod)) {
-    logs.push(powerRefusal(state, mod, null));
+    logs.push(powerRefusal(state, mod, heaviestEquipped(state)));
     return;
   }
-  if (moduleSlotsOpen(state) > 0) {
+  if (moduleInstallsDirectly(state, mod)) {
     equipModule(state, mod, null, logs);
     // Direct installs are final, so the card leaves the pool now. A swap pick
     // stays in the pool until finalizeModuleSwap confirms a slot.

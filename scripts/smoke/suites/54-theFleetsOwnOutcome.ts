@@ -734,7 +734,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     (p) => p?.ventureId === planted.id,
     30000,
   );
-  // The captain's own client behavior, played faithfully: the payout
+  // The captain's own client behaviour, played faithfully: the payout
   // frame is applied to the purse and the new total is reported on the
   // same channel a real browser's beacon uses.
   spender.socket.on(
