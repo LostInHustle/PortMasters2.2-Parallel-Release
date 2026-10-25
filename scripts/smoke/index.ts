@@ -460,14 +460,14 @@ async function main(): Promise<void> {
     console.log("\nThe tag vocabulary");
     await tagVocabularySuite();
     // The card record's article is the third of the three that need no
-    // harbor, and it is the tag walk's neighbour in the tree as well as in
+    // harbor, and it is the tag walk's neighbor in the tree as well as in
     // the run: the same pool the vocabulary is asked about is the one the
     // record puts a shape under, and both are static data rather than a
     // table anybody has to be sitting at.
     console.log("\nThe card record");
     await cardRecordSuite();
     // The milestone boons' article joins the three above that need no
-    // harbor, and it is the card record's neighbour in the run the way it
+    // harbor, and it is the card record's neighbor in the run the way it
     // is in the tree: the pool the record puts a shape under is the pool
     // the five moment cards are drawn from. Its checks walk the engine's
     // own state in process, and the one half that touches the database

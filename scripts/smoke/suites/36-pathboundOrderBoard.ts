@@ -39,7 +39,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
   // =================================================================
   // The nine slot order board: the manifest's pathbound slots, read
   // against the rule for the feature: "Six basic orders open, three
-  // pathbound orders greyed out, each stamped with the crest of the path
+  // pathbound orders grayed out, each stamped with the crest of the path
   // that would unlock it and labeled in plain language."
   //
   // The boards below are dealt through the real lifecycle rather than
@@ -279,7 +279,7 @@ export async function pathboundOrderBoardSuite(): Promise<void> {
   );
   // The same reading for a card already dealt: a marked card is a marker
   // on a card, so a build with the switch off plays it as an ordinary
-  // order rather than leaving it grey forever.
+  // order rather than leaving it gray forever.
   const markedCards = pathOnBoard.customerCards.filter((o) => o.isPathOrder);
   check(
     markedCards.length === PATH_ORDER_SLOTS &&

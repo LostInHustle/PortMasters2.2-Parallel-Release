@@ -1,4 +1,5 @@
 import {
+  DIFFICULTIES,
   difficultyConfig,
   mandateRounds,
   type Difficulty,
@@ -246,7 +247,7 @@ function briefingSteps(phases: readonly BriefingPhase[]): BriefingStep[] {
  *
  * The accent is the phase's own CSS variable, named after the phase, which
  * is the pairing the palette already holds for all six of them, so a round
- * added to a chart is drawn in its own colour without a table of them
+ * added to a chart is drawn in its own color without a table of them
  * living here. Classic's line keeps the accent its cards wore.
  */
 function roundStepHtml(mode: GameMode): string {
@@ -420,7 +421,7 @@ export function tutorialSteps(
     {
       title: t("🏪 Market: Buying"),
       content: t(
-        '<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain\'s rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>',
+        '<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain\'s rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand whisper and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>',
       ),
     },
     {
@@ -471,7 +472,7 @@ export function tutorialSteps(
           { raidKind: raidCopy(cfg), escortShare: escortPct(cfg) },
         ) +
         (cfg.brokerCorruption
-          ? `<p>${t("In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.")}</p>`
+          ? `<p>${t("In these waters a broker can be corrupt. The whisper you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.")}</p>`
           : "") +
         t(
           '\n<div style="background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5">\n  💡 {ESCORT_SHARE_RULE} Often worth it once your Gold is already low.\n</div>',
@@ -481,8 +482,13 @@ export function tutorialSteps(
     {
       title: t("Resolve: Settlement"),
       content: t(
-        '<p>Once the pirates are dealt with, two bills come due:</p>\n<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">\n  <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">🔧</div>\n    <strong>Ship Maintenance</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">15 to 22 Gold each round, set by the waters you sail</span>\n  </div>\n  <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Dues</strong> tab of your captain\'s rail shows exactly what is owed. Check it before spending anything.</p>\n<p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn\'t the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they\'ve got the Gold to spare. Just repay it before the voyage\'s last round ends, or it comes out of your Gold automatically and goes straight to them.</p>',
-        { ARTISAN_WAGE_MIN, ARTISAN_WAGE_MAX },
+        '<p>Once the pirates are dealt with, two bills come due:</p>\n<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0">\n  <div style="background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">🔧</div>\n    <strong>Ship Maintenance Fee</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{MAINTENANCE_MIN} to {MAINTENANCE_MAX} Gold each round, set by the waters you sail</span>\n  </div>\n  <div style="background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)">\n    <div style="font-size:22px;margin-bottom:4px">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style="font-size:12px;color:var(--muted-foreground)">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style="font-size:13px;color:var(--muted-foreground)">The <strong>Dues</strong> tab of your captain\'s rail shows exactly what is owed. Check it before spending anything.</p>\n<p style="font-size:13px;color:var(--muted-foreground)">Coming up short isn\'t the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they\'ve got the Gold to spare. Just repay it before the voyage\'s last round ends, or it comes out of your Gold automatically and goes straight to them.</p>',
+        {
+          ARTISAN_WAGE_MIN,
+          ARTISAN_WAGE_MAX,
+          MAINTENANCE_MIN,
+          MAINTENANCE_MAX,
+        },
       ),
     },
     {
@@ -508,6 +514,16 @@ const wageOf = (id: string): number =>
 // with it rather than leaving a last fortnight's figure in a sentence.
 const ARTISAN_WAGE_MIN = Math.min(...WORKER_TYPES.map((w) => w.wage));
 const ARTISAN_WAGE_MAX = Math.max(...WORKER_TYPES.map((w) => w.wage));
+// The maintenance range the same card prints, read off the tier table the
+// Resolve bill charges from. The two ends are the gentlest and harshest
+// waters, so a retuned bill moves the card rather than leaving a figure
+// from a previous balance pass in the guide.
+const MAINTENANCE_MIN = Math.min(
+  ...Object.values(DIFFICULTIES).map((d) => d.maintenance),
+);
+const MAINTENANCE_MAX = Math.max(
+  ...Object.values(DIFFICULTIES).map((d) => d.maintenance),
+);
 const workerLine = (id: string, makes: string): string => {
   const w = WORKER_TYPES.find((x) => x.id === id);
   return t("• {workerLabel} ({workerWage} Gold/Round): Makes {makes}", {
@@ -639,14 +655,14 @@ ${t(
 )}
 
 ${t("🔮 Broker's Whisper:")}
-${t('• Market: Click "Broker\'s Rumor Board" to open the window')}
-${t('• Spend {INTEL_COST} Gold to buy a "rumor" about Orders demand', {
+${t('• Market: Click "Broker\'s Whisper Board" to open the window')}
+${t("• Spend {INTEL_COST} Gold to buy a Broker's Whisper about Orders demand", {
   INTEL_COST,
 })}
-${t("• Revealed intel guarantees matching orders will appear")}
-${t("• A rumor is always true and always delivered, on every tier")}${
+${t("• Each revealed whisper guarantees a matching order will appear")}
+${t("• A whisper is always true and always delivered, on every tier")}${
     cfg.brokerCorruption
-      ? `\n${t("• Here a broker may still be corrupt: you get the true rumor, but your position leaks and this round's raid risk rises, and the log tells you when")}`
+      ? `\n${t("• Here a broker may still be corrupt: you get the true whisper, but your position leaks and this round's raid risk rises, and the log tells you when")}`
       : ""
   }
 
@@ -657,7 +673,7 @@ ${t("• An offer can't be an item for itself, and both amounts must be whole nu
 ${t("• You can never offer more than you currently own, it's set aside the moment you post, and returned to you if you cancel or nobody takes it")}
 ${t('• Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under "With" when you post: only the two of you will ever see it')}
 
-${t("🔧 Ship Modules:")}
+${t("🔧 Modules:")}
 ${t("• Dusk: Upgrade your hull to unlock Module Slots")}
 ${t("• Draft powerful modules to create unique synergies")}
 ${t("• Swap modules to adapt to your current voyage!")}
@@ -726,7 +742,7 @@ ${t("• Can't cover this round's wages or maintenance? When other captains are 
 ${t("• Any captain with enough Gold can lend it to you on the spot; it's in your hands immediately")}
 ${t("• Repay it any time before the voyage's last round ends, or it's taken from your Gold automatically and handed to your lender")}
 ${t("• Still short when the voyage finishes? That unpaid loan is what bankrupts you, not the round it was borrowed in")}
-${t("• Lending Gold raises your own reputation, scaled to how much you lent")}
+${t("• Lending Gold raises your own Reputation, scaled to how much you lent")}
 
 ${t("🛡️ Backing:")}
 ${t("• Every outstanding loan in your harbor is visible on the settlement screen, to everyone, not just the lender and borrower")}

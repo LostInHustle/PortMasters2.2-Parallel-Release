@@ -52,7 +52,7 @@ import type { NotificationItem } from "@/lib/use-notifications";
  * The badge comes in as a node rather than as an icon plus a class,
  * because the two headings do not wear theirs the same way: the Guide
  * puts its book on a gradient tile, and the Advice leaves the bulb as a
- * plain coloured icon.
+ * plain colored icon.
  */
 function TextModal({
   open,
@@ -168,6 +168,7 @@ export function NotificationHistoryModal({
   onOpenChange: (v: boolean) => void;
   items: NotificationItem[];
 }) {
+  const { locale } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -205,7 +206,7 @@ export function NotificationHistoryModal({
                   <div className="text-sm font-semibold mb-1 flex items-center gap-1.5">
                     <span className="text-base">{n.icon}</span> {n.title}
                     <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {formatTime(new Date(n.at))}
+                      {formatTime(new Date(n.at), locale)}
                     </span>
                   </div>
                   <div className="space-y-0.5">
@@ -240,7 +241,7 @@ export function RumorBoardModal({
   game: GameState;
   onBuy: () => void;
 }) {
-  // The rumor price is derived, through getIntelCost (see
+  // The whisper price is derived, through getIntelCost (see
   // engine/pricing), from whether the Broker's Network module is
   // equipped, so the modal cannot show a price the engine would not
   // charge.
@@ -253,15 +254,15 @@ export function RumorBoardModal({
             <span className="pm-grad-rumors inline-flex h-7 w-7 items-center justify-center rounded-lg">
               <Sparkles className="h-4 w-4" />
             </span>
-            {t("Broker's Rumor Board")}
+            {t("Broker's Whisper Board")}
           </DialogTitle>
           <DialogDescription>
             {t("Spend Gold to reveal what Orders will ask for!")}
           </DialogDescription>
         </DialogHeader>
-        {/* The button greys outside Market because the engine refuses the
-            press there (see purchaseIntel): a rumor bought after the board
-            is dealt could never be honoured, and a dialog left open across
+        {/* The button grays outside Market because the engine refuses the
+            press there (see purchaseIntel): a whisper bought after the board
+            is dealt could never be honored, and a dialog left open across
             the rest of the lap is exactly how that press happens. */}
         <div className="flex flex-col items-center my-2 gap-1.5">
           <Button
@@ -269,7 +270,7 @@ export function RumorBoardModal({
             onClick={onBuy}
             disabled={game.phase !== "market"}
           >
-            {t("🔮 Buy Rumor ({intelCost}💰)", { intelCost })}
+            {t("🔮 Buy a Whisper ({intelCost}💰)", { intelCost })}
           </Button>
           {game.phase !== "market" && (
             <p className="text-[11px] text-muted-foreground">
@@ -281,7 +282,7 @@ export function RumorBoardModal({
           {game.revealedIntel.length ? (
             <>
               <div className="font-semibold text-rumors text-sm mb-1.5">
-                {t("📜 Revealed Intel:")}
+                {t("📜 Revealed Whispers:")}
               </div>
               {game.revealedIntel.map((i, idx) => (
                 <div key={idx} className="text-[13px] py-0.5">
@@ -295,7 +296,7 @@ export function RumorBoardModal({
           ) : (
             <div className="text-muted-foreground text-center py-5 text-sm">
               {t(
-                "✨ No rumors revealed yet... Spend Gold to listen to the Broker's whispers.",
+                "✨ No whispers revealed yet... Spend Gold to listen to the Broker.",
               )}
             </div>
           )}
@@ -321,7 +322,7 @@ export function RumorBoardModal({
  * through.
  *
  * The chip wears the alarm wash and the alarm ink together, so the glyph
- * inside inherits the colour rather than being told it, and the confirm
+ * inside inherits the color rather than being told it, and the confirm
  * press wears the same alarm against the background: the dialog that
  * takes rather than gives is the one that says so before it is answered.
  */
@@ -384,7 +385,7 @@ function ConfirmDialog({
  * restart is the most destructive action in the harbor, and the destructive
  * accent is what surfaces that without needing the body copy to land
  * first. It is the one dialog in the session that takes rather than
- * gives, so it wears the colour that means a loss.
+ * gives, so it wears the color that means a loss.
  */
 export function RestartConfirmModal({
   open,
@@ -517,7 +518,7 @@ export function TutorialModal({
               className="justify-self-end pm-grad-guide"
               onClick={close}
             >
-              {t("🚢 Set Sail!")}
+              {t("Done")}
             </Button>
           ) : (
             <Button

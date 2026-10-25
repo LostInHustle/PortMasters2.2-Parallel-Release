@@ -1,14 +1,14 @@
 /**
  * The palette check.
  *
- * This file owns the widget table: every colour bearing surface on the
+ * This file owns the widget table: every color bearing surface on the
  * front end, the hue it was given, and the screens it appears on. The
  * table is the source of truth, and palette.css is checked against it
  * rather than the other way round.
  *
  * Six things have to hold, and each one has a way of going wrong that
  * nothing else in the toolchain would notice. TypeScript does not read
- * colours, ESLint does not read class strings, and the smoke test only
+ * colors, ESLint does not read class strings, and the smoke test only
  * asks whether the pages answer.
  *
  *   1. Two widgets a captain sees at the same time are at least MIN_GAP
@@ -26,7 +26,7 @@
  *      both written in CSS, so nothing connects the two unless this check
  *      does.
  *   6. No raw Tailwind palette class is left in src/. A tree that still
- *      has them has two colour systems in it.
+ *      has them has two color systems in it.
  *
  * Rules 1 and 2 are one pass over the table and share checkDistances
  * below, so the six rules are five checks.
@@ -58,7 +58,7 @@ function fail(message: string) {
 
 /* The hue a token in palette.css carries, read out of the file rather than
    written here, the same way the widget hues below are read. The meaning
-   colours are declared twice, once for the day and once for the night, and
+   colors are declared twice, once for the day and once for the night, and
    the night value carries the same hue, so the first declaration is the
    number the check measures against. A token whose two declarations do
    not agree is a finding, because a check that measured against one of
@@ -263,7 +263,7 @@ const WIDGETS: Widget[] = [
      half black, so a dialog answers to its own screen and never to the
      board it covers. That exemption is load bearing, and the session
      dialogs are where it shows. The Navigation Guide, the Captain
-     Profile, the Rumor Board and the Notifications history all open over
+     Profile, the Broker's Whisper Board and the Notifications history all open over
      the game, and two of them land close to the panel behind them: the
      guide 7.9 degrees from Ship and Funds, and Notifications 2.7 from
      Chat.
@@ -332,7 +332,7 @@ const WIDGETS: Widget[] = [
   ...PHASE_LIST,
 
   /* Panels that open inside a phase, and the screens that stand alone.
-     Where a hue repeats, the two never share a screen. The Rumor Board
+     Where a hue repeats, the two never share a screen. The Broker's Whisper Board
      moved to the Barter end of the wheel when the check found it 11
      degrees from the Orders panel it opens over. */
   {
@@ -353,7 +353,7 @@ const WIDGETS: Widget[] = [
      that already carries four: the phase tag at 154, the Advisor at 197,
      the Depth at 347 and the Pulse at 90, plus the five session surfaces a
      captain is looking past. 270 is the one wide gap left, and it is wide
-     in both directions: Ledger at 304 is its nearest session neighbour at
+     in both directions: Ledger at 304 is its nearest session neighbor at
      34 degrees and Chat at 240 is next at 30, where the floor is twenty.
      Everything else on the screen is further off than those two. */
   {
@@ -371,7 +371,7 @@ const WIDGETS: Widget[] = [
      those apart is the screen string rather than the hue.
      The cold chip in the status panel needs no rung at all: it wears the
      sea when the crew is dressed for the weather and the alarm when it is
-     not, and those are meaning colours rather than widgets. */
+     not, and those are meaning colors rather than widgets. */
   {
     name: "wardrobe",
     hue: 219,
@@ -421,7 +421,7 @@ const WIDGETS: Widget[] = [
     name: "rumors",
     hue: 218,
     screens: ["phase:orders"],
-    what: "Rumor Board",
+    what: "Broker's Whisper Board",
   },
   /* Standing Orders is a dialog of the captain's own, opened from the
      control panel in any phase, so it answers to a screen of its own the
@@ -439,7 +439,7 @@ const WIDGETS: Widget[] = [
 
   /* The operator console sits at /admin, which is a route of its own
      rather than a panel inside a voyage, so nothing shares its screen
-     and its hue answers to no neighbour. It is kept 151 degrees clear
+     and its hue answers to no neighbor. It is kept 151 degrees clear
      of the red that means danger all the same: a seal in that family
      would read as a warning about the operator rather than about an
      account. */
@@ -477,7 +477,7 @@ function checkDistances() {
     if (fromRed < MIN_GAP) {
       fail(
         `${a.name} (${a.what}) sits ${fromRed.toFixed(1)} degrees from the meaning red. ` +
-          `Identity colour must stay ${MIN_GAP} degrees clear of it.`,
+          `Identity color must stay ${MIN_GAP} degrees clear of it.`,
       );
     }
 
@@ -553,8 +553,8 @@ function checkTokens() {
   }
 
   const tableNames = new Set(WIDGETS.map((w) => w.name));
-  /* A token may go unclaimed by the table when it is a meaning colour,
-     one of the four bright fills, one of the three House colours, or one
+  /* A token may go unclaimed by the table when it is a meaning color,
+     one of the four bright fills, one of the three House colors, or one
      of the three Ages. None of those are chrome: they say what something
      is, not which panel it belongs to, so they are not spread around the
      wheel. An Age is the same kind of fact as a House, since every
@@ -612,7 +612,7 @@ function checkGradients(files: string[]) {
         if (!declaredTokens.has(ref[1])) {
           fail(
             `.pm-grad-${name} fills from ${ref[1]}, which palette.css never declares. ` +
-              `The element would render as the @property fallback colour.`,
+              `The element would render as the @property fallback color.`,
           );
         }
       }
@@ -639,7 +639,7 @@ function checkGradients(files: string[]) {
 /* White ink on a bright fill cannot be read, which is how the old gold
    and amber gradients came to carry a dark ink at every call site and
    then lose it to a later rule. Past this lightness a fill has to name
-   its own ink, so the decision sits beside the colour instead of at the
+   its own ink, so the decision sits beside the color instead of at the
    call site, where a rule order nobody can see was free to overrule it. */
 const BRIGHT = 0.7;
 
@@ -795,7 +795,7 @@ function checkRawPalette(files: string[]) {
       for (const m of line.matchAll(RAW_SCALE)) {
         fail(
           `${where}:${index + 1} still uses ${m[0]}. ` +
-            `Every colour belongs to a token now.`,
+            `Every color belongs to a token now.`,
         );
       }
     });

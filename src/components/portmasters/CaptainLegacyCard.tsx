@@ -246,8 +246,8 @@ export function CaptainLegacyCard({
 
       {/* Captain's Rival: head to head line at the bottom,
           only when the caller names a rival. The line is a filled band in
-          the panel's own colour, which is what marks it as a different
-          surface from the cards above without giving a rival a colour of
+          the panel's own color, which is what marks it as a different
+          surface from the cards above without giving a rival a color of
           its own. */}
       {rival && (
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-legacy/5 text-legacy px-2.5 py-2">

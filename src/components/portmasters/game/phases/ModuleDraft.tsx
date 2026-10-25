@@ -5,13 +5,9 @@ import { cardText } from "@/lib/game/cards";
 import {
   cancelModuleDraft,
   handleModuleSelect,
-  moduleSlotsOpen,
-  moduleSwapPossible,
   swapModuleChoices,
 } from "@/lib/game/engine";
-import { powerBudgetAllows } from "@/lib/game/held-cards";
 import { t } from "@/lib/game/i18n";
-import { PanelNote } from "./PhasePanels";
 import {
   DraftCard,
   DraftGrid,
@@ -23,9 +19,15 @@ import {
 
 /**
  * The module draft: the three modules this round is offering, the once a
- * round swap, and the way back out to the shipyard without picking one.
- * The cards are the same draft cards the boon draft deals, in the module
- * hue.
+ * round batch change, and the way back out to the shipyard without picking
+ * one. The cards are the same draft cards the boon draft deals, in the
+ * module hue.
+ *
+ * The yard does not judge the hull's power before the captain can act. Every
+ * card is offered as a choice, and the engine answers when one is taken: a
+ * card that would put the hull over its cap is refused in words, with the
+ * hull and the table left as they were, so the captain can weigh another
+ * seat or change the batch first.
  *
  * The harbor's bar is drawn under the header because this screen is a seat
  * the ready check waits on: a captain inside the draft is standing at
@@ -41,18 +43,15 @@ export function ModuleDraft({
   members,
 }: Pick<PhasePanelProps, "game" | "act" | "phaseSync" | "members">) {
   const picks = game._draftChoices ?? [];
-  // The swap's button reads the swap's own predicate, the way the
-  // shipyard's door reads the draft's (see moduleSwapPossible): a press
-  // that can fill all three seats is offered even when the fitting pool has
-  // no unseen card, because the same cards seated in new places still change
-  // every choice on the table. Only a yard that cannot fill a batch is
-  // disabled, and the line below says why.
-  const swapDealable = moduleSwapPossible(game);
-  const canSwap = !game.moduleSwapUsed && swapDealable;
+  // The batch change is a reroll, not a fit test: it is offered whenever
+  // there is a table to replace and the round's one use is unspent. Whether
+  // the new batch holds a card this hull can take is the selection's
+  // question, answered when a card is picked.
+  const canSwap = !game.moduleSwapUsed;
   return (
     <div className="max-w-4xl mx-auto text-center">
       <PhaseHeading layout="mb-1" tone="text-module-draft" brush>
-        {t("🔧 Module Drafting")}
+        {t("🔧 Drafting Module")}
       </PhaseHeading>
       <p className="text-sm text-muted-foreground mb-4">
         {t("Choose a module to install or swap.")}
@@ -71,16 +70,9 @@ export function ModuleDraft({
             onClick={() => act((g, l) => swapModuleChoices(g, l))}
           >
             {game.moduleSwapUsed
-              ? t("✅ Choices Swapped This Round")
-              : t("🎲 Swap Choices (1 use/round)")}
+              ? t("✅ Batch Changed This Round")
+              : t("🎲 Change Batch (1 use/round)")}
           </DraftSwapButton>
-          {!game.moduleSwapUsed && !swapDealable && (
-            <PanelNote className="text-center text-[11px] mb-3">
-              {t(
-                "Nothing new to deal: every module the yard could offer this hull is either on this table already or aboard. Take one of these, or come back next round.",
-              )}
-            </PanelNote>
-          )}
           <DraftGrid>
             {picks.map((card, i) => {
               const text = cardText(card);
@@ -91,11 +83,7 @@ export function ModuleDraft({
                   icon={card.icon}
                   name={text.name}
                   desc={text.desc}
-                  actionLabel={
-                    moduleSlotsOpen(game) > 0 && powerBudgetAllows(game, card)
-                      ? t("✅ Install")
-                      : t("🔄 Swap")
-                  }
+                  actionLabel={t("Choose")}
                   actionClassName="pm-grad-module-draft"
                   onSelect={() => act((g, l) => handleModuleSelect(g, i, l))}
                 />

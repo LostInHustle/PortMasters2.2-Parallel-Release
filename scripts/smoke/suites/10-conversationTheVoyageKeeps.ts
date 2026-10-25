@@ -65,7 +65,7 @@ export async function conversationTheVoyageKeepsSuite(
   check(heard !== null, "a line in the harbor chat reaches the harbor");
   check(
     heard?.message?.sender?.id === hostId,
-    "and is labelled with who said it",
+    "and is labeled with who said it",
   );
 
   const heardDm = waitForEvent<WireMessage>(

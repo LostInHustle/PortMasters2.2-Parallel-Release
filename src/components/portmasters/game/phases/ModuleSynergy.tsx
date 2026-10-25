@@ -75,7 +75,7 @@ const MODULE_SYNERGY_RULES: {
   {
     ids: ["brokers_network", "ocean_relay"],
     label:
-      "Intel Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
+      "Whisper Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
     params: (name) => ({
       brokersNetworkName: name("brokers_network"),
       oceanRelayName: name("ocean_relay"),
@@ -168,7 +168,9 @@ export function ModuleSynergyAnalyzer({
                   key={card.id}
                   className="inline-flex items-center gap-1 rounded-full bg-gain/5 px-2 py-0.5 text-[10px] text-gain"
                 >
-                  {card.icon} {text.name}: {text.desc}
+                  {card.icon} {text.name}
+                  {t(": ")}
+                  {text.desc}
                 </span>
               );
             })}

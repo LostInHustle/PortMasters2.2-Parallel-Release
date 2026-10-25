@@ -86,7 +86,7 @@ export function StatGrid({
             is running, so a voyage with the switch off shows the same
             three columns at the same width it always had rather than a
             fourth cell reporting a number no rule moves. The cell swaps its label to the state's own words
-            and opens the full sentence on a tap: colour alone is a
+            and opens the full sentence on a tap: color alone is a
             readout only a captain who already knows the rule can read,
             and a hover never shows on a touch screen. */}
         {larderOn &&

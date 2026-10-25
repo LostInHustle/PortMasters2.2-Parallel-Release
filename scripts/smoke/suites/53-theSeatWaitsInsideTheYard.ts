@@ -12,7 +12,7 @@
 // the departure, and the draft captain's own client, which folds the seat
 // the other way in every guard it has (checkpointRank and the advance
 // guard both read seatOf), followed the announcement and autoCommit
-// cancelled the draft and left Dusk under their hands. Read from the other
+// canceled the draft and left Dusk under their hands. Read from the other
 // seat the same frame is the upgrade half of the report: a captain readied
 // and the harbor moved while the mate was still changing modules.
 //

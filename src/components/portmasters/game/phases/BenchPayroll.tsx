@@ -11,8 +11,8 @@ import { PanelHeading, artisanTint } from "./PhaseShared";
  * The wage bill the bench has run up: one line per artisan type owed money,
  * the total, and what the crew turned out against it.
  *
- * Payroll is money leaving the purse, so this box keeps the colour that
- * means a cost rather than wearing the Artisan Management colour the rest
+ * Payroll is money leaving the purse, so this box keeps the color that
+ * means a cost rather than wearing the Artisan Management color the rest
  * of the screen wears.
  */
 export function BenchPayroll({

@@ -145,7 +145,8 @@ export function EndgameResults({
             {/* The merit's own name and description are read where they
                 print, the way the merits showcase reads them. */}
             <div className="text-lg font-bold flex items-center justify-center gap-2">
-              <MeritIcon id={merit.id} className="h-5 w-5" /> Captain's Merit:{" "}
+              <MeritIcon id={merit.id} className="h-5 w-5" />{" "}
+              {t("Captain's Merit: ")}
               {t(merit.name)}
             </div>
             <div className="text-xs opacity-80 mt-0.5">{t(merit.desc)}</div>

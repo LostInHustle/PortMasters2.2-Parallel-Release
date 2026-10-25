@@ -23,7 +23,7 @@ const monsoon = DIFFICULTIES.monsoon;
 
 // Reputation bar for the hardest tier's endurance badge. Deliberately below the
 // top merchant rating (see MERCHANT_RATINGS), since surviving sixteen rounds of
-// Monsoon at all is the achievement being recognised here, not out earning
+// Monsoon at all is the achievement being recognized here, not out earning
 // every other captain.
 const EYE_OF_THE_STORM_REPUTATION = 200;
 

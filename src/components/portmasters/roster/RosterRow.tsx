@@ -188,7 +188,7 @@ export function RosterRow({
         {/* The shortage is visible to the fleet, not just to the
             captain living it, and this is the board the fleet reads.
             It wears the meaning red rather than the Larder's own
-            hue: the Larder's colour names the panel on the Market
+            hue: the Larder's color names the panel on the Market
             screen, while a status is drawn from the meaning half of
             the palette wherever it appears (see Pill). Not folded
             into seatMarks, which is about the two marks that write a

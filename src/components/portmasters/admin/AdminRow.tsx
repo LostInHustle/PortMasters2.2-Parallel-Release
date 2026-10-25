@@ -139,8 +139,9 @@ export function AccountCard({
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-[11px] tabular-nums text-muted-foreground">
               {account.roomsHosted}{" "}
-              {account.roomsHosted === 1 ? "harbor" : "harbors"} ·{" "}
-              {account.seatsHeld} {account.seatsHeld === 1 ? "seat" : "seats"}
+              {t(account.roomsHosted === 1 ? "Harbor" : "Harbors")} ·{" "}
+              {account.seatsHeld}{" "}
+              {t(account.seatsHeld === 1 ? "Seat" : "Seats")}
             </span>
             <div className="ml-auto flex flex-wrap items-center gap-1.5">
               <AccountActions

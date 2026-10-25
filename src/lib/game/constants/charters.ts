@@ -8,7 +8,7 @@
 // ask what a charter is imports this one, and a module that wants to know
 // whether one is due imports that one.
 //
-//   - A charter is offered once a voyage, at round four, and the choice
+//   * A charter is offered once a voyage, at round four, and the choice
 //     carries to the end of it. The design's shape for the offer is a
 //     trio: the captain's two path charters, and one wildcard drawn at
 //     even weight from the other eight. The pairing lives here in
@@ -19,21 +19,21 @@
 //     NO_LEAN for that reason, and the validator holds the two per path
 //     count against this one map.
 //
-//   - The wildcard is drawn flat: every record's condition is the always
+//   * The wildcard is drawn flat: every record's condition is the always
 //     arm at weight one, so nothing about a captain bends the third slot
 //     of their trio. That is what keeps the dashboard's cover row an
 //     honest number (see COVER_CHARTERS below): a card any captain can
 //     be offered is what lets the row read the pool rather than read who
 //     happened to be dealt what.
 //
-//   - Every charter runs Ocean Gambit's pool alone. Power four is the
+//   * Every charter runs Ocean Gambit's pool alone. Power four is the
 //     floor that follows rather than a taste: a card absent from Classic
 //     must sit above Classic's ceiling of three, which the mode clause
 //     in ../cards enforces, and four is that floor. The Factor sits at
 //     five, the wide ceiling itself, as the one whose strength is a rule
 //     rather than a rate.
 //
-//   - The trigger is the one value charter_draft, and every record names
+//   * The trigger is the one value charter_draft, and every record names
 //     it in its own field the same way a boon does. A charter's kind
 //     needed no new vocabulary: CardKind carried the third word from
 //     ./cards, so what the charters add to the shape is content rather

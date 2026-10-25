@@ -7,7 +7,7 @@
 // same split the tag vocabulary keeps and the card record takes. What it
 // walks is two fields on the state (see the field notes in ./types):
 //
-//   - milestoneOffers is the queue of moments waiting to be answered.
+//   * milestoneOffers is the queue of moments waiting to be answered.
 //     A queue rather than a phase, because the five moments land at
 //     three different seats of the lap and a phase would have to be
 //     entered again from each of them; an offer is a local act, answered
@@ -15,7 +15,7 @@
 //     Nothing here takes an offer off the queue: that is ./engine's
 //     answerMilestone, which is the only writer the queue has.
 //
-//   - milestonesAnswered carries the mark each trigger is answered to,
+//   * milestonesAnswered carries the mark each trigger is answered to,
 //     in that trigger's own units, so a moment that can honestly happen
 //     twice is answered twice and one that cannot stays answered. The
 //     units are: crew loss counts the losses answered, the pathbound

@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { t } from "@/lib/game/i18n";
-import { seatMarks, type SeatStatus } from "@/lib/seatMarks";
+import { writtenOff, type SeatStatus } from "@/lib/seatMarks";
 import { captainName } from "@/lib/voteTally";
 
 /**
@@ -74,7 +74,7 @@ export function VoteSeatPicker({
   /** The vote's own sentence under the row, drawn once a seat is spent. */
   note?: ReactNode;
 }) {
-  const marked = (id: string) => seatMarks(statuses?.[id]).writtenOff;
+  const marked = (id: string) => writtenOff(statuses?.[id]);
   const nameOf = (id: string) => captainName(members, id);
 
   return (

@@ -144,11 +144,11 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "chat:mute",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
         select: { hostId: true },
@@ -192,11 +192,11 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "chat:unmute",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       const room = await db.room.findUnique({
         where: { id: roomId },
         select: { hostId: true },
@@ -236,11 +236,11 @@ export function wireChat(io: Server, socket: Socket): void {
   socket.on(
     "player:report",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const roomId = s.roomId;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || roomId !== s.roomId || !targetUserId) return;
+      if (!targetUserId) return;
       if (targetUserId === s.userId) {
         socket.emit("room:error", {
           roomId,

@@ -226,7 +226,6 @@ export function useVoteBoard<T extends VoteTallyFrame, P extends VotePress>(
   // to everything downstream of it.
   return useMemo(
     () => ({
-      held,
       setHeld,
       pressed,
       setPressed,
@@ -241,7 +240,6 @@ export function useVoteBoard<T extends VoteTallyFrame, P extends VotePress>(
       vote,
     }),
     [
-      held,
       pressed,
       error,
       clearError,

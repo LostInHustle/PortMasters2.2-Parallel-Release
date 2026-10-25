@@ -133,7 +133,7 @@ export function Wardrobe({
         <div className="mt-2 flex flex-wrap gap-1.5">
           {/* The panel's own hue rather than the bench's, on the same
               reasoning the Provisions panel's buttons carry at the port:
-              painting these in the artisan chip colour would say a garment
+              painting these in the artisan chip color would say a garment
               is part of the trade it came from. */}
           {carried.map((good) => (
             <Button

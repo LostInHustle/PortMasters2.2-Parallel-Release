@@ -153,11 +153,12 @@ interface CredentialCardProps extends DoorProps {
    */
   accent: string;
   /**
-   * The sentence under the form, which is the door's own. The card draws
-   * the small print around it, the same size and spacing under both
-   * doors, so a call site hands over the sentence and nothing else.
+   * The sentence under the form, which is the door's own and optional.
+   * The console's door says where its accounts come from; the captain's
+   * door has nothing extra to say. The card draws the small print when a
+   * sentence is handed over, the same size and spacing under both doors.
    */
-  footer: ReactNode;
+  footer?: ReactNode;
 }
 
 export function CredentialCard({
@@ -311,9 +312,11 @@ export function CredentialCard({
             </form>
           </Tabs>
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
-            {footer}
-          </p>
+          {footer && (
+            <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+              {footer}
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

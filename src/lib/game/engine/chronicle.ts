@@ -14,7 +14,7 @@
 // just one that says so plainly rather than dressing it up, and in a mode
 // that sails on through insolvency the sentence says that too.
 // =====================================================================
-import { t } from "@/lib/game/i18n";
+import { tFor, type Locale } from "@/lib/game/i18n";
 import { merchantRatingLabel } from "../constants/reputation";
 import type { Difficulty } from "../difficulty";
 
@@ -88,12 +88,13 @@ function watersLabel(difficulty: Difficulty): string {
 // that is the story: the crown outranks both for the plain reason that a
 // marooned captain can still take one, and a chronicle that led with the
 // ship they lost would bury its own ending.
-function buildHeadline(input: ChronicleInput): string {
+function buildHeadline(input: ChronicleInput, locale: Locale): string {
   // The waters' name lands inside every headline, so it is read into the
   // language here and handed on as the token's value.
-  const waters = t(watersLabel(input.difficulty));
+  const waters = tFor(locale, watersLabel(input.difficulty));
   if (input.crowned) {
-    return t(
+    return tFor(
+      locale,
       "{input.displayName} took the crown sailing {waters} and came home with {input.finalReputation} Reputation.",
       {
         "input.displayName": input.displayName,
@@ -103,7 +104,8 @@ function buildHeadline(input: ChronicleInput): string {
     );
   }
   if (input.marooned) {
-    return t(
+    return tFor(
+      locale,
       "{input.displayName} was put ashore by a vote of the harbor and sailed {waters} without a ship.",
       {
         "input.displayName": input.displayName,
@@ -113,16 +115,19 @@ function buildHeadline(input: ChronicleInput): string {
   }
   if (input.bankrupt) {
     return input.bankruptcyIsFinal
-      ? t(
+      ? tFor(
+          locale,
           "{input.displayName} sailed {waters} and ran out of Gold before the voyage was done.",
           { "input.displayName": input.displayName, waters },
         )
-      : t(
+      : tFor(
+          locale,
           "{input.displayName} sailed {waters}, went bankrupt, and finished the voyage.",
           { "input.displayName": input.displayName, waters },
         );
   }
-  return t(
+  return tFor(
+    locale,
     "{input.displayName} sailed {waters} and came home with {input.finalReputation} Reputation.",
     {
       "input.displayName": input.displayName,
@@ -140,21 +145,21 @@ function buildHeadline(input: ChronicleInput): string {
 // actually ended on. The harbor's own line, when this is the voyage that
 // earned one, is the last sentence of all, which is where a gazette keeps
 // the item that is not about the voyage in front of it.
-function buildBody(input: ChronicleInput): string {
+function buildBody(input: ChronicleInput, locale: Locale): string {
   const sentences: string[] = [];
   sentences.push(
-    t("The voyage ran {input.rounds} rounds.", {
+    tFor(locale, "The voyage ran {input.rounds} rounds.", {
       "input.rounds": input.rounds,
     }),
   );
   sentences.push(
-    t("Peak Reputation hit {input.peakReputation}.", {
+    tFor(locale, "Peak Reputation hit {input.peakReputation}.", {
       "input.peakReputation": input.peakReputation,
     }),
   );
   if (input.largestTrade > 0) {
     sentences.push(
-      t("The largest single trade paid {input.largestTrade} Gold.", {
+      tFor(locale, "The largest single trade paid {input.largestTrade} Gold.", {
         "input.largestTrade": input.largestTrade,
       }),
     );
@@ -166,10 +171,10 @@ function buildBody(input: ChronicleInput): string {
     if (input.lendCount > 0) {
       parts.push(
         input.lendCount === 1
-          ? t("{input.displayName} lent once", {
+          ? tFor(locale, "{input.displayName} lent once", {
               "input.displayName": input.displayName,
             })
-          : t("{input.displayName} lent {input.lendCount} times", {
+          : tFor(locale, "{input.displayName} lent {input.lendCount} times", {
               "input.displayName": input.displayName,
               "input.lendCount": input.lendCount,
             }),
@@ -178,26 +183,27 @@ function buildBody(input: ChronicleInput): string {
     if (input.borrowCount > 0) {
       parts.push(
         input.borrowCount === 1
-          ? t("borrowed once")
-          : t("borrowed {input.borrowCount} times", {
+          ? tFor(locale, "borrowed once")
+          : tFor(locale, "borrowed {input.borrowCount} times", {
               "input.borrowCount": input.borrowCount,
             }),
       );
     }
     // The joining " and " carries its own row; the two parts carry the
     // reading.
-    const joined = parts.join(t(" and "));
-    sentences.push(t("{joined}.", { joined }));
+    const joined = parts.join(tFor(locale, " and "));
+    sentences.push(tFor(locale, "{joined}.", { joined }));
   }
   if (input.crowned) {
     sentences.push(
-      t("The crown went home with {input.displayName}.", {
+      tFor(locale, "The crown went home with {input.displayName}.", {
         "input.displayName": input.displayName,
       }),
     );
   } else if (input.marooned) {
     sentences.push(
-      t(
+      tFor(
+        locale,
         "The harbor voted to put {input.displayName} ashore, and the voyage went on without a ship under them.",
         { "input.displayName": input.displayName },
       ),
@@ -205,13 +211,15 @@ function buildBody(input: ChronicleInput): string {
   } else if (input.bankrupt) {
     sentences.push(
       input.bankruptcyIsFinal
-        ? t(
+        ? tFor(
+            locale,
             "The voyage ended in bankruptcy before {input.displayName} could finish.",
             {
               "input.displayName": input.displayName,
             },
           )
-        : t(
+        : tFor(
+            locale,
             "The books ran out mid voyage, and {input.displayName} sailed the rest of it bankrupt.",
             {
               "input.displayName": input.displayName,
@@ -223,8 +231,11 @@ function buildBody(input: ChronicleInput): string {
     // language of the sentence around it rather than dropped in as the
     // bare English the column holds.
     sentences.push(
-      t("The harbor closed the books at {input.merchantRating}.", {
-        "input.merchantRating": merchantRatingLabel(input.merchantRating),
+      tFor(locale, "The harbor closed the books at {input.merchantRating}.", {
+        "input.merchantRating": merchantRatingLabel(
+          input.merchantRating,
+          locale,
+        ),
       }),
     );
   }
@@ -232,9 +243,12 @@ function buildBody(input: ChronicleInput): string {
   return sentences.join(" ");
 }
 
-export function buildChronicle(input: ChronicleInput): ChronicleOutput {
+export function buildChronicle(
+  input: ChronicleInput,
+  locale: Locale,
+): ChronicleOutput {
   return {
-    headline: buildHeadline(input),
-    body: buildBody(input),
+    headline: buildHeadline(input, locale),
+    body: buildBody(input, locale),
   };
 }

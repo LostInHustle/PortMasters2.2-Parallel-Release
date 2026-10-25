@@ -18,7 +18,7 @@ import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ShieldCheck, Skull } from "lucide-react";
 import type { LedgerAct } from "@/lib/game/ledger";
-import { PhaseHeading, StatTile, SummaryHeading } from "./PhaseShared";
+import { FigureTile, PhaseHeading, SummaryHeading } from "./PhaseShared";
 
 /**
  * The first station of the Resolve phase: the raid the round ends on. The
@@ -113,7 +113,7 @@ export function PirateAttack({
           </SummaryHeading>
           <div className="grid grid-cols-3 gap-2">
             {/* Raid probability */}
-            <StatTile
+            <FigureTile
               value={`${raidPct}%`}
               valueClassName={cn(
                 "tabular-nums",
@@ -126,13 +126,13 @@ export function PirateAttack({
               label={t("Raid Chance")}
             />
             {/* Gold at risk */}
-            <StatTile
+            <FigureTile
               value={goldAtRisk}
               valueClassName="tabular-nums text-alarm"
               label={t("Gold at Risk")}
             />
             {/* Expected loss */}
-            <StatTile
+            <FigureTile
               value={Math.round(expectedLoss)}
               valueClassName="tabular-nums text-warn"
               label={t("Expected Loss")}

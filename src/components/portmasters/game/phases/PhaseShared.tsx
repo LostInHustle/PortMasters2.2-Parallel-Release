@@ -149,7 +149,7 @@ export type PhasePanelProps = {
 
 // The two boards of the Market (the port's purchase board and the
 // manifest's order board) take exactly this much of the phase panel: the
-// game, the act, and the cargo colour reader. Named once so the two board
+// game, the act, and the cargo color reader. Named once so the two board
 // signatures cannot drift apart.
 export type MarketBoardProps = Pick<PhasePanelProps, "game" | "act"> & {
   colorFor: (item: string) => string | undefined;
@@ -319,7 +319,6 @@ export {
   PanelStat,
   PanelTotal,
   FigureTile,
-  StatTile,
   StationStrip,
   IntelBanner,
   PathDeskRow,

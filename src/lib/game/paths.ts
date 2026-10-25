@@ -123,11 +123,19 @@ export function normalizePath(value: unknown): PathId | null {
   return Object.hasOwn(PATHS, value) ? (value as PathId) : null;
 }
 
-// The single door to the record, so no caller indexes PATHS directly.
+// The single door to the record, so no caller indexes PATHS directly. A
+// PathId was already validated when it was narrowed, so it answers without
+// a null test; anything else may be a value from outside the record. The
+// three lines are TypeScript overloads rather than redeclarations, which
+// the core rule reads them as.
+/* eslint-disable no-redeclare */
+export function pathConfig(value: PathId): PathConfig;
+export function pathConfig(value: unknown): PathConfig | null;
 export function pathConfig(value: unknown): PathConfig | null {
   const id = normalizePath(value);
   return id === null ? null : PATHS[id];
 }
+/* eslint-enable no-redeclare */
 
 // Derived from the pool, so a retuned path cannot desynchronize from the
 // labels that explain a locked card.

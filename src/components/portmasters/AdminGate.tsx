@@ -65,7 +65,7 @@ const REGISTER_FIELDS: CredentialFieldSpec[] = [
     key: "displayName",
     label: "Display Name",
     hint: "shown in the roster",
-    placeholder: "for example, Harbor Master",
+    placeholder: "for example, Harbormaster",
     maxLength: DISPLAY_NAME_MAX,
     optional: true,
   },

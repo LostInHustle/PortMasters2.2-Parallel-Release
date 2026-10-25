@@ -65,7 +65,8 @@ export type LedgerLine = {
  * a name the pack does not carry, such as a card's own name, stays in
  * the reader's language too.
  */
-type LedgerValue = string | number | LedgerLine | ((locale: Locale) => string);
+export type LedgerValue =
+  string | number | LedgerLine | ((locale: Locale) => string);
 
 /**
  * The one write.

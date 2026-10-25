@@ -59,7 +59,7 @@ export async function detailPopupsQuestionSuite(
   await new Promise((resolve) => setTimeout(resolve, 400));
   check(
     detailQuestions.some((question) => question.requesterId === askerId),
-    "a captain asking for another captain's detail is relayed to that captain, labelled with the asker",
+    "a captain asking for another captain's detail is relayed to that captain, labeled with the asker",
   );
   hostSocket.emit("player:detail:response", {
     roomId: roomId,

@@ -69,7 +69,7 @@ export function SettlementDeskRow({
  *
  * The purse decides whether the press is live, and the gradient is the
  * reward for it, so a captain who cannot cover the ask is shown the same
- * button greyed rather than a desk with nothing on it. The one press
+ * button grayed rather than a desk with nothing on it. The one press
  * that takes something back rather than granting it wears the alarm
  * instead, and is live whatever the purse holds.
  */

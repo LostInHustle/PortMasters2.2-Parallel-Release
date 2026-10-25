@@ -1,6 +1,6 @@
 # PortMasters 2.2 Parallel Release: Buff Audit
 
-Every boon, every ship module, every House perk, every Age, every difficulty modifier, every Renown rule and every social economy effect was traced from where it is declared to where it is read. This document records what was found.
+Every boon, every module, every House perk, every Age, every difficulty modifier, every Renown rule and every social economy effect was traced from where it is declared to where it is read. This document records what was found.
 
 ## What happened to these findings
 
@@ -25,7 +25,7 @@ One entry in the last section is deliberately left as it was found. `CaptainMeri
 
 ## How the audit was run
 
-The game declares its buffs in one place and applies them in another. A boon is a row in `src/lib/game/constants/drafts.ts` with a `modifiers` object. A module is a row in the same module with a `penalty` or a named flag. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a number in `src/lib/game/engine/ages.ts`.
+The game declares its buffs in one place and applies them in another. A boon and a module are both rows in `src/lib/game/constants/drafts.ts`, each one a `CardRecord` carrying its effect, trigger, condition, tags and mode weights, with the record type and the tag vocabulary in `src/lib/game/constants/cards.ts`. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a modifier number in `src/lib/game/engine/ages.ts`.
 
 For each one the audit did three things:
 
@@ -39,18 +39,18 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 
 ## What was covered
 
-| Family               | Count                | Where it lives                      |
-| -------------------- | -------------------- | ----------------------------------- |
-| Boons                | 19, over three tiers | `src/lib/game/constants/drafts.ts`  |
-| Ship modules         | 14, over three tiers | `src/lib/game/constants/drafts.ts`  |
-| Modifier keys        | 31                   | `src/lib/game/types.ts`             |
-| House perks          | 4 fields, 3 Houses   | `src/lib/game/engine/houses.ts`     |
-| Ages                 | 3                    | `src/lib/game/engine/ages.ts`       |
-| Difficulty modifiers | 3 tiers              | `src/lib/game/difficulty.ts`        |
-| Captain's Merits     | 9                    | `src/lib/game/merits.ts`            |
-| Renown titles        | 7                    | `src/lib/game/legacy.ts`            |
-| Social economy       | 6 systems            | `src/lib/game/engine/` and realtime |
-| Harbor systems       | Harbor Pulse and two | `src/lib/game/harborPulse.ts`       |
+| Family               | Count                           | Where it lives                      |
+| -------------------- | ------------------------------- | ----------------------------------- |
+| Boons                | 19, over three tiers            | `src/lib/game/constants/drafts.ts`  |
+| Modules              | 14, over three tiers            | `src/lib/game/constants/drafts.ts`  |
+| Modifier keys        | 31                              | `src/lib/game/types.ts`             |
+| House perks          | 4 fields, 3 Houses              | `src/lib/game/engine/houses.ts`     |
+| Ages                 | 3                               | `src/lib/game/engine/ages.ts`       |
+| Difficulty modifiers | 3 tiers                         | `src/lib/game/difficulty.ts`        |
+| Captain's Merits     | 9                               | `src/lib/game/merits.ts`            |
+| Renown titles        | 7                               | `src/lib/game/legacy.ts`            |
+| Social economy       | 6 systems                       | `src/lib/game/engine/` and realtime |
+| Harbor systems       | 3 (Harbor Pulse and two others) | `src/lib/game/harborPulse.ts`       |
 
 ## Defects
 
@@ -58,7 +58,7 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 
 `kiln_and_forge_guild` says Celadon Ware and Bronze Mirror orders pay 15 percent more. `exotic_treasures` says Foreign Balm and Pearl String orders pay 15 percent more. Those are the tier 1 finished goods and the tier 2 finished goods, so the two boons are meant to be opposites.
 
-Both are gated on the same test at `src/lib/game/engine/orders.ts:82`, `hasCharterGood`, which calls the helper at `src/lib/game/pools.ts`:
+Both are gated on the same test at `src/lib/game/engine/orders.ts:170`, where `hasCharterGood` is computed from the helper at `src/lib/game/pools.ts:126`:
 
 ```typescript
 export function isCharterGood(item: string): boolean {
@@ -233,7 +233,7 @@ The audit found more working than broken, and it is worth naming the working par
 
 **Merits are pure achievements by design.** The nine merits are evaluated against the voyage record at conclusion and grant standing rather than modifiers. That is the intended shape, not an unread flag.
 
-**Both deliberate exclusions are deliberate.** `artisan_inspiration` returns a weight of zero on an empty roster, which is how the draft avoids offering a boon that cannot fire. The `rollModuleChoices` fallback pool is unreachable because tier 0 offers eight modules against a maximum of three slots. Both are correct.
+**Both deliberate fallbacks are correct.** `artisan_inspiration` returns a weight of zero on an empty roster, which is how the draft avoids offering a boon that cannot fire. `drawModuleBatch` tops up a short batch from cards already aboard, so a small pool still deals three faces when fewer than three unheld modules sit outside the table.
 
 **The Harbor member candidate filter for Bequest Routing is correct.** It excludes the borrower and the bankrupt captain, which is exactly the set that cannot receive the routing.
 

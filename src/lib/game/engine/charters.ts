@@ -8,7 +8,7 @@
 // answerMilestone's, read against a moment that is asked once instead of
 // queued:
 //
-//   - The guards come first, and both of them are refusals rather than
+//   * The guards come first, and both of them are refusals rather than
 //     quietly doing nothing: the moment must be pending (the switch on, a path
 //     held, the round reached, no answer given) and the card has to be one
 //     of the three the moment is dealing, so a stale click or a hand
@@ -17,14 +17,14 @@
 //     is pending exactly while the field is null, so a second answer
 //     meets a question already answered and returns false.
 //
-//   - The write is one field and its consequence: the id is stored and
+//   * The write is one field and its consequence: the id is stored and
 //     the held flags are folded into the round's, which is where a held
 //     card's effect begins to ride. heldFlagsOf is the merger every
 //     held read takes, so the charter's keys and the boons' keys reach
 //     the books through one spread, and the one owner per key clause the
 //     pool validator holds is what lets either side go first.
 //
-//   - The tally is the deviation from the milestone design worth writing
+//   * The tally is the deviation from the milestone design worth writing
 //     down: a milestone's table is counted where it is armed, because
 //     arming happens once and the screen renders again; a charter's trio
 //     is derived rather than armed, so there is no arm moment to count at,
@@ -35,7 +35,7 @@
 //     card is counted off the same table the guard validated, so the
 //     tally and the state cannot disagree about what was taken.
 //
-//   - The ledger line is the moment's own glyph and the card's own lead
+//   * The ledger line is the moment's own glyph and the card's own lead
 //     (see cardLead), the same pair answerMilestone writes. The word is
 //     "Your charter", the possessive the screen uses, because the plain
 //     noun is already spoken for by the voyage schedule's chartered

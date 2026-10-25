@@ -73,7 +73,7 @@ export async function theVoyageLengthSuite(
   );
   check(
     voyageRoundsFor("nonsense", "nonsense") === 8,
-    "while a mode and a tier nobody recognises read as the founding voyage's eight rounds, the same fallback every other reader of a mode or a tier makes",
+    "while a mode and a tier nobody recognizes read as the founding voyage's eight rounds, the same fallback every other reader of a mode or a tier makes",
   );
 
   // The state the captain is handed. This is the number the lap, the

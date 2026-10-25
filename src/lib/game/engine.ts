@@ -83,7 +83,7 @@ export {
 } from "./engine/bazaar";
 
 // canFillOrder and its path readers are public because the board must ask
-// the engine's own question before it presses, so a card the board greys out
+// the engine's own question before it presses, so a card the board grays out
 // is a card the engine refuses. quoteOrder is public so the card, the
 // advisor and the settlement price an order through one chain.
 export {
@@ -173,11 +173,6 @@ export {
   cancelModuleDraft,
   finalizeModuleSwap,
   handleModuleSelect,
-  // The Shipyard asks before its Draft button, so the answer is the roll's
-  // own predicate.
-  moduleDraftPossible,
-  // Likewise, the swap button reads the reroll's predicate.
-  moduleSwapPossible,
   // The heal reads the same surcharge accounting the doors write.
   reconcileModulePenalties,
   startBoonDrafting,

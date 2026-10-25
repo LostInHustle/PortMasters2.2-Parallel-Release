@@ -13,7 +13,7 @@
 // Everything here takes a Renown Level as a plain number and imports
 // nothing but constants, so the identical functions run on a client
 // deciding whether to draw a button and on the server deciding whether to
-// honour the click.
+// honor the click.
 //
 // An unknown level is always passed in as a number that fails, never left
 // undefined. The roster on the wire carries a captain whose client never

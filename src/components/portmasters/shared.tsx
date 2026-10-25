@@ -101,10 +101,10 @@ export function OnlineDot({
 /* The wash a meaning tone wears, read by name.
  *
  * Every entry is a soft wash of its own token, so the thing wearing it
- * and the words inside it are the same colour in both modes and neither
+ * and the words inside it are the same color in both modes and neither
  * needs a dark variant. A Pill, the two stat tiles in the captain profile
  * and the suggestion toggle all say the same kind of thing about a number
- * and have to say it in the same colour, so they read this one map.
+ * and have to say it in the same color, so they read this one map.
  *
  * This covers the whole meaning half of the palette, and a surface may
  * offer a subset of it. The warn tone landed for the balance dashboard's
@@ -112,10 +112,10 @@ export function OnlineDot({
  * calling it an error: a mode that has not shipped yet is watched rather
  * than broken, and red would be the wrong word for it. Gold is the entry
  * that made one copy worth having.
- * It is the one tone whose words do not wear the token's own text colour,
+ * It is the one tone whose words do not wear the token's own text color,
  * pairing its wash with the gold ink instead, and both the gold token and
  * the gold ink token are real ones. A copy that reached for the wrong one
- * would render in a plausible colour rather than a broken one, which is
+ * would render in a plausible color rather than a broken one, which is
  * the kind of mistake that survives a review.
  */
 export const TONE_WASH: Record<string, string> = {
@@ -139,8 +139,8 @@ export function Pill({
    * A meaning, not a panel. A Pill says something about a number or a
    * status, so it draws from the meaning half of the palette and reads
    * the same wherever it appears. A Pill that names a thing rather than
-   * a status takes its colour through className instead, so that a
-   * Widget colour is never put on a status and a meaning is never put
+   * a status takes its color through className instead, so that a
+   * Widget color is never put on a status and a meaning is never put
    * on a panel heading.
    */
   tone?:
@@ -157,12 +157,12 @@ export function Pill({
   className?: string;
 }) {
   /* Every one of these is a soft wash of its own token, so a Pill and
-     the number inside it are the same colour in both modes and neither
+     the number inside it are the same color in both modes and neither
      needs a dark variant. */
   const tones: Record<string, string> = {
     default: "bg-black/5 dark:bg-white/10 text-foreground",
     /* A Pill that names a thing rather than a status brings its own
-       colour through className. Leaving the tone map out entirely is
+       color through className. Leaving the tone map out entirely is
        what keeps the two from fighting over background-color, which
        would otherwise be settled by Tailwind's own rule order rather
        than by anything visible in the markup. */
@@ -316,7 +316,7 @@ export function Th({
 }
 
 /**
- * A labelled form row: the label, an optional hint on the far side of it,
+ * A labeled form row: the label, an optional hint on the far side of it,
  * and the control underneath. It backs the field below it rather than being
  * spread across the tree, so the two cards that take a captain name and a
  * password ask for them the same way without either of them reaching past
@@ -355,7 +355,7 @@ function Field({
  * this exists to stop them drifting apart one attribute at a time.
  *
  * The label and the input are tied together here rather than left as two
- * neighbours: without the pair of them naming the same id, clicking the
+ * neighbors: without the pair of them naming the same id, clicking the
  * word "Password" lands on nothing and a screen reader announces the
  * field as an unnamed edit box. The id comes from useId, so two cards
  * stacked on one screen cannot mint the same one, and a caller that

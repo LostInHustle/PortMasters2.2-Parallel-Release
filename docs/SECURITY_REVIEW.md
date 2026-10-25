@@ -73,8 +73,8 @@ run as `npm run check:private`, holds eight rules:
    tree has a single `RichText` component that renders markup, and no
    other site may render it. Every other sentence in the tree is text.
 6. The roster frame, which is the only thing in the tree that carries the
-   mute list, goes out one captain at a time. A mute is the host's judgement
-   of one captain, so a roster frame sent to a harbor is that judgement told to
+   mute list, goes out one captain at a time. A mute is the host's judgment
+   of one captain, so a roster frame sent to a harbor is that judgment told to
    the harbor.
 7. The draft frame, which carries a captain's hand, goes out one captain at
    a time for the sixth rule's reason. A hand dealt to a seat is that seat's
@@ -163,8 +163,8 @@ The four clauses below were applied to it, and the one of them it touches is
 the broadcast payload clause, which it satisfies by adding fields to a
 statement already in this inventory rather than a statement of its own. The
 single new broadcast statement is the harbor's own line explaining a move the
-harbor did not vote for (`src/server/realtime/checkpoint.ts:303`), which
-carries a sentence and a room id and nothing about any captain. No new path
+harbor did not vote for (`src/server/realtime/checkpoint.ts:301`), which
+carries a sentence and a harbor id and nothing about any captain. No new path
 trusts a client either: the departure a captain who had not acted takes is
 computed by the same client authoritative engine the boundaries below
 already accept.
@@ -219,7 +219,7 @@ operator's purge deletes the rows that name an account by hand, on the
 reporting side and the reported side alike.
 
 Nothing on the wire carries a report. The captain it names is not told, the
-harbor is not told, and the only frame it produces is the acknowledgement to
+harbor is not told, and the only frame it produces is the acknowledgment to
 the captain who filed it. With the mute, the second pass added no new private
 channel at all; it added a record the game keeps and a frame that lost an
 audience, which is why the review repeats over them rather than the suite
@@ -461,7 +461,7 @@ row and creates no table.
 It deliberately does not contact a running server. The one route a script can
 call without credentials answers from the process and touches nothing else,
 by design, so it cannot say which database the server answering for it is
-writing to; asking would be theatre. The run time proof that a server and the
+writing to; asking would be theater. The run time proof that a server and the
 script driving it share one database is the smoke suite's safety interlock:
 the first account is created through the API, and the run stops before a
 second one exists unless that account can be read back through the driver's

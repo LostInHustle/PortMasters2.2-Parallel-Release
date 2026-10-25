@@ -852,7 +852,7 @@ export async function escortContractSuite(
     "a contract the two captains agreed cannot be withdrawn by the seller, so the one captain who regrets a price is left with the gap rather than with a button",
   );
 
-  const cancelledBoard = boardSettles(escortForeigner, (board) =>
+  const canceledBoard = boardSettles(escortForeigner, (board) =>
     board.every((c) => c.id !== openRow?.id),
   );
   socketOf(escortSeller).emit("contract:cancel", {
@@ -860,7 +860,7 @@ export async function escortContractSuite(
     contractId: openRow?.id ?? "",
   });
   check(
-    (await cancelledBoard) !== null,
+    (await canceledBoard) !== null,
     "while an offer nobody has taken is the seller's own to take back",
   );
 

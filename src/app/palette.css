@@ -1,16 +1,16 @@
 /* PortMasters 2.2 Parallel Release: the palette.
 
-   Every widget has a colour of its own, so that two panels side by side
+   Every widget has a color of its own, so that two panels side by side
    never read as the same panel twice.
 
-   Identity colour dresses chrome: a heading, an icon, a seal, a border,
-   a soft wash. Meaning colour dresses data: a number, a status, a chip.
+   Identity color dresses chrome: a heading, an icon, a seal, a border,
+   a soft wash. Meaning color dresses data: a number, a status, a chip.
    The two never trade places. That separation is what lets forty odd
    hues share one wheel with the handful a captain has to read, and it
    is the rule to hold to when adding anything new.
 
    Every identity hue sits at one lightness and one chroma and differs
-   only in hue angle, so no colour is louder than its neighbour and the
+   only in hue angle, so no color is louder than its neighbor and the
    whole set reads as one family. Light mode is a deep version for a
    near white canvas, dark mode a bright one for a near black canvas.
    The fill is the exception: it stays put in both, because white ink
@@ -97,7 +97,7 @@
 
      Check In sits in the spread with everything else rather than
      taking the red end of the wheel. The red end belongs to cost and
-     error, and a reward dressed in the colour of a loss would misread
+     error, and a reward dressed in the color of a loss would misread
      however loudly it was meant. It calls for attention by being the
      only filled, moving control on the masthead instead.
   */
@@ -243,7 +243,7 @@
   --w-brand: oklch(0.53 0.13 49.4);
   /* Keyboard Shortcuts: the keys that do things. */
   --w-shortcuts: oklch(0.53 0.13 218);
-  /* Rumor Board: what is being whispered. */
+  /* Broker's Whisper Board: what is being whispered. */
   --w-rumors: oklch(0.53 0.13 218);
   /* Standing Orders: what a seat does when nobody is standing at it. It
      answers to its own dialog screen, so the only hue it is measured
@@ -263,7 +263,7 @@
 
   /*
      Its own route rather than a panel in a voyage, so nothing is ever
-     on screen beside it and its hue answers to no neighbour. It was
+     on screen beside it and its hue answers to no neighbor. It was
      still kept clear of the red that means danger: a seal in that
      family would read as a warning about the operator.
   */
@@ -286,14 +286,14 @@
 
   /* === The three Houses === */
   /*
-     A House is named for its colour, so these three are named tokens
+     A House is named for its color, so these three are named tokens
      like gold rather than widget hues, and they are exempt from the
-     distance rules that keep the widget hues apart. A House colour is
+     distance rules that keep the widget hues apart. A House color is
      data: it says which House a captain sails for, and it is the same in
      every panel that mentions one. The word for this used to be faction,
      which retired: a captain's
      identity in this game is a path (see src/lib/game/paths.ts), and a
-     House is the account level colour a captain sails under rather than
+     House is the account level color a captain sails under rather than
      an identity the table is built around.
   */
   --house-jade: oklch(0.53 0.12 160);
@@ -311,10 +311,10 @@
      and they carry the same exemption. The pill is drawn in the Lobby
      and again in the session, which between them is every screen there
      is, so no hue on this wheel holds twenty degrees clear of both. The
-     three keep the colours they already wore, a jade green for the
+     three keep the colors they already wore, a jade green for the
      Lender, a trader's gold and a violet for the Broker, placed at 130,
      62 and 300 so that an Age and a House crest are never the same
-     colour.
+     color.
   */
   --age-lender: oklch(0.52 0.12 130);
   --age-trader: oklch(0.52 0.11 62);
@@ -325,7 +325,7 @@
 
   /* === Meaning === */
   /*
-     The colours a captain reads rather than merely sees. The hues
+     The colors a captain reads rather than merely sees. The hues
      are what the front end already carries, so nothing anyone has
      learned to read shifts under them.
   */
@@ -333,7 +333,7 @@
      These six were measured rather than chosen. Every one of them is written
      on a white panel as body text somewhere in the game, and at their old
      lightness that pairing ran 3.1 to 3.8 to 1, under the 4.5 a small figure
-     needs. Hue and chroma are untouched, so each is the same colour a captain
+     needs. Hue and chroma are untouched, so each is the same color a captain
      already reads; only the lightness came down, and the set now clears 5.5 on
      a panel. The dark values are left exactly as they were, because they
      already run between 6.4 and 9.0 against the night panel.
@@ -398,7 +398,7 @@
   --w-modules: oklch(0.76 0.12 261);
   /* Every other widget is given a night value. Brand was the one that
      was missed, so after dark it kept its daylight lightness and sat at
-     3.08 to 1 on the night panel, against 7.65 for its neighbours. */
+     3.08 to 1 on the night panel, against 7.65 for its neighbors. */
   --w-brand: oklch(0.76 0.12 49.4);
   --w-shortcuts: oklch(0.76 0.12 218);
   --w-rumors: oklch(0.76 0.12 218);

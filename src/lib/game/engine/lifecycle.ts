@@ -49,7 +49,7 @@ function endRound(state: GameState, logs: LedgerLine[]) {
   logs.push(line("💸 Total Cost this round: {totalCost} Gold", { totalCost }));
   logs.push(
     line(
-      "🔧 Maintenance: {state.maintenanceCosts} Gold",
+      "🔧 Ship Maintenance Fee: {state.maintenanceCosts} Gold",
       { "state.maintenanceCosts": state.maintenanceCosts },
       "   ",
     ),
@@ -102,7 +102,6 @@ function endRound(state: GameState, logs: LedgerLine[]) {
       "state.currentRound": state.currentRound,
     }),
   );
-  state.phase = "harbor";
   state.purchaseCount = 0;
   state.orderCount = 0;
   state.resourceCards = [];
@@ -143,9 +142,12 @@ function finishSettlement(state: GameState, logs: LedgerLine[]) {
   const wageResult = payWages(state, logs);
   if (wageResult === "bankruptcy") return failSeat(state, logs);
   logs.push(
-    line("\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance ===", {
-      "state.currentRound": state.currentRound,
-    }),
+    line(
+      "\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance Fee ===",
+      {
+        "state.currentRound": state.currentRound,
+      },
+    ),
   );
   const maintResult = payMaintenance(state, logs);
   if (maintResult === "bankruptcy") return failSeat(state, logs);
@@ -215,9 +217,10 @@ export function showWelcome(state: GameState, logs: LedgerLine[]) {
 }
 
 // Each branch does the work of leaving a phase; none names its successor.
-// Harbor, Dawn and the path draft are not generic departures: the host sets
-// sail, a boon must be picked, and the draft advances when the server settles
-// it. Those return instead of falling through to the handoff.
+// Harbor and Dawn are not generic departures: the host sets sail, and a boon
+// must be picked. Those return instead of falling through to the handoff.
+// The path draft has no departure work of its own; the server settles it, and
+// the handoff below opens the successor on the lap.
 export function nextPhase(
   state: GameState,
   ctx: GameContext,
@@ -226,6 +229,8 @@ export function nextPhase(
   const from = normalizePhase(state.phase);
   switch (from) {
     case "path_draft":
+      // No departure work: the settle is the departure, and the handoff
+      // below opens the seat that follows the draft on this mode's lap.
       break;
     case "market":
       // Port purchases settle here. The artisan bench has no separate settlement:

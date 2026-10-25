@@ -121,11 +121,11 @@ export function HarborBoard({
                   {t(difficultyConfig(room.difficulty).badge)}
                 </Pill>
                 {/* Only the exceptions carry a chip. Every harbor a captain
-                    has seen so far is Classic, so labelling that one would
+                    has seen so far is Classic, so labeling that one would
                     be noise, and the voyage worth flagging is the one that
-                    plays by a different clock. Its colour is the meaning
+                    plays by a different clock. Its color is the meaning
                     token rather than a widget hue, the same way the Sailing
-                    status below is coloured: this says what the harbor IS,
+                    status below is colored: this says what the harbor IS,
                     not which panel it belongs to. */}
                 {room.mode !== DEFAULT_MODE && (
                   <Pill tone="none" className="bg-warn/5 text-warn">
@@ -134,7 +134,7 @@ export function HarborBoard({
                   </Pill>
                 )}
                 {/* What opened the harbor, worn beside
-                    the voyage it opened. It takes the charter colour rather
+                    the voyage it opened. It takes the charter color rather
                     than the caution above it, because it is not a warning
                     about the room: it is how the room was charted, which is
                     what that token means everywhere else on this screen. A

@@ -1,6 +1,6 @@
 "use client";
 
-import { t } from "@/lib/game/i18n";
+import { listJoiner, t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { ItemIcon } from "../../shared";
@@ -20,7 +20,7 @@ export function artisanTint(id: string) {
 /**
  * The title a phase screen leads with, at the size and weight every one of
  * them sets it: the glyph and the name, a line of margin under it, and the
- * phase's own colour. The margin and the colour are the two things a screen
+ * phase's own color. The margin and the color are the two things a screen
  * legitimately decides for itself, so they are props.
  *
  * The brush face is optional because two screens (the artisan bench and the
@@ -75,9 +75,9 @@ export function PanelTitle({
 }
 
 /**
- * The heading of a box inside a screen: the centred line the artisan bench
+ * The heading of a box inside a screen: the centered line the artisan bench
  * opens its four boxes with. The hue is the caller's, because the payroll
- * box keeps the colour that means a cost while the other three wear the
+ * box keeps the color that means a cost while the other three wear the
  * screen's own.
  */
 export function PanelHeading({
@@ -123,7 +123,7 @@ const HUE_TONES = {
  * card, a faint border and fill in the hue of whatever is speaking, and the
  * box model the caller asks for. The padding is a prop because the four
  * port board panels and the wardrobe do not pick the same one, and
- * normalising them would be a layout change.
+ * normalizing them would be a layout change.
  */
 export function HuePanel({
   tone,
@@ -164,7 +164,7 @@ export function SummaryHeading({
 
 /**
  * A line under a panel: the larder is full, the hold carries no clothes, a
- * hand is out of action. One size and one indent, in either the quiet grey
+ * hand is out of action. One size and one indent, in either the quiet gray
  * or the alarm red, because a panel with two of these reads as a stack of
  * them.
  */
@@ -256,11 +256,10 @@ export function PanelTotal({
  * and the crew that came home. It is the one tile the whole app draws a
  * figure in, at the scale those two screens read at, and it used to be
  * written out again here with its own frame, its own padding and its own
- * caption size. The name is the one the phase screens have always called
- * it by, and the scale is the tile's default, so a screen that counts in
- * it does not have to name a scale.
+ * caption size. The scale is the tile's default, so a screen that counts
+ * in it does not have to name a scale.
  */
-export { FigureTile, FigureTile as StatTile };
+export { FigureTile };
 
 /**
  * The station strip, shared by the two panels that hold more than one
@@ -346,14 +345,17 @@ export function IntelBanner({
         "px-3.5 py-2.5 mb-3.5 text-xs",
       )}
     >
-      <strong>{t("🗣️ Broker's Whispers active this round:")}</strong>{" "}
-      {game.revealedIntel.map((i, idx) => (
-        <span key={idx}>
-          {idx > 0 && ", "}
-          <ItemIcon item={i.item} className="h-3.5 w-3.5" /> {i.item} ({i.port})
-        </span>
-      ))}
-      <span className="text-muted-foreground"> {note}</span>
+      <strong>{t("🗣️ Broker's Whispers active this round:")}</strong>
+      <span className="ml-1">
+        {game.revealedIntel.map((i, idx) => (
+          <span key={idx}>
+            {idx > 0 && listJoiner()}
+            <ItemIcon item={i.item} className="h-3.5 w-3.5" />{" "}
+            {t("{item} ({port})", { item: t(i.item), port: t(i.port) })}
+          </span>
+        ))}
+      </span>
+      <span className="ml-1 text-muted-foreground">{note}</span>
     </div>
   );
 }

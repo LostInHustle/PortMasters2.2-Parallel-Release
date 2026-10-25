@@ -76,7 +76,7 @@ function lapSeat(mode: unknown, phase: Phase) {
 
 // The phases a mode's lap visits, in order.
 //
-// The one reader that needs the whole list rather than a neighbour or a
+// The one reader that needs the whole list rather than a neighbor or a
 // rank is the voyage rail, which draws a step per phase and has to walk
 // them. It used to reach into modeConfig(mode).checkpointPhaseOrder
 // itself, which is the same fact stated in a fourth place and one more

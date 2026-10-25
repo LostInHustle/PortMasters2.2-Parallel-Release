@@ -58,8 +58,8 @@ function HarborRoster({
   );
 }
 
-// Named for the meaning each one carries rather than the colour it
-// happens to be, the same way ActionSuggester's tones are: the colour
+// Named for the meaning each one carries rather than the color it
+// happens to be, the same way ActionSuggester's tones are: the color
 // follows the meaning, and a rename of the palette should not have to
 // reach into this file.
 const INFO_TONES: Record<"gain" | "warn" | "sea" | "alarm", string> = {
@@ -266,8 +266,11 @@ export function Welcome({
             </span>
           )}
           <span className="block mt-1.5 pt-1.5 border-t border-sea/15">
-            <strong>🧭 {t(play.badge)}:</strong> {t(play.tagline)}{" "}
-            {t(play.failureRule)}
+            <strong>
+              🧭 {t(play.badge)}
+              {t(": ")}
+            </strong>{" "}
+            {t(play.tagline)} {t(play.failureRule)}
             {/* It points at the button without a direction, because the
                 button sits above this panel rather than below it. */}
             {play.differences.length > 0 &&
@@ -324,7 +327,7 @@ export function Welcome({
               tone="sea"
               title={t("💸 Round End Costs")}
               rows={[
-                t("🔧 {cfg.maintenance} Gold ship maintenance per round", {
+                t("🔧 {cfg.maintenance} Gold ship maintenance fee per round", {
                   "cfg.maintenance": cfg.maintenance,
                 }),
                 t("👥 Wages settled at Resolve, not on hire"),

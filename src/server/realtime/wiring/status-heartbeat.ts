@@ -15,7 +15,7 @@ import { voyageRoundsFor } from "@/lib/game/mode";
 import { normalizePhase, seatOf } from "@/lib/game/phases";
 import { type Phase } from "@/lib/game/types";
 import { clearAid } from "../aid";
-import { requireAuth } from "../auth";
+import { seated } from "../auth";
 import { barterList, clearBarter } from "../barter";
 import { roomChannel } from "../channel";
 import {
@@ -59,11 +59,9 @@ type GameStatusReport = {
 
 export function wireStatusHeartbeat(io: Server, socket: Socket): void {
   socket.on("game:status", async (payload: GameStatusReport) => {
-    const s = requireAuth(socket);
+    const s = seated(socket, payload);
     if (!s) return;
-    if (!s.roomId) return;
-    const roomId = payload?.roomId ?? s.roomId;
-    if (roomId !== s.roomId) return;
+    const roomId = s.roomId;
     if (!isNewestSocketFor(s.userId, socket.id)) return;
 
     const broadcast = buildStatusFrame(roomId, s.user, payload);

@@ -1,6 +1,6 @@
 // Online presence and harbor rosters.
 //
-// Two maps sit at the centre: sockets (socketId -> SocketState) and userSockets
+// Two maps sit at the center: sockets (socketId -> SocketState) and userSockets
 // (userId -> Set<socketId>, since a user may hold several). onlineUsers() and
 // roomMembers() collapse the sockets map to one row per user; newest socket wins,
 // so a reconnecting captain's fresh status overrides the stale one.

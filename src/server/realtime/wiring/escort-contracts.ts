@@ -117,7 +117,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   // The money never passes through here. A fee moves on the two clients
   // when the board says the two captains agreed, and the absorbed raid
   // moves on the seller's client when the board says the raid arrived,
-  // which is the same division of labour the barter board runs on and the
+  // which is the same division of labor the barter board runs on and the
   // reason none of these handlers reads a purse. What the server is
   // authoritative about is the ordering: one captain per cover, one claim
   // per contract, and no agreement about a round that has already gone.

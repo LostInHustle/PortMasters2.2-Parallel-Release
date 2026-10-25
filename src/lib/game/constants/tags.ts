@@ -57,7 +57,7 @@ export type Tag = (typeof TAGS)[number];
 export type TagList = readonly [Tag] | readonly [Tag, Tag];
 
 // One sentence each, and every one of them phrased as the thing an effect
-// would test rather than as a flavour. Five of the twelve are also read
+// would test rather than as a flavor. Five of the twelve are also read
 // against a number the tree already keeps, which is what the rule module
 // checks: cold against the wardrobe's own table, perishable and preserved
 // against the pantry's keepings, and armed and contraband against a
@@ -72,7 +72,7 @@ export const TAG_MEANINGS: Record<Tag, string> = {
   preserved:
     "It is kept: salted, dried, or otherwise made to outlast the voyage it was bought for.",
   woven:
-    "Thread and the cloth made from it, the raw fibres included, because a fibre is cloth that has not been spun yet.",
+    "Thread and the cloth made from it, the raw fibers included, because a fiber is cloth that has not been spun yet.",
   luxury:
     "The expensive end of the catalogue, where a slot carries far more Gold than the slot beside it.",
   armed:

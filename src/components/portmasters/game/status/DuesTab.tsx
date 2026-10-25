@@ -20,6 +20,7 @@ import type { RosterEntry } from "../GameStatusPanel";
  */
 export function DuesTab({
   showObligations,
+  atHarbor,
   workerCount,
   pendWages,
   pendMaint,
@@ -33,6 +34,7 @@ export function DuesTab({
   onRepayLoan,
 }: {
   showObligations: boolean;
+  atHarbor: boolean;
   workerCount: number;
   pendWages: number;
   pendMaint: number;
@@ -50,7 +52,11 @@ export function DuesTab({
     <>
       {showObligations ? (
         <>
-          <Row label={<Term term="Maintenance">{t("🔧 Maintenance")}</Term>}>
+          <Row
+            label={
+              <Term term="Maintenance">{t("🔧 Ship Maintenance Fee")}</Term>
+            }
+          >
             <b>{t("{contract.fee} Gold", { "contract.fee": pendMaint })}</b>
           </Row>
           <Row
@@ -104,11 +110,11 @@ export function DuesTab({
             </div>
           )}
         </>
-      ) : (
+      ) : atHarbor ? (
         <p className="py-2 text-[11px] text-muted-foreground">
           {t("Nothing is owed until the voyage is under way.")}
         </p>
-      )}
+      ) : null}
 
       {hasLoans && (
         <div className="mt-3 border-t border-black/5 pt-2 dark:border-white/10">

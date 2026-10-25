@@ -10,7 +10,7 @@ import {
   lockedBehind,
   orderRewardBonusSteps,
 } from "@/lib/game/engine";
-import { t } from "@/lib/game/i18n";
+import { listJoiner, t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { ClipboardList, CheckCircle2, Clock, Coins } from "lucide-react";
 import { ItemIcon } from "../../shared";
@@ -141,7 +141,8 @@ export function OrderFulfillmentPlanner({ game }: { game: GameState }) {
         )}
         {totalPotential > 0 && (
           <span className="ml-auto inline-flex items-center gap-1 font-bold text-gain">
-            <Coins className="h-3 w-3" />+{totalPotential} {t("Gold")}
+            <Coins className="h-3 w-3" />
+            {t("+{amount} Gold", { amount: totalPotential })}
             <span className="font-normal text-muted-foreground">
               {t("if all ready filled")}
             </span>
@@ -166,13 +167,15 @@ export function OrderFulfillmentPlanner({ game }: { game: GameState }) {
                     {m.have}/{m.need}
                   </span>
                   {i < p.missingGoods.length - 1 && (
-                    <span className="text-muted-foreground">,</span>
+                    <span className="text-muted-foreground">
+                      {listJoiner()}
+                    </span>
                   )}
                 </span>
               ))}
               <span className="ml-auto text-gain font-medium">
                 +{p.netProfit}
-                {t("g")}
+                <span className="ml-0.5">{t("Gold")}</span>
               </span>
             </div>
           ))}

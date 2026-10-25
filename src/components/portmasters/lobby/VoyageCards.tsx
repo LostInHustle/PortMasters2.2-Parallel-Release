@@ -18,7 +18,7 @@
 // Neither control takes pm-pressable. Its hover lift scales a control by
 // 1.04, which suits a 2rem tool in the masthead and not a card half a
 // panel wide, where the growth would reach past its own gap and onto its
-// neighbour. They take the focus ring the Button primitive uses instead.
+// neighbor. They take the focus ring the Button primitive uses instead.
 // =====================================================================
 
 import { AlertTriangle, KeyRound } from "lucide-react";
@@ -134,7 +134,7 @@ export function VoyageCards<T extends string>({
                     <span>{t("Still being built.")}</span>
                   </span>
                 )}
-                {/* Not a caution, so not the caution's colour: a sealed
+                {/* Not a caution, so not the caution's color: a sealed
                     voyage is finished, and what it asks for is a phrase
                     rather than patience. The line names the ask and the
                     field under the cards is where it is answered. */}

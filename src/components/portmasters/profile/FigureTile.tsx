@@ -10,7 +10,7 @@ type TileTone = "sea" | "gold" | "due" | "intel" | "gain";
 // scale cannot arrive wearing a mix of the five. The frame, the glyph,
 // the number and the caption are one set per scale, and so is the
 // alignment: the captain's key figures are set to their own edge and a
-// voyage's own figures are centred, because those are the two places the
+// voyage's own figures are centered, because those are the two places the
 // game counts them, and a scale that left the alignment out would be a
 // shape every caller had to remember.
 //
@@ -90,11 +90,11 @@ type FigureTileProps = {
   /** The figure itself. */
   value: React.ReactNode;
   /**
-   * The colour the figure is printed in, on the scales that print it in
+   * The color the figure is printed in, on the scales that print it in
    * one. The scales that take a glyph in a chip leave the figure in the
    * frame's own ink, so they do not use it. The scale that wears its
    * glyph beside the figure does, because the glyph takes the figure's
-   * colour with it.
+   * color with it.
    */
   valueClassName?: string;
 } & (
@@ -165,11 +165,11 @@ export function FigureTile({
   title,
 }: FigureTileProps) {
   const scale = TILE_SCALES[size];
-  const centred = scale.align === "center";
+  const centered = scale.align === "center";
   const body = (
     <>
       {/* The chip wears the wash and the ink together, so the icon inside
-          inherits the colour rather than being told it. The scale that
+          inherits the color rather than being told it. The scale that
           wears its glyph beside the figure has no chip, so it draws none
           and the glyph goes into the figure's own line. */}
       {Icon && tone && !scale.inline && (
@@ -177,7 +177,7 @@ export function FigureTile({
           className={cn(
             "inline-flex rounded-lg p-1.5",
             scale.chip,
-            centred && "mx-auto",
+            centered && "mx-auto",
             TONE_WASH[tone],
           )}
         >
@@ -196,7 +196,7 @@ export function FigureTile({
   // when it is one.
   if (!onPress) {
     return (
-      <div className={cn(scale.frame, centred && "text-center")}>{body}</div>
+      <div className={cn(scale.frame, centered && "text-center")}>{body}</div>
     );
   }
   return (
@@ -205,7 +205,7 @@ export function FigureTile({
       onClick={onPress}
       aria-expanded={expanded}
       title={title}
-      className={cn(scale.frame, "w-full", centred && "text-center")}
+      className={cn(scale.frame, "w-full", centered && "text-center")}
     >
       {body}
     </button>

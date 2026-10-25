@@ -211,7 +211,7 @@
      whatever the canvas happened to be doing behind it, and the small type
      in the busier panels was the first thing to go.
 
-     The colour written here is the colour the glass already resolved to once
+     The color written here is the color the glass already resolved to once
      the canvas had shown through, so the panel looks like itself and simply
      stops being see through. The border and the shadow are untouched.
 
@@ -275,7 +275,7 @@
      The rule lives inside @layer utilities, after the Tailwind import,
      which is where the gradient rules it replaces live too. That place
      is load bearing. At equal specificity a later rule wins, which is
-     how a fill sets its own ink instead of losing to the text colour
+     how a fill sets its own ink instead of losing to the text color
      written at the call site.
   */
 
@@ -389,7 +389,7 @@
     --pm-ink: var(--pm-ink-bronze);
   }
   /* The three Houses. A crown of lotus gold, a gate of vermilion, a
-     pavilion of jade: the colour is the name, so the ink is dark on the
+     pavilion of jade: the color is the name, so the ink is dark on the
      two bright ones and white on the deep one. */
   .pm-grad-house-lotus {
     --pm-fill: var(--w-house-lotus-fill);
@@ -438,7 +438,7 @@
      grows away from the surface, and a brighter, more saturated face
      together read as "this one is alive" from across the room. Any one of
      them alone does not, which is what the earlier two pixel nudge with a
-     colour shift amounted to.
+     color shift amounted to.
 
      Two families of selector reach this rule. The first is the pressable
      class, which the plain buttons and clickable panels carry by hand. The
@@ -447,7 +447,7 @@
      a pressable, so they used to sit perfectly still while the plain
      buttons beside them moved. The brightening earns its keep on a gradient
      more than anywhere else, because a gradient is painted as a background
-     image, so a background colour change would pass straight underneath it
+     image, so a background color change would pass straight underneath it
      and show nothing at all.
 
      The second family is restricted to button and anchor on purpose. The
@@ -517,7 +517,7 @@
      with the radius, so nothing ends up wearing one level's corners with
      another level's spacing.
 
-     None of these carries a colour. Tint stays at the call site, which is
+     None of these carries a color. Tint stays at the call site, which is
      what lets a tool wear the vermilion reserved for a live call to action
      and still line up to the pixel with the quiet ones beside it. */
   .pm-tool,
@@ -883,7 +883,7 @@
      --pm-avatar-size and --pm-avatar-size-sm, because a diameter that
      changes at a breakpoint cannot live in an inline style. The letter
      inside is a share of the diameter rather than a fixed size, so it
-     stays centred at every step instead of overflowing a small circle or
+     stays centered at every step instead of overflowing a small circle or
      floating in the middle of a large one. */
   .pm-avatar {
     width: var(--pm-avatar-size);

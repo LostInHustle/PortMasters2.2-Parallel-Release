@@ -262,7 +262,7 @@ function voyageLogLineFor(locale: Locale, facts: VoyageLogFacts): string {
     case "path_taken":
       return tFor(locale, "{facts.captain} takes up the {pathName} path.", {
         "facts.captain": facts.captain,
-        pathName: tFor(locale, pathConfig(facts.path)!.name),
+        pathName: tFor(locale, pathConfig(facts.path).name),
       });
     case "path_switched":
       return tFor(
@@ -270,7 +270,7 @@ function voyageLogLineFor(locale: Locale, facts: VoyageLogFacts): string {
         "{facts.captain} sets aside their old papers and takes up the {pathName} path.",
         {
           "facts.captain": facts.captain,
-          pathName: tFor(locale, pathConfig(facts.path)!.name),
+          pathName: tFor(locale, pathConfig(facts.path).name),
         },
       );
   }

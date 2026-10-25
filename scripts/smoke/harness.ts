@@ -108,7 +108,7 @@ export function carriesADash(relative: string): boolean {
 // read them in Gambit: a check that held a switch on in the shipped mode
 // would be checking that a Classic table received a system the mode does
 // not have, which is the bug the mode boundary exists to prevent rather
-// than the behaviour any of them are about. CLASSIC is read by the one
+// than the behavior any of them are about. CLASSIC is read by the one
 // block that holds the boundary itself, at the end of the family.
 export const GAMBIT: GameMode = "ocean_gambit";
 

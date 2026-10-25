@@ -18,7 +18,7 @@
 // the sentence. This module runs on the captain the raiders found, and the
 // seller is another machine: what this client can do is keep its own Gold
 // and leave a claim behind (state.pendingEscortClaim) for the React layer
-// to relay to the harbor, which is the same division of labour the whole
+// to relay to the harbor, which is the same division of labor the whole
 // contract runs on (see ./contracts). The claim carries the Gold the raid
 // would have taken, because the seller is the one who prices what they eat.
 // =====================================================================
@@ -84,10 +84,6 @@ export function pirateChance(state: GameState): number {
   return chance;
 }
 
-// The Gold an escort actually costs, with its one modifier applied. Exported
-// on the same reasoning as pirateChance above: the panel quoted the plain
-// tier rate while the charge applied the Escort Pact, so the button offered
-// one price and took another.
 /**
  * The Gold a raid is expected to take, chance and salvage in one number:
  * the odds of a hit times what a hit would actually cost after the
@@ -99,13 +95,6 @@ export function pirateChance(state: GameState): number {
  * the figure quoted here and the Gold the raid leaves behind are one
  * reading of one rule.
  */
-// The Gold a raid would actually take, after the salvage a Letter of
-// Marque returns. The one reading of the exposure: the expected loss below
-// multiplies it by the odds, and the risk screen's own tile prints it
-// rather than the purse, so the two numbers on that screen describe the
-// same raid. A tile reading the raw purse over an expected loss that had
-// already given the salvage back was the two halves of one sentence
-// disagreeing about what a raid costs.
 export function raidGoldAtRisk(state: GameState): number {
   const salvage = state.modifierFlags.marque_salvage || 0;
   return Math.max(0, state.money - Math.floor(state.money * salvage));
@@ -115,6 +104,10 @@ export function expectedRaidLoss(state: GameState): number {
   return pirateChance(state) * raidGoldAtRisk(state);
 }
 
+// The Gold an escort actually costs, with its one modifier applied. Exported
+// on the same reasoning as pirateChance above: the panel quoted the plain
+// tier rate while the charge applied the Escort Pact, so the button offered
+// one price and took another.
 export function escortCost(state: GameState): number {
   let rate = difficultyConfig(state.difficulty).escortCostRate;
   if (state.modifierFlags.escort_discount)
@@ -153,7 +146,7 @@ export function resolvePirateAttack(state: GameState, logs: LedgerLine[]) {
         return;
       }
       // A covered hold with nothing in it. The raiders are still turned
-      // away, which is the contract being honoured, but there is no claim
+      // away, which is the contract being honored, but there is no claim
       // to raise: a claim of zero Gold would put a loss on the seller's
       // ledger that never happened. See escortClaimFrom in ./contracts.
       logs.push(

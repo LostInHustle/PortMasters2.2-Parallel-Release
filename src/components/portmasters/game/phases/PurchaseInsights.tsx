@@ -52,7 +52,7 @@ export function TradeAdvisor({
         const unit = Math.round(cardLineUnitPrice(game, c, i) * 10) / 10;
         const qty = r.quantity ?? 0;
         const baseScore = 1 - priceRatio(unit, range);
-        // Boost score for goods that match revealed intel (guaranteed
+        // Boost score for goods that match revealed whispers (guaranteed
         // orders at Orders), since buying them now secures a known
         // future reward. The flag rides along on the scored row, because
         // the badge below is drawn from it and the alternative was asking
@@ -93,9 +93,11 @@ export function TradeAdvisor({
             <span className="font-bold text-intel">{i + 1}.</span>
             <ItemIcon item={s.goodName} className="h-3.5 w-3.5" />
             <span style={{ color: colorFor(s.goodName) }}>{t(s.goodName)}</span>
-            <span className="text-muted-foreground">x{s.qty}</span>
+            <span className="text-muted-foreground">×{s.qty}</span>
             <span className="font-bold text-gain">{s.unitPrice}</span>
-            <span className="text-[9px] text-muted-foreground">{t("g")}</span>
+            <span className="ml-0.5 text-[9px] text-muted-foreground">
+              {t("Gold")}
+            </span>
             {s.matchesIntel && (
               <span
                 className="rounded-full bg-intel/5 px-1 py-0.5 text-[7px] font-bold text-intel"
@@ -103,7 +105,7 @@ export function TradeAdvisor({
                   "Matches a Broker's Whisper, guaranteed order at Orders",
                 )}
               >
-                {t("Intel")}
+                {t("Whisper")}
               </span>
             )}
             <span

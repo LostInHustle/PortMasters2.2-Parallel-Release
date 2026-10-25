@@ -68,7 +68,7 @@ export function GamePhasePanel(props: Props) {
   // The phase's own accent, read from its face in @/lib/game/phases, which
   // is the one table that describes a phase: the gradient is not written
   // down again here, so a phase renamed in the engine cannot leave a stale
-  // key beside a panel wearing the wrong colour.
+  // key beside a panel wearing the wrong color.
   const accentGradient = phaseFace(game.phase).gradient;
   // The floor under the stage is a share of the viewport rather than a
   // flat one: the floor exists so a short phase does not
@@ -122,8 +122,8 @@ export function GamePhasePanel(props: Props) {
   );
 }
 
-/* The accent strip along the top of the panel, one colour per phase.
-   The colours live in the phase's own face (see @/lib/game/phases) and
+/* The accent strip along the top of the panel, one color per phase.
+   The colors live in the phase's own face (see @/lib/game/phases) and
    in src/app/palette.css behind them, so what is left here is the
    lookup: this file writes no gradient table of its own.
 

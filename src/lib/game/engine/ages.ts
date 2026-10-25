@@ -32,7 +32,7 @@ import { BROKERS_FAVOR_PAYOUT_CAP } from "../constants/world";
  * the cycle's order: the floor of the fortnight count picks an index into
  * this list, so the Lender takes the first turn, the Trader the second and
  * the Broker the third, forever. The palette reads its token names off
- * the same list, so an Age cannot wear a colour the palette was never
+ * the same list, so an Age cannot wear a color the palette was never
  * told about.
  */
 export const AGE_IDS = ["lender", "trader", "broker"] as const;
@@ -125,7 +125,7 @@ export function nextAgeChange(now: Date = new Date()): Date {
 // caller holding a fixed clock can reproduce a chosen Age exactly.
 
 // What the Age in force multiplies a backing pledge's Reputation by, 1
-// when no Age favours backing. Read by receiveBackingOutcome in
+// when no Age favors backing. Read by receiveBackingOutcome in
 // ./backingState.ts. Applied to the raw figure before the shared per
 // voyage helper ceiling, never after it, so no Age can lift a captain past
 // the one cap lending and backing both answer to.

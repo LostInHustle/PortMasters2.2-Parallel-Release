@@ -29,10 +29,9 @@ Each leaf is one pair:
 
 - The everyday reader is keyed by the English source text. A call site writes `t("Harbor")`, and the reader looks up that exact English string. The English literal stays in the source, where the smoke suite can see it.
 - Cards are read by id rather than by text: `card.<id>.name` and `card.<id>.desc`, through `tId` or `tIdFor`. A card's words travel with the card.
-- Sentence rows use a sweep and number id, such as `shell.001`, `room-a.115` or `lobby.233`. The id organises the pack and gives the check a stable name. Runtime still reaches the row by its English text.
+- Sentence rows use a sweep and number id, such as `shell.001`, `room-a.115` or `lobby.233`. The id organizes the pack and gives the check a stable name. Runtime still reaches the row by its English text.
 - Fragments are short words and phrases joined into a sentence by a call site. They are keyed by English like any other leaf.
-- The flat text map keeps the earlier leaf when one English string is carried twice. By-id reads are how two surfaces share one word and still differ: the Market phase chip reads 开市, while the market tab reads 集市 through `ui.market`. A duplicate without an id read is reachable only through the earlier leaf.
-- A phase without a short entry uses its label.
+- The flat text map keeps the earlier leaf when one English string is carried twice. Reads by id are how two surfaces share one word and still differ: the Market phase chip reads 开市, while the market tab reads 集市 through `ui.market`. A duplicate without an id read is reachable only through the earlier leaf.
 
 ## Runtime and fallback
 
@@ -79,7 +78,7 @@ The pick applies at once. A captain who changes language sees the game change un
 
 The Mandarin edition of the game is the baseline. Its word wins wherever a Song era harbor register would puzzle more than it clarifies. Prefer the concrete trade word to a literary flourish, and prefer the word a captain would actually say.
 
-These written exceptions are deliberate and should not be normalised away:
+These written exceptions are deliberate and should not be normalized away:
 
 | English      | Mandarin | Why                                                                                                |
 | ------------ | -------- | -------------------------------------------------------------------------------------------------- |
@@ -106,53 +105,56 @@ Other rules:
 - Mandarin prose uses full width punctuation: `，` `。` `：` `；` `！` `？` and full width parentheses.
 - Mandarin writes the ellipsis as three ASCII dots, `...`. English leaves keep the form already in the source, which is usually a single ellipsis character and sometimes three dots. A translation pass does not change either.
 - Code, HTML, CSS values, tokens and command text stay ASCII and are not translated.
-- Card values use the tight form: `{cost}金币`, `2麻布`, `{rounds}轮`. Other prose keeps the spacing already in the leaf. Do not re-space numbers and units in a wording pass.
-- Do not use em dashes, en dashes or doubled hyphens in captain facing copy. The smoke suite refuses them. A single hyphen inside a compound word is allowed.
+- Card values use the tight form: `{cost}金币`, `2麻布`, `{rounds}轮`. Other prose keeps the spacing already in the leaf. Do not change the spacing of numbers and units in a wording pass.
+- Do not use em dashes, en dashes, doubled hyphens or a hyphen standing in for punctuation between words in captain facing copy. A single hyphen inside a compound word is allowed. `npm run check:prose` enforces the same rule in Markdown and text files, and the smoke suite enforces it in captain facing copy.
 
 ## Core terminology
 
 These are the words every screen leans on. Spell each one the same way everywhere.
 
-| English           | Chinese  | Note                                                     |
-| ----------------- | -------- | -------------------------------------------------------- |
-| Gold              | 金币     |                                                          |
-| Captain           | 船长     |                                                          |
-| Harbor            | 港湾     |                                                          |
-| Port              | 港       | As a suffix, as in 泉州港 and 大食港.                    |
-| Host              | 港主     | The captain who opens the harbor.                        |
-| Seat              | 席位     |                                                          |
-| Renown            | 声望     | The account level that persists across voyages.          |
-| Reputation        | 声誉     | The score inside one voyage. Kept apart from 声望.       |
-| Score             | 积分     |                                                          |
-| Captain's Legacy  | 船长传承 |                                                          |
-| Merits            | 功勋     |                                                          |
-| Sea Master        | 沧海之主 | The voyage crown.                                        |
-| Sea Master crowns | 沧海之冠 |                                                          |
-| Voyage            | 航程     | The whole run.                                           |
-| Round             | 轮       | One lap of a voyage, from the first phase to the last.   |
-| Trade order       | 订单     |                                                          |
-| Locked order      | 专属订单 |                                                          |
-| Manifest          | 舱单     |                                                          |
-| Path              | 商道     | The captain's identity. The older word 路径 is retired.  |
-| Boon              | 机缘     | The card kind.                                           |
-| Module            | 模块     | The card kind.                                           |
-| Charter           | 特许状   | Chip form 特许.                                          |
-| Draft             | 抽取     | The drawing verb across phase chips, labels and buttons. |
-| Hold              | 货舱     |                                                          |
-| Cargo             | 货物     |                                                          |
-| Stores            | 存粮     |                                                          |
-| Larder            | 粮舱     |                                                          |
-| Pantry            | 伙房     |                                                          |
-| Rations           | 口粮     |                                                          |
-| Cargo slot        | 仓位     |                                                          |
-| Freight           | 运费     |                                                          |
-| Ship maintenance  | 维护费   |                                                          |
-| Wages             | 工钱     |                                                          |
-| Severance         | 遣散费   |                                                          |
-| VAT               | 增值税   |                                                          |
-| Income tax        | 所得税   |                                                          |
-| Harbor dues       | 港务费   |                                                          |
-| Settlement        | 结算     |                                                          |
+| English              | Chinese    | Note                                                         |
+| -------------------- | ---------- | ------------------------------------------------------------ |
+| Gold                 | 金币       |                                                              |
+| Captain              | 船长       |                                                              |
+| Harbor               | 港湾       |                                                              |
+| Port                 | 港         | As a suffix, as in 泉州港 and 大食港.                        |
+| Host                 | 港主       | The captain who opens the harbor.                            |
+| Seat                 | 席位       |                                                              |
+| Renown               | 声望       | The account level that persists across voyages.              |
+| Reputation           | 声誉       | The score inside one voyage. Kept apart from 声望.           |
+| Score                | 积分       |                                                              |
+| Captain's Legacy     | 船长传承   |                                                              |
+| Merits               | 功勋       |                                                              |
+| Sea Master           | 沧海之主   | The voyage crown.                                            |
+| Sea Master crowns    | 沧海之冠   |                                                              |
+| Voyage               | 航程       | The whole run.                                               |
+| Round                | 轮         | One lap of a voyage, from the first phase to the last.       |
+| Trade order          | 订单       |                                                              |
+| Locked order         | 专属订单   |                                                              |
+| Manifest             | 舱单       |                                                              |
+| Path                 | 商道       | The captain's identity. The older word 路径 is retired.      |
+| Boon                 | 机缘       | The card kind.                                               |
+| Module               | 模块       | The card kind.                                               |
+| Module batch         | 模块批次   | The three cards on the draft table.                          |
+| Charter              | 特许状     | Chip form 特许.                                              |
+| Draft                | 抽取       | The drawing verb across phase chips, labels and buttons.     |
+| Hold                 | 货舱       |                                                              |
+| Cargo                | 货物       |                                                              |
+| Stores               | 存粮       |                                                              |
+| Larder               | 粮舱       |                                                              |
+| Pantry               | 伙房       |                                                              |
+| Rations              | 口粮       |                                                              |
+| Cargo slot           | 仓位       |                                                              |
+| Freight              | 运费       |                                                              |
+| Hull                 | 船体       | The ship itself, as distinct from its level.                 |
+| Ship level           | 船只等级   | The upgrade rung that sets slots and freight discount.       |
+| Ship maintenance fee | 船只维护费 | Short form 维护费 where the sentence already names the ship. |
+| Wages                | 工钱       |                                                              |
+| Severance            | 遣散费     |                                                              |
+| VAT                  | 增值税     |                                                              |
+| Income tax           | 所得税     |                                                              |
+| Harbor dues          | 港务费     |                                                              |
+| Settlement           | 结算       |                                                              |
 
 ## Phases and modes
 
@@ -236,22 +238,22 @@ The nine ports: Quanzhou Port 泉州港, Guangzhou Port 广州港, Ningbo Port �
 
 ## Named systems and interface terms
 
-| English                | Chinese    | English            | Chinese  |
-| ---------------------- | ---------- | ------------------ | -------- |
-| Broker                 | 掮客       | Broker's Rumor     | 掮客密语 |
-| Broker's Favor         | 掮客的人情 | Honest Broker      | 诚信掮客 |
-| Corrupt Broker         | 通匪掮客   | Word on the Docks  | 码头风闻 |
-| Tidewatch Alerts       | 观潮预警   | Ventures           | 合股     |
-| Backing (a loan)       | 作保       | Captain's Exchange | 船长行市 |
-| Manifest Audit         | 舱单稽查   | Maroon             | 放逐     |
-| Harbormaster           | 港务长     | Imperial Mandate   | 皇命采办 |
-| The fleet's commission | 公议       | Standing Order     | 常备订单 |
-| Salvage                | 打捞       | Escort             | 护航     |
-| Pirate raid            | 海盗劫掠   | Market             | 集市     |
-| Port Purchase          | 港口采购   | Artisan Bench      | 工匠台   |
-| Warmth                 | 暖意       | Frostbite          | 冻伤     |
-| Wardrobe               | 衣箱       | Shipyard           | 船坞     |
-| Hull                   | 船体       | Upgrade            | 升级     |
+| English          | Chinese    | English            | Chinese  |
+| ---------------- | ---------- | ------------------ | -------- |
+| Broker           | 掮客       | Broker's Whisper   | 掮客密语 |
+| Broker's Favor   | 掮客的人情 | Honest Broker      | 诚信掮客 |
+| Corrupt Broker   | 通匪掮客   | Word on the Docks  | 码头风闻 |
+| Tidewatch Alerts | 观潮预警   | Ventures           | 合股     |
+| Backing (a loan) | 作保       | Captain's Exchange | 船长行市 |
+| Manifest Audit   | 舱单稽查   | Maroon             | 放逐     |
+| Harbormaster     | 港务长     | Imperial Mandate   | 皇命采办 |
+| Fleet Commission | 船队公议   | Standing Order     | 常备订单 |
+| Salvage          | 打捞       | Escort             | 护航     |
+| Pirate raid      | 海盗劫掠   | Market             | 集市     |
+| Port Purchase    | 港口采购   | Artisan Bench      | 工匠台   |
+| Warmth           | 暖意       | Frostbite          | 冻伤     |
+| Wardrobe         | 衣箱       | Shipyard           | 船坞     |
+| Hull             | 船体       | Upgrade            | 升级     |
 
 ## Renown, ratings and the long game
 
@@ -265,7 +267,7 @@ The nine ports: Quanzhou Port 泉州港, Guangzhou Port 广州港, Ningbo Port �
 | Best Score          | 最佳积分 | The merchant ledger | 商名录   | Leaderboard       | 排行榜       |
 | Lobby               | 大厅     | Standings           | 排名     |                   |              |
 
-The four merits named in the interface: First Landfall 初登彼岸, Sea Master 沧海之主, Iron Hull 铁船体, Century Club 百程会. The five milestone moments: A Hand Is Lost 痛失一臂, The Route Knows You 商道识君, A Rung Crossed 又晋一阶, Through the Cold 既渡寒程, and The Fleet's Commission 船队公议. The charter card is Your Charter 你的特许状.
+The six base merits named in the interface: First Landfall 初登彼岸, Sea Master 沧海之主, King of Silk Road 丝路之王, Silk Road Sovereign 丝路霸主, Iron Hull 铁船体, Century Club 百程会. The three difficulty scoped merits are Open Water Captain 开阔水域船长, Storm Sovereign 风暴之主, and Eye of the Storm 风暴之眼. The five milestone moments deal boons rather than grant merits: A Hand Is Lost 痛失一臂, The Route Knows You 商道识君, A Rung Crossed 又晋一阶, Through the Cold 既渡寒程, and The Fleet's Commission 船队公议. The charter card is Your Charter 你的特许状.
 
 ## Tags
 
@@ -301,8 +303,8 @@ The four merits named in the interface: First Landfall 初登彼岸, Sea Master 
 1. Change the English source first. The English literal is the key, so changing it without adding the matching leaf leaves the old translation unreachable.
 2. Add or update the leaf with the same `en` value and the reviewed `zh` value. Keep the group and the key in their existing order.
 3. Preserve every token. Mandarin may drop a token, but it may not invent one.
-4. Run `npm run build` and `npm run test:smoke`. The build runs the tag, card, status and dead surface checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
-5. Do not machine-translate a leaf into the pack without review. A leaf that reads correctly in isolation can break a sentence whose subject or classifier lives in another leaf.
+4. Run `npm run build` and `npm run test:smoke`. The build runs the tag, card, status, dead surface and prose checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
+5. Do not run a leaf through machine translation and add it without review. A leaf that reads correctly in isolation can break a sentence whose subject or classifier lives in another leaf.
 6. Do not add a third language by editing JSON alone. `LOCALES` in `src/lib/game/i18n/index.ts` is the list the picker offers, the reader accepts and the checks walk. A new language needs that list, the pack and the picker copy together.
 
 The ledger is not a normal string table. A ledger line stores the fact and its values, and the sentence is built at the read in the language the reader holds. A good's name, a path's name and a card's name travel with the sentence rather than being frozen into it. Suite 68 holds that rule at the ledger and at the three surfaces that read it.

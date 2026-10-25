@@ -60,10 +60,6 @@ type SeatMarks = {
   bankrupt: boolean;
   // Put ashore by a vote of the harbor, and still sailing.
   marooned: boolean;
-  // Neither may be named in the maroon vote: what the two marks share
-  // is that the voyage is over for them as a race, while every other
-  // part of the seat stays.
-  writtenOff: boolean;
 };
 
 // A majority of the harbor voted this seat ashore. The flag is the only
@@ -102,7 +98,5 @@ export function leftTheVoyage(status: SeatStatus | undefined): boolean {
 }
 
 export function seatMarks(status: SeatStatus | undefined): SeatMarks {
-  const bankrupt = bankruptMark(status);
-  const marooned = maroonedMark(status);
-  return { bankrupt, marooned, writtenOff: bankrupt || marooned };
+  return { bankrupt: bankruptMark(status), marooned: maroonedMark(status) };
 }

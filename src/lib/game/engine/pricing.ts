@@ -57,8 +57,9 @@ type StackRung = {
   inPlay: boolean;
   // The number carried out of this rung.
   next: (running: number) => number;
-  // The movement the tooltip reports. Defaults to next - running; the VAT
-  // rungs that take from the sale price rather than from the tax override it.
+  // The movement the tooltip reports. Defaults to the difference between
+  // next and running; the VAT rungs that take from the sale price rather
+  // than from the tax override it.
   delta?: (running: number, next: number) => number;
 };
 
@@ -409,7 +410,7 @@ function vatStack(
       next: (tax) => Math.floor(tax * (1 - vatDiscount)),
     },
     {
-      // Harbor Credit: dues a quarter lower, multiplied in after the
+      // Harbor Credit: VAT a quarter lower, multiplied in after the
       // round's own discount, so a captain holding both pays the product of
       // the two. Multiplication commutes, so the order is a declaration.
       label: () =>
@@ -421,12 +422,15 @@ function vatStack(
       next: (tax) => Math.floor(tax * (1 - harborCredit)),
     },
     {
+      // The rung reads the same factor the charge folds (TAX_EVASION_FACTOR),
+      // so the sentence a captain reads and the tax they pay cannot drift.
       label: () =>
-        t("{cardName} module (down 50%)", {
+        t("{cardName} module (down {pct}%)", {
           cardName: cardName("tax_evasion"),
+          pct: Math.round((1 - TAX_EVASION_FACTOR) * 100),
         }),
       inPlay: taxable > 0 && hasModule(state, "tax_evasion"),
-      next: (tax) => Math.floor(tax * 0.5),
+      next: (tax) => Math.floor(tax * TAX_EVASION_FACTOR),
     },
   ];
 }
@@ -768,7 +772,7 @@ export function getHireCost(state: GameState, type: string): number {
   return wage;
 }
 
-// The Gold a captain pays for one Broker's rumor in Market, derived from
+// The Gold a captain pays for one Broker's Whisper in Market, derived from
 // the equipped module rather than stored on GameState, so the price cannot
 // drift from the hull. Callers should use getIntelCost, not a state field.
 //

@@ -18,16 +18,16 @@
 // row. This article holds down the arithmetic under it and both branches
 // live:
 //
-//   - a voyage where exactly one client kept the round that filled the
+//   * a voyage where exactly one client kept the round that filled the
 //     commission. Every row reads met, the captain whose own record stops
 //     short wins the card the fix restored, and the frame, the rows and a
 //     merge recomputed here by hand all tell one story;
-//   - a voyage where no client kept a record at all. Every row reads
+//   * a voyage where no client kept a record at all. Every row reads
 //     unmet, and the Pirate card pays for the first time in a concluded
 //     voyage: a pirate who ends solvent and standing wins the failure,
 //     which is the branch no earlier article's fixture could reach because
 //     every one of them filled the commission.
-//   - a voyage whose purse the conclusion's own sweeps pay out after the
+//   * a voyage whose purse the conclusion's own sweeps pay out after the
 //     verdict was once read. The open venture force failed at the close
 //     refunds its half, the client reports the settled total the way its
 //     own beacon would, and the purse goal the finished total missed by
@@ -734,7 +734,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     (p) => p?.ventureId === planted.id,
     30000,
   );
-  // The captain's own client behaviour, played faithfully: the payout
+  // The captain's own client behavior, played faithfully: the payout
   // frame is applied to the purse and the new total is reported on the
   // same channel a real browser's beacon uses.
   spender.socket.on(

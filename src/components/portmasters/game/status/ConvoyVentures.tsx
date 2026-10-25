@@ -114,10 +114,14 @@ export function ConvoyVentures({
         <>
           <div className="mb-2 flex items-end gap-1.5">
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground">
+              <label
+                htmlFor="venture-target"
+                className="mb-0.5 block text-[9px] text-muted-foreground"
+              >
                 {t("Target Gold")}
               </label>
               <Input
+                id="venture-target"
                 type="number"
                 min={CONVOY_VENTURE_MIN_TARGET}
                 max={CONVOY_VENTURE_MAX_TARGET}
@@ -130,10 +134,14 @@ export function ConvoyVentures({
               />
             </div>
             <div className="flex-1">
-              <label className="mb-0.5 block text-[9px] text-muted-foreground">
+              <label
+                htmlFor="venture-rounds"
+                className="mb-0.5 block text-[9px] text-muted-foreground"
+              >
                 {t("Rounds to fill")}
               </label>
               <Input
+                id="venture-rounds"
                 type="number"
                 min={CONVOY_VENTURE_MIN_ROUNDS_AHEAD}
                 max={maxRoundsAhead}

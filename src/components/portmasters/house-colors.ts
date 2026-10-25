@@ -1,12 +1,12 @@
 /**
- * The three Houses wear the colours they are named for: a pavilion of
+ * The three Houses wear the colors they are named for: a pavilion of
  * jade, a gate of vermilion, a crown of lotus gold. The palette carries
  * one token each, and everything that draws a House reads from here, so
- * a House is never one colour in one panel and another colour in the
+ * a House is never one color in one panel and another color in the
  * next.
  *
  * This lives apart from the components because two of them draw a House:
- * one list with two readers, so a House wears the same colour in the
+ * one list with two readers, so a House wears the same color in the
  * Great Houses dialog and on the leaderboard.
  *
  * The maps are typed to the Houses themselves, so a House that the
@@ -14,7 +14,7 @@
  * House that quietly wears the fallback everywhere it is drawn. The token
  * each House wears is the House's own fact (see HOUSE_TOKENS in the
  * engine), so the three forms below are built from it rather than each
- * spelling the colour out: a House added there is a House the crest, the
+ * spelling the color out: a House added there is a House the crest, the
  * tint and the bar all know how to draw.
  */
 import { HOUSE_TOKENS } from "@/lib/game/engine";
@@ -40,14 +40,14 @@ export const HOUSE_TINT: Record<HouseId, string> = byHouse(
   (token) => `bg-${token}/15 text-${token}`,
 );
 
-/** The progress bar a House runs along, in its own colour. */
+/** The progress bar a House runs along, in its own color. */
 export const HOUSE_BAR: Record<HouseId, string> = byHouse(
   (token) => `from-${token}/60 to-${token}`,
 );
 
 /**
  * A House the palette has not met yet falls back to the panel it is
- * drawn in rather than to the brand colour, so an unknown House reads
+ * drawn in rather than to the brand color, so an unknown House reads
  * as part of the Great Houses panel instead of as the app mark.
  */
 export const HOUSE_FALLBACK = "pm-grad-houses";

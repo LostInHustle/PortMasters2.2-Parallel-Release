@@ -30,12 +30,12 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     Promise.all([
       api.me().catch(() => ({ user: null, token: null })),
       api.getActiveRoom().catch(() => ({ room: null })),
     ]).then(([meRes, activeRes]) => {
-      if (cancelled) return;
+      if (canceled) return;
       if (meRes.user) {
         if (meRes.token) setAuthToken(meRes.token);
         setUser(meRes.user);
@@ -50,7 +50,7 @@ export default function Home() {
       }
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
 

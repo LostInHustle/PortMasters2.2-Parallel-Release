@@ -181,7 +181,7 @@ export function HarborTopBar({
             <Avatar hue={me.avatarHue} name={me.displayName} size={30} ring />
             {/* Below the sm width the Leave button is its glyph alone,
                 with the name kept in the title and the aria label: the
-                labelled button and the divider before it were the last
+                labeled button and the divider before it were the last
                 two things pushing the bar's controls onto a second row
                 on a phone, and a second row of chrome is a second row
                 of board the captain cannot see. */}

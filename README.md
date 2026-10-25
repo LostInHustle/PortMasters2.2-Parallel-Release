@@ -2,7 +2,7 @@
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
-Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, upkeep and pirate raids come due, then refitting at the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next gate until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then refitting at the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
 Everything runs as a single npm project on a single port.
 
@@ -34,29 +34,30 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command                     | What it does                                                                                             |
-| --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                        |
-| `npm run build`             | Generates the database client, runs the tag, card, status and dead surface checks, then produces a build |
-| `npm start`                 | Runs the production build on port 8080                                                                   |
-| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                     |
-| `npm run lint`              | Runs ESLint across the project                                                                           |
-| `npm run test:smoke`        | Runs the smoke suite against a running server                                                            |
-| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw colour class slipped in      |
-| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                |
-| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                         |
-| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                        |
-| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file               |
-| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice            |
-| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one            |
-| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                  |
-| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision              |
-| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                          |
-| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                    |
-| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                   |
-| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                       |
-| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                 |
-| `npm run db:generate`       | Regenerates the database client after a schema change                                                    |
+| Command                     | What it does                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                               |
+| `npm run build`             | Generates the database client, runs the tag, card, status, dead surface and prose checks, then produces a build |
+| `npm start`                 | Runs the production build on port 8080                                                                          |
+| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                            |
+| `npm run lint`              | Runs ESLint across the project                                                                                  |
+| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                   |
+| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in              |
+| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                       |
+| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                |
+| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                               |
+| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                      |
+| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                   |
+| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                   |
+| `npm run check:prose`       | Checks Markdown and text files for em dashes, en dashes, doubled hyphens and hyphens used as separators         |
+| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                         |
+| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                     |
+| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                 |
+| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                           |
+| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                          |
+| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                              |
+| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                        |
+| `npm run db:generate`       | Regenerates the database client after a schema change                                                           |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 
@@ -81,9 +82,9 @@ The telemetry checks inside it read the records a voyage leaves behind, so a ser
 
 ### The shape of a round
 
-Every round walks the same six gates, opening at the harbor, and every captain in the harbor goes through them together. The one thing the voyage you sail changes is where the Parley sits against the Orders board: Classic trades at the table before the manifest is filled, Ocean Gambit fills the manifest first, and the rail across the top of the board always shows the order.
+Every round walks the same six phases, opening at the harbor, and every captain in the harbor goes through them together. The one thing the voyage you sail changes is where the Parley sits against the Orders board: Classic trades at the table before the manifest is filled, Ocean Gambit fills the manifest first, and the rail across the top of the board always shows the order.
 
-| Gate    | What happens                                                                                                                   |
+| Phase   | What happens                                                                                                                   |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Dawn    | Draw from a fresh pool of boons that bend the rules for the coming round                                                       |
 | Market  | Buy raw materials from the port market, and hire artisans and set what each of them crafts                                     |
@@ -96,11 +97,11 @@ Every round walks the same six gates, opening at the harbor, and every captain i
 
 The host picks a tier when creating the harbor. It sets how long the voyage runs, how much of the content opens up, and how hard the sea pushes back.
 
-| Tier           | Rounds | Starting Gold | Maintenance | The feel of it                                 |
-| -------------- | ------ | ------------- | ----------- | ---------------------------------------------- |
-| Fair Winds     | 8      | 100           | 15          | A gentle passage for new captains              |
-| Open Waters    | 12     | 100           | 18          | The full trade opens as the harbor grows busy  |
-| Monsoon Season | 16     | 90            | 22          | A long, adversarial haul for seasoned captains |
+| Tier           | Rounds | Starting Gold | Ship Maintenance Fee | The feel of it                                 |
+| -------------- | ------ | ------------- | -------------------- | ---------------------------------------------- |
+| Fair Winds     | 8      | 100           | 15                   | A gentle passage for new captains              |
+| Open Waters    | 12     | 100           | 18                   | The full trade opens as the harbor grows busy  |
+| Monsoon Season | 16     | 90            | 22                   | A long, adversarial haul for seasoned captains |
 
 Fair Winds is calibrated to play exactly like the game did before difficulty tiers existed, so it is the right place to learn.
 
@@ -116,7 +117,7 @@ A captain may pledge to one House. The pledge is account level, so it carries ac
 
 A pledge is a second identity alongside Renown. Renown measures how long you have sailed; a House says what kind of captain you are while you do it. Every pledge also feeds a harbor wide House standing, so the three Houses compete on crowns, voyages and best Reputation, and the standings board in the lobby ranks them.
 
-Each House carries one small passive perk, applied when a fresh voyage starts and never partway through one. Jade Pavilion's first artisan joins at no cost. Vermilion Gate adds one more cargo lot to the Port Purchase board every round. Golden Lotus pays a fifth less in wages against a raid chance five percent higher. None of the three touches a number that compounds, which is what keeps a pledge a flavour rather than a power pick, and a captain can change House between voyages.
+Each House carries one small passive perk, applied when a fresh voyage starts and never partway through one. Jade Pavilion's first artisan joins at no cost. Vermilion Gate adds one more cargo lot to the Port Purchase board every round. Golden Lotus pays a fifth less in wages against a raid chance five percent higher. None of the three touches a number that compounds, which is what keeps a pledge a flavor rather than a power pick, and a captain can change House between voyages.
 
 ### Bartering between captains
 
@@ -292,7 +293,7 @@ Everything under `src/lib/game` is plain functions over plain data. That is what
 
 The database holds the durable things: accounts, sessions, harbors, memberships, saved game states, loans, ventures, messages, chronicles and legacy. The transient things, such as the ready check, open barter offers, aid requests and convoy tallies, live in the realtime layer's memory for as long as the process is up.
 
-### One behaviour worth knowing
+### One behavior worth knowing
 
 On boot, the realtime layer reconciles harbor membership. A seat belongs to a live connection, so every captain who is not currently connected is scheduled to leave, and the harbor is left holding only the people actually there. That keeps a harbor from waiting forever on somebody whose tab closed weeks ago.
 
@@ -308,7 +309,7 @@ The harbor itself survives the restart, along with the voyage saved inside it. S
 
 **Changes to a component do not appear.** Hot reload covers everything under `src`, which is the whole application. It does not cover `server.ts` itself, because changing that file changes the process rather than the page. Stop the server and start it again after editing it.
 
-**The page loads but pieces of it are missing, and the browser console mentions a blocked cross origin request.** The development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognises, and it recognises `localhost` and `127.0.0.1` on its own. Any other hostname, such as a custom domain pointed at a hosted deployment, belongs in `ALLOWED_DEV_ORIGINS`. A Railway service reads its own hostname without being told.
+**The page loads but pieces of it are missing, and the browser console mentions a blocked cross origin request.** The development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognizes, and it recognizes `localhost` on its own, and `next.config.ts` spells out `127.0.0.1` because the bare address is not a name Next.js recognizes by itself. Any other hostname, such as a custom domain pointed at a hosted deployment, belongs in `ALLOWED_DEV_ORIGINS`. A Railway service reads its own hostname without being told.
 
 **The realtime channel will not connect behind a proxy.** The client asks for `/socket.io` on the same origin it was served from. A reverse proxy in front of the app has to allow WebSocket upgrades on that path, not just plain HTTP.
 

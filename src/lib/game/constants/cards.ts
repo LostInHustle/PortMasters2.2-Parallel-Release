@@ -9,7 +9,7 @@
 // imports this one and a module that wants to answer one imports that
 // one. Nothing here reads a game state, a world fact or a clock.
 //
-//   - The identifier is a string rather than a literal union. A tag list
+//   * The identifier is a string rather than a literal union. A tag list
 //     is a closed twelve and a path is a closed five, so both derive their
 //     id types from their own record; a card pool is not closed, it is
 //     widened in waves (the card pool's own iteration says to ship it
@@ -18,13 +18,13 @@
 //     registry in ./cards and the clause that no two records share one,
 //     both checkable at load rather than at review.
 //
-//   - The kind names where a card can come from, and the trigger names the
+//   * The kind names where a card can come from, and the trigger names the
 //     draft that offers it. The three kinds are the design's three, and the
 //     trigger for each is written once in CARD_TRIGGER rather than beside
 //     every card: a card that arrives at the boon draft and says so in its
 //     own words is a card that can disagree with its own kind.
 //
-//   - Power is a card's weight in the balance ledger, authored rather than
+//   * Power is a card's weight in the balance ledger, authored rather than
 //     derived, because the power cap spends it as a budget ("Every
 //     card carries a power budget and a captain's total is capped") and
 //     a derived number is one nobody can retune without moving a rule.
@@ -35,14 +35,14 @@
 //     your good luck is somebody else's bad evening, while Ocean Gambit
 //     can run the wild pool, because the headline objective is shared").
 //
-//   - Both language strings are carried from the beginning, which is what
+//   * Both language strings are carried from the beginning, which is what
 //     makes the translation pass a pass rather than a rebuild: the card
 //     record carries both strings from the beginning, so translation is a
 //     pass rather than a structural change. The shipped language is named
 //     rather than assumed, so the day a captain picks one, the pick is one
 //     value and not a second copy of the pool.
 //
-//   - The condition is what makes an offer fit the captain it is offered
+//   * The condition is what makes an offer fit the captain it is offered
 //     to, and it is a closed list of questions the engine already knows
 //     how to ask. It deliberately reads tags and roles rather than goods
 //     and ids, which is the tag rule ("No effect ever names an item key")
@@ -50,7 +50,7 @@
 //     gates on a good named in its own record is a card the tag system
 //     cannot widen later.
 //
-//   - Path weight is the lean, not the filter, and the design is explicit
+//   * Path weight is the lean, not the filter, and the design is explicit
 //     that this is the point: "Path weighting is what makes an offer feel
 //     like it belongs to you without locking you out of the rest of the
 //     pool, so the three presented cards are drawn from a weighted pool

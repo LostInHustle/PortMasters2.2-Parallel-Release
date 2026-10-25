@@ -57,7 +57,7 @@ export async function theCaptainsExchangeInItsOwnPhaseSuite(inputs: {
   hostSocket.emit("room:start", { roomId: roomId });
   check(
     (await liftedAtDeparture) !== null,
-    "and the voyage lifts it, because a mute is a judgement about a table rather than about a captain",
+    "and the voyage lifts it, because a mute is a judgment about a table rather than about a captain",
   );
   await new Promise((resolve) => setTimeout(resolve, 500));
   hostSocket.emit("game:status", {

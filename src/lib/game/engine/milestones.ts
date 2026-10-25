@@ -7,7 +7,7 @@
 // ../held-cards (what is held). This half is the writes, and there are
 // exactly three:
 //
-//   - queueMilestoneMoment arms one moment. The switch, the queue guard,
+//   * queueMilestoneMoment arms one moment. The switch, the queue guard,
 //     the due gate, the tally and the ledger line all live here so the
 //     five trigger sites are one call each and none of them carries a
 //     copy of the order those readings are taken in. A moment whose pool
@@ -15,13 +15,13 @@
 //     because there is no decline and every card is a gain: an offer
 //     with an empty table would be a screen with no exit.
 //
-//   - answerMilestone takes one card off the head of the queue. It is
+//   * answerMilestone takes one card off the head of the queue. It is
 //     the only writer the queue, the held list and the marks have, and
 //     it validates against the same derived choices the screen drew (see
 //     milestoneChoices), so a stale click or a hand made frame is
 //     refused rather than trusted.
 //
-//   - The two sweeps are where the moments the voyage produces on its
+//   * The two sweeps are where the moments the voyage produces on its
 //     own are noticed. The crew loss is written by the dawn meal, so its
 //     sweep runs at dawn beside the meal; the cold round and the rung are
 //     both facts the settlement produces (the tick's stamps and the

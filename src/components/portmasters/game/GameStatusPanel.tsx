@@ -92,7 +92,7 @@ export function GameStatusPanel({
   // Read once for the two decisions
   // below, since it is the same answer to both: whether the layer is
   // running decides whether the stat exists at all, and if it is running,
-  // whether the crew is short decides what colour the number wears.
+  // whether the crew is short decides what color the number wears.
   const larderOn = survivalLayerOn(game.mode);
   const shortRations = larderOn && onShortRations(game);
   // The weather and the wardrobe, read once
@@ -194,6 +194,7 @@ export function GameStatusPanel({
         <TabsContent value="dues">
           <DuesTab
             showObligations={showObligations}
+            atHarbor={game.phase === "harbor"}
             workerCount={nW}
             pendWages={pendWages}
             pendMaint={pendMaint}

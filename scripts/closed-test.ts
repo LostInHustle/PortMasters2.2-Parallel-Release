@@ -21,7 +21,7 @@
  *   route a script can call without credentials is /api/health, which
  *   answers { status: "ok" } and touches nothing else by design, so it
  *   has no way to say which database the server answering for it is
- *   writing to. Asking would be theatre. The real proof that a server
+ *   writing to. Asking would be theater. The real proof that a server
  *   and the script driving it share one database happens at run time,
  *   and it already exists: the smoke suite refuses to clean up after
  *   itself until it has read back, through its own connection, the

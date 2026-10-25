@@ -1,6 +1,7 @@
 "use client";
 
 import { difficultyConfig, type Difficulty } from "@/lib/game/difficulty";
+import { t } from "@/lib/game/i18n";
 
 /**
  * The top line of the pinned rail: how far into the voyage the captain is,
@@ -58,13 +59,13 @@ export function VoyageHeader({
             </svg>
           );
         })()}
-        Voyage{" "}
+        {t("Voyage")}{" "}
         <b className="text-foreground">
           {currentRound}/{maxRounds}
         </b>
       </span>
-      <span className="pm-truncate text-foreground" title={cfg.name}>
-        {cfg.icon} {cfg.name}
+      <span className="pm-truncate text-foreground" title={t(cfg.name)}>
+        {cfg.icon} {t(cfg.name)}
       </span>
     </div>
   );

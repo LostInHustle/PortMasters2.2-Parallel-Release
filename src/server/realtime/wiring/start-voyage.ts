@@ -37,7 +37,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
     // database calls below, and both go on to move the harbor, open its
     // records and deal its table: a voyage announced twice, with the two
     // deals colliding on the alignment table's own key (see
-    // dealAlignments, whose fresh read is the second line of defence here).
+    // dealAlignments, whose fresh read is the second line of defense here).
     // A claim is only a claim if it is taken before the first await, so
     // it is taken here, and everything it guards, the refusals included,
     // is answered inside the finally that releases it.
@@ -115,7 +115,7 @@ export function wireStartVoyage(io: Server, socket: Socket): void {
       // the other two clears because a voyage has exactly one beginning
       // and the other two are not it: restart reopens a harbor that has
       // been sailed, and teardown ends one. A host who mutes in the
-      // lobby and starts a voyage has made a judgement about a lobby.
+      // lobby and starts a voyage has made a judgment about a lobby.
       // If it is still true in the voyage, it can be made again.
       if (clearMutedUsers(roomId)) void emitRoomMembers(io, roomId);
       // The voyage is under way, so the spine

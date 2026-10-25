@@ -60,7 +60,7 @@ export function RoundFlow({
               {/* Three columns rather than a flex row, because the rail
                   below has to be told what to line up with and a column is
                   how it is told: the tile column is exactly as wide as the
-                  tile, so the rail is centred on it by being centred in
+                  tile, so the rail is centered on it by being centered in
                   its own column, with no offset arithmetic to rot.
 
                   The button carries no vertical padding for the same

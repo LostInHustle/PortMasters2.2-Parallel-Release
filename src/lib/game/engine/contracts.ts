@@ -11,7 +11,6 @@
 // peerTradeProfit in ./barter; an escort premium is a different
 // institution, and the contract's own tally counts its coin.
 import { line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
 import { CONVOY_RAID_COVERAGE } from "../constants/paths";
 import { escortContractsOn } from "../flags";
 import type { PathId } from "../paths";
@@ -192,8 +191,9 @@ export function applyEscortSide(
     addOwnedAmount(state, "Gold", -ate);
     state.escortClaims += 1;
     state.escortAbsorbed += ate;
-    // The fallback phrase comes from the harbor's dictionary.
-    const who = contract.buyerName ?? t("a captain");
+    // The fallback phrase is held as material like every other name, so it
+    // reads in the language of whoever opens the ledger.
+    const who = contract.buyerName ?? line("a captain");
     logs.push(
       ate > 0
         ? line(

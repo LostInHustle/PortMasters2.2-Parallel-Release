@@ -427,7 +427,7 @@ export async function standingOrdersSuite(): Promise<void> {
   //
   // The one thing the model does not restate is the pathbound lock,
   // because the lock is not a rule about the hold: it is asked through
-  // lockedBehind, the same reader the trade board greys a card with and
+  // lockedBehind, the same reader the trade board grays a card with and
   // the same one the engine's own guard asks, so a card this model would
   // cover and the engine would refuse cannot slip past here having been
   // checked nowhere.
@@ -484,9 +484,9 @@ export async function standingOrdersSuite(): Promise<void> {
   // The two seats below are the same board and the same hold, one
   // environment value apart in nothing at all: the only difference is the
   // path the captain sails. It is the check the lock was put inside
-  // canFillOrder for, since that function is the one judgement the hand
+  // canFillOrder for, since that function is the one judgment the hand
   // and the seat both go through (see workStandingOrders), and the one
-  // the board greys its cards with.
+  // the board grays its cards with.
   const pathboundSeat = (withPath: boolean) => {
     const state = deal("orders");
     const card = state.customerCards.find((o) => o.isPathOrder);

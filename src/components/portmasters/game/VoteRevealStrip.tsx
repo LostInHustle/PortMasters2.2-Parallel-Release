@@ -13,9 +13,9 @@
 // reveal different things: one opens a manifest and the other puts a
 // captain ashore, and neither of those is a frame.
 //
-// The frame wears the meaning colour of the vote that made it: the
-// audit's is the colour of what somebody knows, the maroon's is the
-// colour of money out at its worst.
+// The frame wears the meaning color of the vote that made it: the
+// audit's is the color of what somebody knows, the maroon's is the
+// color of money out at its worst.
 // =====================================================================
 
 import { useState, type ReactNode } from "react";
@@ -52,7 +52,7 @@ export function VoteRevealStrip({
   dismissLabel,
   children,
 }: {
-  /** The meaning colour of the vote that made this finding. */
+  /** The meaning color of the vote that made this finding. */
   tone: "intel" | "alarm";
   /** The glyph the strip leads with. */
   icon: string;

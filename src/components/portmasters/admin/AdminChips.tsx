@@ -4,7 +4,8 @@ import { Ban, ShieldCheck } from "lucide-react";
 import { OnlineDot } from "@/components/portmasters/shared";
 import { t } from "@/lib/game/i18n";
 
-// Shared by rows and cards so one account's role reads the same in both.
+// Shared by rows and cards so an account's role is drawn by one component
+// in both.
 export function RoleChip({ isAdmin }: { isAdmin: boolean }) {
   if (!isAdmin) {
     return (

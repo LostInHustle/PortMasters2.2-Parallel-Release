@@ -73,7 +73,7 @@ export type ConsentTerms = {
  * a number at all, or that lands outside the bounds in ../constants,
  * answers null rather than being clamped: a fee somebody typed wrong is not
  * the fee they meant, and quietly charging a different one is the one
- * behaviour a market cannot have. A fraction is floored instead, because
+ * behavior a market cannot have. A fraction is floored instead, because
  * Gold is counted in whole coins and a form that hands back a value a hair
  * over the number somebody typed is a form, not a cheat.
  */
@@ -192,7 +192,7 @@ export function consentSettled(status: string): boolean {
  * Both kinds need this bound and they need it on different sides, which is
  * why the side is a parameter rather than the function being written twice.
  * A convoy's bound is on the buyer, because one captain's cover is one
- * field: a second accepted contract could not be honoured, so the server
+ * field: a second accepted contract could not be honored, so the server
  * refuses the second accept. A loom's bound is on the seller, because one
  * captain can put one garment right in a round, and the second customer would
  * be paying for work that was never done. A seller who may write several

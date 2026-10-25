@@ -415,7 +415,7 @@ export async function pathDraftSuite(
   });
 
   // The refusals, one per fact, and each of them is the sentence the panel
-  // greys a button out with and the switch itself obeys, because they are
+  // grays a button out with and the switch itself obeys, because they are
   // one function rather than two that could drift.
   const atSea = (round: number, phase: Phase, path: PathId, money: number) => {
     const state = voyageState();
@@ -1200,7 +1200,7 @@ export async function pathDraftSuite(
     late?.currentRound === PATH_SWITCH_TO_ROUND + 1 &&
       (await closed)?.error ===
         `The window for new papers closed after round ${PATH_SWITCH_TO_ROUND}.`,
-    "and past the last round of the window the harbor closes it with the round it closes after, which is the same sentence the panel would have greyed the button out with",
+    "and past the last round of the window the harbor closes it with the round it closes after, which is the same sentence the panel would have grayed the button out with",
   );
 
   // ========== one departure for one press, however it arrives ==========
@@ -1429,7 +1429,7 @@ export async function pathDraftSuite(
   // refusals the panel prints, the harbor module carries the sentences a
   // refused request is answered with, the hook carries none and the two
   // components carry the faces of the beats. The two components are swept
-  // whole, unlike the borrow's board, because they read no colour through
+  // whole, unlike the borrow's board, because they read no color through
   // a CSS custom property: their classes are Tailwind's and carry no
   // doubled hyphen.
   check(

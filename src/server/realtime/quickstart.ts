@@ -18,7 +18,7 @@ import { db } from "@/lib/db";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { DEFAULT_MODE } from "@/lib/game/mode";
 import { generateRoomCode, normalizeRoomName } from "@/lib/rooms";
-import { userSockets } from "./presence";
+import { emitToUser, userSockets } from "./presence";
 
 // The seat a captain is waiting in, and the tier they asked for.
 //
@@ -164,9 +164,7 @@ async function matchQueuedCaptainsNow(io: Server): Promise<void> {
     });
 
     // Tell every socket the captain holds that they've been matched.
-    for (const sid of userSockets.get(userId) ?? []) {
-      io.to(sid).emit("quickstart:matched", { roomId, roomCode });
-    }
+    emitToUser(io, userId, "quickstart:matched", { roomId, roomCode });
 
     quickStartQueue.delete(userId);
   }

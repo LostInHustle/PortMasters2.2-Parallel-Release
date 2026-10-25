@@ -84,7 +84,7 @@ export function SettlementBills({
   // force pay variant is the destructive call: the captain cannot cover
   // wages plus maintenance, has either no open aid request or no captain
   // willing to back them in time, and is about to go bankrupt the moment
-  // they confirm. The two wear different colours so the consequence shows
+  // they confirm. The two wear different colors so the consequence shows
   // before the label is read: the settlement fill for the calm one, and
   // the alarm red for the one that cannot be taken back and must not be
   // tapped by reflex.
@@ -209,7 +209,7 @@ export function SettlementBills({
         </BillRow>
         <BillRow label={t("Round Revenue")}>
           <span className="text-gain">
-            +{game.roundRevenue} {t("Gold")}
+            {t("+{amount} Gold", { amount: game.roundRevenue })}
           </span>
         </BillRow>
       </div>

@@ -60,19 +60,19 @@ export async function pathsSuite(): Promise<void> {
   );
 
   // Names and crests, the two things a locked card wears. The pathbound
-  // order board greys three of them at once, so two paths sharing either make
+  // order board grays three of them at once, so two paths sharing either make
   // two cards nobody can tell apart.
   const pathNames = PATH_IDS.map((id) => PATHS[id].name);
   const pathCrests = PATH_IDS.map((id) => PATHS[id].crest);
   check(
     pathNames.every((name) => name.length > 0) &&
       new Set(pathNames).size === pathNames.length,
-    "no two paths print the same name, so a locked card cannot be labelled for one path and stamped for another",
+    "no two paths print the same name, so a locked card cannot be labeled for one path and stamped for another",
   );
   check(
     pathCrests.every((crest) => crest.length > 0) &&
       new Set(pathCrests).size === pathCrests.length,
-    "and no two wear the same crest, for the same reason read from the other end: a repeated glyph makes two of the three greyed cards the same card",
+    "and no two wear the same crest, for the same reason read from the other end: a repeated glyph makes two of the three grayed cards the same card",
   );
 
   // The hold, which is where a path's structural poverty or plenty lives.
@@ -140,7 +140,7 @@ export async function pathsSuite(): Promise<void> {
   // than writes onto a card. The three errand paths bring the board an
   // order of their own and the two action paths do not, which is by design
   // rather than a gap: selling a contract and borrowing an order
-  // are actions, and a board that greyed a card for them would have
+  // are actions, and a board that grayed a card for them would have
   // invented an errand the design never gave them.
   const catalogue = new Set<string>([
     ...ITEMS,
@@ -154,13 +154,13 @@ export async function pathsSuite(): Promise<void> {
     ) &&
       PATHS.convoy.orderPool.length === 0 &&
       PATHS.free_captain.orderPool.length === 0,
-    "the three paths whose ability is an errand carry an order pool and the two whose ability is an action carry none, which is where the pathbound order board's three greyed cards are drawn from",
+    "the three paths whose ability is an errand carry an order pool and the two whose ability is an action carry none, which is where the pathbound order board's three grayed cards are drawn from",
   );
   check(
     PATH_IDS.every((id) =>
       PATHS[id].orderPool.every((good) => catalogue.has(good)),
     ),
-    "and every good a pool names is a good the catalogue knows, so the board can never grey a card for an order nobody could fill",
+    "and every good a pool names is a good the catalogue knows, so the board can never gray a card for an order nobody could fill",
   );
   const claimed = new Map<string, number>();
   for (const id of PATH_IDS) {
@@ -179,7 +179,7 @@ export async function pathsSuite(): Promise<void> {
     lockingPathFor("Brocade") === "loom" &&
       lockingPathFor("Silk") === "aroma" &&
       lockingPathFor("Salt Fish") === "quartermaster",
-    "a good finds its locking path by being looked up in the pools rather than by a label written onto the card, so what the board greys out and what the card says cannot come apart",
+    "a good finds its locking path by being looked up in the pools rather than by a label written onto the card, so what the board grays out and what the card says cannot come apart",
   );
   check(
     lockingPathFor("") === null && lockingPathFor("sachet") === null,
@@ -187,7 +187,7 @@ export async function pathsSuite(): Promise<void> {
   );
   check(
     [...catalogue].some((good) => lockingPathFor(good) === null),
-    "and the catalogue still holds goods no path claims, which is what keeps the board's ordinary orders ordinary and the locked ones the exception the pathbound order board greys out",
+    "and the catalogue still holds goods no path claims, which is what keeps the board's ordinary orders ordinary and the locked ones the exception the pathbound order board grays out",
   );
 
   // The door every other module reads a saved value through, and the

@@ -5,13 +5,14 @@
     "source": "en",
     "target": "zh",
     "version": 2,
-    "notes": "Braced tokens like {n} stand for runtime values. A phase without a short entry uses its label. Crew plurals (Weavers, Masters) collapse into the single Chinese form. The sentences group adds every remaining captain facing line, keyed by sweep and number in the same order the sentence tables read. Tokens there take their final names from source when the file lifts into the repo."
+    "notes": "Braced tokens like {n} stand for runtime values. A phase without a short entry uses its label. Crew plurals (Weavers, Masters) collapse into the single Chinese form. The sentences group adds every remaining captain facing line, keyed by sweep and number in the same order the sentence tables read. Tokens there take their final names from source as the file was lifted into the repo."
   },
 
   "terms": {
     "term.gold": { "en": "Gold", "zh": "金币" },
     "term.captain": { "en": "Captain", "zh": "船长" },
     "term.harbor": { "en": "Harbor", "zh": "港湾" },
+    "term.seat": { "en": "Seat", "zh": "席位" },
     "term.host": { "en": "Host", "zh": "港主" },
     "term.renown": { "en": "Renown", "zh": "声望" },
     "term.reputation": { "en": "Reputation", "zh": "声誉" },
@@ -427,7 +428,7 @@
     },
     "card.farsight.name": { "en": "Farsight", "zh": "远见" },
     "card.farsight.desc": {
-      "en": "One Broker's rumor is free this round.",
+      "en": "One Broker's Whisper is free this round.",
       "zh": "本轮免费获得一条掮客密语。"
     },
     "card.kiln_and_forge_guild.name": {
@@ -487,7 +488,7 @@
     },
     "card.harbor_credit.name": { "en": "Harbor Credit", "zh": "港湾信用" },
     "card.harbor_credit.desc": {
-      "en": "Product sales dues are a quarter lower, for the voyage.",
+      "en": "Product sales VAT is a quarter lower, for the voyage.",
       "zh": "本航程余下期间，成品销售的增值税降低四分之一。"
     },
     "card.fleet_colors.name": { "en": "Fleet Colors", "zh": "船队旗帜" },
@@ -525,7 +526,7 @@
     },
     "card.brokers_network.name": { "en": "Broker's Network", "zh": "掮客人脉" },
     "card.brokers_network.desc": {
-      "en": "Intel costs 2 Gold and reveals 2 rumors.",
+      "en": "A Whisper costs 2 Gold and reveals 2.",
       "zh": "密语花费2金币，每次购买揭示2条。"
     },
     "card.salvage_crane.name": { "en": "Salvage Crane", "zh": "打捞起重机" },
@@ -556,7 +557,7 @@
     },
     "card.ocean_relay.name": { "en": "Ocean Interpreter", "zh": "通译" },
     "card.ocean_relay.desc": {
-      "en": "Broker's Whisper reveals 1 extra rumor at no extra cost.",
+      "en": "Each Broker's Whisper reveals 1 extra at no extra cost.",
       "zh": "掮客密语每次多揭示 1 条，不另收费。"
     },
     "card.foreign_quarter_pass.name": {
@@ -659,7 +660,10 @@
       "zh": "抽取并安装模块"
     },
     "ui.cta.buy_at_port": { "en": "Buy at Port", "zh": "港口采购" },
-    "ui.cta.buy_rumor": { "en": "Buy a Broker's Rumor", "zh": "购买掮客密语" },
+    "ui.cta.buy_rumor": {
+      "en": "Buy a Broker's Whisper",
+      "zh": "购买掮客密语"
+    },
     "ui.cta.barter": { "en": "Barter with Captains", "zh": "与船长易货" },
     "ui.cta.post_barter": { "en": "Post a barter offer", "zh": "挂出易货报价" },
     "ui.cta.fill_orders": { "en": "Fill Trade Orders", "zh": "交付贸易订单" },
@@ -710,7 +714,7 @@
     "ui.ledger.captains": { "en": "Captain's Ledger", "zh": "船长账簿" },
     "ui.stat.worker_wages": { "en": "Artisan Wages", "zh": "工匠工钱" },
     "ui.stat.ship_maintenance": {
-      "en": "Ship Maintenance",
+      "en": "Ship Maintenance Fee",
       "zh": "船只维护费"
     },
     "ui.stat.vat_paid": { "en": "VAT Paid", "zh": "增值税" },
@@ -727,6 +731,10 @@
     "shell.001": {
       "en": "{APP_NAME}: A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
       "zh": "{APP_NAME}：古丝路上的多人海上贸易游戏。船长们聚在同一个港湾，步调一致地航行，声誉最高者赢得沧海之冠。"
+    },
+    "shell.021": {
+      "en": "A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
+      "zh": "古丝路上的多人海上贸易游戏。船长们聚在同一个港湾，步调一致地航行，声誉最高者赢得沧海之冠。"
     },
     "shell.002": { "en": "Silk Road", "zh": "丝路" },
     "shell.003": { "en": "trading game", "zh": "贸易游戏" },
@@ -796,7 +804,7 @@
     },
     "guides.003": {
       "en": "<li><strong>{entry.crest} {entry.name}</strong>: {entry.signature}<br><span style=\"font-size:12px;color:var(--muted-foreground)\">{pathFacts}</span></li>",
-      "zh": "<li><strong>{entry.crest} {entry.name}</strong>: {entry.signature}<br><span style=\"font-size:12px;color:var(--muted-foreground)\">{pathFacts}</span></li>"
+      "zh": "<li><strong>{entry.crest} {entry.name}</strong>：{entry.signature}<br><span style=\"font-size:12px;color:var(--muted-foreground)\">{pathFacts}</span></li>"
     },
     "guides.004": { "en": "Base", "zh": "基价" },
     "guides.005": { "en": "Final", "zh": "最终价" },
@@ -839,7 +847,7 @@
       "zh": "<p>一轮是航程里的一圈，这趟要走{rounds}轮。每轮依次走过下面的阶段，顺序由你的航程排定：</p>\n{roundSteps}\n<p style=\"font-size:12px;color:var(--muted-foreground);margin:4px 0 0\"><kbd style=\"background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px\">Ctrl+N</kbd> 可以不点鼠标直接就绪（所有船长都就绪，港湾才继续）；航程是这些轮连起来的一整趟，不是单独的一轮。</p>"
     },
     "guides.016": {
-      "en": "<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain's rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand rumor and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style=\"background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>",
+      "en": "<p>The port market has Hemp, Silk, and Tea at prices that shift every round. Buy here, barter with the other captains at Parley, and fill trade orders at Orders. Which of those two stops comes first is a rule of the voyage you are sailing rather than a choice you make, and your captain's rail always shows the order. That is the core loop.</p>\n<p>One thing worth knowing about: the <strong>Broker</strong>. Pay a small fee for a demand whisper and a specific trade order is <em>guaranteed</em> to appear when Orders opens. Useful when you have stocked a particular good and want to make sure a buyer shows up.</p>\n<div style=\"background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  💡 For the first two or three voyages, stick to raw materials. You can fill an order with them the same round you buy them. No waiting and no risk.\n</div>",
       "zh": "<p>集市里有麻布、丝绸和茶叶，价格每轮都在动。在这里采购，到洽谈去易货，去订单交单。开市和订单谁先谁后，由你所走航程的规则定，没得选，船长栏里一直标着顺序。这就是核心循环。</p>\n<p>还有一个人要记住：<strong>掮客</strong>。花点小钱买一条需求密语，订单一开，指定的那张<em>必定</em>出现。囤着货想保准有买家，就用这个。</p>\n<div style=\"background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  💡 最初两三趟航程，先做原材料。买进的当轮就能拿去交订单，不用等，也没有风险。\n</div>"
     },
     "guides.017": {
@@ -848,7 +856,7 @@
     },
     "guides.018": {
       "en": "<p>Trade orders appear and you match your cargo to them. Each one shows the goods needed, the reward, and the freight cost. Your take is whatever is left after fees and tax.</p>\n<p>You can fill as many orders as your cargo allows while Orders is open.</p>\n<div style=\"background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  📌 <strong>Finished goods</strong> ({tier0List}) pay two to three times more than raw materials. The catch is they need artisans, and the artisans deliver at Resolve. That is covered next.\n</div>\n",
-      "zh": "<p>订单上板了，拿货去对。每条都写明要什么货、给多少报酬、收多少运费。运费和税扣完，剩下的都归你。</p>\n<p>订单开着的时候，货够就交，能交几条交几条。</p>\n<div style=\"background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  📌 <strong>成品</strong> ({tier0List})的报酬是原材料的两三倍。可它得靠工匠，工匠要到结算才交货。下一页就讲这个。\n</div>\n"
+      "zh": "<p>订单上板了，拿货去对。每条都写明要什么货、给多少报酬、收多少运费。运费和税扣完，剩下的都归你。</p>\n<p>订单开着的时候，货够就交，能交几条交几条。</p>\n<div style=\"background:color-mix(in oklch, var(--intel) 14%, transparent);border:1px solid var(--intel);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  📌 <strong>成品</strong>（{tier0List}）的报酬是原材料的两三倍。可它得靠工匠，工匠要到结算才交货。下一页就讲这个。\n</div>\n"
     },
     "guides.019": {
       "en": "<p>Artisans turn raw materials into high value finished goods and collect wages at every Resolve. That part is simple. What catches most new captains is this:</p>\n<div style=\"background:color-mix(in oklch, var(--alarm) 18%, transparent);border:1px solid var(--alarm);color:var(--foreground);border-radius:6px;padding:12px;margin:12px 0;text-align:center;font-size:14px;font-weight:bold;line-height:1.7\">\n  Assign a task this round.<br>Wages come due at Resolve either way.\n</div>\n<p style=\"font-size:13px;color:var(--muted-foreground);line-height:1.6\">Weavers ({weaverWage} Gold), Master Weavers ({masterWage} Gold), and Sachet Makers ({sachetWage} Gold) all charge wages <strong>every round</strong>, even when idle, so the bill comes round whether they worked or not. Only hire once you have enough Gold to cover at least two rounds of wages alongside your other bills.</p>",
@@ -859,8 +867,8 @@
       "zh": "\n<div style=\"background:color-mix(in oklch, var(--warn) 14%, transparent);border:1px solid var(--warn);color:var(--foreground);border-radius:6px;padding:9px;font-size:13px;margin-top:10px;line-height:1.5\">\n  💡 {ESCORT_SHARE_RULE}手头紧的时候，这笔往往划算。\n</div>"
     },
     "guides.021": {
-      "en": "<p>Once the pirates are dealt with, two bills come due:</p>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0\">\n  <div style=\"background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">🔧</div>\n    <strong>Ship Maintenance</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">15 to 22 Gold each round, set by the waters you sail</span>\n  </div>\n  <div style=\"background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">The <strong>Dues</strong> tab of your captain's rail shows exactly what is owed. Check it before spending anything.</p>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your Gold automatically and goes straight to them.</p>",
-      "zh": "<p>海盗的事了结之后，还有两笔账单：</p>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0\">\n  <div style=\"background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">🔧</div>\n    <strong>船只维护费</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">每轮15到22金币，由你走的水域决定</span>\n  </div>\n  <div style=\"background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">👥</div>\n    <strong>工匠工钱</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">每人每轮{ARTISAN_WAGE_MIN}到{ARTISAN_WAGE_MAX}金币</span>\n  </div>\n</div>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">船长栏里的<strong>港务费</strong>页签写着确切欠多少。花钱之前先看一眼。</p>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">钱不够，本身不是终点。就在结算界面上，你可以向港湾里的其他船长借一笔；对方手头宽裕，当场就能转给你。在航程最后一轮结束前还上就行，还不清，会自动从你的金币里扣出来，交到他手上。</p>"
+      "en": "<p>Once the pirates are dealt with, two bills come due:</p>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0\">\n  <div style=\"background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">🔧</div>\n    <strong>Ship Maintenance Fee</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">{MAINTENANCE_MIN} to {MAINTENANCE_MAX} Gold each round, set by the waters you sail</span>\n  </div>\n  <div style=\"background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">👥</div>\n    <strong>Artisan Wages</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">{ARTISAN_WAGE_MIN} to {ARTISAN_WAGE_MAX} Gold per person per round</span>\n  </div>\n</div>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">The <strong>Dues</strong> tab of your captain's rail shows exactly what is owed. Check it before spending anything.</p>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">Coming up short isn't the end on its own. Right there on the settlement screen, you can ask another captain in the harbor for a loan, and they can send it to you on the spot if they've got the Gold to spare. Just repay it before the voyage's last round ends, or it comes out of your Gold automatically and goes straight to them.</p>",
+      "zh": "<p>海盗的事了结之后，还有两笔账单：</p>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0\">\n  <div style=\"background:color-mix(in oklch, var(--w-ship) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">🔧</div>\n    <strong>船只维护费</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">每轮{MAINTENANCE_MIN}到{MAINTENANCE_MAX}金币，由你走的水域决定</span>\n  </div>\n  <div style=\"background:color-mix(in oklch, var(--w-market) 14%, transparent);border-radius:6px;padding:10px;text-align:center;color:var(--foreground)\">\n    <div style=\"font-size:22px;margin-bottom:4px\">👥</div>\n    <strong>工匠工钱</strong><br>\n    <span style=\"font-size:12px;color:var(--muted-foreground)\">每人每轮{ARTISAN_WAGE_MIN}到{ARTISAN_WAGE_MAX}金币</span>\n  </div>\n</div>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">船长栏里的<strong>港务费</strong>页签写着确切欠多少。花钱之前先看一眼。</p>\n<p style=\"font-size:13px;color:var(--muted-foreground)\">钱不够，本身不是终点。就在结算界面上，你可以向港湾里的其他船长借一笔；对方手头宽裕，当场就能转给你。在航程最后一轮结束前还上就行，还不清，会自动从你的金币里扣出来，交到他手上。</p>"
     },
     "guides.022": {
       "en": "<p>Keep these points in mind as you play:</p>\n<ul style=\"padding-left:18px;line-height:2.1;font-size:14px\">\n  <li>Start with raw material orders. Fast money, no complications.</li>\n  <li>Always keep at least <strong>30 Gold above</strong> what Resolve will cost you.</li>\n  <li>Hire artisans only when you can cover <strong>two full rounds of wages</strong>.</li>\n  <li>Dusk hull upgrades compound quickly. Do not skip them.</li>\n  <li>Caught short by pirates or a bad round? When other captains are aboard, ask the harbor for a loan before you assume the voyage is over.</li>\n  <li>Every voyage's final Reputation becomes Renown on your account, forever, win or lose. Check your Captain's Legacy any time from the Lobby.</li>\n  <li><kbd style=\"background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px\">Ctrl+S</kbd> saves your voyage &nbsp;·&nbsp; <kbd style=\"background:var(--muted);border:1px solid var(--border);color:var(--foreground);padding:1px 6px;border-radius:3px\">F1</kbd> opens the full guide.</li>\n</ul>\n<div style=\"background:color-mix(in oklch, var(--gain) 14%, transparent);border:2px solid var(--gain);color:var(--foreground);border-radius:8px;padding:12px;text-align:center;margin-top:14px\">\n  <strong style=\"font-size:15px\">Good winds and good margins, Captain. ⚓</strong>\n</div>",
@@ -911,23 +919,23 @@
     },
     "guides.104": { "en": "🔮 Broker's Whisper:", "zh": "🔮 掮客密语：" },
     "guides.105": {
-      "en": "• Market: Click \"Broker's Rumor Board\" to open the window",
+      "en": "• Market: Click \"Broker's Whisper Board\" to open the window",
       "zh": "• 集市：点掮客密语板，窗口就开"
     },
     "guides.106": {
-      "en": "• Spend {INTEL_COST} Gold to buy a \"rumor\" about Orders demand",
+      "en": "• Spend {INTEL_COST} Gold to buy a Broker's Whisper about Orders demand",
       "zh": "• 花 {INTEL_COST} 金币，买一条关于订单需求的密语"
     },
     "guides.107": {
-      "en": "• Revealed intel guarantees matching orders will appear",
-      "zh": "• 买到的情报保证引出对得上的订单"
+      "en": "• Each revealed whisper guarantees a matching order will appear",
+      "zh": "• 每条揭示的密语都保证引出对得上的订单"
     },
     "guides.108": {
-      "en": "• A rumor is always true and always delivered, on every tier",
+      "en": "• A whisper is always true and always delivered, on every tier",
       "zh": "• 密语句句为真、条条送达，哪个难度都一样"
     },
     "guides.109": {
-      "en": "• Here a broker may still be corrupt: you get the true rumor, but your position leaks and this round's raid risk rises, and the log tells you when",
+      "en": "• Here a broker may still be corrupt: you get the true whisper, but your position leaks and this round's raid risk rises, and the log tells you when",
       "zh": "• 在这片水域，掮客可能是黑的：密语照真照送，可你的位置会走漏，本轮的劫掠风险跟着上涨，日志会写明"
     },
     "guides.110": { "en": "🤝 Parley (Bartering):", "zh": "🤝 洽谈（易货）：" },
@@ -951,18 +959,18 @@
       "en": "• Want to make sure a specific captain gets your offer, not whoever clicks fastest? Pick their name under \"With\" when you post: only the two of you will ever see it",
       "zh": "• 想让报价稳稳落进某位船长手里，而不是谁点得快谁得？挂单时在给谁一栏点他的名字：这份报价只有你们俩看得到"
     },
-    "guides.116": { "en": "🔧 Ship Modules:", "zh": "🔧 船只模块：" },
+    "guides.116": { "en": "🔧 Modules:", "zh": "🔧 模块：" },
     "guides.117": {
       "en": "• Dusk: Upgrade your hull to unlock Module Slots",
       "zh": "• 暮色：升级船体，解锁模块槽位"
     },
     "guides.118": {
       "en": "• Draft powerful modules to create unique synergies",
-      "zh": "• 抽选强力模块，凑出独一份的组合"
+      "zh": "• 抽取强力模块，凑出独一份的组合"
     },
     "guides.119": {
       "en": "• Swap modules to adapt to your current voyage!",
-      "zh": "• 换模块，随这趟航程随时调整！"
+      "zh": "• 切换模块，随这趟航程随时调整！"
     },
     "guides.120": { "en": "🏴‍☠️ Pirates and Escorts:", "zh": "🏴‍☠️ 海盗与护航：" },
     "guides.121": {
@@ -1067,7 +1075,7 @@
       "zh": "• 航程走完还欠着？让你破产的是那笔没还的借款，不是借它的那一轮"
     },
     "guides.150": {
-      "en": "• Lending Gold raises your own reputation, scaled to how much you lent",
+      "en": "• Lending Gold raises your own Reputation, scaled to how much you lent",
       "zh": "• 借出金币会抬高你自己的声誉，借得越多涨得越多"
     },
     "guides.151": { "en": "🛡️ Backing:", "zh": "🛡️ 作保：" },
@@ -1179,7 +1187,7 @@
       "zh": "制作香囊。雇价最高的工匠，但香囊的报酬也最高。"
     },
     "guides.038": {
-      "en": "Your score for the voyage, roughly your accumulated trading profit. Highest reputation on the voyage's final round wins.",
+      "en": "Your score for the voyage, roughly your accumulated trading profit. Highest Reputation on the voyage's final round wins.",
       "zh": "你在本航程的积分，大致就是累积的贸易利润。最后一轮结束时声誉最高的人获胜。"
     },
     "guides.039": {
@@ -1203,8 +1211,8 @@
       "zh": "交一条订单要付的运费，按件数算。船只等级，以及某些机缘和模块，能把它压低。"
     },
     "guides.044": {
-      "en": "A fixed per round upkeep fee for your ship, due at Resolve regardless of how the round went.",
-      "zh": "每轮固定的船只维护，不论这轮走得如何，结算时都要交。"
+      "en": "A fixed per round ship maintenance fee, due at Resolve regardless of how the round went.",
+      "zh": "每轮固定的船只维护费，不论这轮走得如何，结算时都要交。"
     },
     "guides.045": {
       "en": "Raised by a Hull Upgrade at the Shipyard during Dusk. Each level opens a module slot and adds a flat discount on freight costs.",
@@ -1247,8 +1255,8 @@
       "zh": "一轮的最后一步，轮到船坞：升级船体，或者抽取并装上一件模块。"
     },
     "guides.057": {
-      "en": "What this captain owes at the round end: the crew's wages and the ship's upkeep in one total, with any outstanding loans listed underneath. This tab keeps the running count.",
-      "zh": "这位船长轮末欠的账：船员工钱和船只维护合成一个总数，下面列着未还的借款。这个页签一直记着数。"
+      "en": "What this captain owes at the round end: the crew's wages and the ship maintenance fee in one total, with any outstanding loans listed underneath. This tab keeps the running count.",
+      "zh": "这位船长轮末欠的账：船员工钱和船只维护费合成一个总数，下面列着未还的借款。这个页签一直记着数。"
     },
     "guides.058": {
       "en": "The cargo hold: the goods stowed aboard, one slot per unit of cargo, plus the crew that works them. This tab lists it all.",
@@ -1378,7 +1386,7 @@
       "zh": "三张都不合你的打法，每轮还能花{BOON_SWAP_COST}金币把机缘换一次。"
     },
     "manual.009": {
-      "en": "Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay {INTEL_COST} Gold for a Broker's Rumor that guarantees a matching order appears when Orders opens.",
+      "en": "Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay {INTEL_COST} Gold for a Broker's Whisper that guarantees a matching order appears when Orders opens.",
       "zh": "开市就在港口。向港口商人采购麻布、丝绸、茶叶这些原材料。价格每位船长各不同，每轮也在变。还可以花{INTEL_COST}金币买一条掮客密语，保证订单一开就有对得上的单子出现。"
     },
     "manual.010": {
@@ -1405,7 +1413,7 @@
       "zh": "原材料订单是前期的稳妥之选，大笔声誉都在成品订单里。"
     },
     "manual.015": {
-      "en": "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Dues tab of your captain's rail before you spend anything.",
+      "en": "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and the ship maintenance fee, and check the Dues tab of your captain's rail before you spend anything.",
       "zh": "结算就是本轮账单到期的时候。海盗可能先找上门，把你在手的金币卷走：雇护航求平安，或者赌一把。接着是工钱和船只维护费。花钱之前，先看一眼船长栏里的港务费页签。"
     },
     "manual.016": {
@@ -1457,7 +1465,6 @@
       "en": "Weigh the numbers under each name rather than the crest. The five paths trade different holds, Renown ceilings and locked order pools, and the one you keep sails with you to the end.",
       "zh": "看名字下面的数字，而不是徽记。五条商道的货舱、声望上限和专属订单各不相同；留下哪条，它陪你走到航程尽头。"
     },
-    "manual.028": { "en": "{progressPct}%", "zh": "{progressPct}%" },
     "manual.062": {
       "en": "You can target a specific captain with a Direct Barter Offer if you want to trade with only them.",
       "zh": "只想和某一位船长做买卖，可以发一份定向易货给他。"
@@ -1520,7 +1527,7 @@
       "zh": "工匠不会立刻产出！"
     },
     "manual.055": {
-      "en": "🔧 {cfg.maintenance} Gold ship maintenance per round",
+      "en": "🔧 {cfg.maintenance} Gold ship maintenance fee per round",
       "zh": "🔧 每轮船只维护费{cfg.maintenance}金币"
     },
     "manual.056": {
@@ -1632,8 +1639,8 @@
       "zh": "海盗盯上船上的每一枚钱。护航按你随身金币的比例抽成，替你买下平安通行；所以你身上金币越少，这笔钱反倒越便宜。"
     },
     "descriptions.025": {
-      "en": "Then the wages and the ship's maintenance come due, and what survives the bills is what you take to the yard.",
-      "zh": "然后工钱和船只维护到期，扛过账单剩下多少，你就带多少去船坞。"
+      "en": "Then the wages and the ship maintenance fee come due, and what survives the bills is what you take to the yard.",
+      "zh": "然后工钱和船只维护费到期，扛过账单剩下多少，你就带多少去船坞。"
     },
     "descriptions.026": {
       "en": "Spend what survived: a level of hull carries another module slot and cuts the cost of every haul, and a drafted module is bolted on for good.",
@@ -1895,24 +1902,20 @@
       "zh": "🔄 花{BOON_SWAP_COST}金币换了一批机缘"
     },
     "engine.047": {
-      "en": "❌ You've already swapped your module choices this round",
-      "zh": "❌ 本轮你已经换过模块了"
+      "en": "❌ You've already changed your module batch this round",
+      "zh": "❌ 本轮已经更换过模块批次"
     },
     "engine.048": {
-      "en": "❌ Nothing to swap, draft your modules first",
-      "zh": "❌ 没有可换的，先抽取模块"
+      "en": "❌ Nothing to change, draft your modules first",
+      "zh": "❌ 没有可改的批次，先抽取模块"
     },
     "engine.049": {
-      "en": "❌ The yard has nothing new to deal this hull: every module it could offer is either aboard or already on the table. Take one of these, sell one at the table, or come back next round.",
-      "zh": "❌ 船坞没有新货能给这艘船体了：它拿得出来的模块，要么已经在船上，要么已经摆在桌上。从这些里挑一个，或者到桌上卖掉一个，要么下轮再来。"
+      "en": "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch. Take one of these or come back next round.",
+      "zh": "❌ 船坞凑不齐一整批新模块：这一批之外能发的模块不足三件。先从这些里挑一件，或下轮再来。"
     },
     "engine.050": {
-      "en": "🔄 Swapped Module Choices for a fresh batch",
+      "en": "🔄 Changed your module batch for a fresh deal",
       "zh": "🔄 换了一批新的模块"
-    },
-    "engine.372": {
-      "en": "🔄 Re-dealt the same module choices; the yard has nothing new for this hull",
-      "zh": "🔄 重新发放了同样的模块选择；船坞没有这艘船体没见过的新模块"
     },
     "engine.051": {
       "en": "❌ That seat is no longer on your hull, so there is nothing there to replace. Back to Draft and take the card again: the yard fits it to the hull as it stands.",
@@ -2106,16 +2109,16 @@
       "zh": "   ✨ 机缘折扣生效！省下{saved}金币"
     },
     "engine.347": {
-      "en": "📊 Purchased {state.purchaseCount} cargo batches",
-      "zh": "📊 采购了{state.purchaseCount}批货物"
+      "en": "📊 Purchased {state.purchaseCount} cargo lots",
+      "zh": "📊 采购了{state.purchaseCount}件货物"
     },
     "engine.348": {
       "en": "🗺️ The Silk Road Charter opens a new tier! The harbor grows busier: {tierPurchaseCount} cargo lots and as many buyers from this voyage on.",
       "zh": "🗺️ 丝路特许开启新层级！港湾更热闹了：从本航程起，货物多出{tierPurchaseCount}件，买家也一样多。"
     },
     "engine.349": {
-      "en": "✅ Purchasing ended, bought {state.purchaseCount} batches",
-      "zh": "✅ 采购结束，共买下{state.purchaseCount}批"
+      "en": "✅ Purchasing ended, bought {state.purchaseCount} cargo lots",
+      "zh": "✅ 采购结束，共买下{state.purchaseCount}件货物"
     },
     "engine.087": {
       "en": "\n{moment.icon}=== {moment.title} ===",
@@ -2216,12 +2219,12 @@
       "zh": "🔮 掮客没有更多密语了..."
     },
     "engine.109": {
-      "en": "❌ Need {cost} Gold for a rumor",
+      "en": "❌ Need {cost} Gold for a whisper",
       "zh": "❌ 买一条密语要{cost}金币"
     },
     "engine.110": {
-      "en": "🗣️ Broker's Whisper: 'Word from {port}: High demand for {item}!'",
-      "zh": "🗣️ 掮客密语：'{port}有消息：急需{item}！'"
+      "en": "🗣️ Broker's Whisper: ‘Word from {port}: High demand for {item}!’",
+      "zh": "🗣️ 掮客密语：‘{port}有消息：急需{item}！’"
     },
     "engine.111": {
       "en": "📜 Imperial Mandate at {mandate.port}: {need} for {mandate.reward} Gold. The Emperor's commission is exempt from VAT.",
@@ -2277,7 +2280,6 @@
       "en": "{vatPct}% VAT on the margin",
       "zh": "按差价计增值税{vatPct}%"
     },
-    "engine.123": { "en": "Floor at 0 Gold", "zh": "下限0金币" },
     "engine.358": {
       "en": "{boonName} (down {down} Gold)",
       "zh": "{boonName}（降{down}金币）"
@@ -2300,8 +2302,8 @@
       "zh": "{boonName}（降{pct}%）"
     },
     "engine.364": {
-      "en": "{cardName} module (down 50%)",
-      "zh": "{cardName}模块（降50%）"
+      "en": "{cardName} module (down {pct}%)",
+      "zh": "{cardName}模块（降{pct}%）"
     },
     "engine.365": {
       "en": "{cardName} module (down {perUnit} Gold per unit)",
@@ -3268,10 +3270,8 @@
       "zh": "显示全部快捷键"
     },
     "room-a.115": { "en": "Keyboard shortcuts", "zh": "快捷键" },
-    "room-a.116": { "en": "Voyage Ended", "zh": "航程结束" },
     "room-a.117": { "en": "Waiting for host…", "zh": "等港主..." },
     "room-a.118": { "en": "Need one captain", "zh": "还差一位船长" },
-    "room-a.119": { "en": "Start Solo Practice", "zh": "开始单人练习" },
     "room-a.120": { "en": "Start the Voyage", "zh": "开始航程" },
     "room-a.121": { "en": "Drafting Paths...", "zh": "正在择道..." },
     "room-a.122": { "en": "Drafting Boon...", "zh": "正在抽取机缘..." },
@@ -3306,7 +3306,7 @@
       "en": "Nothing yet this voyage.",
       "zh": "本航程还没有记下什么。"
     },
-    "room-a.134": { "en": "Broker's Rumor Board", "zh": "掮客密语板" },
+    "room-a.134": { "en": "Broker's Whisper Board", "zh": "掮客密语板" },
     "room-a.135": {
       "en": "Spend Gold to reveal what Orders will ask for!",
       "zh": "花点金币，看看订单会要什么！"
@@ -3315,9 +3315,9 @@
       "en": "The Broker only deals during Market.",
       "zh": "掮客只在开市时做生意。"
     },
-    "room-a.137": { "en": "📜 Revealed Intel:", "zh": "📜 已揭示的密语：" },
+    "room-a.137": { "en": "📜 Revealed Whispers:", "zh": "📜 已揭示的密语：" },
     "room-a.138": {
-      "en": "✨ No rumors revealed yet... Spend Gold to listen to the Broker's whispers.",
+      "en": "✨ No whispers revealed yet... Spend Gold to listen to the Broker.",
       "zh": "✨ 还没听到任何密语... 花点金币，听听掮客密语。"
     },
     "room-a.139": { "en": "Restart the voyage?", "zh": "重开航程？" },
@@ -3332,7 +3332,6 @@
       "zh": "港湾没有你照样开航：你的席位就此除名，你身上的金币和货也一并带走。你随时可以自己开一个港湾，或加入别的港湾。这一步收不回来。"
     },
     "room-a.144": { "en": "Leave the Voyage", "zh": "离开航程" },
-    "room-a.145": { "en": "🚢 Set Sail!", "zh": "🚢 扬帆起航！" },
     "room-a.146": { "en": "Skip tutorial", "zh": "跳过教程" },
     "room-a.147": { "en": "Navigation Guide", "zh": "航行指南" },
     "room-a.148": {
@@ -3342,12 +3341,12 @@
     "room-a.149": { "en": "Trade Strategy Advice", "zh": "交易策略建议" },
     "room-a.150": { "en": "Close Board", "zh": "关闭面板" },
     "room-a.321": {
-      "en": "🔮 Buy Rumor ({intelCost}💰)",
-      "zh": "🔮 买传闻（{intelCost}💰）"
+      "en": "🔮 Buy a Whisper ({intelCost}💰)",
+      "zh": "🔮 买密语（{intelCost}💰）"
     },
     "room-a.322": {
       "en": "• 🗣️ '{port} wants {item}'",
-      "zh": "• 🗣️{port}想要{item}"
+      "zh": "• 🗣️ “{port}想要{item}”"
     },
     "room-a.323": {
       "en": "Tutorial step {step} of {total}",
@@ -3509,7 +3508,7 @@
     "room-a.201": { "en": "🏁 Voyage Ended", "zh": "🏁 航程结束" },
     "room-a.202": { "en": "Detailed voyage status", "zh": "航程状态详情" },
     "room-a.203": {
-      "en": "Asking the harbor master…",
+      "en": "Asking the Harbormaster…",
       "zh": "正在询问港务长..."
     },
     "room-a.204": { "en": "📦 Cargo", "zh": "📦 货物" },
@@ -3797,7 +3796,7 @@
       "zh": "本航程还没有单独发给你的东西。"
     },
     "room-a.299": { "en": "Ship", "zh": "船只" },
-    "room-b.001": { "en": "Ship Fleet Bankrupt!", "zh": "船队破产！" },
+    "room-b.001": { "en": "Your Ship Is Bankrupt!", "zh": "你的船破产了！" },
     "room-b.002": { "en": "Rounds Completed:", "zh": "已完成轮数：" },
     "room-b.003": { "en": "Final Gold:", "zh": "最终金币：" },
     "room-b.004": { "en": "Final Reputation:", "zh": "最终声誉：" },
@@ -3906,7 +3905,7 @@
       "zh": "💥 破产：借款违约"
     },
     "room-b.046": { "en": "{r.icon} {r.label}", "zh": "{r.icon} {r.label}" },
-    "room-b.311": { "en": "📈 Merchant Rank: ", "zh": "📈 商人评级： " },
+    "room-b.311": { "en": "📈 Merchant Rank: ", "zh": "📈 商人评级：" },
     "room-b.047": { "en": "Crew Summary", "zh": "船员汇总" },
     "room-b.048": { "en": "Total Wages Paid", "zh": "已付工钱合计" },
     "room-b.049": {
@@ -3933,7 +3932,7 @@
       "en": "🤝 Broker's Favor Unlocked!",
       "zh": "🤝 掮客的人情已解锁！"
     },
-    "room-b.312": { "en": "Captain's Merit: ", "zh": "船长功勋： " },
+    "room-b.312": { "en": "Captain's Merit: ", "zh": "船长功勋：" },
     "room-b.374": { "en": "{reputation} Rep.", "zh": "{reputation}声誉" },
     "room-b.059": { "en": "Financial Summary", "zh": "财务汇总" },
     "room-b.060": { "en": "Net Cash Flow", "zh": "净现金流" },
@@ -3955,7 +3954,7 @@
     "room-b.375": { "en": "+{rep} Rep", "zh": "+{rep}声誉" },
     "room-b.073": { "en": "Port Board", "zh": "港口采购板" },
     "room-b.074": { "en": "Take This Boon", "zh": "收下这份机缘" },
-    "room-b.075": { "en": "🔧 Module Drafting", "zh": "🔧 抽取模块" },
+    "room-b.075": { "en": "🔧 Drafting Module", "zh": "🔧 抽取模块" },
     "room-b.076": {
       "en": "Choose a module to install or swap.",
       "zh": "选一个模块安装或切换。"
@@ -3964,21 +3963,16 @@
       "en": "No module choices are on offer right now. A fresh set is rolled each round.",
       "zh": "现在没有可选的模块。每轮都会重新发一批。"
     },
-    "room-b.078": {
-      "en": "Nothing new to deal: every module the yard could offer this hull is either on this table already or aboard. Take one of these, or come back next round.",
-      "zh": "没有新牌可发：船坞能为这条船体开出的模块，不在桌上，就在船上。从这些里挑一个，或者下一轮再来。"
-    },
     "room-b.079": { "en": "⬅️ Back to Shipyard", "zh": "⬅️ 回到船坞" },
     "room-b.080": {
-      "en": "✅ Choices Swapped This Round",
-      "zh": "✅ 本轮已换过选择"
+      "en": "✅ Batch Changed This Round",
+      "zh": "✅ 本轮已更换批次"
     },
     "room-b.081": {
-      "en": "🎲 Swap Choices (1 use/round)",
-      "zh": "🎲 切换选择（每轮1次）"
+      "en": "🎲 Change Batch (1 use/round)",
+      "zh": "🎲 更换批次（每轮1次）"
     },
-    "room-b.082": { "en": "✅ Install", "zh": "✅ 安装" },
-    "room-b.083": { "en": "🔄 Swap", "zh": "🔄 切换" },
+    "room-b.082": { "en": "Choose", "zh": "选择" },
     "room-b.084": {
       "en": "🔄 Select Module to Replace",
       "zh": "🔄 选择要切换的模块"
@@ -4171,7 +4165,7 @@
       "en": "Hire Escort ({fee} Gold)",
       "zh": "雇护航（{fee}金币）"
     },
-    "room-b.155": { "en": "🔮 Broker's Rumor Board", "zh": "🔮 掮客密语板" },
+    "room-b.155": { "en": "🔮 Broker's Whisper Board", "zh": "🔮 掮客密语板" },
     "room-b.156": {
       "en": "✅ Board Done, to the Artisan Bench",
       "zh": "✅ 板看完了，去工匠台"
@@ -4213,8 +4207,7 @@
     },
     "room-b.333": { "en": "(Was {gold})", "zh": "（原价{gold}）" },
     "room-b.167": { "en": "Best Deals This Round", "zh": "本轮最划算" },
-    "room-b.168": { "en": "g", "zh": "金币" },
-    "room-b.169": { "en": "Intel", "zh": "密语" },
+    "room-b.169": { "en": "Whisper", "zh": "密语" },
     "room-b.170": { "en": "Harbor Pulse", "zh": "港湾行情" },
     "room-b.171": { "en": "Pricier", "zh": "涨价" },
     "room-b.172": { "en": "Softer", "zh": "降价" },
@@ -4441,12 +4434,12 @@
       "zh": "🔧 抽取并安装模块"
     },
     "room-b.355": {
-      "en": "🔌 Module Slots: {n} / {m}",
-      "zh": "🔌 模块槽位：{n} / {m}"
+      "en": "🔌 Module Slots: {n}/{m}",
+      "zh": "🔌 模块槽位：{n}/{m}"
     },
     "room-b.356": {
-      "en": "⚡ Hull Power: {n} / {m}",
-      "zh": "⚡ 船体承重：{n} / {m}"
+      "en": "⚡ Hull Power: {n}/{m}",
+      "zh": "⚡ 船体承重：{n}/{m}"
     },
     "room-b.357": {
       "en": "{n} installed, power {p} of {CAP}.",
@@ -4502,7 +4495,7 @@
     },
     "room-b.238": { "en": "👥 Artisan Bench", "zh": "👥 工匠台" },
     "room-b.239": { "en": "🔨 Hire Artisans", "zh": "🔨 雇佣工匠" },
-    "room-b.240": { "en": "{a} {m}", "zh": "{a} {m}" },
+    "room-b.240": { "en": "{a} {m}", "zh": "{a}{m}" },
     "room-b.241": { "en": "{t}({mats})", "zh": "{t}（{mats}）" },
     "room-b.242": {
       "en": "✅ Complete Market, Continue",
@@ -4576,7 +4569,6 @@
       "zh": "已筹{total}/{targetGold}金币"
     },
     "room-b.372": { "en": "By Round {round}", "zh": "第{round}轮前" },
-    "room-b.264": { "en": "🔧 Maintenance", "zh": "🔧 维护费" },
     "room-b.265": {
       "en": "✅ Enough Gold for round end",
       "zh": "✅ 金币够撑到本轮结束"
@@ -4622,13 +4614,18 @@
       "zh": "还没装模块。到船坞升级船体就能解锁模块槽位。"
     },
     "room-b.281": { "en": "Modules", "zh": "模块" },
-    "room-b.282": { "en": "module slot", "zh": "个模块槽位" },
-    "room-b.283": { "en": "module slots", "zh": "个模块槽位" },
-    "room-b.301": {
-      "en": "max(5, n×2 minus {discount})",
-      "zh": "max(5, n×2 减 {discount})"
+    "room-b.282": {
+      "en": "{filled} of {total} module slot",
+      "zh": "{filled}/{total} 个模块槽位"
     },
-    "room-b.284": { "en": "Gold", "zh": "金币" },
+    "room-b.283": {
+      "en": "{filled} of {total} module slots",
+      "zh": "{filled}/{total} 个模块槽位"
+    },
+    "room-b.301": {
+      "en": "2 Gold per item, minus {discount} Gold per bill (minimum 5)",
+      "zh": "每件货物2金币，每张账单减免{discount}金币（最低5金币）"
+    },
     "room-b.285": { "en": "Due", "zh": "应付" },
     "room-b.286": { "en": "{money}", "zh": "{money}" },
     "room-b.287": { "en": "{score}", "zh": "{score}" },
@@ -4653,7 +4650,7 @@
     },
     "lobby.010": {
       "en": "Your {type} is idle and you have the materials to make {product}. Assign the task now so production lands at this round's Resolve. Materials: {materialsList}.",
-      "zh": "你的{type}闲着，原材料也够，能做{product}。现在就安排上工，本轮结算时产出就到手。原材料：{materialsList}."
+      "zh": "你的{type}闲着，原材料也够，能做{product}。现在就安排上工，本轮结算时产出就到手。原材料：{materialsList}。"
     },
     "lobby.011": {
       "en": "Buy materials for {product}",
@@ -4679,7 +4676,7 @@
       "en": "You are only missing {missingGood} (have {missingHave}, need {missingNeed}). Try bartering for it now; a fresh order board is dealt each round.",
       "zh": "你只缺{missingGood}（现有{missingHave}，需要{missingNeed}）。现在就找船长易货；订单板每轮都会重新发一份。"
     },
-    "lobby.018": { "en": "Upgrade to Ship Level 1", "zh": "升级船体到1级" },
+    "lobby.018": { "en": "Upgrade to Ship Level 1", "zh": "升级到船只等级1" },
     "lobby.019": {
       "en": "A hull upgrade costs {cost} Gold but you only have {game.money}. Save the Gold for the Resolve bills and continue the voyage.",
       "zh": "船体升级要{cost}金币，你手上只有{game.money}。金币留着结算付账，航程先接着走。"
@@ -4724,10 +4721,6 @@
     "lobby.031": {
       "en": "Maritime trade on the ancient Silk Road",
       "zh": "古丝路上，海上通商"
-    },
-    "lobby.032": {
-      "en": "Open this page in another browser to register a second captain and see them appear online in real time.",
-      "zh": "在另一个浏览器里打开这一页，再注册一位船长，就能实时看到对方上线。"
     },
     "lobby.033": { "en": "shown to other sailors", "zh": "其他船员可见" },
     "lobby.034": { "en": "for example, Captain Mei", "zh": "例如：梅船长" },
@@ -5075,7 +5068,6 @@
     "lobby.200": { "en": "loans given", "zh": "笔借出" },
     "lobby.201": { "en": "loans taken", "zh": "笔借入" },
     "lobby.202": { "en": "Crowned", "zh": "加冕" },
-    "lobby.251": { "en": "monsoon", "zh": "季风时节" },
     "lobby.203": {
       "en": "No chronicles saved yet. A chronicle is written when your voyage concludes.",
       "zh": "还没有保存的航程实录。航程结束时，就会写下一份。"
@@ -5210,10 +5202,6 @@
     },
     "misc.075": { "en": "{count} found", "zh": "找到{count}条" },
     "misc.019": { "en": "N/A", "zh": "暂无" },
-    "misc.020": {
-      "en": "Gain {EMERGENCY_LOAN_GOLD} Gold immediately. No strings attached.",
-      "zh": "立即获得{EMERGENCY_LOAN_GOLD}金币，无需偿还。"
-    },
     "misc.021": { "en": "{lowPct}%", "zh": "{lowPct}%" },
     "misc.022": {
       "en": "{lowPct}% to {highPct}%",
@@ -5420,7 +5408,7 @@
       "zh": "你的{game.shipLevel}个模块槽位装了{game.equippedModules.length}个。空着的槽位就是白扔的潜力。现在就去抽一个模块，换一份永久加成。"
     },
     "residual.014": {
-      "en": "You have {game.money} Gold. Spending {intelCost} Gold on a rumor guarantees a matching order in Orders, then buying the {bestGoodName} at {bestPrice} Gold per unit sets up a profitable trade.",
+      "en": "You have {game.money} Gold. Spending {intelCost} Gold on a whisper guarantees a matching order in Orders, then buying the {bestGoodName} at {bestPrice} Gold per unit sets up a profitable trade.",
       "zh": "你手上有{game.money}金币。花{intelCost}金币买一条掮客密语，订单阶段就保有一条对得上的订单；再按每件{bestPrice}金币买进{bestGoodName}，一笔好买卖就成了。"
     },
     "residual.015": {
@@ -5533,7 +5521,7 @@
     "residual.063": { "en": "setup code", "zh": "设置口令" },
     "residual.064": { "en": "shown in the roster", "zh": "会显示在名册里" },
     "residual.065": {
-      "en": "for example, Harbor Master",
+      "en": "for example, Harbormaster",
       "zh": "例如：港务长"
     },
     "residual.066": {
@@ -5833,14 +5821,6 @@
       "en": "{captainTally} {haveWord} not named anyone: {nameList}. {nextStep}",
       "zh": "{captainTally}还没有指认他人：{nameList}。{nextStep}"
     },
-    "residual.461": {
-      "en": "{namesNeeded} carries it.",
-      "zh": "{namesNeeded}，就能通过。"
-    },
-    "residual.462": {
-      "en": "{namesNeeded} carry it.",
-      "zh": "{namesNeeded}，就能通过。"
-    },
     "residual.153": {
       "en": "{entries.length} {harborLines} in the harbor, {privateLog.length} {privateLines} to you alone",
       "zh": "港湾{entries.length}条，只发给你{privateLog.length}条"
@@ -5882,7 +5862,7 @@
       "zh": "生产引擎：{artisansWorkshopName}提升工匠产出，{salvageCraneName}退还部分订单的运费。货更多，金币回得更多。"
     },
     "residual.163": {
-      "en": "Intel Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
+      "en": "Whisper Network: {brokersNetworkName} discounts every whisper, and {oceanRelayName} adds one more at no cost. Maximum market intelligence.",
       "zh": "密语网：{brokersNetworkName}让每条掮客密语都打折，{oceanRelayName}再免费加一条。集市密语拉满。"
     },
     "residual.164": {
@@ -5957,10 +5937,6 @@
       "en": "🆘 Waiting for a captain to lend you {myRequest.amount} Gold…",
       "zh": "🆘 等待船长借给你{myRequest.amount}金币..."
     },
-    "residual.182": {
-      "en": "Every module the yard could deal would put this hull past its {HELD_POWER_CAP} power, by install or by swap. Selling one at the Parley table makes room.",
-      "zh": "船坞能给到的模块，无论是安装还是切换，每一件都会让这条船体超过{HELD_POWER_CAP}点的承载上限。到洽谈桌卖掉一件，就腾出了位置。"
-    },
     "residual.183": {
       "en": "🚢 Ship Level: {game.shipLevel} | ⚓ Discount: {shipDiscount} Gold",
       "zh": "🚢 船只等级：{game.shipLevel}｜⚓ 折扣：{shipDiscount}金币"
@@ -5995,7 +5971,7 @@
     },
     "residual.442": {
       "en": "Your first seat is the {label}: three cards dealt face down, and the one you keep is the path you sail.",
-      "zh": "你的第一个座位是{label}：三张牌扣着发下，留下哪张，就走哪条道。"
+      "zh": "你的第一个席位是{label}：三张牌扣着发下，留下哪张，就走哪条道。"
     },
     "residual.443": { "en": "📦 {stock}", "zh": "📦 {stock}" },
     "residual.444": {
@@ -6121,7 +6097,7 @@
       "zh": "📜 在第{mandateList}轮，皇帝会颁下一道<strong>皇命</strong>：一笔大额订单，报酬固定，而且是唯一免增值税的订单。它要的货常常一个货舱装不下，所以提前打算好，靠易货或借货把它填满。"
     },
     "residual.218": {
-      "en": "In these waters a broker can be corrupt. The rumor you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.",
+      "en": "In these waters a broker can be corrupt. The whisper you buy is still true and still arrives, always, but a corrupt one also leaks your position to the pirates. The log says so plainly when it happens, and the odds you see already include it.",
       "zh": "在这片水域，掮客可能是通匪的。你买来的密语依旧属实，也一定会送到；但通匪的掮客还会把你的位置泄露给海盗。事发时日志会直说，你看到的概率已经把这一层算进去了。"
     },
     "residual.219": { "en": "Save game state", "zh": "保存游戏进度" },
@@ -6182,7 +6158,7 @@
       "zh": "耐储：腌过、晒过，或者用别的办法，让它熬过当初买它要走的航程。"
     },
     "residual.237": {
-      "en": "Thread and the cloth made from it, the raw fibres included, because a fibre is cloth that has not been spun yet.",
+      "en": "Thread and the cloth made from it, the raw fibers included, because a fiber is cloth that has not been spun yet.",
       "zh": "线和用线织成的布，生纤维也算在内，因为纤维是还没纺成布的布。"
     },
     "residual.238": {
@@ -6230,8 +6206,8 @@
       "zh": "\n🛟 账单要是先压垮了你：\n{play.failureRule}\n"
     },
     "residual.473": {
-      "en": "💰 Gold Management:\n1. Always keep reserve Gold for expenses\n2. Maintenance + Wages are fixed round costs\n3. Calculate total expenditure before buying\n\n👥 Artisan Management:\n1. Weaver Wage: {weaverWage} Gold / Round\n2. Master Wage: {masterWage} Gold / Round\n3. Maker Wage: {sachetWage} Gold / Round\n4. Hire only as needed\n\n🔮 Broker's Whisper Strategy:\n1. Buy rumors early if you have spare Gold\n2. Hoard revealed items to guarantee Orders profits\n3. Balance intel purchases with other investments\n\n🛒 Buying Strategy:\n1. Reserve Gold for maintenance and wages first\n2. Select high value for money goods\n3. Prioritize port specialties + revealed intel\n\n🔄 Bartering Strategy:\n1. Trade away surplus raw materials for the one you're actually short on\n2. A modest Gold offer can secure a needed item faster than waiting on the next round's market\n3. Cancel an offer that's sitting unclaimed if you'd rather keep the material yourself\n\n🤝 Trading Strategy:\n1. Prioritize highest profit orders\n2. Consider freight impact on margins\n3. Finished orders yield high profit but incur VAT\n\n⚠️ Risk Control:\n1. Calculate fixed round costs: Maintenance + Wages\n2. Keep Gold consistently above fixed costs\n3. Avoid overexpansion cash flow issues\n\n🏴‍☠️ Pirates and Escorts:\n1. The escort fee scales with your own Gold, so it's relatively cheap exactly when you're poor and the stakes are also low\n2. Hire one when you're carrying enough Gold that losing it would actually hurt\n3. Sailing without one is a fair bet when you have little to lose anyway\n\n🆘 Borrowing and Lending:\n1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round {rounds}\n2. Lending Gold raises your own reputation, so helping a captain who can clearly repay you is rarely a bad trade\n3. Watch how much you've lent out across the voyage; it's still your Gold until it's actually repaid\n\n🛡️ Backing Strategy:\n1. Back a loan you'd have happily lent Gold on yourself; you're taking on the same risk without earning the lender's own full reputation rate\n2. Only pledge what you can afford to lose outright, the same rule as lending directly\n3. A loan to a captain who's clearly about to turn a profit is a safer backing bet than one taken late in the voyage with little runway left to repay it\n\n💾 Save game progress frequently with Ctrl+S!",
-      "zh": "💰 金币管理：\n1. 手头永远留一笔应急金币\n2. 维护费和工钱是每轮的固定开销\n3. 出手采购前，先算清这一轮总共要花多少\n\n👥 工匠管理：\n1. 织女工钱：每轮 {weaverWage} 金币\n2. 纺织大师工钱：每轮 {masterWage} 金币\n3. 香囊师工钱：每轮 {sachetWage} 金币\n4. 按需雇工匠，别多雇\n\n🔮 掮客密语策略：\n1. 手头有余钱，就早点买密语\n2. 把点破的货捂紧，用来稳稳吃下订单利润\n3. 情报开销和其他投资要平衡\n\n🛒 采购策略：\n1. 先把维护费和工钱留出来\n2. 挑性价比高的货\n3. 优先港口特产，再配上点破的情报\n\n🔄 易货策略：\n1. 多余的原材料拿去换真正短缺的那一样\n2. 一笔不高的金币报价，往往比等下一轮市场更快拿到货\n3. 挂着没人接的报价，与其干等，不如撤回，自己留着材料\n\n🤝 交易策略：\n1. 优先做利润最高的订单\n2. 把运费对利润的影响算进去\n3. 成品订单利润高，但要缴增值税\n\n⚠️ 风险控制：\n1. 算清每轮固定开销：维护费加工钱\n2. 让手里的金币始终高过固定开销\n3. 别贪扩张，小心周转不开\n\n🏴‍☠️ 海盗与护航：\n1. 护航费随你手上的金币浮动，越是穷的时候越便宜，那时的损失本来也小\n2. 金币多到丢了会肉疼的时候，就该雇一趟护航\n3. 反正没什么可输的，不雇护航也赌得起\n\n🆘 借与贷：\n1. 能还就尽早还，别拖到第{rounds}轮被自动扣还\n2. 放贷长自己的声誉，借给明显还得上的船长，很少是笔亏本买卖\n3. 留意整个航程放出去多少：没还回来之前，那还是你的金币\n\n🛡️ 作保策略：\n1. 只给你自己乐意放贷的那类借款作保：担的是同样的风险，却拿不到债主那份完整的声誉\n2. 只押你可以干脆认赔的数目，和直接放贷一个道理\n3. 作保给一位眼看就要盈利的船长，比押给航程末尾、还款空间所剩无几的那类借款稳妥\n\n💾 用 Ctrl+S 勤存档！"
+      "en": "💰 Gold Management:\n1. Always keep reserve Gold for expenses\n2. Maintenance + Wages are fixed round costs\n3. Calculate total expenditure before buying\n\n👥 Artisan Management:\n1. Weaver Wage: {weaverWage} Gold / Round\n2. Master Weaver Wage: {masterWage} Gold / Round\n3. Sachet Maker Wage: {sachetWage} Gold / Round\n4. Hire only as needed\n\n🔮 Broker's Whisper Strategy:\n1. Buy whispers early if you have spare Gold\n2. Hoard revealed goods to guarantee Orders profits\n3. Balance whisper purchases with other investments\n\n🛒 Buying Strategy:\n1. Reserve Gold for maintenance and wages first\n2. Select high value for money goods\n3. Prioritize port specialties + goods named by whispers\n\n🔄 Bartering Strategy:\n1. Trade away surplus raw materials for the one you're actually short on\n2. A modest Gold offer can secure a needed item faster than waiting on the next round's market\n3. Cancel an offer that's sitting unclaimed if you'd rather keep the material yourself\n\n🤝 Trading Strategy:\n1. Prioritize highest profit orders\n2. Consider freight impact on margins\n3. Finished orders yield high profit but incur VAT\n\n⚠️ Risk Control:\n1. Calculate fixed round costs: Maintenance + Wages\n2. Keep Gold consistently above fixed costs\n3. Avoid overexpansion cash flow issues\n\n🏴‍☠️ Pirates and Escorts:\n1. The escort fee scales with your own Gold, so it's relatively cheap exactly when you're poor and the stakes are also low\n2. Hire one when you're carrying enough Gold that losing it would actually hurt\n3. Sailing without one is a fair bet when you have little to lose anyway\n\n🆘 Borrowing and Lending:\n1. Repay a loan as soon as you can afford it, instead of waiting for it to be deducted automatically at Round {rounds}\n2. Lending Gold raises your own Reputation, so helping a captain who can clearly repay you is rarely a bad trade\n3. Watch how much you've lent out across the voyage; it's still your Gold until it's actually repaid\n\n🛡️ Backing Strategy:\n1. Back a loan you'd have happily lent Gold on yourself; you're taking on the same risk without earning the lender's own full Reputation rate\n2. Only pledge what you can afford to lose outright, the same rule as lending directly\n3. A loan to a captain who's clearly about to turn a profit is a safer backing bet than one taken late in the voyage with little runway left to repay it\n\n💾 Save game progress frequently with Ctrl+S!",
+      "zh": "💰 金币管理：\n1. 手头永远留一笔应急金币\n2. 维护费和工钱是每轮的固定开销\n3. 出手采购前，先算清这一轮总共要花多少\n\n👥 工匠管理：\n1. 织女工钱：每轮 {weaverWage} 金币\n2. 纺织大师工钱：每轮 {masterWage} 金币\n3. 香囊师工钱：每轮 {sachetWage} 金币\n4. 按需雇工匠，别多雇\n\n🔮 掮客密语策略：\n1. 手头有余钱，就早点买密语\n2. 把揭示出的货捂紧，用来稳稳吃下订单利润\n3. 密语开销和其他投资要平衡\n\n🛒 采购策略：\n1. 先把维护费和工钱留出来\n2. 挑性价比高的货\n3. 优先港口特产，再考虑密语指出的货\n\n🔄 易货策略：\n1. 多余的原材料拿去换真正短缺的那一样\n2. 一笔不高的金币报价，往往比等下一轮市场更快拿到货\n3. 挂着没人接的报价，与其干等，不如撤回，自己留着材料\n\n🤝 交易策略：\n1. 优先做利润最高的订单\n2. 把运费对利润的影响算进去\n3. 成品订单利润高，但要缴增值税\n\n⚠️ 风险控制：\n1. 算清每轮固定开销：维护费加工钱\n2. 让手里的金币始终高过固定开销\n3. 别贪扩张，小心周转不开\n\n🏴‍☠️ 海盗与护航：\n1. 护航费随你手上的金币浮动，越是穷的时候越便宜，那时的损失本来也小\n2. 金币多到丢了会肉疼的时候，就该雇一趟护航\n3. 反正没什么可输的，不雇护航也赌得起\n\n🆘 借与贷：\n1. 能还就尽早还，别拖到第{rounds}轮被自动扣还\n2. 放贷长自己的声誉，借给明显还得上的船长，很少是笔亏本买卖\n3. 留意整个航程放出去多少：没还回来之前，那还是你的金币\n\n🛡️ 作保策略：\n1. 只给你自己乐意放贷的那类借款作保：担的是同样的风险，却拿不到债主那份完整的声誉\n2. 只押你可以干脆认赔的数目，和直接放贷一个道理\n3. 作保给一位眼看就要盈利的船长，比押给航程末尾、还款空间所剩无几的那类借款稳妥\n\n💾 用 Ctrl+S 勤存档！"
     },
     "residual.246": {
       "en": "Barge revenue share of all food spending",
@@ -6589,12 +6565,12 @@
       "zh": "\n📊=== 第{state.currentRound}轮 · 结算 ==="
     },
     "residual.343": {
-      "en": "🔧 Maintenance: {state.maintenanceCosts} Gold",
-      "zh": "🔧 维护费：{state.maintenanceCosts}金币"
+      "en": "🔧 Ship Maintenance Fee: {state.maintenanceCosts} Gold",
+      "zh": "🔧 船只维护费：{state.maintenanceCosts}金币"
     },
     "residual.344": {
-      "en": "\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance ===",
-      "zh": "\n🔧=== 第{state.currentRound}轮 · 结算：船只维护 ==="
+      "en": "\n🔧=== Round {state.currentRound} · Resolve: Ship Maintenance Fee ===",
+      "zh": "\n🔧=== 第{state.currentRound}轮 · 结算：船只维护费 ==="
     },
     "residual.345": {
       "en": "\n🚢=== Round {state.currentRound} · Dusk: Shipyard & Modules ===",
@@ -6882,7 +6858,7 @@
     },
     "residual.413": {
       "en": "{readyCount} of {requiredCount} captains {haveWord} readied.",
-      "zh": "{requiredCount}位船长里已有{readyCount}位就绪。"
+      "zh": "已有{readyCount}/{requiredCount}位船长就绪。"
     },
     "residual.414": {
       "en": "{account} is already banned.",
@@ -6977,6 +6953,14 @@
       "en": "❌ {name} is already bolted to your hull; the extra copy is discarded.",
       "zh": "❌ {name}已经装配在你的船体上，多出的一份被丢弃。"
     },
+    "room-b.380": {
+      "en": "{item} ({port})",
+      "zh": "{item}（{port}）"
+    },
+    "room-b.381": {
+      "en": "+{amount} Gold",
+      "zh": "+{amount}金币"
+    },
     "engine.371": {
       "en": "🔮 The Broker has only {remaining} of {count} whispers left this round, so this press would come up short.",
       "zh": "🔮 本轮掮客只剩{remaining}/{count}条密语，这一单凑不齐。"
@@ -7012,6 +6996,8 @@
     },
     "fragment.this_captain": { "en": "this captain", "zh": "这位船长" },
     "fragment.or": { "en": " or ", "zh": "或" },
+    "fragment.colon": { "en": ": ", "zh": "：" },
+    "fragment.comma": { "en": ", ", "zh": "，" },
     "fragment.and": { "en": " and ", "zh": "和" },
     "fragment.on": { "en": " on ", "zh": "，按" },
     "fragment.past_midpoint_on": {

@@ -34,7 +34,7 @@ import type {
 import { bazaarList, broadcastBazaar } from "./bazaar";
 import { roomChannel } from "./channel";
 import { portShiftFor } from "./maroon";
-import { roomMembers, sockets } from "./presence";
+import { broadcastRoomSystem, roomMembers } from "./presence";
 import { roomStatuses } from "./status";
 import { noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
@@ -298,16 +298,12 @@ async function reportNeverArrived(
   // No telemetry or log line here: round_timed_out would misread this as a
   // phase that was too short, and "the tide ran out" would be false. The
   // harbor is told below, per captain, in their own language.
-  for (const [socketId, state] of sockets) {
-    if (state.roomId !== roomId) continue;
-    io.to(socketId).emit("room:system", {
-      roomId,
-      content: tFor(
-        state.locale,
-        "The harbor did not hear that round move, so the ready check is open again. Press ready when you are done here and the voyage will carry on.",
-      ),
-    });
-  }
+  broadcastRoomSystem(io, roomId, (locale) =>
+    tFor(
+      locale,
+      "The harbor did not hear that round move, so the ready check is open again. Press ready when you are done here and the voyage will carry on.",
+    ),
+  );
   await broadcastReadyState(io, roomId, cp);
 }
 
@@ -367,16 +363,12 @@ async function forceAdvance(
     noteVoyageLog(io, roomId, { kind: "round_timed_out", phase: cp.phase });
     // The harbor moved without a full ready set, so it owes the remaining
     // captains an explanation, each in their own language.
-    for (const [socketId, state] of sockets) {
-      if (state.roomId !== roomId) continue;
-      io.to(socketId).emit("room:system", {
-        roomId,
-        content: tFor(
-          state.locale,
-          "The tide has run out for this round, and the harbor moves on. Any captain who had not finished commits the phase's own defaults.",
-        ),
-      });
-    }
+    broadcastRoomSystem(io, roomId, (locale) =>
+      tFor(
+        locale,
+        "The tide has run out for this round, and the harbor moves on. Any captain who had not finished commits the phase's own defaults.",
+      ),
+    );
     await announceAdvance(io, roomId, from);
   });
 }

@@ -246,9 +246,6 @@ export function difficultyConfig(value: unknown): DifficultyConfig {
 // their place by computing something (a midpoint, an accumulation, a
 // normalization) rather than forwarding a field.
 
-// Card counts for both boards on a given round: the base plus every charter
-// bump the voyage has reached by now. Mirrors the accumulation of the
-// original's tier unlocks / phaseOptionCount, expressed as card density.
 // The highest content tier whose charter has opened by this round. Everything
 // tier gated (goods, ports, artisans, boons, modules, market breadth) keys off
 // this one number, so they can never disagree about what is available.

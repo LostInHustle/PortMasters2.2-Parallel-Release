@@ -11,6 +11,10 @@
 // only has to happen in one place.
 export const APP_NAME = "PortMasters 2.2 Parallel Release";
 
+// The line under the name on the two screens that introduce the game, so
+// the first sentence a captain reads is written in one place.
+export const APP_TAGLINE = "Maritime trade on the ancient Silk Road";
+
 // The one sentence the game says about itself when it is asked what it
 // is: the browser's metadata, the link preview a shared address unfolds
 // into, and the social card's own art. Written without the name, because

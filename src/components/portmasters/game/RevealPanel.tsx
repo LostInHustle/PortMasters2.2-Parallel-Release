@@ -14,7 +14,7 @@
 // The ceremony is a stagger, one card every REVEAL_STAGGER_MS in the
 // order the standings arrived in, which is the beat the design asks for and
 // the reason this panel is not a table. It is skippable from the first
-// second, because twenty five seconds of theatre is a joy on the first
+// second, because twenty five seconds of theater is a joy on the first
 // voyage of an evening and a hold up on the fourth, and either way the
 // host is waiting to start the next one.
 //
@@ -371,7 +371,9 @@ function ReplayLedger({
                       row.mine && "font-semibold",
                     )}
                   >
-                    {row.name}: {row.line}
+                    {row.name}
+                    {t(": ")}
+                    {row.line}
                   </div>
                 ))}
               </div>

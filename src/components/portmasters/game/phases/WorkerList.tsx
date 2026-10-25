@@ -115,7 +115,9 @@ function WorkerList({
               so this row and the voyage log give one account of the
               cold rather than two that can drift. */}
           <span>
-            {w.name}: {workerStatusLine(w, round)}
+            {w.name}
+            {t(": ")}
+            {workerStatusLine(w, round)}
           </span>
           {!w.task && (
             // Quiet until you reach for it, but still edged so it reads as a

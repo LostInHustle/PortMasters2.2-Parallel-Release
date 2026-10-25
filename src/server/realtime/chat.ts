@@ -15,7 +15,7 @@
 // [MANIFEST 14: Harbor Watch] Who the host has muted from harbor chat
 // this voyage, in memory only. Cleared at departure, on room:restart and
 // on harbor deletion, alongside every other per voyage structure: a mute is
-// a judgement about a table, so a new table starts with none.
+// a judgment about a table, so a new table starts with none.
 //
 // A conversation held inside a voyage is held here in memory and nowhere
 // else. Both logs below are keyed by harbor and die with the harbor they
@@ -169,7 +169,7 @@ export function clearSessionChat(roomId: string): boolean {
 //
 // One frame per captain rather than one for
 // the harbor, because what rides on it is the mute list and the roster is
-// the wrong audience for that. A mute is the host's judgement of one
+// the wrong audience for that. A mute is the host's judgment of one
 // captain, and broadcasting it tells every captain in the harbor who has
 // been silenced and, by inference, who has been making trouble: in a mode
 // built on reading other captains, that is information a player can act

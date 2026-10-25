@@ -363,7 +363,7 @@ export function AdminConsole({
                       )}
                 </p>
               </div>
-              {/* The console's one neighbour: the balance dashboard reads
+              {/* The console's one neighbor: the balance dashboard reads
                 the two measurement tables rather than the account rows, so
                 it is a page of its own. It lives one level down from here
                 and this is the way in. */}
@@ -471,7 +471,7 @@ export function AdminConsole({
               a state of the register below it and not a third panel. The
               buttons keep their chips: four actions for a moment's work
               should be found at a glance, which is the one place on this
-              screen a chip still earns its colour. */}
+              screen a chip still earns its color. */}
           {selected.length > 0 && (
             <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-black/[0.06] bg-black/[0.03] px-2 py-1.5 dark:border-white/[0.08] dark:bg-white/[0.05]">
               <span className="px-1 text-xs font-medium">
@@ -619,8 +619,8 @@ export function AdminConsole({
                   table has no room. The two are drawn from the register
                   rather than from each other, and the pieces they share
                   are shared: an account's role, its status and its four
-                  actions are one component each, so a card and a row can
-                  never come to describe the same account differently. */}
+                  actions are one component each, so the two layouts cannot
+                  drift in how they draw one. */}
                 <ul className="pm-scroll @min-[52rem]:hidden lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                   {visible.map((a) => (
                     <AccountCard
@@ -669,12 +669,13 @@ export function AdminConsole({
           </DialogHeader>
 
           <div className="mt-2 space-y-1.5">
-            <Label className="text-sm font-medium">
+            <Label htmlFor="purge-confirm" className="text-sm font-medium">
               {t("Type {purgeTargetHandle} to confirm", {
                 purgeTargetHandle: purgeTarget?.username ?? "",
               })}
             </Label>
             <Input
+              id="purge-confirm"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={purgeTarget?.username ?? ""}
@@ -731,10 +732,11 @@ export function AdminConsole({
                 confirmation for a selection is the count. It is a number
                 the operator can only produce by looking at what they
                 ticked, and the server holds the two against each other. */}
-            <Label className="text-sm font-medium">
+            <Label htmlFor="bulk-purge-confirm" className="text-sm font-medium">
               {t("Type {bulkCount} to confirm", { bulkCount })}
             </Label>
             <Input
+              id="bulk-purge-confirm"
               value={bulkConfirm}
               onChange={(e) => setBulkConfirm(e.target.value)}
               placeholder={String(bulkCount)}

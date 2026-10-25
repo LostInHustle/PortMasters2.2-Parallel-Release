@@ -12,7 +12,7 @@
 // makes that shape the rule rather than six good instances of it. The
 // defects it closes are specific: the bench's frozen row had lost the
 // remedy its engine lines kept, the hunger sentence was written out per
-// surface and would drift, and the rail rendered a shortage in colour
+// surface and would drift, and the rail rendered a shortage in color
 // alone.
 //
 // A family's clauses are read back two ways. The validator holds every

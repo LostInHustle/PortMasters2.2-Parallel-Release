@@ -678,7 +678,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
   check(
     yHeld !== null &&
       (yAdvanceAt === -1 || yFrames.indexOf(yHeld) < yAdvanceAt),
-    "and nothing is announced while the hold stands, so the draft in front of the captain is not cancelled under them",
+    "and nothing is announced while the hold stands, so the draft in front of the captain is not canceled under them",
   );
   const yFired = await waitForFrame(
     clockY.crew[0],

@@ -60,7 +60,7 @@ const MODULE_POST: ConsentPostSpec<ModuleTrade> = {
   // board is done hearing about it until the round turns, whatever stage
   // that row has reached (see moduleListedThisRound). Further listings
   // of the same module would be rows a buyer could accept and the
-  // seller could not honour, which is a worse thing to hand a buyer
+  // seller could not honor, which is a worse thing to hand a buyer
   // than a sentence at the moment the second listing is made.
   bound: {
     busy: (rows, sellerId, term, round) =>

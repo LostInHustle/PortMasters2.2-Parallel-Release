@@ -6,7 +6,7 @@
  * src/lib/game/status-copy.ts. The convention answers a run of defects of
  * one shape: the bench's frozen row had lost the remedy its engine lines
  * kept, the hunger sentence was written out on five surfaces and could
- * drift one surface at a time, and two statuses rendered in colour or in
+ * drift one surface at a time, and two statuses rendered in color or in
  * a hover title alone, which a touch screen never shows.
  *
  * Two halves. The validator (in the module, run here against the shipped

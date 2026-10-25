@@ -14,7 +14,7 @@
 import { RevealedCaptain } from "@/types/realtime/voyage";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
-import { tFor } from "@/lib/game/i18n";
+import { DEFAULT_LOCALE, tFor, type Locale } from "@/lib/game/i18n";
 import {
   levelForRenownXP,
   parseStatsByDifficulty,
@@ -40,7 +40,7 @@ import { MAX_HELD_CARDS } from "@/lib/game/combinations";
 import { normalizeCharter, normalizeHeldBoons } from "@/lib/game/held-cards";
 import { unlockLineFor } from "@/lib/unlock";
 import { maroonResultFor } from "../maroon";
-import { sockets } from "../presence";
+import { broadcastRoomSystem, sockets } from "../presence";
 import type { RivalStanding } from "../rival";
 import type { FinishedCaptain, VoyageRun } from "./voyage";
 // The standings row is declared with the wire shape it travels in; the
@@ -512,12 +512,30 @@ function readCaptainRecord(
   return { save, extras, objectiveMet, card, ending, verdict: won, marooned };
 }
 
+// The language a captain's chronicle is written in.
+//
+// A chronicle is composed once, here, and stored as prose, so it cannot be
+// localized when the profile reads it back later: the language has to be
+// decided at the write. The captain's own sockets carry it, and a socket in
+// this harbor speaks for the seat. A captain who left before the conclusion
+// has no socket left to ask, so the line falls back to the language a fresh
+// process prints rather than guessing.
+function chronicleLocale(userId: string, roomId: string): Locale {
+  let locale: Locale | null = null;
+  for (const state of sockets.values()) {
+    if (state.userId === userId && state.roomId === roomId)
+      locale = state.locale;
+  }
+  return locale ?? DEFAULT_LOCALE;
+}
+
 // The prose this captain's chronicle is written in.
 function chronicleInput(
   f: FinishedCaptain,
   ctx: FinisherContext,
   outcome: FinisherOutcome,
   record: CaptainRecord,
+  locale: Locale,
 ) {
   return {
     displayName: f.user.displayName,
@@ -554,7 +572,7 @@ function chronicleInput(
     // integrity pass refuses to keep.
     unlockLine: outcome.forged
       ? null
-      : unlockLineFor(outcome.newVoyagesCompleted),
+      : unlockLineFor(outcome.newVoyagesCompleted, locale),
   };
 }
 
@@ -571,7 +589,11 @@ async function writeChronicleRow(
   // producing a sparse but honest chronicle). A write failure is
   // logged rather than thrown so a chronicle problem can't break the
   // conclusion for everyone else.
-  const chronicle = buildChronicle(chronicleInput(f, ctx, outcome, record));
+  const locale = chronicleLocale(f.userId, ctx.roomId);
+  const chronicle = buildChronicle(
+    chronicleInput(f, ctx, outcome, record, locale),
+    locale,
+  );
   const { extras, card, verdict: won, marooned, objectiveMet } = record;
   await db.voyageChronicle
     .create({
@@ -800,41 +822,30 @@ function announceFinisher(
     // The title is read per socket for the same reason: it is a name the
     // client reads through the pack, so it has to land in the reader's
     // language too.
-    for (const [socketId, state] of sockets) {
-      if (state.roomId !== roomId) continue;
-      io.to(socketId).emit("room:system", {
-        roomId,
-        content: tFor(
-          state.locale,
-          "{f.user.displayName} reached Renown Level {rows.outcome.newLevel}: {renownTitle}!",
-          {
-            "f.user.displayName": f.user.displayName,
-            "rows.outcome.newLevel": rows.outcome.newLevel,
-            renownTitle: tFor(
-              state.locale,
-              renownTitleForLevel(rows.outcome.newLevel),
-            ),
-          },
-        ),
-      });
-    }
+    broadcastRoomSystem(io, roomId, (locale) =>
+      tFor(
+        locale,
+        "{f.user.displayName} reached Renown Level {rows.outcome.newLevel}: {renownTitle}!",
+        {
+          "f.user.displayName": f.user.displayName,
+          "rows.outcome.newLevel": rows.outcome.newLevel,
+          renownTitle: tFor(locale, renownTitleForLevel(rows.outcome.newLevel)),
+        },
+      ),
+    );
   }
   for (const meritId of rows.newMerits) {
     const merit = meritById(meritId);
     if (!merit) continue;
-    for (const [socketId, state] of sockets) {
-      if (state.roomId !== roomId) continue;
-      io.to(socketId).emit("room:system", {
-        roomId,
-        content: tFor(
-          state.locale,
-          "{f.user.displayName} earned the Captain's Merit: {merit.name}!",
-          {
-            "f.user.displayName": f.user.displayName,
-            "merit.name": merit.name,
-          },
-        ),
-      });
-    }
+    broadcastRoomSystem(io, roomId, (locale) =>
+      tFor(
+        locale,
+        "{f.user.displayName} earned the Captain's Merit: {merit.name}!",
+        {
+          "f.user.displayName": f.user.displayName,
+          "merit.name": tFor(locale, merit.name),
+        },
+      ),
+    );
   }
 }

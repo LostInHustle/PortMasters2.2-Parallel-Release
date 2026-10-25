@@ -123,7 +123,7 @@ export function FinancialSummary({ game }: { game: GameState }) {
       tone: "text-due",
     },
     {
-      label: "Ship Maintenance",
+      label: "Ship Maintenance Fee",
       value: game.maintenancePaid,
       icon: "🔧",
       tone: "text-due",

@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 type AgeVisual = {
   /** The filled form, for the pill and the seal. */
   gradient: string;
-  /** The same colour as text, for the headings in the banner and dialog. */
+  /** The same color as text, for the headings in the banner and dialog. */
   ink: string;
   icon: typeof TrendingUp;
 };

@@ -88,11 +88,8 @@ const ServerConfigSchema = z.object({
     // The empty case is already reported above. Short circuiting here keeps
     // a blank value from producing two complaints about the same line.
     .refine(
-      (value) =>
-        value === "" ||
-        value.startsWith("file:") ||
-        value.startsWith("postgres"),
-      "DATABASE_URL must start with file: for SQLite, or name a Postgres database.",
+      (value) => value === "" || value.startsWith("file:"),
+      "DATABASE_URL must start with file: and name a SQLite database.",
     ),
 });
 

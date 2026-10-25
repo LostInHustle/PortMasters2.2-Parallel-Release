@@ -118,6 +118,41 @@ const RAIL_COLS = {
 const RAIL_STUB =
   "pm-glass hidden rounded-2xl p-1.5 flex-col items-center gap-1";
 
+const RAIL_STUB_ACTIONS = {
+  roster: {
+    label: "Open the Harbor Roster",
+    tone: "text-members",
+    Icon: Ship,
+  },
+  chat: {
+    label: "Open the chat",
+    tone: "text-chat",
+    Icon: MessageCircle,
+  },
+} as const;
+
+function RailStubButton({
+  panel,
+  onOpen,
+}: {
+  panel: keyof typeof RAIL_STUB_ACTIONS;
+  onOpen: () => void;
+}) {
+  const { label, tone, Icon } = RAIL_STUB_ACTIONS[panel];
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={`h-8 w-8 rounded-lg ${tone}`}
+      aria-label={t(label)}
+      title={t(label)}
+      onClick={onOpen}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
+}
+
 // Why a Next Phase press was refused, in the words of the seat the captain is
 // standing in. Every case here is a seat the engine's canLeavePhase says no
 // to, and every one of them has a way out that is not this button: the host
@@ -1366,7 +1401,7 @@ export function GameRoom({
                     server did not send: it is read from the captain's own
                     voyage, on the captain's own screen, and no drawer holds
                     it, which is why the card asks for it rather than it
-                    travelling on the private entry. Only a Broker's card
+                    traveling on the private entry. Only a Broker's card
                     prints it. */}
                 {privateLog.map((entry, index) => (
                   <PrivateCard
@@ -1566,16 +1601,10 @@ export function GameRoom({
                 panelCollapsed.roster && !rightFolded ? "lg:flex" : "lg:hidden",
               )}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-members"
-                aria-label={t("Open the Harbor Roster")}
-                title={t("Open the Harbor Roster")}
-                onClick={() => setPanelCollapsed("roster", false)}
-              >
-                <Ship className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="roster"
+                onOpen={() => setPanelCollapsed("roster", false)}
+              />
             </div>
             <div
               className={cn(
@@ -1584,16 +1613,10 @@ export function GameRoom({
                 panelCollapsed.chat && !rightFolded ? "lg:flex" : "lg:hidden",
               )}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-chat"
-                aria-label={t("Open the chat")}
-                title={t("Open the chat")}
-                onClick={() => setPanelCollapsed("chat", false)}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="chat"
+                onOpen={() => setPanelCollapsed("chat", false)}
+              />
             </div>
             {/* The one stub both folded widgets leave, the way back shaped
                 like what it leads to: one press each, and the press opens
@@ -1604,26 +1627,14 @@ export function GameRoom({
             <div
               className={cn(RAIL_STUB, rightFolded ? "lg:flex" : "lg:hidden")}
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-members"
-                aria-label={t("Open the Harbor Roster")}
-                title={t("Open the Harbor Roster")}
-                onClick={() => setPanelCollapsed("roster", false)}
-              >
-                <Ship className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-chat"
-                aria-label={t("Open the chat")}
-                title={t("Open the chat")}
-                onClick={() => setPanelCollapsed("chat", false)}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              <RailStubButton
+                panel="roster"
+                onOpen={() => setPanelCollapsed("roster", false)}
+              />
+              <RailStubButton
+                panel="chat"
+                onOpen={() => setPanelCollapsed("chat", false)}
+              />
             </div>
           </div>
         </div>

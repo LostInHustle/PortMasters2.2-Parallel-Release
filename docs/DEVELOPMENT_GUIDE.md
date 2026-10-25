@@ -46,7 +46,7 @@ The engine is deliberately the bottom layer. Everything above it may call it; it
 
 ## Changing the interface
 
-The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colours, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
+The visual language lives in `src/app/globals.css`, in the `pm-` utility classes and the `@theme inline` block. Colors, gradients, glass panels, textures and truncation are all defined there once. A component that reaches past those for a raw hex value or a hand measured pixel size is how the palette drifts.
 
 Four habits worth keeping:
 
@@ -64,11 +64,14 @@ Four habits worth keeping:
 npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
 npm run check:private    # no second path to a secret the game hides
+npm run check:prose      # no banned dash in Markdown or text
 npm run build            # type errors fail the build on purpose
 # then, in a second terminal, with the clock on for both lines:
 PHASE_CLOCK=1 npm run dev
 PHASE_CLOCK=1 npm run test:smoke
 ```
+
+`npm run build` runs the tag, card, status, dead surface and prose checks before it compiles a page, so a clean build also clears those five. `npm run check:prose` can be run alone while editing documentation.
 
 The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its rounds, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 
@@ -88,7 +91,7 @@ Four things about it are load bearing, and each one is easy to undo by accident.
 
 **The healthcheck stays dependency free.** `/api/health` answers from the process and touches nothing else, so a database that is briefly busy cannot fail the probe and turn a slow query into a restart loop. Anything added to that route should keep it that way.
 
-One more, for a new hostname: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognises, and it recognises `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
+One more, for a new hostname: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognizes, and it recognizes `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
 
 ## Testing more than the smoke test covers
 

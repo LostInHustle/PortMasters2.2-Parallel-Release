@@ -20,14 +20,15 @@
 //
 // Two reads need saying out loud. The first is that the flat text map
 // keeps the earlier leaf where the file carries one English string
-// twice. The file carries none of those now: every leaf is a string of
-// its own, so the map has nothing to choose between, and the reading on
-// a screen is the reading written in the file. The second is the read by
-// id. A card's Mandarin is not written beside its English in the record,
-// it is written here, so a card is asked for by the id the pool knows it
-// by (card.<id>.name and card.<id>.desc) rather than by the text it
-// prints. The two doors answer different questions, and the card layer
-// asks the second.
+// twice. One such pair ships today: `phase.market.label` and `ui.market`
+// are both `Market` in English, and the surfaces that need them apart ask
+// for the second by id so it can read `集市` while the phase label reads
+// `开市`. The flat map serves the earlier leaf, and the id reader serves
+// the card layer. The second is the read by id. A card's Mandarin is not
+// written beside its English in the record, it is written here, so a card
+// is asked for by the id the pool knows it by (card.<id>.name and
+// card.<id>.desc) rather than by the text it prints. The two doors answer
+// different questions, and the card layer asks the second.
 //
 // Missing entries fail open: an English string with no leaf prints
 // itself, in either language, because a missing row is a gap in the pack

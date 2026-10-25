@@ -33,7 +33,7 @@ import {
   escortContractsOn,
   moduleTradesOn,
 } from "@/lib/game/flags";
-import { listJoiner, t } from "@/lib/game/i18n";
+import { listJoiner, t, type Params } from "@/lib/game/i18n";
 import { modeConfig, type GameMode } from "@/lib/game/mode";
 import { openingPhase } from "@/lib/game/checkpoint";
 import { pathFactText, pathGuide } from "@/lib/game/paths";
@@ -63,6 +63,10 @@ type Step = {
   title: string;
   gradient: string;
   body: string;
+  // The values a body or tip fills in. The tuned numbers are passed here
+  // rather than baked into the sentence, so the pack's row is the one the
+  // reader's language holds instead of English with numbers in it.
+  params?: Params;
   // A list under the body, for a page whose content is a set of rules
   // rather than a paragraph. Two pages use it today: the mode's own page,
   // which prints the differences the mode record lists, and the paths
@@ -93,14 +97,16 @@ const STEPS: Step[] = [
     icon: ChevronRight,
     title: "Draft a Boon",
     gradient: "pm-grad-dawn",
-    body: `Each round opens with a boon draft. Pick one of ${CARDS_PER_OFFER} boons that bend the rules for the coming round: cheaper purchases, faster production, a tax shelter, or an emergency loan of ${EMERGENCY_LOAN_GOLD} Gold.`,
-    tip: `You can swap your boon choices once per round for ${BOON_SWAP_COST} Gold if none of the three fit your strategy.`,
+    body: "Each round opens with a boon draft. Pick one of {CARDS_PER_OFFER} boons that bend the rules for the coming round: cheaper purchases, faster production, a tax shelter, or an emergency loan of {EMERGENCY_LOAN_GOLD} Gold.",
+    params: { CARDS_PER_OFFER, EMERGENCY_LOAN_GOLD, BOON_SWAP_COST },
+    tip: "You can swap your boon choices once per round for {BOON_SWAP_COST} Gold if none of the three fit your strategy.",
   },
   {
     icon: Package,
     title: "Buy at Port",
     gradient: "pm-grad-market",
-    body: `Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay ${INTEL_COST} Gold for a Broker's Rumor that guarantees a matching order appears when Orders opens.`,
+    body: "Market is the port. Buy raw materials like Hemp, Silk, and Tea from the port merchant. Prices vary per captain and per round. You can also pay {INTEL_COST} Gold for a Broker's Whisper that guarantees a matching order appears when Orders opens.",
+    params: { INTEL_COST },
     tip: "The harbor remembers what everyone bought. A good the harbor leans into gets pricier next round, while one nobody touches softens.",
   },
   {
@@ -117,7 +123,7 @@ const STEPS: Step[] = [
     // What a failed seat means is the mode's own rule, stated on the
     // mode's page rather than repeated here: the founding mode's ending
     // would be wrong for a Gambit captain, whose voyage carries on.
-    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and ship maintenance, and check the Dues tab of your captain's rail before you spend anything.",
+    body: "Resolve is where the round's bills land. First, pirates may find you and take every Gold coin on hand. Hire an escort to sail safe, or risk it. Then pay wages and the ship maintenance fee, and check the Dues tab of your captain's rail before you spend anything.",
     tip: "When other captains are aboard, ask the harbor for a loan before assuming the voyage is over. Any captain can lend, and a third captain can back the loan as a safety net.",
   },
   {
@@ -131,7 +137,8 @@ const STEPS: Step[] = [
     icon: Coins,
     title: "Build Your Legacy",
     gradient: "pm-grad-renown",
-    body: `Every voyage's final Reputation becomes Renown XP, multiplied by the difficulty tier. Renown levels grant titles, a small starting Gold bonus, and at level ${BROKERS_FAVOR_UNLOCK_LEVEL} unlock the Broker's Favor. The captain with the highest Reputation in a voyage is crowned Sea Master.`,
+    body: "Every voyage's final Reputation becomes Renown XP, multiplied by the difficulty tier. Renown levels grant titles, a small starting Gold bonus, and at level {BROKERS_FAVOR_UNLOCK_LEVEL} unlock the Broker's Favor. The captain with the highest Reputation in a voyage is crowned Sea Master.",
+    params: { BROKERS_FAVOR_UNLOCK_LEVEL },
     tip: "Check in daily for a seven day cycle of Renown XP rewards. It is not a streak, so a missed day never resets your progress.",
     // The last page, because the harbor's one locked door is about a
     // captain's record rather than about a phase, and this is the page
@@ -260,7 +267,7 @@ function barterPage(mode: GameMode): Step {
  *
  * The body states the rule the rows cannot (what a path decides about a
  * seat), and the tip is the sentence a new captain needs before the first
- * deal: weigh the numbers, because the flavour sentence is a promise and
+ * deal: weigh the numbers, because the flavor sentence is a promise and
  * the numbers are the promise kept.
  */
 function pathsPage(mode: GameMode): Step[] {
@@ -398,7 +405,7 @@ export function HowToPlayModal({
                   </h3>
                 </div>
                 <p className="text-sm leading-relaxed text-foreground">
-                  {t(current.body)}
+                  {t(current.body, current.params)}
                 </p>
                 {/* The rules a mode changes, listed rather than folded
                     into the paragraph above, because a reader asking what
@@ -417,7 +424,7 @@ export function HowToPlayModal({
                 <div className="rounded-xl bg-warn/[0.07] border border-warn/20 p-3">
                   <p className="text-xs text-warn">
                     <span className="font-semibold">{t("Tip:") + " "}</span>
-                    {t(current.tip)}
+                    {t(current.tip, current.params)}
                   </p>
                 </div>
                 {/* The manual's appendix, under the advice rather than
@@ -435,7 +442,7 @@ export function HowToPlayModal({
             </div>
 
             {/* Step dots: pinned below the scroll area, above the navigation,
-                so they are always centred regardless of content height. */}
+                so they are always centered regardless of content height. */}
             <div className="flex items-center justify-center gap-1.5 py-2 border-t border-border/20">
               {pages.map((s, i) => (
                 <button
@@ -456,7 +463,7 @@ export function HowToPlayModal({
             </div>
 
             {/* Navigation: three column grid so the page indicator is
-                always perfectly centred regardless of button widths. */}
+                always perfectly centered regardless of button widths. */}
             <div className="grid grid-cols-3 items-center border-t border-border/40 p-4">
               <div className="justify-self-start">
                 <button
@@ -485,7 +492,7 @@ export function HowToPlayModal({
                     onClick={() => onOpenChange(false)}
                     className="pm-pressable pm-grad-guide rounded-xl px-4 py-2 text-sm font-medium"
                   >
-                    {t("Set Sail")}
+                    {t("Done")}
                   </button>
                 )}
               </div>

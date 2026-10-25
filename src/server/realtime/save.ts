@@ -11,6 +11,8 @@
 // nobody would trace back to a parse.
 // =====================================================================
 
+import { parseJsonObject } from "@/lib/game/json";
+
 /**
  * The object a save blob holds, or null.
  *
@@ -23,13 +25,5 @@
 export function parseSave(
   rawData: string | null,
 ): Record<string, unknown> | null {
-  if (!rawData) return null;
-  try {
-    const data = JSON.parse(rawData) as unknown;
-    return data && typeof data === "object" && !Array.isArray(data)
-      ? (data as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+  return rawData ? parseJsonObject(rawData) : null;
 }

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { cardText } from "@/lib/game/cards";
 import {
   leavePhase,
-  moduleDraftPossible,
   moduleSlotsOpen,
   startModuleDrafting,
   upgradeShip,
@@ -49,15 +48,11 @@ export function Shipyard({
     ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
     : 0;
   const affordable = game.money >= upgCost;
-  // The draft's door reads the roll's own predicate, which asks both ways a
-  // card can reach the hull: straight into an open slot, or over the side in
-  // a swap that gives up the heaviest module. Only a hull the cap has shut
-  // even after a replacement is told before the click rather than dealt an
-  // empty table: the button disables and the line below it says why, the
-  // same way every other disabled control on this panel is explained beside
-  // itself.
-  const draftDealable = moduleDraftPossible(game);
-  const canDraft = game.shipLevel > 0 && draftDealable;
+  // The door opens for any hull that has a slot to rig. Whether a module
+  // fits the hull's power is judged on the draft screen, after the captain
+  // can see the batch and weigh a card against the hull as it stands, not
+  // here at the door before they have had the chance to change anything.
+  const canDraft = game.shipLevel > 0;
   // The level guard rides along because a hull below its first upgrade has
   // no slots to fill rather than full ones, and the label below says
   // "Slots Full" only about a hull that has some. The open count itself is
@@ -80,7 +75,7 @@ export function Shipyard({
           )}
         </div>
         <div className="text-sm text-dusk mt-1.5">
-          {t("🔌 Module Slots: {n} / {m}", {
+          {t("🔌 Module Slots: {n}/{m}", {
             n: game.equippedModules.length,
             m: game.shipLevel,
           })}
@@ -90,7 +85,7 @@ export function Shipyard({
             in, read where the hull's composition is already the subject,
             so a refused pick at the table has something to point at. */}
         <div className="text-sm text-dusk mt-1.5">
-          {t("⚡ Hull Power: {n} / {m}", {
+          {t("⚡ Hull Power: {n}/{m}", {
             n: heldPower(game),
             m: HELD_POWER_CAP,
           })}
@@ -130,7 +125,8 @@ export function Shipyard({
                   <strong>
                     <Term term={text.name}>{text.name}</Term>
                   </strong>
-                  : {text.desc}
+                  {t(": ")}
+                  {text.desc}
                 </div>
               );
             })}
@@ -191,14 +187,6 @@ export function Shipyard({
               ? t("🔄 Draft & Swap Module (Slots Full)")
               : t("🔧 Draft & Install Module")}
           </Button>
-          {game.shipLevel > 0 && !draftDealable && (
-            <PanelNote className="text-center text-[11px]">
-              {t(
-                "Every module the yard could deal would put this hull past its {HELD_POWER_CAP} power, by install or by swap. Selling one at the Parley table makes room.",
-                { HELD_POWER_CAP },
-              )}
-            </PanelNote>
-          )}
           <Button
             size="lg"
             className="pm-grad-voyage rounded-xl"

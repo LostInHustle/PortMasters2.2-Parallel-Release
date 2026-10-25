@@ -8,7 +8,7 @@
 // moments keep. What it walks is one field on the state (see the field
 // note in ./types):
 //
-//   - charter is the id the captain took, or null before the moment is
+//   * charter is the id the captain took, or null before the moment is
 //     answered. There is no queue field, and that is a difference from
 //     the moments' design rather than an omission: the five milestones
 //     queue because several can be waiting at once, while the charter

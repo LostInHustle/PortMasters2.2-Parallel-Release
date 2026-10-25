@@ -14,10 +14,18 @@ import { signedInResponse, requestLocale } from "@/lib/api-auth";
 import { readJson } from "@/lib/api-json";
 import { tFor } from "@/lib/game/i18n";
 import { noteDoorAttempt, spendDoorBudget } from "@/lib/auth-limit";
+import { PASSWORD_MAX, USERNAME_MAX } from "@/lib/credentials";
 
+// The stored bounds, not a second copy of the numbers. Every account this
+// door can meet was written under the rules in lib/credentials, so a name
+// or password longer than its ceiling cannot exist; reading the ceiling
+// from the one home keeps the two from drifting apart if it ever moves.
+// The name's shape (the pattern the register screen prints) is still not
+// checked here, because a sign in should answer a wrong shape the same way
+// it answers a wrong password rather than teaching the rule to a guesser.
 const Schema = z.object({
-  username: z.string().min(1).max(20),
-  password: z.string().min(1).max(72),
+  username: z.string().min(1).max(USERNAME_MAX),
+  password: z.string().min(1).max(PASSWORD_MAX),
 });
 
 export async function POST(req: NextRequest) {

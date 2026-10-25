@@ -55,14 +55,18 @@ export function Purchase({
           className="rounded-lg"
           onClick={onRumorBoardOpen}
         >
-          {t("🔮 Broker's Rumor Board")}
+          {t("🔮 Broker's Whisper Board")}
         </Button>
       </div>
-      <IntelBanner
-        game={game}
-        tone="warn"
-        note={t("(a matching order is guaranteed at Orders, buy accordingly).")}
-      />
+      {game.revealedIntel.length > 0 && (
+        <IntelBanner
+          game={game}
+          tone="warn"
+          note={t(
+            "(a matching order is guaranteed at Orders, buy accordingly).",
+          )}
+        />
+      )}
       {/* The offer leads, because it is the screen: each card answers for
           itself (it prices its own goods, marks what is a deal and what is
           dear, and says whether this captain can afford it), so it does

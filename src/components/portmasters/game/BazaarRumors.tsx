@@ -37,7 +37,7 @@ import { PathDeskRow, type Bazaar } from "./phases/PhaseShared";
 
 // Resolved once at module load. The assertion is the type checker's proof
 // through a lookup by value.
-const SELLER_PATH = pathConfig(BAZAAR_SELLER_PATH)!;
+const SELLER_PATH = pathConfig(BAZAAR_SELLER_PATH);
 
 /**
  * The bazaar desk, drawn at Parley below the protection market. The intro
@@ -93,7 +93,7 @@ export function BazaarRumors({
   const closesHere = !rumorCanLand(game.currentRound, game.maxRounds);
   const canSpeak = mine && !closesHere && cooldown < 1 && goods.length > 0;
   // The harbor's board is the receipt: a publish is answered by a
-  // broadcast, not an acknowledgement, so this screen keeps no second copy.
+  // broadcast, not an acknowledgment, so this screen keeps no second copy.
   const myRow = bazaar.rumors.find(
     (row) => row.publisherUserId === me.id && row.round === game.currentRound,
   );

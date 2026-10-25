@@ -16,11 +16,11 @@
 // is left in this file is the audit's own: which window the vote opens
 // in, and what it says when it does.
 //
-// It wears `intel`, which is a meaning colour rather than a panel's own
+// It wears `intel`, which is a meaning color rather than a panel's own
 // hue (see scripts/palette.ts). That is deliberate and it is the same
 // choice the commission made with gold: a surface that reports what
 // somebody knows is not chrome, and giving it a widget hue would put a
-// thirteenth colour on a wheel that already has twelve.
+// thirteenth color on a wheel that already has twelve.
 
 import { AuditReveal } from "@/types/realtime/audit";
 import type { PublicUser } from "@/lib/api";

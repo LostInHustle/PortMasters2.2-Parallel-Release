@@ -551,7 +551,7 @@ function staplesPanel(
       target: tFor(locale, "no threshold in the design"),
       verdict: coverTakes === 0 ? "unplayed" : "ungated",
     },
-    // The nearest readings the window has, labelled for what they are
+    // The nearest readings the window has, labeled for what they are
     // rather than dressed as the gates above them: a count is not a share,
     // and the gate wants a share.
     {
@@ -727,7 +727,7 @@ function variancePanel(
 // and a per captain denominator would make rounds incomparable under a fleet
 // claim. The cost is stated rather than hidden: a captain on short rations
 // reads against the hold they would have had. The median, because one nearly
-// empty hold is a tail rather than a centre.
+// empty hold is a tail rather than a center.
 function holdUtilization(
   records: readonly TelemetryRecord[],
   locale: Locale,
@@ -740,8 +740,8 @@ function holdUtilization(
       }
     }
   }
-  const centre = median(fills);
-  if (centre === null) {
+  const center = median(fills);
+  if (center === null) {
     return {
       label: tFor(locale, "Median hold utilization"),
       value: tFor(locale, "no round report from a split hold"),
@@ -750,11 +750,11 @@ function holdUtilization(
       gate: "hold_utilization",
     };
   }
-  const percent = Math.round(centre * 100);
+  const percent = Math.round(center * 100);
   return {
     label: tFor(locale, "Median hold utilization"),
     value: tFor(locale, "{rate}, median of {fills.length}", {
-      rate: ratePercent(centre),
+      rate: ratePercent(center),
       "fills.length": fills.length,
     }),
     target: tFor(locale, "55 to 80%"),
@@ -866,7 +866,7 @@ function floorPanel(
 // the record's own, and only concluded voyages have an end a session can be
 // measured to; a wiped or emptied voyage stopped early and its clock is not
 // a session. The median, because one harbor left open for an hour is a tail
-// rather than a centre.
+// rather than a center.
 function sessionLength(
   records: readonly TelemetryRecord[],
   locale: Locale,
@@ -875,8 +875,8 @@ function sessionLength(
     .filter((record) => record.outcome === "concluded" && record.seats === 5)
     .map((record) => (record.endedAt - record.openedAt) / 60000)
     .filter((value) => Number.isFinite(value) && value > 0);
-  const centre = median(minutes);
-  if (centre === null) {
+  const center = median(minutes);
+  if (center === null) {
     return {
       label: tFor(locale, "Session length at five captains, charted to reveal"),
       value: tFor(locale, "no concluded voyage at five"),
@@ -885,7 +885,7 @@ function sessionLength(
       gate: "session_length",
     };
   }
-  const whole = Math.round(centre);
+  const whole = Math.round(center);
   return {
     label: tFor(locale, "Session length at five captains, charted to reveal"),
     value: tFor(locale, "{whole} min, median of {minutes.length}", {
@@ -918,11 +918,11 @@ function lobbyFill(
       .filter((value) => Number.isFinite(value) && value > 0);
     return {
       label: band.label,
-      centre: median(minutes),
+      center: median(minutes),
       count: minutes.length,
     };
   });
-  const sailed = bands.filter((band) => band.centre !== null);
+  const sailed = bands.filter((band) => band.center !== null);
   if (sailed.length === 0) {
     return {
       label: tFor(locale, "Lobby fill time by table size, charted to set sail"),
@@ -935,7 +935,7 @@ function lobbyFill(
     label: tFor(locale, "Lobby fill time by table size, charted to set sail"),
     value: bands
       .map((band) =>
-        band.centre === null
+        band.center === null
           ? tFor(locale, "{band.label} seats none in the window", {
               // The band table in ./objectives holds the English; the read
               // sits here, where the label becomes part of the row.
@@ -946,7 +946,7 @@ function lobbyFill(
               "{band.label} seats {medianMinutes} min of {band.count}",
               {
                 "band.label": tFor(locale, band.label),
-                medianMinutes: Math.round(band.centre),
+                medianMinutes: Math.round(band.center),
                 "band.count": band.count,
               },
             ),
@@ -966,13 +966,13 @@ function earlyEndings(
   locale: Locale,
 ): DashboardReadingLine {
   const stopped = records.filter((record) => record.outcome !== "concluded");
-  const centre = median(stopped.map((record) => record.endedAtRound));
+  const center = median(stopped.map((record) => record.endedAtRound));
   return {
     label: tFor(locale, "Voyages that stopped before the reveal"),
     value:
       records.length === 0
         ? tFor(locale, "no voyage in the window")
-        : centre === null
+        : center === null
           ? tFor(locale, "none")
           : tFor(
               locale,
@@ -980,7 +980,7 @@ function earlyEndings(
               {
                 "stopped.length": stopped.length,
                 "records.length": records.length,
-                medianRound: Math.round(centre),
+                medianRound: Math.round(center),
               },
             ),
     target: tFor(locale, "no gate yet"),
@@ -997,7 +997,7 @@ function isGated(reading: DashboardReadingLine): boolean {
 
 // A panel with no readable gate is "no reading", not "clear": the two
 // answers a dashboard must not confuse, and the third state has its own
-// colour.
+// color.
 function stateOf(readings: readonly DashboardReadingLine[]): QuestionState {
   const readable = readings.filter(
     (reading) => isGated(reading) && reading.verdict !== "unplayed",
@@ -1054,7 +1054,7 @@ function sharePercent(part: number, whole: number): string {
 // The middle of a list, or null for an empty one. An even count takes the
 // mean of the two middles, which for a list of minutes stays a number a
 // reader can hold once it is rounded, and for goods counts is the only
-// defensible centre.
+// defensible center.
 function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);

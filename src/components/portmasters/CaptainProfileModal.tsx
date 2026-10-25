@@ -54,14 +54,14 @@ export function CaptainProfileModal({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let canceled = false;
     const load = async () => {
       const [legacyRes, chronRes, rivalRes] = await Promise.all([
         api.getLegacy().catch(() => ({ legacy: null, checkIn: null })),
         api.listChronicles().catch(() => ({ chronicles: [] })),
         api.listRivals().catch(() => ({ rivals: [] })),
       ]);
-      if (cancelled) return;
+      if (canceled) return;
       setData({
         legacy: legacyRes.legacy,
         chronicles: chronRes.chronicles ?? [],
@@ -71,7 +71,7 @@ export function CaptainProfileModal({
     };
     void load();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [open]);
 

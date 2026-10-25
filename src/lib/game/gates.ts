@@ -144,7 +144,7 @@ export function readLaunchVerdict(reading: DashboardReading): LaunchVerdict {
   const ungated = gates.filter((gate) => gate.verdict === "ungated");
   // The design's own priority, and only the case the rule has something to
   // resolve: the priority gate is the one out of band, so a conflict is
-  // settled in its favour rather than against it. A priority gate with no
+  // settled in its favor rather than against it. A priority gate with no
   // source and a priority gate inside its band both leave this null,
   // because in neither state is there a number of it being traded.
   const untradeable =

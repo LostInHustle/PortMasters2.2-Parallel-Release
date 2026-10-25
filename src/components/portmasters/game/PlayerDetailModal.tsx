@@ -36,16 +36,16 @@ import { Coins, Trophy, Ship, Loader2, Eye } from "lucide-react";
 
 /**
  * One line of a captain's cargo: the good's icon, its name in the good's
- * own colour, and the count the popup was told. One component rather than
+ * own color, and the count the popup was told. One component rather than
  * one row under Raw Materials and another under Finished Goods, because
  * the two lists are the same kind of thing and their rows should not be
  * two chances to drift.
  *
- * The colour is resolved by the caller rather than looked up here, because
- * the resolver comes from the viewer's own colour preference and belongs to
+ * The color is resolved by the caller rather than looked up here, because
+ * the resolver comes from the viewer's own color preference and belongs to
  * the screen rather than to a row of it. It is allowed to be absent, which
- * is the resolver's own answer for a good it has no colour for: the name
- * then draws in the panel's text colour.
+ * is the resolver's own answer for a good it has no color for: the name
+ * then draws in the panel's text color.
  */
 function CargoRow({
   item,
@@ -144,7 +144,7 @@ export function PlayerDetailModal({
       {/* Capped and scrollable. This panel is the tallest dialog in the
           game: header, stat tiles, comparison bar, legacy card, cargo,
           artisans, modules and a log box. Uncapped it ran taller than a
-          laptop viewport, and because the dialog is vertically centred
+          laptop viewport, and because the dialog is vertically centered
           with the page scroll locked, both the title and the Close
           button were off screen with no way to reach them. */}
       <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto pm-scroll">
@@ -200,7 +200,7 @@ export function PlayerDetailModal({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />{" "}
-                {t("Asking the harbor master…")}
+                {t("Asking the Harbormaster…")}
               </>
             ) : (
               t("Not available right now, they may have stepped away.")
@@ -359,7 +359,8 @@ export function PlayerDetailModal({
                           const text = cardText(card);
                           return (
                             <div key={card.id} className="text-[12px]">
-                              {card.icon} <strong>{text.name}</strong>:{" "}
+                              {card.icon} <strong>{text.name}</strong>
+                              {t(": ")}
                               {text.desc}
                             </div>
                           );
@@ -493,10 +494,10 @@ function ComparisonBar({
   );
 }
 
-// One colour for both captains: the bar compares two numbers, and the
+// One color for both captains: the bar compares two numbers, and the
 // tint names the stat rather than the captain. Two tone fields, one per
 // captain, would read as an invitation to give one captain a different
-// colour from the other, which is not what the bar does.
+// color from the other, which is not what the bar does.
 type ComparisonStat = {
   label: string;
   mine: number;

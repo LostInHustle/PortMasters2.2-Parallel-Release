@@ -23,6 +23,18 @@ import {
 
 type MarketCard = GameState["resourceCards"][number];
 
+// The recipe a product card was drawn from, named when the board is read
+// rather than when the card was dealt. A save written before the card kept
+// its recipe as a list still carries the rendered sentence, so that string
+// is the fallback when there is no list to read.
+function materialDetailsText(ref: MarketCard["resources"][number]): string {
+  if (ref.materialList)
+    return ref.materialList
+      .map((m) => t("{m}×{a}", { m: t(m.type), a: m.amount }))
+      .join(" + ");
+  return ref.materialDetails ?? "";
+}
+
 /**
  * One card on the port board: a port's offer, its goods at this round's
  * prices, and the single action that buys it. It draws the shared card
@@ -74,7 +86,7 @@ function PurchaseCard({
               ? t("✅ Purchased")
               : t("🛒 Buy ({cost}💰)", { cost: finalCost })}
           </Button>
-          {/* Why a greyed Buy is greyed, said beside it. The one reason a
+          {/* Why a grayed Buy is grayed, said beside it. The one reason a
               card refuses that is not already on the button is the purse,
               and the shortfall is a number this card can read: the price
               it already printed and the purse it already checked. A
@@ -160,7 +172,7 @@ function PurchaseCard({
         <div className="text-[10px] text-muted-foreground pl-6">
           {t("📦 Mat Cost: {gold} Gold ({details})", {
             gold: c.resources[0].materialCost,
-            details: c.resources[0].materialDetails ?? "",
+            details: materialDetailsText(c.resources[0]),
           })}
         </div>
       ) : null}

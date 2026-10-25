@@ -10,14 +10,14 @@
 //
 // The five triggers, in the order the checks walk:
 //
-//   - crew_loss. Losing a hand, read off the list the crew module writes
+//   * crew_loss. Losing a hand, read off the list the crew module writes
 //     the moment a hand goes (see ../crew).
 //
-//   - pathbound_order. The first order along the captain's path, read at
+//   * pathbound_order. The first order along the captain's path, read at
 //     the completion of an order carrying the path's own mark (see
 //     ./engine/orders and isPathOrder in ../types).
 //
-//   - renown_rung. Crossing a Reputation rung. The tree grants Renown,
+//   * renown_rung. Crossing a Reputation rung. The tree grants Renown,
 //     the account level, only at a voyage's conclusion, so no mid voyage
 //     crossing exists to fire on and a boon dealt after the books close
 //     would be dealt to a finished voyage. The smallest honest reading is
@@ -27,11 +27,11 @@
 //     captain facing copy below says Reputation, because that is the
 //     number on their rail.
 //
-//   - cold_round. Surviving a cold round with zero frostbite, read off the
+//   * cold_round. Surviving a cold round with zero frostbite, read off the
 //     settlement tick's own marks (see ../garments): the round was cold
 //     and no hand carries a frostbite written for the round after it.
 //
-//   - mandate. Contributing to a Joint Mandate, read at the first
+//   * mandate. Contributing to a Joint Mandate, read at the first
 //     delivery to the voyage's shared commission (see
 //     ./engine/objectives).
 // =====================================================================

@@ -50,20 +50,22 @@ const SITE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
 // own name filled in, because the name is a name and never translates.
 //
 // The link preview and the social card carry the sentence WITHOUT the
-// name, which is the plain APP_DESCRIPTION they have always carried; the
-// pack carries only the named spelling (shell.001), so those two fields
-// keep the shipped constant unwired rather than gaining a prefix their
-// card has never shown.
+// name, which is the plain APP_DESCRIPTION they have always carried, so
+// the pack stores that unnamed spelling as its own row beside the named
+// one (shell.001 and shell.021). Both fields read it in the captain's
+// language, the same way the search description does, so a shared link
+// unfolds in the language its captain reads rather than in the build's
+// default.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await requestLocale();
   // The meta description, with the build's own name in front. The social
-  // fields below carry the same sentence without the name (see the note
-  // above the function).
+  // fields below carry the same sentence without the name.
   const about = tFor(
     locale,
     "{APP_NAME}: A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.",
     { APP_NAME },
   );
+  const social = tFor(locale, APP_DESCRIPTION);
   return {
     metadataBase: new URL(SITE_URL),
     title: APP_NAME,
@@ -79,12 +81,12 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       siteName: APP_NAME,
       title: APP_NAME,
-      description: APP_DESCRIPTION,
+      description: social,
     },
     twitter: {
       card: "summary_large_image",
       title: APP_NAME,
-      description: APP_DESCRIPTION,
+      description: social,
     },
   };
 }

@@ -6,7 +6,7 @@
 // of the record is here for the same reason; the fields it carries are
 // the ones that were previously nowhere or in the wrong place:
 //
-//   - The prose was a good's name in ten of these cards. Silk Winds named
+//   * The prose was a good's name in ten of these cards. Silk Winds named
 //     Silk, Hemp Monopoly named Hemp, the Fleet of Treasures named Foreign
 //     Balm and Pearl String. Every one of them now names the tag its effect
 //     actually reads, which is the rule ("effects name tags, never item
@@ -17,12 +17,12 @@
 //     handle where it is (the same reading ./paths.ts takes of a persisted
 //     name).
 //
-//   - The offer weights were a switch statement in the engine, keyed by id
+//   * The offer weights were a switch statement in the engine, keyed by id
 //     and reading inventory and roster by name. They are now a condition on
 //     the record, in the three or four shapes the engine actually needs,
 //     and the engine holds no card's id at all.
 //
-//   - The mode list and the power budget are new, and they are the pair
+//   * The mode list and the power budget are new, and they are the pair
 //     that gives the two modes different pools. Classic runs a ceiling of
 //     three, so the three cards above it below carry a zero there: the two
 //     that bend the whole ledger (Tax Evasion and the Woven Monopoly) and
@@ -31,7 +31,7 @@
 //     from the start, which is the design's rollback clause: switching a mode
 //     between the tight pool and the wide one is a config change.
 //
-//   - The second language is not written here. The Mandarin for a card
+//   * The second language is not written here. The Mandarin for a card
 //     lives in the pack (src/lib/game/i18n/zh.json), one row per card and
 //     face, and the record reads its own row by id, so a card's Chinese
 //     is written in one place rather than twice. A card that arrives
@@ -259,7 +259,10 @@ export const BOONS_TIER1: CardRecord[] = [
     effect: { kind: "flags", flags: { free_intel: 1 } },
     modes: BOTH_MODES,
     strings: {
-      en: { name: "Farsight", desc: "One Broker's rumor is free this round." },
+      en: {
+        name: "Farsight",
+        desc: "One Broker's Whisper is free this round.",
+      },
       zh: zhCard("farsight"),
     },
   },
@@ -502,7 +505,7 @@ export const MILESTONE_BOONS: CardRecord[] = [
     strings: {
       en: {
         name: "Harbor Credit",
-        desc: "Product sales dues are a quarter lower, for the voyage.",
+        desc: "Product sales VAT is a quarter lower, for the voyage.",
       },
       zh: zhCard("harbor_credit"),
     },
@@ -662,7 +665,7 @@ export const MODULES_TIER0: CardRecord[] = [
     strings: {
       en: {
         name: "Broker's Network",
-        desc: "Intel costs 2 Gold and reveals 2 rumors.",
+        desc: "A Whisper costs 2 Gold and reveals 2.",
       },
       zh: zhCard("brokers_network"),
     },
@@ -761,7 +764,7 @@ export const MODULES_TIER1: CardRecord[] = [
     strings: {
       en: {
         name: "Ocean Interpreter",
-        desc: "Broker's Whisper reveals 1 extra rumor at no extra cost.",
+        desc: "Each Broker's Whisper reveals 1 extra at no extra cost.",
       },
       zh: zhCard("ocean_relay"),
     },

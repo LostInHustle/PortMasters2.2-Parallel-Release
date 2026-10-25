@@ -36,7 +36,7 @@ import type { Escort } from "./phases/PhaseShared";
 // id is a constant the paths table carries, so the record is there in every
 // build this compiles in, and the assertion is only the type checker asking
 // for a proof it cannot see through a lookup by value (see pathConfig).
-const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH)!;
+const SELLER_PATH = pathConfig(ESCORT_SELLER_PATH);
 
 /**
  * The protection market, drawn at the
@@ -309,7 +309,7 @@ function ContractRow({
  * answers to the question a captain actually has, which is what may I do
  * about this: an offer addressed to me waits on my press, an offer of mine
  * waits on somebody else's, an agreement is done, and a claim is spent.
- * The tone is the panel's only bit of colour of its own, and it answers the
+ * The tone is the panel's only bit of color of its own, and it answers the
  * same question: due when the next move is this captain's, sea otherwise.
  *
  * The round is read before the status, because an offer is the one row whose

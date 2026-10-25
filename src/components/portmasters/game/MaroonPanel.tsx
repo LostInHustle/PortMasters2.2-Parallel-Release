@@ -20,7 +20,7 @@
 // what it leaves behind.
 //
 // It wears `alarm`, which is the palette's meaning for money out at its
-// worst (see palette.css, where the token is described as the colour of a
+// worst (see palette.css, where the token is described as the color of a
 // cost, a loss, an error, a bankruptcy, a raid). The audit wears `intel`
 // because it reports what somebody knows; this one takes a ship, and
 // dressing the two in the same blue would say they cost the same.

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
    is worth nothing if it only surfaces in the settlement that has
    already happened. It is drawn on a cold round alone, because a
    mild one asks nothing of anybody, and it wears the meaning
-   colours rather than a hue of its own: the sea while the crew is
+   colors rather than a hue of its own: the sea while the crew is
    dressed for the weather, the alarm red the moment the clothes
    on their backs are not enough. The two sentences are authored in
    status-copy with the rest of the status lines (see

@@ -2,7 +2,7 @@
 
 import { VoyageChronicle } from "@/types/realtime/voyage";
 import { HouseStanding } from "@/types/realtime/standings";
-import { APP_NAME } from "@/lib/game/constants/brand";
+import { APP_NAME, APP_TAGLINE } from "@/lib/game/constants/brand";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -632,7 +632,7 @@ export function Lobby({
           One card, answering one question in two rows: what can I reach
           from here, and what is the harbor doing. The tools sit on a
           single shelf, all of them the same height and the same shape,
-          quiet by default, with colour spent on the one thing actually
+          quiet by default, with color spent on the one thing actually
           waiting for the captain, so a row of controls doing the same
           kind of job reads as one instrument. The harbor's numbers sit
           under a hairline as a gauge row, and the figure that also opens
@@ -663,14 +663,14 @@ export function Lobby({
                 <span className="text-brand pm-truncate block">{APP_NAME}</span>
               </h1>
               <p className="pm-truncate text-[11px] leading-tight text-muted-foreground">
-                {t("Maritime trade on the ancient Silk Road")}
+                {t(APP_TAGLINE)}
               </p>
             </div>
 
             {/* The shelf. One height, one shape, one quiet skin for every
                 tool on it, because the tools all do the same kind of job
                 and a row of different tints reads as a row of unrelated
-                widgets; colour is kept for Check In, the only tool that is
+                widgets; color is kept for Check In, the only tool that is
                 ever waiting. */}
             <div className="flex basis-full items-center gap-1.5 sm:basis-auto">
               <button
@@ -836,7 +836,7 @@ export function Lobby({
               carry the harbor green and this carries the quickstart hue, and
               two saturated gradients a row apart in one column read as a
               clash rather than as two ways in. */}
-          {/* One ring of the quickstart hue is the only colour on the tile,
+          {/* One ring of the quickstart hue is the only color on the tile,
               and it is what gives the column an entry point: rows of equal
               weight leave the eye with nowhere to land, and this is the one a
               captain with no preference should reach for first. It stays a
@@ -856,7 +856,7 @@ export function Lobby({
                 )}
               </p>
             </div>
-            {/* The vermilion seal, the same colour the harbor uses for a
+            {/* The vermilion seal, the same color the harbor uses for a
                 thing that must not be missed: the button wears the
                 quickstart hue, so no two unrelated controls share a
                 skin. */}
@@ -899,7 +899,7 @@ export function Lobby({
             >
               {/* The switch is a recessed well with the live view raised
                   inside it, which is the pairing the tool shelf already uses.
-                  Colour is spent on the two icons, one per view, in the hue
+                  Color is spent on the two icons, one per view, in the hue
                   that view already wears below: harbors dresses the board,
                   charter dresses the create form. Both hues are already on
                   this screen and they sit far enough apart on the ladder to
@@ -1009,7 +1009,7 @@ export function Lobby({
                   {/* Join by code is the other half of "get into a room I did
                       not make", so it belongs here in the browse view, beside
                       Quick Start, rather than at the foot of the create form.
-                      One line rather than a labelled stack, because a captain
+                      One line rather than a labeled stack, because a captain
                       who has a code has exactly one thing to do with it. */}
                   <div className="flex items-center gap-2">
                     <Label
@@ -1081,10 +1081,14 @@ export function Lobby({
 
                   <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">
+                      <Label
+                        htmlFor="harbor-name"
+                        className="text-xs text-muted-foreground"
+                      >
                         {t("Harbor name")}
                       </Label>
                       <Input
+                        id="harbor-name"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         placeholder={t("e.g. Silk Run · Voyage 1")}

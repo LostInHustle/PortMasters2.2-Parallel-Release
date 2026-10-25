@@ -5,9 +5,9 @@
 // leaves tier 0, which is what keeps the entry tier exactly the game it
 // has always been.
 //
-// Tier 2 is authored in a following pass, so its arrays are deliberately
-// empty: a difficulty that unlocks tier 2 today simply gains nothing yet,
-// rather than referencing goods that have no price or recipe.
+// Tiers 1 and 2 carry a real catalogue: a difficulty that unlocks one
+// gains the goods, ports, and artisans below rather than a name with
+// nothing behind it.
 // =====================================================================
 import type { TagList } from "./tags";
 
@@ -36,7 +36,7 @@ export const PRODUCTS = [
 // The worn out end of a garment, and the one good in
 // this catalogue the market board never trades. It is named here with the
 // other goods rather than down beside the rest of the Loom's arithmetic,
-// because the hold, the icons and the colours are all built from the names
+// because the hold, the icons and the colors are all built from the names
 // in this block and the name has to exist before the catalogue below reads
 // it. What it is worth, and what it turns back into, live with the numbers
 // that do that arithmetic (see the refit block further down).
@@ -74,7 +74,7 @@ export const ITEMS = [...MARKET_GOODS, RAGS] as const;
 // The rest are authored, and two of them are the readings a second author
 // would most likely make differently, so they are written down instead of
 // left to be inferred. Hemp is bulk and woven together: it is the cheap
-// fibre, the good a hold fills with, and it is also the thread Linen
+// fiber, the good a hold fills with, and it is also the thread Linen
 // Clothes is spun from, so a card about the cloth trade and a card about
 // the heavy trade both have a claim on it. Tea and Spices are perishable
 // because both are aromatics, which is the one property a merchant of

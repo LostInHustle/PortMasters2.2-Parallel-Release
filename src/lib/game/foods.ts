@@ -1,9 +1,10 @@
 // The three foods and the sea's clock. The count in state.larder is the
 // game's number; the lots are where that number comes from and the only
 // thing spoilage can read, since only a batch knows its own age. Every
-// writer keeps the two in step in the same statement, and reconcileLarder
-// is the one door a foreign save comes through: the account wins and the
-// count is set to the sum of the lots.
+// writer keeps the two in step in the same statement. A foreign save comes
+// through normalizeLarderLots, where the lots are the more specific fact
+// and the count follows them; reconcileLarder is the other direction, and
+// it makes the account agree with a count that has moved without it.
 import {
   FOODS,
   FOODS_DRAW_ORDER,

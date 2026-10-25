@@ -38,18 +38,18 @@ function useRivalHere(
     // Nothing to look up until the standings land, so the request waits
     // for them rather than firing an unanswerable one on first paint.
     if (partnerIds.size === 0) return;
-    let cancelled = false;
+    let canceled = false;
     api
       .listRivals()
       .then((res) => {
-        if (!cancelled) setRivals(res.rivals ?? []);
+        if (!canceled) setRivals(res.rivals ?? []);
       })
       // A failed read just leaves the line off the card. This is a record
       // of the voyage just sailed, and a rivalry line is a nice extra on
       // it, never something worth showing an error state over.
       .catch(() => {});
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [partnerIds]);
 
@@ -133,13 +133,24 @@ export function Endgame({
       />
 
       {isHost ? (
-        <Button
-          className="pm-grad-endgame rounded-xl px-8"
-          onClick={onRestart}
-          disabled={!onRestart}
-        >
-          {t("🔄 Restart Voyage")}
-        </Button>
+        <div className="flex flex-col items-center gap-2.5">
+          <Button
+            className="pm-grad-endgame rounded-xl px-8"
+            onClick={onRestart}
+            disabled={!onRestart}
+          >
+            {t("🔄 Restart Voyage")}
+          </Button>
+          {onLeave && (
+            <Button
+              variant="secondary"
+              className="rounded-xl px-8"
+              onClick={onLeave}
+            >
+              {t("⚓ Sail Again")}
+            </Button>
+          )}
+        </div>
       ) : (
         <div className="flex flex-col items-center gap-2.5">
           <p className="text-sm text-muted-foreground">

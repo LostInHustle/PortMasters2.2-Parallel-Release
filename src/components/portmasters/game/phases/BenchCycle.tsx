@@ -50,7 +50,7 @@ export function BenchCycle({
     <div className="rounded-xl bg-market/[0.06] border border-market/20 p-3.5 mb-4 text-xs">
       <strong>{t("⏱️ Production Cycle: What Happens When")}</strong>
       {/* One tile per phase the round still has in front of it, each
-          wearing the colour of the phase it names, so the strip is a map
+          wearing the color of the phase it names, so the strip is a map
           of this voyage's round rather than four unrelated swatches in
           one mode's order. */}
       <div className="flex gap-1.5 mt-2 text-center">

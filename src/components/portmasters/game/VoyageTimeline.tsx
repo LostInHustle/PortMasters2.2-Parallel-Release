@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { lapPhases } from "@/lib/game/checkpoint";
+import { t } from "@/lib/game/i18n";
 import { isRoundPhase, phaseFace } from "@/lib/game/phases";
 import { leftTheVoyage } from "@/lib/seatMarks";
 import type { GameMode } from "@/lib/game/mode";
@@ -118,7 +119,7 @@ export function VoyageTimeline({
                     repeat: isCurrent ? Infinity : 0,
                     ease: "easeInOut",
                   }}
-                  title={p.label}
+                  title={t(p.label)}
                 >
                   <span className="text-sm">{p.icon}</span>
                 </motion.div>
@@ -130,7 +131,7 @@ export function VoyageTimeline({
                       : "text-muted-foreground",
                   )}
                 >
-                  {p.short}
+                  {t(p.short)}
                 </span>
               </div>
             );
@@ -146,7 +147,7 @@ export function VoyageTimeline({
             phase === "bankruptcy" ? "bg-alarm/5 text-alarm" : "pm-grad-voyage",
           )}
         >
-          {terminalFace.icon} {terminalFace.label}
+          {terminalFace.icon} {t(terminalFace.label)}
         </div>
       )}
     </div>

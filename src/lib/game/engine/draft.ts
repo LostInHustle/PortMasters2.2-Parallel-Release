@@ -18,14 +18,13 @@
 // one.
 //
 // pathSwitchBlocked is the one reader the panel and the switch itself
-// share: a control the harbor greys out and a press the engine refuses
+// share: a control the harbor grays out and a press the engine refuses
 // are the same sentence, because they are the same function. It answers
 // with the reason rather than a bare no, the way orderShortfall answers
 // with the good, since the reason is the only part of a refusal worth
 // printing.
 // =====================================================================
-import { line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
+import { ledgerText, line, type LedgerLine } from "@/lib/game/ledger";
 import {
   PATH_SWITCH_FROM_ROUND,
   PATH_SWITCH_TO_ROUND,
@@ -62,7 +61,7 @@ function pathTakenLine(path: PathId): LedgerLine {
   // spelling, the same reading pathSwitchLine below takes of its two
   // names.
   return line("🧭 You took up the {pathName} path.", {
-    pathName: line(pathConfig(path)!.name),
+    pathName: line(pathConfig(path).name),
   });
 }
 
@@ -73,8 +72,8 @@ function pathSwitchLine(from: PathId, to: PathId, fee: number): LedgerLine {
   return line(
     "🧭 You set aside the {fromPathName} path and took up the {toPathName}. The harbor charges {fee} Gold.",
     {
-      fromPathName: line(pathConfig(from)!.name),
-      toPathName: line(pathConfig(to)!.name),
+      fromPathName: line(pathConfig(from).name),
+      toPathName: line(pathConfig(to).name),
       fee,
     },
   );
@@ -111,50 +110,20 @@ type PathSwitchRefusal =
 /**
  * The harbor's refusal, as a sentence for a reader who is reading now.
  *
- * The one place the copy lives, so the screen and the ledger cannot
- * drift: the ledger's reader below takes the same English and the same
- * values from the same fact.
+ * The line below is the one place the copy lives, and this reader prints it
+ * in the process's own language, so the screen and the ledger cannot drift.
  */
 function refusalText(refusal: PathSwitchRefusal): string {
-  switch (refusal.kind) {
-    case "no_path":
-      return t("You hold no path to set aside.");
-    case "spent":
-      return t(
-        "A captain changes their papers once a voyage, and yours are already changed.",
-      );
-    case "before_window":
-      return t(
-        "The harbor reads new papers from round {PATH_SWITCH_FROM_ROUND}.",
-        {
-          PATH_SWITCH_FROM_ROUND,
-        },
-      );
-    case "after_window":
-      return t(
-        "The window for new papers closed after round {PATH_SWITCH_TO_ROUND}.",
-        { PATH_SWITCH_TO_ROUND },
-      );
-    case "wrong_phase":
-      return t("Papers are changed at the port, in {switchPorts}.", {
-        switchPorts: pathSwitchPortsList(),
-      });
-    case "same_path":
-      return t("You already hold that path.");
-    case "too_poor":
-      return t("❌ Need {fee} Gold to change your papers.", {
-        fee: refusal.fee,
-      });
-  }
+  return ledgerText(refusalLine(refusal));
 }
 
 /**
  * The harbor's refusal, as a ledger line, read at the read.
  *
- * The same facts and the same English the sentence above is made of, held
- * as material so the line reads in the reader's language. The three seats
- * are named through a reader rather than a value, because the list they
- * make is joined in the reader's language too.
+ * The one place the copy lives: the screen's sentence above is this line
+ * read now, so the two cannot drift. The three seats are named through a
+ * reader rather than a value, because the list they make is joined in the
+ * reader's language too.
  */
 function refusalLine(refusal: PathSwitchRefusal): LedgerLine {
   switch (refusal.kind) {

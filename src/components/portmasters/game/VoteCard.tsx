@@ -57,7 +57,7 @@ export function VoteCard({
   members: PublicUser[];
   me: PublicUser;
   statuses?: Marks;
-  /** The meaning colour of what this vote costs. */
+  /** The meaning color of what this vote costs. */
   tone: "intel" | "alarm";
   /** The glyph the card leads with. */
   icon: string;

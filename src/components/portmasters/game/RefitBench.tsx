@@ -49,7 +49,7 @@ import type { Refit } from "./phases/PhaseShared";
 // pathConfig). Its `goods` field is the three garments, read off the
 // wardrobe table, so the form's menu and the orders a Loom captain is
 // offered are one list rather than two that agree today.
-const SELLER_PATH = pathConfig(REFIT_SELLER_PATH)!;
+const SELLER_PATH = pathConfig(REFIT_SELLER_PATH);
 
 // What the harbor tailors do, quoted rather than spelled into the two
 // sentences that describe it. "One point" written as words is a second place
@@ -287,7 +287,7 @@ export function RefitBench({
             </span>
           )}
           {/* The row of buttons stays a row after the mend: the same
-              buttons, greyed, with the numbers the mend left behind. The
+              buttons, grayed, with the numbers the mend left behind. The
               spent round reads the whole wardrobe, because a garment already
               whole has no room to mend and would otherwise vanish from a
               row whose whole job is to account for where the points went. */}

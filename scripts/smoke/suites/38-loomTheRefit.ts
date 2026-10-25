@@ -186,7 +186,7 @@ export async function loomTheRefitSuite(
       );
       check(
         noPath.ok === false && noPath.said.includes("Only a Loom captain"),
-        "only a Loom captain buys rags off the harbor pile, and the refusal is a sentence rather than a silent false, because the exclusivity the design asks for is this line rather than a greyed out button",
+        "only a Loom captain buys rags off the harbor pile, and the refusal is a sentence rather than a silent false, because the exclusivity the design asks for is this line rather than a grayed out button",
       );
       const spent = benchState({
         currentRound: coldRound,
@@ -1152,7 +1152,7 @@ export async function loomTheRefitSuite(
     "an agreement the two captains made cannot be withdrawn by the seller, so the one captain who regrets a price is left with the gap rather than with a button",
   );
 
-  const loomCancelledBoard = loomSettles(loomForeigner, (board) =>
+  const loomCanceledBoard = loomSettles(loomForeigner, (board) =>
     board.every((row) => row.id !== loomOpenRow?.id),
   );
   loomSocketOf(loomSeller).emit("refit:cancel", {
@@ -1160,7 +1160,7 @@ export async function loomTheRefitSuite(
     contractId: loomOpenRow?.id ?? "",
   });
   check(
-    (await loomCancelledBoard) !== null,
+    (await loomCanceledBoard) !== null,
     "while an offer nobody has taken is the seller's own to take back",
   );
 

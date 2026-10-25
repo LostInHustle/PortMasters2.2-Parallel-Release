@@ -215,7 +215,7 @@ export function DifficultyAdvisor({
                   {advice.caution
                     ? t("Heads up")
                     : t("Consider {adviceName}", {
-                        adviceName: advice.recommended.replace(/_/g, " "),
+                        adviceName: t(DIFFICULTIES[advice.recommended].name),
                       })}
                 </p>
               )}

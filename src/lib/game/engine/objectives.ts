@@ -15,8 +15,7 @@
 // =====================================================================
 
 import { ICONS } from "../constants/brand";
-import { line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
+import { joined, line, type LedgerLine } from "@/lib/game/ledger";
 import type { GameState, Phase } from "../types";
 import {
   higherObjectiveTally,
@@ -148,7 +147,7 @@ export function deliverToObjective(
   }
 
   let paid = 0;
-  const parts: string[] = [];
+  const parts: LedgerLine[] = [];
   for (const r of taking) {
     state.inventory[r.type] -= r.take;
     state.objectiveDelivered[r.type] =
@@ -159,9 +158,9 @@ export function deliverToObjective(
     state.totalRevenue += sum;
     paid += sum;
     parts.push(
-      t("{goodIcon}{r.type}×{r.take}", {
+      line("{goodIcon}{r.type}×{r.take}", {
         goodIcon: ICONS[r.type],
-        "r.type": r.type,
+        "r.type": line(r.type),
         "r.take": r.take,
       }),
     );
@@ -169,7 +168,7 @@ export function deliverToObjective(
   logs.push(
     line(
       "📜 Fleet Commission: delivered {partList} for {paid} Gold. The Emperor's commission is exempt from VAT.",
-      { partList: parts.join(" + "), paid },
+      { partList: joined(parts, () => " + "), paid },
     ),
   );
   // The mandate moment: the design's

@@ -25,6 +25,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { Pill } from "@/components/portmasters/shared";
 import { RENOWN_BONUS_LINE } from "@/lib/game/constants/copy";
 import { t } from "@/lib/game/i18n";
+import { useLanguage } from "@/lib/use-language-preference";
 import { CaptainLegacyCard } from "@/components/portmasters/CaptainLegacyCard";
 import { HouseLeaderboard } from "@/components/portmasters/HouseLeaderboard";
 import {
@@ -181,6 +182,7 @@ export function ChronicleDialog({
   loading: boolean;
   chronicles: VoyageChronicle[];
 }) {
+  const { locale } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -214,7 +216,7 @@ export function ChronicleDialog({
                       {c.headline}
                     </span>
                     <span className="text-[10px] text-muted-foreground shrink-0">
-                      {formatDate(c.createdAt)}
+                      {formatDate(c.createdAt, locale)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">

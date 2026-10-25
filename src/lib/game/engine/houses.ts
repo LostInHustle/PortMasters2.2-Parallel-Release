@@ -2,10 +2,10 @@
 // Great Houses.
 //
 // A captain's chosen House is a persistent, account level identity that
-// colours a voyage without unbalancing it. Each House grants one small,
+// colors a voyage without unbalancing it. Each House grants one small,
 // thematic perk at the start of every fresh voyage and nothing else: no
 // monthly fee, no gating, no perk that scales with Renown. The point is a
-// flavourful leaning rather than a power pick, which is why every perk is
+// flavorful leaning rather than a power pick, which is why every perk is
 // either a one shot discount or a flat per round nudge rather than a
 // multiplier on the things that compound.
 //
@@ -30,7 +30,7 @@ import type { GameState, HousePerks } from "../types";
 // the empty set has one definition: a field added here and forgotten in a
 // hand written copy elsewhere is a crash waiting on the first captain to
 // load a save from before that field, which is exactly the trap the save
-// normaliser in use-game-session.ts would otherwise have to dodge by hand.
+// normalizer in use-game-session.ts would otherwise have to dodge by hand.
 export function noHousePerks(): HousePerks {
   return {
     jadeFreeHireAvailable: false,
@@ -55,7 +55,7 @@ export type House = {
    * one carries: the crest, the tint and the bar are all built from it,
    * and the palette's own check reads the same list, so a House the
    * palette has not been told about is a House nobody can draw, rather
-   * than a House that quietly falls back to a colour nobody chose.
+   * than a House that quietly falls back to a color nobody chose.
    */
   token: string;
 };
@@ -64,9 +64,9 @@ export type House = {
 // flags it sets on a fresh voyage.
 //
 // The flags sit beside the House they belong to rather than in a list of
-// their own, so a House's one line and the behaviour behind it are read in
+// their own, so a House's one line and the behavior behind it are read in
 // one place. A House whose line says it hires free while its flags say
-// something else is a House whose name and behaviour disagree, and the two
+// something else is a House whose name and behavior disagree, and the two
 // can only disagree here.
 type HouseEntry = Omit<House, "id"> & {
   // The flags this House sets. A flag the House does not set is left off
@@ -123,9 +123,9 @@ export const HOUSES: House[] = HOUSE_IDS.map((id) => {
  *
  * The same list the House table carries, shaped for the callers that
  * want one token rather than a whole House: the palette's own check reads
- * it to learn which tokens are meaning colours rather than chrome, and
+ * it to learn which tokens are meaning colors rather than chrome, and
  * the screens that draw a House build their classes from it, so the
- * colour a House wears is named once rather than spelled out in each
+ * color a House wears is named once rather than spelled out in each
  * place that draws it.
  */
 export const HOUSE_TOKENS: Record<HouseId, string> = Object.fromEntries(
@@ -156,7 +156,7 @@ export function applyHousePerkAtStart(
 ): void {
   state.houseId = houseId;
   // The flags come from the table rather than from a comparison per flag,
-  // so a House and its behaviour are one record: a House added to the
+  // so a House and its behavior are one record: a House added to the
   // table with a flag of its own is live the moment it lands, and a flag
   // written here has no House to belong to.
   //

@@ -108,7 +108,7 @@ export function PathChip({
   // Read through pathConfig off the save's own id, which the load heal has
   // already answered as a path this build has (see normalizePath), so the
   // lookup always answers.
-  const card = pathConfig(game.path)!;
+  const card = pathConfig(game.path);
   const fee = pathSwitchFee(game.renownLevel);
   const others = PATH_IDS.filter((id) => id !== game.path);
 
@@ -162,7 +162,7 @@ export function PathChip({
           )}
           <div className="grid grid-cols-2 gap-2">
             {others.map((id) => {
-              const other = pathConfig(id)!;
+              const other = pathConfig(id);
               return (
                 <Button
                   key={id}

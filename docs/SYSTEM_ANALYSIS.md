@@ -22,14 +22,14 @@ The six phases a round walks are:
 2. Market. The port purchase board opens, then the artisan bench. Buying stock and assigning craft happen under one harbor wait.
 3. Orders. The trade board deals and the captain fills orders for Gold and Reputation. A pathbound order is locked to the path that carries its goods.
 4. Parley. The Captain's Exchange opens for direct trades. In Ocean Gambit the Manifest Audit and the maroon vote also happen here.
-5. Resolve. Production lands, wages and maintenance come due, and the pirate raid is rolled.
+5. Resolve. Production lands, the pirate raid is rolled, then wages and maintenance come due.
 6. Dusk. The shipyard opens for a hull upgrade, a module draft, or a module swap.
 
 The phase union in `src/lib/game/phases.ts` also carries the pier, the path draft, two personal shipyard states, bankruptcy, and endgame. The six phases a round walks, the pier, and the path draft are the harbor's synchronized seats. The personal shipyard states and the terminals are not. `module_draft` and `module_swap` are personal states inside Dusk, and the harbor never waits on them. Bankruptcy is terminal in Classic and a mark the captain sails on with in Ocean Gambit. Endgame is terminal in both.
 
 A captain's hold and purse are read live in every phase. A barter that settles halfway through Market changes what the captain can afford before Market closes, and no phase keeps a cached copy of those numbers.
 
-The phase order is written once on the mode record as `checkpointPhaseOrder` in `src/lib/game/mode.ts`. The ready check and the interface read that record rather than keeping their own lists. A save or room row from an older vocabulary is mapped through `LEGACY_PHASES` by `normalizePhase` on load, so a voyage in flight when a release lands can still be placed.
+The phase order is written once on the mode record as `checkpointPhaseOrder` in `src/lib/game/mode.ts`. The ready check and the interface read that record rather than keeping their own lists. A saved voyage or a `Room` row from an older vocabulary is mapped through `LEGACY_PHASES` by `normalizePhase` on load, so a voyage in flight when a release lands can still be placed.
 
 ## The Voyage's Length
 
@@ -54,8 +54,8 @@ Some deals cannot be derived from values the client already knows. The Ocean Gam
 The following rolls use `Math.random` rather than the seeded stream. The list is complete for game rules in `src`.
 
 - **Boon draft offers.** `drawOffer` in `src/lib/game/cards.ts` defaults to `Math.random`, and `draftBoons` in `src/lib/game/engine/boons.ts` takes the default. The offer is written to `state.boonChoices` before the pick, so a reload reads the same three cards.
-- **Module draft offers and rerolls.** `rollModuleChoices` and `rerollModuleChoices` also take the default. The offer is stored in `state._draftChoices` before the pick, and the pick or swap is what changes the save. No other captain is dealt the same hand.
-- **Farsight's free rumor.** `revealRumor` in `src/lib/game/engine/market.ts` picks a demand tag and an open port with `Math.random`. The result is written to `state.revealedIntel`, which is private intel for that captain, not a change to a shared market.
+- **Module draft offers and batch changes.** `rollModuleChoices` and `swapModuleChoices` also take the default. The offer is stored in `state._draftChoices` before the pick, and the pick or batch change is what changes the save. No other captain is dealt the same hand.
+- **Farsight's free whisper.** `revealRumor` in `src/lib/game/engine/market.ts` picks a demand tag and an open port with `Math.random`. The result is written to `state.revealedIntel`, which only that captain can see, not a change to a shared market.
 - **A Broker's Whisper guaranteed order.** After the seeded board is drawn, `startOrders` in `src/lib/game/engine/orders.ts` overwrites slots with orders built from the captain's own `revealedIntel`, using `localRng = Math.random`. It touches only that captain's board and does not advance or rewind the seeded stream.
 - **The Broker's Favor order.** `callBrokersFavor` generates one extra standard order for goods the captain already holds, using `localRng = Math.random`. It appends to that captain's board, once per voyage.
 - **The Salvage Crane refund.** During order fill, the module refunds freight cost on a 0.3 roll. It changes the captain's own purse and ledger.
@@ -144,7 +144,7 @@ The durable rules that came out of it are:
 - The player detail relay is bound to the exact pair that asked and answered, so a captain cannot push a snapshot at an arbitrary account.
 - A save body is capped at 64 KB.
 
-`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which asks whether anything outside a module reads its exports and whether anything under `src/` is a file nothing imports.
+`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which asks whether anything outside a module reads its exports and whether anything under `src/` is a file nothing imports. `npm run check:prose` runs `scripts/prose.ts`, which holds Markdown and text files to the same dash rule the captain facing copy follows.
 
 ## The Paths
 
@@ -250,7 +250,7 @@ The Bilingual Harbor carries English and Mandarin for the captain facing interfa
 
 ## Ocean Gambit Private Systems
 
-Ocean Gambit adds hidden roles, a public commission, two harbor votes, and a reveal. The mode is selected once per harbor and is a property of the room, not of an account.
+Ocean Gambit adds hidden roles, a public commission, two harbor votes, and a reveal. The mode is selected once per harbor and is a property of the harbor, not of an account.
 
 ### The Private Card
 
@@ -304,7 +304,7 @@ Verdicts stay private while there is a round left to sail. They are written to t
 
 Ocean Gambit is a sealed mode. The mode record sets `sealed: true`, and the create route refuses to charter the harbor without the unlock phrase. The phrase is `the second ledger`, stored in `UNLOCKS` in `src/lib/unlock.ts` with the mode it opens. The normalization lowercases the input and collapses punctuation and whitespace, so capitals, a trailing full stop, and stray spaces still open the door.
 
-The phrase is a harbor setting, not an account permission. One captain can open the table for everyone seated at it. The room records the id of the door it was opened through in `unlock`, never the words. The tenth completed voyage (`UNLOCK_EARNED_AT` is 10) writes the phrase into that voyage's Chronicle, and the How to Play guide and `README.md` also print it. A phrase that opened one harbor opens the next one too.
+The phrase is a harbor setting, not an account permission. One captain can open the table for everyone seated at it. The harbor records the id of the door it was opened through in `unlock`, never the words. The tenth completed voyage (`UNLOCK_EARNED_AT` is 10) writes the phrase into that voyage's Chronicle, and the How to Play guide and `README.md` also print it. A phrase that opened one harbor opens the next one too.
 
 ## The Harbor's Width
 
@@ -338,7 +338,7 @@ The four reading tables share column tracks so the panels lay out identically. R
 
 ## The Shared Surfaces
 
-A look written more than once is a look that drifts. The shared components in `src/components/portmasters/` are:
+A look written more than once is a look that drifts. The shared components under `src/components/` are:
 
 - `ModalClose`, beside the modal overlay, for the close button on the dialogs. Each caller passes a label and nothing else.
 - `PanelHeader`, for the captain's rail, the roster, and the chat. The icon, the uppercase title, and the fold chevron are one head, which also puts the fold in the same place on all three.
@@ -346,7 +346,7 @@ A look written more than once is a look that drifts. The shared components in `s
 - `VoteCardShell`, for the heading and section rhythm the audit and maroon votes share while their bodies stay separate, because the difference between the mechanics is the point.
 - `Select`, for dropdowns. A board that needs a different height asks for it in `className` rather than writing a second dropdown.
 
-Three repeats are deliberate. The quiet button tint stays at the call site because the stylesheet's wash class carries no colour and tint is the caller's. The two vote card bodies stay separate for the reason above. The inline panel closes differ in padding, weight, and margin, which is the whole of what a shared component would have to be told.
+Three repeats are deliberate. The quiet button tint stays at the call site because the stylesheet's wash class carries no color and tint is the caller's. The two vote card bodies stay separate for the reason above. The inline panel closes differ in padding, weight, and margin, which is the whole of what a shared component would have to be told.
 
 ## Deployment
 

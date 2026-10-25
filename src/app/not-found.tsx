@@ -6,7 +6,7 @@ import { ErrorShell } from "./error-shell";
 
 // The harbor's answer to an address that names nothing. Next renders
 // this for any route the app does not have, which until now was the
-// framework's own grey page: the one screen a lost visitor was certain to
+// framework's own gray page: the one screen a lost visitor was certain to
 // see was the one screen that did not look like the game.
 //
 // It is deliberately stateless. A captain reaches it by typing a wrong

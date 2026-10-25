@@ -23,7 +23,17 @@ function readCookie(
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(";")) {
     const [k, ...rest] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(rest.join("="));
+    if (k !== name) continue;
+    // A cookie header is client supplied, so a stray percent sign is an
+    // ordinary bad handshake rather than a fault here: the value is
+    // unreadable, which is the same answer as no cookie at all. Without
+    // the catch a malformed escape throws out of the socket's handshake
+    // before authentication can refuse it politely.
+    try {
+      return decodeURIComponent(rest.join("="));
+    } catch {
+      return null;
+    }
   }
   return null;
 }

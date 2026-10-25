@@ -1818,9 +1818,9 @@ export async function manifestAuditSuite(
     "both vote hooks lift the press that is still in flight only on the frame that carries this captain's own name, so another captain's ballot cannot put the button back while the first press is on its way, and the id the guard reads is a dependency of the effect that reads it",
   );
   check(
-    seatPickerCode.includes("import { seatMarks, type SeatStatus }") &&
+    seatPickerCode.includes("import { writtenOff, type SeatStatus }") &&
       seatPickerCode.includes("!marked(m.id)") &&
-      seatPickerCode.includes("seatMarks(statuses?.[id]).writtenOff") &&
+      seatPickerCode.includes("writtenOff(statuses?.[id])") &&
       !auditPanelCode.includes("seatMarks") &&
       !maroonPanelCode.includes("seatMarks") &&
       auditPanelCode.includes(

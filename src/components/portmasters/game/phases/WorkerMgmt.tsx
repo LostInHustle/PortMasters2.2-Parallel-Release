@@ -106,7 +106,7 @@ export function WorkerMgmt({
               <strong className="pm-artisan-ink">
                 {r.icon} <Term term={r.label}>{t(r.label)}</Term>
               </strong>
-              :{" "}
+              {t(": ")}
               {r.tasks
                 .map((task) => {
                   const mats = Object.entries(RECIPES[task].materials)
@@ -115,17 +115,17 @@ export function WorkerMgmt({
                   return t("{t}({mats})", { t: t(task), mats });
                 })
                 .join(t(" or "))}
-              ,{" "}
+              {t(", ")}
               <span className="text-due">
                 {t("{cost} Gold/round", { cost: r.cost })}
               </span>
             </div>
           ))}
         </div>
-        {/* Each hire button wears its own craft's hue: a three colour
+        {/* Each hire button wears its own craft's hue: a three color
             cycle puts the same saturated green on the first, fourth and
             seventh artisan, so a row of seven reads as one repeating
-            stripe and the colour tells you nothing about which artisan
+            stripe and the color tells you nothing about which artisan
             you are about to hire. */}
         <div className="flex flex-wrap justify-center gap-2">
           {roster.map((r) => (

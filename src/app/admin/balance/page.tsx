@@ -40,21 +40,21 @@ export default function AdminBalancePage() {
   const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     api
       .me()
       .then((res) => {
-        if (cancelled) return;
+        if (canceled) return;
         // A signed in captain who is not an operator gets the gate card,
         // which is where they find that out: signing in there goes through
         // the same role check the console uses.
         setStatus(res.user && res.user.role === "admin" ? "dashboard" : "gate");
       })
       .catch(() => {
-        if (!cancelled) setStatus("gate");
+        if (!canceled) setStatus("gate");
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
 

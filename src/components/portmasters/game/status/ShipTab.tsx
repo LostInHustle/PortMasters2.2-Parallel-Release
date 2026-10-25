@@ -29,13 +29,22 @@ export function ShipTab({
       </Row>
       <Row label={<Term term="Freight">{t("Freight")}</Term>}>
         <span className="text-[10px] text-muted-foreground">
-          {t("max(5, n×2 minus {discount})", { discount })}
+          {t("2 Gold per item, minus {discount} Gold per bill (minimum 5)", {
+            discount,
+          })}
         </span>
       </Row>
       <Row label={t("Modules")}>
         <b>
-          {modules.length} of {shipLevel}{" "}
-          {shipLevel === 1 ? t("module slot") : t("module slots")}
+          {shipLevel === 1
+            ? t("{filled} of {total} module slot", {
+                filled: modules.length,
+                total: shipLevel,
+              })
+            : t("{filled} of {total} module slots", {
+                filled: modules.length,
+                total: shipLevel,
+              })}
         </b>
       </Row>
       {modules.length === 0 ? (

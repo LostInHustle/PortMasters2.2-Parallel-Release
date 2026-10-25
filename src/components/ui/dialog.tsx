@@ -38,7 +38,7 @@ function DialogOverlay(
 // the worse default of the two.
 //
 // It is capped to the live viewport and scrolls, and that part is not
-// cosmetic: a dialog is centred on the viewport, so one taller than the
+// cosmetic: a dialog is centered on the viewport, so one taller than the
 // screen it opens on is clipped at BOTH ends at once and no amount of
 // scrolling inside it can reach what was cut off. That is worst where the
 // content is longest, which is the tutorial, on the smallest screen, which

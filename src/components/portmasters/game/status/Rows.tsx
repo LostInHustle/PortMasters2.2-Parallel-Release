@@ -36,7 +36,7 @@ export function LedgerRow({
 }
 
 /**
- * The two ledger rows the Ship and Dues tabs are built out of: a labelled
+ * The two ledger rows the Ship and Dues tabs are built out of: a labeled
  * line with its value on the far side, and the indented line under it that
  * breaks a total down by whoever it is owed to. Both tabs draw the same
  * pair, so the pair lives here rather than as a copy in each of them.

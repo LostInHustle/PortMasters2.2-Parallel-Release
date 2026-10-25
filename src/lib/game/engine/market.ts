@@ -3,8 +3,12 @@
 // captain. Keep the generators pure: pools are arguments, not state.
 import { cardLead } from "../cards";
 import { ICONS } from "../constants/brand";
-import { joined, line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
+import {
+  joined,
+  line,
+  type LedgerLine,
+  type LedgerValue,
+} from "@/lib/game/ledger";
 import {
   COMMODITIES,
   PRODUCT_PRICES,
@@ -148,11 +152,13 @@ function genProductPurchaseCard(
   const port = pick(rng, pools.ports);
   const recipe = RECIPES[product];
   let matCost = 0;
-  const details: string[] = [];
+  const materialList: { type: string; amount: number }[] = [];
   for (const [m, a] of Object.entries(recipe.materials)) {
     const avg = (COMMODITIES[m].basePrice[0] + COMMODITIES[m].basePrice[1]) / 2;
     matCost += avg * a;
-    details.push(t("{m}×{a}", { m, a }));
+    // The card holds the recipe, not a rendered list: the goods are named
+    // when the board is read, so their names follow the reader's language.
+    materialList.push({ type: m, amount: a });
   }
   // Price is material cost times a 1.4 to 1.8 markup, clamped to the
   // product's table range.
@@ -168,7 +174,7 @@ function genProductPurchaseCard(
         quantity: qty,
         price: unitPrice,
         materialCost: matCost,
-        materialDetails: details.join(" + "),
+        materialList,
       },
     ],
     totalCost: unitPrice * qty,
@@ -407,7 +413,7 @@ export function purchaseCard(
       );
   }
   logs.push(
-    line("📊 Purchased {state.purchaseCount} cargo batches", {
+    line("📊 Purchased {state.purchaseCount} cargo lots", {
       "state.purchaseCount": state.purchaseCount,
     }),
   );
@@ -420,7 +426,7 @@ export function revealRumor(
   state: GameState,
   logs: LedgerLine[],
   sentence: string,
-  params: Record<string, string | number> = {},
+  params: Record<string, LedgerValue> = {},
 ): void {
   const tags = state.marketDemandTags;
   const idx = Math.floor(Math.random() * tags.length);
@@ -428,7 +434,13 @@ export function revealRumor(
   const openPorts = unlockedPorts(state.difficulty, state.currentRound);
   const port = openPorts[Math.floor(Math.random() * openPorts.length)];
   state.revealedIntel.push({ item, port });
-  logs.push(line(sentence, { port, item, ...params }));
+  logs.push(
+    line(sentence, {
+      ...params,
+      port: line(port),
+      item: line(item),
+    }),
+  );
 }
 
 export function startMarket(
@@ -461,7 +473,7 @@ export function startMarket(
       state,
       logs,
       "{farsightLead}: 'Word from {port}: High demand for {item}!' (free)",
-      { farsightLead: cardLead("farsight") },
+      { farsightLead: (locale) => cardLead("farsight", locale) },
     );
   }
   logs.push(
@@ -519,7 +531,7 @@ export function completeMarket(state: GameState, logs: LedgerLine[]) {
   if (state.purchaseCount === 0) logs.push(line("⏭️ Purchasing skipped"));
   else
     logs.push(
-      line("✅ Purchasing ended, bought {state.purchaseCount} batches", {
+      line("✅ Purchasing ended, bought {state.purchaseCount} cargo lots", {
         "state.purchaseCount": state.purchaseCount,
       }),
     );

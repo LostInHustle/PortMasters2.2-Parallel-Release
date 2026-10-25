@@ -610,7 +610,7 @@ function stringsOf(card: CardRecord, language: string): CardText | undefined {
 
 // Whether a string names a catalogue key as a whole word. Case matters: the
 // catalogues are capitalised and prose is not, so "Artisans produce" is a
-// sentence about labour while Produce is a food.
+// sentence about labor while Produce is a food.
 function namesKey(text: string, key: string): boolean {
   return new RegExp(`\\b${escapeForRegExp(key)}\\b`).test(text);
 }

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import type { ChatMessage } from "@/lib/api";
 import { Avatar } from "../shared";
 import { cn, formatTime } from "@/lib/utils";
+import { useLanguage } from "@/lib/use-language-preference";
 
 /**
  * One line of the conversation: who said it, the bubble itself, and when it
@@ -18,6 +19,7 @@ export function MessageRow({
   message: ChatMessage;
   myUserId: string;
 }) {
+  const { locale } = useLanguage();
   const mine = message.mine ?? message.sender.id === myUserId;
   return (
     <motion.div
@@ -53,7 +55,7 @@ export function MessageRow({
           {message.content}
         </div>
         <span className="text-[9px] text-muted-foreground mt-0.5 px-1">
-          {formatTime(message.createdAt)}
+          {formatTime(message.createdAt, locale)}
         </span>
       </div>
     </motion.div>

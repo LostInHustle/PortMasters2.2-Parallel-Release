@@ -1,5 +1,5 @@
 // Artisan hiring, dismissal, assignments, production and the two round end
-// bills. Roster behaviour is driven by WORKER_TYPES, and every wage path uses
+// bills. Roster behavior is driven by WORKER_TYPES, and every wage path uses
 // getHireCost so hire, payroll and severance agree.
 import { ICONS } from "../constants/brand";
 import { WORKER_TYPES, workerType, type WorkerTypeId } from "../constants/crew";
@@ -15,7 +15,6 @@ import {
 } from "../status-copy";
 import type { GameState } from "../types";
 import { joined, line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
 import { hasModule } from "./core";
 import { discountedDue, getHireCost } from "./pricing";
 
@@ -132,19 +131,21 @@ export function assignTask(
         }
       if (!can) {
         // List every material and mark the short ones, rather than naming only the
-        // first missing good.
-        const short = Object.entries(recipe.materials)
-          .map(([m, a]) => {
+        // first missing good. The list is joined at the read (see `joined`), so
+        // the separator and the good names follow the reader's language.
+        const short = joined(
+          Object.entries(recipe.materials).map(([m, a]) => {
             const have = state.inventory[m] || 0;
-            return t("{moduleIcon}{m} {have}/{a}{shortMark}", {
+            return line("{moduleIcon}{m} {have}/{a}{shortMark}", {
               moduleIcon: ICONS[m],
-              m: t(m),
+              m: line(m),
               have,
               a,
               shortMark: have < a ? " ⚠️" : "",
             });
-          })
-          .join(" + ");
+          }),
+          () => " + ",
+        );
         logs.push(
           line("❌ Material shortage to produce {task}! (Have: {short})", {
             task: line(task),
@@ -184,6 +185,14 @@ export function assignTask(
   );
 }
 
+// The yield before any bonus: an unskilled hand makes one and a skilled
+// hand makes two. Named once because the bonus check in processProduction
+// reads the same rule, and a promotion that moved one copy would leave the
+// other behind.
+function baseWorkerYield(skilled: boolean): number {
+  return skilled ? 2 : 1;
+}
+
 // Shared by production and the roster tooltip. The Weavers' Charter applies
 // only to weaving trades.
 export function workerBaseYield(
@@ -191,7 +200,7 @@ export function workerBaseYield(
   skilled: boolean,
   weaves = false,
 ): number {
-  let amt = skilled ? 2 : 1;
+  let amt = baseWorkerYield(skilled);
   amt += state.modifierFlags.worker_bonus_production || 0;
   if (hasModule(state, "artisans_workshop")) amt += 1;
   if (weaves) amt += state.modifierFlags.loom_extra_produce || 0;
@@ -220,7 +229,7 @@ export function processProduction(state: GameState, logs: LedgerLine[]) {
         continue;
       }
       if (w.task) {
-        const base = w.isSkilled ? 2 : 1;
+        const base = baseWorkerYield(w.isSkilled);
         // Additions apply before the ration reduction, so hunger shrinks the whole
         // output.
         let amt = workerBaseYield(state, w.isSkilled, weaves);
@@ -355,7 +364,7 @@ export function payWages(
     }
   }
   for (const b of bills) {
-    const bLabel = b.sponsored === 1 ? t(b.label) : b.plural;
+    const bLabel = line(b.sponsored === 1 ? b.label : b.plural);
     if (b.sponsored > 0)
       logs.push(
         line(
@@ -374,7 +383,7 @@ export function payWages(
     // The voyage tally is written here because endRound clears workerWages.
     state.wagesPaid += total;
     for (const b of bills) {
-      const bLabel = b.count === 1 ? t(b.label) : b.plural;
+      const bLabel = line(b.count === 1 ? b.label : b.plural);
       if (b.due > 0)
         logs.push(
           line("💰 Paid wages for {b.count} {bLabel}: {b.due} Gold", {

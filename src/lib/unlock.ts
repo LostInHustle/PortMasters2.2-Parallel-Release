@@ -29,7 +29,7 @@ import type { GameMode } from "./game/mode";
 // label is read where it is rendered (the harbor card wraps its own read)
 // and the phrase is what a host types, which the normalizer below only
 // accepts in one form.
-import { t } from "./game/i18n";
+import { getLocale, tFor, type Locale } from "./game/i18n";
 
 export type UnlockId = "second_ledger";
 
@@ -131,11 +131,20 @@ export function unlockForPhrase(value: unknown): UnlockId | null {
 // The phrase is read through the pack like a name rather than passed
 // raw, so the line names the door the way the guide and the harbor card
 // name it.
-export function unlockLineFor(voyagesCompleted: number): string | null {
+//
+// The language is a parameter because the server composes this line once,
+// for a captain's chronicle, and stores it: the caller that knows which
+// language that captain reads passes it, while a client-side read keeps
+// the default and follows the picker.
+export function unlockLineFor(
+  voyagesCompleted: number,
+  locale: Locale = getLocale(),
+): string | null {
   if (voyagesCompleted !== UNLOCK_EARNED_AT) return null;
   const unlock = UNLOCKS[UNLOCK_ORDER[0]];
-  return t(
+  return tFor(
+    locale,
     "The harbor keeps one door shut, and {UNLOCK_EARNED_AT} completed voyages is what opens it: the phrase is {unlock.phrase}, and the guide has the line for whoever asks.",
-    { UNLOCK_EARNED_AT, "unlock.phrase": t(unlock.phrase) },
+    { UNLOCK_EARNED_AT, "unlock.phrase": tFor(locale, unlock.phrase) },
   );
 }

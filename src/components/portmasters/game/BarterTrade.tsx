@@ -179,7 +179,7 @@ export function OfferCard({
   const canAfford =
     getOwnedAmount(game, offer.requestItem) >= offer.requestAmount;
   const isDirect = Boolean(offer.targetUserId);
-  // The server refuses an accept it should not honour whether or not this
+  // The server refuses an accept it should not honor whether or not this
   // agrees, so this only spares a captain a click that could not succeed.
   //
   // Taking an offer is never rationed, so this captain's own tally is

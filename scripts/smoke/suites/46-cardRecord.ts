@@ -465,7 +465,7 @@ export async function cardRecordSuite(): Promise<void> {
       voyage.boonChoices.every((card) =>
         offerPool("boon", voyage).some(([pooled]) => pooled.id === card.id),
       ),
-    "the boon draft deals three different cards and every one of them is off the pool this captain's own state answers for: the engine no longer holds a single card's id at the draft, so a card added to the content arrives with its own offer behaviour rather than with an edit to the draft",
+    "the boon draft deals three different cards and every one of them is off the pool this captain's own state answers for: the engine no longer holds a single card's id at the draft, so a card added to the content arrives with its own offer behavior rather than with an edit to the draft",
   );
   check(
     voyage.boonChoices.every(

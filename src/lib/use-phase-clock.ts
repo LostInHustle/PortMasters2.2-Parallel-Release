@@ -81,7 +81,7 @@ export function usePhaseClock(
   // minutes old and would show a countdown longer than the seat was given.
   const now = Math.max(observedAt ?? 0, tickedAt ?? 0);
 
-  const secondsLeft = endsAt === null ? null : secondsRemaining(endsAt, now);
+  const secondsLeft = secondsRemaining(endsAt, now);
   return useMemo(
     () =>
       secondsLeft === null

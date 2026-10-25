@@ -120,7 +120,7 @@ export async function seeingEachOthersLiveDataSuite(inputs: {
 
   const status = await seenStatus;
   check(status !== null, "the other captain receives the status broadcast");
-  check(status?.user?.id === hostId, "the status is labelled with its captain");
+  check(status?.user?.id === hostId, "the status is labeled with its captain");
   check(status?.gold === 777, "the gold travels intact");
   check(status?.reputation === 42, "the reputation travels intact");
   check(status?.round === 3, "the round travels intact");

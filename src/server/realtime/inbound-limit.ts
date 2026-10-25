@@ -26,7 +26,7 @@
 // so a socket's first frame (its auth) is never the thing refused, and it
 // is per socket rather than per account, so a captain with two tabs pays
 // twice and a captain who reloads does not. A reconnect is a new socket,
-// and the delay its client honours is a second, so nothing about an honest
+// and the delay its client honors is a second, so nothing about an honest
 // connection can reach this.
 //
 // A frame over budget is dropped rather than queued, and the captain is

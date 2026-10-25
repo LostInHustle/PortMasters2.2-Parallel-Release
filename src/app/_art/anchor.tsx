@@ -35,7 +35,7 @@ export function AnchorMark({ size, ink }: { size: number; ink: string }) {
       }}
     >
       {/* The ring at the top: r 3 with a 2 wide stroke, so its outer edge
-          is a circle of 4 from the centre. */}
+          is a circle of 4 from the center. */}
       <div
         style={{
           ...box(u, 8, 1, 8, 8),
@@ -68,7 +68,7 @@ export function AnchorMark({ size, ink }: { size: number; ink: string }) {
           borderRadius: 1 * u,
         }}
       />
-      {/* The arms: the lower half of a circle of r 10 around the centre,
+      {/* The arms: the lower half of a circle of r 10 around the center,
           drawn as a box whose bottom corners carry the outer radius. */}
       <div
         style={{

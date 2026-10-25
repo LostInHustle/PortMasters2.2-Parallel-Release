@@ -84,7 +84,7 @@ export function Bankruptcy({
         💥
       </motion.div>
       <PhaseHeading layout="mb-1" tone="text-alarm" brush>
-        {t("Ship Fleet Bankrupt!")}
+        {t("Your Ship Is Bankrupt!")}
       </PhaseHeading>
       <p className="mb-4 text-sm text-muted-foreground">
         {game.money <= 0
@@ -146,7 +146,9 @@ export function Bankruptcy({
                       {t("Owed by")}{" "}
                       <b className="text-foreground">{l.counterpartyName}</b>
                     </span>
-                    <span className="font-bold text-gain">{l.amount} Gold</span>
+                    <span className="font-bold text-gain">
+                      {t("{contract.fee} Gold", { "contract.fee": l.amount })}
+                    </span>
                   </div>
                   {candidates.length > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -230,6 +232,15 @@ export function Bankruptcy({
               </div>
             ))}
           </div>
+          {!isHost && onLeave && (
+            <Button
+              variant="secondary"
+              className="mt-3 rounded-xl px-8"
+              onClick={onLeave}
+            >
+              {t("⚓ Sail Again")}
+            </Button>
+          )}
         </motion.div>
       )}
 

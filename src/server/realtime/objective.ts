@@ -6,7 +6,7 @@
 // broadcast to the whole harbor, and it is worth saying out loud how it
 // differs from the alignment sitting next to it in this directory. The
 // alignment is a secret defended all the way to the wire. This is a shared
-// number nobody needs defending from, and the only two defences it gets
+// number nobody needs defending from, and the only two defenses it gets
 // are the ones a shared number needs: it cannot be double counted, and it
 // cannot be inflated past what the commission asked for.
 //
@@ -26,12 +26,12 @@
 // board is read. What arrives is held to what the harbor has left of every
 // good at that instant, and only that much of it is merged, so the fleet's
 // record can never hold more than the commission named no matter how many
-// captains press at once. That read, the judgement on it and the merge
+// captains press at once. That read, the judgment on it and the merge
 // that follows are one synchronous stretch with nothing awaited inside
 // them: this is a single Node process, so the second of two reports that
 // arrive together is judged against the board the first one just wrote
 // rather than against the board it also read. The clamp in objectiveTotalFor
-// below still caps the sum it hands out, as the last line of defence a
+// below still caps the sum it hands out, as the last line of defense a
 // public number wants, but it is no longer the only one: a harbor whose
 // tallies were somehow overfilled reads met rather than "17 of 12", and
 // what rides the wire is what every client would have clamped for itself.

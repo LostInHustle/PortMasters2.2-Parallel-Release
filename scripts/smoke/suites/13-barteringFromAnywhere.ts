@@ -260,7 +260,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // Once a trade completes, the poster's other flexible offers go with
   // it. They promised the goods that have just left their hold, and
   // they share the one allowance, so leaving them up would advertise a
-  // swap that can no longer be honoured.
+  // swap that can no longer be honored.
   check(
     !(settled?.offers ?? []).some((o) => o.id === second?.id),
     "and the poster's other flexible offers are retired along with it",

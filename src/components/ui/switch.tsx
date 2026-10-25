@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 // They are one control because they are one control: a switch that looks
 // one way in the lobby and another way in the settings is two things to
 // learn, and the house rule about one meaning per shape applies to
-// controls as much as to words. The size is a prop, so the behaviour, the
+// controls as much as to words. The size is a prop, so the behavior, the
 // keyboard handling and the focus treatment are one implementation.
 //
 // The wide thumb's travel is the travel the setting's own control had:

@@ -36,8 +36,8 @@
  *      appears in the tree.
  *   6. The roster frame, which is the only thing that carries the mute
  *      list, addressed one captain at a time. A mute is the host's
- *      judgement of one captain, so a roster frame sent to a harbor is that
- *      judgement told to the harbor. What it cannot catch is the event name
+ *      judgment of one captain, so a roster frame sent to a harbor is that
+ *      judgment told to the harbor. What it cannot catch is the event name
  *      retyped at the emit or reached through a variable holding it, which
  *      is why the name is written out in full where it is sent.
  *   7. The draft frame, which carries a captain's hand, addressed one
@@ -102,7 +102,7 @@ const isSmoke = (file: string): boolean => file.startsWith("scripts/smoke/");
    reading is a reduction over rows that carry it (win rate by pair, see
    src/lib/game/combinations.ts). The fourth was added when the
    combination instrument landed, and it carries its sentence: the instrument
-   counts verdicts it does not decide, and counting is not travelling. */
+   counts verdicts it does not decide, and counting is not traveling. */
 const VERDICT_PROPERTY_FILES = [
   "src/lib/game/balance.ts",
   "src/server/telemetry-window.ts",
@@ -313,7 +313,7 @@ for (const file of scannedFiles) {
       line: index + 1,
       message:
         `delivers ${ROSTER_FRAME_EVENT} to a harbor. The mute list rides that frame and a mute is the` +
-        " host's judgement of one captain, so it goes out through emitToUser or emitPrivate" +
+        " host's judgment of one captain, so it goes out through emitToUser or emitPrivate" +
         " (see PER_RECIPIENT_EMITTERS in this script) and never to a harbor channel.",
     });
   });

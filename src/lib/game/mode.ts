@@ -11,7 +11,7 @@ export type GameMode = "classic" | "ocean_gambit";
 
 export const DEFAULT_MODE: GameMode = "classic";
 // One phase of a round as briefed before the voyage begins. phase ties the
-// chart to the mode's lap. The phase's name, glyph, and colour live with the
+// chart to the mode's lap. The phase's name, glyph, and color live with the
 // phase (./phases.ts), so the two cannot call one phase by different names.
 export interface BriefingPhase {
   phase: RoundPhase;
@@ -148,8 +148,9 @@ export const MODES: Record<GameMode, ModeConfig> = {
     experimental: true,
     // Sealed: a host needs the harbor phrase, which is a harbor setting.
     sealed: true,
-    // A failed seat keeps sailing, and from the ninth round the harbor may vote
-    // one ashore. On an eight-round tier that rung is unreachable by design.
+    // A failed seat keeps sailing, and from the ninth round the harbor may
+    // vote one ashore. Gambit pins twelve rounds on every tier (see
+    // voyageRounds below), so both votes are reachable whatever the tier.
     bankruptcyIsFinal: false,
     maroonFrom: GAMBIT_MAROON_FROM,
     // Opens at the same round on every tier; the difference sentence quotes it.
@@ -195,7 +196,7 @@ export const MODES: Record<GameMode, ModeConfig> = {
           phase: "resolve",
           body: "Pirates roll for every coin aboard. An escort buys the safe passage for a cut of what you carry, so the fee is cheapest exactly when you have the least to protect.",
           setsUp:
-            "Then the wages and the ship's maintenance come due, and what survives the bills is what you take to the yard.",
+            "Then the wages and the ship maintenance fee come due, and what survives the bills is what you take to the yard.",
         },
         {
           phase: "dusk",

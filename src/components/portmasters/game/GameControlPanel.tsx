@@ -22,6 +22,7 @@ import {
   Cloud,
   ScrollText,
   Keyboard,
+  X,
 } from "lucide-react";
 import { ActionSuggester } from "../ActionSuggester";
 
@@ -119,6 +120,7 @@ export function GameControlPanel({
   let startText = t("Set Sail");
   let startDisabled = true;
   let nextText = t("Continue");
+  let nextTitle: string | undefined;
   let nextDisabled = true;
 
   if (game.gameOver) {
@@ -191,13 +193,14 @@ export function GameControlPanel({
     // @/lib/use-phase-sync) with this bar's own tail, because the one
     // thing a captain pressing the button wants to know is how close the
     // harbor is to turning.
-    nextText = t("⏳ {readyLine} The phase turns when the rest do.", {
+    nextText = t("Not ready yet");
+    nextTitle = t("⏳ {readyLine} The phase turns when the rest do.", {
       readyLine: readyLine(readyCount, requiredCount),
     });
     // The clock's tail keeps its leading space outside the read: the row
     // covers the mark and the label, and the bar is what puts the gap in.
     if (clock)
-      nextText += ` ${t("· {clock.label}", { "clock.label": clock.label })}`;
+      nextTitle += ` ${t("· {clock.label}", { "clock.label": clock.label })}`;
     nextDisabled = false;
   }
 
@@ -218,9 +221,12 @@ export function GameControlPanel({
         )}
         variant={nextDisabled || waiting ? "secondary" : "default"}
         disabled={nextDisabled}
+        title={nextTitle}
         onClick={waiting ? onCancelReady : onNextPhase}
       >
-        {nextText} <ChevronRight className="h-4 w-4 ml-1" />
+        {waiting && <X className="h-4 w-4 mr-1.5" aria-hidden />}
+        {nextText}
+        {!waiting && <ChevronRight className="h-4 w-4 ml-1" aria-hidden />}
       </Button>
       <div className="flex-1" />
       {/* Mobile friendly ActionSuggester (the header version is hidden on mobile) */}
@@ -236,7 +242,7 @@ export function GameControlPanel({
           screen in the harbor would scroll sideways with it.
           Below the sm width the four wear their glyphs alone, with the
           name kept in the title, the aria label and the wider layouts:
-          four labelled buttons wrap to a row of their own on a phone,
+          four labeled buttons wrap to a row of their own on a phone,
           and a phone's rows are the room the board needed. */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground px-2">

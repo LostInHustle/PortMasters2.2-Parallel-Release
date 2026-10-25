@@ -59,7 +59,7 @@ import { Gauge, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 // which of the meaning tones says it: an out of band gate is warn rather
 // than alarm on purpose, because the mode has not shipped yet and a number
 // outside its band is being watched rather than having broken. The three
-// verdicts that are not judgements (no source, no gate, unplayed) take the
+// verdicts that are not judgments (no source, no gate, unplayed) take the
 // quiet default, since none of them is a finding.
 type ChipTone = "gain" | "warn" | "default";
 
@@ -80,7 +80,7 @@ const STATE: Record<QuestionState, { tone: ChipTone; word: string }> = {
 
 // The ship decision's three states, in the same tones the readings under
 // them use, so a held gate and the strip that says the mode is held are
-// not two colours about one fact. Held is warn rather than alarm for the
+// not two colors about one fact. Held is warn rather than alarm for the
 // reason the out of band chips are: a mode that has not shipped is being
 // watched, not broken.
 const LAUNCH: Record<LaunchState, { tone: ChipTone; word: string }> = {
@@ -106,15 +106,15 @@ export function BalanceDashboard() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     const read = async () => {
       try {
         const answer = await api.adminBalance();
-        if (cancelled) return;
+        if (canceled) return;
         setReading(answer.reading);
         setError(null);
       } catch (err) {
-        if (cancelled) return;
+        if (canceled) return;
         setError(
           err instanceof Error
             ? err.message
@@ -125,7 +125,7 @@ export function BalanceDashboard() {
     };
     void read();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [nonce]);
 
@@ -333,7 +333,7 @@ function GapList({ gaps }: { gaps: string[] }) {
 // nothing to read rather than as a zero.
 //
 // Only a judged reading gets the display size. A verdict that is not a
-// judgement has no number to show, only a sentence about what is missing,
+// judgment has no number to show, only a sentence about what is missing,
 // and a sentence at display size is the page shouting an absence: those
 // read at body size, in the quieter ink the rest of the page's prose uses.
 // The size itself grows with the window rather than sitting at one value,
@@ -440,7 +440,7 @@ function Panel({ panel }: { panel: DashboardPanel }) {
                 things: measured across them, the Gate column came out 291
                 pixels wide on one panel and 135 on the next, and the
                 Reading column starved to 237 on the panel with the longest
-                Window lists while its neighbour ran 295, wrapping labels
+                Window lists while its neighbor ran 295, wrapping labels
                 that fit on two lines next door onto four. The label is the
                 one thing a reader scans first, so it gets a floor rather
                 than whatever is left over.
@@ -516,8 +516,8 @@ function Panel({ panel }: { panel: DashboardPanel }) {
 }
 
 // A verdict at row scale: a dot and the word, no chip. Forty chips down
-// four tables turn the verdict column into a stripe of coloured lozenges,
-// and a stripe is not a column anyone scans; the dot keeps the colour and
+// four tables turn the verdict column into a stripe of colored lozenges,
+// and a stripe is not a column anyone scans; the dot keeps the color and
 // lets the word sit on the row's own baseline. The full pill is kept for
 // the three places a verdict is a headline rather than a detail: the
 // launch strip, a panel's header and a front tile. The word and its tone

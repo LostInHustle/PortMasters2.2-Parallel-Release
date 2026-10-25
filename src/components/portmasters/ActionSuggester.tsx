@@ -56,7 +56,7 @@ export function ActionSuggester({ game }: { game: GameState }) {
           "pm-pressable inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium",
           /* The fill is the wash its tone carries, from the one shared
              table, so the toggle and the panel it opens cannot disagree
-             about a colour. Read by tone name and never by matching the
+             about a color. Read by tone name and never by matching the
              class string that tone produces: a match like that held only
              while the classes were raw palette names, and quietly sent
              every suggestion down the last branch once they became

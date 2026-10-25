@@ -43,6 +43,11 @@ type ResourceRef = {
   quantity?: number;
   price?: number;
   materialCost?: number;
+  // A product card authors its recipe as a list rather than as a sentence,
+  // so the board can name each good in the reader's language.
+  materialList?: { type: string; amount: number }[];
+  // The rendered recipe list older saves carry. A card with the list above
+  // reads the list; this is only the fallback for those saves.
   materialDetails?: string;
 };
 
@@ -718,7 +723,7 @@ export function createInitialGameState(setup: VoyageSetup = {}): GameState {
     debts: [],
     loansGiven: [],
     defaultedDebt: false,
-    // Explicitly initialised so restartGame's Object.assign(state, fresh)
+    // Explicitly initialized so restartGame's Object.assign(state, fresh)
     // carries a clean slate forward and a captain switching Houses cannot keep
     // the old House's perks by accident.
     houseId: null,

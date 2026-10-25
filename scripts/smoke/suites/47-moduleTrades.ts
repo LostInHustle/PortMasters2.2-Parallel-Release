@@ -702,7 +702,7 @@ export async function moduleTradesSuite(
   });
   check(
     modRelisted !== null && modRelisted.includes("already listed that module"),
-    "the same module cannot be listed twice in one round, whatever price the second row names, because one module is one thing and a second row could not be honoured",
+    "the same module cannot be listed twice in one round, whatever price the second row names, because one module is one thing and a second row could not be honored",
   );
 
   const modDoubleOpen = await modRefused(modSeller, "module:post", {
@@ -806,7 +806,7 @@ export async function moduleTradesSuite(
     "an agreement the two captains made cannot be withdrawn by the seller, and the refusal says so rather than dropping the press",
   );
 
-  const modCancelledBoard = modSettles(modForeigner, (board) =>
+  const modCanceledBoard = modSettles(modForeigner, (board) =>
     board.every((t) => t.id !== modOpenRow?.id),
   );
   modSocketOf(modSeller).emit("module:cancel", {
@@ -814,7 +814,7 @@ export async function moduleTradesSuite(
     tradeId: modOpenRow?.id ?? "",
   });
   check(
-    (await modCancelledBoard) !== null,
+    (await modCanceledBoard) !== null,
     "while an offer nobody has taken is the seller's own to take back",
   );
 
@@ -871,7 +871,7 @@ export async function moduleTradesSuite(
 
   // The duplicate press, which is the other half of a single settlement:
   // the row is already agreed, so the second accept is refused by the
-  // same guard a cancelled row meets, and the agreement on the board is
+  // same guard a canceled row meets, and the agreement on the board is
   // the one the first press made rather than a second one over it.
   const modOpenSecondPress = await modRefused(modForeigner, "module:accept", {
     tradeId: modOpenTakeRow?.id ?? "",

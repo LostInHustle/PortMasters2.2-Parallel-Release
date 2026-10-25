@@ -14,7 +14,6 @@
 import { cardLead, cargoCarriesTag } from "../cards";
 import { ICONS } from "../constants/brand";
 import { joined, line, type LedgerLine } from "@/lib/game/ledger";
-import { t } from "@/lib/game/i18n";
 import { PRODUCTS, RESOURCES } from "../constants/goods";
 import { PATH_ORDER_SLOTS } from "../constants/paths";
 import {
@@ -316,7 +315,7 @@ export function completeOrder(
   if (short) {
     logs.push(
       line("❌ Inventory short! Need {short.type}×{short.required}", {
-        "short.type": short.type,
+        "short.type": line(short.type),
         "short.required": short.required ?? 0,
       }),
     );
@@ -463,7 +462,7 @@ export function completeOrder(
   );
   logs.push(
     line("📦 Completed Order at {order.demandPort}: {txt}", {
-      "order.demandPort": order.demandPort,
+      "order.demandPort": line(order.demandPort),
       txt,
     }),
   );
@@ -538,14 +537,18 @@ export function callBrokersFavor(
   const isRaw = (RESOURCES as readonly string[]).includes(item);
   const isProduct = (PRODUCTS as readonly string[]).includes(item);
   if (!isRaw && !isProduct) {
-    logs.push(line("❌ The Broker can't find a buyer for {item}", { item }));
+    logs.push(
+      line("❌ The Broker can't find a buyer for {item}", {
+        item: line(item),
+      }),
+    );
     return;
   }
   const held = state.inventory[item] || 0;
   if (held <= 0) {
     logs.push(
       line("❌ You have no {item} in the hold for the Broker to sell", {
-        item,
+        item: line(item),
       }),
     );
     return;
@@ -555,7 +558,7 @@ export function callBrokersFavor(
     logs.push(
       line("❌ Choose between 1 and {held} {item} for the Broker to sell", {
         held,
-        item,
+        item: line(item),
       }),
     );
     return;
@@ -567,19 +570,20 @@ export function callBrokersFavor(
   const nextId = nextCardId(state);
   state.customerCards.push({ id: nextId, ...order, isBrokerFavor: true });
   state.brokersFavorUsed = true;
-  const txt = order.resources
-    .map((r) =>
-      t("{goodIcon}{r.type}×{r.required}", {
+  const txt = joined(
+    order.resources.map((r) =>
+      line("{goodIcon}{r.type}×{r.required}", {
         goodIcon: ICONS[r.type],
-        "r.type": r.type,
+        "r.type": line(r.type),
         "r.required": r.required ?? 0,
       }),
-    )
-    .join(" + ");
+    ),
+    () => " + ",
+  );
   logs.push(
     line(
       "🤝 Broker's Favor called in: a buyer at {order.demandPort} now wants {txt}. The bigger the ask, the bigger the Broker's cut.",
-      { "order.demandPort": order.demandPort, txt },
+      { "order.demandPort": line(order.demandPort), txt },
     ),
   );
 }
@@ -599,7 +603,7 @@ export function purchaseIntel(state: GameState, logs: LedgerLine[]) {
   }
   const cost = getIntelCost(state);
   if (state.money < cost) {
-    logs.push(line("❌ Need {cost} Gold for a rumor", { cost }));
+    logs.push(line("❌ Need {cost} Gold for a whisper", { cost }));
     return;
   }
   // One press is one purchase and one fee. The modules change how many
@@ -630,7 +634,7 @@ export function purchaseIntel(state: GameState, logs: LedgerLine[]) {
     revealRumor(
       state,
       logs,
-      "🗣️ Broker's Whisper: 'Word from {port}: High demand for {item}!'",
+      "🗣️ Broker's Whisper: ‘Word from {port}: High demand for {item}!’",
     );
     // Corrupt broker (Monsoon only): the rumor itself is always delivered
     // and true, on every tier. The broker instead also sells word of this
@@ -741,20 +745,21 @@ export function startOrders(
       isProductOrder: false,
       isMandate: true,
     });
-    const need = mandate.resources
-      .map((r) =>
-        t("{goodIcon}{r.type}×{r.required}", {
+    const need = joined(
+      mandate.resources.map((r) =>
+        line("{goodIcon}{r.type}×{r.required}", {
           goodIcon: ICONS[r.type],
-          "r.type": r.type,
+          "r.type": line(r.type),
           "r.required": r.required,
         }),
-      )
-      .join(" + ");
+      ),
+      () => " + ",
+    );
     logs.push(
       line(
         "📜 Imperial Mandate at {mandate.port}: {need} for {mandate.reward} Gold. The Emperor's commission is exempt from VAT.",
         {
-          "mandate.port": mandate.port,
+          "mandate.port": line(mandate.port),
           need,
           "mandate.reward": mandate.reward,
         },

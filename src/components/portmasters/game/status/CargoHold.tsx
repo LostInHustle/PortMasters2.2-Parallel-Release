@@ -78,7 +78,7 @@ export function CargoHold({
               </span>
               <span className="font-display text-sm font-bold text-gold-ink tabular-nums">
                 ~{totalValue}
-                {t("g")}
+                <span className="ml-0.5">{t("Gold")}</span>
               </span>
             </div>
           </div>

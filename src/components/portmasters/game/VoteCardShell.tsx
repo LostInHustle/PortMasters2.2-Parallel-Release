@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { PanelLabel } from "../shared";
 
-// The two votes share one shape: a heading in the meaning colour of what
+// The two votes share one shape: a heading in the meaning color of what
 // the vote costs, and the body of whichever state its window is in. Both
 // votes live inside the one Harbor Business fold, so the fold owns the
 // disclosure and the shell owns the heading and the section rhythm. The

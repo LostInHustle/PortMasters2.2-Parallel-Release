@@ -55,7 +55,7 @@ function OrderCard({
   // this card waits on for this captain, and it is null wherever the
   // card is theirs to fill, which is every ordinary card and every
   // marked card whose path they hold. Both are the engine's own readings
-  // (pathOrderOf and lockedBehind), so a card greyed here is a card the
+  // (pathOrderOf and lockedBehind), so a card grayed here is a card the
   // engine refuses there: the board and the guard cannot come apart.
   const path = pathConfig(pathOrderOf(o, game.mode));
   const locked = lockedBehind(game, o);
@@ -192,8 +192,8 @@ function OrderCard({
           // that is where a captain's eye already goes on every card
           // on this board. Deliberately not a disabled button: a
           // button that can never be pressed promises an action the
-          // card does not have, and what a greyed card owes its
-          // reader is a sentence about why rather than a grey shape.
+          // card does not have, and what a grayed card owes its
+          // reader is a sentence about why rather than a gray shape.
           // The string is pathLockLine's, the same one the ledger
           // prints when a fill is refused.
           <div className="space-y-1.5">
@@ -269,7 +269,7 @@ function OrderCard({
         // `?? 0`): a line with no count is a line needing nothing, so the
         // tick agrees with the button the engine arms. The non null
         // assertion this replaces read a doctored line as an impossible
-        // one, greying a card the fill would have accepted.
+        // one, graying a card the fill would have accepted.
         const has = (game.inventory[r.type] || 0) >= (r.required ?? 0);
         return (
           <div key={i} className="flex items-center text-[12px]">

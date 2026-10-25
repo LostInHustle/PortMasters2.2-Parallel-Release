@@ -4,7 +4,7 @@
 // and avatar hues, and returns them highest Renown XP first. Requires
 // authentication but is not harbor scoped.
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { PUBLIC_USER_SELECT, db } from "@/lib/db";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import { normalizeHouseId } from "@/lib/game/legacy";
 
@@ -15,12 +15,7 @@ export async function GET() {
   const rows = await db.captainLegacy.findMany({
     include: {
       user: {
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          avatarHue: true,
-        },
+        select: PUBLIC_USER_SELECT,
       },
     },
     orderBy: {

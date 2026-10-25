@@ -25,7 +25,7 @@ import type { NextConfig } from "next";
 const localOrigins = [
   // The loopback address. "localhost" is already covered, but a browser
   // pointed at 127.0.0.1 sends that address as its origin instead, and
-  // the bare address is not a name Next.js recognises on its own.
+  // the bare address is not a name Next.js recognizes on its own.
   "127.0.0.1",
   // This machine reached by its own name. macOS answers to a name ending
   // in ".local" over Bonjour, and the README sends a second player to

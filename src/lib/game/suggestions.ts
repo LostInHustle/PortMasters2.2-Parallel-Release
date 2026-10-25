@@ -167,9 +167,14 @@ function analyzePurchase(game: GameState): Suggestion | null {
   if (unpurchased.length === 0) return null;
 
   // Keep the winning good beside its price; resources[0] is not
-  // necessarily the one the score picked.
+  // necessarily the one the score picked. A unit's ratio is where it sits
+  // in its range: zero at the floor and one at the ceiling, so the lowest
+  // ratio is the best deal. That same number is what the sentence below
+  // prints, which is why it is kept rather than inverted into a score:
+  // inverting it for the ranking and then printing the inverse told a
+  // captain a cheap unit was at 100% of the range.
   let bestCard = null as (typeof unpurchased)[0] | null;
-  let bestPriceRatio = -1;
+  let bestValueRatio = Number.POSITIVE_INFINITY;
   let bestGoodName = "";
   let bestGoodPrice = 0;
   for (const card of unpurchased) {
@@ -177,9 +182,9 @@ function analyzePurchase(game: GameState): Suggestion | null {
       const range = basePriceRange(r.type) ?? [0, 100];
       // Rank by the till's per unit price, not the card's list price.
       const unit = Math.round(cardLineUnitPrice(game, card, i) * 10) / 10;
-      const score = 1 - priceRatio(unit, range);
-      if (score > bestPriceRatio) {
-        bestPriceRatio = score;
+      const ratio = priceRatio(unit, range);
+      if (ratio < bestValueRatio) {
+        bestValueRatio = ratio;
         bestCard = card;
         bestGoodName = r.type;
         bestGoodPrice = unit;
@@ -209,9 +214,9 @@ function analyzePurchase(game: GameState): Suggestion | null {
   ) {
     return {
       icon: "🔮",
-      title: t("Buy a Broker's Rumor"),
+      title: t("Buy a Broker's Whisper"),
       body: t(
-        "You have {game.money} Gold. Spending {intelCost} Gold on a rumor guarantees a matching order in Orders, then buying the {bestGoodName} at {bestPrice} Gold per unit sets up a profitable trade.",
+        "You have {game.money} Gold. Spending {intelCost} Gold on a whisper guarantees a matching order in Orders, then buying the {bestGoodName} at {bestPrice} Gold per unit sets up a profitable trade.",
         {
           "game.money": game.money,
           intelCost,
@@ -232,7 +237,7 @@ function analyzePurchase(game: GameState): Suggestion | null {
         bestGoodName: t(bestGoodName),
         bestPrice: bestGoodPrice,
         "bestCard.port": t(bestCard.port),
-        pricePct: Math.round(bestPriceRatio * 100),
+        pricePct: Math.round(bestValueRatio * 100),
       },
     ),
     tone: "gain",

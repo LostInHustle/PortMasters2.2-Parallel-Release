@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Check, Clock, Hourglass } from "lucide-react";
 
 /* Seconds at which the countdown stops reading as information and starts
-   reading as a warning. It is a colour choice rather than a rule: the harbor
+   reading as a warning. It is a color choice rather than a rule: the harbor
    moves when the server says it does, whatever this is drawn as. */
 const URGENT_SECONDS = 10;
 

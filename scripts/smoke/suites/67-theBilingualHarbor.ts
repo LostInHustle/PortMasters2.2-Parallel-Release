@@ -119,7 +119,7 @@ export async function theBilingualHarborSuite(): Promise<void> {
     if (!en.trim() && !zh.trim()) continue;
     // The dash rule reads the words with the style carriers taken out:
     // `--` is how a CSS custom property is read, so the var() calls the
-    // guide fragments wrap their colours in are the same exemption the
+    // guide fragments wrap their colors in are the same exemption the
     // tree wide rule documents, not typography.
     const styleFree = (text: string) =>
       text.replace(/var\(--[^)]*\)/g, "var()");

@@ -25,7 +25,7 @@ export type RoomMembersPayload = {
   hostId: string | null;
   /** The captains this recipient may see as muted. The host is handed the
       whole list, a muted captain is handed their own id, and every other
-      captain is handed an empty list: a mute is the host's judgement of
+      captain is handed an empty list: a mute is the host's judgment of
       one captain, and the harbor is the wrong audience for it. Optional
       because a reader treats a wire field defensively whatever the writer
       intended, which is the same rule every other payload read follows. */

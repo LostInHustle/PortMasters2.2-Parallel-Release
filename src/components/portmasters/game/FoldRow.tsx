@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 // three places to fix a chevron. The caller keeps the state, since the
 // three callers mean three different things by open.
 //
-// The tone is named for its meaning rather than its colour, the way the
+// The tone is named for its meaning rather than its color, the way the
 // cards themselves name it: the audit wears intel because it reports what
 // somebody knows, the maroon wears alarm because it takes a ship, and the
 // briefing wears harbor because it is what the pier hands a captain
@@ -25,7 +25,7 @@ const TONES = {
   harbor: "border-harbor/25 bg-harbor/[0.04]",
   // Two desks of the Market phase wear their own hue on the fold itself:
   // the Loom's bench and the larder's barge are panels a captain finds by
-  // their colour before reading their name, so the row that holds them
+  // their color before reading their name, so the row that holds them
   // open wears the same tone at the fold's strength.
   refit: "border-refit/25 bg-refit/[0.04]",
   larder: "border-larder/25 bg-larder/[0.04]",

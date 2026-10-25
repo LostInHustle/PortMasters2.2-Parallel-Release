@@ -11,7 +11,7 @@
 // the title is what a captain needs here.
 //
 // It wears gold, and gold specifically. The commission is an imperial
-// one, so it wears the colour the Imperial Mandate already wears on the
+// one, so it wears the color the Imperial Mandate already wears on the
 // orders board, and it shares that card's classes rather than its own so
 // the two read as the same kind of object. It is not a widget in the
 // palette's table and takes no hue of its own: gold is a meaning token,
