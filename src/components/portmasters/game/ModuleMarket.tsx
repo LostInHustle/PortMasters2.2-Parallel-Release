@@ -107,6 +107,18 @@ export function ModuleMarket({
   const chosen = sellable.some((card) => card.id === moduleId)
     ? moduleId
     : (sellable[0]?.id ?? "");
+  // A module already on this captain's hull is not an option, so its row is
+  // not drawn: the hull carries each module once, and the row would only
+  // repeat what the buyer already has. The seller's own row stays so it can
+  // be withdrawn, and an agreed row stays as the record of a sale. The engine
+  // keeps its own refusal for a board that has gone stale between the render
+  // and the press (see applyModuleTradeSide).
+  const visibleTrades = modules.moduleTrades.filter(
+    (trade) =>
+      trade.sellerUserId === me.id ||
+      trade.status !== "offered" ||
+      !game.equippedModules.some((m) => m.id === trade.module),
+  );
 
   return (
     <MarketPanel
@@ -178,19 +190,21 @@ export function ModuleMarket({
         onDismiss={modules.clearError}
       />
 
-      {modules.moduleTrades.length === 0 ? (
+      {visibleTrades.length === 0 ? (
         <MarketEmpty>
-          {canSell
-            ? t(
-                "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the round turns or the Parley closes, so a row you posted earlier may already be gone.",
-              )
-            : t(
-                "No modules listed this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
-              )}
+          {modules.moduleTrades.length > 0
+            ? t("Every module on the board is already on your hull.")
+            : canSell
+              ? t(
+                  "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the round turns or the Parley closes, so a row you posted earlier may already be gone.",
+                )
+              : t(
+                  "No modules listed this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
+                )}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
-          {modules.moduleTrades.map((trade) => (
+          {visibleTrades.map((trade) => (
             <ModuleRow
               key={trade.id}
               trade={trade}
@@ -261,20 +275,14 @@ function ModuleRow({
     ? t(STALE_OFFER)
     : roomOpen < 1
       ? t("Every slot on your hull is full. Make room at the yard first.")
-      : card !== null && game.equippedModules.some((m) => m.id === trade.module)
-        ? // A hull reads a module as present or absent (hasModule), so a
-          // second copy adds no effect but would add a slot, power and the
-          // per copy surcharge the two costing modules carry. The trade
-          // path is the one door that did not ask this question.
-          t("That module is already bolted to your hull.")
-        : card !== null && !powerBudgetAllows(game, card)
-          ? t(
-              "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
-              { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
-            )
-          : !canPayFee(game, trade.fee)
-            ? feeShortfallLine(hold, trade.fee)
-            : null;
+      : card !== null && !powerBudgetAllows(game, card)
+        ? t(
+            "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
+            { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
+          )
+        : !canPayFee(game, trade.fee)
+          ? feeShortfallLine(hold, trade.fee)
+          : null;
 
   return (
     <OfferRow

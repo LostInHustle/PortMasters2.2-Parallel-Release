@@ -551,6 +551,11 @@ export const BOON_SWAP_COST = 10;
 // presenting different sized hands with nothing to say that was intended.
 export const CARDS_PER_OFFER = 3;
 
+// The starter pool is the floor under a batch change. A captain at the top
+// of the ladder carries three modules, the table being replaced holds three,
+// and a whole new batch needs three more that are on neither, so a mode needs
+// at least nine starter modules before the yard can promise a change that
+// leaves every face new. The card check holds the floor.
 export const MODULES_TIER0: CardRecord[] = [
   {
     id: "smugglers_hold",
@@ -708,10 +713,6 @@ export const MODULES_TIER0: CardRecord[] = [
       zh: zhCard("overdrive_engine"),
     },
   },
-];
-
-// Drafted only once the first charter has opened, same as BOONS_TIER1.
-export const MODULES_TIER1: CardRecord[] = [
   {
     id: "bureau_token",
     kind: "module",
@@ -771,7 +772,9 @@ export const MODULES_TIER1: CardRecord[] = [
   },
 ];
 
-export const MODULES_TIER2: CardRecord[] = [
+// The second wave, drafted only once the first charter has opened, same as
+// BOONS_TIER1.
+export const MODULES_TIER1: CardRecord[] = [
   {
     id: "foreign_quarter_pass",
     kind: "module",
@@ -831,8 +834,4 @@ export const MODULES_TIER2: CardRecord[] = [
   },
 ];
 
-export const MODULES: CardRecord[] = [
-  ...MODULES_TIER0,
-  ...MODULES_TIER1,
-  ...MODULES_TIER2,
-];
+export const MODULES: CardRecord[] = [...MODULES_TIER0, ...MODULES_TIER1];

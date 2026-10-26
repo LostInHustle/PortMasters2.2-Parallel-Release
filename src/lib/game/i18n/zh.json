@@ -1910,8 +1910,8 @@
       "zh": "❌ 没有可改的批次，先抽取模块"
     },
     "engine.049": {
-      "en": "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch. Take one of these or come back next round.",
-      "zh": "❌ 船坞凑不齐一整批新模块：这一批之外能发的模块不足三件。先从这些里挑一件，或下轮再来。"
+      "en": "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch and your hull. Take one of these or come back next round.",
+      "zh": "❌ 船坞凑不齐一整批新模块：这一批之外、且不在你船上的模块不足三件。先从这些里挑一件，或下轮再来。"
     },
     "engine.050": {
       "en": "🔄 Changed your module batch for a fresh deal",
@@ -6946,12 +6946,12 @@
     },
     "room-b.377": { "en": "Fines", "zh": "罚款" },
     "room-b.378": {
-      "en": "That module is already bolted to your hull.",
-      "zh": "该模块已经装配在你的船体上。"
+      "en": "Every module on the board is already on your hull.",
+      "zh": "市场上的每个模块都已经装在你的船体上。"
     },
     "room-b.379": {
-      "en": "❌ {name} is already bolted to your hull; the extra copy is discarded.",
-      "zh": "❌ {name}已经装配在你的船体上，多出的一份被丢弃。"
+      "en": "❌ {name} is already bolted to your hull; the yard fits each module once.",
+      "zh": "❌ {name}已经装配在你的船体上；每个模块船坞只装一件。"
     },
     "room-b.380": {
       "en": "{item} ({port})",

@@ -42,7 +42,7 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 | Family               | Count                           | Where it lives                      |
 | -------------------- | ------------------------------- | ----------------------------------- |
 | Boons                | 19, over three tiers            | `src/lib/game/constants/drafts.ts`  |
-| Modules              | 14, over three tiers            | `src/lib/game/constants/drafts.ts`  |
+| Modules              | 14, over two tiers              | `src/lib/game/constants/drafts.ts`  |
 | Modifier keys        | 31                              | `src/lib/game/types.ts`             |
 | House perks          | 4 fields, 3 Houses              | `src/lib/game/engine/houses.ts`     |
 | Ages                 | 3                               | `src/lib/game/engine/ages.ts`       |
@@ -213,7 +213,7 @@ The audit found more working than broken, and it is worth naming the working par
 
 **All 31 modifier keys are written and read.** Every key in the `ModifierKey` union at `src/lib/game/types.ts:87` has a grant site and a read site. None is orphaned.
 
-**All 14 modules are read.** Every module id in the three tiers resolves to an effect somewhere in the engine.
+**All 14 modules are read.** Every module id in the two tiers resolves to an effect somewhere in the engine.
 
 **Both module penalty fields are charged and displayed through matching paths.** The penalty a module imposes is read from the same accessor in both places, so they cannot drift.
 
@@ -233,7 +233,7 @@ The audit found more working than broken, and it is worth naming the working par
 
 **Merits are pure achievements by design.** The nine merits are evaluated against the voyage record at conclusion and grant standing rather than modifiers. That is the intended shape, not an unread flag.
 
-**Both deliberate fallbacks are correct.** `artisan_inspiration` returns a weight of zero on an empty roster, which is how the draft avoids offering a boon that cannot fire. `drawModuleBatch` tops up a short batch from cards already aboard, so a small pool still deals three faces when fewer than three unheld modules sit outside the table.
+**The deliberate fallback is correct.** `artisan_inspiration` returns a weight of zero on an empty roster, which is how the draft avoids offering a boon that cannot fire. The module batch has no fallback of that kind: a module already bolted to a hull is never offered again, and a pool that cannot deal three fresh faces refuses the change instead of recycling the hull's own modules.
 
 **The Harbor member candidate filter for Bequest Routing is correct.** It excludes the borrower and the bankrupt captain, which is exactly the set that cannot receive the routing.
 

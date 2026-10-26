@@ -20,7 +20,6 @@ import {
   BOONS_TIER2,
   MODULES_TIER0,
   MODULES_TIER1,
-  MODULES_TIER2,
 } from "./constants/drafts";
 import {
   PRODUCTS_TIER0,
@@ -84,7 +83,7 @@ export function unlockedModules(
   roundNo: number,
 ): CardRecord[] {
   return unlockedPool<CardRecord>(
-    [MODULES_TIER0, MODULES_TIER1, MODULES_TIER2],
+    [MODULES_TIER0, MODULES_TIER1],
     difficulty,
     roundNo,
   );

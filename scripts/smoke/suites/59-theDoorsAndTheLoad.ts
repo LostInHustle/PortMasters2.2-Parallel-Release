@@ -191,13 +191,13 @@ export async function theDoorsAndTheLoadSuite(): Promise<void> {
   ];
   healLoadedVoyage(recut, { legacyRenownLevel: null });
   check(
-    recut.equippedModules.length === 2 &&
-      recut.equippedModules.every((mod) => mod === overdrive) &&
+    recut.equippedModules.length === 1 &&
+      recut.equippedModules[0] === overdrive &&
       recut.equippedModules[0]?.strings.en.name === "Overdrive Engine" &&
-      recut.maintenancePenalty === 20 &&
+      recut.maintenancePenalty === 10 &&
       recut.revealedIntel.length === 1 &&
       recut.revealedIntel[0]?.port === "Yun",
-    "the hull heals through the same pool every reader resolves a held card through: both copies of the old shape land as this build's own record, so the yard's cardText reads a strings table that exists and the two copies still count their surcharge twice, an id the pool cannot answer for and a null are dropped rather than drawn, and the whisper board keeps only entries carrying the item and port its readers index",
+    "the hull heals through the same pool every reader resolves a held card through: a second copy of the old shape collapses into the one the hull carries, so the yard's cardText reads a strings table that exists and the module counts its surcharge once, an id the pool cannot answer for and a null are dropped rather than drawn, and the whisper board keeps only entries carrying the item and port its readers index",
   );
 
   // ========== D. The pantry's reader asks for its own keys ==========

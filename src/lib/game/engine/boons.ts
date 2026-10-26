@@ -234,39 +234,44 @@ export function selectBoon(
   return true;
 }
 
-// Deal a batch from the unlocked pool, holding back every excluded id.
-// Unheld cards are drawn first so a press changes the faces rather than
-// recycling the hull's own modules; when the pool cannot supply a whole
-// batch without them, the equipped cards fill the rest. Returns whatever it
-// could draw, and the caller decides whether a short batch is usable.
+// Deal a batch from the unlocked pool, holding back every excluded id and
+// every module already aboard. An equipped card is never dealt: the hull
+// carries a module once, and a second copy would add slot, power and a
+// surcharge without an effect. The draw returns a short batch when the pool
+// cannot supply three, and the caller decides whether that is usable.
 function drawModuleBatch(
   state: GameState,
   excluded: ReadonlySet<string>,
 ): CardRecord[] {
-  const pool = offerPool("module", state).filter(
-    ([card]) => !excluded.has(card.id),
-  );
   const equipped = new Set(state.equippedModules.map((card) => card.id));
-  const picks = drawOffer(
-    pool.filter(([card]) => !equipped.has(card.id)),
-    CARDS_PER_OFFER,
+  const pool = offerPool("module", state).filter(
+    ([card]) => !excluded.has(card.id) && !equipped.has(card.id),
   );
-  if (picks.length < CARDS_PER_OFFER) {
-    const drawn = new Set(picks.map((card) => card.id));
-    picks.push(
-      ...drawOffer(
-        pool.filter(([card]) => !drawn.has(card.id)),
-        CARDS_PER_OFFER - picks.length,
-      ),
-    );
-  }
-  return picks;
+  return drawOffer(pool, CARDS_PER_OFFER);
+}
+
+// Whether the hull already carries this module. A module is present or
+// absent rather than stacked, so every door into the hull asks this before
+// it installs.
+function alreadyAboard(state: GameState, card: CardRecord): boolean {
+  return state.equippedModules.some((mod) => mod.id === card.id);
+}
+
+// The yard's refusal for a card the hull already carries. It is reached only
+// through a table saved by a build that could deal one, or a parked pick
+// from such a table: the draw above never offers an equipped module.
+function duplicateRefusal(card: CardRecord): LedgerLine {
+  return line(
+    "❌ {name} is already bolted to your hull; the yard fits each module once.",
+    { name: (locale) => cardName(card.id, locale) },
+  );
 }
 
 // The initial deal is not filtered by fit: every seat is a real choice, and
 // a card the hull cannot take is refused when the captain picks it, after
-// they have had the chance to change the hull. The draw is stored, not
-// derived again, so the trio cannot change between roll and pick.
+// they have had the chance to change the hull. The hull's own modules are
+// held back like any other card it cannot be offered again. The draw is
+// stored, not derived again, so the trio cannot change between roll and pick.
 function rollModuleChoices(state: GameState): CardRecord[] {
   const picks = drawModuleBatch(state, new Set());
   for (const card of picks) noteCardOffer(state.cardTally, card);
@@ -333,10 +338,10 @@ export function startModuleDrafting(state: GameState) {
 }
 
 // One free batch change per round. Every press replaces all three faces: the
-// cards now on the table are excluded from the draw, so a use never buys a
-// reshuffle. A pool that cannot supply a whole batch without recycling the
-// table is refused and the use stays unspent. A parked swap pick belonged to
-// the old table, so a successful press clears it.
+// cards now on the table and the modules already aboard are excluded from the
+// draw, so a use never buys a reshuffle or a card the hull carries. A pool
+// that cannot supply a whole batch is refused and the use stays unspent. A
+// parked pick belonged to the old table, so a successful press clears it.
 export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
   if (state.moduleSwapUsed) {
     logs.push(line("❌ You've already changed your module batch this round"));
@@ -351,7 +356,7 @@ export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
   if (cards.length < CARDS_PER_OFFER) {
     logs.push(
       line(
-        "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch. Take one of these or come back next round.",
+        "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch and your hull. Take one of these or come back next round.",
       ),
     );
     return;
@@ -363,11 +368,12 @@ export function swapModuleChoices(state: GameState, logs: LedgerLine[]) {
   logs.push(line("🔄 Changed your module batch for a fresh deal"));
 }
 
-// Defense in depth for the power cap. A refusal leaves the phase in place so
-// the captain can take another seat or back out. A card that only fits by
-// swap is routed to the picker even when a slot is open, because the open
-// slot's arithmetic is the one that failed; the refusal prints the best case
-// total, which is the total after replacing the heaviest module aboard.
+// Defense in depth for the power cap and the hull's one copy per module. A
+// refusal leaves the phase in place so the captain can take another seat or
+// back out. A card that only fits by swap is routed to the picker even when a
+// slot is open, because the open slot's arithmetic is the one that failed;
+// the refusal prints the best case total, which is the total after replacing
+// the heaviest module aboard.
 export function handleModuleSelect(
   state: GameState,
   idx: number,
@@ -375,6 +381,10 @@ export function handleModuleSelect(
 ) {
   const mod = state._draftChoices?.[idx];
   if (!mod) return;
+  if (alreadyAboard(state, mod)) {
+    logs.push(duplicateRefusal(mod));
+    return;
+  }
   if (!moduleFitsHull(state, mod)) {
     logs.push(powerRefusal(state, mod, heaviestEquipped(state)));
     return;
@@ -394,8 +404,11 @@ export function handleModuleSelect(
 }
 
 // A stale slot index is refused in words: a Parley trade can remove a module
-// between drawing the picker and this press. The card leaves the pool only
-// after the swap is confirmed, so Back to Draft still shows it.
+// between drawing the picker and this press. A parked pick the hull already
+// carries is refused for the same reason, which only a stale save can ask
+// now that the draw and the selection both hold equipped cards back. The
+// card leaves the pool only after the swap is confirmed, so Back to Draft
+// still shows it.
 export function finalizeModuleSwap(
   state: GameState,
   slotIdx: number,
@@ -403,6 +416,10 @@ export function finalizeModuleSwap(
 ) {
   const mod = state._newModule;
   if (!mod) return;
+  if (alreadyAboard(state, mod)) {
+    logs.push(duplicateRefusal(mod));
+    return;
+  }
   // The pressed row names a seat on the hull as it stood when the picker was
   // drawn. A trade may have removed it since.
   const displaced = state.equippedModules[slotIdx];

@@ -55,7 +55,6 @@ export type Action =
   | {
       type: "APPLY";
       fn: (g: GameState, logs: LedgerLine[]) => void;
-      postDraft?: boolean;
     }
   | {
       type: "START_FRESH";

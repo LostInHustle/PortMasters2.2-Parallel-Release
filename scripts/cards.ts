@@ -15,8 +15,15 @@
  * reading the mode field exists to move, and a pool whose shape nobody has
  * looked at is one that widens by accident.
  */
-import { modePoolShape, shippedCards, validateCards } from "@/lib/game/cards";
+import {
+  cardRunsInMode,
+  modePoolShape,
+  shippedCards,
+  validateCards,
+} from "@/lib/game/cards";
 import { CARD_KINDS, MODE_POWER_CEILING } from "@/lib/game/constants/cards";
+import { CARDS_PER_OFFER, MODULES_TIER0 } from "@/lib/game/constants/drafts";
+import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
 import type { GameMode } from "@/lib/game/mode";
 
 const subject = shippedCards();
@@ -37,19 +44,41 @@ const kinds = CARD_KINDS.map(
   (kind) => `${kind} ${subject.cards.filter((c) => c.kind === kind).length}`,
 ).join(", ");
 
-if (findings.length === 0) {
+// The floor under a batch change: a full hull, the table it replaces and a
+// whole new batch are three sets of three, so each mode's starter pool has to
+// hold that many cards before the yard can promise three fresh faces.
+const STARTER_FLOOR = MAX_SHIP_LEVEL + 2 * CARDS_PER_OFFER;
+const starterCounts = Object.fromEntries(
+  modes.map((mode) => [
+    mode,
+    MODULES_TIER0.filter((card) => cardRunsInMode(card, mode)).length,
+  ]),
+) as Record<GameMode, number>;
+const starters = modes
+  .map((mode) => `${mode} ${starterCounts[mode]}`)
+  .join(", ");
+const floorFindings = modes
+  .filter((mode) => starterCounts[mode] < STARTER_FLOOR)
+  .map(
+    (mode) =>
+      `${mode} carries ${starterCounts[mode]} starter modules and needs ${STARTER_FLOOR}: a full hull, the table it is changing and a fresh batch are three cards each.`,
+  );
+const allFindings = [...findings, ...floorFindings];
+
+if (allFindings.length === 0) {
   console.log(
     `The cards hold. ${subject.cards.length} records (${kinds}), one shape, two languages each.`,
   );
   console.log(`The modes run: ${shape}.`);
+  console.log(`The starter pools carry: ${starters} (floor ${STARTER_FLOOR}).`);
   process.exit(0);
 }
 
 console.log(
-  `The card check found ${findings.length} thing${findings.length === 1 ? "" : "s"}:\n`,
+  `The card check found ${allFindings.length} thing${allFindings.length === 1 ? "" : "s"}:\n`,
 );
-for (const finding of findings) console.log(`  ${finding}`);
+for (const finding of allFindings) console.log(`  ${finding}`);
 console.log(
-  `\nThe pool: ${subject.cards.length} records. The modes run: ${shape}.`,
+  `\nThe pool: ${subject.cards.length} records. The modes run: ${shape}. The starter pools carry: ${starters} (floor ${STARTER_FLOOR}).`,
 );
 process.exit(1);

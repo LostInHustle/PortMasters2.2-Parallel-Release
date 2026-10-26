@@ -116,7 +116,7 @@ export function applyModuleTradeSide(
       ) {
         logs.push(
           line(
-            "❌ {name} is already bolted to your hull; the extra copy is discarded.",
+            "❌ {name} is already bolted to your hull; the yard fits each module once.",
             {
               name,
             },
@@ -135,8 +135,8 @@ export function applyModuleTradeSide(
       }
     },
     onSell: (state, logs) => {
-      // The automatic unequip, found by position: the first copy goes, so a
-      // captain with two of the same module keeps one.
+      // The automatic unequip, found by id: a hull carries each module once,
+      // and the accounting unwinds with the record it removes.
       const at = state.equippedModules.findIndex((m) => m.id === trade.module);
       if (at >= 0) {
         unequipModuleAccounting(state, state.equippedModules[at]);

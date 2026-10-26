@@ -259,6 +259,25 @@ export async function moduleTradesSuite(
       "the buyer's side pays the price the two captains agreed and bolts the module onto the hull, and the only machine the module ever lands on is the buyer's own",
     );
 
+    const alreadyHeld = hullState({
+      currentRound: 3,
+      equippedModules: [hauler],
+    });
+    const alreadyHeldLogs: LedgerLine[] = [];
+    check(
+      applyModuleTradeSide(alreadyHeld, agreed, "buyer", alreadyHeldLogs) &&
+        alreadyHeld.equippedModules.length === 1 &&
+        alreadyHeld.equippedModules[0]?.id === "bulk_hauler" &&
+        alreadyHeld.money === 460 &&
+        ledgerSentences(alreadyHeldLogs).some((sentence) =>
+          sentence.includes("already bolted to your hull"),
+        ) &&
+        !ledgerSentences(alreadyHeldLogs).some((sentence) =>
+          sentence.includes("bolted to the hull."),
+        ),
+      "a buyer who already carries the module cannot buy a second copy: a stale agreement settles without adding a slot, a power or a surcharge, the ledger says the hull already has it, and the market hides the row before this floor is reached",
+    );
+
     const fullHull = hullState({
       currentRound: 3,
       equippedModules: [hauler, overdrive, smuggler],
@@ -1140,6 +1159,18 @@ export async function moduleTradesSuite(
       marketDesk.includes("comes off the board when the round turns") &&
       marketDesk.includes("Any captain with a module bolted on can list one"),
     "and the empty board tells the seller what took a row of theirs off it and the buyer who may list at all, so the invitation to be first cannot be read as a claim that a listing already posted is still standing",
+  );
+  check(
+    marketDesk.includes("const visibleTrades = modules.moduleTrades.filter(") &&
+      marketDesk.includes(
+        "!game.equippedModules.some((m) => m.id === trade.module)",
+      ) &&
+      marketDesk.includes("visibleTrades.map((trade)") &&
+      marketDesk.includes(
+        "Every module on the board is already on your hull.",
+      ) &&
+      !marketDesk.includes('t("That module is already bolted to your hull.")'),
+    "a module already on this captain's hull is not drawn as an offer: the board hides the row until the module leaves the hull, keeps the seller's own row so it can be withdrawn, and keeps an agreed row as the record of a sale, so the only copy of a module a captain can take is one the hull does not already carry",
   );
 
   // The buyer's purse, which is the one condition the settle deliberately

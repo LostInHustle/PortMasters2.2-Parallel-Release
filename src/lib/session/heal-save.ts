@@ -118,6 +118,16 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
     (game as unknown as { equippedModules?: unknown }).equippedModules,
     mode,
   );
+  // The round's table and its parked pick are transients, but a save from a
+  // build that could deal an equipped module can carry one. Healing them
+  // against the hull keeps that card off the draft screen as well as off the
+  // hull, and a repeat is dropped for the same reason.
+  const hullIds = new Set(game.equippedModules.map((card) => card.id));
+  game._draftChoices = healModuleTable(game._draftChoices, mode, hullIds);
+  const parked = game._newModule;
+  if (parked && !game._draftChoices?.some((card) => card.id === parked.id)) {
+    game._newModule = undefined;
+  }
   // Fills in worker types the save predates, and reads pre-charter saves
   // that still carried separate weavers / masterWeavers / sachetMakers.
   game.workers = normalizeWorkerRoster(
@@ -154,12 +164,14 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
 }
 
 // The hull, healed through the pool. Unknown ids, strings and nulls are
-// damage and are dropped; duplicates are kept one entry per copy, which the
-// sell and swap flows read. A module the current mode does not run is
-// dropped, so a Gambit save rejoined in a Classic room loses it.
+// damage and are dropped, and a repeat is dropped too: a hull carries each
+// module once, and a second copy would add slot, power and a surcharge
+// without an effect. A module the current mode does not run is dropped, so a
+// Gambit save rejoined in a Classic room loses it.
 function healHull(raw: unknown, mode: GameState["mode"]): CardRecord[] {
   if (!Array.isArray(raw)) return [];
   const hull: CardRecord[] = [];
+  const seen = new Set<string>();
   for (const item of raw) {
     const id =
       item !== null && typeof item === "object"
@@ -168,9 +180,39 @@ function healHull(raw: unknown, mode: GameState["mode"]): CardRecord[] {
     const card = typeof id === "string" ? cardById(id) : null;
     if (card === null || card.kind !== "module") continue;
     if (!cardRunsInMode(card, mode)) continue;
+    if (seen.has(card.id)) continue;
+    seen.add(card.id);
     hull.push(card);
   }
   return hull;
+}
+
+// The round's module table, healed through the pool. An entry the pool cannot
+// answer, a card the mode does not run, a card already aboard and a repeat
+// are all dropped: the draw never deals any of them, so a table saved by a
+// build that could is not allowed to offer one now. An emptied table reads as
+// undefined, which lets the yard roll a fresh one rather than standing on no
+// choices.
+function healModuleTable(
+  raw: unknown,
+  mode: GameState["mode"],
+  hullIds: ReadonlySet<string>,
+): CardRecord[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const table: CardRecord[] = [];
+  for (const item of raw) {
+    const id =
+      item !== null && typeof item === "object"
+        ? (item as Record<string, unknown>).id
+        : null;
+    const card = typeof id === "string" ? cardById(id) : null;
+    if (card === null || card.kind !== "module") continue;
+    if (!cardRunsInMode(card, mode)) continue;
+    if (hullIds.has(card.id)) continue;
+    if (table.some((held) => held.id === card.id)) continue;
+    table.push(card);
+  }
+  return table.length > 0 ? table : undefined;
 }
 
 // The fleet commission, the manifest audit and the hold.
