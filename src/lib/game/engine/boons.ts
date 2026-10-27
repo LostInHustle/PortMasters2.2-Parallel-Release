@@ -17,7 +17,7 @@ import {
 import type { CardRecord } from "../constants/cards";
 import { HELD_POWER_CAP } from "../constants/cards";
 import { BOON_SWAP_COST, CARDS_PER_OFFER } from "../constants/drafts";
-import { MAX_SHIP_LEVEL, SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
+import { SHIP_DISCOUNT_PER_LEVEL } from "../constants/ships";
 import { settleHunger } from "../crew";
 import {
   heldFlagsOf,
@@ -28,7 +28,7 @@ import { feedCrew } from "../larder";
 import type { GameState } from "../types";
 import { resetEscortRound } from "./contracts";
 import { resetConsentLedger } from "./consent";
-import { moduleSlotsOpen } from "./core";
+import { moduleSlotsOpen, nextShipUpgradeCost } from "./core";
 import { noteDawnMilestones } from "./milestones";
 
 // Offer counts are tallied at the offer, not the pick, so conversion has the
@@ -59,9 +59,8 @@ function applyBoon(state: GameState, card: CardRecord, logs: LedgerLine[]) {
 }
 
 export function upgradeShip(state: GameState, logs: LedgerLine[]) {
-  if (state.shipLevel >= MAX_SHIP_LEVEL) return;
-  const cost =
-    state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
+  const cost = nextShipUpgradeCost(state);
+  if (cost === null) return;
   if (state.money < cost) {
     logs.push(line("❌ Need {cost} Gold for the hull upgrade", { cost }));
     return;

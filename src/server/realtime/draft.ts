@@ -393,7 +393,6 @@ export function recordPathSwitch(
   const published: PathSwitched = {
     roomId,
     userId: row.userId,
-    name: row.name,
     path: row.path,
   };
   io.to(roomChannel(roomId)).emit("path:switched", published);

@@ -39,7 +39,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { walkSrc } from "./walk-src";
+import { walkSrc, withoutComments } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -51,8 +51,14 @@ const sourceFiles = [
   join(ROOT, "server.ts"),
 ];
 
+// The declarations and the reads are both taken from the code alone. A
+// comment that names an export is a note about the code, not a reader of
+// it, and a commented out import is not an importer: counting either
+// would let a dead surface report itself alive.
 const bodies = new Map<string, string>();
-for (const file of sourceFiles) bodies.set(file, readFileSync(file, "utf8"));
+for (const file of sourceFiles) {
+  bodies.set(file, withoutComments(readFileSync(file, "utf8")));
+}
 
 /**
  * The names the App Router reads for itself, and the files it loads by

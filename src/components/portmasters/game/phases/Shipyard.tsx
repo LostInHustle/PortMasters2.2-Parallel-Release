@@ -6,6 +6,7 @@ import { cardText } from "@/lib/game/cards";
 import {
   leavePhase,
   moduleSlotsOpen,
+  nextShipUpgradeCost,
   startModuleDrafting,
   upgradeShip,
 } from "@/lib/game/engine";
@@ -19,21 +20,14 @@ import { heldPower } from "@/lib/game/held-cards";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
 import { FoldRow } from "../FoldRow";
-import { PanelNote } from "./PhasePanels";
 import {
+  PanelNote,
   PhaseClockBar,
   PhaseHeading,
   PhaseWaiting,
   type PhasePanelProps,
 } from "./PhaseShared";
 import { ModuleSynergyAnalyzer } from "./ModuleSynergy";
-
-// The draft and the swap are the same two screens whether they are reached
-// from the shipyard's own button or drawn by the phase dispatcher, so they
-// live beside it and are exported from here, which is where the dispatcher
-// has always imported them from.
-export { ModuleDraft } from "./ModuleDraft";
-export { ModuleSwap } from "./ModuleSwap";
 
 export function Shipyard({
   game,
@@ -44,9 +38,7 @@ export function Shipyard({
 }: Pick<PhasePanelProps, "game" | "ctx" | "act" | "phaseSync" | "members">) {
   const [rigOpen, setRigOpen] = useState(false);
   const canUpgrade = game.shipLevel < MAX_SHIP_LEVEL;
-  const upgCost = canUpgrade
-    ? game.shipUpgradeCost[game.shipLevel] + game.shipUpgradePenalty
-    : 0;
+  const upgCost = nextShipUpgradeCost(game) ?? 0;
   const affordable = game.money >= upgCost;
   // The door opens for any hull that has a slot to rig. Whether a module
   // fits the hull's power is judged on the draft screen, after the captain
@@ -92,7 +84,9 @@ export function Shipyard({
         </div>
         {game.equippedModules.length === 0 && (
           <PanelNote className="mt-2 text-xs">
-            {t("No modules installed. Upgrade the hull to unlock slots!")}
+            {game.shipLevel === 0
+              ? t("No modules installed. Upgrade the hull to unlock slots!")
+              : t("No modules installed. Draft one to fill your open slot.")}
           </PanelNote>
         )}
       </div>

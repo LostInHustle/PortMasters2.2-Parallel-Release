@@ -17,7 +17,8 @@ import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { normalizeDifficulty, type Difficulty } from "@/lib/game/difficulty";
 import { DEFAULT_MODE } from "@/lib/game/mode";
-import { generateRoomCode, normalizeRoomName } from "@/lib/rooms";
+import { generateRoomCode } from "@/lib/rooms";
+import { normalizeRoomName } from "@/lib/room-policy";
 import { emitToUser, userSockets } from "./presence";
 
 // The seat a captain is waiting in, and the tier they asked for.

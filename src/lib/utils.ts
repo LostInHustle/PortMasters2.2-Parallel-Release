@@ -48,9 +48,3 @@ export function formatDate(d: Date | string, locale?: "en" | "zh"): string {
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleDateString(intlLocale(locale));
 }
-
-// Forwarded from ./rooms so the Lobby and GameRoom can keep importing
-// normalizeRoomName from "@/lib/utils" as the original single process build
-// did. The function itself lives in ./rooms beside the harbor code that also
-// uses it.
-export { normalizeRoomName } from "./rooms";

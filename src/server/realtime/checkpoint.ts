@@ -10,12 +10,7 @@ import type { Server } from "socket.io";
 import { db } from "@/lib/db";
 import { loadServerConfig } from "@/lib/config";
 import { roomMemberIds } from "@/lib/rooms";
-import {
-  checkpointRank,
-  isGatedPhase,
-  lapSuccessor,
-  openingPhase,
-} from "@/lib/game/checkpoint";
+import { isGatedPhase, lapSuccessor } from "@/lib/game/checkpoint";
 import { normalizePhase, phaseFace, seatOf } from "@/lib/game/phases";
 import { modeConfig, normalizeMode } from "@/lib/game/mode";
 import { tFor } from "@/lib/game/i18n";
@@ -39,8 +34,6 @@ import { roomStatuses } from "./status";
 import { noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
 import { roomPulseTallies } from "./pulse";
-
-export { checkpointRank, openingPhase };
 
 export const roomCheckpoints = new Map<string, Checkpoint>();
 

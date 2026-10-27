@@ -54,10 +54,18 @@ export async function cleanupSuite(
       // Only harbors this run created are deleted. A Quick Start can
       // legitimately seat the two test captains into a harbor that was
       // already open, and that harbor belongs to whoever opened it.
-      for (const id of [roomId, quickStartRoomId, ...run.lapRoomIds]) {
-        if (id && !run.preExistingRoomIds.has(id)) {
-          await db.room.deleteMany({ where: { id } });
-        }
+      const createdRoomIds = [
+        roomId,
+        quickStartRoomId,
+        ...run.lapRoomIds,
+      ].filter(
+        (id): id is string =>
+          typeof id === "string" &&
+          id.length > 0 &&
+          !run.preExistingRoomIds.has(id),
+      );
+      for (const id of createdRoomIds) {
+        await db.room.deleteMany({ where: { id } });
       }
       if (ids.length) {
         await db.session.deleteMany({ where: { userId: { in: ids } } });
@@ -66,20 +74,17 @@ export async function cleanupSuite(
       // The telemetry rows and the report rows are the two things a
       // deleted harbor does not take with it, and deliberately so: both
       // models carry a bare roomId rather than a foreign key, because
-      // both have to outlive the harbor they describe. The two deletes
-      // above have just removed every harbor this run created, so the
-      // rows left pointing at a harbor that no longer exists are this
-      // run's, and the database is put back the way it was found.
-      const roomsLeft = await db.room.findMany({ select: { id: true } });
-      const orphaned = roomsLeft.length
-        ? {
-            where: {
-              roomId: { notIn: roomsLeft.map((room) => room.id) },
-            },
-          }
-        : undefined;
-      await db.voyageTelemetry.deleteMany(orphaned);
-      await db.report.deleteMany(orphaned);
+      // both have to outlive the harbor they describe. Delete only the
+      // rows addressed to a harbor this run created. A complement query
+      // would also sweep every row left by a harbor deleted before this
+      // run, and with no rooms left it would delete the whole table.
+      // Rows a suite wrote for a pre-existing harbor stay, because that
+      // harbor's history is not this run's to remove.
+      if (createdRoomIds.length) {
+        const where = { roomId: { in: createdRoomIds } };
+        await db.voyageTelemetry.deleteMany({ where });
+        await db.report.deleteMany({ where });
+      }
     } catch (err) {
       // Reported, never swallowed: an unnoticed leftover account is
       // exactly what this block exists to prevent.

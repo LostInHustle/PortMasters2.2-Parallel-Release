@@ -5,11 +5,12 @@
 // newest-socket guard, the frame, the surge, and the checkpoint move.
 
 import { PublicUser } from "@/types/realtime/presence";
-import { GameStatusUpdate } from "@/types/realtime/status";
+import type { GameStatusUpdate, StatusFrame } from "@/types/realtime/status";
 import { TIDEWATCH_SURGE_THRESHOLD } from "@/lib/game/constants/world";
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
+import { checkpointRank } from "@/lib/game/checkpoint";
 import { tFor } from "@/lib/game/i18n";
 import { voyageRoundsFor } from "@/lib/game/mode";
 import { normalizePhase, seatOf } from "@/lib/game/phases";
@@ -21,7 +22,6 @@ import { roomChannel } from "../channel";
 import {
   armPhaseClock,
   broadcastReadyState,
-  checkpointRank,
   clearAdvanceWatch,
   getCheckpoint,
   maybeAdvance,
@@ -38,24 +38,11 @@ import type { Checkpoint } from "../types";
 import { resolveExpiredVentures } from "../ventures";
 import { noteVoyageLog, noteVoyageLogAdvance } from "../voyage-log";
 
-// What a captain's client reports; the reading lives in the browser's GameState.
-type GameStatusReport = {
-  roomId?: string;
-  round?: number;
-  phase?: Phase;
-  phaseLabel?: string;
-  gold?: number;
-  reputation?: number;
-  gameOver?: boolean;
-  renownLevel?: number;
-  // The two marks a failed voyage leaves on a seat that keeps sailing. Optional
-  // because a client that never failed, and every older client, reports neither.
-  bankrupt?: boolean;
-  marooned?: boolean;
-  // Whether this captain's crew is going hungry. The Larder lives in the
-  // browser's GameState, so only the browser can read it.
-  shortRations?: boolean;
-};
+// What a captain's client reports; the reading lives in the browser's
+// GameState. Every field is optional because a client can report only part of
+// the frame, and a client from before a field reports less. The shape is the
+// browser's own StatusFrame, so the two ends cannot drift.
+type GameStatusReport = Partial<StatusFrame>;
 
 export function wireStatusHeartbeat(io: Server, socket: Socket): void {
   socket.on("game:status", async (payload: GameStatusReport) => {

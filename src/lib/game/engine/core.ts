@@ -8,10 +8,27 @@
 // one subsystem would make that subsystem an import target for all the
 // others for no reason other than history.
 // =====================================================================
+import { MAX_SHIP_LEVEL } from "../constants/ships";
 import type { GameState } from "../types";
 
 export function hasModule(state: GameState, id: string): boolean {
   return state.equippedModules.some((m) => m.id === id);
+}
+
+/**
+ * What the next hull upgrade costs, or null when the hull is already at the
+ * top of the ladder. The yard's button, the upgrade step and the action
+ * suggester all quote this one figure, so a penalty or a rung can never be
+ * counted twice by one of them and missed by another.
+ */
+export function nextShipUpgradeCost(
+  state: Pick<
+    GameState,
+    "shipLevel" | "shipUpgradeCost" | "shipUpgradePenalty"
+  >,
+): number | null {
+  if (state.shipLevel >= MAX_SHIP_LEVEL) return null;
+  return state.shipUpgradeCost[state.shipLevel] + state.shipUpgradePenalty;
 }
 
 // How many module slots this hull has open, which is the one place the

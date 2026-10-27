@@ -19,6 +19,7 @@ import {
   lockedBehind,
   maintenanceDue,
   moduleSlotsOpen,
+  nextShipUpgradeCost,
   quoteOrder,
   wagesDue,
 } from "@/lib/game/engine";
@@ -494,7 +495,8 @@ function analyzeShipyard(game: GameState): Suggestion | null {
   const roundsLeft = game.maxRounds - game.currentRound;
 
   if (game.shipLevel === 0 && roundsLeft >= 2) {
-    const cost = game.shipUpgradeCost[0] + game.shipUpgradePenalty;
+    const cost = nextShipUpgradeCost(game);
+    if (cost === null) return null;
     if (game.money >= cost + 20) {
       return {
         icon: "⚓",

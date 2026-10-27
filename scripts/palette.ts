@@ -313,7 +313,6 @@ const WIDGETS: Widget[] = [
   { name: "ship", hue: 111, screens: ["session"], what: "Ship and Funds" },
   { name: "members", hue: 175, screens: ["session"], what: "Members" },
   { name: "chat", hue: 240, screens: ["session"], what: "Chat" },
-  { name: "ledger", hue: 304, screens: ["session"], what: "Ledger" },
 
   /* The phases. Each key of PHASE_FACES gets its own hue, and the screen
      string is that phase's own, so a phase carries only its own phase tag

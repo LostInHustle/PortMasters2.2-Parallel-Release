@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cardText } from "@/lib/game/cards";
+import { usedCargoSlots } from "@/lib/game/hold";
 import { renderLedger } from "@/lib/game/ledger";
 import type { Difficulty } from "@/lib/game/difficulty";
 import { t } from "@/lib/game/i18n";
@@ -408,7 +409,7 @@ export function PlayerDetailModal({
  * Captain comparison bar. Shows two captains' key stats side by side
  * with visual bars so a captain can see at a glance how they stack up
  * against a peer. Compares Gold, Reputation, Ship Level, and Cargo
- * value (sum of all inventory).
+ * (goods held, counted the way the hold counts them).
  */
 function ComparisonBar({
   myDetail,
@@ -432,15 +433,11 @@ function ComparisonBar({
   if (!theirPlayer) return null;
 
   // Cargo is counted in items, not in Gold, so a hold reads the same
-  // whichever goods it happens to be carrying.
-  const myCargoValue = Object.values(myDetail.inventory).reduce(
-    (sum, qty) => sum + qty,
-    0,
-  );
-  const theirCargoValue = Object.values(theirDetail.inventory).reduce(
-    (sum, qty) => sum + qty,
-    0,
-  );
+  // whichever goods it happens to be carrying. The hold's own reader does
+  // the counting, so a stray key on a damaged save cannot inflate the bar
+  // above what the market tab calls cargo.
+  const myCargoValue = usedCargoSlots(myDetail);
+  const theirCargoValue = usedCargoSlots(theirDetail);
 
   const stats: ComparisonStat[] = [
     {

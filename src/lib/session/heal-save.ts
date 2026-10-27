@@ -99,7 +99,7 @@ export function healLoadedVoyage(
   // A voyage from before the Supply Barge loads as a captain who has never
   // bought from it, so the vendor's first round is full rather than spent.
   normalizeBargeState(game);
-  refreshVoyageFacts(game, facts);
+  refreshVoyageFacts(game, facts, mode);
   // After the facts above: the fixed cost falls back to the settled tier's
   // maintenance, and the penalties are read back off the healed hull.
   healShipLedger(game);
@@ -379,7 +379,11 @@ function healShipLedger(game: GameState): void {
 }
 
 // The facts from outside the save, applied last so that they win.
-function refreshVoyageFacts(game: GameState, facts: LoadedSaveFacts): void {
+function refreshVoyageFacts(
+  game: GameState,
+  facts: LoadedSaveFacts,
+  mode: GameMode,
+): void {
   // A captain who leveled up since this voyage was saved gets the current
   // unlocks; the saved value, then 1, covers a missing legacy row.
   game.renownLevel = facts.legacyRenownLevel ?? game.renownLevel ?? 1;
@@ -407,5 +411,7 @@ function refreshVoyageFacts(game: GameState, facts: LoadedSaveFacts): void {
   // Mode decides the phase order. A save restored under a mode the harbor is
   // not keeping would run the right phases in the wrong order and silently
   // desynchronize, so the harbor wins; the hint covers a response without it.
-  game.mode = normalizeMode(facts.apiMode ?? facts.roomMode ?? game.mode);
+  // The mode resolved at the top is the same expression, read once so the
+  // heals and the stored field cannot disagree.
+  game.mode = mode;
 }

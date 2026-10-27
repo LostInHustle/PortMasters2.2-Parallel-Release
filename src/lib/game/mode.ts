@@ -100,7 +100,7 @@ export const MODES: Record<GameMode, ModeConfig> = {
     icon: "⚓",
     tagline: "The harbor as it has always run.",
     summary:
-      "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and refit.",
+      "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and visit the shipyard.",
     experimental: false,
     // Never sealed: the founding voyage stays open to a first visitor.
     sealed: false,
@@ -215,6 +215,8 @@ export const MODES: Record<GameMode, ModeConfig> = {
     differences: [
       "The manifest closes before the table opens: Orders runs ahead of Parley, so you commit to your sheet first and nothing on it can be revised once the fleet starts talking.",
       `Every voyage here runs ${GAMBIT_ROUNDS} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.`,
+      "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
+      "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
       "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
       `From round ${AUDIT_FROM_ROUND}, a simple majority of the fleet can open one captain's manifest at a Parley. The harbor is shown ${AUDIT_REVEAL_COUNT} of that captain's last ${AUDIT_WINDOW} fills, and calling the vote spends the rest of that Parley's trading.`,
       `From round ${GAMBIT_MAROON_FROM}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${PORT_SHIFT_PERCENT} percent either way.`,

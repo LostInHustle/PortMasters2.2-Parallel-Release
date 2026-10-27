@@ -13,8 +13,14 @@
 
 // addOwnedAmount and hasModule stay private to ./engine/. moduleSlotsOpen is
 // exported because the shipyard screens, the action suggester and the module
-// trade panel all ask a hull the same question.
-export { canPayFee, getOwnedAmount, moduleSlotsOpen } from "./engine/core";
+// trade panel all ask a hull the same question. nextShipUpgradeCost is
+// exported because the same three surfaces quote the next rung's price.
+export {
+  canPayFee,
+  getOwnedAmount,
+  moduleSlotsOpen,
+  nextShipUpgradeCost,
+} from "./engine/core";
 
 // The explain* breakdowns are exported for the tooltips that show a captain
 // where a price came from. calcVAT and calcIncomeTax stay inside ./engine/,
@@ -97,7 +103,6 @@ export {
   pathOrderOf,
   purchaseIntel,
   quoteOrder,
-  type OrderQuote,
 } from "./engine/orders";
 
 // The borrow's allowance, payout and sentences. Several layers read this

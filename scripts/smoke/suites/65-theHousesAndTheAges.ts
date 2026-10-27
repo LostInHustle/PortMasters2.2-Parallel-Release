@@ -17,9 +17,11 @@
 // and every engine state below is built in process.
 
 import { db } from "@/lib/db";
+import { HOUSE_BAR, HOUSE_TINT } from "@/components/portmasters/house-colors";
 import { BROKERS_FAVOR_PAYOUT_CAP } from "@/lib/game/constants/world";
 import {
   HOUSES,
+  HOUSE_TOKENS,
   currentAge,
   nextAgeChange,
   noHousePerks,
@@ -39,6 +41,7 @@ import {
   call,
   check,
   ledgerSentences,
+  readSource,
   signUp,
   voyageState,
   walkSrc,
@@ -51,10 +54,6 @@ import type { LedgerLine } from "@/lib/game/ledger";
 
 const REPO = join(import.meta.dirname, "..", "..", "..");
 
-function readSource(relative: string): string {
-  return withoutComments(readFileSync(join(REPO, relative), "utf8"));
-}
-
 // Two weeks in milliseconds, spelled here rather than imported, because
 // the anchor is the contract: every client computes the same Age at the
 // same instant by flooring the Unix clock, and a suite that read the
@@ -63,6 +62,20 @@ function readSource(relative: string): string {
 const FORTNIGHT = 14 * 24 * 60 * 60 * 1000;
 
 export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
+  // Tailwind only emits utilities whose full names appear in source, so the
+  // House tint and bar are literal maps. Pin each literal to the House's own
+  // token, which is the fact the old interpolated builder read.
+  check(
+    HOUSE_IDS.every((id) => {
+      const token = HOUSE_TOKENS[id];
+      return (
+        HOUSE_TINT[id] === `bg-${token}/15 text-${token}` &&
+        HOUSE_BAR[id] === `from-${token}/60 to-${token}`
+      );
+    }),
+    "every House's tint and bar spell that House's own token in full, so Tailwind emits the utilities the screens draw",
+  );
+
   // ========== A. The pledge is account level, and its route is the Lobby's ==========
   const captain = await signUp("pledge");
   run.extraAccounts.push(captain);

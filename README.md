@@ -2,7 +2,7 @@
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
-Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then refitting at the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
 Everything runs as a single npm project on a single port.
 

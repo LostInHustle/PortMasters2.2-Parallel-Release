@@ -57,8 +57,8 @@
       "zh": "港湾一如既往。"
     },
     "mode.classic.summary": {
-      "en": "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and refit.",
-      "zh": "最初的航程。在港口采购，交付订单，与同席船长易货，结算账目，再整备船只。"
+      "en": "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and visit the shipyard.",
+      "zh": "最初的航程。在港口采购，交付订单，与同席船长易货，结算账目，再去船坞。"
     },
     "mode.ocean_gambit.badge": { "en": "Gambit", "zh": "暗潮" },
     "mode.ocean_gambit.tagline": {
@@ -4608,7 +4608,6 @@
       "en": "No path yet. The deal ran before you came aboard, so you sail this voyage without one.",
       "zh": "还没有商道。发牌在你上船之前就结束了，所以本航程你就这样出海，没有商道。"
     },
-    "room-b.279": { "en": "Class", "zh": "船只等级" },
     "room-b.280": {
       "en": "No modules installed. Upgrade the hull in the Shipyard to unlock slots.",
       "zh": "还没装模块。到船坞升级船体就能解锁模块槽位。"
@@ -4838,8 +4837,8 @@
     "lobby.095": { "en": "View captain profile", "zh": "查看船长资料" },
     "lobby.096": { "en": "Captains", "zh": "船长" },
     "lobby.097": { "en": "Sailing", "zh": "航行中" },
-    "lobby.098": { "en": "Captain Legacy", "zh": "船长传承" },
-    "lobby.099": { "en": "View captain legacy", "zh": "查看船长传承" },
+    "lobby.098": { "en": "Captain's Legacy", "zh": "船长传承" },
+    "lobby.099": { "en": "View captain's legacy", "zh": "查看船长传承" },
     "lobby.100": { "en": "Dismiss", "zh": "关闭" },
     "lobby.101": { "en": "Refresh harbors", "zh": "刷新港湾" },
     "lobby.102": { "en": "Refresh the harbor list", "zh": "刷新港湾列表" },
@@ -6468,6 +6467,22 @@
     "residual.493": { "en": "above 66%", "zh": "高于66%" },
     "residual.494": { "en": "62 to 74 min", "zh": "62到74分钟" },
     "residual.495": { "en": "not measurable", "zh": "测不出来" },
+    "residual.496": {
+      "en": "No modules installed. Draft one to fill your open slot.",
+      "zh": "还没装模块。抽一件模块，填上空的槽位！"
+    },
+    "residual.497": {
+      "en": "The round turns once every captain has chosen.",
+      "zh": "每位船长都选好之后，这一轮才继续。"
+    },
+    "residual.498": {
+      "en": "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
+      "zh": "每个阶段都有一只计时器。时间一到，港湾就继续往前走，无论你是否已经准备；你放着没动的那一处，会由引擎按默认替你走完。"
+    },
+    "residual.499": {
+      "en": "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
+      "zh": "常备指令由你预先写好：要哪张机缘、买什么货、雇哪位匠人、交哪张订单。计时器走完时，那一处就按你的指令行事，而不是按默认。"
+    },
     "residual.319": {
       "en": "❌ Need {debt.amount} Gold to repay {debt.counterpartyName}, have {state.money}",
       "zh": "❌ 还{debt.counterpartyName}{debt.amount}金币，手上只有{state.money}"

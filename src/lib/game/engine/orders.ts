@@ -206,7 +206,7 @@ export function orderRewardBonusSteps(
  * One order's money as the settlement reads it: the pieces the reward is
  * made of, the reward itself, and what the run costs to carry the goods.
  */
-export type OrderQuote = {
+type OrderQuote = {
   /** The card's face value, or the payout a borrow would pay. */
   basis: number;
   /** VAT taken off the basis before any bonus applies. */

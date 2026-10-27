@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Sparkles, TrendingUp, Handshake, Coins } from "lucide-react";
-import { useAges } from "@/lib/use-ages";
 import {
   ModalCard,
   ModalClose,
   ModalOverlay,
 } from "@/components/ui/modal-overlay";
-import type { Age, AgeId } from "@/lib/game/engine";
+import { currentAge, type Age, type AgeId } from "@/lib/game/engine";
 import { t } from "@/lib/game/i18n";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +52,12 @@ const AGE_VISUALS: Record<AgeId, AgeVisual> = {
 };
 
 export function AgeBanner({ className }: { className?: string }) {
-  const { age } = useAges();
+  // The Age is computed once per mount from a single clock read, and does not
+  // tick: a tab left open across the fortnight boundary keeps the Age it
+  // mounted with until the next navigation. That is plenty for a two week
+  // cycle, and it means every captain sharing a moment reads the same Age off
+  // the same shared clock.
+  const age = useMemo(() => currentAge(new Date()), []);
   const [expanded, setExpanded] = useState(false);
   const visual = AGE_VISUALS[age.id];
 

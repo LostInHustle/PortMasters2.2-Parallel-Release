@@ -69,14 +69,20 @@ export async function GET(req: NextRequest) {
   });
   const difficulty = room?.difficulty ?? DEFAULT_DIFFICULTY;
   const mode = room?.mode ?? DEFAULT_MODE;
-  const checkpoint =
-    !state && room
-      ? {
-          currentRound: room.currentRound,
-          currentPhase: room.currentPhase,
-          voyageEpoch: room.voyageEpoch,
-        }
-      : null;
+  // The checkpoint rides along whether or not a save was found. A brand
+  // new captain drops into the harbor's current seat, and a captain whose
+  // save predates the departure (a reload between the host's start and
+  // this client's first action) is snapped forward by it rather than
+  // restored to a harbor that has already sailed. Without the second
+  // reading, a reload could leave the captain standing in a lobby no
+  // frame can move.
+  const checkpoint = room
+    ? {
+        currentRound: room.currentRound,
+        currentPhase: room.currentPhase,
+        voyageEpoch: room.voyageEpoch,
+      }
+    : null;
 
   return NextResponse.json({
     state: state?.data ?? null,

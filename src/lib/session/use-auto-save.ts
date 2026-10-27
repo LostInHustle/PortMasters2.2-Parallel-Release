@@ -26,7 +26,7 @@ export function useAutoSave({
   state: SessionState;
   dispatch: Dispatch<Action>;
 }): () => Promise<void> {
-  const { game, loaded } = state;
+  const { game, loaded, persistable } = state;
 
   // Autosave (debounced) to the server.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,7 +36,10 @@ export function useAutoSave({
   const dirtyRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !loaded) return;
+    // A fallback voyage is playable but not writable: the server never
+    // confirmed what this captain holds, and its blank harbor would
+    // overwrite the real voyage the retry is still trying to fetch.
+    if (!enabled || !loaded || !persistable) return;
     latestGameRef.current = game;
     dirtyRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -53,7 +56,7 @@ export function useAutoSave({
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [game, loaded, roomId, enabled, dispatch]);
+  }, [game, loaded, persistable, roomId, enabled, dispatch]);
 
   // Flush any unsaved changes immediately. Call this before deliberately
   // leaving a harbor so the debounce window above can't silently drop the

@@ -38,7 +38,9 @@ export function BoonDraft({
           {t("🧭 Boon Locked In")}
         </PhaseHeading>
         <p className="text-sm text-muted-foreground mb-5">
-          {t("The voyage begins once every captain has chosen.")}
+          {game.currentRound === 1
+            ? t("The voyage begins once every captain has chosen.")
+            : t("The round turns once every captain has chosen.")}
         </p>
         <PhaseClockBar
           phaseSync={phaseSync}

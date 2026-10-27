@@ -8,11 +8,8 @@ import {
   requestLocale,
   unauthorizedResponse,
 } from "@/lib/api-auth";
-import {
-  generateRoomCode,
-  normalizeRoomName,
-  serializeRoom,
-} from "@/lib/rooms";
+import { generateRoomCode, serializeRoom } from "@/lib/rooms";
+import { normalizeRoomName } from "@/lib/room-policy";
 import { normalizeDifficulty } from "@/lib/game/difficulty";
 import { tFor } from "@/lib/game/i18n";
 import { modeConfig, normalizeMode } from "@/lib/game/mode";

@@ -157,8 +157,6 @@
   --w-members: oklch(0.53 0.13 175);
   /* Chat: the table talking. */
   --w-chat: oklch(0.53 0.13 240);
-  /* Ledger: what has happened so far. */
-  --w-ledger: oklch(0.53 0.13 304);
 
   --w-voyage-fill: oklch(0.55 0.15 47);
   --w-chat-fill: oklch(0.55 0.15 240);
@@ -197,10 +195,6 @@
   --w-dusk: oklch(0.53 0.13 90);
   /* Endgame: the voyage closes. */
   --w-endgame: oklch(0.53 0.13 132);
-  /* Bankruptcy: a fleet lost. It wears Dawn's hue, the two of which can
-     never be on screen together: a voyage that ends here never reaches
-     another boon draft. */
-  --w-bankruptcy: oklch(0.53 0.13 325);
   /* Module Draft: choosing what to bolt on. */
   --w-module-draft: oklch(0.53 0.13 132);
   /* Module Swap: changing what is already there. */
@@ -215,6 +209,8 @@
   --w-resolve-fill: oklch(0.55 0.15 261);
   --w-dusk-fill: oklch(0.55 0.15 90);
   --w-endgame-fill: oklch(0.55 0.15 132);
+  /* A fleet lost. It wears Dawn's hue, and the two are never on screen
+     together: a voyage that ends here never reaches another boon draft. */
   --w-bankruptcy-fill: oklch(0.55 0.15 325);
   --w-module-draft-fill: oklch(0.55 0.15 132);
   --w-module-swap-fill: oklch(0.55 0.15 347);
@@ -375,7 +371,6 @@
   --w-ship: oklch(0.76 0.12 111);
   --w-members: oklch(0.76 0.12 175);
   --w-chat: oklch(0.76 0.12 240);
-  --w-ledger: oklch(0.76 0.12 304);
   --w-harbor: oklch(0.76 0.12 68);
   --w-path-draft: oklch(0.76 0.12 207);
   --w-dawn: oklch(0.76 0.12 325);
@@ -385,7 +380,6 @@
   --w-resolve: oklch(0.76 0.12 261);
   --w-dusk: oklch(0.76 0.12 90);
   --w-endgame: oklch(0.76 0.12 132);
-  --w-bankruptcy: oklch(0.76 0.12 325);
   --w-module-draft: oklch(0.76 0.12 132);
   --w-module-swap: oklch(0.76 0.12 347);
   --w-advisor: oklch(0.76 0.12 197);
