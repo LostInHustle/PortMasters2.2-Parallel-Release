@@ -15,7 +15,10 @@
 //   once, via the per module lock, and a buyer's slots bound a purchase
 //   on their panel. A purchase onto a full hull bolts on anyway: both
 //   machines must agree a trade completed, and a module lost between
-//   clients would be a durable thing destroyed by a race.
+//   clients would be a durable thing destroyed by a race. The panel sends
+//   one accept at a time (see ModuleMarket), so that branch is the last
+//   resort for a stale client rather than the ordinary path for a full
+//   hull, and the load holds a hull that took it to the ladder's top.
 import { cardById, cardName, cardsOfKind } from "../cards";
 import { line, type LedgerLine } from "@/lib/game/ledger";
 import { moduleTradesOn } from "../flags";

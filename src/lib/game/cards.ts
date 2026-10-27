@@ -200,6 +200,12 @@ export function cardWeight(card: CardRecord, state: GameState): number {
  * the ones this mode does not run and the ones this captain has no use for
  * removed. A charter is composed at the moment it is offered rather than
  * drawn from a ladder (see ./charters), so the empty arm is deliberate.
+ *
+ * The pool is a view of the immutable catalog rather than a deck held by the
+ * harbor: every call builds a fresh list, and drawOffer copies it before
+ * drawing. One captain taking a module therefore cannot shrink or reshuffle
+ * another captain's offer; what a captain owns lives on their own hull, not
+ * in this function's answer.
  */
 export function offerPool(
   kind: CardKind,

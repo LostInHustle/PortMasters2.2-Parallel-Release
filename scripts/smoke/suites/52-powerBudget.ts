@@ -33,6 +33,7 @@ import {
   type MilestoneTrigger,
 } from "@/lib/game/constants/milestones";
 import { MAX_SHIP_LEVEL } from "@/lib/game/constants/ships";
+import { difficultyConfig } from "@/lib/game/difficulty";
 import { heldPower, powerBudgetAllows } from "@/lib/game/held-cards";
 import { milestoneChoices, milestonePending } from "@/lib/game/milestones";
 import type { GameMode } from "@/lib/game/mode";
@@ -694,6 +695,100 @@ export async function powerBudgetSuite(): Promise<void> {
     "the starter module pool leaves room for the worst case a batch change meets: a full hull, the table it is changing and a whole fresh batch are three cards each, and both modes carry at least that many starter modules, so a capped hull can always replace every face without dealing a module it already has",
   );
 
+  // The pool itself is a per captain view of the immutable catalog, not a
+  // set of module instances the harbor hands out: one captain installing a
+  // card changes only that captain's hull, and the card remains on offer to
+  // every other captain. The check above the draw is the one a shared pool
+  // would fail, since it would lose the installed id from the second pool.
+  const installingCaptain = voyageState();
+  installingCaptain.shipLevel = 3;
+  const watchingCaptain = voyageState();
+  watchingCaptain.shipLevel = 3;
+  const watchingPoolBefore = offerPool("module", watchingCaptain).map(
+    ([card]) => card.id,
+  );
+  installingCaptain._draftChoices = [cardOf("overdrive_engine")];
+  handleModuleSelect(installingCaptain, 0, []);
+  const watchingPoolAfter = offerPool("module", watchingCaptain).map(
+    ([card]) => card.id,
+  );
+  check(
+    installingCaptain.equippedModules.some(
+      (card) => card.id === "overdrive_engine",
+    ) &&
+      watchingCaptain.equippedModules.length === 0 &&
+      watchingCaptain._draftChoices === undefined &&
+      watchingPoolBefore.join("|") === watchingPoolAfter.join("|") &&
+      watchingPoolAfter.includes("overdrive_engine"),
+    "the module pool is each captain's own view of one immutable catalog rather than a shared deck: a card one captain installs stays on offer to the next captain, whose hull and table are untouched, so no captain's acquisition can leave another captain short of a module or a batch",
+  );
+
+  // The floor above, held at every schedule a voyage can run: both modes,
+  // every difficulty, every round from the opening to the last. A hull at
+  // the ladder's top and a table of three leave at least three cards outside
+  // both on each of them, and every press turns all three faces. The table
+  // is seeded from the pool rather than drawn, so the state is the worst
+  // case the yard can meet rather than a lucky roll.
+  const schedules = ["fair_winds", "open_waters", "monsoon"] as const;
+  const sweepFailures: string[] = [];
+  let sweepTrials = 0;
+  for (const mode of [CLASSIC, GAMBIT]) {
+    for (const schedule of schedules) {
+      const lastRound = difficultyConfig(schedule).rounds;
+      for (let round = 1; round <= lastRound; round++) {
+        const yard = voyageState({ mode, difficulty: schedule });
+        yard.currentRound = round;
+        yard.shipLevel = MAX_SHIP_LEVEL;
+        const pool = offerPool("module", yard).map(([card]) => card.id);
+        const hull = pool.slice(0, MAX_SHIP_LEVEL);
+        const table = pool.slice(
+          MAX_SHIP_LEVEL,
+          MAX_SHIP_LEVEL + CARDS_PER_OFFER,
+        );
+        if (hull.length < MAX_SHIP_LEVEL || table.length < CARDS_PER_OFFER) {
+          sweepFailures.push(
+            `${mode}/${schedule}/R${round}: a pool of ${pool.length}`,
+          );
+          continue;
+        }
+        yard.equippedModules = hull.map((id) => cardOf(id));
+        yard._draftChoices = table.map((id) => cardOf(id));
+        const sweepLogs: LedgerLine[] = [];
+        swapModuleChoices(yard, sweepLogs);
+        sweepTrials += 1;
+        const dealt = trioOf(yard);
+        if (!yard.moduleSwapUsed) {
+          sweepFailures.push(`${mode}/${schedule}/R${round}: refused`);
+          continue;
+        }
+        if (
+          dealt.length !== CARDS_PER_OFFER ||
+          new Set(dealt).size !== CARDS_PER_OFFER ||
+          dealt.some((id) => hull.includes(id) || table.includes(id))
+        ) {
+          sweepFailures.push(`${mode}/${schedule}/R${round}: a short batch`);
+        } else if (
+          !ledgerSentences(sweepLogs).some((line) =>
+            line.includes("fresh deal"),
+          )
+        ) {
+          sweepFailures.push(`${mode}/${schedule}/R${round}: no fresh deal`);
+        }
+      }
+    }
+  }
+  if (sweepFailures.length > 0)
+    console.log(`    [batch sweep] ${sweepFailures.slice(0, 3).join("; ")}`);
+  const sweepExpected =
+    schedules.reduce(
+      (sum, schedule) => sum + difficultyConfig(schedule).rounds,
+      0,
+    ) * 2;
+  check(
+    sweepFailures.length === 0 && sweepTrials === sweepExpected,
+    "a hull at the ladder's top changes its whole batch at every schedule the harbor runs: on both modes, all three difficulties and every round from the opening to the last, a full hull and a three card table leave at least three modules outside both, so the yard always deals three distinct cards that are neither aboard nor on the table and never refuses a whole batch",
+  );
+
   // A hull with room to spare at an Ocean Gambit table: eleven modules are
   // live in this mode and this hull carries none, so the round shows three
   // and the press has eight it has not shown to draw from.
@@ -1131,6 +1226,45 @@ export async function powerBudgetSuite(): Promise<void> {
         "salvage_crane" &&
       healedHull._newModule === undefined,
     "a save carrying a repeated module heals to one copy per card: the hull's extra entry and its surcharge are dropped, the table loses the card the hull now holds and the repeat beside it, and the parked pick that named the duplicate is cleared, so a reload cannot put the same module in front of a captain twice",
+  );
+
+  // The other overfull hull: four distinct modules aboard, which the Parley
+  // trade could once produce when two accepts raced the slot check. The load
+  // holds the hull to the ladder's top, keeps the first three in the saved
+  // order and reconciles the surcharges from them, so the yard is not left
+  // with only two cards outside a full hull and its table. The press below
+  // is the proof: the tightest Classic pool still deals a whole batch.
+  const overfullSave = voyageState({ mode: CLASSIC });
+  overfullSave.shipLevel = MAX_SHIP_LEVEL;
+  overfullSave.equippedModules = [
+    "overdrive_engine",
+    "bulk_hauler",
+    "smugglers_hold",
+    "brokers_network",
+  ].map((id) => cardOf(id));
+  const clampedHull = JSON.parse(JSON.stringify(overfullSave)) as GameState;
+  healLoadedVoyage(clampedHull, { legacyRenownLevel: null });
+  startModuleDrafting(clampedHull);
+  const clampedBefore = trioOf(clampedHull);
+  const clampedLogs: LedgerLine[] = [];
+  swapModuleChoices(clampedHull, clampedLogs);
+  const clampedAfter = trioOf(clampedHull);
+  check(
+    clampedHull.equippedModules.length === MAX_SHIP_LEVEL &&
+      clampedHull.equippedModules.map((card) => card.id).join("|") ===
+        "overdrive_engine|bulk_hauler|smugglers_hold" &&
+      clampedHull.maintenancePenalty === 10 &&
+      clampedHull.shipUpgradePenalty === 15 &&
+      clampedHull.moduleSwapUsed &&
+      clampedBefore.length === CARDS_PER_OFFER &&
+      clampedAfter.length === CARDS_PER_OFFER &&
+      new Set(clampedAfter).size === CARDS_PER_OFFER &&
+      clampedAfter.every((id) => !clampedBefore.includes(id)) &&
+      clampedAfter.every(
+        (id) => !clampedHull.equippedModules.some((card) => card.id === id),
+      ) &&
+      ledgerSentences(clampedLogs).some((line) => line.includes("fresh deal")),
+    "a save carrying more distinct modules than the hull has slots heals to the ladder's top and the yard can still change a whole batch: the first three in the saved order stay, both surcharges are read back from them, the table is dealt fresh, and every face the press turns is neither aboard nor on the old table, so damage that once left only two cards outside the hull can no longer strand a captain without a batch",
   );
 
   // The tally a swap writes, which is the record the card conversion

@@ -236,9 +236,10 @@ function readObjectiveTrace(raw: unknown): ObjectiveTraceEntry[] {
 // modules are records rather than ids on the save, so their ids are
 // pulled here and held to the module kind and the same mode gate.
 //
-// A repeat among the boons is dropped by that same heal (it is one held
-// card); a repeated module id is kept, because two of the same module
-// bolted on is two modules, which is the reading the hull itself takes.
+// A repeat among the boons is dropped by that same heal, and a repeated
+// module id is dropped here for the same reason: a hull carries each module
+// once, so two copies in a save are one card in the set the instrument
+// counts.
 //
 // The list is bounded by the instrument's own MAX_HELD_CARDS, which has
 // one home there rather than here because both ends of the column need
@@ -249,19 +250,21 @@ function readHeldCards(
   mode: VoyageRun["mode"],
 ): string[] {
   const ids: string[] = [...normalizeHeldBoons(data.heldBoons, mode)];
+  const seen = new Set(ids);
   const modules = Array.isArray(data.equippedModules)
     ? data.equippedModules
     : [];
   for (const item of modules) {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const id = (item as Record<string, unknown>).id;
-    if (typeof id !== "string") continue;
+    if (typeof id !== "string" || seen.has(id)) continue;
     const card = cardById(id);
     if (card?.kind !== "module" || !cardRunsInMode(card, mode)) continue;
+    seen.add(id);
     ids.push(id);
   }
   const charter = normalizeCharter(data.charter, mode);
-  if (charter !== null) ids.push(charter);
+  if (charter !== null && !seen.has(charter)) ids.push(charter);
   return ids.slice(0, MAX_HELD_CARDS);
 }
 

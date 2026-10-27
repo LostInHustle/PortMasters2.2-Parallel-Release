@@ -80,6 +80,20 @@ export function ModuleMarket({
   const [fee, setFee] = useState(CONSENT_FEE_MIN);
   const [moduleId, setModuleId] = useState("");
   const [targetId, setTargetId] = useState("");
+  // The row whose accept is in the harbor's hands. The panel draws its
+  // refusals from the game state it last rendered, so two presses on two
+  // rows before the first settle could both read an open slot and land a
+  // fourth module on a three slot hull. One press at a time is the same rule
+  // the slot check states, read before the state has had a chance to move.
+  // The wait ends by itself: the row leaving the offer status, the row
+  // disappearing, or the harbor's refusal arriving all close it.
+  const [taking, setTaking] = useState<string | null>(null);
+  const takenRow =
+    taking === null
+      ? undefined
+      : modules.moduleTrades.find((trade) => trade.id === taking);
+  const settling =
+    takenRow !== undefined && takenRow.status === "offered" && !modules.error;
 
   if (!moduleTradesOn(game.mode)) return null;
 
@@ -213,6 +227,11 @@ export function ModuleMarket({
               modules={modules}
               round={game.currentRound}
               roomOpen={roomOpen}
+              settling={settling}
+              onTake={() => {
+                setTaking(trade.id);
+                modules.accept(trade.id);
+              }}
             />
           ))}
         </div>
@@ -237,6 +256,8 @@ function ModuleRow({
   modules,
   round,
   roomOpen,
+  settling,
+  onTake,
 }: {
   trade: ModuleTrade;
   game: GameState;
@@ -244,6 +265,8 @@ function ModuleRow({
   modules: ModuleTrades;
   round: number;
   roomOpen: number;
+  settling: boolean;
+  onTake: () => void;
 }) {
   const mine = trade.sellerUserId === me.id;
   const isBuyer = trade.buyerUserId === me.id;
@@ -300,8 +323,9 @@ function ModuleRow({
       acceptLabel={t("{icon} Take It", { icon })}
       acceptClassName="pm-grad-parley"
       blocked={blocked}
+      busy={settling}
       onCancel={() => modules.cancel(trade.id)}
-      onAccept={() => modules.accept(trade.id)}
+      onAccept={onTake}
     />
   );
 }

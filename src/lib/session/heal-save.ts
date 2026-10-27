@@ -163,24 +163,41 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
   game.priceHistory = game.priceHistory ?? {};
 }
 
+// One saved module entry read through the pool. The shape, the kind and the
+// mode gate are the same for the hull and the round's table, so a change to
+// what the yard accepts lives here rather than in two loops.
+function healModuleEntry(
+  item: unknown,
+  mode: GameState["mode"],
+): CardRecord | null {
+  const id =
+    item !== null && typeof item === "object"
+      ? (item as Record<string, unknown>).id
+      : null;
+  const card = typeof id === "string" ? cardById(id) : null;
+  if (card === null || card.kind !== "module") return null;
+  if (!cardRunsInMode(card, mode)) return null;
+  return card;
+}
+
 // The hull, healed through the pool. Unknown ids, strings and nulls are
 // damage and are dropped, and a repeat is dropped too: a hull carries each
 // module once, and a second copy would add slot, power and a surcharge
 // without an effect. A module the current mode does not run is dropped, so a
-// Gambit save rejoined in a Classic room loses it.
+// Gambit save rejoined in a Classic room loses it. The count is held to the
+// ladder's top as well: a hull carrying more distinct modules than it has
+// slots is the same damage in another shape, and keeping the extras would
+// leave the yard with fewer than a whole batch outside the hull and its
+// table when a captain changes one. The kept modules are the first in the
+// saved order, and the penalties are reconciled from them afterwards.
 function healHull(raw: unknown, mode: GameState["mode"]): CardRecord[] {
   if (!Array.isArray(raw)) return [];
   const hull: CardRecord[] = [];
   const seen = new Set<string>();
   for (const item of raw) {
-    const id =
-      item !== null && typeof item === "object"
-        ? (item as Record<string, unknown>).id
-        : null;
-    const card = typeof id === "string" ? cardById(id) : null;
-    if (card === null || card.kind !== "module") continue;
-    if (!cardRunsInMode(card, mode)) continue;
-    if (seen.has(card.id)) continue;
+    if (hull.length >= MAX_SHIP_LEVEL) break;
+    const card = healModuleEntry(item, mode);
+    if (card === null || seen.has(card.id)) continue;
     seen.add(card.id);
     hull.push(card);
   }
@@ -201,14 +218,8 @@ function healModuleTable(
   if (!Array.isArray(raw)) return undefined;
   const table: CardRecord[] = [];
   for (const item of raw) {
-    const id =
-      item !== null && typeof item === "object"
-        ? (item as Record<string, unknown>).id
-        : null;
-    const card = typeof id === "string" ? cardById(id) : null;
-    if (card === null || card.kind !== "module") continue;
-    if (!cardRunsInMode(card, mode)) continue;
-    if (hullIds.has(card.id)) continue;
+    const card = healModuleEntry(item, mode);
+    if (card === null || hullIds.has(card.id)) continue;
     if (table.some((held) => held.id === card.id)) continue;
     table.push(card);
   }

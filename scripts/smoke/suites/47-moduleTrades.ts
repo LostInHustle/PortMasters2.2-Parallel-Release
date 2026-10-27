@@ -1172,6 +1172,17 @@ export async function moduleTradesSuite(
       !marketDesk.includes('t("That module is already bolted to your hull.")'),
     "a module already on this captain's hull is not drawn as an offer: the board hides the row until the module leaves the hull, keeps the seller's own row so it can be withdrawn, and keeps an agreed row as the record of a sale, so the only copy of a module a captain can take is one the hull does not already carry",
   );
+  check(
+    marketDesk.includes(
+      "const [taking, setTaking] = useState<string | null>(null)",
+    ) &&
+      marketDesk.includes("busy={settling}") &&
+      marketDesk.includes("setTaking(trade.id)") &&
+      rowSource.includes("busy?: boolean;") &&
+      rowSource.includes("const closed = blocked !== null || busy;") &&
+      rowSource.includes("disabled={closed}"),
+    "a captain cannot take two module offers in the tick before the first one settles: the panel sends one accept at a time and the offer row closes every take until the board answers, so two presses cannot both read the same open slot and land a fourth module on a three slot hull",
+  );
 
   // The buyer's purse, which is the one condition the settle deliberately
   // does not ask and the desks therefore have to. The rule is stated
