@@ -286,16 +286,10 @@ export function voyageLogLine(facts: VoyageLogFacts): string {
   return voyageLogLineFor(getLocale(), facts);
 }
 
-// A fact and the round it happened on, stamped together so a caller cannot
-// pair one with another.
-export function voyageLogEntry(
-  round: number,
-  facts: VoyageLogFacts,
-): VoyageLogEntry {
-  return { round, kind: facts.kind, text: voyageLogLine(facts) };
-}
-
-// The same pair in a named language; the server builds frames here.
+// The same pair in a named language; the server builds frames here and the
+// screen reads them back in the captain's own language. There is no
+// process-language twin: a log entry is built once, at the send, and every
+// reader of the wire already carries the language it was built in.
 export function voyageLogEntryFor(
   locale: Locale,
   round: number,

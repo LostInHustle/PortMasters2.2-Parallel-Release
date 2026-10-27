@@ -64,14 +64,14 @@ Four habits worth keeping:
 npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
 npm run check:private    # no second path to a secret the game hides
-npm run check:prose      # no banned dash in Markdown or text
+npm run check:prose      # no banned dash in Markdown, MDX, text or the environment template
 npm run build            # type errors fail the build on purpose
 # then, in a second terminal, with the clock on for both lines:
 PHASE_CLOCK=1 npm run dev
 PHASE_CLOCK=1 npm run test:smoke
 ```
 
-`npm run build` runs the tag, card, status, dead surface and prose checks before it compiles a page, so a clean build also clears those five. `npm run check:prose` can be run alone while editing documentation.
+`npm run build` runs the tag, card, status, dead surface, prose, palette and private checks before it compiles a page, so a clean build also clears those seven. `npm run check:prose` can be run alone while editing documentation.
 
 The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its rounds, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 

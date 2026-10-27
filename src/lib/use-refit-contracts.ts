@@ -18,6 +18,9 @@ const CHANNEL = {
   error: "refit:error",
   stateRequest: "refit:state:request",
   field: "refits",
+  accept: "refit:accept",
+  cancel: "refit:cancel",
+  idField: "contractId",
 } as const;
 
 /**
@@ -26,7 +29,8 @@ const CHANNEL = {
  * The board, the per captain filtering and the report that fires when a
  * refit this captain is party to moves past the offer stage are the shared
  * relay's (see ./use-consent-board). What is left here is what only the
- * bench can say: the three actions a captain takes against it.
+ * bench can say: the offer it posts. Accept and withdraw are the relay's
+ * two shared presses.
  *
  * There is no claim. A refit settles the moment it is agreed, because both
  * sides of it are known at that moment: the customer pays the price the two
@@ -46,6 +50,8 @@ export function useRefitContracts(
     rows: refits,
     error,
     clearError,
+    accept,
+    cancel,
   } = useConsentBoard(socket, roomId, myUserId, CHANNEL, onSettle);
 
   // A price and the garment it buys work on. `targetUserId` names the
@@ -57,30 +63,6 @@ export function useRefitContracts(
       if (!socket) return;
       clearError();
       socket.emit("refit:post", { roomId, fee, good, targetUserId });
-    },
-    [socket, roomId, clearError],
-  );
-
-  const accept = useCallback(
-    (contractId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("refit:accept", { roomId, contractId });
-    },
-    [socket, roomId, clearError],
-  );
-
-  // The seller's own withdrawal. The last refusal is cleared first, the
-  // same clear the escort's cancel makes and for the same reason: the
-  // refusal this press can meet is the one saying the row moved past an
-  // offer before the press landed, and the previous sentence must not be
-  // left standing over the answer to this one (see ./use-escort-contracts,
-  // whose cancel carries the identical call).
-  const cancel = useCallback(
-    (contractId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("refit:cancel", { roomId, contractId });
     },
     [socket, roomId, clearError],
   );

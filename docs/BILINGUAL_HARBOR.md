@@ -106,7 +106,7 @@ Other rules:
 - Mandarin writes the ellipsis as three ASCII dots, `...`. English leaves keep the form already in the source, which is usually a single ellipsis character and sometimes three dots. A translation pass does not change either.
 - Code, HTML, CSS values, tokens and command text stay ASCII and are not translated.
 - Card values use the tight form: `{cost}金币`, `2麻布`, `{rounds}轮`. Other prose keeps the spacing already in the leaf. Do not change the spacing of numbers and units in a wording pass.
-- Do not use em dashes, en dashes, doubled hyphens or a hyphen standing in for punctuation between words in captain facing copy. A single hyphen inside a compound word is allowed. `npm run check:prose` enforces the same rule in Markdown and text files, and the smoke suite enforces it in captain facing copy.
+- Do not use em dashes, en dashes, doubled hyphens or a hyphen standing in for punctuation between words in captain facing copy. A single hyphen inside a compound word is allowed. `npm run check:prose` enforces the same rule in Markdown, MDX and text files, plus the environment template, and the smoke suite enforces it in captain facing copy.
 
 ## Core terminology
 
@@ -303,7 +303,7 @@ The six base merits named in the interface: First Landfall 初登彼岸, Sea Mas
 1. Change the English source first. The English literal is the key, so changing it without adding the matching leaf leaves the old translation unreachable.
 2. Add or update the leaf with the same `en` value and the reviewed `zh` value. Keep the group and the key in their existing order.
 3. Preserve every token. Mandarin may drop a token, but it may not invent one.
-4. Run `npm run build` and `npm run test:smoke`. The build runs the tag, card, status, dead surface and prose checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
+4. Run `npm run build` and `npm run test:smoke`. The build runs the tag, card, status, dead surface, prose, palette and private checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
 5. Do not run a leaf through machine translation and add it without review. A leaf that reads correctly in isolation can break a sentence whose subject or classifier lives in another leaf.
 6. Do not add a third language by editing JSON alone. `LOCALES` in `src/lib/game/i18n/index.ts` is the list the picker offers, the reader accepts and the checks walk. A new language needs that list, the pack and the picker copy together.
 

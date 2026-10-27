@@ -18,6 +18,9 @@ const CHANNEL = {
   error: "module:error",
   stateRequest: "module:state:request",
   field: "moduleTrades",
+  accept: "module:accept",
+  cancel: "module:cancel",
+  idField: "tradeId",
 } as const;
 
 /**
@@ -26,7 +29,8 @@ const CHANNEL = {
  * The board, the per captain filtering and the report that fires when a
  * trade this captain is party to moves past the offer stage are the shared
  * relay's (see ./use-consent-board). What is left here is what only this
- * market can say: the three actions a captain takes against it.
+ * market can say: the offer it posts. Accept and withdraw are the relay's
+ * two shared presses.
  *
  * There is no claim, for the reason the bench's own hook gives: both sides
  * of a module trade are known the moment the two captains agree, since
@@ -45,6 +49,8 @@ export function useModuleTrades(
     rows: moduleTrades,
     error,
     clearError,
+    accept,
+    cancel,
   } = useConsentBoard(socket, roomId, myUserId, CHANNEL, onSettle);
 
   // A price and the module it buys. `targetUserId` names the captain the
@@ -61,31 +67,6 @@ export function useModuleTrades(
         module: moduleId,
         targetUserId,
       });
-    },
-    [socket, roomId, clearError],
-  );
-
-  const accept = useCallback(
-    (tradeId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("module:accept", { roomId, tradeId });
-    },
-    [socket, roomId, clearError],
-  );
-
-  // The seller's own withdrawal. The last refusal is cleared first, the
-  // same clear the escort's cancel and the bench's make and for the same
-  // reason: the refusal this press can meet is the one saying the row
-  // moved past an offer before the press landed, and the previous
-  // sentence must not be left standing over the answer to this one (see
-  // ./use-escort-contracts and ./use-refit-contracts, whose cancels carry
-  // the identical call).
-  const cancel = useCallback(
-    (tradeId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("module:cancel", { roomId, tradeId });
     },
     [socket, roomId, clearError],
   );

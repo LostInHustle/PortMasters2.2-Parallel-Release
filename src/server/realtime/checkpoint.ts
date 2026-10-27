@@ -14,13 +14,13 @@ import { isGatedPhase, lapSuccessor } from "@/lib/game/checkpoint";
 import { normalizePhase, phaseFace, seatOf } from "@/lib/game/phases";
 import { modeConfig, normalizeMode } from "@/lib/game/mode";
 import { tFor } from "@/lib/game/i18n";
-import { computeHarborPulse } from "@/lib/game/harborPulse";
+import { computeHarborPulse } from "@/lib/game/harbor-pulse";
 import { bazaarRumorsOn } from "@/lib/game/flags";
 import { rumorLean } from "@/lib/game/engine";
 import type { PortShift } from "@/lib/game/maroon";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Phase } from "@/lib/game/types";
-import { leftTheVoyage } from "@/lib/seatMarks";
+import { leftTheVoyage } from "@/lib/seat-marks";
 import type { Checkpoint } from "./types";
 import type {
   PhaseAdvanceFrame,
@@ -140,6 +140,14 @@ export async function readyStatePayload(
       roster.includes(id),
     ),
     requiredUserIds: roster,
+    // The market's leans, on the one seat where a catch-up transition can
+    // draw a board (see onReadyUpdate in @/lib/use-phase-sync). They are the
+    // ones the advance carried, kept on the checkpoint so this frame cannot
+    // compute a different answer from the numbers the rest of the table is
+    // shopping at.
+    ...(cp.phase === "market" && cp.marketLeans
+      ? { marketLeans: cp.marketLeans }
+      : {}),
   };
 }
 
@@ -215,6 +223,18 @@ async function announceAdvance(
     bazaarLean = bazaarRumorsOn(room?.mode)
       ? rumorLean(bazaarList(roomId), from.round)
       : undefined;
+    // Kept on the checkpoint so a ready frame can hand the same numbers to a
+    // captain who missed this one (see readyStatePayload above). The next
+    // market overwrites it, and the frame reads it only on the market seat,
+    // so it cannot be handed out for a round it does not belong to.
+    const cp = roomCheckpoints.get(roomId);
+    if (cp) {
+      cp.marketLeans = {
+        harborPulse,
+        portShift,
+        ...(bazaarLean !== undefined ? { bazaarLean } : {}),
+      };
+    }
   }
   const frame: PhaseAdvanceFrame = {
     roomId,

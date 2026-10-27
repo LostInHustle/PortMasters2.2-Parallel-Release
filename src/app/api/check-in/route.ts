@@ -7,7 +7,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser, unauthorizedResponse } from "@/lib/api-auth";
 import {
-  DEFAULT_LEGACY_SUMMARY,
   levelForRenownXP,
   toLegacySummary,
   type LegacySummarySource,
@@ -64,6 +63,23 @@ export async function POST() {
   const newLevel = levelForRenownXP(newXP);
   const priorLevel = prior?.renownLevel ?? 1;
 
+  // The answer a granted claim gives, built once: both ways a claim can
+  // land (the guarded update, or the first write that creates the row)
+  // answer with the same body, and a second copy is a second place for one
+  // of the fields to drift.
+  const claimedBody = {
+    claimed: true as const,
+    day: result.day,
+    xpGained: result.xp,
+    leveledUp: newLevel > priorLevel,
+    legacy: {
+      ...toLegacySummary(prior, meritIds),
+      renownXP: newXP,
+      renownLevel: newLevel,
+    },
+    checkIn: checkInStatus(result.next, today),
+  };
+
   // Guarded write: the update only lands while the row still shows a date
   // other than today (or none yet), so two requests racing on the same day
   // can grant the reward at most once. A row with a null date (never
@@ -95,18 +111,7 @@ export async function POST() {
             lastCheckInDate: result.next.lastCheckInDate,
           },
         });
-        return NextResponse.json({
-          claimed: true,
-          day: result.day,
-          xpGained: result.xp,
-          leveledUp: newLevel > priorLevel,
-          legacy: {
-            ...DEFAULT_LEGACY_SUMMARY,
-            renownXP: newXP,
-            renownLevel: newLevel,
-          },
-          checkIn: checkInStatus(result.next, today),
-        });
+        return NextResponse.json(claimedBody);
       } catch {
         // Another request created the row first. Fall through to report the
         // now current (already claimed) state.
@@ -122,16 +127,5 @@ export async function POST() {
     });
   }
 
-  return NextResponse.json({
-    claimed: true,
-    day: result.day,
-    xpGained: result.xp,
-    leveledUp: newLevel > priorLevel,
-    legacy: {
-      ...toLegacySummary(prior, meritIds),
-      renownXP: newXP,
-      renownLevel: newLevel,
-    },
-    checkIn: checkInStatus(result.next, today),
-  });
+  return NextResponse.json(claimedBody);
 }

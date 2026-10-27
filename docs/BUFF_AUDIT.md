@@ -6,6 +6,8 @@ Every boon, every module, every House perk, every Age, every difficulty modifier
 
 Every defect below has since been repaired. The audit is kept in the tense it was written in, because a record of what was found is worth more than a list quietly edited after the fact, so this section is the one place that says what became of each.
 
+Counts, line numbers and quoted code in this record are as they stood when the audit was written. Code moves, so a number may no longer land on the line it names, while the symbol named beside it keeps its name. The table below says what became of each finding, and it is the place to check before treating anything further down as still standing.
+
 | Finding                                                      | Outcome                                                                                                                                                               |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The two charter boons are the same boon                      | Split. Kiln and Forge Guild reads a tier 1 gate and Exotic Treasures reads a tier 2 gate, so each pays on the goods it names.                                         |
@@ -50,7 +52,7 @@ The audit was performed by reading the code. Nothing here was confirmed by playi
 | Captain's Merits     | 9                               | `src/lib/game/merits.ts`            |
 | Renown titles        | 7                               | `src/lib/game/legacy.ts`            |
 | Social economy       | 6 systems                       | `src/lib/game/engine/` and realtime |
-| Harbor systems       | 3 (Harbor Pulse and two others) | `src/lib/game/harborPulse.ts`       |
+| Harbor systems       | 3 (Harbor Pulse and two others) | `src/lib/game/harbor-pulse.ts`      |
 
 ## Defects
 
@@ -120,7 +122,7 @@ The quote and the charge are one function now: `escortCost` at `src/lib/game/eng
 
 ### Harbor Pulse is calibrated to three goods and the harbor trades more
 
-`src/lib/game/harborPulse.ts:32` fixes the baseline:
+`src/lib/game/harbor-pulse.ts:32` fixes the baseline:
 
 ```typescript
 const baseline = 1 / 3; // Hemp, Silk, Tea: an even split of the harbor's buying
@@ -138,7 +140,7 @@ The reader applies both module lines now (`explainExpectedPrice`, `src/lib/game/
 
 ### A load timeout and a load error both drop the Renown bonus
 
-The two fallback loads, for a saved voyage that cannot be fetched, are the two call sites of `applyUnreachableLoad` in `src/lib/session/use-voyage-load.ts` (`:145` and `:158`). Both used to reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 fell from 160 Gold to 100, and the Broker's Favor unlock relocked for the rest of that voyage.
+The two fallback loads, for a saved voyage that cannot be fetched, are the two call sites of `applyUnreachableLoad` in `src/lib/session/use-voyage-load.ts` (`:147` and `:160`). Both used to reset the Renown level to 1. The starting Gold bonus is `cfg.startingGold + startingGoldBonus`, so a captain at Renown level 21 fell from 160 Gold to 100, and the Broker's Favor unlock relocked for the rest of that voyage.
 
 A network timeout should not demote a captain, and it no longer does: both paths read the level remembered across loads (`env.renownRef.current`), so a failed fetch leaves the captain exactly where they were.
 
@@ -146,14 +148,14 @@ A network timeout should not demote a captain, and it no longer does: both paths
 
 These are display errors rather than rule errors. The rules are right and the text beside them is not.
 
-| Where                                              | What it says                                                             | What is true                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `Purchase.tsx` panel title                         | "Next Round Forecast"                                                    | It showed the pulse already applied to this board               |
-| `AgeBanner.tsx` full variant                       | "~2 weeks remaining"                                                     | A fixed string in a branch nothing rendered; the branch is gone |
-| `Welcome.tsx:170`                                  | Understates the stake                                                    | The tier's real numbers                                         |
-| `constants/copy.ts:175` tutorial                   | "Starting gold is **100**"                                               | Monsoon starts at 90                                            |
-| `DifficultyAdvisor.tsx:48`                         | "three difficulty scoped Merits await"                                   | Only two require Monsoon                                        |
-| `partialSight.ts:12` and the original design notes | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                                    |
+| Where                                               | What it says                                                             | What is true                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `Purchase.tsx` panel title                          | "Next Round Forecast"                                                    | It showed the pulse already applied to this board               |
+| `AgeBanner.tsx` full variant                        | "~2 weeks remaining"                                                     | A fixed string in a branch nothing rendered; the branch is gone |
+| `Welcome.tsx:170`                                   | Understates the stake                                                    | The tier's real numbers                                         |
+| `constants/copy.ts:175` tutorial                    | "Starting gold is **100**"                                               | Monsoon starts at 90                                            |
+| `DifficultyAdvisor.tsx:48`                          | "three difficulty scoped Merits await"                                   | Only two require Monsoon                                        |
+| `partial-sight.ts:12` and the original design notes | Partial Sight uses "the same trust threshold as Backing", Renown level 5 | No such gate exists anywhere                                    |
 
 The tutorial line hardcodes 100 in a sentence that templates every other number from the difficulty config.
 
@@ -201,7 +203,7 @@ None of these changed what a captain could do, and all of them are cleared now e
 
 The standings rows built by `standingRow` in `src/server/realtime/conclusion/finishers.ts` used to carry `gold`, `renownLevel` and `renownTitle` as well, and nothing read any of the three: the Endgame panel draws final Gold from the captain's own game state and the level and title from the legacy record it fetches alongside the payload. The three fields are gone, and the comment above the builder records the reasoning. `totalCrowns` at `src/app/api/leaderboard/route.ts` used to be summed from `parseStatsByDifficulty` and then left out of the entry, so the route paid for a parse whose result nothing ever sent; it is gone too, recorded in the comment above the entries. The conclusion sweep's dead `totalShips` variable is cleared. `CaptainMerit.earnedAt` is the one that stays: stored and never shown, kept on purpose as audit data (see the note above).
 
-`src/lib/game/engine/partialSight.ts` used to assert a Backing trust gate at Renown level 5 that did not exist in the code, and the original design notes repeated it. Both now describe the two real thresholds instead: the viewer at Renown Level 5, and the captain being looked at at Level 3.
+`src/lib/game/engine/partial-sight.ts` used to assert a Backing trust gate at Renown level 5 that did not exist in the code, and the original design notes repeated it. Both now describe the two real thresholds instead: the viewer at Renown Level 5, and the captain being looked at at Level 3.
 
 `src/lib/game/integrity.ts:49` attributes the surge sizing to the order board while `src/lib/game/engine/market.ts:381` adds it to the purchase board. One of the two comments is wrong.
 

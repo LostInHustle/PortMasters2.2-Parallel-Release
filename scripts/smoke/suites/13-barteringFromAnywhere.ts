@@ -602,7 +602,10 @@ export async function barteringFromAnywhereSuite(inputs: {
       convoyHook.split("setError(null);").length - 1 === 2 &&
       backingHook.split("setError(null);").length - 1 === 2 &&
       escortHook.includes("clearError();") &&
-      convoyHook.includes("clearError: () => setError(null),"),
+      /clearError = useCallback\(\(\) => setError\(null\), \[\]\)/.test(
+        convoyHook,
+      ) &&
+      /return useMemo\(\s*\(\) => \(\{[\s\S]*?\bclearError,/.test(convoyHook),
     "every press on the board hooks clears the previous refusal before it goes out, and the convoy board can be cleared by the screen that read it",
   );
 

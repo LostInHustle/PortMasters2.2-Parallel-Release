@@ -21,7 +21,7 @@ import { LARDER_MAX } from "@/lib/game/constants/supplies";
 import { checkSave, snapshotFromSave } from "@/lib/game/integrity";
 import { maroonCarried, maroonNamesNeeded } from "@/lib/game/maroon";
 import type { OrderFill } from "@/lib/game/types";
-import { leaderShortfall, tallyRows } from "@/lib/voteTally";
+import { leaderShortfall, tallyRows } from "@/lib/vote-tally";
 import {
   CARRIES_A_DASH,
   LEDGER_PHRASE,
@@ -207,7 +207,7 @@ export async function manifestAuditSuite(
   // The other half of what a card prints, and the question a captain
   // actually asks of a running count: how many more names the leading
   // target needs before it carries (see leaderShortfall in
-  // @/lib/voteTally). It reads off the same rows the count block draws
+  // @/lib/vote-tally). It reads off the same rows the count block draws
   // and the same threshold the walk above carries on, so the sentence a
   // captain reads and the arithmetic the server decides on cannot come
   // apart, and a book with no names in it has no leader to be short.
@@ -1745,7 +1745,7 @@ export async function manifestAuditSuite(
       tallyRowCode.includes('"carries" : "carry"') &&
       !tallyRowCode.includes("captains ${") &&
       !tallyRowCode.includes("names are in"),
-    "the count line states the count and the threshold in one sentence, the count half built by the shared builder (see namedCountLine in @/lib/voteTally) rather than worded here, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one, and the two votes cannot word one number two ways",
+    "the count line states the count and the threshold in one sentence, the count half built by the shared builder (see namedCountLine in @/lib/vote-tally) rather than worded here, so the block can never print the grammar of the old bug, a bare 1 of 5 names are in over a book that holds one, and the two votes cannot word one number two ways",
   );
   check(
     tallyRowCode.includes("nextStep(census.needed)") &&
@@ -1826,7 +1826,7 @@ export async function manifestAuditSuite(
       auditPanelCode.includes(
         "A captain the harbor has written off cannot be audited.",
       ),
-    "the list of captains a vote offers is drawn through the one predicate the server refuses on (see writtenOff in @/lib/seatMarks): a captain the harbor has written off is never offered as a name, the predicate belongs to the one picker rather than to a card, and the audit's card says so instead of leaving the short list unexplained",
+    "the list of captains a vote offers is drawn through the one predicate the server refuses on (see writtenOff in @/lib/seat-marks): a captain the harbor has written off is never offered as a name, the predicate belongs to the one picker rather than to a card, and the audit's card says so instead of leaving the short list unexplained",
   );
   check(
     auditPanelCode.includes("audit.reveal === null") &&

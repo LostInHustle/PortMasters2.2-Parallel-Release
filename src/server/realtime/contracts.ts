@@ -15,9 +15,10 @@
 // socket layer goes through this object: an escort board has no second door.
 // =====================================================================
 import { visibleContracts, type EscortContract } from "@/lib/game/engine";
+import type { EscortBoard } from "@/types/realtime/boards";
 import { consentBoard } from "./consent";
 
-export const escortContracts = consentBoard<EscortContract>({
+export const escortContracts = consentBoard<EscortContract, EscortBoard>({
   event: "contract:update",
   visible: visibleContracts,
   pack: (roomId, contracts) => ({ roomId, contracts }),

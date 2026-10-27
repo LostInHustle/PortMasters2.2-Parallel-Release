@@ -10,7 +10,7 @@ import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
-} from "@/lib/game/engine/barterAccess";
+} from "@/lib/game/engine/barter-access";
 import { tFor } from "@/lib/game/i18n";
 import { auditSpentRound, auditSpentReason } from "../audit";
 import { requireAuth, seated } from "../auth";

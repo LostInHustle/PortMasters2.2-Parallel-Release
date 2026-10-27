@@ -6,6 +6,8 @@
 import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
+import { normalizeDifficulty } from "@/lib/game/difficulty";
+import { normalizeMode } from "@/lib/game/mode";
 import { HOST_ONLY_RESTART } from "@/lib/game/constants/copy";
 import { tFor } from "@/lib/game/i18n";
 import { ENTRY_PHASE } from "@/lib/game/phases";
@@ -47,6 +49,7 @@ import { clearSurge } from "../surge";
 import { closeVoyageTelemetry } from "../telemetry";
 import { resolveExpiredVentures } from "../ventures";
 import { clearVoyageLog } from "../voyage-log";
+import type { RoomRestartedFrame } from "@/types/realtime/restart";
 
 export function wireRestartVoyage(io: Server, socket: Socket): void {
   socket.on("room:restart", async (payload: { roomId?: string }) => {
@@ -234,10 +237,10 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
         "restarted",
         roomMembers(roomId).map((m) => m.id),
       );
-      io.to(roomChannel(roomId)).emit("room:restarted", {
+      const frame: RoomRestartedFrame = {
         roomId,
         voyageEpoch: restarted.voyageEpoch,
-        difficulty: restarted.difficulty,
+        difficulty: normalizeDifficulty(restarted.difficulty),
         // Rides along for the same reason difficulty does. A restart resets
         // the voyage but not the harbor, so the mode is whatever the harbor
         // was created with, and every captain rebuilding their state here
@@ -245,8 +248,9 @@ export function wireRestartVoyage(io: Server, socket: Socket): void {
         // restart deliberately cannot change it: a host switching laps
         // between voyages would be switched out from under the table, so
         // the mode is fixed at creation exactly as the tier is.
-        mode: restarted.mode,
-      });
+        mode: normalizeMode(restarted.mode),
+      };
+      io.to(roomChannel(roomId)).emit("room:restarted", frame);
       const cp = await getCheckpoint(roomId);
       await broadcastReadyState(io, roomId, cp);
     } finally {

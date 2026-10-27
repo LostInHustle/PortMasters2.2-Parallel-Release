@@ -48,12 +48,13 @@ import {
   AuditTally as AuditTallyPayload,
   AuditVote as AuditVotePayload,
 } from "@/types/realtime/audit";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { auditOpensAt } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 import { useVoteBoard, type VoteChannel } from "@/lib/use-vote-board";
-import type { VoteCensus } from "@/lib/voteTally";
+import type { VoteCensus } from "@/lib/vote-tally";
 
 // The events this vote speaks on, named in one place for the reason the
 // bazaar's and the two consent boards' own channels are. The press is
@@ -131,25 +132,23 @@ export function useAudit(
       if (data?.roomId !== roomId) return;
       setReveal(data);
     };
-    // A new voyage has no audit and no nominations, which is also the
-    // signal a client gets for the harbor it is already sitting in.
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      reset();
-      setReveal(null);
-    };
-
     socket.on("audit:tally", onTally);
     socket.on("audit:reveal", onReveal);
     socket.on("audit:error", onRefused);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("audit:tally", onTally);
       socket.off("audit:reveal", onReveal);
       socket.off("audit:error", onRefused);
-      socket.off("room:restarted", onRestarted);
     };
   }, [socket, roomId, myUserId, setHeld, setPressed, onRefused, reset]);
+
+  // A new voyage has no audit and no nominations, which is also the signal
+  // a client gets for the harbor it is already sitting in.
+  const onRestarted = useCallback(() => {
+    reset();
+    setReveal(null);
+  }, [reset]);
+  useRoomRestarted(socket, roomId, onRestarted);
 
   const thisReveal = reveal?.roomId === roomId ? reveal : null;
   // The captain's own nomination, so the panel can show what they said

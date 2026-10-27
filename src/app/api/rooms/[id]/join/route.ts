@@ -5,8 +5,8 @@
 // come aboard. What this route owns is the naming: an id off the params,
 // and the sentence an id that names no harbor is refused with.
 import { NextRequest } from "next/server";
-import { HARBOR_NOT_FOUND } from "@/lib/api";
 import {
+  HARBOR_NOT_FOUND,
   getCurrentUser,
   requestLocale,
   unauthorizedResponse,

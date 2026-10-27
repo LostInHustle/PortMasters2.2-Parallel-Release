@@ -5,6 +5,7 @@
 import { difficultyConfig } from "./difficulty";
 import { AUDIT_FROM_ROUND, AUDIT_REVEAL_COUNT, AUDIT_WINDOW } from "./audit";
 import { PORT_SHIFT_PERCENT, MAROON_VOTE_SHARE } from "./maroon";
+import { getLocale, tFor, type Locale, type Params } from "./i18n";
 import type { RoundPhase, Phase } from "./types";
 
 export type GameMode = "classic" | "ocean_gambit";
@@ -18,6 +19,20 @@ export interface BriefingPhase {
   // What happens here, and what it decides for the phases after it.
   body: string;
   setsUp: string;
+}
+
+// One way a mode differs from the founding voyage.
+//
+// The sentence is a template with braced tokens, and the figures it quotes
+// ride beside it rather than being baked into the English. A rule constant
+// that moves then moves the number a captain reads, and the pack's row
+// still answers because the template itself never changed. `phrases`
+// carries a token whose value is a phrase with a row of its own, so the
+// words arrive translated rather than as the English the rule stores.
+interface ModeDifference {
+  readonly text: string;
+  readonly params?: Params;
+  readonly phrases?: Readonly<Record<string, string>>;
 }
 
 // How a mode describes its round on the Welcome screen. Classic uses a line;
@@ -45,7 +60,7 @@ interface ModeConfig {
 
   // Ways this mode differs from the founding voyage, in the captain's words.
   // Empty on Classic, which is what the others differ from.
-  differences: readonly string[];
+  differences: readonly ModeDifference[];
 
   // Flags a mode still being built; the interface warns wherever it is selectable.
   experimental: boolean;
@@ -213,13 +228,38 @@ export const MODES: Record<GameMode, ModeConfig> = {
     failureRule:
       "No captain leaves the table here. Fall short on the bills and the harbor marks it against you for the rest of the voyage, and you sail on with your card, your vote and your say at the table.",
     differences: [
-      "The manifest closes before the table opens: Orders runs ahead of Parley, so you commit to your sheet first and nothing on it can be revised once the fleet starts talking.",
-      `Every voyage here runs ${GAMBIT_ROUNDS} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.`,
-      "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
-      "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
-      "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
-      `From round ${AUDIT_FROM_ROUND}, a simple majority of the fleet can open one captain's manifest at a Parley. The harbor is shown ${AUDIT_REVEAL_COUNT} of that captain's last ${AUDIT_WINDOW} fills, and calling the vote spends the rest of that Parley's trading.`,
-      `From round ${GAMBIT_MAROON_FROM}, ${MAROON_VOTE_SHARE.toLowerCase()} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there ${PORT_SHIFT_PERCENT} percent either way.`,
+      {
+        text: "The manifest closes before the table opens: Orders runs ahead of Parley, so you commit to your sheet first and nothing on it can be revised once the fleet starts talking.",
+      },
+      {
+        text: "Every voyage here runs {rounds} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.",
+        params: { rounds: GAMBIT_ROUNDS },
+      },
+      {
+        text: "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
+      },
+      {
+        text: "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
+      },
+      {
+        text: "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
+      },
+      {
+        text: "From round {auditFrom}, a simple majority of the fleet can open one captain's manifest at a Parley. The harbor is shown {revealCount} of that captain's last {window} fills, and calling the vote spends the rest of that Parley's trading.",
+        params: {
+          auditFrom: AUDIT_FROM_ROUND,
+          revealCount: AUDIT_REVEAL_COUNT,
+          window: AUDIT_WINDOW,
+        },
+      },
+      {
+        text: "From round {maroonFrom}, {share} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there {portShift} percent either way.",
+        params: {
+          maroonFrom: GAMBIT_MAROON_FROM,
+          portShift: PORT_SHIFT_PERCENT,
+        },
+        phrases: { share: MAROON_VOTE_SHARE },
+      },
     ],
     // Orders before Parley is the mode's structural change: commit to the
     // manifest before the table opens, so nobody can trade on known information.
@@ -272,4 +312,33 @@ export function auditOpensAt(value: unknown): number | null {
  */
 export function voyageRoundsFor(mode: unknown, difficulty: unknown): number {
   return modeConfig(mode).voyageRounds ?? difficultyConfig(difficulty).rounds;
+}
+
+/**
+ * One line of a mode's difference list, in the language on screen.
+ *
+ * The one reader every surface that teaches a mode goes through, so the
+ * figures and the phrase fill the template the same way in the tutorial,
+ * the manual and the lobby card. A phrase token is translated first and
+ * lowered for the middle of a sentence, which is how "Two thirds" reads
+ * there; the pack carries the phrase under its own capitalised spelling.
+ */
+export function readModeDifference(line: ModeDifference): string {
+  return readModeDifferenceFor(getLocale(), line);
+}
+
+/**
+ * The same read in a language the caller names, for the checks that walk
+ * both columns. The screen's reader above is this one with the process
+ * language, so a suite cannot check a rule the screen does not use.
+ */
+export function readModeDifferenceFor(
+  locale: Locale,
+  line: ModeDifference,
+): string {
+  const params: Params = { ...line.params };
+  for (const [token, phrase] of Object.entries(line.phrases ?? {})) {
+    params[token] = tFor(locale, phrase).toLowerCase();
+  }
+  return tFor(locale, line.text, params);
 }

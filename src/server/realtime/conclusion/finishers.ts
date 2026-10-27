@@ -25,7 +25,7 @@ import { merchantRatingForScore } from "@/lib/game/engine";
 import { BROKERS_FAVOR_UNLOCK_LEVEL } from "@/lib/game/constants/world";
 import { meritById, qualifyingMerits } from "@/lib/game/merits";
 import { normalizeOrderFills } from "@/lib/game/audit";
-import { bankruptMark } from "@/lib/seatMarks";
+import { bankruptMark } from "@/lib/seat-marks";
 import { modeConfig } from "@/lib/game/mode";
 import { fleetTrace, objectiveProgress } from "@/lib/game/objectives";
 import {
@@ -279,7 +279,7 @@ async function concludeFinisher(
   // By either signal, read through the one reader that owns the rule: in
   // Classic the bankruptcy phase is what says it, and in Ocean Gambit the
   // seat sails on to the endgame screen and the flag is all that is left
-  // of it (see bankruptMark in @/lib/seatMarks).
+  // of it (see bankruptMark in @/lib/seat-marks).
   const bankrupt = bankruptMark(f);
   const xpGained = forged
     ? 0

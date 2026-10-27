@@ -4,14 +4,13 @@
 // chat panel can render them straight into the timeline. Each row carries
 // a `mine` flag the renderer uses to right align the bubbles.
 import { NextRequest, NextResponse } from "next/server";
-import { CAPTAIN_NOT_FOUND } from "@/lib/api";
 import { db, PUBLIC_USER_SELECT } from "@/lib/db";
 import {
+  CAPTAIN_NOT_FOUND,
   getCurrentUser,
-  requestLocale,
+  notFoundResponse,
   unauthorizedResponse,
 } from "@/lib/api-auth";
-import { tFor } from "@/lib/game/i18n";
 import { MESSAGE_PAGE, messageRows } from "@/lib/messages";
 
 export async function GET(
@@ -30,13 +29,7 @@ export async function GET(
     where: { id: otherUserId },
     select: PUBLIC_USER_SELECT,
   });
-  if (!other) {
-    const locale = await requestLocale();
-    return NextResponse.json(
-      { error: tFor(locale, CAPTAIN_NOT_FOUND) },
-      { status: 404 },
-    );
-  }
+  if (!other) return notFoundResponse(CAPTAIN_NOT_FOUND);
 
   const msgs = await db.message.findMany({
     where: {

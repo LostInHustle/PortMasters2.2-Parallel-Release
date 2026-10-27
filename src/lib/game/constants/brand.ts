@@ -24,7 +24,17 @@ export const APP_TAGLINE = "Maritime trade on the ancient Silk Road";
 export const APP_DESCRIPTION =
   "A multiplayer maritime trade game on the ancient Silk Road. Captains gather in a shared harbor, sail in lockstep, and the highest Reputation wins the Sea Master crown.";
 
-export const ICONS: Record<string, string> = {
+import { ITEMS } from "./goods";
+
+// Every name a palette row is required for: Gold, which is not cargo, and
+// every good the hold can carry. The table is also a string map, because a
+// name read off the wire is any string, but the named half of the
+// intersection is what makes coverage structural: a good added to the
+// catalogue fails the build here until it has an icon and a color.
+type PaletteKey = "Gold" | (typeof ITEMS)[number];
+type Palette = Record<PaletteKey, string> & Record<string, string>;
+
+export const ICONS: Palette = {
   Gold: "💰",
   Hemp: "🧶",
   Silk: "👘",
@@ -44,7 +54,7 @@ export const ICONS: Record<string, string> = {
   Rags: "🪡",
 };
 
-export const COLORS: Record<string, string> = {
+const COLORS: Palette = {
   Gold: "#D4A017",
   Hemp: "#8B7355",
   Silk: "#DC143C",
@@ -64,6 +74,17 @@ export const COLORS: Record<string, string> = {
   Rags: "#A89A8C",
 };
 
+// The color for a name read off the wire, in the palette the captain chose.
+// Undefined asks the caller's own fallback to decide, the same answer the
+// resolver has always given for a name outside the catalogue.
+export function itemColor(
+  name: string,
+  colorblindSafe = false,
+): string | undefined {
+  const palette: Palette = colorblindSafe ? COLORS_COLORBLIND_SAFE : COLORS;
+  return palette[name];
+}
+
 // The set above puts Silk (a crimson red) and Tea (a forest green) close
 // enough on the color wheel that a red green colorblind captain, the most
 // common form by far, would struggle to tell them apart at a glance in the
@@ -80,7 +101,7 @@ export const COLORS: Record<string, string> = {
 // how one captain's own client renders a color already being shown to
 // them anyway; see useColorPreference in src/lib/use-color-preference.ts
 // for where a player turns it on.
-export const COLORS_COLORBLIND_SAFE: Record<string, string> = {
+const COLORS_COLORBLIND_SAFE: Palette = {
   Gold: "#E8A33D",
   Hemp: "#A67C52",
   Silk: "#CC79A7",

@@ -38,6 +38,7 @@
 // =====================================================================
 import type { Server } from "socket.io";
 import { publicRumors, rumorId, type BazaarRumor } from "@/lib/game/engine";
+import type { BazaarBoard } from "@/types/realtime/boards";
 import { sockets } from "./presence";
 
 // The harbor's rumors. Module local on the same reasoning as the barter
@@ -100,7 +101,7 @@ export function bazaarPayloadFor(
   roomId: string,
   userId: string,
   round: number,
-) {
+): BazaarBoard {
   return {
     roomId,
     // Personalized, because a standing rumor's direction belongs to its

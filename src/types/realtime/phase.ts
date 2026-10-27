@@ -13,6 +13,7 @@
 import type { Phase } from "@/lib/game/types";
 import type { GameMode } from "@/lib/game/mode";
 import type { PortShift } from "@/lib/game/maroon";
+import type { MarketLeans } from "@/lib/game/engine/market";
 
 // One round's ready check, as the harbor publishes it: where the harbor
 // stands, who has readied there, and who the harbor is waiting on.
@@ -41,6 +42,13 @@ export type PhaseReadyFrame = {
   phaseSeconds: number | null;
   readyUserIds: string[];
   requiredUserIds: string[];
+  // The leans the market opened under, present only while the harbor stands
+  // on the market seat. A captain whose advance frame was lost catches up
+  // through this frame, and the transition that catch-up runs draws the
+  // board; without these three it would price that board from the previous
+  // round's numbers, and the captain would shop at prices nobody else was
+  // offered. Absent everywhere else, because no other seat draws a market.
+  marketLeans?: MarketLeans;
 };
 
 // The advance that opens a new seat, carrying the market's three hands.

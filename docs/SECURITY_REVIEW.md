@@ -163,7 +163,7 @@ The four clauses below were applied to it, and the one of them it touches is
 the broadcast payload clause, which it satisfies by adding fields to a
 statement already in this inventory rather than a statement of its own. The
 single new broadcast statement is the harbor's own line explaining a move the
-harbor did not vote for (`src/server/realtime/checkpoint.ts:301`), which
+harbor did not vote for (`src/server/realtime/checkpoint.ts:314`), which
 carries a sentence and a harbor id and nothing about any captain. No new path
 trusts a client either: the departure a captain who had not acted takes is
 computed by the same client authoritative engine the boundaries below
@@ -191,18 +191,18 @@ adds a line to it should know which array it is writing into.
 
 ### 3. The save path
 
-`src/app/api/game/state/route.ts`. The `PUT` requires a session (line 114), a
-membership row (line 125), and then writes what it was handed. The Ledger
-Integrity Pass reads four numbers out of the blob (line 152) and marks the
+`src/app/api/game/state/route.ts`. The `PUT` requires a session (line 119), a
+membership row (line 131), and then writes what it was handed. The Ledger
+Integrity Pass reads four numbers out of the blob (line 157) and marks the
 row rather than rejecting it, which is deliberate: a captain must never lose
 a voyage to a false positive, and an implausible save is a mark the features
 that read standings can decline to trust.
 
 Three properties hold around it. The verdict is judged against the harbor's own
 `currentRound` rather than anything in the payload, which is the one number a
-client cannot forge (line 148). The response shape is identical whether or
+client cannot forge (line 154). The response shape is identical whether or
 not the save tripped the guard, so a tampering client learns nothing about
-whether it was caught (line 189). And the alignment table is not in a save at
+whether it was caught (line 192). And the alignment table is not in a save at
 all: alignments live in `VoyageRole` rows the server writes, which is why a
 doctored save cannot invent one.
 
@@ -272,7 +272,7 @@ Any member of a harbor could write a save of any size, and the harbor pays for
 it: the conclusion parses every blob at the table and the Manifest Audit
 samples one, on the code path that has to finish before a voyage can end.
 
-Fixed with a 64 KB cap (`SAVE_BODY_MAX`, same route, line 111), chosen from
+Fixed with a 64 KB cap (`SAVE_BODY_MAX`, same route, line 117), chosen from
 measurement rather than taste: five real saves on a live database run 1.5 KB
 to 3.5 KB, so the cap is around twenty times the largest real one and leaves
 room for a long voyage, a big hold and a full ledger. An oversized save is
@@ -292,7 +292,7 @@ has that reading, so it is fixed here.
 
 As fixed, `src/server/realtime/inbound-limit.ts` puts every incoming frame on
 a token bucket per socket, installed in front of every handler
-(`src/server/realtime/index.ts:288`): thirty frames in hand
+(`src/server/realtime/index.ts:289`): thirty frames in hand
 (`inbound-limit.ts:56`) and ten a second earned back, both read off the client
 this tree ships rather than picked. An idle captain in a voyage sends two
 heartbeats per eight seconds, a captain trading sends two to nine frames a
@@ -359,7 +359,7 @@ the voyage does not have, whether from a stale build or a modified client,
 leaves the harbor where it stands.
 
 **Two harbor wide carriers of a secret, both deliberate.**
-`voyage:reveal` (`src/server/realtime/reveal.ts:40`) publishes every card at
+`voyage:reveal` (`src/server/realtime/reveal.ts:41`) publishes every card at
 the end of a voyage, because that is what the end of a voyage is for, and
 `audit:reveal` (`src/server/realtime/audit.ts:249`) publishes two sampled
 manifest lines during one, because the audit's whole value is that the table
@@ -367,7 +367,7 @@ sees them. Both are the mode's design rather than leaks of it, and both are
 reachable only at their own moment.
 
 **The win verdict and the alignment are on their own rows.** The chronicle
-row carries both (`prisma/schema.prisma:343-344`), and the wire type does not:
+row carries both (`prisma/schema.prisma:386-387`), and the wire type does not:
 the route that hands a captain their chronicles maps the row to a shape that
 carries neither, and filters on the reader (`src/app/api/chronicle/route.ts:22, 50`).
 That is the same allow list discipline the payloads follow, one layer down.

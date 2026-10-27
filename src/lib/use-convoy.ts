@@ -1,7 +1,7 @@
 "use client";
 
 import { VentureSummary } from "@/types/realtime/ventures";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
 import { refusalHandler } from "@/lib/refusals";
@@ -138,15 +138,22 @@ export function useConvoy(
     [socket, roomId],
   );
 
-  return {
-    ventures,
-    locked,
-    error,
-    // The refusal this hook holds is a sentence about one press, so a
-    // screen that has read it hands it back rather than leaving it over
-    // the board until the next press replaces it.
-    clearError: () => setError(null),
-    post,
-    contribute,
-  };
+  // Stable across renders so the returned object can keep one identity.
+  const clearError = useCallback(() => setError(null), []);
+
+  // One identity until something inside changes; the board takes this
+  // whole object as a prop. The refusal this hook holds is a sentence
+  // about one press, so a screen that has read it hands it back rather
+  // than leaving it over the board until the next press replaces it.
+  return useMemo(
+    () => ({
+      ventures,
+      locked,
+      error,
+      clearError,
+      post,
+      contribute,
+    }),
+    [ventures, locked, error, clearError, post, contribute],
+  );
 }

@@ -4,7 +4,7 @@ import { cardById } from "@/lib/game/cards";
 import { heldFlagsOf } from "@/lib/game/held-cards";
 import type { GameState } from "@/lib/game/types";
 import { healLoadedVoyage } from "@/lib/session/heal-save";
-import { bankruptMark, leftTheVoyage, writtenOff } from "@/lib/seatMarks";
+import { bankruptMark, leftTheVoyage, writtenOff } from "@/lib/seat-marks";
 import { CLASSIC, GAMBIT, check, voyageState } from "../harness";
 
 /**
@@ -91,7 +91,7 @@ export async function theMarksAndTheGatesSuite(): Promise<void> {
   // ========== C. The marks, as the two ends of the wire read them ==========
 
   // The readers the roster, the fleet ticker, the maroon vote's list and
-  // the maroon door all share (see @/lib/seatMarks), asserted against the
+  // the maroon door all share (see @/lib/seat-marks), asserted against the
   // three questions they are kept apart for. The first two are the marks a
   // seat wears, which are read off either signal because a status from a
   // client older than the flags carries the phase and nothing else. The

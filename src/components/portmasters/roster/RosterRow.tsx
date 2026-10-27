@@ -8,7 +8,7 @@ import type { PlayerDetailData } from "@/lib/use-player-detail";
 import { canSeeDetail, phaseLabel } from "@/lib/game/engine";
 import { hungryPillLine, hungryTooltip } from "@/lib/game/status-copy";
 import { t } from "@/lib/game/i18n";
-import { seatMarks } from "@/lib/seatMarks";
+import { seatMarks } from "@/lib/seat-marks";
 import { cn, memberRowClass } from "@/lib/utils";
 import { Avatar, OnlineDot, Pill } from "../shared";
 import { IconButton } from "./IconButton";
@@ -63,7 +63,7 @@ export function RosterRow({
   peekSnapshot: PlayerDetailData | null;
 }) {
   // The two marks a failed voyage leaves on a seat, read through the one
-  // place that states the rule (see seatMarks). Both are read from the
+  // place that states the rule (see seat-marks). Both are read from the
   // broadcast status for the reason the bankruptcy mark always was: in
   // Ocean Gambit a failed seat sails on, so the phase alone would badge
   // nobody.
@@ -191,7 +191,7 @@ export function RosterRow({
             hue: the Larder's color names the panel on the Market
             screen, while a status is drawn from the meaning half of
             the palette wherever it appears (see Pill). Not folded
-            into seatMarks, which is about the two marks that write a
+            into seat-marks, which is about the two marks that write a
             seat off: a hungry captain is neither of those, and a
             badge that rode writtenOff would quietly take them out of
             the running for a vote they are still entitled to. The

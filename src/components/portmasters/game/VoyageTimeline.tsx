@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { lapPhases } from "@/lib/game/checkpoint";
 import { t } from "@/lib/game/i18n";
 import { isRoundPhase, phaseFace } from "@/lib/game/phases";
-import { leftTheVoyage } from "@/lib/seatMarks";
+import { leftTheVoyage } from "@/lib/seat-marks";
 import type { GameMode } from "@/lib/game/mode";
 import type { RoundPhase, Phase } from "@/lib/game/types";
 
@@ -74,7 +74,7 @@ export function VoyageTimeline({
   const currentKey = railStep(phase);
   const currentIndex = steps.findIndex((p) => p.phase === currentKey);
   // The two phases that end the voyage, read through the shared reader
-  // (see leftTheVoyage in @/lib/seatMarks) rather than spelled here: the
+  // (see leftTheVoyage in @/lib/seat-marks) rather than spelled here: the
   // rail reads "no step is lit" for the pier as well, and the pier is not
   // a voyage ending. Being terminal belongs to the phase, not to the rail.
   const isTerminal = leftTheVoyage({ phase });

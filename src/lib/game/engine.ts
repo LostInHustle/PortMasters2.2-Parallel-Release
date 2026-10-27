@@ -154,7 +154,7 @@ export {
 export {
   flexibleBarterUnlocked,
   flexibleOffersLeft,
-} from "./engine/barterAccess";
+} from "./engine/barter-access";
 
 export {
   assignTask,
@@ -308,11 +308,11 @@ export {
   pledgeBacking,
   receiveBackedCoverage,
   receiveBackingOutcome,
-} from "./engine/backingState";
+} from "./engine/backing-state";
 export {
   contributeToVenture,
   receiveVentureSettlement,
-} from "./engine/convoyState";
+} from "./engine/convoy-state";
 
 // Departures stay private to ./engine/lifecycle.ts. Every panel reaches the
 // spine through nextPhase or lockInBoon, and a second export of a step whose
@@ -357,5 +357,5 @@ export {
 } from "./engine/houses";
 // The sight thresholds stay inside ./engine/; callers ask canSeeDetail or
 // bandFor.
-export { bandFor, canSeeDetail } from "./engine/partialSight";
+export { bandFor, canSeeDetail } from "./engine/partial-sight";
 export { rivalSummary, type RivalOutcome } from "./engine/rival";

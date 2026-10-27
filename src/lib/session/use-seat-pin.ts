@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { Socket } from "socket.io-client";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 
 // =====================================================================
 // The voyage's own seat count: how many captains the voyage under way was
@@ -73,15 +80,15 @@ export function useSeatPinFrames({
         seats: typeof data.seats === "number" ? data.seats : 0,
       });
     };
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      setSeatPin({ roomId, seats: 0 });
-    };
     socket.on("room:started", onStarted);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("room:started", onStarted);
-      socket.off("room:restarted", onRestarted);
     };
   }, [enabled, socket, roomId, setSeatPin]);
+
+  // A restarted voyage has no pin until the next departure writes one.
+  const onRestarted = useCallback(() => {
+    setSeatPin({ roomId, seats: 0 });
+  }, [roomId, setSeatPin]);
+  useRoomRestarted(socket, roomId, onRestarted, enabled);
 }

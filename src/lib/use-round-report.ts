@@ -43,7 +43,7 @@
 // =====================================================================
 
 import { RoundReport } from "@/types/realtime/objectives";
-import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
+import { STATUS_BROADCAST_MS, trailingReport } from "@/lib/session/pacing";
 import { useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
@@ -205,10 +205,13 @@ export function useRoundReport(
     : undefined;
 
   // The figures are the dependency list, which is the point: the effect
-  // fires when a count moves, not when the captain clicks.
+  // fires when a count moves, not when the captain clicks. The debounce is
+  // the cadence every live channel rides on (see STATUS_BROADCAST_MS in
+  // @/lib/session/pacing): enough to feel immediate, sparse enough that a
+  // captain filling four orders in a row files one report rather than four.
   useEffect(() => {
     if (!socket || !roomId || round < 1) return;
-    const timer = setTimeout(() => {
+    return trailingReport(STATUS_BROADCAST_MS, () => {
       const payload: RoundReport = {
         roomId,
         round,
@@ -235,12 +238,7 @@ export function useRoundReport(
         charter,
       };
       socket.emit("telemetry:round", payload);
-      // The debounce is the cadence every live channel rides on (see
-      // STATUS_BROADCAST_MS in @/lib/session/use-status-beacon): enough to
-      // feel immediate, sparse enough that a captain filling four orders in
-      // a row files one report rather than four.
-    }, STATUS_BROADCAST_MS);
-    return () => clearTimeout(timer);
+    });
   }, [
     socket,
     roomId,

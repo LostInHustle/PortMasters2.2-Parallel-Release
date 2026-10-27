@@ -160,7 +160,7 @@ export function drawObjective(seed: string, seats = 0): Objective {
   };
 }
 
-/** Items across every good. The smoke suites are the readers. */
+/** Items across every good, the whole commission in one number. */
 export function objectiveTotalItems(objective: Objective): number {
   return objective.resources.reduce((sum, r) => sum + r.required, 0);
 }
@@ -307,7 +307,7 @@ export function objectiveProgress(
     };
   });
   const delivered = rows.reduce((sum, row) => sum + row.delivered, 0);
-  const required = rows.reduce((sum, row) => sum + row.required, 0);
+  const required = objectiveTotalItems(objective);
   return {
     rows,
     delivered,

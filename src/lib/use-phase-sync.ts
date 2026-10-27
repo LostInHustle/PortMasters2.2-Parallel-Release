@@ -24,10 +24,12 @@ import { api } from "@/lib/api";
 import type { PhaseDeadline } from "@/lib/phase-clock";
 import type { LedgerAct, LedgerWrite } from "@/lib/game/ledger";
 import { t } from "@/lib/game/i18n";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 import type {
   PhaseAdvanceFrame,
   PhaseReadyFrame,
 } from "@/types/realtime/phase";
+import type { RoomRestartedFrame } from "@/types/realtime/restart";
 
 // The frame shape lives in @/types/realtime/phase so the server and this
 // hook cannot drift. The alias keeps the historical name.
@@ -163,7 +165,14 @@ export function usePhaseSync({
           const fn = pendingFn.current;
           pendingFn.current = null;
           setWaiting(false);
-          act(fn);
+          act((state, logs) => {
+            // The advance that opened this market was missed, and its leans
+            // rode that frame. This frame carries them too, so the board the
+            // catch-up transition is about to draw is priced like the
+            // table's rather than from the previous round's numbers.
+            if (data.marketLeans) applyMarketLeans(state, data.marketLeans);
+            fn(state, logs);
+          });
           return;
         }
         // Only a gated seat can have been run out. The pier is excluded:
@@ -174,7 +183,12 @@ export function usePhaseSync({
         // defaults, exactly as the advance broadcast does.
         pendingFn.current = null;
         setWaiting(false);
-        act((state, logs) => autoCommit(state, ctx, logs));
+        act((state, logs) => {
+          // Same reason as the held transition above: this commit may be the
+          // one that opens the market.
+          if (data.marketLeans) applyMarketLeans(state, data.marketLeans);
+          autoCommit(state, ctx, logs);
+        });
         return;
       }
       // Terminals have no rank; personal screens fold into Dusk, so a move
@@ -256,16 +270,32 @@ export function usePhaseSync({
     const onError = (data: { roomId: string; error: string }) => {
       if (data.roomId === roomId) setStartError(data.error);
     };
-    // Restart drops every captain to a fresh run. Refetch legacy first so
-    // the starting gold bonus reflects Renown just earned, not the value
-    // captured at mount.
-    const onRestarted = async (data: {
-      roomId: string;
-      voyageEpoch?: number;
-      difficulty?: string;
-      mode?: string;
-    }) => {
-      if (data.roomId !== roomId) return;
+
+    socket.on("phase:ready_update", onReadyUpdate);
+    socket.on("phase:advance", onAdvance);
+    socket.on("room:started", onStarted);
+    socket.on("room:error", onError);
+
+    // Request state only after auth; an unauthenticated request is dropped
+    // silently. `authed` is a dependency, so this line answers the
+    // deferred case when it flips.
+    if (authed) {
+      socket.emit("phase:state:request", { roomId });
+    }
+
+    return () => {
+      socket.off("phase:ready_update", onReadyUpdate);
+      socket.off("phase:advance", onAdvance);
+      socket.off("room:started", onStarted);
+      socket.off("room:error", onError);
+    };
+  }, [socket, roomId, act, authed, myUserId, ctx]);
+
+  // Restart drops every captain to a fresh run. Refetch legacy first so
+  // the starting gold bonus reflects Renown just earned, not the value
+  // captured at mount.
+  const onRestarted = useCallback(
+    async (data: RoomRestartedFrame) => {
       pendingFn.current = null;
       setWaiting(false);
       setStartError(null);
@@ -299,29 +329,10 @@ export function usePhaseSync({
           houseId: house ?? state.houseId,
         }),
       );
-    };
-
-    socket.on("phase:ready_update", onReadyUpdate);
-    socket.on("phase:advance", onAdvance);
-    socket.on("room:started", onStarted);
-    socket.on("room:restarted", onRestarted);
-    socket.on("room:error", onError);
-
-    // Request state only after auth; an unauthenticated request is dropped
-    // silently. `authed` is a dependency, so this line answers the
-    // deferred case when it flips.
-    if (authed) {
-      socket.emit("phase:state:request", { roomId });
-    }
-
-    return () => {
-      socket.off("phase:ready_update", onReadyUpdate);
-      socket.off("phase:advance", onAdvance);
-      socket.off("room:started", onStarted);
-      socket.off("room:restarted", onRestarted);
-      socket.off("room:error", onError);
-    };
-  }, [socket, roomId, act, authed, myUserId, ctx]);
+    },
+    [act],
+  );
+  useRoomRestarted(socket, roomId, onRestarted);
 
   // Standing orders buy after the advance tally is read, so their delta
   // rides _pendingPulseTally. The server accumulates reports rather than

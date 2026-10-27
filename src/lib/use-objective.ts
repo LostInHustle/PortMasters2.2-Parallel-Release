@@ -75,13 +75,12 @@ import {
 import { normalizeMode } from "@/lib/game/mode";
 import type { LedgerAct } from "@/lib/game/ledger";
 import type { GameContext, GameState } from "@/lib/game/types";
-import { STATUS_BROADCAST_MS } from "@/lib/session/use-status-beacon";
-
-// How often a captain sends their report again. This is the
-// heal for a server restart: the tally is transient by design, so the
-// clients are the record, and one report every few seconds costs nothing
-// and rebuilds the harbor's board from nothing.
-const REPORT_HEARTBEAT_MS = 8000;
+import {
+  HEARTBEAT_MS,
+  STATUS_BROADCAST_MS,
+  trailingReport,
+} from "@/lib/session/pacing";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 
 // The board of a captain who has not been told anything yet. One board for
 // all of them, so that the tally read from it is one tally and not a new
@@ -193,21 +192,21 @@ export function useObjective(
         deliverToObjective(g, objective, logs, takenRef.current, data.granted),
       );
     };
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      setHeld(null);
-      setPressed(null);
-    };
 
     socket.on("objective:progress", onProgress);
     socket.on("objective:granted", onGranted);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("objective:progress", onProgress);
       socket.off("objective:granted", onGranted);
-      socket.off("room:restarted", onRestarted);
     };
   }, [socket, roomId, objective, act]);
+
+  // A restarted voyage has no commission and no press in flight.
+  const onRestarted = useCallback(() => {
+    setHeld(null);
+    setPressed(null);
+  }, []);
+  useRoomRestarted(socket, roomId, onRestarted);
 
   const report = useCallback(() => {
     if (!socket || !roomId || !objective) return;
@@ -220,21 +219,20 @@ export function useObjective(
 
   // Every change to the hold's contribution goes out, debounced on the
   // cadence every live channel rides on (see STATUS_BROADCAST_MS in
-  // @/lib/session/use-status-beacon), so a delivery and the goods it took
-  // travel in one frame and a captain emptying a hold of six goods sends
-  // one report rather than six.
+  // @/lib/session/pacing), so a delivery and the goods it took travel in
+  // one frame and a captain emptying a hold of six goods sends one report
+  // rather than six.
   const contribution = JSON.stringify(delivered);
   useEffect(() => {
     if (!socket || !roomId || !objective) return;
-    const timer = setTimeout(report, STATUS_BROADCAST_MS);
-    return () => clearTimeout(timer);
+    return trailingReport(STATUS_BROADCAST_MS, report);
   }, [socket, roomId, objective, contribution, report]);
 
   // The heal. Also reports again on a new connection, which is the same
   // repair for a socket that dropped rather than a server that restarted.
   useEffect(() => {
     if (!socket || !roomId || !objective) return;
-    const beat = setInterval(report, REPORT_HEARTBEAT_MS);
+    const beat = setInterval(report, HEARTBEAT_MS);
     socket.on("connect", report);
     return () => {
       clearInterval(beat);

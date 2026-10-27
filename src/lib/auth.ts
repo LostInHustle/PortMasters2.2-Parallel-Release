@@ -5,7 +5,8 @@
 // =====================================================================
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { db, type PublicUser } from "./db";
+import { db } from "./db";
+import type { CurrentUser } from "@/types/realtime/presence";
 import {
   DISPLAY_NAME_MAX,
   PASSWORD_MAX,
@@ -128,10 +129,10 @@ export const captainCredentials = z.object({
 type AccountCreation =
   | {
       created: true;
-      // The created row, which carries more than the wire does. Each route
-      // hands back the part its own shape has: an operator carries its role,
-      // a captain does not.
-      user: PublicUser & { role: string };
+      // The created row, which carries more than the public projection does.
+      // Each route answers with the part its own shape has: the operator
+      // door with the role, the captain door with the public fields alone.
+      user: CurrentUser;
       token: string;
       expiresAt: Date;
     }

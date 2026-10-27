@@ -62,7 +62,7 @@ import { concludedRooms, maybeConcludeVoyage } from "./conclusion";
 // above and cleared in the same places they are, because the two are the
 // same kind of thing: private information this process mints, hands to one
 // captain, and takes back when the voyage it belonged to ends.
-import { clearPathVoyageSilent } from "./draft";
+import { clearPathVoyageSilent, noteDraftLeft } from "./draft";
 import { clearPulseTallies } from "./pulse";
 import { clearObjectiveTallies } from "./objective";
 import { clearAudits } from "./audit";
@@ -207,6 +207,7 @@ function buildDepartureCleanup(): DepartureCleanup {
     emitRoomMembers,
     maybeConcludeVoyage,
     clearRoomAllMaps,
+    noteUserLeftDraft: noteDraftLeft,
   };
 }
 

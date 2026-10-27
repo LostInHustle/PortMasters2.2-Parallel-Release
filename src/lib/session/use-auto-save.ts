@@ -95,26 +95,21 @@ export function useAutoSave({
   // question with one answer. This narrows the same window for every action
   // in the session, not just the one that found it.
   //
-  // The request is written out rather than read through api.saveGameState,
-  // because keepalive is the whole point of this one and that helper does
-  // not thread a RequestInit through. keepalive asks the browser to finish
-  // the request after the document is gone, which is the job sendBeacon
-  // does for a POST: the save route is a PUT, so a beacon cannot carry this
-  // write. The browser caps a keepalive body (around 64 KiB), so an
-  // unusually large save is dropped rather than half written, which is why
-  // the handler stays best effort throughout: a captain with nothing
-  // pending pays one guard read, and an exit the browser cuts off anyway
-  // loses no more than it did before.
+  // The request goes through the same save helper as every other write, with
+  // keepalive in its init: that flag is the whole point of this one. The
+  // flag asks the browser to finish the request after the document is gone,
+  // which is the job sendBeacon does for a POST, but the save route is a PUT,
+  // so a beacon cannot carry this write. The browser caps a keepalive body
+  // (around 64 KiB), so an unusually large save is dropped rather than half
+  // written, which is why the handler stays best effort throughout: a
+  // captain with nothing pending pays one guard read, and an exit the
+  // browser cuts off anyway loses no more than it did before.
   useEffect(() => {
     const flushOnHide = () => {
       if (!dirtyRef.current) return;
-      fetch("/api/game/state", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId, data: latestGameRef.current }),
-        keepalive: true,
-      }).catch(() => {});
+      api
+        .saveGameState(roomId, latestGameRef.current, { keepalive: true })
+        .catch(() => {});
       dirtyRef.current = false;
     };
     const onVisibility = () => {

@@ -34,30 +34,30 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command                     | What it does                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                               |
-| `npm run build`             | Generates the database client, runs the tag, card, status, dead surface and prose checks, then produces a build |
-| `npm start`                 | Runs the production build on port 8080                                                                          |
-| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                            |
-| `npm run lint`              | Runs ESLint across the project                                                                                  |
-| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                   |
-| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in              |
-| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                       |
-| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                |
-| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                               |
-| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                      |
-| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                   |
-| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                   |
-| `npm run check:prose`       | Checks Markdown and text files for em dashes, en dashes, doubled hyphens and hyphens used as separators         |
-| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                         |
-| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                     |
-| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                 |
-| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                           |
-| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                          |
-| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                              |
-| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                        |
-| `npm run db:generate`       | Regenerates the database client after a schema change                                                           |
+| Command                     | What it does                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                                                            |
+| `npm run build`             | Generates the database client, runs the tag, card, status, dead, prose, palette and private checks, then builds                              |
+| `npm start`                 | Runs the production build on port 8080                                                                                                       |
+| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                                                         |
+| `npm run lint`              | Runs ESLint across the project                                                                                                               |
+| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                                                |
+| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in                                           |
+| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                                                    |
+| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                                             |
+| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                                                            |
+| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                                                   |
+| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                                                |
+| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                                                |
+| `npm run check:prose`       | Checks Markdown, MDX and text files, plus the environment template, for em dashes, en dashes, doubled hyphens and hyphens used as separators |
+| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                                                      |
+| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                                                  |
+| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                                              |
+| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                                                        |
+| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                                                       |
+| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                                                           |
+| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                                                     |
+| `npm run db:generate`       | Regenerates the database client after a schema change                                                                                        |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 

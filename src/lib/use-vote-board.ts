@@ -8,7 +8,7 @@
 // whole on the tally frame, and a refusal is a sentence for the panel to
 // print. Written twice, the two copies were free to disagree about the
 // press in flight and about the count a card draws, and the count is the
-// part both cards read (see VoteCensus in ./voteTally).
+// part both cards read (see VoteCensus in ./vote-tally).
 //
 // What is not shared here is the part that is not the same: each channel
 // carries frames of its own (the audit's finding, the maroon's result and
@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import { refusedForRoom } from "@/lib/refusals";
-import type { VoteCensus } from "@/lib/voteTally";
+import type { VoteCensus } from "@/lib/vote-tally";
 
 /**
  * The tally frame both votes answer with, and the fields of it the two

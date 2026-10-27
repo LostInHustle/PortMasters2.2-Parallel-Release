@@ -19,9 +19,10 @@
 // (see applyRefitSide in @/lib/game/engine/refits).
 // =====================================================================
 import { visibleConsent, type RefitContract } from "@/lib/game/engine";
+import type { RefitBoard } from "@/types/realtime/boards";
 import { consentBoard } from "./consent";
 
-export const refitContracts = consentBoard<RefitContract>({
+export const refitContracts = consentBoard<RefitContract, RefitBoard>({
   event: "refit:update",
   visible: visibleConsent,
   pack: (roomId, refits) => ({ roomId, refits }),

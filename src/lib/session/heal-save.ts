@@ -51,6 +51,7 @@ import {
   normalizeGarmentsTickRound,
 } from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
+import { normalizeHouseId } from "@/lib/game/legacy";
 import { normalizePath } from "@/lib/game/paths";
 import { normalizePathSwitchRound } from "@/lib/game/draft";
 import { normalizePhase } from "@/lib/game/phases";
@@ -156,10 +157,15 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
   game.marketDemandTags = game.marketDemandTags ?? legacyDemand ?? [];
   delete (game as unknown as { phase2DemandTags?: string[] }).phase2DemandTags;
   game.modifierFlags = game.modifierFlags ?? {};
-  // Wages, markets and pirates read the perk set. houseId is left as
-  // recorded: a pledge applies to the next voyage, never mid voyage.
+  // Wages, markets and pirates read the perk set. houseId is a closed union
+  // in the type, but the blob is JSON, so an unknown id is normalized rather
+  // than trusted; a damaged id reads as no House, the same answer every API
+  // route gives a stale legacy row. The pledge still applies to the next
+  // voyage rather than mid voyage.
   game.housePerks = game.housePerks ?? noHousePerks();
-  game.houseId = game.houseId ?? null;
+  game.houseId = normalizeHouseId(
+    typeof game.houseId === "string" ? game.houseId : null,
+  );
   game.priceHistory = game.priceHistory ?? {};
 }
 

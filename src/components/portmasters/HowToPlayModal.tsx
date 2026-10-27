@@ -34,7 +34,7 @@ import {
   moduleTradesOn,
 } from "@/lib/game/flags";
 import { listJoiner, t, type Params } from "@/lib/game/i18n";
-import { modeConfig, type GameMode } from "@/lib/game/mode";
+import { modeConfig, readModeDifference, type GameMode } from "@/lib/game/mode";
 import { openingPhase } from "@/lib/game/checkpoint";
 import { pathFactText, pathGuide } from "@/lib/game/paths";
 import { UNLOCKS, UNLOCK_ORDER } from "@/lib/unlock";
@@ -174,7 +174,7 @@ function voyagePage(mode: GameMode): Step {
     }),
     gradient: "pm-grad-guide",
     body: `${t(play.tagline)} ${t(play.failureRule)}`,
-    points: play.differences,
+    points: play.differences.map(readModeDifference),
     tip: play.differences.length
       ? "Everything else is the voyage you would sail in Classic, so the rest of this manual reads the same for both."
       : "This is the voyage every other mode is measured against, and the one the rest of these pages describe.",
@@ -409,15 +409,15 @@ export function HowToPlayModal({
                 </p>
                 {/* The rules a mode changes, listed rather than folded
                     into the paragraph above, because a reader asking what
-                    is different is counting as much as reading. The lines
-                    are the mode record's own sentences, numbers baked in
-                    at module load, so the plain read here is what localizes
-                    them; the paths page above builds its own points and
-                    those already read the pack. */}
+                    is different is counting as much as reading. Both pages
+                    that fill this list compose their lines where they are
+                    built (readModeDifference for the mode's own sentences,
+                    pathGuide for the paths), so each line arrives already
+                    in the language on screen and is printed as it stands. */}
                 {current.points && current.points.length > 0 && (
                   <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-foreground">
                     {current.points.map((point) => (
-                      <li key={point}>{t(point)}</li>
+                      <li key={point}>{point}</li>
                     ))}
                   </ul>
                 )}

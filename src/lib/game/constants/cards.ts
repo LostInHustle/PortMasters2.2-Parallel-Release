@@ -58,7 +58,7 @@
 //     weight above one leans toward; there is no weight that removes a
 //     card from a path, and the validator holds that line.
 // =====================================================================
-import { DEFAULT_LOCALE, LOCALES, type Locale } from "../i18n";
+import { LOCALES, type Locale } from "../i18n";
 import type { GameMode } from "../mode";
 import type { PathId } from "../paths";
 import type { ModifierKey } from "../types";
@@ -206,11 +206,10 @@ export type CardText = { name: string; desc: string };
 type Language = Locale;
 export const LANGUAGES: readonly Language[] = LOCALES;
 
-// The language the tree prints before a captain picks one. Named rather
-// than implied, so the switch is a change to this line plus whatever reads
-// it, and never a hunt for the places a pool was read in the wrong one.
-// It is the book's default rather than a second declaration of English.
-export const SHIPPED_LANGUAGE: Language = DEFAULT_LOCALE;
+// The language the tree prints before a captain picks one is the pack's own
+// DEFAULT_LOCALE in ../i18n. A second named alias for it was once kept here
+// and read by nothing, which is the kind of copy that looks like a switch
+// and is not one.
 type CardStrings = Record<Language, CardText>;
 
 // The record itself. Every field the design names, in the design's order.

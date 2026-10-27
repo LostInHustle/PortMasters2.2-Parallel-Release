@@ -1,7 +1,7 @@
 "use client";
 
 import { LoanRecord } from "@/types/realtime/loans";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { refusalHandler } from "@/lib/refusals";
 
@@ -121,11 +121,19 @@ export function useBacking(
     [socket, roomId],
   );
 
-  return {
-    loans,
-    error,
-    clearError: () => setError(null),
-    offer,
-    redirect,
-  };
+  // Stable across renders so the returned object can keep one identity.
+  const clearError = useCallback(() => setError(null), []);
+
+  // One identity until something inside changes; the panel takes this
+  // whole object as a prop.
+  return useMemo(
+    () => ({
+      loans,
+      error,
+      clearError,
+      offer,
+      redirect,
+    }),
+    [loans, error, clearError, offer, redirect],
+  );
 }

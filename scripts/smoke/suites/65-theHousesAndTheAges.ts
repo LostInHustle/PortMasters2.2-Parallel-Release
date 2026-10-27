@@ -358,7 +358,7 @@ export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
       agesCode.includes('age.id === "lender"') &&
       agesCode.includes('age.id === "trader"') &&
       agesCode.includes('age.id === "broker"') &&
-      readSource("src/lib/game/engine/backingState.ts").includes(
+      readSource("src/lib/game/engine/backing-state.ts").includes(
         "ageBackingReputationMultiplier(",
       ) &&
       readSource("src/lib/game/engine/barter.ts").includes(
@@ -434,29 +434,34 @@ export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
   // scaffolding for the window and not a claim about the figure, reads
   // the captain's own line back through the route wearing the name and
   // the House, and puts the figure back the way it found it so the copy
-  // carries no lifted ghost between suites.
+  // carries no lifted ghost between suites. The restore sits in a finally
+  // because a route that throws would otherwise leave the lifted figure
+  // behind for every later board read in the run.
   const myLegacyRow = await db.captainLegacy.findUnique({
     where: { userId: captain.id },
   });
+  let headedBoard: { leaderboard: LeaderboardEntry[] } | null = null;
   if (myLegacyRow) {
     await db.captainLegacy.update({
       where: { userId: captain.id },
       data: { renownXP: 9_000_000 },
     });
+    try {
+      headedBoard = (
+        await call<{ leaderboard: LeaderboardEntry[] }>("/api/leaderboard", {
+          cookie: captain.cookie,
+        })
+      ).body;
+    } finally {
+      await db.captainLegacy.update({
+        where: { userId: captain.id },
+        data: { renownXP: myLegacyRow.renownXP },
+      });
+    }
   }
-  const headedBoard = await call<{ leaderboard: LeaderboardEntry[] }>(
-    "/api/leaderboard",
-    { cookie: captain.cookie },
-  );
-  const mine = headedBoard.body.leaderboard.find(
+  const mine = headedBoard?.leaderboard.find(
     (entry) => entry.userId === captain.id,
   );
-  if (myLegacyRow) {
-    await db.captainLegacy.update({
-      where: { userId: captain.id },
-      data: { renownXP: myLegacyRow.renownXP },
-    });
-  }
   check(
     myLegacyRow !== null &&
       normalizeHouseId(myLegacyRow.houseId) === "golden_lotus" &&

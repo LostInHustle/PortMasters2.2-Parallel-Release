@@ -435,17 +435,21 @@ function vatStack(
   ];
 }
 
-// The tax a finished good sale pays, as the stack above reads it.
+// The tax a finished good sale pays, as the stack above reads it. One walk,
+// not two: this is the final figure of the same breakdown the tooltip
+// prints, so the charge a sale pays and the last line a captain reads are
+// the same arithmetic rather than two implementations of it.
 export function calcVAT(
   state: GameState,
   product: string,
   sellingPrice: number,
 ): number {
-  return walkStack(vatStack(state, product, sellingPrice), 0);
+  return explainVAT(state, product, sellingPrice).final;
 }
 
 // The same walk, rendered as lines: material cost, wage, tax on the margin,
-// and every discount folded into it.
+// and every discount folded into it. calcVAT above reads only its final
+// figure, so the breakdown and the charge cannot come from two walks.
 export function explainVAT(
   state: GameState,
   product: string,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { COLORS, COLORS_COLORBLIND_SAFE } from "@/lib/game/constants/brand";
+import { itemColor } from "@/lib/game/constants/brand";
 
 // Colorblind safe palette: purely a client side rendering choice, the same
 // reasoning the tutorial seen flag in GameRoom.tsx already follows: read
@@ -18,7 +18,7 @@ const COLORBLIND_SAFE_KEY = "portmasters_colorblind_safe";
 export function itemColorResolver(
   colorFor?: (item: string) => string | undefined,
 ): (item: string) => string | undefined {
-  return colorFor ?? ((item: string) => COLORS[item]);
+  return colorFor ?? ((item: string) => itemColor(item));
 }
 
 export function useColorPreference() {
@@ -48,8 +48,7 @@ export function useColorPreference() {
   }, []);
 
   const colorFor = useCallback(
-    (item: string): string | undefined =>
-      (colorblindSafe ? COLORS_COLORBLIND_SAFE : COLORS)[item],
+    (item: string): string | undefined => itemColor(item, colorblindSafe),
     [colorblindSafe],
   );
 

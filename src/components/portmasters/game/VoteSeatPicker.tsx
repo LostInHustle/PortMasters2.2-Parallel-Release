@@ -10,7 +10,7 @@
 // step.
 //
 // The list is drawn through the one predicate the server refuses on (see
-// writtenOff in @/lib/seatMarks): a captain the voyage has written off is
+// writtenOff in @/lib/seat-marks): a captain the voyage has written off is
 // never offered as a name, because an option that quietly does nothing is
 // worse than no option. The press reads which of the two moments the
 // captain is standing in rather than the state of the list: a name already
@@ -27,8 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { t } from "@/lib/game/i18n";
-import { writtenOff, type SeatStatus } from "@/lib/seatMarks";
-import { captainName } from "@/lib/voteTally";
+import { writtenOff, type SeatStatus } from "@/lib/seat-marks";
+import { captainName } from "@/lib/vote-tally";
 
 /**
  * The harbor's live statuses, read for the mark a vote may not be aimed at.

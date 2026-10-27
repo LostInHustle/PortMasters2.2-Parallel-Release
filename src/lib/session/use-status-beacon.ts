@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import type { Socket } from "socket.io-client";
 import { statusFrame } from "./status-frame";
+import { HEARTBEAT_MS, STATUS_BROADCAST_MS, trailingReport } from "./pacing";
 import type { SessionState } from "./reducer";
 
 // =====================================================================
@@ -11,14 +12,9 @@ import type { SessionState } from "./reducer";
 // heartbeat that keeps the server's cache warm for late joiners.
 //
 // Both send the frame built by ./status-frame, so the two can never
-// disagree about what a captain is doing.
+// disagree about what a captain is doing. The cadence they ride on is
+// ./pacing's, shared with the objective and round reports.
 // =====================================================================
-
-// The cadence every live channel rides on, exported because the round report
-// (see ../use-round-report) and the objective report (see ../use-objective)
-// debounce on this same number: the three answer one change together, and
-// three separate literals are three chances for one of them to drift.
-export const STATUS_BROADCAST_MS = 120;
 
 export function useStatusBeacon({
   roomId,
@@ -37,16 +33,11 @@ export function useStatusBeacon({
   );
 
   // Broadcast live status to the harbor on every game change.
-  const broadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!enabled || !state.loaded || !socket) return;
-    if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
-    broadcastTimer.current = setTimeout(() => {
+    return trailingReport(STATUS_BROADCAST_MS, () => {
       socket.emit("game:status", buildStatus());
-    }, STATUS_BROADCAST_MS);
-    return () => {
-      if (broadcastTimer.current) clearTimeout(broadcastTimer.current);
-    };
+    });
   }, [buildStatus, state.loaded, socket, enabled]);
 
   // Heartbeat: rebroadcast status every 8s so the server side cache stays
@@ -55,7 +46,7 @@ export function useStatusBeacon({
     if (!enabled || !state.loaded || !socket) return;
     const t = setInterval(() => {
       socket.emit("game:status", buildStatus());
-    }, 8000);
+    }, HEARTBEAT_MS);
     return () => clearInterval(t);
   }, [buildStatus, state.loaded, socket, enabled]);
 }

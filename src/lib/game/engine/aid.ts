@@ -8,10 +8,10 @@
 // (src/server/realtime/wiring/aid.ts, src/lib/use-aid.ts) while the
 // functions here only move the money on whichever client they run on.
 //
-// grantHelperReputation lives here rather than in ./backingState because
+// grantHelperReputation lives here rather than in ./backing-state because
 // lending and backing deliberately share one per voyage Reputation
 // ceiling: two separate ceilings would just move the exploit from
-// whichever is capped to whichever is not. ./backingState imports it.
+// whichever is capped to whichever is not. ./backing-state imports it.
 // =====================================================================
 import { line, type LedgerLine } from "@/lib/game/ledger";
 import {

@@ -25,6 +25,13 @@
  * can still serve and which is a question about navigation rather than
  * about dead code.
  *
+ * The smoke battery under scripts/smoke counts as readers on purpose. An
+ * export the suites drive is exercised on every run, and deleting it would
+ * delete the only evidence that the behavior it gates still works, so the
+ * claim this gate makes is that nothing anywhere reads the name, not that
+ * nothing outside a test does. An export reached only by a suite is a
+ * question to raise in review, not a fact this check can settle.
+ *
  * The App Router's own entries are exempt from the orphan half, because
  * the router loads them by their name rather than by an import, and the
  * names it loads them by are listed here rather than guessed at. The
