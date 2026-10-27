@@ -144,7 +144,7 @@ The durable rules that came out of it are:
 - The player detail relay is bound to the exact pair that asked and answered, so a captain cannot push a snapshot at an arbitrary account.
 - A save body is capped at 64 KB.
 
-`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which asks whether anything outside a module reads its exports and whether anything under `src/` is a file nothing imports. `npm run check:prose` runs `scripts/prose.ts`, which holds Markdown and text files to the same dash rule the captain facing copy follows.
+`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which asks whether anything outside a module reads its exports and whether anything under `src/` is a file nothing imports. `npm run check:prose` runs `scripts/prose.ts`, which holds Markdown, MDX and text files, plus the environment template, to the same dash rule the captain facing copy follows.
 
 ## The Paths
 
@@ -220,7 +220,7 @@ The port is drawn from the harbor's unlocked ports for the current round, using 
 
 The Captain's Exchange is the standing trade board. It is open to every captain from their first voyage, and nothing on it is rationed. An offer escrows the offered goods or Gold at the moment it is posted, so the same stock cannot be promised twice. The board is server state and outlives a phase, which is why a trade can settle in any phase. Both sides apply their own movement, and `peerTradeProfit` counts the settled trade for the Broker's card.
 
-Flexible bartering is the extra surface in the harbor chat. It unlocks at Renown level 10 (`FLEXIBLE_BARTER_UNLOCK_LEVEL`), and both the poster and the accepter must be at that level. One of a captain's flexible offers may be taken per voyage, and at level 15 (`FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL`) two may be taken. Accepting is never rationed. A completed flexible trade retires every other flexible offer its own poster still has standing. The rule lives in `src/lib/game/engine/barterAccess.ts`.
+Flexible bartering is the extra surface in the harbor chat. It unlocks at Renown level 10 (`FLEXIBLE_BARTER_UNLOCK_LEVEL`), and both the poster and the accepter must be at that level. One of a captain's flexible offers may be taken per voyage, and at level 15 (`FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL`) two may be taken. Accepting is never rationed. A completed flexible trade retires every other flexible offer its own poster still has standing. The rule lives in `src/lib/game/engine/barter-access.ts`.
 
 Loans are direct aid between captains. A borrower asks, a lender grants, and the debt is recorded. An unpaid loan is deducted automatically when the voyage ends. A third captain can back an outstanding loan, escrowing Gold against the borrower's shortfall; if the loan is repaid in full, the pledge returns and the backer earns Reputation. A bankrupt borrower can route an outstanding loan to a still active captain. Lending and backing share one per voyage Reputation ceiling, so neither path can be used to farm past the other.
 
@@ -242,7 +242,7 @@ A rivalry is recorded when two captains finish the same voyage. The pair is stor
 
 The Harbor Manifest is the design list of eighteen systems. The tree implements all of it except House Rally, which has no table, route, or switch here. Seven systems arrived with 2.2: Partial Sight, Great Houses, Ages of the Ledger, Captain's Rival, Voyage Chronicle, Quick Start Match, and Bilingual Harbor. Houses, Ages, Rival, and Chronicle are described above under what persists.
 
-Partial Sight lets a captain at Renown level 5 or above see the detail of a captain at level 3 or above. The hold is shown as a band rather than a count: none, a few up to three, some up to eight, plenty up to fifteen, and a haul beyond that. The banding happens on the client that is looking, so it adds no new trust boundary. The rule lives in `src/lib/game/engine/partialSight.ts`.
+Partial Sight lets a captain at Renown level 5 or above see the detail of a captain at level 3 or above. The hold is shown as a band rather than a count: none, a few up to three, some up to eight, plenty up to fifteen, and a haul beyond that. The banding happens on the client that is looking, so it adds no new trust boundary. The rule lives in `src/lib/game/engine/partial-sight.ts`.
 
 Quick Start seats a solo captain in the first public harbor with a free seat, or opens a fresh public harbor and makes them the host. The queue is in process and the ceiling is four members (`QUICK_START_MAX_MEMBERS`). Matches are chained, so two captains pressing at once are not sent to two different harbors.
 
@@ -350,9 +350,11 @@ Three repeats are deliberate. The quiet button tint stays at the call site becau
 
 ## Deployment
 
-The repository carries one host configuration, `railway.json`. The build installs development dependencies and runs `prisma generate`. The start command sets `NODE_ENV=development`, defaults `DATABASE_URL` to `file:../db/custom.db`, runs `prisma db push --skip-generate`, and starts `tsx server.ts`. The health check is `/api/health`, the service requires a volume at `/app/db`, and it runs one replica.
+The repository carries host configuration for two hosts. Railway is the current one, in `railway.json`: the build installs development dependencies and runs `prisma generate`. The start command sets `NODE_ENV=development`, defaults `DATABASE_URL` to `file:../db/custom.db`, runs `prisma db push --skip-generate`, and starts `tsx server.ts`. The health check is `/api/health`, the service requires a volume at `/app/db`, and it runs one replica.
 
-The hosted service runs the development server rather than a production build because `next build` needs more memory than the smaller plans provide. A build killed halfway is a deploy that never lands. The volume is what keeps the SQLite file across deploys; without it, every account and voyage is lost on restart. The single replica matters because the harbor state and socket layer are in process.
+Cloudflare Containers is the second path, configured in `wrangler.jsonc` and built by the `Dockerfile`. It puts the same process in one container behind one Durable Object, capped at one instance for the same single writer reason. The container runs a production build, has no durable disk, restores its SQLite file from an R2 replica through Litestream at every start, and applies the migrations under `prisma/migrations` with `prisma migrate deploy` before the process opens the database.
+
+Railway runs the development server rather than a production build because `next build` needs more memory than the smaller plans provide. A build killed halfway is a deploy that never lands. The volume is what keeps the SQLite file across deploys; without it, every account and voyage is lost on restart. The single replica matters because the harbor state and socket layer are in process. The Cloudflare container runs a production build from an image built for the purpose, so none of those three constraints applies to it, and the disk it does have is treated as empty on every start.
 
 ## Architectural Strengths to Conserve
 

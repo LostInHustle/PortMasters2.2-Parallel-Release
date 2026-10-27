@@ -21,16 +21,8 @@ import {
   CARRIES_A_DASH,
   CARRIES_A_HYPHEN,
   check,
-  withoutComments,
+  readSource,
 } from "../harness";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-const REPO = join(import.meta.dirname, "..", "..", "..");
-
-function readSource(relative: string): string {
-  return withoutComments(readFileSync(join(REPO, relative), "utf8"));
-}
 
 export async function theFirstVoyageSuite(): Promise<void> {
   const guide = pathGuide();

@@ -6,6 +6,7 @@ import type { Server, Socket } from "socket.io";
 
 import { db } from "@/lib/db";
 import { roomMemberIds } from "@/lib/rooms";
+import { openingPhase } from "@/lib/game/checkpoint";
 import { tFor } from "@/lib/game/i18n";
 import { gambitSystemsOn } from "@/lib/game/mode";
 import { seated } from "../auth";
@@ -16,7 +17,6 @@ import {
   armPhaseClock,
   broadcastReadyState,
   getCheckpoint,
-  openingPhase,
 } from "../checkpoint";
 import { dealPaths } from "../draft";
 import { dealAlignments } from "../gambit";

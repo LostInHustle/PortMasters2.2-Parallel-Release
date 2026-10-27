@@ -29,3 +29,18 @@ export type OnlineUser = PublicUser & { roomId: string | null };
 // stamp lives on the membership row and is included wherever the lobby
 // or the harbor panel needs to render it.
 export type RoomMemberLive = PublicUser & { joinedAt?: string };
+
+// A harbor roster row as the REST detail read answers it. The stamp is
+// required here because the membership join always carries one, while a
+// live frame may leave it out; the two shapes are named apart so the
+// optionality says which door the row came through rather than being
+// lost in a looser type both doors could pass.
+export type RoomMember = PublicUser & { joinedAt: string };
+
+// The signed in account: the public projection plus the role ("captain" or
+// "admin") the operator console gates on. Declared once so the session
+// read, the auth helper and the client's account type cannot describe
+// three different accounts. The role is a convenience for the client only:
+// every admin action is checked again on the server, against the account
+// row, at the moment it is asked for.
+export type CurrentUser = PublicUser & { role: string };

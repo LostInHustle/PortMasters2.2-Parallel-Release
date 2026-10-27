@@ -24,7 +24,7 @@ export function ShipTab({
     <>
       {/* The glossary key stays the English term (see Term), and the two
           labels a captain reads are read here. */}
-      <Row label={<Term term="Ship Level">{t("Class")}</Term>}>
+      <Row label={<Term term="Ship Level">{t("Ship Level")}</Term>}>
         <b>{t("Level {n}", { n: shipLevel })}</b>
       </Row>
       <Row label={<Term term="Freight">{t("Freight")}</Term>}>

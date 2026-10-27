@@ -1,6 +1,7 @@
 // PortMasters 2.2 Parallel Release, smoke run: The voyage log.
 
 import { openingPhase } from "@/lib/game/checkpoint";
+import { DEFAULT_LOCALE } from "@/lib/game/i18n";
 import { ROUND_PHASE_ORDER, phaseFace } from "@/lib/game/phases";
 import type {
   VoyageLogEntry,
@@ -13,7 +14,7 @@ import {
   appendVoyageLog,
   normalizeVoyageLog,
   normalizeVoyageLogEntry,
-  voyageLogEntry,
+  voyageLogEntryFor,
   voyageLogLine,
 } from "@/lib/game/voyage-log";
 import {
@@ -207,7 +208,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // The round belongs to the log's own stamp rather than to the caller,
   // which is what lets a screen group a voyage by round without working
   // out which round a line fell in.
-  const stamped = voyageLogEntry(3, logFacts.captain_left);
+  const stamped = voyageLogEntryFor(DEFAULT_LOCALE, 3, logFacts.captain_left);
   check(
     stamped.round === 3 &&
       stamped.kind === "captain_left" &&
@@ -219,7 +220,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
   // one that goes: a bound on a live surface keeps the end a captain
   // reads.
   const logFlooded = Array.from({ length: VOYAGE_LOG_CAP + 10 }, (_, index) =>
-    voyageLogEntry(index, logFacts.voyage_started),
+    voyageLogEntryFor(DEFAULT_LOCALE, index, logFacts.voyage_started),
   ).reduce<VoyageLogEntry[]>((kept, entry) => appendVoyageLog(kept, entry), []);
   check(
     logFlooded.length === VOYAGE_LOG_CAP &&

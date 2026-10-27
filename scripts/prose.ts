@@ -8,12 +8,12 @@
  * standing in for punctuation between two words. A single hyphen inside a
  * compound word is allowed.
  *
- * The scan reads Markdown and plain text only. It skips what is not prose:
- * fenced code blocks, inline code spans, HTML comments, URLs, Markdown
- * table delimiter rows and horizontal rules. It also masks the two code
- * shapes a document legitimately prints in running text, a CLI flag such as
- * --skip-generate and a CSS custom property such as var(--w-ship), so the
- * gate does not read either as punctuation.
+ * The scan reads Markdown, plain text, and the environment template. It
+ * skips what is not prose: fenced code blocks, inline code spans, HTML
+ * comments, URLs, Markdown table delimiter rows and horizontal rules. It
+ * also masks the two code shapes a document legitimately prints in running
+ * text, a CLI flag such as --skip-generate and a CSS custom property such as
+ * var(--w-ship), so the gate does not read either as punctuation.
  *
  * Run with npm run check:prose. Read only, and it reaches for neither the
  * socket client nor the database, so it can run inside the build.
@@ -23,8 +23,17 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
-const SKIP_DIRS = new Set(["node_modules", ".next", ".git"]);
+const SKIP_DIRS = new Set(["node_modules", ".next", ".git", ".wrangler"]);
 const PROSE_FILE = /\.(?:md|mdx|txt)$/;
+// The environment template's comments are written in the same voice as the
+// documents, and an operator reads them before the first launch, so its
+// prose is held to the same rule even though its name carries no extension
+// the pattern above can read.
+const PROSE_NAMES = new Set([".env.example"]);
+
+function isProse(name: string): boolean {
+  return PROSE_FILE.test(name) || PROSE_NAMES.has(name);
+}
 
 function walk(dir: string): string[] {
   const files: string[] = [];
@@ -32,7 +41,7 @@ function walk(dir: string): string[] {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       files.push(...walk(join(dir, entry.name)));
-    } else if (PROSE_FILE.test(entry.name)) {
+    } else if (isProse(entry.name)) {
       files.push(join(dir, entry.name));
     }
   }

@@ -3,9 +3,8 @@
 import { lapPhases } from "@/lib/game/checkpoint";
 import { guideText, tutorialSteps } from "@/lib/game/constants/copy";
 import { tipsText } from "@/lib/game/constants/tips";
-import { tFor } from "@/lib/game/i18n";
 import type { GameMode } from "@/lib/game/mode";
-import { MODES, MODE_ORDER } from "@/lib/game/mode";
+import { MODES, MODE_ORDER, readModeDifferenceFor } from "@/lib/game/mode";
 import { isRoundPhase, phaseFace } from "@/lib/game/phases";
 import type { Phase } from "@/lib/game/types";
 import {
@@ -48,7 +47,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
       tagline,
       summary,
       failureRule,
-      ...differences,
+      ...differences.map((line) => line.text),
       ...(briefing.kind === "line"
         ? [briefing.text]
         : [
@@ -97,7 +96,7 @@ export async function voyageBriefingsSuite(): Promise<void> {
       tagline,
       summary,
       failureRule,
-      ...differences,
+      ...differences.map((line) => line.text),
       ...(briefing.kind === "line"
         ? [briefing.text]
         : [
@@ -143,11 +142,13 @@ export async function voyageBriefingsSuite(): Promise<void> {
         // books can sink them, and that is what the note is for.
         (play.bankruptcyIsFinal || tips.includes(play.failureRule)) &&
         guide.includes(play.tagline) &&
-        play.differences.every(
-          (line) =>
-            steps.some((step) => step.content.includes(line)) &&
-            guide.includes(line),
-        ),
+        play.differences.every((line) => {
+          const printed = readModeDifferenceFor("en", line);
+          return (
+            steps.some((step) => step.content.includes(printed)) &&
+            guide.includes(printed)
+          );
+        }),
       `every surface that teaches the ${play.badge} voyage prints the words the record states, so the tutorial, the guide and the advice cannot teach three versions of one rule`,
     );
   }
@@ -164,8 +165,8 @@ export async function voyageBriefingsSuite(): Promise<void> {
   const CJK = /[㐀-䶿一-鿿豈-﫿]/;
   const untranslated = MODE_ORDER.flatMap((mode) =>
     MODES[mode].differences.filter((line) => {
-      const zh = tFor("zh", line);
-      return zh === line || !CJK.test(zh);
+      const zh = readModeDifferenceFor("zh", line);
+      return zh === readModeDifferenceFor("en", line) || !CJK.test(zh);
     }),
   );
   check(

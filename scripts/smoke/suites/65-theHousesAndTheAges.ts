@@ -17,9 +17,11 @@
 // and every engine state below is built in process.
 
 import { db } from "@/lib/db";
+import { HOUSE_BAR, HOUSE_TINT } from "@/components/portmasters/house-colors";
 import { BROKERS_FAVOR_PAYOUT_CAP } from "@/lib/game/constants/world";
 import {
   HOUSES,
+  HOUSE_TOKENS,
   currentAge,
   nextAgeChange,
   noHousePerks,
@@ -39,6 +41,7 @@ import {
   call,
   check,
   ledgerSentences,
+  readSource,
   signUp,
   voyageState,
   walkSrc,
@@ -51,10 +54,6 @@ import type { LedgerLine } from "@/lib/game/ledger";
 
 const REPO = join(import.meta.dirname, "..", "..", "..");
 
-function readSource(relative: string): string {
-  return withoutComments(readFileSync(join(REPO, relative), "utf8"));
-}
-
 // Two weeks in milliseconds, spelled here rather than imported, because
 // the anchor is the contract: every client computes the same Age at the
 // same instant by flooring the Unix clock, and a suite that read the
@@ -63,6 +62,20 @@ function readSource(relative: string): string {
 const FORTNIGHT = 14 * 24 * 60 * 60 * 1000;
 
 export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
+  // Tailwind only emits utilities whose full names appear in source, so the
+  // House tint and bar are literal maps. Pin each literal to the House's own
+  // token, which is the fact the old interpolated builder read.
+  check(
+    HOUSE_IDS.every((id) => {
+      const token = HOUSE_TOKENS[id];
+      return (
+        HOUSE_TINT[id] === `bg-${token}/15 text-${token}` &&
+        HOUSE_BAR[id] === `from-${token}/60 to-${token}`
+      );
+    }),
+    "every House's tint and bar spell that House's own token in full, so Tailwind emits the utilities the screens draw",
+  );
+
   // ========== A. The pledge is account level, and its route is the Lobby's ==========
   const captain = await signUp("pledge");
   run.extraAccounts.push(captain);
@@ -345,7 +358,7 @@ export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
       agesCode.includes('age.id === "lender"') &&
       agesCode.includes('age.id === "trader"') &&
       agesCode.includes('age.id === "broker"') &&
-      readSource("src/lib/game/engine/backingState.ts").includes(
+      readSource("src/lib/game/engine/backing-state.ts").includes(
         "ageBackingReputationMultiplier(",
       ) &&
       readSource("src/lib/game/engine/barter.ts").includes(
@@ -421,29 +434,34 @@ export async function theHousesAndTheAgesSuite(run: SmokeRun): Promise<void> {
   // scaffolding for the window and not a claim about the figure, reads
   // the captain's own line back through the route wearing the name and
   // the House, and puts the figure back the way it found it so the copy
-  // carries no lifted ghost between suites.
+  // carries no lifted ghost between suites. The restore sits in a finally
+  // because a route that throws would otherwise leave the lifted figure
+  // behind for every later board read in the run.
   const myLegacyRow = await db.captainLegacy.findUnique({
     where: { userId: captain.id },
   });
+  let headedBoard: { leaderboard: LeaderboardEntry[] } | null = null;
   if (myLegacyRow) {
     await db.captainLegacy.update({
       where: { userId: captain.id },
       data: { renownXP: 9_000_000 },
     });
+    try {
+      headedBoard = (
+        await call<{ leaderboard: LeaderboardEntry[] }>("/api/leaderboard", {
+          cookie: captain.cookie,
+        })
+      ).body;
+    } finally {
+      await db.captainLegacy.update({
+        where: { userId: captain.id },
+        data: { renownXP: myLegacyRow.renownXP },
+      });
+    }
   }
-  const headedBoard = await call<{ leaderboard: LeaderboardEntry[] }>(
-    "/api/leaderboard",
-    { cookie: captain.cookie },
-  );
-  const mine = headedBoard.body.leaderboard.find(
+  const mine = headedBoard?.leaderboard.find(
     (entry) => entry.userId === captain.id,
   );
-  if (myLegacyRow) {
-    await db.captainLegacy.update({
-      where: { userId: captain.id },
-      data: { renownXP: myLegacyRow.renownXP },
-    });
-  }
   check(
     myLegacyRow !== null &&
       normalizeHouseId(myLegacyRow.houseId) === "golden_lotus" &&

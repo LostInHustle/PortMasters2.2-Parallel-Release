@@ -2,7 +2,7 @@
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
-Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then refitting at the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
 Everything runs as a single npm project on a single port.
 
@@ -34,30 +34,30 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command                     | What it does                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                               |
-| `npm run build`             | Generates the database client, runs the tag, card, status, dead surface and prose checks, then produces a build |
-| `npm start`                 | Runs the production build on port 8080                                                                          |
-| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                            |
-| `npm run lint`              | Runs ESLint across the project                                                                                  |
-| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                   |
-| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in              |
-| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                       |
-| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                |
-| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                               |
-| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                      |
-| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                   |
-| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                   |
-| `npm run check:prose`       | Checks Markdown and text files for em dashes, en dashes, doubled hyphens and hyphens used as separators         |
-| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                         |
-| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                     |
-| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                 |
-| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                           |
-| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                          |
-| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                              |
-| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                        |
-| `npm run db:generate`       | Regenerates the database client after a schema change                                                           |
+| Command                     | What it does                                                                                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                                                            |
+| `npm run build`             | Generates the database client, runs the tag, card, status, dead, prose, palette and private checks, then builds                              |
+| `npm start`                 | Runs the production build on port 8080                                                                                                       |
+| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                                                         |
+| `npm run lint`              | Runs ESLint across the project                                                                                                               |
+| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                                                |
+| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in                                           |
+| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                                                    |
+| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                                             |
+| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                                                            |
+| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                                                   |
+| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                                                |
+| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                                                |
+| `npm run check:prose`       | Checks Markdown, MDX and text files, plus the environment template, for em dashes, en dashes, doubled hyphens and hyphens used as separators |
+| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                                                      |
+| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                                                  |
+| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                                              |
+| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                                                        |
+| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                                                       |
+| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                                                           |
+| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                                                     |
+| `npm run db:generate`       | Regenerates the database client after a schema change                                                                                        |
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 
@@ -199,18 +199,21 @@ The interface and the realtime layer were both rebuilt around the new systems, a
 
 ## Configuration
 
-The server reads six environment variables. Five of them configure the process at boot, and the sixth gates the operator account.
+The server reads six environment variables. Five of them configure the process at boot, and the sixth gates the operator account. One optional seventh decides the address a shared link points at.
 
 | Variable                | Value in `.env.example` | What it does                                                                                               |
 | ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`          | `file:../db/custom.db`  | The SQLite file holding every account, harbor and voyage. The path is relative to `prisma/schema.prisma`   |
 | `PORT`                  | `8080`                  | The port the whole game answers on                                                                         |
 | `HOST`                  | `0.0.0.0`               | The address to bind. Use `127.0.0.1` to keep the game on this machine only                                 |
+| `APP_URL`               | unset                   | The public address used in link metadata, scheme included. Optional and not a boot setting                 |
 | `ADMIN_SETUP_CODE`      | a placeholder           | The one code that admits an operator account through `/admin`. Empty refuses every attempt                 |
 | `TELEMETRY_SAMPLE_RATE` | `1`                     | The share of voyages recorded for balance analysis, as a fraction of one. `1` is every voyage, `0` is none |
 | `PHASE_CLOCK`           | `0`                     | A multiplier on the length of every phase of a round, from `0` to `10`. `0`, or `off`, turns the clock off |
 
 `DATABASE_URL` has no fallback and the server will not start without it, so copy `.env.example` to `.env` before the first run. The operator code fails closed, so an installation that never sets a real one has no way in at all, which is the safe direction for that particular door.
+
+`APP_URL` is the one setting of the seven that the server never reads at boot. It fills the address in the page's link metadata, which is what a preview of a shared link reads, and it must carry its scheme, for example `https://play.example.com`. A local run leaves it unset and gets the address the game is already reachable on.
 
 `TELEMETRY_SAMPLE_RATE` is the one setting a live game reads without any captain noticing. A voyage that ends leaves one row describing what happened in it, which is where any later reading of the numbers is taken from, and this is the share of voyages that leave one. It is a fraction of one, so `0.25` records a quarter of them, and the decision is drawn once per voyage and held for its whole life rather than made per event, so a recorded voyage is recorded from its first round to its last. Leave it unset and every voyage is recorded, which is the default because a game this size has no volume problem yet. Nothing in a voyage waits on that write, and no rule of the game reads a record back, so turning it down or off changes what the harbor remembers and never how it plays.
 
@@ -218,7 +221,7 @@ The server reads six environment variables. Five of them configure the process a
 
 An environment variable that is already set always wins over the file, which is the order a hosting platform expects. Point `ENV_FILE` at a different file to read from that one instead, which is how two servers run side by side from a single checkout without editing anything back and forth.
 
-Twelve further variables are documented in `.env.example` under their own heading, and none of them is a setting of the server the way the six above are. Each is the rollback for one system of Ocean Gambit, the second mode this branch ships, and each is read as two questions in a fixed order: whether the harbor is a Gambit harbor, and then what the file says. The mode is asked first, so a switch can only ever take a system away from the mode it belongs to and never hand it to Classic, which is the shipped release kept exactly as it was. That boundary is also why they are not in the table above: they are not knobs on the game, they are the way one mode of it is taken apart, and a Classic harbor plays the game this branch forked from whatever any of them says.
+Twelve further variables are documented in `.env.example` under their own heading, and none of them is a setting of the server the way the settings above are. Each is the rollback for one system of Ocean Gambit, the second mode this branch ships, and each is read as two questions in a fixed order: whether the harbor is a Gambit harbor, and then what the file says. The mode is asked first, so a switch can only ever take a system away from the mode it belongs to and never hand it to Classic, which is the shipped release kept exactly as it was. That boundary is also why they are not in the table above: they are not knobs on the game, they are the way one mode of it is taken apart, and a Classic harbor plays the game this branch forked from whatever any of them says.
 
 `next.config.ts` reads two more, and only while the development server is running, because they decide which hostnames may load development resources: the compiled chunks under `/_next`, the hot reload channel, and the internal endpoints. Next.js allows `localhost` on its own. `ALLOWED_DEV_ORIGINS` adds any other hostname as a comma separated list, and `RAILWAY_PUBLIC_DOMAIN` is read as well, which the host injects with the hostname the running service answers on. A production build reads neither.
 
@@ -234,7 +237,7 @@ ngrok http 8080
 
 ## Putting the game online on Railway
 
-`railway.json` in the project root is the whole host configuration. Point Railway at this repository and it builds and runs from that file, with nothing to set in the dashboard beyond the two steps below.
+`railway.json` in the project root is Railway's host configuration. Point Railway at this repository and it builds and runs from that file, with nothing to set in the dashboard beyond the two steps below.
 
 ### Why it runs the development server
 
@@ -260,6 +263,16 @@ The healthcheck is `/api/health`. It answers from the process and reads nothing 
 
 Railway is retiring config as code. `railway.json` keeps working until December 1, 2026, after which the same settings move to the dashboard or to the newer infrastructure as code format. The file is not wrong, it is expiring.
 
+## Putting the game online on Cloudflare
+
+Cloudflare Containers is the second host and runs the same process in one Cloudflare managed container. It needs the Workers Paid plan, 5 dollars a month before any usage, because Containers are not available on the free plan. [The Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md) has every command in order.
+
+The shape is one Worker, one Durable Object and one container. The Worker forwards every request to the object, the object owns the only container, and the container runs this repository's `server.ts` unchanged. The container is limited to one instance on purpose: the harbor state and the socket layer live in the process, and SQLite takes one writer.
+
+The container disk is not durable, so the database is copied out continuously. Litestream restores `custom.db` from an R2 bucket when a container starts without one, then replicates every change while the game runs. The Cloudflare database is built from the migrations checked in under `prisma/migrations`, which the container applies before it starts. Railway keeps its `prisma db push`, so a schema change needs both the schema edit and a new migration.
+
+The image is built from the repository's `Dockerfile` by Wrangler. `npm run cf:image` builds the same image locally and creates nothing in the Cloudflare account. The guide begins at the Workers Paid gate for that reason: the image and the configuration can both be ready while the account still cannot run them.
+
 ## How the project is put together
 
 One process. One port. One npm project.
@@ -272,20 +285,24 @@ The shared HTTP surface is deliberately narrow. Cross origin socket access is sw
 
 ### Where things live
 
-| Path                         | What is in it                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `server.ts`                  | The process entry point: Next.js and Socket.IO on one server                  |
-| `src/app`                    | The page and every REST route under `/api`                                    |
-| `src/components/portmasters` | The game interface: the lobby, the harbor, every phase screen and every modal |
-| `src/lib/game`               | The rules engine. Pure functions with no React, no database and no sockets    |
-| `src/lib/game/engine`        | The per system rules, from market and orders to houses and the ages           |
-| `src/lib`                    | The client hooks, the REST helpers and the session and realtime plumbing      |
-| `src/server`                 | The realtime layer and the environment bootstrap                              |
-| `prisma`                     | The database schema                                                           |
-| `scripts`                    | The build gates and the end to end smoke battery                              |
-| `docs`                       | The release notes for 2.2 plus the design notes and the analysis              |
-| `next.config.ts`             | The Next.js settings, including which hosts may load development resources    |
-| `railway.json`               | The host configuration: build, start, healthcheck and the volume guard        |
+| Path                         | What is in it                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `server.ts`                  | The process entry point: Next.js and Socket.IO on one server                     |
+| `src/app`                    | The page and every REST route under `/api`                                       |
+| `src/components/portmasters` | The game interface: the lobby, the harbor, every phase screen and every modal    |
+| `src/lib/game`               | The rules engine. Pure functions with no React, no database and no sockets       |
+| `src/lib/game/engine`        | The per system rules, from market and orders to houses and the ages              |
+| `src/lib`                    | The client hooks, the REST helpers and the session and realtime plumbing         |
+| `src/server`                 | The realtime layer and the environment bootstrap                                 |
+| `prisma`                     | The database schema                                                              |
+| `prisma/migrations`          | The migrations the Cloudflare container applies; Railway still pushes the schema |
+| `cloudflare`                 | The Worker entry, the container entry point and the Litestream configuration     |
+| `Dockerfile`                 | The container image Wrangler builds for Cloudflare                               |
+| `wrangler.jsonc`             | The Cloudflare host configuration: Worker, container, object and variables       |
+| `scripts`                    | The build gates and the end to end smoke battery                                 |
+| `docs`                       | The release notes for 2.2 plus the design notes and the analysis                 |
+| `next.config.ts`             | The Next.js settings, including which hosts may load development resources       |
+| `railway.json`               | The host configuration: build, start, healthcheck and the volume guard           |
 
 ### The rules engine is separate on purpose
 

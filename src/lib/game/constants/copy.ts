@@ -20,6 +20,7 @@ import {
 import {
   modeConfig,
   MODES,
+  readModeDifference,
   voyageRoundsFor,
   type GameMode,
   type BriefingPhase,
@@ -312,7 +313,7 @@ function differenceSteps(mode: GameMode): TutorialStep[] {
   const play = modeConfig(mode);
   if (play.differences.length === 0) return [];
   const items = play.differences
-    .map((line) => `  <li>${t(line)}</li>`)
+    .map((line) => `  <li>${readModeDifference(line)}</li>`)
     .join("\n");
   return [
     {
@@ -612,7 +613,7 @@ export function guideText(mode: GameMode, difficulty: Difficulty): string {
     ? `\n${t("🎲 How {play.badge} Differs From {MODES.classic.badge}:", {
         "play.badge": t(play.badge),
         "MODES.classic.badge": t(MODES.classic.badge),
-      })}\n${play.differences.map((line) => `• ${t(line)}`).join("\n")}\n`
+      })}\n${play.differences.map((line) => `• ${readModeDifference(line)}`).join("\n")}\n`
     : "";
   return `${t("⚓ {APP_NAME}: Rules", { APP_NAME })}
 

@@ -22,6 +22,12 @@ node_modules/
 .env*
 !.env.example
 
+# Wrangler's local build state and a local `.dev.vars` file, which stands
+# in for Worker secrets while `npm run cf:dev` runs on this machine.
+/.wrangler/
+/.dev.vars
+/.dev.vars.*
+
 # Editor and operating system clutter
 .DS_Store
 *.pem

@@ -57,8 +57,8 @@
       "zh": "港湾一如既往。"
     },
     "mode.classic.summary": {
-      "en": "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and refit.",
-      "zh": "最初的航程。在港口采购，交付订单，与同席船长易货，结算账目，再整备船只。"
+      "en": "The founding voyage. Buy the port, work the orders, trade with the table between rounds, settle, and visit the shipyard.",
+      "zh": "最初的航程。在港口采购，交付订单，与同席船长易货，结算账目，再去船坞。"
     },
     "mode.ocean_gambit.badge": { "en": "Gambit", "zh": "暗潮" },
     "mode.ocean_gambit.tagline": {
@@ -673,10 +673,6 @@
       "zh": "挺过结算"
     },
     "ui.cta.request_loan": { "en": "Request a loan", "zh": "申请借款" },
-    "ui.cta.upgrade_shipyard": {
-      "en": "Upgrade at the Shipyard",
-      "zh": "前往船坞升级"
-    },
     "ui.cta.skip_shipyard": {
       "en": "Skip the hull upgrade",
       "zh": "暂不升级船体"
@@ -1134,17 +1130,9 @@
       "en": "<p>Before the bills below come due each round, the pirates roll for your ship. {raidKind} A raid takes every coin you're carrying.</p>\n<p>You get one choice before that roll happens: hire an escort for {escortShare} of your current Gold and sail through guaranteed safe, or set sail anyway and keep the Gold if the pirates don't show.</p>\n",
       "zh": "<p>每轮账单到期之前，海盗会先为你的船掷上一把。{raidKind}一场劫掠下来，你带的钱会被搜刮一空。</p>\n<p>掷这一下之前，你还有得选：花现有金币的 {escortShare}雇一艘护航，保证平安过关；或者照常起航碰运气，海盗不来，那笔金币就省下。</p>\n"
     },
-    "guides.024": {
-      "en": "The harbor's escort, hired at Resolve by any captain: guarantees safe passage from that round's pirate attack, for a fee the voyage's rules set as a share of your Gold: {escortLadder}. Once hired, the round's pirates are no longer a risk.",
-      "zh": "港湾的护航，任何船长都能在结算时雇用：保你免受本轮海盗劫掠，费用按航程规则定，取现有金币的一个比例：{escortLadder}。雇下之后，本轮的海盗就不再是威胁。"
-    },
     "guides.026": {
       "en": "A Convoy path market at the Parley on a Gambit voyage: a Convoy captain sells one round of protection to one other captain at a price the two of them agree. The buyer pays the fee at the handshake, the seller's cannons beat off {convoyCoverPct}% of a raid in that round, and the rest comes out of the seller's own Gold. {ESCORT_OFFER_DEATH}",
       "zh": "暗潮航程里洽谈场上的镖行买卖：镖行船长把一轮的护卫卖给另一位船长，价格两人自己谈。买家在成交时付清费用，卖家的炮火挡下该轮 {convoyCoverPct}% 的劫掠，剩下的从卖家自己的金币里出。{ESCORT_OFFER_DEATH}"
-    },
-    "guides.087": {
-      "en": "A roll at Resolve, before wages and maintenance come due, that can take every Gold coin you're carrying. The voyage's rules set the odds: {pirateLadder}. Hire an escort beforehand to guarantee safe passage instead of risking it.",
-      "zh": "结算时掷上一把，赶在工钱和维护费到期之前，你身上带的每一枚金币都可能被搜刮一空。航程规则定下概率：{pirateLadder}。想稳当过关，提前雇一艘护航，不用冒这个险。"
     },
     "guides.028": {
       "en": "A cheap raw material, bought at port. Weavers turn it into Linen Clothes, or combine it with Silk for Cotton Clothes.",
@@ -1186,26 +1174,6 @@
       "en": "Makes Sachets. The most expensive artisan to hire, but Sachets pay the best.",
       "zh": "制作香囊。雇价最高的工匠，但香囊的报酬也最高。"
     },
-    "guides.038": {
-      "en": "Your score for the voyage, roughly your accumulated trading profit. Highest Reputation on the voyage's final round wins.",
-      "zh": "你在本航程的积分，大致就是累积的贸易利润。最后一轮结束时声誉最高的人获胜。"
-    },
-    "guides.039": {
-      "en": "Your standing across every harbor, kept on the account rather than in one voyage: the Reputation you bank becomes Renown XP when a voyage ends. {RENOWN_BONUS_LINE}. The title beside your level is the ladder's own name for the rung you have reached.",
-      "zh": "你在所有港湾之间的地位，记在账号上，不随某次航程走：航程结束时，你攒下的声誉会变成声望经验。{RENOWN_BONUS_LINE}。等级旁的称号，就是这条阶梯给这一级的名字。"
-    },
-    "guides.040": {
-      "en": "The Gold you can spend. Hit zero with bills still due and the voyage ends in bankruptcy.",
-      "zh": "你手头可用的金币。账单还没付完就见底，航程以破产收场。"
-    },
-    "guides.041": {
-      "en": "A {vatPct}% tax on the profit margin of finished good sales (selling price minus material cost minus wage). Raw material sales aren't taxed this way.",
-      "zh": "对成品的利润（售价减原料成本再减工钱）征 {vatPct}% 的税。卖原材料不在此列。"
-    },
-    "guides.042": {
-      "en": "A {incomeTaxPct}% tax on your net profit for the round, charged at Resolve after everything else is paid.",
-      "zh": "对本轮净利润征 {incomeTaxPct}% 的税，在结算时、其余账付清之后收。"
-    },
     "guides.043": {
       "en": "The fee charged for delivering a trade order, based on how many items you're moving. Reduced by your ship level and certain boons or modules.",
       "zh": "交一条订单要付的运费，按件数算。船只等级，以及某些机缘和模块，能把它压低。"
@@ -1222,21 +1190,9 @@
       "en": "What your hired artisans cost per round, paid at Resolve whether they produced anything or not.",
       "zh": "雇来的工匠每轮的开销，结算时付，产出与否都得付。"
     },
-    "guides.047": {
-      "en": "A one round bonus you draft at the start of each round, at Dawn. It's picked personally, so your three choices differ from everyone else's.",
-      "zh": "每轮开局、破晓时抽的机缘，只保一轮。三张牌单发给你，和别人的都不重样。"
-    },
-    "guides.048": {
-      "en": "A permanent module drafted at the Shipyard once you have a free slot. It stays rigged until you swap or trade it.",
-      "zh": "永久模块，有空余槽位时在船坞抽取。装上就一直在，直到你换掉或转手。"
-    },
     "guides.049": {
       "en": "Trade directly with another captain instead of through the market, on the Captain's Exchange during the Parley or from the harbor chat once you reach Renown Level {FLEXIBLE_BARTER_UNLOCK_LEVEL}. Post what you have for what you want; the offered amount is set aside the moment you post it, and comes back to you if it's canceled, if nobody takes it, or if a flexible offer of yours is taken and this one is retired with it.",
       "zh": "绕开集市，直接和另一位船长易货：洽谈时的船长行市，或声望到 {FLEXIBLE_BARTER_UNLOCK_LEVEL}级后的港湾聊天。挂出你有的、写明你想要的；挂出的那一刻数量就寄存起来，被取消、没人接，或者你的另一份灵活挂单成交、把它一并带走，都会原样回到你手上。"
-    },
-    "guides.052": {
-      "en": "A loan from another captain when you can't cover this round's wages or maintenance on your own. The lender's Gold transfers to you immediately; you owe it back before the voyage ends, or it's deducted automatically and handed to them at the voyage's final round.",
-      "zh": "自己盖不住本轮的工钱或维护费时，向另一位船长借的一笔款。对方的金币立刻到账；在航程结束前还清，还不清，最后一轮会自动从你的金币里扣下来，交到他手上。"
     },
     "guides.053": {
       "en": "The round's opening phase: the boon draft deals three cards and you keep one, and it bends the rules for the round ahead. On a voyage that keeps a larder, this is also when the crew eats a ration a head.",
@@ -1663,20 +1619,20 @@
       "zh": "舱单先行，桌面后开：订单排在洽谈之前，所以你先对单子落定，船队一开口议价，单子上的内容就不能再改。"
     },
     "descriptions.031": {
-      "en": "Every voyage here runs 12 rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.",
-      "zh": "这里的航程不论难度，都走12轮。港湾的两次表决就是照这个长度调的。"
+      "en": "Every voyage here runs {rounds} rounds, whatever tier you sail. That is the length the harbor's two votes are tuned to.",
+      "zh": "这里的航程不论难度，都走{rounds}轮。港湾的两次表决就是照这个长度调的。"
     },
     "descriptions.032": {
       "en": "Every captain is dealt a private card when the voyage leaves the dock, and no one else can see it: most are Honest Captains sailing the fleet's public objective, while a table of four or more hides a Pirate in the fleet and a table of six or more may hide a Broker beside them. Every card turns face up when the voyage ends.",
       "zh": "航程离港时，每位船长都发到一张别人看不到的私牌：多数是诚信船长，跟着船队的公开目标走；四人以上的桌上，船队里藏着一个海盗，六人以上还可能多藏一个掮客。航程结束时，所有牌都翻开。"
     },
     "descriptions.033": {
-      "en": "From round 5, a simple majority of the fleet can open one captain's manifest at a Parley. The harbor is shown 2 of that captain's last 5 fills, and calling the vote spends the rest of that Parley's trading.",
-      "zh": "从第5轮起，船队过半数可以在洽谈时翻开一位船长的舱单。港湾会看到那位船长最近5笔交货中的2笔；发起这次表决，那场洽谈剩下的交易时间就没了。"
+      "en": "From round {auditFrom}, a simple majority of the fleet can open one captain's manifest at a Parley. The harbor is shown {revealCount} of that captain's last {window} fills, and calling the vote spends the rest of that Parley's trading.",
+      "zh": "从第{auditFrom}轮起，船队过半数可以在洽谈时翻开一位船长的舱单。港湾会看到那位船长最近{window}笔交货中的{revealCount}笔；发起这次表决，那场洽谈剩下的交易时间就没了。"
     },
     "descriptions.034": {
-      "en": "From round 9, two thirds of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there 10 percent either way.",
-      "zh": "从第9轮起，仍在航程中的船长凑够三分之二，就能投票把一位船长放逐上岸，每趟航程一次。船和舱里的货归港湾，他一半的金币留在船上；此后他接过港务长之手：每轮一次，点一座港口，把那儿的物价往任意一边拨动10%。"
+      "en": "From round {maroonFrom}, {share} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there {portShift} percent either way.",
+      "zh": "从第{maroonFrom}轮起，仍在航程中的船长凑够{share}，就能投票把一位船长放逐上岸，每趟航程一次。船和舱里的货归港湾，他一半的金币留在船上；此后他接过港务长之手：每轮一次，点一座港口，把那儿的物价往任意一边拨动{portShift}%。"
     },
     "engine.001": { "en": "a random pair", "zh": "随机两项" },
     "engine.002": {
@@ -1910,8 +1866,8 @@
       "zh": "❌ 没有可改的批次，先抽取模块"
     },
     "engine.049": {
-      "en": "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch. Take one of these or come back next round.",
-      "zh": "❌ 船坞凑不齐一整批新模块：这一批之外能发的模块不足三件。先从这些里挑一件，或下轮再来。"
+      "en": "❌ The yard cannot deal a whole new batch: fewer than three modules are outside this batch and your hull. Take one of these or come back next round.",
+      "zh": "❌ 船坞凑不齐一整批新模块：这一批之外、且不在你船上的模块不足三件。先从这些里挑一件，或下轮再来。"
     },
     "engine.050": {
       "en": "🔄 Changed your module batch for a fresh deal",
@@ -3843,7 +3799,6 @@
       "en": "⏱️ Production Cycle: What Happens When",
       "zh": "⏱️ 生产周期：何时发生什么"
     },
-    "room-b.021": { "en": ", not instantly.", "zh": "，并非当场。" },
     "room-b.022": { "en": "Draft a boon", "zh": "抽取机缘" },
     "room-b.023": {
       "en": "Assign tasks, consume materials",
@@ -4608,7 +4563,6 @@
       "en": "No path yet. The deal ran before you came aboard, so you sail this voyage without one.",
       "zh": "还没有商道。发牌在你上船之前就结束了，所以本航程你就这样出海，没有商道。"
     },
-    "room-b.279": { "en": "Class", "zh": "船只等级" },
     "room-b.280": {
       "en": "No modules installed. Upgrade the hull in the Shipyard to unlock slots.",
       "zh": "还没装模块。到船坞升级船体就能解锁模块槽位。"
@@ -4838,8 +4792,7 @@
     "lobby.095": { "en": "View captain profile", "zh": "查看船长资料" },
     "lobby.096": { "en": "Captains", "zh": "船长" },
     "lobby.097": { "en": "Sailing", "zh": "航行中" },
-    "lobby.098": { "en": "Captain Legacy", "zh": "船长传承" },
-    "lobby.099": { "en": "View captain legacy", "zh": "查看船长传承" },
+    "lobby.099": { "en": "View captain's legacy", "zh": "查看船长传承" },
     "lobby.100": { "en": "Dismiss", "zh": "关闭" },
     "lobby.101": { "en": "Refresh harbors", "zh": "刷新港湾" },
     "lobby.102": { "en": "Refresh the harbor list", "zh": "刷新港湾列表" },
@@ -6468,6 +6421,22 @@
     "residual.493": { "en": "above 66%", "zh": "高于66%" },
     "residual.494": { "en": "62 to 74 min", "zh": "62到74分钟" },
     "residual.495": { "en": "not measurable", "zh": "测不出来" },
+    "residual.496": {
+      "en": "No modules installed. Draft one to fill your open slot.",
+      "zh": "还没装模块。抽一件模块，填上空的槽位！"
+    },
+    "residual.497": {
+      "en": "The round turns once every captain has chosen.",
+      "zh": "每位船长都选好之后，这一轮才继续。"
+    },
+    "residual.498": {
+      "en": "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
+      "zh": "每个阶段都有一只计时器。时间一到，港湾就继续往前走，无论你是否已经准备；你放着没动的那一处，会由引擎按默认替你走完。"
+    },
+    "residual.499": {
+      "en": "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
+      "zh": "常备订单由你预先写好：要哪张机缘、买什么货、雇哪位匠人、交哪张订单。计时器走完时，那一处就照你写的办，而不是按默认。"
+    },
     "residual.319": {
       "en": "❌ Need {debt.amount} Gold to repay {debt.counterpartyName}, have {state.money}",
       "zh": "❌ 还{debt.counterpartyName}{debt.amount}金币，手上只有{state.money}"
@@ -6946,12 +6915,12 @@
     },
     "room-b.377": { "en": "Fines", "zh": "罚款" },
     "room-b.378": {
-      "en": "That module is already bolted to your hull.",
-      "zh": "该模块已经装配在你的船体上。"
+      "en": "Every module on the board is already on your hull.",
+      "zh": "市场上的每个模块都已经装在你的船体上。"
     },
     "room-b.379": {
-      "en": "❌ {name} is already bolted to your hull; the extra copy is discarded.",
-      "zh": "❌ {name}已经装配在你的船体上，多出的一份被丢弃。"
+      "en": "❌ {name} is already bolted to your hull; the yard fits each module once.",
+      "zh": "❌ {name}已经装配在你的船体上；每个模块船坞只装一件。"
     },
     "room-b.380": {
       "en": "{item} ({port})",
@@ -6998,11 +6967,6 @@
     "fragment.or": { "en": " or ", "zh": "或" },
     "fragment.colon": { "en": ": ", "zh": "：" },
     "fragment.comma": { "en": ", ", "zh": "，" },
-    "fragment.and": { "en": " and ", "zh": "和" },
-    "fragment.on": { "en": " on ", "zh": "，按" },
-    "fragment.past_midpoint_on": {
-      "en": " past the midpoint on ",
-      "zh": "，过半程后按"
-    }
+    "fragment.and": { "en": " and ", "zh": "和" }
   }
 }

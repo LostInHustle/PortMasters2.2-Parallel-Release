@@ -3,18 +3,21 @@
 import { RoomMembersPayload } from "@/types/realtime/moderation";
 import { PublicUser, RoomMemberLive } from "@/types/realtime/presence";
 import { GameStatusUpdate } from "@/types/realtime/status";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 
-type RoomStatusMap = Record<string, GameStatusUpdate>;
+export type RoomStatusMap = Record<string, GameStatusUpdate>;
 
 /**
  * The harbor's live roster: who is aboard, each captain's last reported status,
- * and who the host has muted. Both surfaces that show the harbor at a glance
- * (MembersPanel's full roster and FleetTicker's strip) need exactly this, and
- * this shares the code, not the state: every caller still subscribes on its
- * own, so mounting both panels behaves identically to the two copies it
- * replaces.
+ * who the host has muted, and who the host is. The harbor mounts this once
+ * (see GameRoom) and hands the answer to the roster panel, the ticker and the
+ * bankruptcy board, so one room:members frame is read once rather than by
+ * three subscribers that can drift apart.
+ *
+ * seedMembers fills the roster from the REST detail read on mount. It is a
+ * no-op once a broadcast has landed, because the broadcast is the harbor's
+ * live answer and the fetch's is a snapshot taken when the question went out.
  */
 export function useRoomRoster(
   socket: Socket | null,
@@ -26,12 +29,16 @@ export function useRoomRoster(
   // Rides the same room:members broadcast the roster itself comes over, so a
   // mute needs no separate subscription.
   const [mutedUserIds, setMutedUserIds] = useState<Set<string>>(new Set());
+  const [hostId, setHostId] = useState<string | null>(null);
+  const broadcastSeen = useRef(false);
 
   useEffect(() => {
     if (!socket) return;
 
     const onMembers = (data: RoomMembersPayload) => {
       if (data.roomId !== roomId) return;
+      broadcastSeen.current = true;
+      if (data.hostId) setHostId(data.hostId);
       // The list is what this captain may see rather than what the harbor
       // holds (see RoomMembersPayload), and the server is the only writer
       // of it, so it is taken as handed rather than filtered here.
@@ -80,5 +87,13 @@ export function useRoomRoster(
     };
   }, [socket, roomId]);
 
-  return { members, statuses, mutedUserIds };
+  const seedMembers = useCallback((seed: RoomMemberLive[]) => {
+    if (broadcastSeen.current) return;
+    setMembers(seed);
+  }, []);
+
+  return useMemo(
+    () => ({ members, statuses, mutedUserIds, hostId, seedMembers }),
+    [members, statuses, mutedUserIds, hostId, seedMembers],
+  );
 }

@@ -46,6 +46,12 @@ export type SessionState = {
   // actual new lines out of the reducer sidesteps length entirely.
   newLines: LedgerLine[];
   loaded: boolean;
+  // Whether this voyage may be written back over the captain's save. A
+  // loaded or harbor seeded voyage is; a fallback built after the server
+  // never answered is not, because writing it would replace a real voyage
+  // the next retry or reload was about to hand back. Play stays open either
+  // way; only the write is withheld.
+  persistable: boolean;
   saving: boolean;
   lastSavedAt: number | null;
 };
@@ -55,7 +61,6 @@ export type Action =
   | {
       type: "APPLY";
       fn: (g: GameState, logs: LedgerLine[]) => void;
-      postDraft?: boolean;
     }
   | {
       type: "START_FRESH";
@@ -70,6 +75,9 @@ export type Action =
       // caller that does not know it, which lands on the default.
       mode?: GameMode;
       houseId?: HouseId | null;
+      // False only for the recovery fallback, whose blank voyage must not
+      // overwrite a save the harbor has not been able to answer for yet.
+      persistable?: boolean;
     }
   | { type: "SET_SAVING"; saving: boolean; at?: number };
 
@@ -82,6 +90,7 @@ export function reducer(state: SessionState, action: Action): SessionState {
         logs: action.logs,
         newLines: [],
         loaded: true,
+        persistable: true,
       };
     case "START_FRESH": {
       const g = createInitialGameState({
@@ -109,7 +118,14 @@ export function reducer(state: SessionState, action: Action): SessionState {
       ) {
         snapToCheckpoint(g, action.ctx, cp.round, cp.phase, logs);
       }
-      return { ...state, game: g, logs, newLines: [], loaded: true };
+      return {
+        ...state,
+        game: g,
+        logs,
+        newLines: [],
+        loaded: true,
+        persistable: action.persistable ?? true,
+      };
     }
     case "APPLY": {
       const game = structuredClone(state.game) as GameState;

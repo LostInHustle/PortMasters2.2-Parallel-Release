@@ -31,7 +31,7 @@ import { modeConfig, voyageRoundsFor } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
 import type { GameState, Phase } from "@/lib/game/types";
 import { createInitialGameState } from "@/lib/game/types";
-import { leaderShortfall, tallyRows } from "@/lib/voteTally";
+import { leaderShortfall, tallyRows } from "@/lib/vote-tally";
 import {
   call,
   CARRIES_A_DASH,
@@ -196,7 +196,7 @@ export async function maroonAndTheHarbormasterSuite(
   // The shortfall line the shared count draws, read at this vote's own
   // threshold rather than at the audit's: the two cards render one line
   // against two different counts of names (see leaderShortfall in
-  // @/lib/voteTally), and a line quoting the majority here would tell the
+  // @/lib/vote-tally), and a line quoting the majority here would tell the
   // table three names were enough for a vote that needs four.
   const shortfallSeat: PublicUser[] = [
     {
@@ -1347,7 +1347,7 @@ export async function maroonAndTheHarbormasterSuite(
 
   // The door reads the marks through the one predicate the maroon list on a
   // card is drawn with, and the phase counts there as well as the flags
-  // (see writtenOff in @/lib/seatMarks). The captain above is the case that
+  // (see writtenOff in @/lib/seat-marks). The captain above is the case that
   // tells the two readings apart: their bankruptcy is the phase alone, a
   // status from a client older than the flags, and they are refused as a
   // name for what they are rather than for the roster arithmetic that also

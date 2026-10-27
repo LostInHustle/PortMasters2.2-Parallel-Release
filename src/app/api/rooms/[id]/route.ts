@@ -1,16 +1,15 @@
 // GET /api/rooms/[id]: harbor detail (members, recent harbor chat)
-// Returns the harbor plus the last 100 public harbor chat messages. DMs are
-// scoped to recipientId not null and never appear here.
+// Returns the harbor plus the shared page of public harbor chat messages.
+// DMs are scoped to recipientId not null and never appear here.
 import { NextResponse } from "next/server";
-import { HARBOR_NOT_FOUND } from "@/lib/api";
-import { db, ROOM_WITH_MEMBERS, PUBLIC_USER_SELECT } from "@/lib/db";
+import { db, ROOM_WITH_MEMBERS } from "@/lib/db";
 import {
+  HARBOR_NOT_FOUND,
   getCurrentUser,
-  requestLocale,
+  notFoundResponse,
   unauthorizedResponse,
 } from "@/lib/api-auth";
-import { tFor } from "@/lib/game/i18n";
-import { messageRows } from "@/lib/messages";
+import { MESSAGE_PAGE, messageRows } from "@/lib/messages";
 import { serializeRoom } from "@/lib/rooms";
 
 export async function GET(
@@ -29,23 +28,11 @@ export async function GET(
       ...ROOM_WITH_MEMBERS,
       messages: {
         where: { recipientId: null },
-        orderBy: { createdAt: "asc" },
-        take: 100,
-        include: {
-          sender: {
-            select: PUBLIC_USER_SELECT,
-          },
-        },
+        ...MESSAGE_PAGE,
       },
     },
   });
-  if (!room) {
-    const locale = await requestLocale();
-    return NextResponse.json(
-      { error: tFor(locale, HARBOR_NOT_FOUND) },
-      { status: 404 },
-    );
-  }
+  if (!room) return notFoundResponse(HARBOR_NOT_FOUND);
 
   const isMember = room.members.some((m) => m.userId === user.id);
 

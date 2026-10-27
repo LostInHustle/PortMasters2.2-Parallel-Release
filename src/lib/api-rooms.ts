@@ -21,6 +21,7 @@
 // route can hand back (see ./api-json and ./api-auth).
 // =====================================================================
 import { NextResponse } from "next/server";
+import { notFoundJson } from "./api-auth";
 import { db, PUBLIC_USER_SELECT } from "./db";
 import { tFor, type Locale } from "./game/i18n";
 import { admitToRoom } from "./rooms";
@@ -51,12 +52,7 @@ export async function joinHarborResponse(
       },
     },
   });
-  if (!room) {
-    return NextResponse.json(
-      { error: tFor(locale, notFound) },
-      { status: 404 },
-    );
-  }
+  if (!room) return notFoundJson(locale, notFound);
 
   const admitted = await admitToRoom(room, userId);
   if ("error" in admitted) {

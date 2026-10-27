@@ -37,7 +37,7 @@ import {
 } from "@/lib/game/maroon";
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
-import { nameCount, tallyRows } from "@/lib/voteTally";
+import { nameCount, tallyRows } from "@/lib/vote-tally";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";

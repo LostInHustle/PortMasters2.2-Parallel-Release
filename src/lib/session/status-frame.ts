@@ -8,6 +8,7 @@
 // =====================================================================
 
 import type { GameState } from "@/lib/game/types";
+import type { StatusFrame } from "@/types/realtime/status";
 import { phaseLabel } from "@/lib/game/engine";
 import { onShortRations } from "@/lib/game/larder";
 
@@ -23,7 +24,7 @@ import { onShortRations } from "@/lib/game/larder";
 // says nothing about it (see GameState.bankrupt). The server reads the
 // same two fields, which is how it refuses to maroon a captain the
 // harbor has already written off.
-export function statusFrame(roomId: string, game: GameState) {
+export function statusFrame(roomId: string, game: GameState): StatusFrame {
   return {
     roomId,
     round: game.currentRound,

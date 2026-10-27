@@ -55,6 +55,7 @@ const eslintConfig = [
       // directory this repo has never had.
       "node_modules/**",
       ".next/**",
+      ".wrangler/**",
       "next-env.d.ts",
     ],
   },

@@ -1146,9 +1146,7 @@ export async function pathDraftSuite(
   });
   const publishedFrame = await published;
   check(
-    publishedFrame?.path === otherPath &&
-      publishedFrame.name === "Smoke draft_a" &&
-      switcher.switched.length === 1,
+    publishedFrame?.path === otherPath && switcher.switched.length === 1,
     "a switch in season is published to the whole harbor, the captain who made it included, and it carries the path taken up and not the one set aside, because the server has never read a save to know what that was",
   );
   check(

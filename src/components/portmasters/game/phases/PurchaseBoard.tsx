@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
 import { ItemIcon } from "../../shared";
 import { PriceBreakdownTooltip, priceAwareTermContent } from "../PriceTooltips";
-import { PanelNote } from "./PhasePanels";
 import {
+  PanelNote,
   TradeCard,
   type MarketBoardProps,
   type PhasePanelProps,

@@ -89,7 +89,7 @@ export function useBarter(
   const [offers, setOffers] = useState<BarterOffer[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Accepted flexible offers, as the server counts them. The allowance
-  // also needs the Renown level from voyage state, which engine/barterAccess
+  // also needs the Renown level from voyage state, which engine/barter-access
   // combines, so both screens read the server's policy. Only the flexible
   // composer reads this.
   const [flexibleOffersAccepted, setFlexibleOffersAccepted] = useState(0);

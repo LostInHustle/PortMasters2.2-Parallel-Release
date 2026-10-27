@@ -184,7 +184,7 @@ const roomBarterOffers = new Map<string, BarterOffer[]>();
 //
 // Only flexible offers are counted. Accepting is never rationed, on
 // either surface, and neither is posting, so this tally is the whole of
-// the policy that barterAccess turns into "offers left".
+// the policy that barter-access turns into "offers left".
 //
 // Deliberately not cleared by clearBarter. That runs every time the harbor's
 // checkpoint moves off the bartering phase, which happens several times a
@@ -262,7 +262,7 @@ export function barterPayloadFor(roomId: string, userId: string) {
     // tallied on the client, because a client would have to rebuild the
     // tally after every reload and could only ever hold a second opinion
     // of it. The policy that turns this into "offers left" lives in
-    // engine/barterAccess, so what travels here stays a plain fact.
+    // engine/barter-access, so what travels here stays a plain fact.
     flexibleOffersAccepted: flexibleOffersAccepted(roomId, userId),
   };
 }

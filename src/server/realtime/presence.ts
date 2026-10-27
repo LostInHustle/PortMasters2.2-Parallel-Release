@@ -239,6 +239,9 @@ export type DepartureCleanup = {
   emitRoomMembers: (io: Server, roomId: string) => Promise<void>;
   maybeConcludeVoyage: (io: Server, roomId: string) => Promise<void>;
   clearRoomAllMaps: (roomId: string) => void;
+  // A reaped captain is out of this harbor for good, so a live path draft
+  // must not keep their seat waiting. Dropped after the leave succeeds.
+  noteUserLeftDraft: (io: Server, roomId: string, userId: string) => void;
 };
 
 // Everything one armed departure needs. Bundled because the boot variant differs
@@ -273,6 +276,8 @@ export async function reapDeparture(
     keepEmptyRoom,
   }).catch(() => null);
   if (!result) return;
+
+  cleanup.noteUserLeftDraft(io, roomId, userId);
 
   // The seat is gone, so a running voyage just lost its captain. Recorded after
   // the write, so a failed leave is not counted. A voyage never started has no
@@ -309,10 +314,17 @@ function armDeparture(io: Server, plan: DeparturePlan): void {
   cancelDeparture(roomId, userId);
   const t = setTimeout(async () => {
     departureTimers.delete(key);
-    // They may have reconnected elsewhere or signed back in during the wait, so
-    // act only if they are still gone from this harbor. The immediate console reap
-    // has already decided they are not coming back.
-    if (userSockets.get(userId)?.size) return;
+    // They may have reconnected during the wait, but only a socket in this
+    // harbor keeps the seat: a captain who signed back in and stayed in the
+    // lobby has left this table, and a seat held for them would wait on a
+    // captain who is no longer sailing here.
+    const live = userSockets.get(userId);
+    const stillHere = live
+      ? Array.from(live).some(
+          (socketId) => sockets.get(socketId)?.roomId === roomId,
+        )
+      : false;
+    if (stillHere) return;
     await reapDeparture(io, plan);
   }, DEPARTURE_GRACE_MS);
   // As with the clock and the advance watch, this must never keep the process up.

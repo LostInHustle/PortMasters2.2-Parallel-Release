@@ -114,6 +114,8 @@ import { theCrewAndTheLarderSuite } from "./suites/66-theCrewAndTheLarder";
 import { theBilingualHarborSuite } from "./suites/67-theBilingualHarbor";
 import { theLedgerReadsInYourLanguageSuite } from "./suites/68-theLedgerReadsInYourLanguage";
 import { thePriceAndThePromiseSuite } from "./suites/69-thePriceAndThePromise";
+import { theDailyCheckInSuite } from "./suites/70-theDailyCheckIn";
+import { theLateCaptainAtTheMarketSuite } from "./suites/71-theLateCaptainAtTheMarket";
 
 async function main(): Promise<void> {
   console.log(`\nSmoke testing ${BASE}\n`);
@@ -560,6 +562,11 @@ async function main(): Promise<void> {
     // pure cluster above, and the ready check stays last.
     console.log("\nThe Houses and the Ages");
     await theHousesAndTheAgesSuite(run);
+    // The check in's article is the Houses' neighbour: one captain of its
+    // own, one account level route walked twice to prove the reward lands
+    // once a day and not twice. It opens no harbor either.
+    console.log("\nThe Daily Check In");
+    await theDailyCheckInSuite(run);
     // The crew and the Larder's article is the wage article's sibling:
     // one state walked in process from its first hire to its last
     // dismissal, so it opens no harbor either, and it sits beside the
@@ -589,6 +596,12 @@ async function main(): Promise<void> {
     // hover through the same door.
     console.log("\nThe price and the promise");
     await thePriceAndThePromiseSuite();
+    // The late captain's article is the ready frame's other reader: a
+    // market's leans have to reach a client that missed the advance, and
+    // they have to stop reaching it the moment the harbor leaves the
+    // Market. It opens one Gambit harbor, and the ready check stays last.
+    console.log("\nThe late captain at the market");
+    await theLateCaptainAtTheMarketSuite(run);
     // The ready check's article is the one that needs a harbor and a wall
     // clock rather than a table: its cure is a grace the harbor has to be
     // watched through, so it is the last thing the run does and it opens a

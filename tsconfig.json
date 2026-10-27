@@ -38,5 +38,8 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  // The Worker is a second TypeScript project with its own globals, so it
+  // is checked by `npm run cf:typecheck` rather than by this one, and
+  // Wrangler's local state is generated rather than authored.
+  "exclude": ["node_modules", "cloudflare", ".wrangler"]
 }

@@ -53,3 +53,8 @@ export type GameStatusUpdate = {
   marooned?: boolean;
   shortRations?: boolean;
 };
+
+// The same report without the public account. The browser builds this half
+// from its own save, and the server adds the account on the way out, so the
+// two ends share one frame definition rather than describing it twice.
+export type StatusFrame = Omit<GameStatusUpdate, "user">;

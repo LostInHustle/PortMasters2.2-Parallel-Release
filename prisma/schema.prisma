@@ -8,13 +8,21 @@
 // createdAt or an updatedAt that no query asks for, and one carries a
 // drawnAt and an earnedAt that are written on purpose and read by
 // nobody. They are kept rather than dropped because of how the schema
-// reaches a live database: the start command pushes this file with
+// reaches a live database. Railway's start command pushes this file with
 // `prisma db push`, which refuses to drop a column unless the command
 // also carries --accept-data-loss, and a start command that accepts
 // data loss on every deploy is a worse trade than a few columns that
-// cost a row nothing. The day the owner wants them gone, the migration
-// is one deliberate deploy with a backup behind it, and the flag goes
-// back off in the same hour.
+// cost a row nothing. The day the owner wants them gone, the change is
+// one deliberate deploy with a backup behind it, and the flag goes back
+// off in the same hour.
+//
+// The Cloudflare container takes the other path. It applies the checked
+// in migrations under prisma/migrations with `prisma migrate deploy` and
+// never runs db push, because Litestream keeps its own tables in the same
+// SQLite file and db push would read them as drift. Every schema change
+// therefore needs both the edit here and a migration beside it. Railway
+// keeps its push, so every future migration is additive history that
+// Railway simply never consults.
 // =====================================================================
 
 generator client {

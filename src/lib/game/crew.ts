@@ -155,7 +155,7 @@ export function newestAboard(
   for (const id of WORKER_TYPE_IDS) {
     const list = state.workers[id] ?? [];
     for (let i = 0; i < list.length; i++) {
-      const seq = Number.isFinite(list[i].seq) ? Math.floor(list[i].seq) : 0;
+      const seq = workerSeq(list[i]);
       if (seq >= newest) {
         newest = seq;
         type = id;

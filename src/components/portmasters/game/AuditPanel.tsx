@@ -33,7 +33,7 @@ import { auditOpensAt } from "@/lib/game/mode";
 import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { nameCount, tallyRows } from "@/lib/voteTally";
+import { nameCount, tallyRows } from "@/lib/vote-tally";
 import { VoteTallyRows } from "@/components/portmasters/game/VoteTallyRows";
 import { type Marks } from "@/components/portmasters/game/VoteSeatPicker";
 import { VoteCard } from "./VoteCard";

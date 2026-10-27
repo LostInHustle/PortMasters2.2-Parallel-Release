@@ -431,7 +431,10 @@ export type GameState = {
   // they were agreed in, and the stamp is read before the list.
   settledMovements: string[];
   settledRound: number;
-  // Voyage contract tally, read by the round report and the contract panels.
+  // Voyage contract tally. The seller side feeds the round report and the
+  // contract panels; the buyer side is written for the trade report scripts
+  // and the smoke suites, which read both halves to check a board settles
+  // evenly. No screen reads a buyer counter.
   escortSold: number;
   escortBought: number;
   escortFeesEarned: number;

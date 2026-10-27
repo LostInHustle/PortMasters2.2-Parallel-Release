@@ -101,6 +101,5 @@ export type DraftView = {
 export type PathSwitched = {
   roomId: string;
   userId: string;
-  name: string;
   path: PathId;
 };

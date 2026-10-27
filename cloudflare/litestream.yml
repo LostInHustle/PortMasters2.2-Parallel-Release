@@ -1,0 +1,34 @@
+# Litestream 0.5 configuration for the Cloudflare container.
+#
+# Every value arrives from the environment: the entry point exports the
+# database path, and the Worker passes the R2 settings to the container at
+# start. No credential is written into this file.
+#
+# The endpoint is the account's R2 address, of the form
+# https://<ACCOUNT_ID>.r2.cloudflarestorage.com, and `region: auto` is
+# R2's setting. Litestream recognises R2 from the endpoint and applies its
+# R2 defaults.
+
+# One replica per database in this version of the format: singular
+# `replica`, not a list.
+dbs:
+  - path: "${DATABASE_PATH}"
+    replica:
+      type: s3
+      bucket: "${LITESTREAM_BUCKET}"
+      # The object prefix inside the bucket. Recovery restores from a
+      # second prefix and switches this line to it rather than writing
+      # over the only copy.
+      path: "portmasters/custom.db"
+      endpoint: "${LITESTREAM_ENDPOINT}"
+      region: auto
+      access-key-id: "${LITESTREAM_ACCESS_KEY_ID}"
+      secret-access-key: "${LITESTREAM_SECRET_ACCESS_KEY}"
+
+# Top level in 0.5, applying to every database above. A snapshot a day and
+# a thirty day window keep a month of point in time restores; the defaults
+# are one day each, which leaves a mistake discovered a day late with no
+# way back.
+snapshot:
+  interval: 24h
+  retention: 720h

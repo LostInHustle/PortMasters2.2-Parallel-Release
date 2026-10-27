@@ -5,7 +5,7 @@
 //
 // The Manifest Audit and the maroon vote both put a target to the table
 // and both show the harbor the nominations as they come in. The rows are
-// tallyRows' (see lib/voteTally.ts, which is where the two votes already
+// tallyRows' (see lib/vote-tally.ts, which is where the two votes already
 // share what a row is); this is the other half of that arrangement: the
 // same paragraph, the same two spans, the same muted count, in two
 // panels.
@@ -26,7 +26,7 @@
 //
 // The count line is worded for its own number: one captain has named
 // someone, five have, one name carries it. The count half is built by the
-// shared builder (see namedCountLine in lib/voteTally.ts), so the two
+// shared builder (see namedCountLine in lib/vote-tally.ts), so the two
 // votes cannot word one number two ways.
 //
 // The last line is the one thing here the count cannot supply: what
@@ -50,7 +50,7 @@ import {
   namedCountLine,
   type TallyRow,
   type VoteCensus,
-} from "@/lib/voteTally";
+} from "@/lib/vote-tally";
 import type { PublicUser } from "@/lib/api";
 
 export function VoteTallyRows({

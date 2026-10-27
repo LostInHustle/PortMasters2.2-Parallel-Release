@@ -38,6 +38,7 @@ import {
   normalizeMilestoneTrigger,
 } from "./constants/milestones";
 import { MERCHANT_RATINGS } from "./constants/reputation";
+import { crewLossRuleOn } from "./crew";
 import { milestoneBoonsOn } from "./flags";
 import { garmentsLayerOn, legIsCold } from "./garments";
 import { powerBudgetAllows } from "./held-cards";
@@ -138,8 +139,10 @@ export function milestoneDue(
   switch (trigger) {
     case "crew_loss":
       // A loss is a count rather than a latch: every hand lost is a
-      // moment, and the mark counts the ones already answered.
-      return state.crewLost.length > mark;
+      // moment, and the mark counts the ones already answered. With the
+      // loss rule off no hand can go, so an old unanswered loss in a save
+      // written while it was on is not a moment this build answers.
+      return crewLossRuleOn(state.mode) && state.crewLost.length > mark;
     case "pathbound_order":
     case "mandate":
       // Both are latches. The site only calls when its event happens at

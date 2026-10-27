@@ -15,7 +15,10 @@
 //   once, via the per module lock, and a buyer's slots bound a purchase
 //   on their panel. A purchase onto a full hull bolts on anyway: both
 //   machines must agree a trade completed, and a module lost between
-//   clients would be a durable thing destroyed by a race.
+//   clients would be a durable thing destroyed by a race. The panel sends
+//   one accept at a time (see ModuleMarket), so that branch is the last
+//   resort for a stale client rather than the ordinary path for a full
+//   hull, and the load holds a hull that took it to the ladder's top.
 import { cardById, cardName, cardsOfKind } from "../cards";
 import { line, type LedgerLine } from "@/lib/game/ledger";
 import { moduleTradesOn } from "../flags";
@@ -116,7 +119,7 @@ export function applyModuleTradeSide(
       ) {
         logs.push(
           line(
-            "❌ {name} is already bolted to your hull; the extra copy is discarded.",
+            "❌ {name} is already bolted to your hull; the yard fits each module once.",
             {
               name,
             },
@@ -135,8 +138,8 @@ export function applyModuleTradeSide(
       }
     },
     onSell: (state, logs) => {
-      // The automatic unequip, found by position: the first copy goes, so a
-      // captain with two of the same module keeps one.
+      // The automatic unequip, found by id: a hull carries each module once,
+      // and the accounting unwinds with the record it removes.
       const at = state.equippedModules.findIndex((m) => m.id === trade.module);
       if (at >= 0) {
         unequipModuleAccounting(state, state.equippedModules[at]);

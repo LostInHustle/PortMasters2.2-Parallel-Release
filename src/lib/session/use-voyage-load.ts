@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { renownStartingGoldBonus, type HouseId } from "@/lib/game/legacy";
 import type { GameContext, GameState } from "@/lib/game/types";
 import type { GameMode } from "@/lib/game/mode";
+import { snapToCheckpoint } from "@/lib/game/engine";
+import { ENTRY_PHASE, normalizePhase } from "@/lib/game/phases";
 import { healLoadedVoyage } from "./heal-save";
 import type { Action } from "./reducer";
 import type { SeatPin } from "./use-seat-pin";
@@ -191,7 +193,9 @@ export function useVoyageLoad({
 // turns a pledge into no pledge or a captain into a first voyage
 // beginner. What closes the checkpoint gap is the retry the caller
 // schedules beside this call: an answer on that second ask lands the
-// harbor's real voyage through the loaded path beside this one.
+// harbor's real voyage through the loaded path beside this one. Until
+// that answer, the fallback is marked unpersistable so autosave cannot
+// write a blank harbor over the voyage it is trying to recover.
 function applyUnreachableLoad(env: LoadEnv): void {
   env.setSeatPin({ roomId: env.roomId, seats: 0 });
   env.dispatch({
@@ -202,6 +206,10 @@ function applyUnreachableLoad(env: LoadEnv): void {
     renownLevel: env.renownRef.current,
     startingGoldBonus: renownStartingGoldBonus(env.renownRef.current),
     mode: env.roomMode,
+    // A voyage the server never confirmed is not written back: its blank
+    // harbor would replace the real save the retry below is still asking
+    // for, and a captain would lose the voyage to a transport hiccup.
+    persistable: false,
   });
 }
 
@@ -257,6 +265,25 @@ function applyLoadedAnswer(
       roomDifficulty,
       legacyRenownLevel: legacyResult ? renownLevel : null,
     });
+    // A save written while the harbor was still a lobby carries the pier,
+    // and the harbor has since set sail. The pier has no rank for the
+    // desync catch-up to climb from, so a reload would strand the captain
+    // in a lobby no frame can move. Snap the healed save to the seat the
+    // room is keeping instead.
+    if (
+      checkpoint &&
+      game.phase === "harbor" &&
+      (checkpoint.currentRound > 1 ||
+        normalizePhase(checkpoint.currentPhase) !== ENTRY_PHASE)
+    ) {
+      snapToCheckpoint(
+        game,
+        env.ctx,
+        checkpoint.currentRound,
+        checkpoint.currentPhase,
+        [],
+      );
+    }
     env.dispatch({ type: "INIT", game, logs: [] });
   } else {
     env.dispatch({

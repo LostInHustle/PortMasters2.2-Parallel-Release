@@ -20,6 +20,9 @@ const CHANNEL = {
   error: "contract:error",
   stateRequest: "contract:state:request",
   field: "contracts",
+  accept: "contract:accept",
+  cancel: "contract:cancel",
+  idField: "contractId",
 } as const;
 
 /**
@@ -28,10 +31,11 @@ const CHANNEL = {
  * The board itself, the per captain filtering and the report that fires
  * when a contract this captain is party to moves past the offer stage are
  * the shared relay's (see ./use-consent-board, which is where the
- * stale broadcast guard and the reload story are written). What is left
- * here is what only the escort can say: the five actions a captain takes
- * against this market (post, accept, decline, withdraw, and the claim,
- * which no other kind has because it is about a raid).
+ * stale broadcast guard and the reload story are written). Accept and
+ * withdraw are the relay's two shared presses. What is left here is what
+ * only the escort can say: the offer it posts, the decline its buyer
+ * sends, and the claim, which no other kind has because it is about a
+ * raid.
  */
 export function useEscortContracts(
   socket: Socket | null,
@@ -43,6 +47,8 @@ export function useEscortContracts(
     rows: contracts,
     error,
     clearError,
+    accept,
+    cancel,
   } = useConsentBoard(socket, roomId, myUserId, CHANNEL, onSettle);
 
   // A fee as the board accepts one. `targetUserId` names the captain this
@@ -58,15 +64,6 @@ export function useEscortContracts(
     [socket, roomId, clearError],
   );
 
-  const accept = useCallback(
-    (contractId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("contract:accept", { roomId, contractId });
-    },
-    [socket, roomId, clearError],
-  );
-
   // The addressed captain's own refusal. It is not the seller's cancel and
   // it is deliberately a frame of its own rather than that one reused: a
   // cancel takes an offer off the board, and a decline leaves the row where
@@ -77,21 +74,6 @@ export function useEscortContracts(
       if (!socket) return;
       clearError();
       socket.emit("contract:decline", { roomId, contractId });
-    },
-    [socket, roomId, clearError],
-  );
-
-  // The seller's own withdrawal, which is the one press on this board that
-  // carries no sentence of its own on success: the row leaves the board,
-  // which is what a withdrawal is. The refusal it can meet (an offer that
-  // has since been agreed) arrives like every other, and the previous
-  // refusal is cleared first so a press that lands does not leave the last
-  // one standing over it.
-  const cancel = useCallback(
-    (contractId: string) => {
-      if (!socket) return;
-      clearError();
-      socket.emit("contract:cancel", { roomId, contractId });
     },
     [socket, roomId, clearError],
   );

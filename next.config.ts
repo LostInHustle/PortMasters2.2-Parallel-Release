@@ -53,12 +53,15 @@ const localOrigins = [
 // The hostnames the hosting platform answers on, which cannot be written
 // down in advance because the platform is what names them.
 //
-// This list carries more weight than its size suggests. The hosted
+// This list carries more weight than its size suggests. The Railway
 // deployment runs the development server rather than a production build,
 // because the plan it runs on does not have the memory to complete
 // `next build`. That makes these entries the difference between the site
 // working and the site loading its HTML and then failing every chunk that
-// would make it do anything.
+// would make it do anything. The Cloudflare container is a second host
+// and runs a production build, which serves no development resources at
+// all, so neither this list nor the Railway variable below plays any part
+// in it.
 //
 // Railway holds the public hostname of the running service in
 // RAILWAY_PUBLIC_DOMAIN and injects it into the container, so a deployment
@@ -91,9 +94,10 @@ const nextConfig: NextConfig = {
   // development server is running. It reports the route and how the page
   // was rendered, which is worth having while the interface is being
   // built and is noise everywhere else. Turning it off costs nothing: a
-  // compile or a runtime error is still reported. The hosted deployment
+  // compile or a runtime error is still reported. The Railway deployment
   // runs the development server, so leaving it on would put it on top of
-  // the game for every player.
+  // the game for every player. A production build, which the Cloudflare
+  // container uses, draws no such badge either way.
   devIndicators: false,
 
   allowedDevOrigins: [...localOrigins, ...hostedOrigins],

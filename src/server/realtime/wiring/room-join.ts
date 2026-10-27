@@ -19,7 +19,7 @@ import { roomChannel } from "../channel";
 import { directLogFor, emitRoomMembers, harborLog } from "../chat";
 import { getCheckpoint, readyStatePayload } from "../checkpoint";
 import { escortContracts } from "../contracts";
-import { draftViewFor } from "../draft";
+import { draftViewFor, noteDraftLeft } from "../draft";
 import { sendAlignment } from "../gambit";
 import { maroonResultFor, maroonShiftNoticeFor } from "../maroon";
 import {
@@ -264,6 +264,10 @@ export function wireRoomJoin(
     forgetStatus(roomId, s.userId);
     removeUserBarterOffers(io, roomId, s.userId);
     removeUserAidRequest(io, roomId, s.userId);
+    // A deliberate departure is final, so a live path draft drops the seat
+    // rather than laying a card for a captain who will never read it (see
+    // noteDraftLeft in ../draft).
+    noteDraftLeft(io, roomId, s.userId);
     // The ordinary way out of a voyage. The
     // client sends this only for a deliberate departure and only after
     // the REST call that gives up the seat has succeeded, and the grace

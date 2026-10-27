@@ -80,6 +80,20 @@ export function ModuleMarket({
   const [fee, setFee] = useState(CONSENT_FEE_MIN);
   const [moduleId, setModuleId] = useState("");
   const [targetId, setTargetId] = useState("");
+  // The row whose accept is in the harbor's hands. The panel draws its
+  // refusals from the game state it last rendered, so two presses on two
+  // rows before the first settle could both read an open slot and land a
+  // fourth module on a three slot hull. One press at a time is the same rule
+  // the slot check states, read before the state has had a chance to move.
+  // The wait ends by itself: the row leaving the offer status, the row
+  // disappearing, or the harbor's refusal arriving all close it.
+  const [taking, setTaking] = useState<string | null>(null);
+  const takenRow =
+    taking === null
+      ? undefined
+      : modules.moduleTrades.find((trade) => trade.id === taking);
+  const settling =
+    takenRow !== undefined && takenRow.status === "offered" && !modules.error;
 
   if (!moduleTradesOn(game.mode)) return null;
 
@@ -107,6 +121,18 @@ export function ModuleMarket({
   const chosen = sellable.some((card) => card.id === moduleId)
     ? moduleId
     : (sellable[0]?.id ?? "");
+  // A module already on this captain's hull is not an option, so its row is
+  // not drawn: the hull carries each module once, and the row would only
+  // repeat what the buyer already has. The seller's own row stays so it can
+  // be withdrawn, and an agreed row stays as the record of a sale. The engine
+  // keeps its own refusal for a board that has gone stale between the render
+  // and the press (see applyModuleTradeSide).
+  const visibleTrades = modules.moduleTrades.filter(
+    (trade) =>
+      trade.sellerUserId === me.id ||
+      trade.status !== "offered" ||
+      !game.equippedModules.some((m) => m.id === trade.module),
+  );
 
   return (
     <MarketPanel
@@ -178,19 +204,21 @@ export function ModuleMarket({
         onDismiss={modules.clearError}
       />
 
-      {modules.moduleTrades.length === 0 ? (
+      {visibleTrades.length === 0 ? (
         <MarketEmpty>
-          {canSell
-            ? t(
-                "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the round turns or the Parley closes, so a row you posted earlier may already be gone.",
-              )
-            : t(
-                "No modules listed this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
-              )}
+          {modules.moduleTrades.length > 0
+            ? t("Every module on the board is already on your hull.")
+            : canSell
+              ? t(
+                  "Nothing on the market yet. List a module and yours is the first row. A listing comes off the board when the round turns or the Parley closes, so a row you posted earlier may already be gone.",
+                )
+              : t(
+                  "No modules listed this Parley. Any captain with a module bolted on can list one, and a listing aimed at one captain waits on that captain.",
+                )}
         </MarketEmpty>
       ) : (
         <div className="space-y-1.5">
-          {modules.moduleTrades.map((trade) => (
+          {visibleTrades.map((trade) => (
             <ModuleRow
               key={trade.id}
               trade={trade}
@@ -199,6 +227,11 @@ export function ModuleMarket({
               modules={modules}
               round={game.currentRound}
               roomOpen={roomOpen}
+              settling={settling}
+              onTake={() => {
+                setTaking(trade.id);
+                modules.accept(trade.id);
+              }}
             />
           ))}
         </div>
@@ -223,6 +256,8 @@ function ModuleRow({
   modules,
   round,
   roomOpen,
+  settling,
+  onTake,
 }: {
   trade: ModuleTrade;
   game: GameState;
@@ -230,6 +265,8 @@ function ModuleRow({
   modules: ModuleTrades;
   round: number;
   roomOpen: number;
+  settling: boolean;
+  onTake: () => void;
 }) {
   const mine = trade.sellerUserId === me.id;
   const isBuyer = trade.buyerUserId === me.id;
@@ -261,20 +298,14 @@ function ModuleRow({
     ? t(STALE_OFFER)
     : roomOpen < 1
       ? t("Every slot on your hull is full. Make room at the yard first.")
-      : card !== null && game.equippedModules.some((m) => m.id === trade.module)
-        ? // A hull reads a module as present or absent (hasModule), so a
-          // second copy adds no effect but would add a slot, power and the
-          // per copy surcharge the two costing modules carry. The trade
-          // path is the one door that did not ask this question.
-          t("That module is already bolted to your hull.")
-        : card !== null && !powerBudgetAllows(game, card)
-          ? t(
-              "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
-              { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
-            )
-          : !canPayFee(game, trade.fee)
-            ? feeShortfallLine(hold, trade.fee)
-            : null;
+      : card !== null && !powerBudgetAllows(game, card)
+        ? t(
+            "Taking it would put your hull at {newPower} power, and a hull carries at most {HELD_POWER_CAP}.",
+            { newPower: powerAfterTaking(game, card), HELD_POWER_CAP },
+          )
+        : !canPayFee(game, trade.fee)
+          ? feeShortfallLine(hold, trade.fee)
+          : null;
 
   return (
     <OfferRow
@@ -292,8 +323,9 @@ function ModuleRow({
       acceptLabel={t("{icon} Take It", { icon })}
       acceptClassName="pm-grad-parley"
       blocked={blocked}
+      busy={settling}
       onCancel={() => modules.cancel(trade.id)}
-      onAccept={() => modules.accept(trade.id)}
+      onAccept={onTake}
     />
   );
 }

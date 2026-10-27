@@ -61,8 +61,9 @@ import { unlockedPorts } from "@/lib/game/pools";
 import type { LedgerAct } from "@/lib/game/ledger";
 import type { GameState } from "@/lib/game/types";
 import { refusedForRoom } from "@/lib/refusals";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 import { useVoteBoard, type VoteChannel } from "@/lib/use-vote-board";
-import type { VoteCensus } from "@/lib/voteTally";
+import type { VoteCensus } from "@/lib/vote-tally";
 
 // The events this vote speaks on, named in one place for the reason the
 // audit's own channel is. The press is built here so that the payload this
@@ -160,31 +161,29 @@ export function useMaroon(
       if (!err) return;
       setShiftError(err);
     };
-    // A new voyage has no vote, no result and no leaning port, which is
-    // also the signal a client gets for the harbor it is already sitting in.
-    const onRestarted = (data: { roomId?: string }) => {
-      if (data?.roomId !== roomId) return;
-      reset();
-      setResult(null);
-      setShift(null);
-      setShiftError(null);
-    };
-
     socket.on("maroon:tally", onTally);
     socket.on("maroon:result", onResult);
     socket.on("maroon:shift", onShift);
     socket.on("maroon:error", onRefused);
     socket.on("maroon:shift:error", onShiftRefused);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("maroon:tally", onTally);
       socket.off("maroon:result", onResult);
       socket.off("maroon:shift", onShift);
       socket.off("maroon:error", onRefused);
       socket.off("maroon:shift:error", onShiftRefused);
-      socket.off("room:restarted", onRestarted);
     };
   }, [socket, roomId, myUserId, setHeld, setPressed, onRefused, reset]);
+
+  // A new voyage has no vote, no result and no leaning port, which is also
+  // the signal a client gets for the harbor it is already sitting in.
+  const onRestarted = useCallback(() => {
+    reset();
+    setResult(null);
+    setShift(null);
+    setShiftError(null);
+  }, [reset]);
+  useRoomRestarted(socket, roomId, onRestarted);
 
   // The vote that carried, applied to the books it took.
   //

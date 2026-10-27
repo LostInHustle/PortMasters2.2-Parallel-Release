@@ -51,6 +51,7 @@ import {
   normalizeGarmentsTickRound,
 } from "@/lib/game/garments";
 import { normalizeStandingOrders } from "@/lib/game/standing";
+import { normalizeHouseId } from "@/lib/game/legacy";
 import { normalizePath } from "@/lib/game/paths";
 import { normalizePathSwitchRound } from "@/lib/game/draft";
 import { normalizePhase } from "@/lib/game/phases";
@@ -99,7 +100,7 @@ export function healLoadedVoyage(
   // A voyage from before the Supply Barge loads as a captain who has never
   // bought from it, so the vendor's first round is full rather than spent.
   normalizeBargeState(game);
-  refreshVoyageFacts(game, facts);
+  refreshVoyageFacts(game, facts, mode);
   // After the facts above: the fixed cost falls back to the settled tier's
   // maintenance, and the penalties are read back off the healed hull.
   healShipLedger(game);
@@ -118,6 +119,16 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
     (game as unknown as { equippedModules?: unknown }).equippedModules,
     mode,
   );
+  // The round's table and its parked pick are transients, but a save from a
+  // build that could deal an equipped module can carry one. Healing them
+  // against the hull keeps that card off the draft screen as well as off the
+  // hull, and a repeat is dropped for the same reason.
+  const hullIds = new Set(game.equippedModules.map((card) => card.id));
+  game._draftChoices = healModuleTable(game._draftChoices, mode, hullIds);
+  const parked = game._newModule;
+  if (parked && !game._draftChoices?.some((card) => card.id === parked.id)) {
+    game._newModule = undefined;
+  }
   // Fills in worker types the save predates, and reads pre-charter saves
   // that still carried separate weavers / masterWeavers / sachetMakers.
   game.workers = normalizeWorkerRoster(
@@ -146,31 +157,79 @@ function healSaveCollections(game: GameState, mode: GameState["mode"]): void {
   game.marketDemandTags = game.marketDemandTags ?? legacyDemand ?? [];
   delete (game as unknown as { phase2DemandTags?: string[] }).phase2DemandTags;
   game.modifierFlags = game.modifierFlags ?? {};
-  // Wages, markets and pirates read the perk set. houseId is left as
-  // recorded: a pledge applies to the next voyage, never mid voyage.
+  // Wages, markets and pirates read the perk set. houseId is a closed union
+  // in the type, but the blob is JSON, so an unknown id is normalized rather
+  // than trusted; a damaged id reads as no House, the same answer every API
+  // route gives a stale legacy row. The pledge still applies to the next
+  // voyage rather than mid voyage.
   game.housePerks = game.housePerks ?? noHousePerks();
-  game.houseId = game.houseId ?? null;
+  game.houseId = normalizeHouseId(
+    typeof game.houseId === "string" ? game.houseId : null,
+  );
   game.priceHistory = game.priceHistory ?? {};
 }
 
+// One saved module entry read through the pool. The shape, the kind and the
+// mode gate are the same for the hull and the round's table, so a change to
+// what the yard accepts lives here rather than in two loops.
+function healModuleEntry(
+  item: unknown,
+  mode: GameState["mode"],
+): CardRecord | null {
+  const id =
+    item !== null && typeof item === "object"
+      ? (item as Record<string, unknown>).id
+      : null;
+  const card = typeof id === "string" ? cardById(id) : null;
+  if (card === null || card.kind !== "module") return null;
+  if (!cardRunsInMode(card, mode)) return null;
+  return card;
+}
+
 // The hull, healed through the pool. Unknown ids, strings and nulls are
-// damage and are dropped; duplicates are kept one entry per copy, which the
-// sell and swap flows read. A module the current mode does not run is
-// dropped, so a Gambit save rejoined in a Classic room loses it.
+// damage and are dropped, and a repeat is dropped too: a hull carries each
+// module once, and a second copy would add slot, power and a surcharge
+// without an effect. A module the current mode does not run is dropped, so a
+// Gambit save rejoined in a Classic room loses it. The count is held to the
+// ladder's top as well: a hull carrying more distinct modules than it has
+// slots is the same damage in another shape, and keeping the extras would
+// leave the yard with fewer than a whole batch outside the hull and its
+// table when a captain changes one. The kept modules are the first in the
+// saved order, and the penalties are reconciled from them afterwards.
 function healHull(raw: unknown, mode: GameState["mode"]): CardRecord[] {
   if (!Array.isArray(raw)) return [];
   const hull: CardRecord[] = [];
+  const seen = new Set<string>();
   for (const item of raw) {
-    const id =
-      item !== null && typeof item === "object"
-        ? (item as Record<string, unknown>).id
-        : null;
-    const card = typeof id === "string" ? cardById(id) : null;
-    if (card === null || card.kind !== "module") continue;
-    if (!cardRunsInMode(card, mode)) continue;
+    if (hull.length >= MAX_SHIP_LEVEL) break;
+    const card = healModuleEntry(item, mode);
+    if (card === null || seen.has(card.id)) continue;
+    seen.add(card.id);
     hull.push(card);
   }
   return hull;
+}
+
+// The round's module table, healed through the pool. An entry the pool cannot
+// answer, a card the mode does not run, a card already aboard and a repeat
+// are all dropped: the draw never deals any of them, so a table saved by a
+// build that could is not allowed to offer one now. An emptied table reads as
+// undefined, which lets the yard roll a fresh one rather than standing on no
+// choices.
+function healModuleTable(
+  raw: unknown,
+  mode: GameState["mode"],
+  hullIds: ReadonlySet<string>,
+): CardRecord[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const table: CardRecord[] = [];
+  for (const item of raw) {
+    const card = healModuleEntry(item, mode);
+    if (card === null || hullIds.has(card.id)) continue;
+    if (table.some((held) => held.id === card.id)) continue;
+    table.push(card);
+  }
+  return table.length > 0 ? table : undefined;
 }
 
 // The fleet commission, the manifest audit and the hold.
@@ -326,7 +385,11 @@ function healShipLedger(game: GameState): void {
 }
 
 // The facts from outside the save, applied last so that they win.
-function refreshVoyageFacts(game: GameState, facts: LoadedSaveFacts): void {
+function refreshVoyageFacts(
+  game: GameState,
+  facts: LoadedSaveFacts,
+  mode: GameMode,
+): void {
   // A captain who leveled up since this voyage was saved gets the current
   // unlocks; the saved value, then 1, covers a missing legacy row.
   game.renownLevel = facts.legacyRenownLevel ?? game.renownLevel ?? 1;
@@ -354,5 +417,7 @@ function refreshVoyageFacts(game: GameState, facts: LoadedSaveFacts): void {
   // Mode decides the phase order. A save restored under a mode the harbor is
   // not keeping would run the right phases in the wrong order and silently
   // desynchronize, so the harbor wins; the hint covers a response without it.
-  game.mode = normalizeMode(facts.apiMode ?? facts.roomMode ?? game.mode);
+  // The mode resolved at the top is the same expression, read once so the
+  // heals and the stored field cannot disagree.
+  game.mode = mode;
 }

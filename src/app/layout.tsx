@@ -25,13 +25,38 @@ const notoSerif = Noto_Serif_SC({
 // What a link preview needs an absolute address for. There is no
 // canonical domain here: the game runs on whatever machine serves it,
 // most often a laptop on a network, so the fallback is the port the
-// server has always answered on. Railway, the one host this tree
-// documents, names the service's own address in its variable (the same
-// one next.config.ts reads for the development origin), so a deployment
-// resolves its real address with nothing to configure.
-const SITE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
-  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : "http://localhost:8080";
+// server has always answered on. APP_URL pins the address of a hosted
+// deployment, and Railway names the service's own address in its variable
+// (the same one next.config.ts reads for the development origin), so a
+// deployment on either host resolves its real address with nothing else
+// to configure.
+const APP_URL = process.env.APP_URL?.trim().replace(/\/+$/, "");
+
+// A malformed value is worth stopping for: the alternative is a page that
+// renders with preview links pointing somewhere nobody intended, which
+// looks like a working site.
+function absoluteOrigin(value: string): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(
+      "APP_URL must be an absolute address with its scheme, for example https://play.example.com.",
+    );
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("APP_URL must start with http:// or https://.");
+  }
+  return url;
+}
+
+const SITE_URL = APP_URL
+  ? absoluteOrigin(APP_URL)
+  : new URL(
+      process.env.RAILWAY_PUBLIC_DOMAIN
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : "http://localhost:8080",
+    );
 
 // Read from the one constant rather than written out again here, the same
 // rule every other screen follows, so the browser tab and the game's own
@@ -67,7 +92,7 @@ export async function generateMetadata(): Promise<Metadata> {
   );
   const social = tFor(locale, APP_DESCRIPTION);
   return {
-    metadataBase: new URL(SITE_URL),
+    metadataBase: SITE_URL,
     title: APP_NAME,
     description: about,
     keywords: [

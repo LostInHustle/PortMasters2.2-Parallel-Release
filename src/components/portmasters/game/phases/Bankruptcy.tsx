@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { PublicUser } from "@/lib/api";
 import { t } from "@/lib/game/i18n";
 import { phaseLabel } from "@/lib/game/engine";
-import { leftTheVoyage } from "@/lib/seatMarks";
+import { leftTheVoyage } from "@/lib/seat-marks";
 import { PhaseHeading, type PhasePanelProps } from "./PhaseShared";
 import { Avatar, Pill } from "../../shared";
 
@@ -60,7 +60,7 @@ export function Bankruptcy({
     // Stated as a type predicate rather than left to be reasserted at
     // every read below, so the standings can trust the status the filter
     // kept. The terminal test itself is the shared reader (see
-    // leftTheVoyage in @/lib/seatMarks), the same question the roster
+    // leftTheVoyage in @/lib/seat-marks), the same question the roster
     // asks, so this board and the roster cannot disagree about who is
     // still sailing.
     .filter(

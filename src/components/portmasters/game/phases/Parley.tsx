@@ -24,7 +24,7 @@ import {
 } from "@/lib/game/flags";
 import { t } from "@/lib/game/i18n";
 import { cn } from "@/lib/utils";
-import { namedCountLine } from "@/lib/voteTally";
+import { namedCountLine } from "@/lib/vote-tally";
 import { Handshake } from "lucide-react";
 import { Term } from "../../Term";
 import { AuditVoteCard, auditCardShown, auditVoteOpen } from "../AuditPanel";
@@ -173,7 +173,7 @@ export function Parley({
   // count comes off the tally frame (see VoteCensus), so the fold's
   // summary and the card's count block are one reading rather than two,
   // and the count is the shared sentence the block below it renders (see
-  // namedCountLine in @/lib/voteTally), so the number and its verb agree
+  // namedCountLine in @/lib/vote-tally), so the number and its verb agree
   // in one place rather than in a phrasing kept beside it.
   const gistOf = (
     labelEn: string,
@@ -184,7 +184,7 @@ export function Parley({
     // The vote's own name is read here, so the fold's summary and the card
     // inside it call the vote the same thing in either language. The count
     // beside it is the shared sentence the tally renders (see
-    // namedCountLine in @/lib/voteTally), which carries its own reading.
+    // namedCountLine in @/lib/vote-tally), which carries its own reading.
     const label = t(labelEn);
     return census && census.roster > 0
       ? `${label}: ${namedCountLine(named, census.roster)}`

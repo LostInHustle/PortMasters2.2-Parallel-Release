@@ -30,7 +30,7 @@ import {
 } from "@/lib/game/maroon";
 import { modeConfig, voyageRoundsFor } from "@/lib/game/mode";
 import { unlockedPorts } from "@/lib/game/pools";
-import { writtenOff } from "@/lib/seatMarks";
+import { writtenOff } from "@/lib/seat-marks";
 import { roomChannel } from "./channel";
 import { activeRosterSet } from "./checkpoint";
 import { roundStateFor, type RoundState } from "./round-state";

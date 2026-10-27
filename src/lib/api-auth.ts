@@ -17,23 +17,11 @@ import {
   SESSION_COOKIE_NAME,
   sessionCookieMaxAge,
 } from "./auth";
+import type { CurrentUser } from "@/types/realtime/presence";
 
-// The shape every API route gets back from getCurrentUser below. Kept
-// local to this module: callers take the return type as it comes rather
-// than naming it.
-type AuthUser = {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarHue: number;
-  // "captain" or "admin". Carried so the operator console can tell whether
-  // the account it just signed in is allowed in. It is a convenience for
-  // the client only: every admin action is checked again on the server,
-  // against the account row, at the moment it is asked for.
-  role: string;
-};
-
-export async function getCurrentUser(): Promise<AuthUser | null> {
+// The shape every API route gets back from getCurrentUser below is the
+// canonical CurrentUser from the wire directory, not a second copy of it.
+export async function getCurrentUser(): Promise<CurrentUser | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE_NAME)?.value;
   const user = await getUserFromToken(token);
@@ -72,6 +60,30 @@ export async function unauthorizedResponse(): Promise<NextResponse> {
     { error: tFor(locale, "Unauthorized") },
     { status: 401 },
   );
+}
+
+// The two absences a route names by these sentences rather than spelling
+// them where it answers: a harbor the caller asked for that is not there,
+// and a captain the same. They are server vocabulary because every reader
+// is a route, and keeping them out of ./api keeps the browser bundle's
+// fetch wrapper from being the place a route learns its refusal wording.
+export const HARBOR_NOT_FOUND = "Harbor not found";
+export const CAPTAIN_NOT_FOUND = "Captain not found";
+
+/**
+ * The answer a route gives when the row it named is not there.
+ *
+ * The status is fixed and the sentence is the caller's, read in the
+ * request's own language. A route that has already read the locale uses
+ * this one directly; a route that has not uses notFoundResponse below.
+ */
+export function notFoundJson(locale: Locale, wording: string): NextResponse {
+  return NextResponse.json({ error: tFor(locale, wording) }, { status: 404 });
+}
+
+/** The same answer for a route that has not read the request's language yet. */
+export async function notFoundResponse(wording: string): Promise<NextResponse> {
+  return notFoundJson(await requestLocale(), wording);
 }
 
 /**

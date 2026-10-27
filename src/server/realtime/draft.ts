@@ -327,6 +327,42 @@ function advanceDraft(io: Server, draft: Draft): void {
   sendDraftViews(io, draft);
 }
 
+// A captain left the harbor while a draft was live. Their seat goes with
+// them, because a departure is final in a way a dropped socket is not: the
+// absence watch only lays a card for a captain who might come back, and a
+// captain who gave up the seat will never read the settled view. The three
+// parallel arrays lose one index together, so every remaining seat keeps
+// the hand and pick it was shown. If the last seat leaves, the draft settles
+// empty and the ordinary completion announcement moves the harbor on.
+export function noteDraftLeft(
+  io: Server,
+  roomId: string,
+  userId: string,
+): void {
+  const draft = drafts.get(roomId);
+  if (!draft) return;
+  const seat = draft.seats.findIndex((held) => held.userId === userId);
+  if (seat < 0) return;
+  draft.seats.splice(seat, 1);
+  draft.hands.splice(seat, 1);
+  draft.picks.splice(seat, 1);
+  // The books outlive the seats, but not a captain who has left the harbor.
+  pathsByRoom.get(roomId)?.delete(userId);
+  switchesByRoom.get(roomId)?.delete(userId);
+  if (draft.seats.length === 0) {
+    settleDraft(io, draft, []);
+    return;
+  }
+  // If the departing seat held the only pick still missing, the step closes
+  // exactly as it would have when that pick landed. Otherwise the table is
+  // told how many captains are still choosing.
+  if (draft.picks.every((held) => held !== null)) {
+    advanceDraft(io, draft);
+    return;
+  }
+  sendDraftViews(io, draft);
+}
+
 // Ends the draft: every seat with a path is stored, the fleet is told, and
 // the draft state is dropped. The log line and the frame carry only the
 // captain's name and path; the cards behind the choice are never published.
@@ -393,7 +429,6 @@ export function recordPathSwitch(
   const published: PathSwitched = {
     roomId,
     userId: row.userId,
-    name: row.name,
     path: row.path,
   };
   io.to(roomChannel(roomId)).emit("path:switched", published);

@@ -1,7 +1,6 @@
 "use client";
 
 import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
-import { RoomMembersPayload } from "@/types/realtime/moderation";
 import {
   BROKERS_FAVOR_UNLOCK_LEVEL,
   TIDEWATCH_SURGE_THRESHOLD,
@@ -30,6 +29,7 @@ import {
 import { usePrivateLog } from "@/lib/use-private-log";
 import { useVoyageLog } from "@/lib/use-voyage-log";
 import { useObjective } from "@/lib/use-objective";
+import { useRoomRestarted } from "@/lib/use-room-restarted";
 import { useRoundReport } from "@/lib/use-round-report";
 import { useAudit } from "@/lib/use-audit";
 import { useBoonLedger } from "@/lib/use-boon-ledger";
@@ -405,27 +405,26 @@ export function GameRoom({
         playSoundRef.current("confirm");
       }
     };
-    const onRestarted = (data: { roomId: string }) => {
-      if (data.roomId !== room.id) return;
-      setVoyageResult(null);
-      // The cards belonged to the voyage that just ended, so they go with
-      // it. The next departure deals a fresh hand and the next conclusion
-      // is what flips it.
-      setReveal(null);
-    };
     const onReveal = (data: VoyageReveal) => {
       if (data.roomId !== room.id) return;
       setReveal(data);
     };
     socket.on("room:voyage_complete", onVoyageComplete);
     socket.on("voyage:reveal", onReveal);
-    socket.on("room:restarted", onRestarted);
     return () => {
       socket.off("room:voyage_complete", onVoyageComplete);
       socket.off("voyage:reveal", onReveal);
-      socket.off("room:restarted", onRestarted);
     };
   }, [socket, room.id, me.id]);
+
+  // The cards belonged to the voyage that just ended, so they go with it.
+  // The next departure deals a fresh hand and the next conclusion is what
+  // flips it.
+  const onVoyageRestarted = useCallback(() => {
+    setVoyageResult(null);
+    setReveal(null);
+  }, []);
+  useRoomRestarted(socket, room.id, onVoyageRestarted);
 
   // Held in a ref so a fresh inline arrow from the page does not resubscribe
   // the handler below on every render of a screen that renders often.
@@ -663,51 +662,23 @@ export function GameRoom({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [roomMessages, setRoomMessages] = useState<ChatMessage[]>([]);
-  const [members, setMembers] = useState<
-    Array<PublicUser & { joinedAt?: string }>
-  >(room.members ?? []);
 
-  // The live roster for spectator mode. The Bankruptcy panel uses this
-  // to show a live standings board of captains still sailing. The
-  // MembersPanel also calls useRoomRoster internally, but the two
-  // subscriptions are harmless: both ride the same room:members and
-  // game:status broadcasts, and React's reconciliation keeps them in
-  // sync.
-  const roster = useRoomRoster(socket, room.id, members);
+  // The harbor's one live roster: who is aboard, each captain's status, who
+  // the host has muted, and who the host is. The roster panel, the ticker and
+  // the bankruptcy board all draw from this one answer, so one room:members
+  // frame is read once rather than by three subscribers that can drift apart.
+  const roster = useRoomRoster(socket, room.id, room.members ?? []);
+  const { members, statuses, mutedUserIds, seedMembers } = roster;
 
   // The host can change (the original one left before the voyage even
   // started, say), so this is kept live from the room:members broadcast
-  // rather than frozen at whatever it was when this component mounted.
-  const [hostId, setHostId] = useState<string>(
-    (room as { host?: PublicUser }).host?.id ?? me.id,
-  );
-  const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
-  // Whether the socket's own roster has landed. The fetch further down
-  // asks the server the same question on mount, and the two answers can
-  // cross: a broadcast that lands while the fetch is still on its way is
-  // the fresher of the two, and letting the slower answer land on top of
-  // it would put a captain back off the roster until the next broadcast.
-  const rosterBroadcast = useRef(false);
-  useEffect(() => {
-    if (!socket) return;
-    // Read defensively, field by field, even though the server always
-    // writes all three: this is a wire frame, and a client that has
-    // reloaded into a slightly older bundle should read the part it can
-    // rather than drop the whole roster over a field it does not expect.
-    const onMembers = (data: RoomMembersPayload) => {
-      if (data.roomId !== room.id) return;
-      rosterBroadcast.current = true;
-      if (data.hostId) setHostId(data.hostId);
-      if (data.members) setMembers(data.members);
-      if (data.mutedUserIds) setMutedUserIds(data.mutedUserIds);
-    };
-    socket.on("room:members", onMembers);
-    return () => {
-      socket.off("room:members", onMembers);
-    };
-  }, [socket, room.id]);
+  // rather than frozen at whatever it was when this component mounted. The
+  // detail read's host is the fallback for a harbor whose first broadcast
+  // has not landed yet.
+  const hostId =
+    roster.hostId ?? (room as { host?: PublicUser }).host?.id ?? me.id;
   const isHost = hostId === me.id;
-  const amIMuted = mutedUserIds.includes(me.id);
+  const amIMuted = mutedUserIds.has(me.id);
 
   // DM state
   const [dmTarget, setDmTarget] = useState<PublicUser | null>(null);
@@ -804,11 +775,10 @@ export function GameRoom({
       try {
         const { room: detail } = await api.getRoom(room.id);
         if (!alive) return;
-        // The socket's roster wins if it has already answered, because
-        // this answer is a snapshot taken when the question went out and
-        // the broadcast is the harbor's live one.
-        if (rosterBroadcast.current) return;
-        setMembers(detail.members);
+        // seedMembers is a no-op once a broadcast has landed, because this
+        // answer is a snapshot taken when the question went out and the
+        // broadcast is the harbor's live one.
+        seedMembers(detail.members);
       } catch {
         /* ignore */
       }
@@ -816,7 +786,7 @@ export function GameRoom({
     return () => {
       alive = false;
     };
-  }, [room.id]);
+  }, [room.id, seedMembers]);
 
   // Pop up a notification for every action's worth of new ledger entries,
   // grouped together.
@@ -1129,12 +1099,7 @@ export function GameRoom({
             drawn in the stage like every other seat rather than leading
             this band (see the PathDraft case in ./game/GamePhasePanel). */}
         <div className="shrink-0 space-y-3 lg:max-h-[45vh] lg:overflow-y-auto pm-scroll lg:pr-1">
-          <FleetTicker
-            socket={socket}
-            roomId={room.id}
-            me={me}
-            initialMembers={members}
-          />
+          <FleetTicker me={me} members={members} statuses={statuses} />
           {/* The table's notices. They sit in a wrapping row rather than in a
               stack, so two of them cost one row instead of two, and they wrap
               rather than sharing a fixed grid so a single live notice keeps
@@ -1480,7 +1445,9 @@ export function GameRoom({
                 socket={socket}
                 roomId={room.id}
                 me={me}
-                initialMembers={members}
+                members={members}
+                statuses={statuses}
+                mutedUserIds={mutedUserIds}
                 hostId={hostId}
                 onSelectPlayer={handleSelectPlayer}
                 myRenownLevel={myRenownLevel}

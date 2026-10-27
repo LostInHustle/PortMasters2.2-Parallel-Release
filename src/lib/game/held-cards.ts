@@ -199,10 +199,11 @@ export function heldFlagsOf(
  * implementation of that reading instead of two that could drift. The
  * mode travels through when the state carries one, so a card the mode
  * does not run is not power here either. The modules are read off the
- * hull the captain carries (a duplicate from the draft's fallback pool is
- * two bolted on modules and counts twice). A card the pool cannot answer
- * for is skipped, so a save that never went through the heal still reads
- * honestly here.
+ * hull the captain carries, one entry per slot: the load heal keeps one
+ * copy per module id, and a duplicate in a state that never went through
+ * it is damage that would read as the extra slot it still occupies. A
+ * card the pool cannot answer for is skipped, so a save that never went
+ * through the heal still reads honestly here.
  */
 export function heldPower(
   state: Pick<GameState, "heldBoons" | "equippedModules" | "charter"> & {

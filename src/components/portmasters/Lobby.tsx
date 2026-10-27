@@ -452,6 +452,17 @@ export function Lobby({
 
   async function createRoom() {
     if (!newName.trim()) return;
+    // A sealed voyage is opened by its phrase and by nothing else, so a
+    // blank field is a request the harbor can only refuse. Answering here
+    // spares the round trip and tells the captain why the door is shut.
+    if (modeConfig(mode).sealed && !unlockPhrase.trim()) {
+      setError(
+        t(
+          "This voyage is sealed. It opens with a phrase, and the harbor was not given one.",
+        ),
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -780,8 +791,8 @@ export function Lobby({
             <button
               onClick={() => setLegacyOpen(true)}
               className="-mx-1.5 flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-              title={t("Captain Legacy")}
-              aria-label={t("View captain legacy")}
+              title={t("Captain's Legacy")}
+              aria-label={t("View captain's legacy")}
             >
               <Star className="h-3.5 w-3.5 text-renown" />
               <span className="text-[11px] text-muted-foreground">
@@ -1109,7 +1120,11 @@ export function Lobby({
                     </div>
                     <Button
                       onClick={createRoom}
-                      disabled={busy || !newName.trim()}
+                      disabled={
+                        busy ||
+                        !newName.trim() ||
+                        (modeConfig(mode).sealed && !unlockPhrase.trim())
+                      }
                       className="pm-grad-charter pm-field text-white"
                     >
                       {busy ? (

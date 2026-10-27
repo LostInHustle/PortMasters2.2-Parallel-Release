@@ -62,11 +62,11 @@ import {
   CARD_TRIGGER,
   LANGUAGES,
   MODE_POWER_CEILING,
-  SHIPPED_LANGUAGE,
   type CardCondition,
   type CardRecord,
   type CardTrigger,
 } from "@/lib/game/constants/cards";
+import { DEFAULT_LOCALE } from "@/lib/game/i18n";
 import { CHARTERS } from "@/lib/game/constants/charters";
 import { BOONS, CARDS_PER_OFFER, MODULES } from "@/lib/game/constants/drafts";
 import type { TagList } from "@/lib/game/constants/tags";
@@ -160,7 +160,7 @@ export async function cardRecordSuite(): Promise<void> {
         );
       }),
     ) &&
-      SHIPPED_LANGUAGE === "en" &&
+      DEFAULT_LOCALE === "en" &&
       cardText(cardOrThrow("silk_wind")).name === "Weaver's Winds",
     "both strings are carried on every card and neither is empty, which is the translation pass read forward: the pool had to carry both from the beginning for the translation pass to be a pass rather than a rebuild, and the shipped language is named once so the day a captain picks one it is one value and not a second copy of the pool",
   );

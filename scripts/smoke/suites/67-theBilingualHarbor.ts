@@ -246,27 +246,49 @@ export async function theBilingualHarborSuite(): Promise<void> {
   );
 
   // ========== E. The call sites, held to the book ==========
-  // The three spellings the wiring uses, each read as the complete double
-  // quoted literal it is: t and tId take the string first, tFor takes it
-  // after the locale. A literal that does not parse as a JSON string is
-  // taken as written rather than dropped, because a walk that skipped
-  // what it could not read would pass by being blind.
+  // The three spellings the wiring uses, each read as the complete string
+  // literal it is: t and tId take the string first, tFor takes it after the
+  // locale. Both quote styles are read, because the guide's copy still
+  // carries two single quoted calls (see copy.ts) and a walk that read only
+  // double quotes would pass over them by being blind to the spelling they
+  // happen to use. A literal that does not parse as a JSON string is taken
+  // as written rather than dropped, because a walk that skipped what it
+  // could not read would pass by being blind.
   const CALLS = [
-    { re: /\bt\(\s*("(?:[^"\\]|\\.)*")/g, byId: false },
-    { re: /\btId\(\s*("(?:[^"\\]|\\.)*")/g, byId: true },
-    { re: /\btFor\([^,()]*,\s*("(?:[^"\\]|\\.)*")/g, byId: false },
+    { re: /\bt\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, byId: false },
+    { re: /\btId\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, byId: true },
+    {
+      re: /\btFor\([^,()]*,\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+      byId: false,
+    },
   ];
   const ids = new Set(leaves.map((leaf) => leaf.id));
+  function literalOf(raw: string): string {
+    if (raw.startsWith('"')) {
+      try {
+        return JSON.parse(raw) as string;
+      } catch {
+        return raw;
+      }
+    }
+    // Read a single quoted literal by restating it as the double quoted form
+    // JSON can parse, so the newlines, tabs, and quote marks the guide's HTML
+    // carries are decoded by the same rules the pack was written under
+    // rather than by a second, thinner unescaper here.
+    const body = raw.slice(1, -1);
+    try {
+      return JSON.parse(
+        '"' + body.replace(/\\(['\\])/g, "$1").replace(/"/g, '\\"') + '"',
+      ) as string;
+    } catch {
+      return body;
+    }
+  }
   function scan(source: string): string[] {
     const found: string[] = [];
     for (const { re, byId } of CALLS) {
       for (const match of source.matchAll(re)) {
-        let literal: string;
-        try {
-          literal = JSON.parse(match[1]) as string;
-        } catch {
-          literal = match[1];
-        }
+        const literal = literalOf(match[1]);
         if (byId ? !ids.has(literal) : !firstWins.has(literal))
           found.push(literal);
       }
@@ -274,25 +296,28 @@ export async function theBilingualHarborSuite(): Promise<void> {
     return found;
   }
 
-  // The detector's own proof: one file with a carried string, a carried
-  // id, and a carried string inside a comment (not a call site), and one
-  // with a string and an id the book does not carry, both named.
+  // The detector's own proof: one file with a carried string (in both
+  // spellings), a carried id, and a carried string inside a comment (not a
+  // call site), and one with strings and an id the book does not carry, all
+  // named.
   const proof = scan(
     withoutComments(
       [
         `const plain = t("${uiMarket?.en ?? "Market"}");`,
+        `const single = t('${uiMarket?.en ?? "Market"}');`,
         `const byId = tId("ui.market");`,
         `// t("${ABSENT}"); a note quoting a string that never shipped`,
         `const missing = t("${ABSENT}");`,
+        `const missingSingle = t('${ABSENT}');`,
         `const missingId = tId("ui.nothing_here");`,
       ].join("\n"),
     ),
   );
   check(
-    proof.length === 2 &&
-      proof.includes(ABSENT) &&
+    proof.length === 3 &&
+      proof.filter((literal) => literal === ABSENT).length === 2 &&
       proof.includes("ui.nothing_here"),
-    "the walk that holds the tree's call sites to the book has been watched fire: handed a file carrying one string and one id the pack does not know, it names both, while the same string inside a comment is not a call site at all",
+    "the walk that holds the tree's call sites to the book has been watched fire: handed files carrying strings in both quote styles and an id the pack does not know, it names all three, while the same string inside a comment is not a call site at all",
   );
 
   // The real tree, then: every t(), tFor() and tId() literal under src

@@ -6,7 +6,7 @@
 // live on that one origin, so nothing here needs a host or a port.
 // =====================================================================
 import { VoyageChronicle } from "@/types/realtime/voyage";
-import { PublicUser } from "@/types/realtime/presence";
+import { CurrentUser, PublicUser, RoomMember } from "@/types/realtime/presence";
 import {
   HouseStanding,
   LeaderboardEntry,
@@ -46,7 +46,7 @@ export type RoomSummary = {
   createdAt: string;
   host: PublicUser;
   memberCount: number;
-  members: Array<PublicUser & { joinedAt: string }>;
+  members: RoomMember[];
 };
 
 export type RoomDetail = RoomSummary & { isMember: boolean };
@@ -61,15 +61,18 @@ export type ChatMessage = {
 };
 
 async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
+  // A caller's own headers join the JSON default rather than replacing it,
+  // whichever of the three shapes fetch accepts.
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   let res: Response;
   try {
     res = await fetch(url, {
       credentials: "include",
-      // Any headers a caller hands in replace this map outright, since the
-      // spread below lands after it. No caller passes any today, so the two
-      // are never actually in conflict.
-      headers: { "Content-Type": "application/json" },
       ...init,
+      headers,
     });
   } catch {
     throw new Error(
@@ -77,7 +80,18 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
     );
   }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // A proxy or framework error page is HTML rather than the API's JSON.
+  // Reading it as a body would throw an engine SyntaxError past the one
+  // localized error path below, so an unparsable body reads as no body and
+  // the status still answers in the captain's language.
+  let data: { error?: string } | null = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as { error?: string };
+    } catch {
+      data = null;
+    }
+  }
   if (!res.ok) {
     const msg =
       data?.error ||
@@ -89,13 +103,6 @@ async function jfetch<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-// The two 404 answers more than one route gives, each said once: a harbor
-// the caller named that is not there, and a captain the caller named that
-// is not there. Two routes answering one absence with two spellings is
-// how a caller learns to match on prose instead of on the absence.
-export const HARBOR_NOT_FOUND = "Harbor not found";
-export const CAPTAIN_NOT_FOUND = "Captain not found";
-
 export const api = {
   // Auth
   // The signed in account plus the role the operator console gates on. The
@@ -104,7 +111,7 @@ export const api = {
   // for, so a stale or edited copy here buys nothing.
   me: () =>
     jfetch<{
-      user: (PublicUser & { role: string }) | null;
+      user: CurrentUser | null;
       token: string | null;
     }>("/api/auth/me"),
   register: (body: {
@@ -202,8 +209,13 @@ export const api = {
       // see. 0 means the harbor has no voyage pinned.
       seats: number;
     }>(`/api/game/state?roomId=${roomId}`),
-  saveGameState: (roomId: string, data: unknown) =>
+  // The optional init carries the one flag a caller ever adds to a save:
+  // keepalive, for the flush an exit hands the browser on its way out. The
+  // method and body stay this function's: the flag rides alongside them
+  // rather than the call site restating the request.
+  saveGameState: (roomId: string, data: unknown, init?: RequestInit) =>
     jfetch<{ ok: true; updatedAt: string }>("/api/game/state", {
+      ...init,
       method: "PUT",
       body: JSON.stringify({ roomId, data }),
     }),

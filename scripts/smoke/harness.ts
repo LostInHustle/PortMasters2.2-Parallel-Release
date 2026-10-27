@@ -69,6 +69,16 @@ export const CARRIES_A_HYPHEN = new RegExp(
 export { walkSrc, withoutComments };
 
 /**
+ * A repo relative source file with its comments taken out. The suites that
+ * read code rather than captain facing text all ask this question, so the
+ * root and the stripper are resolved once rather than in each of them.
+ */
+export function readSource(relative: string): string {
+  const root = join(import.meta.dirname, "..", "..");
+  return withoutComments(readFileSync(join(root, relative), "utf8"));
+}
+
+/**
  * The same rule, read off a file rather than off a claim about it. Whole
  * files rather than the strings a captain reads, because the directive
  * asks the comments to hold it too, and every file named here is read by

@@ -5,7 +5,7 @@ import { MODULES } from "@/lib/game/constants/drafts";
 import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
-import { HuePanel } from "./PhasePanels";
+import { HuePanel } from "./PhaseShared";
 import { PanelLabel } from "../../shared";
 
 /**

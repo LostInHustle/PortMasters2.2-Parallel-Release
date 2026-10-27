@@ -17,7 +17,8 @@
 
 import type { GameState } from "@/lib/game/types";
 import type { PublicUser, RoomDetail } from "@/lib/api";
-import { cn, normalizeRoomName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { normalizeRoomName } from "@/lib/room-policy";
 import { t } from "@/lib/game/i18n";
 import { ActionSuggester } from "../ActionSuggester";
 import { AgeBanner } from "../AgeBanner";

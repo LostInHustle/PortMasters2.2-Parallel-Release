@@ -6,10 +6,13 @@
 // Centralizes what "a player leaves a harbor" actually means (drop the
 // seat, hand off the host crown if they were holding it, remove the
 // harbor entirely once nobody is left in it, unless the caller asks for
-// it to be kept), plus the harbor code generator and the harbor name
-// normalizer that the API routes and the Lobby's create form both call.
+// it to be kept), plus the harbor code generator that the API routes and
+// the Quick Start queue both call. The two pure rules the browser shares,
+// roomLockedFor and normalizeRoomName, live in ./room-policy so a client
+// component can ask them without importing this module's database client.
 // =====================================================================
 import { db, PUBLIC_USER_SELECT, type PublicUser } from "./db";
+import { roomLockedFor } from "./room-policy";
 import { normalizeDifficulty } from "./game/difficulty";
 import { normalizeMode } from "./game/mode";
 import { unlockById } from "./unlock";
@@ -76,28 +79,6 @@ export function serializeRoom(
       joinedAt: m.joinedAt.toISOString(),
     })),
   };
-}
-
-// Whether a harbor is closed to a captain who is not already in it.
-//
-// Two callers reach this and they name the field differently: the lobby's
-// summary carries members with an id, and the room row the join routes load
-// carries members with a userId. Both hand over the started flag and the
-// list of ids, which is everything the rule reads.
-//
-// The lobby had been drawing this as `started && !isMember` and stopping
-// there, so a harbor whose whole crew had gone home showed as Locked, with
-// its Enter button disabled under the label and the takeover described below
-// reachable only by whoever still had the code. Kept here, beside the
-// function that enforces it, because the two halves of that rule have to be
-// read together.
-export function roomLockedFor(
-  started: boolean,
-  memberIds: readonly string[],
-  userId: string,
-): boolean {
-  if (!started || memberIds.includes(userId)) return false;
-  return memberIds.length > 0;
 }
 
 // The one place a captain is admitted to a harbor, shared by the two join
@@ -246,14 +227,4 @@ export function generateRoomCode(): string {
   for (let i = 0; i < 6; i++)
     out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
   return out;
-}
-
-// Mobile keyboards and pasted text love to leave behind double spaces or a
-// stray non breaking space, which show up as odd gaps once a harbor name is
-// rendered. Collapse any run of whitespace down to one regular space and
-// trim the ends so a messy paste still looks clean. Used both when a harbor
-// is created and defensively wherever a name gets rendered, so any harbor
-// named before this existed still displays cleanly.
-export function normalizeRoomName(name: string): string {
-  return name.replace(/\s+/g, " ").trim();
 }

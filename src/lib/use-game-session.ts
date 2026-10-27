@@ -63,6 +63,7 @@ export function useGameSession(
     logs: [],
     newLines: [],
     loaded: false,
+    persistable: false,
     saving: false,
     lastSavedAt: null,
   });

@@ -25,7 +25,8 @@ export function theSurvivalLinesSuite(
   // line is a captain facing string whatever wrote it, and the rule is
   // about the whole set.
   check(
-    survivalLines.length > 0 &&
+    families.every((lines) => lines.length > 0) &&
+      survivalLines.length > 0 &&
       ledgerSentences(survivalLines).every(
         (line) => !CARRIES_A_DASH.test(line),
       ),

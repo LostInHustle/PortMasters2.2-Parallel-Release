@@ -1,12 +1,12 @@
 "use client";
 
-import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
-import { useRoomRoster } from "@/lib/use-room-roster";
+import type { RoomMemberLive } from "@/types/realtime/presence";
+import type { RoomStatusMap } from "@/lib/use-room-roster";
 import { Avatar } from "./shared";
 import { cn, memberRowClass } from "@/lib/utils";
 import { Coins, Trophy, SkullIcon, Anchor, Utensils } from "lucide-react";
-import { seatMarks } from "@/lib/seatMarks";
+import { seatMarks } from "@/lib/seat-marks";
 import { hungryPillLine, hungryTooltip } from "@/lib/game/status-copy";
 import { t } from "@/lib/game/i18n";
 import { phaseLabel } from "@/lib/game/engine";
@@ -19,23 +19,19 @@ import { phaseLabel } from "@/lib/game/engine";
  * to the very bottom of the page behind the phase panel and the roster's
  * own scroll. This strip sits directly under the header instead, full
  * width, on every screen size, so the harbor's state is visible without
- * scrolling past anything. The live roster comes from useRoomRoster, the
- * same hook MembersPanel uses, rather than threading a second copy of that
- * state down from GameRoom.
+ * scrolling past anything. The live roster comes from the harbor's one
+ * useRoomRoster subscription (see GameRoom), handed down rather than
+ * subscribed to again.
  */
 export function FleetTicker({
-  socket,
-  roomId,
   me,
-  initialMembers,
+  members,
+  statuses,
 }: {
-  socket: Socket | null;
-  roomId: string;
   me: PublicUser;
-  initialMembers: (PublicUser & { joinedAt?: string })[];
+  members: RoomMemberLive[];
+  statuses: RoomStatusMap;
 }) {
-  const { members, statuses } = useRoomRoster(socket, roomId, initialMembers);
-
   // Me first, same ordering rule MembersPanel already uses, so a captain
   // finds their own chip in the same spot in both places.
   const sorted = [...members].sort((a, b) => {
@@ -53,7 +49,7 @@ export function FleetTicker({
           const st = statuses[m.id];
           const isMe = m.id === me.id;
           // Both marks come off the one
-          // rule in seatMarks, which is what stops this strip and the
+          // rule in seat-marks, which is what stops this strip and the
           // roster panel spelling the same captain two different ways.
           const { bankrupt: isBankrupt, marooned: isMarooned } = seatMarks(st);
           return (

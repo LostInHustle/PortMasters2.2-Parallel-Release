@@ -54,13 +54,11 @@ export function ModuleSwap({
       )}
       <PhaseClockBar phaseSync={phaseSync} members={members} className="mb-4" />
       <div className="rounded-xl border border-module-swap/15 bg-module-swap/[0.03] p-4 my-4 space-y-2 text-left">
-        {/* The rows are the hull's seats rather than its cards. A hull can
-            carry two of the same module, which the draft's fallback pool
-            deals whenever the unseen cards run short (see rollModuleChoices
-            in the engine's boons), and the press below names the seat it
-            means rather than the card: a key of the card's id would draw one
-            row where two modules are bolted on and could hand a press the
-            other seat's pick (see finalizeModuleSwap). */}
+        {/* The rows are the hull's seats, and the press below names the seat
+            it means rather than the card: each seat holds a distinct module
+            now, because the yard never deals one the hull already carries,
+            but the index is what finalizeModuleSwap takes and what the key
+            keeps stable across a hull that moves under the picker. */}
         {game.equippedModules.map((card, i) => {
           const text = cardText(card);
           const blocked =

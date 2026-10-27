@@ -1,0 +1,19 @@
+{
+  // A second TypeScript project, separate from the Next.js one, because
+  // Workers globals and Node globals cannot describe the same file. The
+  // root project excludes cloudflare, and this one checks it alone.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

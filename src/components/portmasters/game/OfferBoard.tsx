@@ -148,6 +148,7 @@ export function OfferRow({
   acceptClassName,
   declineLabel,
   blocked,
+  busy = false,
   onCancel,
   onDecline,
   onAccept,
@@ -165,10 +166,15 @@ export function OfferRow({
   /** The addressed captain's own refusal, where the market has one. */
   declineLabel?: React.ReactNode;
   blocked: string | null;
+  /** A press already sent and waiting on the harbor, so no second one lands. */
+  busy?: boolean;
   onCancel: () => void;
   onDecline?: () => void;
   onAccept: () => void;
 }) {
+  // A busy row is closed without a sentence: the refusal below already owns
+  // the wording, and the wait is a tick rather than a rule.
+  const closed = blocked !== null || busy;
   return (
     <PathDeskRow mine={mine} className={className}>
       <span className="flex items-center gap-1.5 flex-wrap">
@@ -194,10 +200,10 @@ export function OfferRow({
                 size="sm"
                 className={cn(
                   "h-7 px-2.5 text-[10px] rounded",
-                  !blocked && acceptClassName,
+                  !closed && acceptClassName,
                 )}
-                variant={blocked ? "secondary" : "default"}
-                disabled={blocked !== null}
+                variant={closed ? "secondary" : "default"}
+                disabled={closed}
                 onClick={onAccept}
               >
                 {acceptLabel}

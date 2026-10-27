@@ -22,7 +22,7 @@ import {
   type Objective,
 } from "@/lib/game/objectives";
 import { readPeerTradeProfit } from "@/lib/game/victory";
-import { bankruptMark, leftTheVoyage } from "@/lib/seatMarks";
+import { bankruptMark, leftTheVoyage } from "@/lib/seat-marks";
 import { checkSave, describeFindings } from "@/lib/game/integrity";
 import type { ObjectiveTraceEntry } from "@/lib/game/types";
 import { clearBarter, clearFlexibleAccepted } from "../barter";
@@ -80,7 +80,7 @@ export async function readFinishedCaptains(
     const st = statuses.get(id);
     // Every seat has to have left the voyage, read through the roster's own
     // predicate: no status and still sailing are the same answer here (see
-    // leftTheVoyage in @/lib/seatMarks).
+    // leftTheVoyage in @/lib/seat-marks).
     if (!st || !leftTheVoyage(st)) return null;
     finished.push({
       userId: id,

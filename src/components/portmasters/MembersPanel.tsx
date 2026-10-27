@@ -4,7 +4,8 @@ import { PlayerReportAck } from "@/types/realtime/moderation";
 import { useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import type { PublicUser } from "@/lib/api";
-import { useRoomRoster } from "@/lib/use-room-roster";
+import type { RoomMemberLive } from "@/types/realtime/presence";
+import type { RoomStatusMap } from "@/lib/use-room-roster";
 import { toast } from "sonner";
 import { t } from "@/lib/game/i18n";
 import { usePlayerDetail } from "@/lib/use-player-detail";
@@ -12,10 +13,12 @@ import { RosterHeader } from "./roster/RosterHeader";
 import { RosterRow } from "./roster/RosterRow";
 import { SystemNotices, type SystemNotice } from "./roster/SystemNotices";
 
-// The panel itself is the wiring and nothing else: the roster hook, the
-// notice feed, the run of actions this viewer has taken, and the sort. The
-// heading, the row and the notices under it are drawn by the three
-// components under ./roster, each handed only the fields it draws.
+// The panel itself is the wiring and nothing else: the notice feed, the run
+// of actions this viewer has taken, and the sort. The heading, the row and
+// the notices under it are drawn by the three components under ./roster,
+// each handed only the fields it draws. The roster itself is the harbor's
+// one useRoomRoster answer (see GameRoom), handed down rather than
+// subscribed to again.
 /**
  * Live roster of harbor members, collapsed down to what matters at a glance:
  * gold, reputation, and whether they're still in the run. Click a row to
@@ -23,7 +26,7 @@ import { SystemNotices, type SystemNotice } from "./roster/SystemNotices";
  *
  * Each non self row carries an eye button that
  * opens a small popover showing a banded cargo read of the target captain.
- * The bands come straight from bandFor in engine/partialSight: "none", "a
+ * The bands come straight from bandFor in engine/partial-sight: "none", "a
  * few", "some", "plenty", "a haul". The peek is gated by canSeeDetail, so
  * only a captain at or above the viewer threshold looking at one at or
  * above the subject threshold sees the button at all. The cargo snapshot
@@ -34,7 +37,9 @@ export function MembersPanel({
   socket,
   roomId,
   me,
-  initialMembers,
+  members,
+  statuses,
+  mutedUserIds,
   hostId,
   onSelectPlayer,
   myRenownLevel = 1,
@@ -44,7 +49,9 @@ export function MembersPanel({
   socket: Socket | null;
   roomId: string;
   me: PublicUser;
-  initialMembers: (PublicUser & { joinedAt?: string })[];
+  members: RoomMemberLive[];
+  statuses: RoomStatusMap;
+  mutedUserIds: Set<string>;
   hostId: string;
   onSelectPlayer: (userId: string) => void;
   myRenownLevel?: number;
@@ -59,14 +66,9 @@ export function MembersPanel({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
-  // Roster, per captain status, and the host's mute list all come from the
-  // shared hook, which FleetTicker uses too; only the system notice feed
-  // below is this panel's own, since nothing else renders it.
-  const { members, statuses, mutedUserIds } = useRoomRoster(
-    socket,
-    roomId,
-    initialMembers,
-  );
+  // Only the system notice feed below is this panel's own; the roster, the
+  // per captain status, and the host's mute list all arrive as props from
+  // the harbor's one subscription, because nothing else renders the notices.
   const [systemNotes, setSystemNotes] = useState<SystemNotice[]>([]);
   // The number each notice carries. A notice is a thing that arrives rather
   // than a place in a list: the feed keeps only the last twelve, so a

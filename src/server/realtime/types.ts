@@ -12,6 +12,7 @@ import { PublicUser } from "@/types/realtime/presence";
 import type { GameMode } from "@/lib/game/mode";
 import type { Locale } from "@/lib/game/i18n";
 import type { Phase } from "@/lib/game/types";
+import type { MarketLeans } from "@/lib/game/engine/market";
 
 // One connected socket's server side state. A socket starts unauthed
 // with no harbor; authenticate() fills in userId/user/authed, and
@@ -93,4 +94,10 @@ export type Checkpoint = {
   // itself goes, so this cannot outlive the row it was read from (see the
   // two roomCheckpoints.delete calls).
   mode: GameMode;
+  // The leans the advance announced as it opened a market, kept so the ready
+  // frame can hand the same numbers to a captain who missed that frame (see
+  // readyStatePayload in ./checkpoint). Read only while phase is "market",
+  // which is the only seat that draws a board, and overwritten the next time
+  // a market opens, so it cannot go stale in a way any reader sees.
+  marketLeans?: MarketLeans;
 };

@@ -1,7 +1,7 @@
 // =====================================================================
 // Pure decision logic for Convoy Ventures, split out of
 // src/server/realtime/index.ts for the same reason computeHarborPulse was split
-// out into harborPulse.ts: this is real Gold math and the one exploit
+// out into harbor-pulse.ts: this is real Gold math and the one exploit
 // prevention rule (one filled venture per voyage, harbor wide) that a
 // doctored client or a race between two captains has to actually be safe
 // against, and none of it can be unit tested while it sits nested inside

@@ -27,6 +27,12 @@ type ConsentChannel = {
   stateRequest: string;
   /** The field the rows arrive in. */
   field: string;
+  /** The event a buyer's acceptance speaks on. */
+  accept: string;
+  /** The event a seller's withdrawal speaks on. */
+  cancel: string;
+  /** The field a row's id travels in, on both of the two presses above. */
+  idField: string;
 };
 
 /**
@@ -142,12 +148,36 @@ export function useConsentBoard<T extends ConsentTerms>(
 
   const clearError = useCallback(() => setError(null), []);
 
+  // The two presses every consent market shares: a buyer takes the row, and
+  // a seller takes it back. They differ only in event name and the field the
+  // id travels in, both of which the channel names, so the three markets
+  // cannot word the same call three ways. Each clears the previous refusal
+  // first, because a sentence about a row that has since moved must not be
+  // left standing over the answer to this press.
+  const accept = useCallback(
+    (id: string) => {
+      if (!socket) return;
+      clearError();
+      socket.emit(channel.accept, { roomId, [channel.idField]: id });
+    },
+    [socket, roomId, clearError, channel],
+  );
+
+  const cancel = useCallback(
+    (id: string) => {
+      if (!socket) return;
+      clearError();
+      socket.emit(channel.cancel, { roomId, [channel.idField]: id });
+    },
+    [socket, roomId, clearError, channel],
+  );
+
   // The answer, held to one identity until something inside it changes.
   // The three markets above read this relay and pass their own answers on
   // as props, and an object rebuilt every render is a board that looks new
   // to everything downstream of it.
   return useMemo(
-    () => ({ rows, error, clearError }),
-    [rows, error, clearError],
+    () => ({ rows, error, clearError, accept, cancel }),
+    [rows, error, clearError, accept, cancel],
   );
 }

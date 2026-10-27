@@ -1,0 +1,39 @@
+# The image build is the only place this list matters. Everything the
+# build gates read has to stay in the context, so docs, scripts, src,
+# cloudflare, prisma and .env.example are deliberately absent from this
+# file rather than listed here.
+
+# Version control and local tooling state
+.git
+.github
+.wrangler
+.dev.vars
+.dev.vars.*
+
+# Installed and generated trees, rebuilt inside the image
+node_modules
+.next
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# The local database and its sidecars. A database is never baked into an
+# image: production starts from an empty file and restores from R2.
+db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Local environment files. The example is the one exception, because the
+# prose gate reads it and it carries no secret.
+.env
+.env.*
+!.env.example
+
+# Coverage and logs
+coverage
+*.log
+npm-debug.log*
+
+# Editor and operating system clutter
+.DS_Store

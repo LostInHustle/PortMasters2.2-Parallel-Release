@@ -1,0 +1,63 @@
+{
+  // PortMasters 2.2 Parallel Release on Cloudflare Containers.
+  //
+  // The Worker is a thin edge. Every request goes to one Durable Object,
+  // and that object owns the one container that runs server.ts. Keep the
+  // Durable Object name stable: a new name is a new object and an empty
+  // container with no game in it.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // The dashboard Worker created by the Git integration carries this name,
+  // so a local deploy targets the same Worker rather than creating a
+  // second one beside it.
+  "name": "portmasters2-2-parallel-release",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-10-26",
+  "upload_source_maps": true,
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "GameContainer",
+      // One centrally managed image for every instance. The per instance
+      // policy is for builds that hand each object its own image, which
+      // this deployment never does.
+      "scheduling_policy": "default",
+      "image": "./Dockerfile",
+      // A quarter vCPU, 1 GiB of memory and 4 GB of disk.
+      "instance_type": "basic",
+      // SQLite and the harbor state in memory allow one writer and no
+      // second reader. Raising this splits the game in two.
+      "max_instances": 1,
+      // To ship one of the twelve NEXT_PUBLIC_* switches off, add an
+      // image_vars block and rebuild:
+      //   "image_vars": { "NEXT_PUBLIC_SURVIVAL": "0" }
+      // The Dockerfile turns every switch on. Both the client bundle and
+      // the server read the value baked into the image.
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "GAME", "class_name": "GameContainer" }],
+  },
+  // The declarative form. It is mutually exclusive with a migrations
+  // block, and this is a new application, so no migration history exists
+  // to carry forward.
+  "exports": {
+    "GameContainer": { "type": "durable-object", "storage": "sqlite" },
+  },
+  "vars": {
+    // The two game settings keep their documented defaults. The entry
+    // point falls back to the same values when they are absent.
+    "PHASE_CLOCK": "0",
+    "TELEMETRY_SAMPLE_RATE": "1",
+    // Replication is on. The Worker refuses to start a container while a
+    // Litestream value is missing, so the two empty values below are a
+    // deliberate gate rather than a working default: fill them in before
+    // the first deploy.
+    "LITESTREAM_ENABLED": "1",
+    "LITESTREAM_BUCKET": "",
+    "LITESTREAM_ENDPOINT": "",
+    // APP_URL is added after the first deploy, once Wrangler has printed
+    // the workers.dev address. A custom domain replaces both:
+    //   "routes": [{ "pattern": "game.example.com", "custom_domain": true }]
+  },
+  "workers_dev": true,
+}

@@ -52,7 +52,7 @@ import { expireConsent, type ConsentTerms } from "@/lib/game/engine";
 import type { Phase } from "@/lib/game/types";
 import { sockets } from "./presence";
 
-type ConsentBoard<T extends ConsentTerms> = {
+type ConsentBoard<T extends ConsentTerms, P> = {
   /** The room's rows. An absent key and an empty list mean the same thing. */
   list(roomId: string): T[];
   /** Writes the list back, keeping one representation of an empty board. */
@@ -61,11 +61,11 @@ type ConsentBoard<T extends ConsentTerms> = {
   visibleFor(roomId: string, userId: string): T[];
   /**
    * What one captain is sent, which is their rows in the shape this kind
-   * speaks on the wire. The answer is deliberately untyped here: the payload
-   * is a contract with the client rather than a shape the server reasons
-   * about, and the client declares the type it reads.
+   * speaks on the wire. The payload type P is the binding's own board type
+   * from @/types/realtime/boards, so the server and the client read one
+   * shape rather than two copies of it.
    */
-  payloadFor(roomId: string, userId: string): unknown;
+  payloadFor(roomId: string, userId: string): P;
   /** Sends every connected captain in the harbor the board as they may read it. */
   broadcast(io: Server, roomId: string): void;
   /** Drops the board and tells the harbor it is empty. */
@@ -91,18 +91,21 @@ type ConsentBoard<T extends ConsentTerms> = {
  * contract with every client already connected: `{roomId, contracts}` for
  * the escort contract market and `{roomId, refits}` for the refit bench, so a
  * tab left open across the deploy reads the same field it was built to read.
+ * The board type P is named by the binding (see @/types/realtime/boards), so
+ * `payloadFor` is typed rather than unknown and each binding is checked
+ * against the shape its client declares.
  */
-export function consentBoard<T extends ConsentTerms>(options: {
+export function consentBoard<T extends ConsentTerms, P>(options: {
   event: string;
   visible: (rows: T[], userId: string) => T[];
-  pack: (roomId: string, rows: T[]) => unknown;
-}): ConsentBoard<T> {
+  pack: (roomId: string, rows: T[]) => P;
+}): ConsentBoard<T, P> {
   // Module local on the same reasoning as the barter board's map: every
   // reader and writer goes through the returned object, and there is one
   // meaning for a harbor's board being absent.
   const rooms = new Map<string, T[]>();
 
-  const board: ConsentBoard<T> = {
+  const board: ConsentBoard<T, P> = {
     list(roomId) {
       return rooms.get(roomId) ?? [];
     },
