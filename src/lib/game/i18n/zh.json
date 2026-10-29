@@ -79,7 +79,7 @@
     },
     "difficulty.fair_winds.summary": {
       "en": "A gentle passage on the founding trade. A short, legible voyage with room to learn the rhythm before the money runs tight.",
-      "zh": "初创贸易的柔和航程，用一段简短而精炼的旅程，让你在陷入贫困之前熟悉游戏节奏。"
+      "zh": "初创贸易的柔和开局，一段简短清楚的航程，让你在资金吃紧之前熟悉游戏节奏。"
     },
     "difficulty.open_waters.name": { "en": "Open Waters", "zh": "开阔水域" },
     "difficulty.open_waters.tagline": {
@@ -393,7 +393,7 @@
     "card.merchant_charm.name": { "en": "Merchant's Charm", "zh": "商贾魅力" },
     "card.merchant_charm.desc": {
       "en": "Purchases at the market cost 15% less this round.",
-      "zh": "本轮集市采购降价 15%。"
+      "zh": "本轮集市采购降价15%。"
     },
     "card.artisan_inspiration.name": {
       "en": "Artisan's Inspiration",
@@ -437,7 +437,7 @@
     },
     "card.kiln_and_forge_guild.desc": {
       "en": "Orders for the first charter's goods pay 15% more this round.",
-      "zh": "本轮第一批特许货物的订单多付 15%。"
+      "zh": "本轮第一批特许货物的订单多付15%。"
     },
     "card.frontier_tariff_relief.name": {
       "en": "Frontier Tariff Relief",
@@ -453,7 +453,7 @@
     },
     "card.exotic_treasures.desc": {
       "en": "Orders for the second charter's goods pay 15% more this round.",
-      "zh": "本轮第二批特许货物的订单多付 15%。"
+      "zh": "本轮第二批特许货物的订单多付15%。"
     },
     "card.deep_sea_escort_pact.name": {
       "en": "Deep Sea Escort Pact",
@@ -479,7 +479,7 @@
     "card.cold_hardened.name": { "en": "Cold Hardened", "zh": "耐寒" },
     "card.cold_hardened.desc": {
       "en": "The warmth the crew wears counts one higher, for the voyage.",
-      "zh": "本航程余下期间，船员衣物的暖意多算 1 点。"
+      "zh": "本航程余下期间，船员衣物的暖意多算1点。"
     },
     "card.route_mastery.name": { "en": "Route Mastery", "zh": "商道精通" },
     "card.route_mastery.desc": {
@@ -522,7 +522,7 @@
     "card.silk_monopoly.name": { "en": "Woven Monopoly", "zh": "织物垄断" },
     "card.silk_monopoly.desc": {
       "en": "Woven freight is free. Woven orders pay 20% more.",
-      "zh": "织物类运费为 0，织物类订单多付 20%。"
+      "zh": "织物类运费为0，织物类订单多付20%。"
     },
     "card.brokers_network.name": { "en": "Broker's Network", "zh": "掮客人脉" },
     "card.brokers_network.desc": {
@@ -548,7 +548,7 @@
     },
     "card.bureau_token.desc": {
       "en": "Charter goods pay 10% more on orders.",
-      "zh": "特许货物的订单多付 10%。"
+      "zh": "特许货物的订单多付10%。"
     },
     "card.kiln_cellar.name": { "en": "Kiln Cellar", "zh": "窑窖" },
     "card.kiln_cellar.desc": {
@@ -558,7 +558,7 @@
     "card.ocean_relay.name": { "en": "Ocean Interpreter", "zh": "通译" },
     "card.ocean_relay.desc": {
       "en": "Each Broker's Whisper reveals 1 extra at no extra cost.",
-      "zh": "掮客密语每次多揭示 1 条，不另收费。"
+      "zh": "掮客密语每次多揭示1条，不另收费。"
     },
     "card.foreign_quarter_pass.name": {
       "en": "Foreign Quarter Pass",
@@ -574,7 +574,7 @@
     },
     "card.persian_dome_compass.desc": {
       "en": "Pirate raids are 30% less likely.",
-      "zh": "海盗劫掠风险降低 30%。"
+      "zh": "海盗劫掠风险降低30%。"
     },
     "card.fleet_of_treasures.name": {
       "en": "Fleet of Treasures",
@@ -595,12 +595,12 @@
     },
     "card.standing_manifest.desc": {
       "en": "Completed orders pay 15% more, for the rest of the voyage.",
-      "zh": "本航程每笔完成的订单多付 15%。"
+      "zh": "本航程每笔完成的订单多付15%。"
     },
     "card.gun_charter.name": { "en": "The Gun Charter", "zh": "火炮特许" },
     "card.gun_charter.desc": {
       "en": "You sail armed. Raids against you are 30% less likely, for the rest of the voyage.",
-      "zh": "全船武装，本航程遭遇劫掠的概率降低 30%。"
+      "zh": "全船武装，本航程遭遇劫掠的概率降低30%。"
     },
     "card.standing_escort.name": {
       "en": "The Standing Escort",
@@ -621,12 +621,12 @@
     "card.quality_mark.name": { "en": "The Quality Mark", "zh": "品质印记" },
     "card.quality_mark.desc": {
       "en": "Your cloth carries the mark. Orders carrying woven goods pay 10% more, for the rest of the voyage.",
-      "zh": "织物皆盖印记，本航程含织物的订单报酬提高 10%。"
+      "zh": "织物皆盖印记，本航程含织物的订单报酬提高10%。"
     },
     "card.long_ledger.name": { "en": "The Long Ledger", "zh": "长账簿" },
     "card.long_ledger.desc": {
       "en": "The harbors keep your account. Purchases at the market cost 10% less, for the rest of the voyage.",
-      "zh": "港湾记账，本航程集市采购降价 10%。"
+      "zh": "港湾记账，本航程集市采购降价10%。"
     },
     "card.quiet_account.name": { "en": "The Quiet Account", "zh": "静默账户" },
     "card.quiet_account.desc": {
@@ -1649,7 +1649,7 @@
       "en": "{nameList} or {lastName}",
       "zh": "{nameList}或{lastName}"
     },
-    "engine.007": { "en": "Age of the Lender", "zh": "债主之年" },
+    "engine.007": { "en": "Age of the Lender", "zh": "放贷人之年" },
     "engine.008": {
       "en": "Backing another captain's loan pays extra Renown while this Age holds the harbor.",
       "zh": "时代执掌港湾期间，为其他船长的借款作保，多得声望。"
@@ -1710,7 +1710,7 @@
     },
     "engine.017": {
       "en": "⚖️ Age of the Lender: a pledge that comes home whole pays {pledgeBonusPct}% more while it holds the harbor.",
-      "zh": "⚖️ 债主之年：时代执掌港湾期间，质押完好收回，多付{pledgeBonusPct}%。"
+      "zh": "⚖️ 放贷人之年：时代执掌港湾期间，质押完好收回，多付{pledgeBonusPct}%。"
     },
     "engine.318": {
       "en": "🛡️ Your backing was never called on. Pledge returned in full: {refundAmount} Gold. Reputation +{repGain} for the risk paying off.",
@@ -1730,11 +1730,11 @@
     },
     "engine.019": {
       "en": "⛵ The barge has nothing left for you this round.",
-      "zh": "⛵ 本轮驳船没有余量给你了。"
+      "zh": "⛵ 补给驳船这一轮没剩什么给你了。"
     },
     "engine.020": {
       "en": "❌ Name how many rations to buy from the barge.",
-      "zh": "❌ 请写明从驳船买多少份口粮。"
+      "zh": "❌ 请写明从补给驳船买多少份口粮。"
     },
     "engine.021": {
       "en": "❌ The barge charges {price} Gold a ration, and the purse cannot cover one.",
@@ -1952,7 +1952,7 @@
       "en": "🏛️ No profit, no income tax due",
       "zh": "🏛️ 没有盈利，不用缴所得税"
     },
-    "engine.066": { "en": "⏭️ Trading skipped", "zh": "⏭️ 跳过交易" },
+    "engine.066": { "en": "⏭️ Orders skipped", "zh": "⏭️ 跳过订单" },
     "engine.067": {
       "en": "\n👥=== Processing Artisan Production ===",
       "zh": "\n👥=== 结算工匠产出 ==="
@@ -2019,8 +2019,8 @@
       "zh": "\n🔄=== 第{state.currentRound}轮 · 准备 ==="
     },
     "engine.344": {
-      "en": "✅ Trading ended, completed {state.orderCount} trades",
-      "zh": "✅ 交易结束，完成{state.orderCount}笔"
+      "en": "✅ Orders ended, {state.orderCount} trade orders filled",
+      "zh": "✅ 订单结束，完成{state.orderCount}份贸易订单"
     },
     "engine.077": { "en": "{m}×{a}", "zh": "{m}×{a}" },
     "engine.078": {
@@ -2705,7 +2705,7 @@
     "engine.239": { "en": "Invalid repayment", "zh": "无效的还款" },
     "engine.240": {
       "en": "That loan is no longer outstanding.",
-      "zh": "那笔借款已经还清了。"
+      "zh": "那笔借款已经不在账上了。"
     },
     "engine.241": {
       "en": "That loan is not yours to repay.",
@@ -3223,9 +3223,9 @@
     "room-a.113": { "en": "Restart the voyage", "zh": "重开航程" },
     "room-a.114": {
       "en": "Show all keyboard shortcuts",
-      "zh": "显示全部快捷键"
+      "zh": "显示全部键盘快捷键"
     },
-    "room-a.115": { "en": "Keyboard shortcuts", "zh": "快捷键" },
+    "room-a.115": { "en": "Keyboard shortcuts", "zh": "键盘快捷键" },
     "room-a.117": { "en": "Waiting for host…", "zh": "等港主..." },
     "room-a.118": { "en": "Need one captain", "zh": "还差一位船长" },
     "room-a.120": { "en": "Start the Voyage", "zh": "开始航程" },
@@ -3907,7 +3907,7 @@
     "room-b.071": { "en": "Purchases & Freight", "zh": "采购与运费" },
     "room-b.072": { "en": "Income Tax", "zh": "所得税" },
     "room-b.375": { "en": "+{rep} Rep", "zh": "+{rep}声誉" },
-    "room-b.073": { "en": "Port Board", "zh": "港口采购板" },
+    "room-b.073": { "en": "Port Purchase", "zh": "港口采购" },
     "room-b.074": { "en": "Take This Boon", "zh": "收下这份机缘" },
     "room-b.075": { "en": "🔧 Drafting Module", "zh": "🔧 抽取模块" },
     "room-b.076": {
@@ -4569,11 +4569,7 @@
     },
     "room-b.281": { "en": "Modules", "zh": "模块" },
     "room-b.282": {
-      "en": "{filled} of {total} module slot",
-      "zh": "{filled}/{total} 个模块槽位"
-    },
-    "room-b.283": {
-      "en": "{filled} of {total} module slots",
+      "en": "{filled} of {total} module slot{pluralS}",
       "zh": "{filled}/{total} 个模块槽位"
     },
     "room-b.301": {
@@ -5163,7 +5159,7 @@
     "misc.023": { "en": "The Cordage Warrant", "zh": "绳索采办" },
     "misc.024": {
       "en": "The yards need rope. Hemp by the bale, and linen to back it.",
-      "zh": "船坞要用绳索。麻布要成包的，还要麻布做衬。"
+      "zh": "船坞要用绳索。麻布要成包的，还要亚麻布做衬。"
     },
     "misc.025": { "en": "The Silk and Tea Levy", "zh": "丝茶之征" },
     "misc.026": {
@@ -6431,11 +6427,11 @@
     },
     "residual.498": {
       "en": "Every seat runs on a clock. When the timer runs out, the harbor moves on whether or not you have readied, and a seat you left untouched is played by the engine's defaults.",
-      "zh": "每个阶段都有一只计时器。时间一到，港湾就继续往前走，无论你是否已经准备；你放着没动的那一处，会由引擎按默认替你走完。"
+      "zh": "每个席位都在计时。时间一到，港湾就继续往前走，无论你是否已经准备；你放着没动的席位，会由引擎按默认替你走完。"
     },
     "residual.499": {
       "en": "Standing orders let you write that default yourself: name the boon, the goods, the hire or the order you want, and an expired seat follows your instructions instead.",
-      "zh": "常备订单由你预先写好：要哪张机缘、买什么货、雇哪位匠人、交哪张订单。计时器走完时，那一处就照你写的办，而不是按默认。"
+      "zh": "常备订单由你预先写好：要哪张机缘、买什么货、雇哪位匠人、交哪张订单。计时器走完时，过了时限的席位就照你写的办，而不是按默认。"
     },
     "residual.319": {
       "en": "❌ Need {debt.amount} Gold to repay {debt.counterpartyName}, have {state.money}",
@@ -6487,7 +6483,7 @@
     },
     "residual.331": {
       "en": "Peak Reputation hit {input.peakReputation}.",
-      "zh": "巅峰声誉达到{input.peakReputation}。"
+      "zh": "最高声誉达到{input.peakReputation}。"
     },
     "residual.332": {
       "en": "The largest single trade paid {input.largestTrade} Gold.",

@@ -4,7 +4,11 @@
 // asks it: the finished roster, the boards left behind, the saves and their
 // marks, the voyage row and its deal, unrepaid loans, the two verdicts, and the
 // frames the harbor is told the result with.
-import { RevealedCaptain, type StandingRow } from "@/types/realtime/voyage";
+import {
+  RevealedCaptain,
+  type StandingRow,
+  type VoyageResult,
+} from "@/types/realtime/voyage";
 import { PublicUser } from "@/types/realtime/presence";
 import type { Server } from "socket.io";
 import { db } from "@/lib/db";
@@ -268,7 +272,6 @@ export function sweepAbsentBorrowerLoans(
   roomId: string,
   finished: FinishedCaptain[],
 ): void {
-  // Sweep stale loans for absent borrowers. A still connected borrower
   // Sweep loans whose borrower is absent. A connected borrower may still be
   // settling, and sweeping would race their report; an absent one paid nothing,
   // so 0 is honest.
@@ -360,11 +363,8 @@ export function publishStandings(
   winnerId: string | null,
   standings: StandingRow[],
 ): void {
-  io.to(roomChannel(roomId)).emit("room:voyage_complete", {
-    roomId,
-    winnerId,
-    standings,
-  });
+  const frame: VoyageResult = { roomId, winnerId, standings };
+  io.to(roomChannel(roomId)).emit("room:voyage_complete", frame);
 }
 
 // The reveal: the whole hand, every verdict and the fleet's trace, as one frame.

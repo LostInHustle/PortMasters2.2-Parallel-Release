@@ -29,6 +29,7 @@ import {
   carriesADash,
   check,
   openAuthedSocket,
+  sleep,
   suffix,
   waitForEvent,
   withoutComments,
@@ -571,7 +572,7 @@ export async function manifestAuditSuite(
       revealFrames.push({ socket: index, reveal: payload });
     });
   });
-  const auditSettle = () => new Promise((resolve) => setTimeout(resolve, 400));
+  const auditSettle = () => sleep(400);
 
   // Before the harbor has sailed there is no checkpoint to call a vote
   // from, which is the first of the three ways a nomination is refused.
@@ -638,7 +639,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     auditCheckpoint = await auditRoomRow();
   }
   check(
@@ -1032,7 +1033,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     auditReopened = await auditRoomRow();
   }
   check(
@@ -1093,7 +1094,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   // The count before anyone has voted, which is the one count no
   // broadcast carries: a round's book is built by the captains in it, so
@@ -1207,7 +1208,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   const auditVoyageThree = auditSockets.map((socket) =>
     waitForEvent<{ roomId: string }>(
@@ -1236,7 +1237,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   const flaggedSeeded = await call<{ ok: boolean }>("/api/game/state", {
     method: "PUT",
@@ -1307,7 +1308,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   const auditVoyageFour = auditSockets.map((socket) =>
     waitForEvent<{ roomId: string }>(
@@ -1336,7 +1337,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
 
   const leftRefusals: string[] = [];
@@ -1630,7 +1631,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   const auditVoyageFive = auditSockets.map((socket) =>
     waitForEvent<{ roomId: string }>(
@@ -1659,7 +1660,7 @@ export async function manifestAuditSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
 
   const pairRefusals: string[] = [];

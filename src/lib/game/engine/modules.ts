@@ -72,14 +72,14 @@ export function moduleListedThisRound(
 export function applyModuleTradeSide(
   state: GameState,
   trade: ModuleTrade,
-  meId: string,
+  myUserId: string,
   logs: LedgerLine[],
 ): boolean {
   return settleConsentTrade(state, logs, {
     on: moduleTradesOn,
     status: "agreed",
     row: trade,
-    meId,
+    myUserId,
     counters: {
       bought: "modulesBought",
       feesPaid: "moduleFeesPaid",

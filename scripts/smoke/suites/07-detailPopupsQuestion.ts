@@ -3,7 +3,7 @@
 import { SOCKET_PATH } from "@/lib/realtime-endpoint";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BASE, check, waitForEvent } from "../harness";
+import { BASE, check, sleep, waitForEvent } from "../harness";
 import type { Socket } from "socket.io-client";
 import { connect } from "socket.io-client";
 import type { SmokeRun } from "../run";
@@ -56,7 +56,7 @@ export async function detailPopupsQuestionSuite(
     roomId: roomId,
     targetUserId: hostId,
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   check(
     detailQuestions.some((question) => question.requesterId === askerId),
     "a captain asking for another captain's detail is relayed to that captain, labeled with the asker",
@@ -67,7 +67,7 @@ export async function detailPopupsQuestionSuite(
     requesterId: askerId,
     data: { gold: 1234 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   check(
     guestAnswers.length === 1 &&
       guestAnswers[0].targetUserId === hostId &&
@@ -84,7 +84,7 @@ export async function detailPopupsQuestionSuite(
     requesterId: askerId,
     data: { gold: 9999 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   check(
     guestAnswers.length === 1,
     "a second answer to the same question is dropped, so one question relays one answer",
@@ -97,16 +97,16 @@ export async function detailPopupsQuestionSuite(
     roomId: roomId,
     targetUserId: hostId,
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   guestSocket.emit("room:leave", { roomId: roomId });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   hostSocket.emit("player:detail:response", {
     roomId: roomId,
     targetUserId: hostId,
     requesterId: askerId,
     data: { gold: 5555 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   check(
     guestAnswers.length === 1,
     "and an answer to a captain who has left the harbor is dropped rather than delivered",

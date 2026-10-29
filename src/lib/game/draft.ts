@@ -16,7 +16,7 @@ import {
 import { listJoiner, t, tFor, type Locale } from "./i18n";
 import { PATH_IDS, type PathId } from "./paths";
 import { phaseFace } from "./phases";
-import { type Rng } from "./rng";
+import { shuffle, type Rng } from "./rng";
 import type { Phase } from "./types";
 
 // Deck weight per path, the one table a balance pass turns. Typed over
@@ -73,8 +73,8 @@ export function draftComposition(captains: number): Record<PathId, number> {
 }
 
 /**
- * The deck shuffled, matching ./gambit's Fisher-Yates. The shuffle hides
- * the order; the composition above already fixed the counts.
+ * The deck shuffled. The shuffle hides the order; the composition above
+ * already fixed the counts.
  */
 export function draftDeck(captains: number, rng: Rng): PathId[] {
   const counts = draftComposition(captains);
@@ -82,18 +82,13 @@ export function draftDeck(captains: number, rng: Rng): PathId[] {
   for (const id of PATH_IDS) {
     for (let i = 0; i < counts[id]; i += 1) deck.push(id);
   }
-  for (let i = deck.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    const held = deck[i];
-    deck[i] = deck[j];
-    deck[j] = held;
-  }
-  return deck;
+  return shuffle(rng, deck);
 }
 
 /**
- * One hand per seat, in seating order. The last hand takes what is left,
- * so a wrong seat count does not repeat a card.
+ * One hand per seat, in seating order, taken as a contiguous slice.
+ * draftComposition below deals exactly seats times DRAFT_DEAL cards, so
+ * every card lands in one hand and no card is dealt twice.
  */
 export function draftHands(
   deck: readonly PathId[],

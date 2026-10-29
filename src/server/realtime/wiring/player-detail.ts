@@ -6,7 +6,7 @@
 import type { Server, Socket } from "socket.io";
 
 import { roomMemberIds } from "@/lib/rooms";
-import { requireAuth } from "../auth";
+import { requireAuth, seated } from "../auth";
 import {
   emitToUser,
   rememberDetailRequest,
@@ -31,11 +31,11 @@ export function wirePlayerDetail(io: Server, socket: Socket): void {
   socket.on(
     "player:detail:request",
     async (payload: { roomId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const targetUserId = payload?.targetUserId;
-      if (!roomId || !targetUserId || roomId !== s.roomId) return;
+      if (!targetUserId) return;
       // The question may only be about a captain in this harbor, which
       // is what the popup is for. A target elsewhere would never answer
       // anyway, since their own client compares the harbor on the frame

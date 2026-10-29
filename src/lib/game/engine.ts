@@ -29,7 +29,6 @@ export {
   basePriceRange,
   priceRatio,
   brokersFavorCommission,
-  cardLineFitsCeiling,
   cardLineUnitPrice,
   cargoUnitsWithAllTags,
   cargoUnitsWithTag,
@@ -152,12 +151,14 @@ export {
 // around ./engine/barter, which does not consume it. The Captain's Exchange
 // is not governed here.
 export {
+  bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
 } from "./engine/barter-access";
 
 export {
   assignTask,
+  duesBill,
   fireWorker,
   hireWorker,
   maintenanceDue,

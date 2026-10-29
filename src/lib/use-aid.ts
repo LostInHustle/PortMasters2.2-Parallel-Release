@@ -1,7 +1,8 @@
 "use client";
 
 import { AidRequest } from "@/types/realtime/boards";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import { refusalHandler } from "@/lib/refusals";
 
@@ -74,22 +75,10 @@ export function useAid(
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const onGrantedRef = useRef(onGranted);
-  useEffect(() => {
-    onGrantedRef.current = onGranted;
-  }, [onGranted]);
-  const onRepaidRef = useRef(onRepaid);
-  useEffect(() => {
-    onRepaidRef.current = onRepaid;
-  }, [onRepaid]);
-  const onRedirectedClosedRef = useRef(onRedirectedClosed);
-  useEffect(() => {
-    onRedirectedClosedRef.current = onRedirectedClosed;
-  }, [onRedirectedClosed]);
-  const onRepaymentSettledRef = useRef(onRepaymentSettled);
-  useEffect(() => {
-    onRepaymentSettledRef.current = onRepaymentSettled;
-  }, [onRepaymentSettled]);
+  const onGrantedRef = useLatestRef(onGranted);
+  const onRepaidRef = useLatestRef(onRepaid);
+  const onRedirectedClosedRef = useLatestRef(onRedirectedClosed);
+  const onRepaymentSettledRef = useLatestRef(onRepaymentSettled);
 
   useEffect(() => {
     if (!socket) return;
@@ -172,7 +161,15 @@ export function useAid(
       socket.off("aid:repay:ok", onRepaySettled);
       socket.off("aid:repay:fail", onRepayFail);
     };
-  }, [socket, roomId, myUserId]);
+  }, [
+    socket,
+    roomId,
+    myUserId,
+    onGrantedRef,
+    onRepaidRef,
+    onRedirectedClosedRef,
+    onRepaymentSettledRef,
+  ]);
 
   // Every press clears the last refusal before it goes out, so a sentence
   // about a request that is no longer standing cannot outlive the press

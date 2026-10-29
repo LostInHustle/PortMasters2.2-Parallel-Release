@@ -81,7 +81,7 @@ type SettleTerms = {
   /** The row the two captains agreed. */
   row: SettleRow;
   /** The captain whose own side this is. */
-  meId: string;
+  myUserId: string;
   /** The four counters this kind keeps. */
   counters: SettleCounters;
   /** The sentences the two sides write. */
@@ -150,8 +150,8 @@ export function settleConsentTrade(
   if (!terms.on(state.mode)) return false;
   const row = terms.row;
   if (row.status !== terms.status) return false;
-  const isSeller = row.sellerUserId === terms.meId;
-  const isBuyer = row.buyerUserId === terms.meId;
+  const isSeller = row.sellerUserId === terms.myUserId;
+  const isBuyer = row.buyerUserId === terms.myUserId;
   if (!isSeller && !isBuyer) return false;
   const key = `${row.id}:fee`;
   if (movementApplied(state, key)) return false;

@@ -13,7 +13,8 @@ import {
 import { CLASSIC, GAMBIT, check, voyageState } from "../harness";
 import type { CardRecord } from "@/lib/game/constants/cards";
 import type { GameMode } from "@/lib/game/mode";
-import type { GameState, ModifierKey, ResourceCard } from "@/lib/game/types";
+import type { ModifierKey } from "@/lib/game/constants/modifiers";
+import type { GameState, ResourceCard } from "@/lib/game/types";
 
 /**
  * The purchase price, read through both doors.

@@ -69,8 +69,6 @@ import type { VoteCensus } from "@/lib/vote-tally";
 // audit's own channel is. The press is built here so that the payload this
 // client sends is typed by the wire's own shape.
 const CHANNEL: VoteChannel<MaroonVotePayload> = {
-  tally: "maroon:tally",
-  error: "maroon:error",
   stateRequest: "maroon:state:request",
   vote: "maroon:vote",
   press: (roomId, round, targetUserId) => ({ roomId, round, targetUserId }),
@@ -173,7 +171,7 @@ export function useMaroon(
       socket.off("maroon:error", onRefused);
       socket.off("maroon:shift:error", onShiftRefused);
     };
-  }, [socket, roomId, myUserId, setHeld, setPressed, onRefused, reset]);
+  }, [socket, roomId, myUserId, setHeld, setPressed, onRefused]);
 
   // A new voyage has no vote, no result and no leaning port, which is also
   // the signal a client gets for the harbor it is already sitting in.

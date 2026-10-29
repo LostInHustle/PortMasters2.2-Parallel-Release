@@ -42,6 +42,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -287,7 +288,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
     for (let waited = 0; waited < 15000; waited += 50) {
       if (standing(step)) return true;
       if (waited % 500 === 0) for (const seat of crew) report(seat, step);
-      await new Promise((r) => setTimeout(r, 50));
+      await sleep(50);
     }
     return standing(step);
   };
@@ -303,7 +304,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
   const settled = async (read: () => boolean, ms: number) => {
     for (let waited = 0; waited < ms; waited += 100) {
       if (read()) return true;
-      await new Promise((r) => setTimeout(r, 100));
+      await sleep(100);
     }
     return read();
   };
@@ -340,7 +341,7 @@ export async function readyCheckThatStallsSuite(run: SmokeRun): Promise<void> {
     standing({ round: 1, phase: "market" }),
     "the harbor stands at the seat that report named, so the departure was answered",
   );
-  await new Promise((r) => setTimeout(r, 14000));
+  await sleep(14000);
   check(
     heard.every((mine) => mine.rescues.length === 0),
     "a harbor whose departure was reported is never told the harbor did not hear it, since a cure that fired on a healthy table would be its own bug",

@@ -8,12 +8,7 @@
 // callers.
 // =====================================================================
 import { SESSION_COOKIE_NAME } from "@/lib/auth";
-import {
-  DEFAULT_LOCALE,
-  isLocale,
-  LOCALE_COOKIE_NAME,
-  type Locale,
-} from "@/lib/game/i18n";
+import { LOCALE_COOKIE_NAME, localeOr, type Locale } from "@/lib/game/i18n";
 
 /** One named cookie's value out of a raw cookie header, or null. */
 function readCookie(
@@ -56,5 +51,5 @@ export function readSessionCookie(
  */
 export function readLocaleCookie(cookieHeader: string | undefined): Locale {
   const value = readCookie(cookieHeader, LOCALE_COOKIE_NAME);
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+  return localeOr(value);
 }

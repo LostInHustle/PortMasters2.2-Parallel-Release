@@ -11,9 +11,20 @@
  * The launch gate report keeps its own tail: its exit code is a reading
  * rather than a ceremony (0 clear, 1 held, 2 blocked, 3 the report
  * itself failed), so it cannot share the exit code this helper sets.
+ *
+ * The rate cell lives here for the same reason. A rate with no voyages is
+ * not a rate, so every table prints it as n/a rather than as 0.0%, and a
+ * shared cell means two reports cannot round or pad the same reading to
+ * two different widths.
  */
 
+import { ratePercent } from "@/lib/game/balance";
 import { db } from "@/lib/db";
+
+/** A win rate cell, or n/a where no voyages produced a rate. */
+export function rateCell(rate: number | null, width = 7): string {
+  return (rate === null ? "n/a" : ratePercent(rate)).padStart(width);
+}
 
 export function runReport(
   failureLine: string,

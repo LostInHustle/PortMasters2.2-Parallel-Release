@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+// The categories a captain can mute. Every one of them has a switch on
+// the Settings screen.
+export type NotifCategory = "room" | "docks" | "tidewatch";
+
 export type NotificationItem = {
   id: string;
   icon: string;
@@ -9,7 +13,7 @@ export type NotificationItem = {
   lines: string[];
   at: number;
   onActivate?: () => void;
-  category?: "room" | "docks" | "tidewatch" | "default";
+  category?: NotifCategory | "default";
   /**
    * Whether the captain has seen this one.
    *
@@ -23,10 +27,6 @@ export type NotificationItem = {
 
 const HISTORY_LIMIT = 50;
 const BUBBLE_DURATION_MS = 8000;
-
-// The categories a captain can mute. Every one of them has a switch on
-// the Settings screen.
-export type NotifCategory = "room" | "docks" | "tidewatch";
 
 // localStorage keys for per category suppression. When "false", push
 // calls for that category are silently dropped (the item still lands in

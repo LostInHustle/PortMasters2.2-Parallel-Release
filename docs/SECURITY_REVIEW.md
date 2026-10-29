@@ -22,8 +22,8 @@ now, with what closed them written where they were raised.
 Three surfaces:
 
 1. **Every site that builds a broadcast payload.** Anything a whole harbor
-   receives. There are 57 `io.to(...)` and `io.emit(...)` statements across
-   28 files under `src/server/realtime`, and a twenty-ninth file, the chat
+   receives. There are 52 `io.to(...)` and `io.emit(...)` statements across
+   26 files under `src/server/realtime`, and a twenty-seventh file, the chat
    module, carries the phrase inside a comment and no statement. The
    question asked of each is whether anything private can be inside the
    payload it sends. The two passes read the 50 statements across the 16
@@ -130,7 +130,7 @@ that changes inside a single beat is a card that reached the wrong socket.
 
 ### 1. Broadcast payloads
 
-57 statements, 28 files, with a twenty-ninth file, the chat module, carrying
+52 statements, 26 files, with a twenty-seventh file, the chat module, carrying
 the phrase in a comment and no statement. The two passes read the 50
 statements across the 16 files that existed when they ran, and every one of
 those was read for what it carries; the four files added since are named in
@@ -531,13 +531,14 @@ the same surfaces is a second pass over the same page: the scope, the
 inventories, the findings and the limits above now carry both.
 
 **The surface has grown and moved since the second pass.** The passes read 50
-broadcast statements across 16 files; the tree now carries 57 executable
-statements across 28 files, with the chat module's comment beside them. The
-growth came in small steps: four modules joined the surface (`bazaar.ts`,
-`consent.ts`, `draft.ts`, `voyage-log.ts`), the checkpoint, the harbor join
-and the public offers ledger added one statement each, and the connection
-handlers moved out of the composition root into nine leaves under `wiring/`
-without adding a statement. Two later changes left the count alone: the
+broadcast statements across 16 files; the tree now carries 52 executable
+statements across 26 files, with the chat module's comment beside them. The
+current count is a fresh reading rather than the sum of the steps below. The
+surface moved in small steps: four modules joined (`bazaar.ts`, `consent.ts`,
+`draft.ts`, `voyage-log.ts`), the checkpoint, the harbor join and the public
+offers ledger added one statement each, and the connection handlers moved out
+of the composition root into nine leaves under `wiring/` without adding a
+statement. Two later changes left the count alone: the
 Manifest Audit and the maroon now share one tally helper (`tally.ts`) instead
 of keeping two copies of the same walk, and the fleet commission added a
 grant addressed to one sender (`objective:granted`) whose payload is that

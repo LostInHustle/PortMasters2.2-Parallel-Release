@@ -4,7 +4,8 @@
  * Two claims about the tree, both of them the same claim: a thing that
  * nothing reads is a thing the tree pays for and gets nothing back. The
  * first is an exported name that no other file in the tree reads. The
- * second is a module under src/ that no other file in the tree imports.
+ * second is a source file or asset under src/, scripts/ or cloudflare/ that
+ * is neither imported nor named as a package or framework entry point.
  *
  * The tree has been swept for both by hand, several times, and the hand
  * sweep is what let ten dead exports survive it: the first pass at this
@@ -16,14 +17,11 @@
  * this name read anywhere outside the file that declares it", and that
  * question is what this check now asks on every run.
  *
- * What the check cannot catch, said out loud because a gate that reads as
- * stronger than it is worse than none: a name read only by a file that is
- * itself dead, since the orphan half runs on the same tree rather than
- * after it; a module reached only through a dynamic import, of which the
- * tree has two, both in server.ts and both written out in full; and a
- * page under src/app that no link in the tree points at, which the router
- * can still serve and which is a question about navigation rather than
- * about dead code.
+ * What the check cannot catch: an export read only by a file that is itself
+ * dead, since the export half reads the whole tree before the orphan half
+ * reports it; or a page under src/app that no link in the tree points at,
+ * which the router can still serve and which is a question about
+ * navigation rather than dead code.
  *
  * The smoke battery under scripts/smoke counts as readers on purpose. An
  * export the suites drive is exercised on every run, and deleting it would
@@ -47,43 +45,82 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "typescript";
-import { walkSrc, withoutComments } from "./walk-src";
+import { walkFiles, walkSrc } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
 const APP = join(SRC, "app");
+const WORKER = join(ROOT, "cloudflare/worker.ts");
 
 const sourceFiles = [
   ...walkSrc(SRC),
   ...walkSrc(join(ROOT, "scripts")),
+  ...walkSrc(join(ROOT, "cloudflare")),
   join(ROOT, "server.ts"),
 ];
+const STATIC_FILE = /\.(?:css|json|svg)$/;
+const staticFiles = [
+  ...walkFiles(SRC, { match: (_file, name) => STATIC_FILE.test(name) }),
+  join(ROOT, "public/robots.txt"),
+];
+const surfaceFiles = [...sourceFiles, ...staticFiles];
+const surface = new Set(surfaceFiles);
+const packageJson = JSON.parse(
+  readFileSync(join(ROOT, "package.json"), "utf8"),
+) as { scripts: Record<string, string> };
+const scriptEntryPattern = /\btsx\s+(scripts\/[\w./-]+\.ts|server\.ts)\b/g;
+const scriptEntries = new Set(
+  Object.values(packageJson.scripts).flatMap((command) =>
+    [...command.matchAll(scriptEntryPattern)].map((match) =>
+      resolve(ROOT, match[1]),
+    ),
+  ),
+);
 
-// The declarations and the reads are both taken from the code alone. A
-// comment that names an export is a note about the code, not a reader of
-// it, and a commented out import is not an importer: counting either
-// would let a dead surface report itself alive.
-const bodies = new Map<string, string>();
-const identifiers = new Map<string, Map<string, number>>();
-for (const file of sourceFiles) {
-  const text = readFileSync(file, "utf8");
-  bodies.set(file, withoutComments(text));
-  const source = ts.createSourceFile(
-    file,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+const config = ts.readConfigFile(join(ROOT, "tsconfig.json"), ts.sys.readFile);
+if (config.error) {
+  throw new Error(
+    ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
   );
-  const counts = new Map<string, number>();
+}
+const options = ts.parseJsonConfigFileContent(
+  config.config,
+  ts.sys,
+  ROOT,
+).options;
+const program = ts.createProgram({ rootNames: sourceFiles, options });
+const checker = program.getTypeChecker();
+
+// TypeScript resolves references to their declaration, so a same named
+// identifier in an unrelated file cannot keep an export alive.
+const sources = new Map<string, ts.SourceFile>();
+for (const file of sourceFiles) {
+  const source = program.getSourceFile(file);
+  if (source === undefined) throw new Error(`TypeScript did not load ${file}`);
+  sources.set(file, source);
+}
+
+const references = new Map<ts.Symbol, Set<string>>();
+const targetOf = (symbol: ts.Symbol | undefined): ts.Symbol | undefined => {
+  if (symbol === undefined) return undefined;
+  return symbol.flags & ts.SymbolFlags.Alias
+    ? checker.getAliasedSymbol(symbol)
+    : symbol;
+};
+
+for (const [file, source] of sources) {
   const visit = (node: ts.Node) => {
     if (ts.isIdentifier(node)) {
-      counts.set(node.text, (counts.get(node.text) ?? 0) + 1);
+      const target = targetOf(checker.getSymbolAtLocation(node));
+      if (target !== undefined) {
+        const readers = references.get(target) ?? new Set<string>();
+        readers.add(file);
+        references.set(target, readers);
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
-  identifiers.set(file, counts);
 }
 
 /**
@@ -116,6 +153,10 @@ const ROUTER_EXPORTS = new Set([
   "default",
 ]);
 
+// The Worker's exports are read by Wrangler rather than by an import: the
+// class is named in wrangler.jsonc and the default object is the entry.
+const WORKER_EXPORTS = new Set(["GameContainer", "default"]);
+
 const ROUTER_ENTRIES = new Set([
   "page.tsx",
   "layout.tsx",
@@ -129,9 +170,11 @@ const ROUTER_ENTRIES = new Set([
   "icon.tsx",
   "apple-icon.tsx",
   "opengraph-image.tsx",
+  "icon.svg",
   "twitter-image.tsx",
   "sitemap.ts",
   "robots.ts",
+  "robots.txt",
   "manifest.ts",
   "instrumentation.ts",
   "forbidden.tsx",
@@ -142,33 +185,21 @@ const findings: string[] = [];
 
 // The export half.
 
-const DECL =
-  /export\s+(?:declare\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|interface|type|enum|abstract class)\s+([A-Za-z_$][\w$]*)/g;
-const LIST = /export\s*(?:type\s*)?\{([^}]*)\}/g;
-
 for (const file of sourceFiles) {
-  const body = bodies.get(file) as string;
+  const source = sources.get(file) as ts.SourceFile;
   const underApp = file.startsWith(APP);
-  const names = new Set<string>();
-  for (const match of body.matchAll(DECL)) names.add(match[1]);
-  for (const match of body.matchAll(LIST)) {
-    for (const piece of match[1].split(",")) {
-      const name = piece
-        .trim()
-        .split(/\s+as\s+/)
-        .pop()
-        ?.trim();
-      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
-    }
-  }
-  for (const name of names) {
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  if (moduleSymbol === undefined) continue;
+  for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+    const name = exported.getName();
     if (underApp && ROUTER_EXPORTS.has(name)) continue;
-    let reads = 0;
-    for (const [other, counts] of identifiers) {
-      if (other === file) continue;
-      reads += counts.get(name) ?? 0;
-    }
-    if (reads === 0) {
+    if (file === WORKER && WORKER_EXPORTS.has(name)) continue;
+    const target = targetOf(exported);
+    const readers = target === undefined ? undefined : references.get(target);
+    if (
+      readers === undefined ||
+      ![...readers].some((reader) => reader !== file)
+    ) {
       findings.push(
         `${relative(ROOT, file)} exports "${name}", and nothing in the tree reads it.`,
       );
@@ -178,12 +209,39 @@ for (const file of sourceFiles) {
 
 // The orphan half.
 
-/** Every module specifier the tree writes, paired with the file it names. */
-const SPECIFIER = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
+/** Module specifiers in actual import, re-export, dynamic import or require nodes. */
+function moduleSpecifiers(source: ts.SourceFile): string[] {
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier !== undefined &&
+      ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteralLike(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require"))
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return specifiers;
+}
 
 const candidates = (base: string): string[] => [
+  base,
   `${base}.ts`,
   `${base}.tsx`,
+  `${base}.json`,
+  `${base}.css`,
+  `${base}.svg`,
   join(base, "index.ts"),
   join(base, "index.tsx"),
 ];
@@ -195,9 +253,8 @@ const stripExtension = (base: string): string =>
 
 const imported = new Set<string>();
 
-for (const [file, body] of bodies) {
-  for (const match of body.matchAll(SPECIFIER)) {
-    const specifier = match[1];
+for (const [file, source] of sources) {
+  for (const specifier of moduleSpecifiers(source)) {
     let base: string | null = null;
     if (specifier.startsWith("@/")) {
       base = join(SRC, specifier.slice(2));
@@ -209,7 +266,7 @@ for (const [file, body] of bodies) {
       continue;
     }
     for (const candidate of candidates(stripExtension(base))) {
-      if (existsSync(candidate) && bodies.has(candidate)) {
+      if (existsSync(candidate) && surface.has(candidate)) {
         imported.add(candidate);
         break;
       }
@@ -217,8 +274,26 @@ for (const [file, body] of bodies) {
   }
 }
 
-for (const file of walkSrc(SRC)) {
+const CSS_IMPORT = /@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?\s*;/g;
+for (const file of staticFiles.filter((path) => path.endsWith(".css"))) {
+  const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of css.matchAll(CSS_IMPORT)) {
+    const specifier = match[1];
+    if (!specifier.startsWith(".")) continue;
+    const importedFile = resolve(dirname(file), specifier);
+    if (surface.has(importedFile)) imported.add(importedFile);
+  }
+}
+
+for (const file of surfaceFiles) {
   if (imported.has(file)) continue;
+  if (
+    scriptEntries.has(file) ||
+    file === resolve(ROOT, "server.ts") ||
+    file === WORKER
+  ) {
+    continue;
+  }
   const rel = relative(ROOT, file);
   if (
     ROUTER_ENTRIES.has(rel.split("/").pop() as string) &&
@@ -226,14 +301,15 @@ for (const file of walkSrc(SRC)) {
   ) {
     continue;
   }
-  findings.push(`${rel} is a module nothing imports.`);
+  if (file === join(ROOT, "public/robots.txt")) continue;
+  findings.push(`${rel} is a source file or asset nothing imports.`);
 }
 
 // The verdict.
 
 if (findings.length === 0) {
   console.log(
-    `The surface is alive. ${sourceFiles.length} files read, no export without a reader and no module without an importer.`,
+    `The surface is alive. ${surfaceFiles.length} files read, no export without a reader and no source file or asset without a reference or entry point.`,
   );
   process.exit(0);
 }

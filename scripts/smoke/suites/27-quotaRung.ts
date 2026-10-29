@@ -23,6 +23,7 @@ import {
   call,
   check,
   openAuthedSocket,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -449,7 +450,7 @@ export async function quotaRungSuite(
   rungSockets[0].emit("room:restart", { roomId: rungRoomId });
   let unpinned = (await pinned(rungRoomId))?.voyageSeats;
   for (let waited = 0; unpinned !== 0 && waited < 5000; waited += 250) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     unpinned = (await pinned(rungRoomId))?.voyageSeats;
   }
   check(

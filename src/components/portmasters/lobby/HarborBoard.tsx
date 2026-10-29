@@ -33,13 +33,13 @@ import { UNLOCKS } from "@/lib/unlock";
 export function HarborBoard({
   rooms,
   loading,
-  meId,
+  myUserId,
   joining,
   onEnter,
 }: {
   rooms: RoomSummary[];
   loading: boolean;
-  meId: string;
+  myUserId: string;
   joining: string | null;
   onEnter: (room: RoomSummary) => void;
 }) {
@@ -98,7 +98,7 @@ export function HarborBoard({
         const locked = roomLockedFor(
           room.started,
           room.members.map((m) => m.id),
-          meId,
+          myUserId,
         );
         return (
           <motion.div
@@ -148,7 +148,9 @@ export function HarborBoard({
                     🔑 {t(UNLOCKS[room.unlock].label)}
                   </Pill>
                 )}
-                {room.host.id === meId && <Pill tone="gold">{t("Host")}</Pill>}
+                {room.host.id === myUserId && (
+                  <Pill tone="gold">{t("Host")}</Pill>
+                )}
                 {!room.isPublic && <Pill tone="default">{t("Private")}</Pill>}
                 {room.started && (
                   <Pill tone="none" className="bg-sailing/5 text-sailing">

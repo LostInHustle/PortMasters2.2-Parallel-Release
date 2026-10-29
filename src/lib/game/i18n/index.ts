@@ -91,6 +91,20 @@ export function isLocale(value: unknown): value is Locale {
   );
 }
 
+/**
+ * The language a value off storage, a cookie or a wire frame names, or null
+ * when this pack cannot print it. Readers with a fallback of their own ask
+ * this; the doors that answer in the shipped language ask localeOr.
+ */
+export function asLocale(value: unknown): Locale | null {
+  return isLocale(value) ? value : null;
+}
+
+/** The language a value names, or the shipped language where it names none. */
+export function localeOr(value: unknown): Locale {
+  return asLocale(value) ?? DEFAULT_LOCALE;
+}
+
 // The file, as groups of leaves. One cast for the whole walk: the json
 // module types each group by its own keys, and the readers below want
 // one shape over every group rather than nineteen shapes. The $meta

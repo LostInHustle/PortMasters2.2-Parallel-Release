@@ -30,10 +30,9 @@ import { heldCharterCard, heldFlagsOf } from "@/lib/game/held-cards";
 import { PATHS, type PathId } from "@/lib/game/paths";
 import {
   MODIFIER_KEYS,
-  type GameState,
   type ModifierKey,
-  type OrderCard,
-} from "@/lib/game/types";
+} from "@/lib/game/constants/modifiers";
+import type { GameState, OrderCard } from "@/lib/game/types";
 import { answerCharter } from "@/lib/game/engine/charters";
 import * as engineBarrel from "@/lib/game/engine";
 import {

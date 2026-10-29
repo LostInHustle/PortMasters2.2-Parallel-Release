@@ -1,7 +1,8 @@
 "use client";
 
 import { LoanRecord } from "@/types/realtime/loans";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import { refusalHandler } from "@/lib/refusals";
 
@@ -44,18 +45,9 @@ export function useBacking(
   const [loans, setLoans] = useState<OutstandingLoan[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const onAcceptedRef = useRef(onAccepted);
-  useEffect(() => {
-    onAcceptedRef.current = onAccepted;
-  }, [onAccepted]);
-  const onResolvedRef = useRef(onResolved);
-  useEffect(() => {
-    onResolvedRef.current = onResolved;
-  }, [onResolved]);
-  const onCoveredRef = useRef(onCovered);
-  useEffect(() => {
-    onCoveredRef.current = onCovered;
-  }, [onCovered]);
+  const onAcceptedRef = useLatestRef(onAccepted);
+  const onResolvedRef = useLatestRef(onResolved);
+  const onCoveredRef = useLatestRef(onCovered);
 
   useEffect(() => {
     if (!socket) return;
@@ -96,7 +88,7 @@ export function useBacking(
       socket.off("backing:covered", onCoveredEvent);
       socket.off("backing:fail", onFail);
     };
-  }, [socket, roomId, myUserId]);
+  }, [socket, roomId, myUserId, onAcceptedRef, onResolvedRef, onCoveredRef]);
 
   const offer = useCallback(
     (debtId: string, amount: number) => {

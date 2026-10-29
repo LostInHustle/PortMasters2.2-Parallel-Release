@@ -9,6 +9,7 @@
 // gains the goods, ports, and artisans below rather than a name with
 // nothing behind it.
 // =====================================================================
+import type { WorkerTypeId } from "./crew";
 import type { TagList } from "./tags";
 
 export const RESOURCES_TIER0 = ["Hemp", "Silk", "Tea"] as const;
@@ -149,7 +150,11 @@ export const FLEXIBLE_BARTER_SECOND_ATTEMPT_LEVEL = 15;
 
 export const RECIPES: Record<
   string,
-  { materials: Record<string, number>; value: number; worker_type: string }
+  {
+    materials: Record<string, number>;
+    value: number;
+    worker_type: WorkerTypeId;
+  }
 > = {
   "Linen Clothes": { materials: { Hemp: 2 }, value: 15, worker_type: "weaver" },
   "Cotton Clothes": {

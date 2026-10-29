@@ -31,6 +31,7 @@ import {
   ledgerSentences,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   switchFor,
   voyageState,
@@ -392,9 +393,9 @@ export async function theCrewByNameSuite(run: SmokeRun): Promise<LedgerLine[]> {
     });
   };
   reportLarder(true);
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   reportLarder(false);
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
   check(
     larderFrames.length === 2 &&
       larderFrames[0].shortRations === true &&

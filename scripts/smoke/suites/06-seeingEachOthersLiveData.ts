@@ -1,6 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: Seeing each other's live data.
 
-import { check, waitForEvent } from "../harness";
+import { check, sleep, waitForEvent } from "../harness";
 import type { WireMessage } from "../wire";
 import type { Socket } from "socket.io-client";
 
@@ -79,7 +79,7 @@ export async function seeingEachOthersLiveDataSuite(inputs: {
   // Both Lobby sockets have taken delivery of frames the server emitted
   // in the same loop that would have carried the guest's, so a short
   // settle is enough to tell whether the guest was handed one too.
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
   check(
     squareLeaksToSea.length === 0,
     "and is never handed to a captain who took a seat",

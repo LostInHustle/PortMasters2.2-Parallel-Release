@@ -20,7 +20,6 @@ import { rumorLean } from "@/lib/game/engine";
 import type { PortShift } from "@/lib/game/maroon";
 import { unlockedResources } from "@/lib/game/pools";
 import type { Phase } from "@/lib/game/types";
-import { leftTheVoyage } from "@/lib/seat-marks";
 import type { Checkpoint } from "./types";
 import type {
   PhaseAdvanceFrame,
@@ -30,6 +29,7 @@ import { bazaarList, broadcastBazaar } from "./bazaar";
 import { roomChannel } from "./channel";
 import { portShiftFor } from "./maroon";
 import { broadcastRoomSystem, roomMembers } from "./presence";
+import { activeRosterSet } from "./roster";
 import { roomStatuses } from "./status";
 import { noteTelemetry } from "./telemetry";
 import { noteVoyageLog } from "./voyage-log";
@@ -75,22 +75,6 @@ export async function parleyCheckpoint(
   const cp = await getCheckpoint(roomId);
   if (cp.phase !== "parley" || cp.round !== round) return null;
   return cp;
-}
-
-// Harbor members still in the voyage: membership minus anyone bankrupt or at
-// the endgame screen. Based on durable membership rather than live sockets,
-// so a slow-loading captain still counts. leftTheVoyage reads the phase, not
-// seat marks, so a written-off Ocean Gambit seat keeps its place at the
-// table. Exported because the Manifest Audit and the maroon vote count
-// against this roster.
-export async function activeRosterSet(roomId: string): Promise<Set<string>> {
-  const statuses = roomStatuses.get(roomId);
-  const memberIds = await roomMemberIds(roomId);
-  const out = new Set<string>();
-  for (const id of memberIds) {
-    if (!leftTheVoyage(statuses?.get(id))) out.add(id);
-  }
-  return out;
 }
 
 // The captains a seat's ready check waits on: the active roster narrowed to

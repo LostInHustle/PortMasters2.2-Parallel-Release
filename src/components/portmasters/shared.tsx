@@ -129,6 +129,23 @@ export const TONE_WASH: Record<string, string> = {
   intel: "bg-intel/5 text-intel",
 };
 
+/* The ink a signed figure wears: gain above zero and alarm below it. The
+ * caller names the side zero falls on, since a zero balance is good news on
+ * one sheet and no movement on another. */
+export function signInk(
+  value: number,
+  zero: "gain" | "alarm" = "gain",
+): string {
+  if (value > 0) return "text-gain";
+  if (value < 0) return "text-alarm";
+  return zero === "gain" ? "text-gain" : "text-alarm";
+}
+
+/* The ink a yes-or-no figure wears, where yes is the good answer. */
+export function stateInk(ok: boolean): string {
+  return ok ? "text-gain" : "text-alarm";
+}
+
 export function Pill({
   children,
   tone = "default",

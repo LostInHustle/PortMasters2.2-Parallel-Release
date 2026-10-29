@@ -5,13 +5,7 @@
 // =====================================================================
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  DEFAULT_LOCALE,
-  isLocale,
-  LOCALE_COOKIE_NAME,
-  tFor,
-  type Locale,
-} from "./game/i18n";
+import { LOCALE_COOKIE_NAME, localeOr, tFor, type Locale } from "./game/i18n";
 import {
   getUserFromToken,
   SESSION_COOKIE_NAME,
@@ -104,7 +98,7 @@ export async function notFoundResponse(wording: string): Promise<NextResponse> {
 export async function requestLocale(): Promise<Locale> {
   const store = await cookies();
   const value = store.get(LOCALE_COOKIE_NAME)?.value;
-  return isLocale(value) ? value : DEFAULT_LOCALE;
+  return localeOr(value);
 }
 
 // Whether this request reached the app over TLS. The app never terminates
@@ -132,8 +126,12 @@ function reachedOverTls(req: NextRequest): boolean {
 // ride a plain connection the proxy happened to forward. The flag follows
 // the connection the cookie was minted on, which is the connection the
 // browser is actually holding.
+function cookieAttributes(https: boolean): string {
+  return `Path=/; HttpOnly; SameSite=Lax${https ? "; Secure" : ""}`;
+}
+
 function sessionCookie(token: string, maxAgeSec: number, https: boolean) {
-  return `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${https ? "; Secure" : ""}`;
+  return `${SESSION_COOKIE_NAME}=${token}; ${cookieAttributes(https)}; Max-Age=${maxAgeSec}`;
 }
 
 // How long a browser that has seen the game served over TLS should keep
@@ -186,6 +184,5 @@ export function signedInResponse(
 // cookie sitting in the jar after a logout over TLS. The request comes in
 // for the same reading signedInResponse takes from its own.
 export function clearSessionCookie(req: NextRequest) {
-  const secure = reachedOverTls(req) ? "; Secure" : "";
-  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+  return `${SESSION_COOKIE_NAME}=; ${cookieAttributes(reachedOverTls(req))}; Max-Age=0`;
 }

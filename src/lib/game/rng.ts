@@ -54,6 +54,16 @@ export function pick<T>(rng: Rng, arr: readonly T[]): T {
   return arr[Math.floor(rng() * arr.length)];
 }
 
+// Fisher-Yates over a copy, so the caller's array is left alone.
+export function shuffle<T>(rng: Rng, arr: readonly T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 // Seeded weighted choice. items: [value, weight][]
 export function weightedPick<T>(rng: Rng, items: Array<[T, number]>): T {
   const total = items.reduce((s, [, w]) => s + w, 0);

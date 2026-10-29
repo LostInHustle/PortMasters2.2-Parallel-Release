@@ -36,15 +36,11 @@ export function ShipTab({
       </Row>
       <Row label={t("Modules")}>
         <b>
-          {shipLevel === 1
-            ? t("{filled} of {total} module slot", {
-                filled: modules.length,
-                total: shipLevel,
-              })
-            : t("{filled} of {total} module slots", {
-                filled: modules.length,
-                total: shipLevel,
-              })}
+          {t("{filled} of {total} module slot{pluralS}", {
+            filled: modules.length,
+            total: shipLevel,
+            pluralS: shipLevel === 1 ? "" : "s",
+          })}
         </b>
       </Row>
       {modules.length === 0 ? (

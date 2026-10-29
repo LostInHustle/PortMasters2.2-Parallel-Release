@@ -20,8 +20,8 @@
 import type { Server } from "socket.io";
 import { pruneStaleVotes } from "@/lib/game/audit";
 import { roomChannel } from "./channel";
-import { activeRosterSet } from "./checkpoint";
 import type { RoundState } from "./round-state";
+import { activeRosterSet } from "./roster";
 
 /**
  * The count the harbor is told, recounted against the roster as it stands.

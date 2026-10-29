@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import {
+  asLocale,
   DEFAULT_LOCALE,
   getLocale,
   isLocale,
@@ -63,8 +64,7 @@ function readCookieLocale(): Locale | null {
       new RegExp("(?:^|; )" + LOCALE_COOKIE_NAME + "=([^;]*)"),
     );
     if (!match) return null;
-    const stored = decodeURIComponent(match[1]);
-    return isLocale(stored) ? stored : null;
+    return asLocale(decodeURIComponent(match[1]));
   } catch {
     // A hand edited cookie that will not decode names no language.
     return null;
@@ -74,8 +74,8 @@ function readCookieLocale(): Locale | null {
 /** The captain's stored pick, or the shipped language where none is stored. */
 function readStoredLocale(): Locale {
   try {
-    const stored = localStorage.getItem(LANGUAGE_KEY);
-    if (isLocale(stored)) return stored;
+    const stored = asLocale(localStorage.getItem(LANGUAGE_KEY));
+    if (stored) return stored;
   } catch {
     // Private browsing or a disabled storage API: the cookie below stands.
   }

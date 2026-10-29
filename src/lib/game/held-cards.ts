@@ -32,7 +32,8 @@ import { cardById, cardRunsInMode } from "./cards";
 import { HELD_POWER_CAP } from "./constants/cards";
 import type { CardRecord } from "./constants/cards";
 import { normalizeIdList } from "./id-list";
-import type { GameState, ModifierKey } from "./types";
+import type { ModifierKey } from "./constants/modifiers";
+import type { GameState } from "./types";
 
 // ========== The save ==========
 

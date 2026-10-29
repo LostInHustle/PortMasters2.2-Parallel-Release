@@ -87,14 +87,14 @@ type PlaySound = ReturnType<typeof useSound>["play"];
 export function useHarborBoards({
   socket,
   roomId,
-  meId,
+  myUserId,
   act,
   loaded,
   playSound,
 }: {
   socket: Socket | null;
   roomId: string;
-  meId: string;
+  myUserId: string;
   act: Act;
   /** Whether the real voyage has arrived yet. See the held receipts below. */
   loaded: boolean;
@@ -133,7 +133,7 @@ export function useHarborBoards({
 
   const onBarterFulfilled = useCallback(
     (offer: BarterOffer, accepterId: string) => {
-      if (accepterId === meId) {
+      if (accepterId === myUserId) {
         onVoyage((g, l) =>
           acceptBarterOffer(
             g,
@@ -144,7 +144,7 @@ export function useHarborBoards({
             l,
           ),
         );
-      } else if (offer.fromUserId === meId) {
+      } else if (offer.fromUserId === myUserId) {
         onVoyage((g, l) =>
           settleBarterTrade(
             g,
@@ -157,7 +157,7 @@ export function useHarborBoards({
         );
       }
     },
-    [onVoyage, meId],
+    [onVoyage, myUserId],
   );
   // An offer of mine the board has stopped listing: its escrow has to come
   // back, and that is the whole of what this report says. The board never
@@ -210,7 +210,7 @@ export function useHarborBoards({
   const barter = useBarter(
     socket,
     roomId,
-    meId,
+    myUserId,
     onBarterFulfilled,
     onBarterRefund,
     onBarterPostRefused,
@@ -285,7 +285,7 @@ export function useHarborBoards({
   const aid = useAid(
     socket,
     roomId,
-    meId,
+    myUserId,
     onAidGranted,
     onAidRepaid,
     onAidRedirectedClosed,
@@ -294,8 +294,8 @@ export function useHarborBoards({
 
   const onBackingAccepted = useCallback(
     (loan: OutstandingLoan) => {
-      if (loan.backedAmount)
-        onVoyage((g, l) => pledgeBacking(g, loan.backedAmount!, l));
+      const amount = loan.backedAmount;
+      if (amount) onVoyage((g, l) => pledgeBacking(g, amount, l));
     },
     [onVoyage],
   );
@@ -329,7 +329,7 @@ export function useHarborBoards({
   const backing = useBacking(
     socket,
     roomId,
-    meId,
+    myUserId,
     onBackingAccepted,
     onBackingResolved,
     onBackingCovered,
@@ -347,7 +347,7 @@ export function useHarborBoards({
       outcome: VentureOutcome,
       settlements: VentureSettlement[],
     ) => {
-      const mine = settlements.find((s) => s.userId === meId);
+      const mine = settlements.find((s) => s.userId === myUserId);
       if (!mine) return;
       // The purse moves on the receipt, and the receipt waits for the
       // voyage like every other one. The two spoken outcomes below are
@@ -377,7 +377,7 @@ export function useHarborBoards({
         });
       }
     },
-    [meId, onVoyage, playSound],
+    [myUserId, onVoyage, playSound],
   );
   const convoy = useConvoy(
     socket,
@@ -400,12 +400,12 @@ export function useHarborBoards({
   const onEscortSettle = useCallback(
     (contract: EscortContract) => {
       onVoyage((g, l) => {
-        applyEscortSide(g, contract, meId, l);
+        applyEscortSide(g, contract, myUserId, l);
       });
     },
-    [onVoyage, meId],
+    [onVoyage, myUserId],
   );
-  const escort = useEscortContracts(socket, roomId, meId, onEscortSettle);
+  const escort = useEscortContracts(socket, roomId, myUserId, onEscortSettle);
 
   // The bench's relay, which is the escort's shape
   // with one fewer number in it: a refit this captain is a side of has been
@@ -422,12 +422,12 @@ export function useHarborBoards({
   const onRefitSettle = useCallback(
     (refit: RefitContract) => {
       onVoyage((g, l) => {
-        applyRefitSide(g, refit, meId, l);
+        applyRefitSide(g, refit, myUserId, l);
       });
     },
-    [onVoyage, meId],
+    [onVoyage, myUserId],
   );
-  const refit = useRefitContracts(socket, roomId, meId, onRefitSettle);
+  const refit = useRefitContracts(socket, roomId, myUserId, onRefitSettle);
 
   // The market's relay, which is the bench's shape exactly: a trade this
   // captain is a side of has been agreed, and the engine works out what
@@ -446,18 +446,18 @@ export function useHarborBoards({
   const onModuleSettle = useCallback(
     (trade: ModuleTrade) => {
       onVoyage((g, l) => {
-        applyModuleTradeSide(g, trade, meId, l);
+        applyModuleTradeSide(g, trade, myUserId, l);
       });
     },
-    [onVoyage, meId],
+    [onVoyage, myUserId],
   );
-  const modules = useModuleTrades(socket, roomId, meId, onModuleSettle);
+  const modules = useModuleTrades(socket, roomId, myUserId, onModuleSettle);
 
-  // The bazaar's relay, and it is the
-  // shortest of the three because nothing about a rumor moves anything
-  // between captains. There is no settle report to give and no field on
-  // GameState to mirror into, which is the difference between this board
-  // and the other two: a contract's cover has to be read back into a field
+  // The bazaar's relay, and it is the only one of the four markets whose
+  // result moves nothing between captains. There is no settle report to
+  // give and no field on GameState to mirror into, which is the difference
+  // between this board and the other three: a contract's cover has to be
+  // read back into a field
   // because the raid roll consults one, and a refit's whole result lands on
   // the customer's own garment. What a rumor does to a price never touches
   // this hook at all: the lean arrives on the advance frame and is applied
@@ -474,7 +474,7 @@ export function useHarborBoards({
   // this captain's own save: the settled view is the path they sail on, and
   // the harbor's published switch is applied to their own purse and manifest,
   // which is the same shape useMaroon's result handoff takes.
-  const draft = usePathDraft(socket, roomId, meId, act);
+  const draft = usePathDraft(socket, roomId, myUserId, act);
 
   return {
     barter,

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import type { EscortContract } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
 
@@ -11,19 +12,9 @@ import { useConsentBoard } from "./use-consent-board";
 // @/types/realtime).
 export type { EscortContract };
 
-// The events this market speaks on. The channel is the whole of what this
-// hook adds to the shared relay, and it is declared beside the emitters
-// below rather than inlined at the call so a reader can see the five names
-// together (see useConsentBoard in ./use-consent-board).
-const CHANNEL = {
-  update: "contract:update",
-  error: "contract:error",
-  stateRequest: "contract:state:request",
-  field: "contracts",
-  accept: "contract:accept",
-  cancel: "contract:cancel",
-  idField: "contractId",
-} as const;
+// The events this market speaks on, shared with the server's board and
+// handlers (see CONSENT_CHANNELS in @/lib/consent-channels).
+const CHANNEL = CONSENT_CHANNELS.escort;
 
 /**
  * The harbor's escort contract board, as one captain sees it.
@@ -59,7 +50,7 @@ export function useEscortContracts(
     (fee: number, targetUserId?: string) => {
       if (!socket) return;
       clearError();
-      socket.emit("contract:post", { roomId, fee, targetUserId });
+      socket.emit(CHANNEL.post, { roomId, fee, targetUserId });
     },
     [socket, roomId, clearError],
   );
@@ -73,7 +64,7 @@ export function useEscortContracts(
     (contractId: string) => {
       if (!socket) return;
       clearError();
-      socket.emit("contract:decline", { roomId, contractId });
+      socket.emit(CHANNEL.decline, { roomId, contractId });
     },
     [socket, roomId, clearError],
   );
@@ -87,7 +78,7 @@ export function useEscortContracts(
     (contractId: string, raidGold: number) => {
       if (!socket) return;
       clearError();
-      socket.emit("contract:claim", { roomId, contractId, raidGold });
+      socket.emit(CHANNEL.claim, { roomId, contractId, raidGold });
     },
     [socket, roomId, clearError],
   );

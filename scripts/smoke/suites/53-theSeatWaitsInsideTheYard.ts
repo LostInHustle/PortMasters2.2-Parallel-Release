@@ -40,6 +40,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -178,18 +179,17 @@ export async function theSeatWaitsInsideTheYardSuite(
     for (let waited = 0; waited < 15000; waited += 50) {
       if (standing(step)) return true;
       if (waited % 500 === 0) for (const seat of crew) report(seat, step);
-      await new Promise((r) => setTimeout(r, 50));
+      await sleep(50);
     }
     return standing(step);
   };
   const settled = async (read: () => boolean, ms: number) => {
     for (let waited = 0; waited < ms; waited += 100) {
       if (read()) return true;
-      await new Promise((r) => setTimeout(r, 100));
+      await sleep(100);
     }
     return read();
   };
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // Every read below is a count against what it was a moment ago rather
   // than against zero, so a frame from an earlier step can never stand in
   // for one this step is watching for.
@@ -207,7 +207,7 @@ export async function theSeatWaitsInsideTheYardSuite(
     () => (heard[0].standing?.readyUserIds ?? []).length === 1,
     4000,
   );
-  await wait(1500);
+  await sleep(1500);
   check(
     counts().every((count, i) => count === beforeMate[i]),
     "one ready vote at Dusk moves nothing while the other captain stands at the seat",
@@ -221,7 +221,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   // while the vote stands.
   const beforeDraft = counts();
   report(crew[0], { round: 1, phase: "module_draft" });
-  await wait(2500);
+  await sleep(2500);
   check(
     counts().every((count, i) => count === beforeDraft[i]),
     "opening the module draft moves nothing, because the harbor waits on the captain inside the yard",
@@ -235,7 +235,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   // screens are two names a fix could have covered one of.
   const beforeSwap = counts();
   report(crew[0], { round: 1, phase: "module_swap" });
-  await wait(2000);
+  await sleep(2000);
   check(
     counts().every((count, i) => count === beforeSwap[i]),
     "and the swap screen is the same wait for the same reason",
@@ -247,7 +247,7 @@ export async function theSeatWaitsInsideTheYardSuite(
   // which is what this holds down.
   const beforeAct = counts();
   report(crew[0], { round: 1, phase: "dusk" }, 140);
-  await wait(1500);
+  await sleep(1500);
   check(
     counts().every((count, i) => count === beforeAct[i]),
     "an upgrade at the seat moves nothing either, so neither half of the report was a gap in the seat's own rules",
@@ -326,7 +326,7 @@ export async function theSeatWaitsInsideTheYardSuite(
     () => (heard[0].standing?.readyUserIds ?? []).length === 1,
     4000,
   );
-  await wait(1500);
+  await sleep(1500);
   check(
     counts().every((count, i) => count === beforeTheYard[i]),
     "so the mate's vote moves nothing while the draft captain is inside the yard, which is the half of the report a vote left standing used to walk straight past",

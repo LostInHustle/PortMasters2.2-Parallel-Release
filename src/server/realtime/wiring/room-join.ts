@@ -5,6 +5,7 @@
 import { type ObjectiveProgressPayload } from "@/types/realtime/objectives";
 import type { Server, Socket } from "socket.io";
 
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { db } from "@/lib/db";
 import { normalizeMode } from "@/lib/game/mode";
 import { NOT_A_HARBOR_MEMBER } from "@/lib/game/constants/copy";
@@ -135,7 +136,7 @@ export function wireRoomJoin(
     // rather than the harbor's because two captains can legitimately be
     // owed two different boards.
     io.to(socket.id).emit(
-      "contract:update",
+      CONSENT_CHANNELS.escort.update,
       escortContracts.payloadFor(roomId, s.userId),
     );
     // And the bench's, on the same reasoning: a
@@ -143,7 +144,7 @@ export function wireRoomJoin(
     // answered with their own view of the board, because a direct offer
     // is one captain's business and the harbor's board is not.
     io.to(socket.id).emit(
-      "refit:update",
+      CONSENT_CHANNELS.refit.update,
       refitContracts.payloadFor(roomId, s.userId),
     );
     // And the module market's, on the same reasoning as the two
@@ -151,7 +152,7 @@ export function wireRoomJoin(
     // and is answered with their own view, because a direct offer is one
     // captain's business and the harbor's board is not.
     io.to(socket.id).emit(
-      "module:update",
+      CONSENT_CHANNELS.module.update,
       moduleTrades.payloadFor(roomId, s.userId),
     );
     // And the bazaar's, which needs one

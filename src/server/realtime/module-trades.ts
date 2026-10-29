@@ -18,12 +18,13 @@
 // does with their side of it is the only place their purse and their hull
 // change (see applyModuleTradeSide in @/lib/game/engine/modules).
 // =====================================================================
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { visibleConsent, type ModuleTrade } from "@/lib/game/engine";
 import type { ModuleTradeBoard } from "@/types/realtime/boards";
 import { consentBoard } from "./consent";
 
 export const moduleTrades = consentBoard<ModuleTrade, ModuleTradeBoard>({
-  event: "module:update",
+  event: CONSENT_CHANNELS.module.update,
   visible: visibleConsent,
   pack: (roomId, moduleTrades) => ({ roomId, moduleTrades }),
 });

@@ -240,13 +240,16 @@ async function endAccountSessions(
     });
   }
 
+  closeSockets(io, socketIds, message);
+}
+
+// The last line a closed connection hears, read by whoever is holding it
+// in that socket's own language. Every operator action that ends a session
+// closes it the same way, so the event and its shape are written once.
+function closeSockets(io: Server, socketIds: string[], message: string): void {
   for (const socketId of socketIds) {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) continue;
-    // The same event every other refusal to authenticate uses, because
-    // that is what has just happened to this connection: it is no longer
-    // an authenticated captain. The message carries the reason, and the
-    // client's existing handler puts it on the sign in screen.
     socket.emit("auth:fail", {
       error: tFor(sockets.get(socketId)?.locale ?? DEFAULT_LOCALE, message),
     });
@@ -549,19 +552,7 @@ async function purgeResolved(
 
   await db.user.delete({ where: { id: target.id } });
 
-  for (const socketId of socketIds) {
-    const socket = io.sockets.sockets.get(socketId);
-    if (!socket) continue;
-    // The account is gone, so this is the last line it will hear, read by
-    // whoever is holding the socket, in that socket's own language.
-    socket.emit("auth:fail", {
-      error: tFor(
-        sockets.get(socketId)?.locale ?? DEFAULT_LOCALE,
-        PURGED_ACCOUNT,
-      ),
-    });
-    socket.disconnect(true);
-  }
+  closeSockets(io, socketIds, PURGED_ACCOUNT);
   return { ok: true };
 }
 

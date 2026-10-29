@@ -15,6 +15,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -110,7 +111,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   // the way any real voyage does. What that hand is does not matter
   // below, because every card in it is overwritten a few lines down.
   revSockets[0].emit("room:start", { roomId: revRoomId });
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await sleep(800);
   check(
     (await db.voyageRole.count({ where: { roomId: revRoomId } })) ===
       revCrew.length,
@@ -356,7 +357,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   const revArrived = () =>
     revCrew.every((captain) => (revSeen.get(captain.id)?.length ?? 0) > 0);
   for (let waited = 0; !revArrived() && waited < 10000; waited += 250) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   const revPaid = revSeen.get(revPirate.id)?.[0];
   check(
@@ -492,7 +493,7 @@ export async function revealAndTheReplaySuite(run: SmokeRun): Promise<{
   // that kept it would tell its next table a story about other people.
   revSockets[0].emit("room:restart", { roomId: revRoomId });
   const revStale = await (async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await sleep(1200);
     const socket = await openAuthedSocket(revNew);
     run.sockets.push(socket);
     const frame = waitForEvent<WireReveal>(

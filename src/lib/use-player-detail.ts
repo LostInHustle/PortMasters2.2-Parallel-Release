@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import type { GameState } from "@/lib/game/types";
 import type { CardRecord } from "@/lib/game/constants/cards";
@@ -71,7 +72,7 @@ export function usePlayerDetail(
   // left with a "loading" row and no snapshot, or a snapshot with the row
   // still spinning, and neither is a fact the hook should be able to hold.
   const [peeks, setPeeks] = useState<Record<string, Peek>>({});
-  const myDetailRef = useRef(myDetail);
+  const myDetailRef = useLatestRef(myDetail);
 
   // The one write a row gets. A patch rather than a whole row, because
   // the two events that touch a row touch different halves of it: a
@@ -87,10 +88,6 @@ export function usePlayerDetail(
       },
     }));
   }, []);
-  useEffect(() => {
-    myDetailRef.current = myDetail;
-  }, [myDetail]);
-
   // One timer per captain being asked about, so a second press resets the
   // wait rather than stacking a second clock on the same row.
   const peekTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -167,7 +164,7 @@ export function usePlayerDetail(
       socket.off("player:detail:request", onRequest);
       socket.off("player:detail:response", onResponse);
     };
-  }, [socket, roomId, answers, stopWaiting, setPeek]);
+  }, [socket, roomId, answers, stopWaiting, setPeek, myDetailRef]);
 
   const requestDetail = useCallback(
     (targetUserId: string) => {

@@ -189,6 +189,11 @@ export const MANUAL = readFileSync(
   "utf8",
 );
 
+/** Wait for a realtime frame to land before the next assertion reads it. */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function check(condition: boolean, description: string): void {
   if (condition) {
     console.log(`  ok    ${description}`);

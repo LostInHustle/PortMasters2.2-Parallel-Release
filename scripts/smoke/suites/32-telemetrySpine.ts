@@ -19,6 +19,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -335,7 +336,7 @@ export async function telemetrySpineSuite(
         select: { currentRound: true, currentPhase: true },
       });
       if (row?.currentRound === round && row.currentPhase === phase) return;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await sleep(100);
     }
     throw new Error(`The harbor never reached round ${round} at ${phase}.`);
   };
@@ -370,7 +371,7 @@ export async function telemetrySpineSuite(
     for (let waited = 0; waited < 12000; waited += 250) {
       const found = await telStored(roomId);
       if (found.length) return found[0];
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
     }
     return (await telStored(roomId))[0];
   };
@@ -496,7 +497,7 @@ export async function telemetrySpineSuite(
   // own, so a refusal is the only way either could appear.
   telRoundReport(sailCast, 99, 1, 1, 1);
   telRoundReport(sailCast, 0, 1, 1, 1);
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
 
   // The Parley ends and the standing offer goes back to its poster, which
   // is the expired line. The checkpoint has to move forward off the table
@@ -548,7 +549,7 @@ export async function telemetrySpineSuite(
   telRoundReport(sailHome, 2, 2, 1, 1, undefined, undefined, {
     foodSpend: 120,
   });
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
 
   // ========== the two votes, at their own rungs ==========
   // Two of three carries both, and the record keeps the nominations and
@@ -565,7 +566,7 @@ export async function telemetrySpineSuite(
     round: 5,
     targetUserId: telCast.id,
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
 
   await telStand(sailHome, sailRoomId, 9, "parley");
   sailHome.emit("maroon:vote", {
@@ -578,7 +579,7 @@ export async function telemetrySpineSuite(
     round: 9,
     targetUserId: telCast.id,
   });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
 
   // ========== the captain who walks out ==========
   // The ordinary Leave button, in the order the client sends it: the
@@ -598,7 +599,7 @@ export async function telemetrySpineSuite(
     castSeat.status === 200 && castMembership === null,
     "a captain gives up their seat mid round, through the same route the Leave button uses",
   );
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await sleep(400);
 
   // ========== the ending ==========
   const sailEnds = waitForEvent<{ roomId?: string }>(
@@ -978,7 +979,7 @@ export async function telemetrySpineSuite(
     roomId: wipeRoom.roomId,
     content: "Wreck ahead.",
   });
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
   const wipeFrame = waitForEvent<{ roomId?: string }>(
     wipeSolo,
     "room:restarted",
@@ -1025,7 +1026,7 @@ export async function telemetrySpineSuite(
     roomId: wipeRoom.roomId,
     content: "New voyage.",
   });
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   const wipeAfter = await telStored(wipeRoom.roomId);
   check(
     wipeAfter.length === 1 && wipeAfter[0]?.row.record === wipeStored,

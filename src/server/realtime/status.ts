@@ -4,7 +4,7 @@
 // Last known game status per (harbor, user) so late joiners can hydrate
 // the roster immediately instead of seeing "loading" until the next
 // broadcast. Split out of presence.ts because the status cache is
-// read by several modules (presence for the dedupe, checkpoint for
+// read by several modules (presence for the dedupe, roster for
 // activeRosterSet, surge for combinedReputation, conclusion for the
 // finisher loop) and each of those should import from one place
 // rather than reaching into presence's internals.

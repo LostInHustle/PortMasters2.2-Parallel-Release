@@ -30,6 +30,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -175,7 +176,7 @@ export async function theLateCaptainAtTheMarketSuite(
     for (let waited = 0; waited < 15000; waited += 50) {
       if (at(step)) return true;
       if (waited % 500 === 0) for (const seat of crew) report(seat, step);
-      await new Promise((r) => setTimeout(r, 50));
+      await sleep(50);
     }
     return at(step);
   };
@@ -191,7 +192,7 @@ export async function theLateCaptainAtTheMarketSuite(
   const settled = async (read: () => boolean, ms: number) => {
     for (let waited = 0; waited < ms; waited += 100) {
       if (read()) return true;
-      await new Promise((r) => setTimeout(r, 100));
+      await sleep(100);
     }
     return read();
   };

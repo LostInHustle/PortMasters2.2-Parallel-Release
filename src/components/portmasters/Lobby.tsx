@@ -1063,7 +1063,7 @@ export function Lobby({
                     <HarborBoard
                       rooms={rooms}
                       loading={loadingRooms}
-                      meId={me.id}
+                      myUserId={me.id}
                       joining={joining}
                       onEnter={enterRoom}
                     />

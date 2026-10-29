@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import type { ModuleTrade } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
 
@@ -11,17 +12,9 @@ import { useConsentBoard } from "./use-consent-board";
 // @/types/realtime).
 export type { ModuleTrade };
 
-// The events this market speaks on, named in one place for the reason the
-// two markets before it name theirs (see ./use-consent-board).
-const CHANNEL = {
-  update: "module:update",
-  error: "module:error",
-  stateRequest: "module:state:request",
-  field: "moduleTrades",
-  accept: "module:accept",
-  cancel: "module:cancel",
-  idField: "tradeId",
-} as const;
+// The events this market speaks on, shared with the server's board and
+// handlers (see CONSENT_CHANNELS in @/lib/consent-channels).
+const CHANNEL = CONSENT_CHANNELS.module;
 
 /**
  * The harbor's module market, as one captain sees it.
@@ -61,7 +54,7 @@ export function useModuleTrades(
     (fee: number, moduleId: string, targetUserId?: string) => {
       if (!socket) return;
       clearError();
-      socket.emit("module:post", {
+      socket.emit(CHANNEL.post, {
         roomId,
         fee,
         module: moduleId,

@@ -61,7 +61,7 @@
 import { LOCALES, type Locale } from "../i18n";
 import type { GameMode } from "../mode";
 import type { PathId } from "../paths";
-import type { ModifierKey } from "../types";
+import type { ModifierKey } from "./modifiers";
 import type { Tag, TagList } from "./tags";
 import { MILESTONE_TRIGGERS, type MilestoneTrigger } from "./milestones";
 

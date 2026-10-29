@@ -27,7 +27,7 @@ import {
 import { tFor, type Locale } from "@/lib/game/i18n";
 import type { Phase } from "@/lib/game/types";
 import { auditSpentRound, auditSpentReason } from "../audit";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
 import { makeFail, marketOffRefusal, type MarketName } from "./fail";
 
@@ -128,9 +128,10 @@ type ConsentAcceptPayload = {
   [key: string]: unknown;
 };
 
-// What a market answers to the questions the post frame asks. Every field here
-// is a difference between the three markets; the questions live in the frame.
-export type ConsentPostSpec<T extends ConsentTerms> = {
+// The questions every consent frame asks before its own: the board it reads,
+// the switch it sits under, and the spend that closes it. Both specs below
+// build on this shape, so a market field added to the frame is added once.
+type ConsentFrameSpec<T extends ConsentTerms> = {
   board: (roomId: string) => T[];
   market: MarketName;
   errorEvent: string;
@@ -138,6 +139,13 @@ export type ConsentPostSpec<T extends ConsentTerms> = {
   phase: Phase;
   // The refusal for another phase, in the presser's language.
   phaseRefusal: (locale: Locale) => string;
+  // The audit's spend that closes this market, where it has one.
+  auditSpend?: string;
+};
+
+// What a market answers to the questions the post frame asks. Every field here
+// is a difference between the three markets; the questions live in the frame.
+export type ConsentPostSpec<T extends ConsentTerms> = ConsentFrameSpec<T> & {
   // The term a post names, where the market has one.
   term?: {
     // The term off the wire, or null when none.
@@ -145,8 +153,6 @@ export type ConsentPostSpec<T extends ConsentTerms> = {
     known: (term: string) => boolean;
     refusal: (locale: Locale) => string;
   };
-  // The audit's spend that closes this market, where it has one.
-  auditSpend?: string;
   selfRefusal: (locale: Locale) => string;
   // The market's own bound on a seller, where it has one.
   bound?: {
@@ -276,21 +282,13 @@ export async function postConsentOffer<T extends ConsentTerms>(
 }
 
 // What a market answers to the questions the accept frame asks.
-export type ConsentAcceptSpec<T extends ConsentTerms> = {
-  board: (roomId: string) => T[];
-  market: MarketName;
-  errorEvent: string;
-  on: (mode: unknown) => boolean;
+export type ConsentAcceptSpec<T extends ConsentTerms> = ConsentFrameSpec<T> & {
   // The payload key the row's id arrives under, a wire contract.
   idKey: "contractId" | "tradeId";
-  phase: Phase;
-  phaseRefusal: (locale: Locale) => string;
   missingRefusal: (locale: Locale) => string;
   // The refusal for a row that is on the board but is not an offer.
   statusRefusal?: (row: T, locale: Locale) => string | null;
   selfRefusal: (locale: Locale) => string;
-  // The audit spend that closes this market, where it has one.
-  auditSpend?: string;
   busy?: (
     rows: T[],
     opening: T,
@@ -325,11 +323,11 @@ export async function acceptConsentOffer<T extends ConsentTerms>(
   spec: ConsentAcceptSpec<T>,
   commit: (accepted: ConsentAccepted<T>) => void,
 ): Promise<boolean> {
-  const s = requireAuth(socket);
+  const s = seated(socket, payload);
   if (!s) return false;
-  const roomId = payload?.roomId ?? s.roomId;
+  const { roomId } = s;
   const id = payload?.[spec.idKey] as string | undefined;
-  if (!roomId || roomId !== s.roomId || !id) return false;
+  if (!id) return false;
   const fail = makeFail(socket, roomId, spec.errorEvent);
   if (!spec.on(s.mode)) {
     fail(marketOffRefusal(spec.market, s.locale));

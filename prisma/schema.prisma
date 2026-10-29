@@ -212,7 +212,7 @@ model VoyageRole {
   flourish String?
   // Write only, on purpose: the moment a role was dealt is a record of
   // when it happened, kept the same way CaptainMerit.earnedAt is, and no
-  // reader has needed it yet. Docs: BUFF_AUDIT.md, the deliberate keeps.
+  // reader has needed it yet. Docs: BOON_AUDIT.md, the deliberate keeps.
   drawnAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

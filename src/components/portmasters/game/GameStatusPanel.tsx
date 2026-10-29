@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  maintenanceDue,
-  unlockedWorkerRoster,
-  wagesDue,
-} from "@/lib/game/engine";
+import { duesBill, unlockedWorkerRoster } from "@/lib/game/engine";
 import { onShortRations } from "@/lib/game/larder";
 import { survivalLayerOn } from "@/lib/game/flags";
 import {
@@ -117,10 +113,12 @@ export function GameStatusPanel({
   // rail and the settle sheet quote one number each rather than two
   // walks of the same list that can only agree by accident.
   const roster = unlockedWorkerRoster(game);
-  const pendWages = wagesDue(game);
-  const pendMaint = maintenanceDue(game);
-  const pendTotal = pendWages + pendMaint;
-  const safe = game.money >= pendTotal;
+  const {
+    wages: pendWages,
+    maintenance: pendMaint,
+    total: pendTotal,
+    affordable: safe,
+  } = duesBill(game);
   const nW = crewSize(game);
   const duesAlert = (showObligations && !safe) || game.debts.length > 0;
 

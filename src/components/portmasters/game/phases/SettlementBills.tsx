@@ -1,18 +1,13 @@
 "use client";
 
 import { cardName } from "@/lib/game/cards";
-import {
-  leavePhase,
-  maintenanceDue,
-  wageBill,
-  wagesDue,
-} from "@/lib/game/engine";
+import { duesBill, leavePhase, wageBill } from "@/lib/game/engine";
 import { listJoiner, t } from "@/lib/game/i18n";
 import { crewSize } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import { PhaseHeading, ReadyFooter, type PhasePanelProps } from "./PhaseShared";
-import { Notice } from "../../shared";
+import { Notice, signInk } from "../../shared";
 import { HarborAid } from "./SettlementAid";
 import { LoanBacking } from "./SettlementBacking";
 import { LedgerRow } from "../status/Rows";
@@ -70,12 +65,14 @@ export function SettlementBills({
   // charter's Coppersmith or Potter for less than the engine charges a
   // breath later.
   const bill = wageBill(game);
-  const wages = wagesDue(game);
+  const {
+    wages,
+    maintenance: maintCost,
+    total: totalDue,
+    affordable: canAfford,
+  } = duesBill(game);
   const nWorkers = crewSize(game);
   const sponsored = bill.reduce((sum, b) => sum + b.sponsored, 0);
-  const maintCost = maintenanceDue(game);
-  const totalDue = wages + maintCost;
-  const canAfford = game.money >= totalDue;
   const balanceAfter = game.money - totalDue;
   const shortfall = Math.max(1, totalDue - game.money);
 
@@ -198,12 +195,7 @@ export function SettlementBills({
           </span>
         </BillRow>
         <BillRow label={t("After Settlement")}>
-          <span
-            className={cn(
-              "font-bold",
-              balanceAfter >= 0 ? "text-gain" : "text-alarm",
-            )}
-          >
+          <span className={cn("font-bold", signInk(balanceAfter))}>
             {t("{contract.fee} Gold", { "contract.fee": balanceAfter })}
           </span>
         </BillRow>

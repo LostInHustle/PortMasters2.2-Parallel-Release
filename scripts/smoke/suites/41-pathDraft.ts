@@ -50,6 +50,7 @@ import {
   ledgerSentences,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   voyageState,
   waitForEvent,
@@ -892,7 +893,7 @@ export async function pathDraftSuite(
     "when the last card is laid the draft settles and every seat is told the path it sails on, which is the card that captain held on to: the whole of the result rides the settled view rather than a frame of its own",
   );
   for (let waited = 0; takenLines.length < 2 && waited < 8000; waited += 100) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await sleep(100);
   }
   check(
     takenLines.length === 2 &&
@@ -1101,7 +1102,7 @@ export async function pathDraftSuite(
       waited < 5000;
       waited += 250
     ) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
       row = await draftRoomRow();
     }
     return row;
@@ -1270,7 +1271,7 @@ export async function pathDraftSuite(
   // Long enough for a second departure to have announced itself and sent
   // a second hand if the claim had missed it: a departure's whole body
   // runs in well under this once its reads are warm.
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   check(
     raceCards?.hand.length === DRAFT_DEAL &&
       raceStarts === 1 &&

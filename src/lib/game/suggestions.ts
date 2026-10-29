@@ -1,9 +1,6 @@
 import { cardText } from "@/lib/game/cards";
-import {
-  flatWorkerRoster,
-  type GameState,
-  type ModifierKey,
-} from "@/lib/game/types";
+import type { ModifierKey } from "@/lib/game/constants/modifiers";
+import { flatWorkerRoster, type GameState } from "@/lib/game/types";
 import type { CardRecord } from "@/lib/game/constants/cards";
 import {
   basePriceRange,

@@ -60,10 +60,6 @@ type VotePress = {
  * the frame the harbor reads back cannot drift apart.
  */
 export type VoteChannel<P extends VotePress = VotePress> = {
-  /** The event a tally arrives on. */
-  tally: string;
-  /** The event a refusal arrives on. */
-  error: string;
   /** The event this client asks for the count on. */
   stateRequest: string;
   /** The event a nomination is sent on. */

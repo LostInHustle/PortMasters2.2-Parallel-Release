@@ -21,6 +21,7 @@ import {
   carriesADash,
   check,
   openAuthedSocket,
+  sleep,
   suffix,
   voyageState,
   waitForEvent,
@@ -262,7 +263,7 @@ export async function publicOffersSuite(
       boonFrames.push({ socket: index, ledger: payload });
     });
   });
-  const boonSettle = () => new Promise((resolve) => setTimeout(resolve, 400));
+  const boonSettle = () => sleep(400);
 
   // The cards the reports below put on the table, taken from the same
   // catalogue the server reads them against: three the round draft deals
@@ -561,7 +562,7 @@ export async function publicOffersSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     boonReopened = await boonRoomRow();
   }
   check(

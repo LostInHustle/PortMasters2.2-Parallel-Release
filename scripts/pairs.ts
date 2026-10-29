@@ -26,9 +26,8 @@ import {
   parseHeldCards,
   readPairs,
 } from "@/lib/game/combinations";
-import { ratePercent } from "@/lib/game/balance";
 import { db } from "@/lib/db";
-import { runReport } from "./report";
+import { rateCell, runReport } from "./report";
 
 async function main(): Promise<void> {
   const rows = await db.voyageChronicle.findMany({
@@ -64,10 +63,8 @@ async function main(): Promise<void> {
       `${pair.aName} + ${pair.bName}`.padEnd(40),
       String(pair.appearances).padStart(6),
       String(pair.wins).padStart(6),
-      pair.rate === null
-        ? "n/a".padStart(7)
-        : ratePercent(pair.rate).padStart(7),
-      ratePercent(pair.share).padStart(8),
+      rateCell(pair.rate),
+      rateCell(pair.share, 8),
       pair.flags.length > 0 ? ` ${pair.flags.join(", ")}` : "",
     ];
     console.log(cells.join("  "));

@@ -1,9 +1,11 @@
 /**
- * The walk over the source tree.
+ * The walks over the tree.
  *
- * Every source file under a directory, for a check whose claim is about
- * the tree rather than about a file. Read only, and only .ts and .tsx:
- * the claim every caller makes is about source.
+ * Every file under a directory, for a check whose claim is about the tree
+ * rather than about a file. walkSrc keeps only .ts and .tsx, which is the
+ * claim the source checks make; walkFiles is the same recursion for the
+ * prose gate, which reads documents rather than source and skips the
+ * generated directories a document walk has no reason to enter.
  *
  * The comment stripper lives here as well, for the same reason the walk
  * does: a check that reads the code of a file rather than the words
@@ -28,17 +30,30 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-export function walkSrc(dir: string): string[] {
+type WalkOptions = {
+  /** Directory names not to descend into. */
+  skip?: (name: string) => boolean;
+  /** Whether a file at this path belongs in the walk. */
+  match: (file: string, name: string) => boolean;
+};
+
+/** Every file under a directory, filtered by the caller's one predicate. */
+export function walkFiles(dir: string, options: WalkOptions): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
-      out.push(...walkSrc(full));
+      if (options.skip?.(entry)) continue;
+      out.push(...walkFiles(full, options));
       continue;
     }
-    if (/\.tsx?$/.test(entry)) out.push(full);
+    if (options.match(full, entry)) out.push(full);
   }
   return out;
+}
+
+export function walkSrc(dir: string): string[] {
+  return walkFiles(dir, { match: (_file, name) => /\.tsx?$/.test(name) });
 }
 
 /**

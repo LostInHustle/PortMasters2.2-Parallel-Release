@@ -16,6 +16,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -273,7 +274,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
     for (let waited = 0; waited < windowMs; waited += 250) {
       const found = seat.frames.find(match);
       if (found) return found;
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
     }
     return seat.frames.find(match) ?? null;
   };
@@ -289,7 +290,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
       if (row) {
         return { outcome: row.outcome, record: readStoredRecord(row.record) };
       }
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
     }
     return null;
   };
@@ -440,7 +441,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
     waited < 8000 && yDuskReadies().length < 2;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
   }
   check(
     yArmed !== null &&
@@ -522,7 +523,7 @@ export async function harborClockSuite(run: SmokeRun): Promise<void> {
     (frame) => frame.event === "phase:advance" && frame.phase === "dawn",
     windowMs,
   );
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  await sleep(5000);
 
   check(
     advancedA?.round === 1 && advancedA?.phase === "dawn",

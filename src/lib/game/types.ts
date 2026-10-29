@@ -1,6 +1,7 @@
 import { WORKER_TYPE_IDS, type WorkerTypeId } from "./constants/crew";
 import type { CardTally } from "./cards";
 import type { CardRecord } from "./constants/cards";
+import type { ModifierKey } from "./constants/modifiers";
 import type { MilestoneTrigger } from "./constants/milestones";
 import { ITEMS, STARTING_STOCK } from "./constants/goods";
 import { LARDER_START, type FoodId } from "./constants/supplies";
@@ -83,46 +84,6 @@ type IntelItem = { item: string; port: string };
 // A finished good a captain can produce. Names must exist in PRODUCTS
 // (./constants); kept as a plain string so new goods need no type change.
 type Product = string;
-
-// Known keys a boon can write into GameState.modifierFlags. Exported as a
-// runtime array so the content check can verify exactly one card writes each;
-// ModifierKey is derived from it. Keys from "steady_rations" on belong to held
-// cards (milestone boons and charters) and are disjoint from round-card keys.
-export const MODIFIER_KEYS = [
-  "transport_flat_discount",
-  "transport_silk_discount",
-  "purchase_discount",
-  "worker_bonus_production",
-  "instant_gold",
-  "income_tax_override",
-  "hemp_price_reduction",
-  "hire_discount",
-  "free_intel",
-  "charter_order_bonus",
-  "vat_discount",
-  "extra_order",
-  "escort_discount",
-  "pirate_risk_discount",
-  "exotic_order_bonus",
-  "steady_rations",
-  "cold_hardened",
-  "route_mastery",
-  "harbor_credit",
-  "fleet_color",
-  "transport_per_lot_discount",
-  "manifest_order_bonus",
-  "guns_risk_discount",
-  "standing_escort_discount",
-  "loom_extra_produce",
-  "loom_sale_bonus",
-  "voyage_purchase_discount",
-  "voyage_dues_discount",
-  "factor_borrows",
-  "factor_penalty",
-  "marque_salvage",
-] as const;
-
-export type ModifierKey = (typeof MODIFIER_KEYS)[number];
 
 export type Worker = {
   task: Product | null;

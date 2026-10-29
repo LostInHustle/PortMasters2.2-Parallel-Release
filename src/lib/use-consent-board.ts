@@ -1,39 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
+import { type ConsentChannel } from "@/lib/consent-channels";
 import { consentSettled, type ConsentTerms } from "@/lib/game/engine";
 import { guardedRefusalHandler } from "@/lib/refusals";
-
-/**
- * The channel one kind of agreement speaks on, which is the whole of what
- * the two markets differ on at this layer.
- *
- * A channel is event names and a field name rather than a callback that
- * parses a board, because both kinds receive the same shape on the wire and
- * only call it different things: `{roomId, contracts}` for the escort
- * contract market and `{roomId, refits}` for the refit bench, each named once
- * on the server where it is packed (see consentBoard in src/server/realtime). The
- * field name is a contract with every client already connected, so it is
- * read here as the string the server sent rather than inferred from the
- * kind.
- */
-type ConsentChannel = {
-  /** The event a personalized board arrives on. */
-  update: string;
-  /** The event a refusal arrives on. */
-  error: string;
-  /** The event this client asks for the board on. */
-  stateRequest: string;
-  /** The field the rows arrive in. */
-  field: string;
-  /** The event a buyer's acceptance speaks on. */
-  accept: string;
-  /** The event a seller's withdrawal speaks on. */
-  cancel: string;
-  /** The field a row's id travels in, on both of the two presses above. */
-  idField: string;
-};
 
 /**
  * One captain's view of one kind's board: a thin relay around a consent
@@ -92,10 +64,7 @@ export function useConsentBoard<T extends ConsentTerms>(
   // settled.
   const shownRef = useRef<Map<string, string>>(new Map());
 
-  const onSettleRef = useRef(onSettle);
-  useEffect(() => {
-    onSettleRef.current = onSettle;
-  }, [onSettle]);
+  const onSettleRef = useLatestRef(onSettle);
 
   useEffect(() => {
     if (!socket) return;
@@ -144,7 +113,7 @@ export function useConsentBoard<T extends ConsentTerms>(
       socket.off(channel.update, onUpdate);
       socket.off(channel.error, onBoardError);
     };
-  }, [socket, roomId, myUserId, channel]);
+  }, [socket, roomId, myUserId, channel, onSettleRef]);
 
   const clearError = useCallback(() => setError(null), []);
 

@@ -5,7 +5,7 @@ import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Term } from "../../Term";
-import { PanelLabel } from "../../shared";
+import { PanelLabel, stateInk } from "../../shared";
 import { loanSettleLine } from "../phases/SettlementAid";
 import { PanelTotal } from "../phases/PhasePanels";
 import { Row, SubRow } from "./Rows";
@@ -94,9 +94,7 @@ export function DuesTab({
               <span className="text-xs font-semibold">{t("💸 Total Due")}</span>
             }
           >
-            <span
-              className={cn("font-bold", safe ? "text-gain" : "text-alarm")}
-            >
+            <span className={cn("font-bold", stateInk(safe))}>
               {t("{contract.fee} Gold", { "contract.fee": pendTotal })}
             </span>
           </PanelTotal>

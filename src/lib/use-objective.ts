@@ -56,7 +56,8 @@ import {
   ObjectiveProgressPayload,
   ObjectiveReportPayload,
 } from "@/types/realtime/objectives";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import {
   clampObjectiveTally,
@@ -133,10 +134,7 @@ export function useObjective(
   // were installed on, and a heartbeat that read a value captured when it
   // started would go on reporting the hold as it stood minutes ago.
   const delivered = game.objectiveDelivered;
-  const deliveredRef = useRef(delivered);
-  useEffect(() => {
-    deliveredRef.current = delivered;
-  }, [delivered]);
+  const deliveredRef = useLatestRef(delivered);
 
   // The commission as this screen knows it: the harbor's board and this
   // captain's own record merged good by good into the higher, which is one
@@ -159,10 +157,7 @@ export function useObjective(
   // read when the harbor answers. A ref for the reason the hold above is one,
   // and written above the listener below rather than after it, so the
   // listener answers with the board as it stands when the answer lands.
-  const takenRef = useRef(taken);
-  useEffect(() => {
-    takenRef.current = taken;
-  }, [taken]);
+  const takenRef = useLatestRef(taken);
 
   // The round this captain pressed Deliver in and has not been answered
   // about. A number rather than a boolean, the way the audit's own press
@@ -199,7 +194,7 @@ export function useObjective(
       socket.off("objective:progress", onProgress);
       socket.off("objective:granted", onGranted);
     };
-  }, [socket, roomId, objective, act]);
+  }, [socket, roomId, objective, act, takenRef]);
 
   // A restarted voyage has no commission and no press in flight.
   const onRestarted = useCallback(() => {
@@ -215,7 +210,7 @@ export function useObjective(
       delivered: deliveredRef.current,
     };
     socket.emit("objective:report", payload);
-  }, [socket, roomId, objective]);
+  }, [socket, roomId, objective, deliveredRef]);
 
   // Every change to the hold's contribution goes out, debounced on the
   // cadence every live channel rides on (see STATUS_BROADCAST_MS in
@@ -243,24 +238,25 @@ export function useObjective(
   // The trace the evaluation reads, written once per round rather than on
   // every move: what matters months later is how close the fleet stood in
   // each round, so the last value a round reached is the value worth keeping.
-  const totalJson = JSON.stringify(total);
+  // The board is state rather than a value rebuilt on every render, so it is
+  // safe as an effect dependency and is written as it stands rather than
+  // round tripped through JSON for a key.
   useEffect(() => {
-    if (!objective || totalJson === "{}") return;
-    const snapshot = JSON.parse(totalJson) as Record<string, number>;
+    if (!objective || Object.keys(total).length === 0) return;
     act((g) => {
       const last = g.objectiveTrace[g.objectiveTrace.length - 1];
       if (last?.round === g.currentRound) {
         last.at = Date.now();
-        last.delivered = snapshot;
+        last.delivered = total;
         return;
       }
       g.objectiveTrace.push({
         round: g.currentRound,
         at: Date.now(),
-        delivered: snapshot,
+        delivered: total,
       });
     });
-  }, [objective, totalJson, act]);
+  }, [objective, total, act]);
 
   // A press this screen is waiting on an answer to. It is one term in two
   // places, because the two things it shuts are the same thing said twice:

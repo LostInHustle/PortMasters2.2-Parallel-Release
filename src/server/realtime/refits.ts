@@ -18,12 +18,13 @@
 // client does with their side of it is the only place their clothes change
 // (see applyRefitSide in @/lib/game/engine/refits).
 // =====================================================================
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { visibleConsent, type RefitContract } from "@/lib/game/engine";
 import type { RefitBoard } from "@/types/realtime/boards";
 import { consentBoard } from "./consent";
 
 export const refitContracts = consentBoard<RefitContract, RefitBoard>({
-  event: "refit:update",
+  event: CONSENT_CHANNELS.refit.update,
   visible: visibleConsent,
   pack: (roomId, refits) => ({ roomId, refits }),
 });

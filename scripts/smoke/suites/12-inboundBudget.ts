@@ -1,6 +1,6 @@
 // PortMasters 2.2 Parallel Release, smoke run: The inbound budget.
 
-import { check, openAuthedSocket } from "../harness";
+import { check, openAuthedSocket, sleep } from "../harness";
 import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
@@ -64,14 +64,14 @@ export async function inboundBudgetSuite(
   // socket and for every bucket in the harbor to refill past the twelve
   // frames below even from empty, so what follows measures the flood
   // rather than the frames this voyage has been sending all along.
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await sleep(1500);
   const politeBefore = politeAnswered;
   const floodBefore = floodAnswered;
   const FLOOD_FRAMES = 200;
   const POLITE_FRAMES = 12;
   for (let i = 0; i < FLOOD_FRAMES; i++) floodSocket.emit("presence:request");
   for (let i = 0; i < POLITE_FRAMES; i++) guestSocket.emit("presence:request");
-  await new Promise((resolve) => setTimeout(resolve, 1200));
+  await sleep(1200);
   const flooded = floodAnswered - floodBefore;
   const politeAnsweredHere = politeAnswered - politeBefore;
 
@@ -96,9 +96,9 @@ export async function inboundBudgetSuite(
   // refill window is answered again, which is what keeps a human who has
   // somehow reached the ceiling from being locked out of the harbor.
   const beforeRefill = floodAnswered;
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await sleep(1500);
   floodSocket.emit("presence:request");
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await sleep(500);
   check(
     floodAnswered > beforeRefill,
     "and the socket is answered again once the budget refills",

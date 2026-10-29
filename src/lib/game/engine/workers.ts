@@ -412,6 +412,20 @@ export function maintenanceDue(state: GameState): number {
   return discountedDue(state, state.fixedCost + state.maintenancePenalty);
 }
 
+// The round's two bills, read together so every surface quotes the same
+// total and reaches the same answer about whether the purse covers it.
+export function duesBill(state: GameState): {
+  wages: number;
+  maintenance: number;
+  total: number;
+  affordable: boolean;
+} {
+  const wages = wagesDue(state);
+  const maintenance = maintenanceDue(state);
+  const total = wages + maintenance;
+  return { wages, maintenance, total, affordable: state.money >= total };
+}
+
 // Maintenance is its own settlement line, not part of roundCosts, for the
 // same double count reason as wages.
 export function payMaintenance(

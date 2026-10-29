@@ -151,7 +151,7 @@ export function usePathDraft(
         act((g, l) => applyDraftPath(g, path, l));
       }
     };
-    const onDraftError = guardedRefusalHandler(roomId, setError);
+    const onRefused = guardedRefusalHandler(roomId, setError);
     // The harbor's one publication, read for the one name that is this
     // captain's. The path is read through normalizePath rather than asserted
     // because it came off the wire, and a frame that is not a path is a
@@ -167,7 +167,6 @@ export function usePathDraft(
       if (path === null) return;
       act((g, l) => applyPathSwitch(g, path, l));
     };
-    const onSwitchError = guardedRefusalHandler(roomId, setError);
     // The hand lives in the server's process and nowhere else, so a socket
     // that drops mid draft and comes back has to ask again: the reconnect is
     // a new connection that was never sent a view, and a captain left
@@ -180,17 +179,17 @@ export function usePathDraft(
     };
 
     socket.on(CHANNEL.update, onView);
-    socket.on(CHANNEL.error, onDraftError);
+    socket.on(CHANNEL.error, onRefused);
     socket.on(CHANNEL.switched, onSwitched);
-    socket.on(CHANNEL.switchError, onSwitchError);
+    socket.on(CHANNEL.switchError, onRefused);
     socket.on("connect", request);
     request();
 
     return () => {
       socket.off(CHANNEL.update, onView);
-      socket.off(CHANNEL.error, onDraftError);
+      socket.off(CHANNEL.error, onRefused);
       socket.off(CHANNEL.switched, onSwitched);
-      socket.off(CHANNEL.switchError, onSwitchError);
+      socket.off(CHANNEL.switchError, onRefused);
       socket.off("connect", request);
     };
   }, [socket, roomId, myUserId, act]);

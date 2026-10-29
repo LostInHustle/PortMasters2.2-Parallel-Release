@@ -23,7 +23,7 @@ import { pathConfig, pathLockLine } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
-import { ItemIcon } from "../../shared";
+import { ItemIcon, signInk } from "../../shared";
 import { PriceBreakdownTooltip } from "../PriceTooltips";
 import {
   TradeCard,
@@ -290,10 +290,7 @@ function OrderCard({
         </Term>
       </div>
       <div
-        className={cn(
-          "text-[13px] font-semibold mt-0.5",
-          netProfit >= 0 ? "text-gain" : "text-alarm",
-        )}
+        className={cn("text-[13px] font-semibold mt-0.5", signInk(netProfit))}
       >
         {t("💰 Reward: {reward} Gold 📊 Net: {net} Gold", {
           reward: quote.reward,

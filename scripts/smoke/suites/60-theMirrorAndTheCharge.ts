@@ -9,7 +9,8 @@ import {
   explainTransportCost,
   explainVAT,
 } from "@/lib/game/engine/pricing";
-import type { GameState, ModifierKey } from "@/lib/game/types";
+import type { ModifierKey } from "@/lib/game/constants/modifiers";
+import type { GameState } from "@/lib/game/types";
 import { check, voyageState } from "../harness";
 
 /**
