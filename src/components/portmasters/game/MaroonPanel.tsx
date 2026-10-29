@@ -30,11 +30,8 @@ import { MaroonResult, PortShiftNotice } from "@/types/realtime/maroon";
 import { useState } from "react";
 import type { PublicUser } from "@/lib/api";
 import { t } from "@/lib/game/i18n";
-import {
-  MAROON_VOTE_SHARE,
-  PORT_SHIFT_PERCENT,
-  portShiftLine,
-} from "@/lib/game/maroon";
+import { MAROON_VOTE_SHARE, portShiftLine } from "@/lib/game/maroon";
+import { PRICE_SHIFT_PERCENT } from "@/lib/game/constants/paths";
 import { modeConfig } from "@/lib/game/mode";
 import type { GameState } from "@/lib/game/types";
 import { nameCount, tallyRows } from "@/lib/vote-tally";
@@ -280,7 +277,7 @@ export function HarbormasterConsole({
       <p className="text-center text-xs text-muted-foreground mb-3 leading-relaxed">
         {t(
           "The harbor put you ashore and left you its own lever: once a round, name a port and lean every price at it by {shiftPct} percent, up or down. The call is public, and the market that opens next round is the one that answers it.",
-          { shiftPct: PORT_SHIFT_PERCENT },
+          { shiftPct: PRICE_SHIFT_PERCENT },
         )}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2 text-sm">

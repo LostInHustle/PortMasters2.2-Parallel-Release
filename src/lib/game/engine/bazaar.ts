@@ -6,9 +6,9 @@
 import { t } from "@/lib/game/i18n";
 import { COMMODITIES } from "../constants/goods";
 import {
+  PRICE_SHIFT_FRACTION,
+  PRICE_SHIFT_PERCENT,
   RUMOR_COOLDOWN_ROUNDS,
-  RUMOR_SHIFT_FRACTION,
-  RUMOR_SHIFT_PERCENT,
 } from "../constants/paths";
 import { bazaarRumorsOn } from "../flags";
 import type { PathId } from "../paths";
@@ -283,7 +283,7 @@ export function rumorLean(
   }
   const lean: Record<string, number> = {};
   for (const [good, sum] of leaning) {
-    const net = Math.max(-1, Math.min(1, sum)) * RUMOR_SHIFT_FRACTION;
+    const net = Math.max(-1, Math.min(1, sum)) * PRICE_SHIFT_FRACTION;
     if (net) lean[good] = net;
   }
   return lean;
@@ -292,13 +292,13 @@ export function rumorLean(
 /**
  * The rumor as a clause, the way the Harbormaster's call is (see
  * portShiftLine in ../maroon), so the caller can frame it with the round and
- * the speaker. The percent comes from RUMOR_SHIFT_PERCENT so the sentence
+ * the speaker. The percent comes from PRICE_SHIFT_PERCENT so the sentence
  * matches the arithmetic.
  */
 export function rumorDirectionLine(
   row: Pick<BazaarRumor, "good" | "direction">,
 ): string {
-  const percent = RUMOR_SHIFT_PERCENT;
+  const percent = PRICE_SHIFT_PERCENT;
   // The direction word is captain facing, so it is translated here.
   const way = row.direction > 0 ? t("higher") : t("lower");
   return t("{row.good}: every price {percent} percent {way} at the next port", {
@@ -353,8 +353,8 @@ export function normalizeRumorLean(value: unknown): Record<string, number> {
   for (const [good, raw] of Object.entries(value as Record<string, unknown>)) {
     if (typeof raw !== "number" || !Number.isFinite(raw) || raw === 0) continue;
     lean[good] = Math.max(
-      -RUMOR_SHIFT_FRACTION,
-      Math.min(RUMOR_SHIFT_FRACTION, raw),
+      -PRICE_SHIFT_FRACTION,
+      Math.min(PRICE_SHIFT_FRACTION, raw),
     );
   }
   return lean;

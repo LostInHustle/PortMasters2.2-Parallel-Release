@@ -61,7 +61,7 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
 
-Schema changes travel through `db:push` alone. There is no `prisma/migrations` history in this repository, and a versioned migration would not be applied by the host either; `docs/RELEASE_NOTES.md` says why under Where the two repositories differ outside the game.
+Schema changes follow the deployment path. Railway updates its SQLite schema with `db:push`. The Cloudflare container applies versioned migrations from `prisma/migrations`. For a schema change that supports both hosts, update `prisma/schema.prisma`, add a migration for Cloudflare, and use `db:push` for Railway.
 
 The smoke suite needs a server that is already running. To check a production build instead of a development one:
 

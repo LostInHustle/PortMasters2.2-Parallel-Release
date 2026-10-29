@@ -46,6 +46,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import ts from "typescript";
 import { walkSrc, withoutComments } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -63,8 +64,26 @@ const sourceFiles = [
 // it, and a commented out import is not an importer: counting either
 // would let a dead surface report itself alive.
 const bodies = new Map<string, string>();
+const identifiers = new Map<string, Map<string, number>>();
 for (const file of sourceFiles) {
-  bodies.set(file, withoutComments(readFileSync(file, "utf8")));
+  const text = readFileSync(file, "utf8");
+  bodies.set(file, withoutComments(text));
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const counts = new Map<string, number>();
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node)) {
+      counts.set(node.text, (counts.get(node.text) ?? 0) + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  identifiers.set(file, counts);
 }
 
 /**
@@ -144,11 +163,10 @@ for (const file of sourceFiles) {
   }
   for (const name of names) {
     if (underApp && ROUTER_EXPORTS.has(name)) continue;
-    const pattern = new RegExp(`\\b${name}\\b`, "g");
     let reads = 0;
-    for (const [other, otherBody] of bodies) {
+    for (const [other, counts] of identifiers) {
       if (other === file) continue;
-      for (const _ of otherBody.matchAll(pattern)) reads += 1;
+      reads += counts.get(name) ?? 0;
     }
     if (reads === 0) {
       findings.push(

@@ -4,7 +4,8 @@
 
 import { difficultyConfig } from "./difficulty";
 import { AUDIT_FROM_ROUND, AUDIT_REVEAL_COUNT, AUDIT_WINDOW } from "./audit";
-import { PORT_SHIFT_PERCENT, MAROON_VOTE_SHARE } from "./maroon";
+import { MAROON_VOTE_SHARE } from "./maroon";
+import { PRICE_SHIFT_PERCENT } from "./constants/paths";
 import { getLocale, tFor, type Locale, type Params } from "./i18n";
 import type { RoundPhase, Phase } from "./types";
 
@@ -256,7 +257,7 @@ export const MODES: Record<GameMode, ModeConfig> = {
         text: "From round {maroonFrom}, {share} of the captains still sailing can vote one captain ashore, once a voyage. The ship and its hold go to the harbor, half that captain's Gold stays aboard, and they take up the Harbormaster's hand: once a round, they name a port and lean every price there {portShift} percent either way.",
         params: {
           maroonFrom: GAMBIT_MAROON_FROM,
-          portShift: PORT_SHIFT_PERCENT,
+          portShift: PRICE_SHIFT_PERCENT,
         },
         phrases: { share: MAROON_VOTE_SHARE },
       },

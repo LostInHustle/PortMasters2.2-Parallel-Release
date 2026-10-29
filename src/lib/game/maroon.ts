@@ -31,6 +31,7 @@
 // =====================================================================
 
 import { carriedTarget } from "./audit";
+import { PRICE_SHIFT_FRACTION, PRICE_SHIFT_PERCENT } from "./constants/paths";
 import { t } from "@/lib/game/i18n";
 
 // The share of their Gold a marooned captain keeps. The rest goes to the
@@ -39,20 +40,9 @@ import { t } from "@/lib/game/i18n";
 export const MAROON_SHARE = 0.5;
 
 // How far the Harbormaster moves a port's prices, in either direction.
-// A tenth is small enough that a market stays readable and large enough
-// that a whole round of buying at one port is a decision rather than a
-// rounding error, which is the same band the mode's other multipliers
-// work in (see the Harbor Pulse's own per good nudge).
-export const PORT_SHIFT_FRACTION = 0.1;
-
-// The same tenth as the whole number every line of copy prints, derived
-// rather than written beside the fraction so the figure a captain reads
-// and the figure the engine leans prices by cannot drift apart. The
-// rounding is what makes the derived value whole: a tenth of a hundred is
-// not arithmetically a whole number in this language, and
-// "10.000000000000002 percent" is a number no captain should ever be
-// shown.
-export const PORT_SHIFT_PERCENT = Math.round(PORT_SHIFT_FRACTION * 100);
+// These names keep the Harbormaster terminology while using the shared
+// market shift.
+export const PORT_SHIFT_FRACTION = PRICE_SHIFT_FRACTION;
 
 // The share of the roster a maroon vote carries, in the words the vote
 // card and the Harbormaster's hand state it in. It lives here, beside the
@@ -171,7 +161,7 @@ export function portShiftMultiplier(
   port: string,
 ): number {
   if (!shift || shift.port !== port) return 1;
-  return 1 + shift.direction * PORT_SHIFT_FRACTION;
+  return 1 + shift.direction * PRICE_SHIFT_FRACTION;
 }
 
 /**
@@ -185,11 +175,11 @@ export function portShiftMultiplier(
  * landed yet, and a call made last round is the one the market on screen was
  * priced against.
  *
- * The percent is read from PORT_SHIFT_PERCENT above, which is where its
+ * The percent is read from PRICE_SHIFT_PERCENT, which is where its
  * rounding is accounted for.
  */
 export function portShiftLine(shift: PortShift): string {
-  const percent = PORT_SHIFT_PERCENT;
+  const percent = PRICE_SHIFT_PERCENT;
   // The way the price moves is the engine's direction, spelled as the two
   // words the row names; each word carries its own row and is read here.
   const way = t(shift.direction > 0 ? "higher" : "lower");
