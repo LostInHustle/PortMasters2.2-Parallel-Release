@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkline } from "../Sparkline";
+import { signInk } from "../shared";
 import { cn } from "@/lib/utils";
 
 export function TrendCard({
@@ -32,10 +33,7 @@ export function TrendCard({
         </div>
         {prev !== undefined && trend !== 0 && (
           <span
-            className={cn(
-              "text-[10px] font-semibold",
-              trend > 0 ? "text-gain" : "text-alarm",
-            )}
+            className={cn("text-[10px] font-semibold", signInk(trend, "alarm"))}
           >
             {trend > 0 ? "▲" : "▼"} {Math.abs(trend)}
           </span>

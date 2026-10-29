@@ -33,6 +33,7 @@ import {
   check,
   ledgerSentences,
   openAuthedSocket,
+  sleep,
   voyageState,
   waitForEvent,
 } from "../harness";
@@ -362,7 +363,7 @@ export async function fleetCommissionSuite(
   // is old. Without the clear in room:restart, the dead voyage's numbers
   // are still there and this report lands on top of them.
   seated[0].socket.emit("room:restart", { roomId: gambitRoomId });
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   const nextRoom = await db.room.findUnique({
     where: { id: gambitRoomId },
     select: { voyageEpoch: true },
@@ -658,7 +659,7 @@ export async function fleetCommissionSuite(
   ).then(() => {
     settledUnderClaim = true;
   });
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await sleep(200);
   check(
     !settledUnderClaim,
     "a press that arrives while the harbor's commission claim is held waits for it rather than settling under it",
@@ -1235,7 +1236,7 @@ export async function fleetCommissionSuite(
       shipLevel: 2,
       gameOver: true,
     });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await sleep(300);
   }
 
   // The conclusion writes behind the last report rather than inside it,
@@ -1261,7 +1262,7 @@ export async function fleetCommissionSuite(
     chronicles.length < finishers.length && waited < 10000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     chronicles = await readChronicles();
   }
   check(
@@ -1342,7 +1343,7 @@ export async function fleetCommissionSuite(
     roomId: classicRoomId,
     delivered: { [nextOwed.type]: 2 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   seated[0].socket.offAny(collector);
   check(
     !boardRefused.some((frame) => frame.startsWith("objective:progress")),

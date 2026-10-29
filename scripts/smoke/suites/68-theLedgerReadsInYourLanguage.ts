@@ -186,7 +186,9 @@ export async function theLedgerReadsInYourLanguageSuite(): Promise<void> {
     "zh",
   );
   check(
-    goods === "亚麻、丝绸" || goods.includes("、"),
+    goods === "麻布、丝绸" &&
+      !goods.includes("Hemp") &&
+      !goods.includes("Silk"),
     "and a list of goods is joined in the reader's language, so the separator between two of them is the reader's and not the one the voyage began in",
   );
 

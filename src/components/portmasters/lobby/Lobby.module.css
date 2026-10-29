@@ -1,0 +1,221 @@
+.lobby {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.workspace,
+.primary,
+.harbors,
+.navigation,
+.view,
+.rail {
+  min-height: 0;
+}
+
+.harbors,
+.navigation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.roster {
+  height: 18rem;
+}
+
+.chat {
+  height: 25rem;
+}
+
+.form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.lobby:has(.creation[data-state="active"]) > header {
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .lobby {
+    height: max(100dvh, 44rem);
+  }
+
+  .workspace {
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) 22.5rem;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .workspace:has(> .notice) {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .view {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding-right: 0.25rem;
+  }
+
+  .lobby:has(.creation[data-state="active"]) {
+    height: auto;
+    min-height: max(100dvh, 44rem);
+  }
+
+  .creation {
+    flex: none;
+    overflow: visible;
+    padding-right: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .roster {
+    flex: 0 0 42%;
+    min-height: 13.125rem;
+    max-height: 20rem;
+  }
+
+  .chat {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+.lobby :global(.pm-glass) {
+  background-image: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--sea) 3%, transparent),
+    transparent 45%,
+    color-mix(in oklch, var(--gold) 4%, transparent)
+  );
+  border-color: color-mix(in oklch, var(--foreground) 10%, transparent);
+  box-shadow:
+    0 4px 8px color-mix(in oklch, var(--foreground) 2%, transparent),
+    0 16px 40px color-mix(in oklch, var(--foreground) 4%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
+}
+
+@media (max-width: 399px) {
+  .lobby [role="tab"] {
+    gap: 0.25rem;
+    padding-inline: 0.25rem;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    white-space: normal;
+  }
+}
+
+.lobby :global(.pm-panel-bar) {
+  padding: 1rem 1.25rem;
+}
+
+.lobby :global(.pm-tool) {
+  border: 1px solid color-mix(in oklch, var(--foreground) 7%, transparent);
+  border-radius: 0.625rem;
+}
+
+.lobby :global(.pm-seal) {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    0 3px 8px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.lobby :global(.lobbyQuickstart) {
+  padding: 1rem;
+  border-radius: 0.875rem;
+  border-color: color-mix(in oklch, var(--w-quickstart) 20%, transparent);
+  background-image: linear-gradient(
+    115deg,
+    color-mix(in oklch, var(--w-quickstart) 6%, transparent),
+    transparent 65%
+  );
+}
+
+.lobby :global(.lobbyQuickstart) p {
+  margin-top: 0.25rem;
+  line-height: 1.6;
+}
+
+.lobby :global(.lobbyJoin) {
+  padding: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--foreground) 6%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in oklch, var(--background) 65%, transparent);
+}
+
+.lobby :global(.lobbyRoom) {
+  padding: 1rem;
+  box-shadow: inset 0 1px 0
+    color-mix(in oklch, var(--background) 65%, transparent);
+}
+
+.lobby :global(.lobbyVoyage) {
+  background-image: linear-gradient(145deg, oklch(1 0 0 / 0.03), transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in oklch, var(--background) 50%, transparent);
+}
+
+.lobby :global(.lobbyVoyage[aria-pressed="true"]) {
+  box-shadow:
+    inset 0 2px 0 color-mix(in oklch, var(--w-charter) 50%, transparent),
+    0 4px 12px color-mix(in oklch, var(--w-charter) 5%, transparent);
+}
+
+@media (max-width: 639px) {
+  .lobby :global(.lobbyStats) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+
+  .lobby :global(.lobbyStats) > span:empty {
+    display: none;
+  }
+
+  .lobby :global(.lobbyStats) > button {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .lobby :global(.lobbyStats) > div {
+    grid-column: 1 / -1;
+  }
+
+  .lobby :global(.pm-panel),
+  .lobby :global(.pm-panel-bar),
+  .lobby :global(.lobbyQuickstart) {
+    padding: 1rem;
+  }
+
+  .lobby :global(.lobbyQuickstart) {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .lobby :global(.lobbyQuickstart) > button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .lobby :global(.lobbyJoin) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .lobby :global(.lobbyJoin) > label {
+    grid-column: 1 / -1;
+  }
+
+  .lobby :global(.lobbyRoom) {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+
+  .lobby :global(.lobbyRoom) > :global(.lobbyRoomAction) {
+    grid-column: 2;
+    justify-self: end;
+  }
+}

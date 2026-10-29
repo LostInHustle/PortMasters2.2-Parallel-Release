@@ -1,12 +1,13 @@
 // Path and subsystem constants. Values stay here rather than in prose so
 // the rules and the screens that quote them share one source.
 
-/** Bazaar rumor cooldown, in rounds, and the price shift one rumor applies. */
-export const RUMOR_COOLDOWN_ROUNDS = 3;
-export const RUMOR_SHIFT_FRACTION = 0.1;
+/** The price shift shared by harbor calls and Bazaar rumors. */
+export const PRICE_SHIFT_FRACTION = 0.1;
+export const PRICE_SHIFT_PERCENT = Math.round(PRICE_SHIFT_FRACTION * 100);
 
-/** The shift as the whole number the rumor copy prints. */
-export const RUMOR_SHIFT_PERCENT = Math.round(RUMOR_SHIFT_FRACTION * 100);
+/** Bazaar rumor cooldown, in rounds. */
+export const RUMOR_COOLDOWN_ROUNDS = 3;
+export const RUMOR_SHIFT_FRACTION = PRICE_SHIFT_FRACTION;
 
 /**
  * Convoy cannons occupy cargo slots. The Quartermaster carries half again

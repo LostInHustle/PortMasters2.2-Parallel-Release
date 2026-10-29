@@ -23,7 +23,7 @@ import { pathConfig, pathLockLine } from "@/lib/game/paths";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
-import { ItemIcon } from "../../shared";
+import { ItemIcon, signInk } from "../../shared";
 import { PriceBreakdownTooltip } from "../PriceTooltips";
 import {
   TradeCard,
@@ -107,16 +107,6 @@ function OrderCard({
   // from.
   const quote = quoteOrder(game, o, { borrowed: mayBorrow });
   const netProfit = quote.net;
-  // Matched on the whole whisper, its good and its harbor, because that
-  // pair is the promise: the guarantee lands the order on the port the
-  // Broker named (see the intel guarantee in engine/orders), so a card
-  // carrying the good to some other port is not the promised trade, and a
-  // badge on it would be the board claiming a guarantee the engine never
-  // gave.
-  const matchesIntel = game.revealedIntel.some(
-    (i) =>
-      i.port === o.demandPort && o.resources.some((r) => r.type === i.item),
-  );
   // A locked card is asked first, because the lock is the
   // strongest thing a card can say: a card nobody may fill is
   // not a card to style as a prize. Dashed and muted is how this
@@ -135,7 +125,7 @@ function OrderCard({
       ? "border-gold/70 bg-gradient-to-br from-gold/[0.18] to-gold/[0.06] ring-1 ring-gold/25"
       : o.isBrokerFavor
         ? "border-favor/45 bg-favor/[0.05]"
-        : matchesIntel
+        : o.isGuaranteed
           ? "border-intel/40 bg-intel/[0.04]"
           : "border-black/10 dark:border-white/10 bg-background/50";
   return (
@@ -180,7 +170,7 @@ function OrderCard({
               {t("🤝 Broker's Favor")}
             </span>
           ) : (
-            matchesIntel && (
+            o.isGuaranteed && (
               <span className="text-intel shrink-0">{t("🔮 Guaranteed")}</span>
             )
           )}
@@ -300,10 +290,7 @@ function OrderCard({
         </Term>
       </div>
       <div
-        className={cn(
-          "text-[13px] font-semibold mt-0.5",
-          netProfit >= 0 ? "text-gain" : "text-alarm",
-        )}
+        className={cn("text-[13px] font-semibold mt-0.5", signInk(netProfit))}
       >
         {t("💰 Reward: {reward} Gold 📊 Net: {net} Gold", {
           reward: quote.reward,

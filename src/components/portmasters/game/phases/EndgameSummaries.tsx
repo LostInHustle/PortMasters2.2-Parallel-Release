@@ -6,6 +6,7 @@ import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { SummaryHeading } from "./PhaseShared";
+import { signInk } from "../../shared";
 
 // One line of the ledger: what it is, what it came to, and the hue its
 // figure wears. Both columns and both blocks below are drawn from these.
@@ -182,7 +183,7 @@ export function FinancialSummary({ game }: { game: GameState }) {
         <span
           className={cn(
             "font-display text-sm font-bold tabular-nums",
-            net >= 0 ? "text-gain" : "text-alarm",
+            signInk(net),
           )}
         >
           {net >= 0 ? "+" : ""}

@@ -267,14 +267,14 @@ export function mendGarment(
 export function applyRefitSide(
   state: GameState,
   contract: RefitContract,
-  meId: string,
+  myUserId: string,
   logs: LedgerLine[],
 ): boolean {
   return settleConsentTrade(state, logs, {
     on: refitsOn,
     status: "agreed",
     row: contract,
-    meId,
+    myUserId,
     counters: {
       bought: "refitsBought",
       feesPaid: "refitFeesPaid",

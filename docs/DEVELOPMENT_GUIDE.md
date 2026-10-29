@@ -13,7 +13,7 @@ Four layers, and a change should belong to exactly one of them.
 | Server           | `src/server`, `src/app/api`, `server.ts`                            | The engine, the shared contracts, Prisma           |
 | Interface        | `src/components`, `src/lib/use-*.ts`, `src/app/page.tsx`            | The engine, the shared contracts, the REST helpers |
 
-The engine is deliberately the bottom layer. Everything above it may call it; it may call nothing. That is what keeps a voyage reproducible: the same seed and the same inputs produce the same result on every machine, with no database and no server in the picture.
+The engine is deliberately the bottom layer. Everything above it may call it; it may call nothing. That is what keeps a voyage reproducible: the same seed and the same inputs produce the same result on every machine, apart from the private rolls the rules below keep outside the seed, with no database and no server in the picture.
 
 ## Adding a game system
 
@@ -64,16 +64,17 @@ Four habits worth keeping:
 npm run typecheck        # every type error, including the ones a build would skip
 npm run lint
 npm run check:private    # no second path to a secret the game hides
-npm run check:prose      # no banned dash in Markdown, MDX, text or the environment template
+npm run check:prose      # checks documents, the environment template and the bilingual language pack
 npm run build            # type errors fail the build on purpose
-# then, in a second terminal, with the clock on for both lines:
+# terminal 1, with the clock on:
 PHASE_CLOCK=1 npm run dev
+# terminal 2, with the same clock:
 PHASE_CLOCK=1 npm run test:smoke
 ```
 
-`npm run build` runs the tag, card, status, dead surface, prose, palette and private checks before it compiles a page, so a clean build also clears those seven. `npm run check:prose` can be run alone while editing documentation.
+`npm run build` typechecks the Cloudflare Worker and runs the tag, card, status, dead surface, prose, palette and private checks before it compiles a page, so a clean build also clears those seven and both TypeScript projects. The prose check covers Markdown, MDX, text files, the environment template and the bilingual language pack.
 
-The smoke test drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its rounds, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
+The smoke suite drives a real voyage through a running server: two captains register, one opens a harbor, the other joins it, both open a socket and authenticate, and the presence channel is checked. Its 77 files also carry the rule articles, including the victory rules, the launch gates and the wage bill. The clock suites inside it are why both lines above carry `PHASE_CLOCK=1`: the server under test has to be timing its rounds, and the run reads the same variable to know which clock it is checking, so one shell exports it for both. It cleans up the accounts it creates. If it is pointed at a different database than the server it is testing, it stops and says so rather than pretending the cleanup worked.
 
 Before a run that involves players who are not the authors, `npm run check:closed-test` is the first command: it refuses to bless anything but a local SQLite file whose name begins with `closed-test`, so the invitations go out from somebody who has just read the database's name and a count of what is already inside it.
 
@@ -83,20 +84,10 @@ Before a run that involves players who are not the authors, `npm run check:close
 
 Cloudflare runs the application in one container rather than on a request scoped Worker, because the realtime layer, the harbor state and the SQLite writer all live in one process. That container runs the production build from the `Dockerfile`, keeps no durable disk, restores its SQLite file from an R2 replica through Litestream at every boot, and applies the checked in Prisma migrations before it starts. The four notes below are about the Railway service and none of them describes the Cloudflare path.
 
-Four things about the Railway service are load bearing, and each one is easy to undo by accident.
-
-**Railway runs the development server.** `next build` wants more memory than the smaller plans provide, so the file starts `server.ts` with `NODE_ENV=development` instead. Anything that only works in a production build will not be exercised by a deploy, and first visits are slow because routes compile on demand. Both are accepted costs rather than oversights.
-
-**The database lives on a mounted volume at `/app/db`.** The container filesystem is discarded between deploys, so `DATABASE_URL` resolves to that mount. `requiredMountPath` in the file makes the deploy refuse to start without it, which is what turns a forgotten volume into a failed deploy instead of a silent loss of every account.
-
-**Schema changes ship with the code.** The start command runs `prisma db push --skip-generate` before it starts the process, which is deliberate: a volume is attached when the container starts, not when it builds, so a step running before the deploy would have nowhere to write. A migration added to the repository will not be applied by this path.
-
-**The healthcheck stays dependency free.** `/api/health` answers from the process and touches nothing else, so a database that is briefly busy cannot fail the probe and turn a slow query into a restart loop. Anything added to that route should keep it that way.
-
-One more, for a new hostname on Railway: the development server serves its compiled chunks, its hot reload channel and its internal endpoints only to hostnames it recognizes, and it recognizes `localhost` on its own. A custom domain goes in `ALLOWED_DEV_ORIGINS`. `railway.json` cannot declare it, because the file has no variables section, so that one is set on the service itself, as is `RAILPACK_PRUNE_DEPS=false`, which keeps the development dependencies in the image.
+The Railway service's four load bearing settings (the development server, the `/app/db` volume, the schema push on start, and the dependency free healthcheck) and the custom hostname note are documented once in [the README's Railway section](../README.md#putting-the-game-online-on-railway).
 
 ## Testing more than the smoke test covers
 
-The smoke test proves the wiring. It does not prove the rules, and the rules are where a subtle mistake is most expensive, because a broken voyage is only discovered eight rounds in.
+The smoke suite proves the wiring and the rules it exercises, not every rule, and the rules are where a subtle mistake is most expensive, because a broken voyage is only discovered deep into a run.
 
 For engine changes, the fastest honest check is a throwaway script that runs the pure functions directly, run with `npx tsx` from the project root. It needs no server and no database, because the engine takes plain data. Anything under `scripts` is picked up by the type checker, so a scratch script that stops compiling will tell you so.

@@ -26,7 +26,8 @@ import { PATH_IDS, type PathId, pathConfig } from "./paths";
 import { unlockedBoons, unlockedModules } from "./pools";
 import { MAX_TAGS_PER_ENTRY, TAGS } from "./constants/tags";
 import { entriesWithTag, taggedEntries, tagsOf, type TaggedKind } from "./tags";
-import { MODIFIER_KEYS, type GameState } from "./types";
+import { MODIFIER_KEYS } from "./constants/modifiers";
+import type { GameState } from "./types";
 
 // Every card the build ships: the two drafted ladders and the charters,
 // stacked in catalogue order.
@@ -51,8 +52,8 @@ export function cardsOfKind(kind: CardKind): CardRecord[] {
  *
  * The one accessor every surface reads a card through. English comes off the
  * record; Mandarin comes out of the language pack by card id, because the
- * pack is where the translation is written. The content check holds the pack
- * and the record in step.
+ * pack is where the translation is written. The content check holds the
+ * record's English to the pack and the pack's Mandarin to a present row.
  */
 export function cardText(
   card: CardRecord,

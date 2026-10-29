@@ -26,7 +26,6 @@ const eslintConfig = [
       "react/no-unescaped-entities": "off",
       "react/display-name": "off",
       "react/prop-types": "off",
-      "react-compiler/react-compiler": "off",
 
       // Next.js rules
       "@next/next/no-img-element": "off",

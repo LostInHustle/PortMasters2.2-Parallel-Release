@@ -3,6 +3,7 @@
 // from during Parley, ordered over ../contracts' own board.
 // =====================================================================
 
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { ROUND_ALREADY_COVERED } from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
@@ -10,7 +11,7 @@ import { consentPartyBusy, type EscortContract } from "@/lib/game/engine";
 import { escortClaimFrom } from "@/lib/game/engine/contracts";
 import { escortContractsOn } from "@/lib/game/flags";
 import { tFor } from "@/lib/game/i18n";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import { getCheckpoint } from "../checkpoint";
 import { escortContracts } from "../contracts";
 import { rowId } from "../ids";
@@ -44,7 +45,7 @@ const OFFER_GONE = "That offer is no longer on the board.";
 const ESCORT_POST: ConsentPostSpec<EscortContract> = {
   board: (roomId) => escortContracts.list(roomId),
   market: "escort",
-  errorEvent: "contract:error",
+  errorEvent: CONSENT_CHANNELS.escort.error,
   on: escortContractsOn,
   phase: "parley",
   phaseRefusal: (locale) =>
@@ -59,7 +60,7 @@ const ESCORT_POST: ConsentPostSpec<EscortContract> = {
 const ESCORT_ACCEPT: ConsentAcceptSpec<EscortContract> = {
   board: (roomId) => escortContracts.list(roomId),
   market: "escort",
-  errorEvent: "contract:error",
+  errorEvent: CONSENT_CHANNELS.escort.error,
   on: escortContractsOn,
   idKey: "contractId",
   phase: "parley",
@@ -121,18 +122,21 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   // reason none of these handlers reads a purse. What the server is
   // authoritative about is the ordering: one captain per cover, one claim
   // per contract, and no agreement about a round that has already gone.
-  socket.on("contract:state:request", (payload: { roomId?: string }) => {
-    const s = seated(socket, payload);
-    if (!s) return;
-    const { roomId } = s;
-    socket.emit(
-      "contract:update",
-      escortContracts.payloadFor(roomId, s.userId),
-    );
-  });
+  socket.on(
+    CONSENT_CHANNELS.escort.stateRequest,
+    (payload: { roomId?: string }) => {
+      const s = seated(socket, payload);
+      if (!s) return;
+      const { roomId } = s;
+      socket.emit(
+        CONSENT_CHANNELS.escort.update,
+        escortContracts.payloadFor(roomId, s.userId),
+      );
+    },
+  );
 
   socket.on(
-    "contract:post",
+    CONSENT_CHANNELS.escort.post,
     async (payload: {
       roomId?: string;
       fee?: number;
@@ -183,7 +187,7 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "contract:accept",
+    CONSENT_CHANNELS.escort.accept,
     async (payload: { roomId?: string; contractId?: string }) => {
       await acceptConsentOffer(socket, payload, ESCORT_ACCEPT, (accepted) => {
         escortContracts.set(accepted.roomId, accepted.rows);
@@ -199,14 +203,14 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "contract:decline",
+    CONSENT_CHANNELS.escort.decline,
     async (payload: { roomId?: string; contractId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const contractId = payload?.contractId;
-      if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = makeFail(socket, roomId, "contract:error");
+      if (!contractId) return;
+      const fail = makeFail(socket, roomId, CONSENT_CHANNELS.escort.error);
       if (!escortContractsOn(s.mode)) {
         fail(marketOffRefusal("escort", s.locale));
         return;
@@ -271,14 +275,14 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "contract:cancel",
+    CONSENT_CHANNELS.escort.cancel,
     (payload: { roomId?: string; contractId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const contractId = payload?.contractId;
-      if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = makeFail(socket, roomId, "contract:error");
+      if (!contractId) return;
+      const fail = makeFail(socket, roomId, CONSENT_CHANNELS.escort.error);
       if (!escortContractsOn(s.mode)) {
         fail(marketOffRefusal("escort", s.locale));
         return;
@@ -337,19 +341,22 @@ export function wireEscortContracts(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "contract:claim",
+    CONSENT_CHANNELS.escort.claim,
     async (payload: {
       roomId?: string;
       contractId?: string;
       raidGold?: number;
     }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const contractId = payload?.contractId;
-      if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = makeFail(socket, roomId, "contract:error");
-      if (!escortContractsOn(s.mode)) return;
+      if (!contractId) return;
+      const fail = makeFail(socket, roomId, CONSENT_CHANNELS.escort.error);
+      if (!escortContractsOn(s.mode)) {
+        fail(marketOffRefusal("escort", s.locale));
+        return;
+      }
       const raidGold = payload?.raidGold;
       // The wire can carry anything at all, so a value that is not a
       // number, or one the guns could never be paid, is not a raid's take

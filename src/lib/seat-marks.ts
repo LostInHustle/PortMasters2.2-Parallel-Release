@@ -44,7 +44,7 @@
 //
 // Read through the roster as well: the harbor stops counting a seat that
 // leftTheVoyage, and keeps counting one that is merely written off (see
-// activeRosterSet in src/server/realtime/checkpoint, and
+// activeRosterSet in src/server/realtime/roster, and
 // readFinishedCaptains in src/server/realtime/conclusion/voyage for the
 // other end of the same question).
 // =====================================================================

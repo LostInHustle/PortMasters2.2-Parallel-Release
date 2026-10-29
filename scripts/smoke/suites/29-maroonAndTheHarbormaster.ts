@@ -39,6 +39,7 @@ import {
   LEDGER_PHRASE,
   ledgerSentences,
   openAuthedSocket,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -561,7 +562,7 @@ export async function maroonAndTheHarbormasterSuite(
         maroonReadyStates.push(payload),
     );
   });
-  const maroonSettle = () => new Promise((resolve) => setTimeout(resolve, 400));
+  const maroonSettle = () => sleep(400);
 
   // The first way a nomination is dropped is the oldest one: there is no
   // voyage yet, so there is no checkpoint to call a vote from.
@@ -621,7 +622,7 @@ export async function maroonAndTheHarbormasterSuite(
       waited < 5000;
       waited += 250
     ) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
       row = await maroonRoomRow();
     }
     return row;
@@ -1199,7 +1200,7 @@ export async function maroonAndTheHarbormasterSuite(
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     maroonReopened = await maroonRoomRow();
   }
   check(

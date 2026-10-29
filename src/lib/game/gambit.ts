@@ -3,7 +3,7 @@
 // that is used once and discarded; only the resulting rows are kept, which
 // is what a reload replays. The seed owner is src/server/realtime/gambit.ts.
 
-import { createRng, pick, weightedPick, type Rng } from "./rng";
+import { createRng, pick, shuffle, weightedPick, type Rng } from "./rng";
 import { t } from "@/lib/game/i18n";
 
 export type GambitRole = "honest" | "pirate" | "broker";
@@ -42,12 +42,8 @@ export function dealRoles(
   seed: string,
 ): Record<string, GambitRole> {
   const rng = createRng(seed);
-  const order = [...captainIds].sort();
-  // Fisher-Yates over the sorted roster: seats depend on the seed alone.
-  for (let i = order.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
-  }
+  // Sorted first, then shuffled: seats depend on the seed alone.
+  const order = shuffle(rng, [...captainIds].sort());
 
   const roles: Record<string, GambitRole> = {};
   for (const id of order) roles[id] = "honest";

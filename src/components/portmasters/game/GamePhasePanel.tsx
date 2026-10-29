@@ -2,9 +2,7 @@
 
 import { VoyageResult, VoyageReveal } from "@/types/realtime/voyage";
 import { motion, AnimatePresence } from "framer-motion";
-import { Anchor } from "lucide-react";
 import type { CaptainLegacySummary } from "@/lib/game/legacy";
-import { t } from "@/lib/game/i18n";
 import { phaseFace } from "@/lib/game/phases";
 import { Welcome } from "./phases/Welcome";
 import { BoonDraft } from "./phases/BoonDraft";
@@ -366,27 +364,12 @@ function ActivePhase(props: Props) {
         />
       );
     default:
-      // Defensive: every Phase value is mapped above, so this branch is
-      // only reached if a future phase was added to the union without a
-      // matching case here. The placeholder copy is intentionally
-      // generic so a stranger phase still renders something legible
-      // rather than a blank pane. Its floor rides just under the stage
-      // floor above so the branch never pushes the card taller than the
-      // stage itself intends to stand.
-      return (
-        <div className="flex min-h-[clamp(320px,52dvh,480px)] flex-col items-center justify-center text-center px-6">
-          <div className="pm-grad-brand mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg">
-            <Anchor className="h-6 w-6" />
-          </div>
-          <h2 className="font-display text-2xl text-brand mb-1.5 pm-brush">
-            {t("Round {state.game.currentRound}", {
-              "state.game.currentRound": game.currentRound,
-            })}
-          </h2>
-          <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-            {t("The Harbormaster is fetching the tide tables.")}
-          </p>
-        </div>
-      );
+      // A phase added to the union without a screen here is a build error,
+      // not a placeholder a captain can land on.
+      return assertNever(p);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled phase: ${String(value)}`);
 }

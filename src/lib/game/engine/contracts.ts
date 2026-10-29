@@ -138,14 +138,14 @@ export function resetEscortRound(state: GameState): void {
 export function applyEscortSide(
   state: GameState,
   contract: EscortContract,
-  meId: string,
+  myUserId: string,
   logs: LedgerLine[],
 ): boolean {
   // Read here as well as inside the settlement, because the claim below is
   // this function's own.
   if (!escortContractsOn(state.mode)) return false;
-  const isSeller = contract.sellerUserId === meId;
-  const isBuyer = contract.buyerUserId === meId;
+  const isSeller = contract.sellerUserId === myUserId;
+  const isBuyer = contract.buyerUserId === myUserId;
   if (!isSeller && !isBuyer) return false;
 
   if (contract.status === "agreed") {
@@ -153,7 +153,7 @@ export function applyEscortSide(
       on: escortContractsOn,
       status: "agreed",
       row: contract,
-      meId,
+      myUserId,
       counters: {
         bought: "escortBought",
         feesPaid: "escortFeesPaid",

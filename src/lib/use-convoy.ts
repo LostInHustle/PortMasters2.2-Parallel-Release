@@ -1,7 +1,8 @@
 "use client";
 
 import { VentureSummary } from "@/types/realtime/ventures";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import type { VentureOutcome, VentureSettlement } from "@/lib/game/convoy";
 import { refusalHandler } from "@/lib/refusals";
@@ -59,14 +60,8 @@ export function useConvoy(
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onContributedRef = useRef(onContributed);
-  useEffect(() => {
-    onContributedRef.current = onContributed;
-  }, [onContributed]);
-  const onSettledRef = useRef(onSettled);
-  useEffect(() => {
-    onSettledRef.current = onSettled;
-  }, [onSettled]);
+  const onContributedRef = useLatestRef(onContributed);
+  const onSettledRef = useLatestRef(onSettled);
 
   useEffect(() => {
     if (!socket) return;
@@ -115,7 +110,7 @@ export function useConvoy(
       socket.off("venture:settled", onSettledEvent);
       socket.off("venture:error", onPostError);
     };
-  }, [socket, roomId]);
+  }, [socket, roomId, onContributedRef, onSettledRef]);
 
   // Every press clears the last refusal before it goes out, so a sentence
   // about a venture that is no longer standing cannot outlive the press

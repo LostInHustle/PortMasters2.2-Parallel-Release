@@ -10,10 +10,10 @@ import {
   bothFlexibleBarterUnlocked,
   flexibleBarterUnlocked,
   flexibleOffersLeft,
-} from "@/lib/game/engine/barter-access";
+} from "@/lib/game/engine";
 import { tFor } from "@/lib/game/i18n";
 import { auditSpentRound, auditSpentReason } from "../audit";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import {
   authoritativeRenownLevel,
   barterList,
@@ -240,10 +240,10 @@ export function wireBarter(io: Server, socket: Socket): void {
   socket.on(
     "barter:cancel",
     (payload: { roomId?: string; offerId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId || !payload?.offerId) return;
+      const { roomId } = s;
+      if (!payload?.offerId) return;
       const list = barterList(roomId);
       const next = list.filter(
         (o) => !(o.id === payload.offerId && o.fromUserId === s.userId),
@@ -257,11 +257,11 @@ export function wireBarter(io: Server, socket: Socket): void {
   socket.on(
     "barter:accept",
     async (payload: { roomId?: string; offerId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const offerId = payload?.offerId;
-      if (!roomId || roomId !== s.roomId || !offerId) return;
+      if (!offerId) return;
       const fail = (reason: string): void => {
         socket.emit("barter:accept:fail", { roomId, offerId, reason });
       };

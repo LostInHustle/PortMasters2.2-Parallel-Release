@@ -5,7 +5,7 @@ import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants/goods";
 import { phaseFace } from "@/lib/game/phases";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { call, check, waitForEvent } from "../harness";
+import { call, check, sleep, waitForEvent } from "../harness";
 import type { WireOffer } from "../wire";
 import type { Socket } from "socket.io-client";
 
@@ -326,7 +326,7 @@ export async function barteringFromAnywhereSuite(inputs: {
   // completed, because their side of it releases escrow when it sees the
   // offer go and would hand the goods back as well as to the taker.
   thirdSocket.close();
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await sleep(500);
   const refused = waitForEvent<{ offerId?: string; reason?: string }>(
     guestSocket,
     "barter:accept:fail",

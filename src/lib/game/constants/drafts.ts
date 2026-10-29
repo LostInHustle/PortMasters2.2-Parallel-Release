@@ -51,8 +51,9 @@ import { tIdFor } from "../i18n";
 //
 // The pack is where the Chinese for every card is written, so a record
 // does not keep a second copy of it: the record asks the pack for the
-// two rows that belong to this card, and the smoke suite holds the
-// record and the rows in step. A card the pack does not carry answers
+// two rows that belong to this card. The smoke suite holds each row's
+// English to the record and each Mandarin row to a present value. A
+// card the pack does not carry answers
 // with its own id, which is the honest line to print and the reason the
 // check fails loudly rather than quietly.
 function zhCard(id: string): CardText {
@@ -423,7 +424,7 @@ export const BOONS_TIER2: CardRecord[] = [
 
 //
 // Each card writes a key of its own. The five keys are new here (see
-// MODIFIER_KEYS in ../types), and no round drafted card writes any of
+// MODIFIER_KEYS in ./modifiers), and no round drafted card writes any of
 // them, so a held boon and a round boon are never in force on the same
 // key: the pool's one owner per key clause (see the validator in
 // ../cards) holds the line, and the pricing breakdown's source line

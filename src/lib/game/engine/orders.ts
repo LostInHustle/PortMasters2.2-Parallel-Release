@@ -698,11 +698,8 @@ export function startOrders(
       }),
     );
   }
-  // Broker's Whisper guarantee, applied after the seeded draw and with the
-  // captain's own randomness, so it cannot shift the drawn stream. One slot
-  // is overwritten per revealed rumor (see purchaseIntel). Both halves of
-  // the rumor are honored: the named good is demanded, and the named harbor
-  // is where the card pays.
+  // Each revealed rumor replaces one existing order. The named good and
+  // harbor stay on that card, and the seeded draw stays unchanged.
   const guaranteedCount = Math.min(
     state.revealedIntel.length,
     state.customerCards.length,
@@ -719,7 +716,11 @@ export function startOrders(
           undefined,
           intel.port,
         );
-    state.customerCards[i] = { id: state.customerCards[i].id, ...guaranteed };
+    state.customerCards[i] = {
+      id: state.customerCards[i].id,
+      ...guaranteed,
+      isGuaranteed: true,
+    };
   }
   // Imperial Mandate: on scheduled rounds the Emperor commissions one large
   // order from fixed template data, with no rng and the same template for
@@ -730,9 +731,8 @@ export function startOrders(
     mandateIdx === undefined ? undefined : MANDATE_TEMPLATES[mandateIdx];
   if (mandate) {
     const nextId = nextCardId(state);
-    // Placed first because it is the round's headline, after the intel
-    // guarantee loop that writes by index. Identity stays on `id`, so
-    // position is presentation only.
+    // Placed first because it is the round's headline. Its id stays with it
+    // even after it moves to the front.
     state.customerCards.unshift({
       id: nextId,
       demandPort: mandate.port,
@@ -766,7 +766,7 @@ export function startOrders(
       ),
     );
   }
-  // The pathbound slots, filled last from their own stream (`:pathorders`),
+  // The pathbound slots are filled last from their own stream (`:pathorders`),
   // so the six scheduled orders stay the same six seed for seed. Each card
   // names a good the path's trade lives in and pays what that trade pays.
   if (pathOrdersOn(state.mode)) {

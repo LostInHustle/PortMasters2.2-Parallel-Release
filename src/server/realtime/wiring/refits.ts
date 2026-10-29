@@ -3,6 +3,7 @@
 // a port, ordered over ../refits' own board.
 // =====================================================================
 
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import {
   OFFER_ALREADY_GONE,
   REFIT_ALREADY_TAKEN,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/game/engine";
 import { garmentSpec } from "@/lib/game/garments";
 import { tFor } from "@/lib/game/i18n";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import { rowId } from "../ids";
 import { refitContracts } from "../refits";
 import { noteVoyageLog } from "../voyage-log";
@@ -36,7 +37,7 @@ import { makeFail, marketOffRefusal } from "./fail";
 const REFIT_POST: ConsentPostSpec<RefitContract> = {
   board: (roomId) => refitContracts.list(roomId),
   market: "refit",
-  errorEvent: "refit:error",
+  errorEvent: CONSENT_CHANNELS.refit.error,
   on: refitsOn,
   phase: "market",
   phaseRefusal: (locale) =>
@@ -71,7 +72,7 @@ const REFIT_POST: ConsentPostSpec<RefitContract> = {
 const REFIT_ACCEPT: ConsentAcceptSpec<RefitContract> = {
   board: (roomId) => refitContracts.list(roomId),
   market: "refit",
-  errorEvent: "refit:error",
+  errorEvent: CONSENT_CHANNELS.refit.error,
   on: refitsOn,
   idKey: "contractId",
   phase: "market",
@@ -128,15 +129,21 @@ export function wireRefits(io: Server, socket: Socket): void {
   // reading rather than a queue one pair of hands cannot work through.
   // And a bench offer names a garment that exists, checked through the
   // game layer's own reader rather than trusted from the post.
-  socket.on("refit:state:request", (payload: { roomId?: string }) => {
-    const s = seated(socket, payload);
-    if (!s) return;
-    const { roomId } = s;
-    socket.emit("refit:update", refitContracts.payloadFor(roomId, s.userId));
-  });
+  socket.on(
+    CONSENT_CHANNELS.refit.stateRequest,
+    (payload: { roomId?: string }) => {
+      const s = seated(socket, payload);
+      if (!s) return;
+      const { roomId } = s;
+      socket.emit(
+        CONSENT_CHANNELS.refit.update,
+        refitContracts.payloadFor(roomId, s.userId),
+      );
+    },
+  );
 
   socket.on(
-    "refit:post",
+    CONSENT_CHANNELS.refit.post,
     async (payload: {
       roomId?: string;
       fee?: number;
@@ -175,7 +182,7 @@ export function wireRefits(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "refit:accept",
+    CONSENT_CHANNELS.refit.accept,
     async (payload: { roomId?: string; contractId?: string }) => {
       await acceptConsentOffer(socket, payload, REFIT_ACCEPT, (accepted) => {
         refitContracts.set(accepted.roomId, accepted.rows);
@@ -192,14 +199,14 @@ export function wireRefits(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "refit:cancel",
+    CONSENT_CHANNELS.refit.cancel,
     (payload: { roomId?: string; contractId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const contractId = payload?.contractId;
-      if (!roomId || roomId !== s.roomId || !contractId) return;
-      const fail = makeFail(socket, roomId, "refit:error");
+      if (!contractId) return;
+      const fail = makeFail(socket, roomId, CONSENT_CHANNELS.refit.error);
       if (!refitsOn(s.mode)) {
         fail(marketOffRefusal("refit", s.locale));
         return;

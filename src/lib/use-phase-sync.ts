@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import type { GameContext, GameState } from "@/lib/game/types";
 import {
@@ -98,17 +99,11 @@ export function usePhaseSync({
   const pendingFn = useRef<LedgerWrite | null>(null);
 
   // Latest snapshot for the listeners, without resubscribing them.
-  const gameRef = useRef(game);
-  useEffect(() => {
-    gameRef.current = game;
-  }, [game]);
+  const gameRef = useLatestRef(game);
 
   // Same pattern: the legacy row loads after mount, so onRestarted reads
   // the current value without resubscribing the effect.
-  const goldBonusRef = useRef(startingGoldBonus);
-  useEffect(() => {
-    goldBonusRef.current = startingGoldBonus;
-  }, [startingGoldBonus]);
+  const goldBonusRef = useLatestRef(startingGoldBonus);
 
   // Deadline, seat budget, and the moment this client saw them. Carried as
   // numbers; the ticker lives in use-phase-clock so the shared harbor hook
@@ -289,7 +284,7 @@ export function usePhaseSync({
       socket.off("room:started", onStarted);
       socket.off("room:error", onError);
     };
-  }, [socket, roomId, act, authed, myUserId, ctx]);
+  }, [socket, roomId, act, authed, myUserId, ctx, gameRef]);
 
   // Restart drops every captain to a fresh run. Refetch legacy first so
   // the starting gold bonus reflects Renown just earned, not the value
@@ -330,7 +325,7 @@ export function usePhaseSync({
         }),
       );
     },
-    [act],
+    [act, goldBonusRef],
   );
   useRoomRestarted(socket, roomId, onRestarted);
 
@@ -366,12 +361,6 @@ export function usePhaseSync({
     [socket, roomId, game.currentRound, game.phase],
   );
 
-  // Committing a choice needs no extra check; the choice is the departure.
-  const markChoiceReady = useCallback(
-    (fn: LedgerWrite) => sendReady(fn),
-    [sendReady],
-  );
-
   const markReady = useCallback(
     (fn: LedgerWrite) => {
       // A seat must have a departure for a vote to mean anything; otherwise
@@ -380,7 +369,7 @@ export function usePhaseSync({
       if (!canLeavePhase(gameRef.current)) return false;
       return sendReady(fn);
     },
-    [sendReady],
+    [sendReady, gameRef],
   );
 
   const cancelReady = useCallback(() => {
@@ -417,7 +406,7 @@ export function usePhaseSync({
       requiredCount,
       phaseDeadline,
       markReady,
-      markChoiceReady,
+      sendReady,
       cancelReady,
       startGame,
       restartVoyage,
@@ -430,7 +419,7 @@ export function usePhaseSync({
       requiredCount,
       phaseDeadline,
       markReady,
-      markChoiceReady,
+      sendReady,
       cancelReady,
       startGame,
       restartVoyage,

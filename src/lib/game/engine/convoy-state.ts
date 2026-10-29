@@ -4,6 +4,7 @@
 // rates) is pure and already lives in ../convoy.ts; this file is only the
 // part that moves money.
 // =====================================================================
+import type { VentureOutcome } from "../convoy";
 import type { GameState } from "../types";
 import { line, type LedgerLine } from "@/lib/game/ledger";
 import { debitGold } from "./settlement";
@@ -50,7 +51,7 @@ export function receiveVentureSettlement(
   state: GameState,
   amount: number,
   logs: LedgerLine[],
-  outcome: "filled" | "failed" | "destroyed",
+  outcome: VentureOutcome,
 ) {
   state.money += amount;
   logs.push(

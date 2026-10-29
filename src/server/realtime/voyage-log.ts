@@ -38,7 +38,7 @@ import {
   VoyageLogHistory,
 } from "@/types/realtime/voyage-log";
 import type { Server, Socket } from "socket.io";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/game/i18n";
+import { localeOr, type Locale } from "@/lib/game/i18n";
 import type { Phase } from "@/lib/game/types";
 import {
   VOYAGE_LOG_CAP,
@@ -82,7 +82,7 @@ interface HeldVoyageLog {
 // same answer the handshake would have given it.
 function localeOfSocket(socket: Socket): Locale {
   const held = (socket.data as { locale?: unknown } | undefined)?.locale;
-  return isLocale(held) ? held : DEFAULT_LOCALE;
+  return localeOr(held);
 }
 
 // The one append rule for held lines, capping exactly as the wire copy

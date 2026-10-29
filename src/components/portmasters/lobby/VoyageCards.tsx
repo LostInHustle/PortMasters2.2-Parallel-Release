@@ -15,10 +15,7 @@
 // choice look the same size as the smaller one and left two of those rows
 // stacked on the form.
 //
-// Neither control takes pm-pressable. Its hover lift scales a control by
-// 1.04, which suits a 2rem tool in the masthead and not a card half a
-// panel wide, where the growth would reach past its own gap and onto its
-// neighbor. They take the focus ring the Button primitive uses instead.
+// These choices use color feedback and a focus ring without changing size.
 // =====================================================================
 
 import { AlertTriangle, KeyRound } from "lucide-react";
@@ -58,12 +55,7 @@ export function VoyageCards<T extends string>({
   return (
     <>
       <Label className="text-xs text-muted-foreground">{t(label)}</Label>
-      {/* items-start, because a card should be the size of what it says. The
-          grid stretches its cells to the tallest row by default, and the
-          experimental card always runs longer than the shipped one, so the
-          shipped card was being handed a block of empty space under its own
-          text every time. */}
-      <div className="mt-1.5 grid gap-2 sm:grid-cols-2 sm:items-start">
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
         {options.map((option) => {
           const active = value === option.key;
           return (
@@ -73,10 +65,10 @@ export function VoyageCards<T extends string>({
               onClick={() => onChange(option.key)}
               aria-pressed={active}
               className={cn(
-                "flex items-start gap-3 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "lobbyVoyage flex h-full items-start gap-3 rounded-xl border p-4 text-left",
                 active
                   ? "border-charter/50 bg-charter/[0.07]"
-                  : "border-black/10 bg-background/40 hover:bg-black/[0.03] dark:border-white/10 dark:hover:bg-white/[0.04]",
+                  : "border-black/10 bg-background/40 dark:border-white/10",
               )}
             >
               <span
@@ -89,7 +81,7 @@ export function VoyageCards<T extends string>({
                 {option.icon}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-1.5">
                   <span
                     className={cn(
                       "font-display text-sm font-semibold",

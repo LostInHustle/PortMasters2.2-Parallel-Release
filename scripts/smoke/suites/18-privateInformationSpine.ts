@@ -23,6 +23,7 @@ import {
   leakedHiddenFields,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -356,7 +357,7 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
 
   // Let the departure's broadcasts land before the frames are read
   // back, since the leak this is looking for would ride one of them.
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   const secret = hidden[0]?.role ?? "pirate";
   const leaks: string[] = [];
   for (const seat of seated) {
@@ -445,7 +446,7 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
   );
 
   seated[0].socket.emit("room:restart", { roomId: gambitRoomId });
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   check(
     (await db.voyageRole.count({ where: { roomId: gambitRoomId } })) === 0,
     "restarting the voyage clears the hand it dealt",
@@ -608,7 +609,7 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
   // count below reads every frame including the cards; nothing else on
   // any of the six sockets may carry any hidden field at all, which is
   // what the sweep under it reads for.
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   const allyFrames: { captain: string; event: string }[] = [];
   const pairLeaks: string[] = [];
   for (const seat of pairedSeats) {
@@ -704,7 +705,7 @@ export async function privateInformationSpineSuite(run: SmokeRun): Promise<{
     await takenASeat;
   }
   seated[0].socket.emit("room:start", { roomId: classicRoomId });
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  await sleep(600);
   check(
     !classicFrames.some((frame) => frame.includes("private:entry")),
     "a Classic harbor sends no private entry to anyone",

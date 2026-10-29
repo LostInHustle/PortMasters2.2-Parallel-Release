@@ -12,6 +12,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -184,7 +185,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
         ) {
           return true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(50);
       }
       return false;
     };
@@ -202,7 +203,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
         ) {
           return true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(50);
       }
       return false;
     };
@@ -217,7 +218,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     const first = expected[0];
     const standing = await stand(first);
     ready(crew[0], first);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await sleep(600);
     check(
       !crew.some((seat) =>
         seat.frames.some((f) => f.event === "phase:advance"),
@@ -241,7 +242,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
     // stopped advancing. A third of a second a step holds the walk under
     // seven frames a second a seat, which is inside the budget a shipped
     // client lives inside too.
-    const pace = () => new Promise((resolve) => setTimeout(resolve, 300));
+    const pace = () => sleep(300);
     for (const step of expected.slice(1)) {
       await pace();
       if (!(await stand(step))) break;
@@ -311,7 +312,7 @@ export async function voyageEndToEndSuite(run: SmokeRun): Promise<void> {
       gameOver: true,
       renownLevel: 3,
     });
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await sleep(600);
     const settled = await db.room.findUnique({
       where: { id: room },
       select: { currentRound: true, currentPhase: true },

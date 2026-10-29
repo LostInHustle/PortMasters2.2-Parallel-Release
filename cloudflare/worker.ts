@@ -30,6 +30,7 @@ const LITESTREAM_SETTINGS = [
 ] as const;
 
 type LitestreamSetting = (typeof LITESTREAM_SETTINGS)[number];
+type ContainerContext = ConstructorParameters<typeof Container<Env>>[0];
 
 // Declared by hand because the Worker is small. Secrets are optional here
 // until `wrangler secret put` has run, and the vars carry the defaults the
@@ -79,7 +80,7 @@ export class GameContainer extends Container<Env> {
   // poll this way.
   pingEndpoint = "container/api/health";
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: ContainerContext, env: Env) {
     super(ctx, env);
 
     // A running process keeps the environment it started with, so a

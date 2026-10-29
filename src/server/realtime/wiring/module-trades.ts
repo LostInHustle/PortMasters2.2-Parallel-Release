@@ -3,6 +3,7 @@
 // during Parley, ordered over ../module-trades' own board.
 // =====================================================================
 
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { OFFER_ALREADY_GONE } from "@/lib/game/constants/copy";
 import type { Server, Socket } from "socket.io";
 
@@ -13,7 +14,7 @@ import {
 } from "@/lib/game/engine";
 import { moduleTradesOn } from "@/lib/game/flags";
 import { tFor } from "@/lib/game/i18n";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import { rowId } from "../ids";
 import { moduleTrades } from "../module-trades";
 import { noteVoyageLog } from "../voyage-log";
@@ -33,7 +34,7 @@ import { makeFail, marketOffRefusal } from "./fail";
 const MODULE_POST: ConsentPostSpec<ModuleTrade> = {
   board: (roomId) => moduleTrades.list(roomId),
   market: "module",
-  errorEvent: "module:error",
+  errorEvent: CONSENT_CHANNELS.module.error,
   on: moduleTradesOn,
   phase: "parley",
   phaseRefusal: (locale) =>
@@ -73,7 +74,7 @@ const MODULE_POST: ConsentPostSpec<ModuleTrade> = {
 const MODULE_ACCEPT: ConsentAcceptSpec<ModuleTrade> = {
   board: (roomId) => moduleTrades.list(roomId),
   market: "module",
-  errorEvent: "module:error",
+  errorEvent: CONSENT_CHANNELS.module.error,
   on: moduleTradesOn,
   idKey: "tradeId",
   phase: "parley",
@@ -135,15 +136,21 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
   // shares (see moduleListedThisRound). And a listing names a module the
   // pool knows, checked through the game layer's own reader rather than
   // trusted from the post.
-  socket.on("module:state:request", (payload: { roomId?: string }) => {
-    const s = seated(socket, payload);
-    if (!s) return;
-    const { roomId } = s;
-    socket.emit("module:update", moduleTrades.payloadFor(roomId, s.userId));
-  });
+  socket.on(
+    CONSENT_CHANNELS.module.stateRequest,
+    (payload: { roomId?: string }) => {
+      const s = seated(socket, payload);
+      if (!s) return;
+      const { roomId } = s;
+      socket.emit(
+        CONSENT_CHANNELS.module.update,
+        moduleTrades.payloadFor(roomId, s.userId),
+      );
+    },
+  );
 
   socket.on(
-    "module:post",
+    CONSENT_CHANNELS.module.post,
     async (payload: {
       roomId?: string;
       fee?: number;
@@ -184,7 +191,7 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "module:accept",
+    CONSENT_CHANNELS.module.accept,
     async (payload: { roomId?: string; tradeId?: string }) => {
       await acceptConsentOffer(socket, payload, MODULE_ACCEPT, (accepted) => {
         moduleTrades.set(accepted.roomId, accepted.rows);
@@ -201,14 +208,14 @@ export function wireModuleTrades(io: Server, socket: Socket): void {
   );
 
   socket.on(
-    "module:cancel",
+    CONSENT_CHANNELS.module.cancel,
     (payload: { roomId?: string; tradeId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const tradeId = payload?.tradeId;
-      if (!roomId || roomId !== s.roomId || !tradeId) return;
-      const fail = makeFail(socket, roomId, "module:error");
+      if (!tradeId) return;
+      const fail = makeFail(socket, roomId, CONSENT_CHANNELS.module.error);
       if (!moduleTradesOn(s.mode)) {
         fail(marketOffRefusal("module", s.locale));
         return;

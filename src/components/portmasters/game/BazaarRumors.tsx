@@ -6,8 +6,8 @@ import { Select } from "@/components/ui/select";
 import type { PublicUser } from "@/lib/api";
 import { ICONS } from "@/lib/game/constants/brand";
 import {
+  PRICE_SHIFT_PERCENT,
   RUMOR_COOLDOWN_ROUNDS,
-  RUMOR_SHIFT_PERCENT,
 } from "@/lib/game/constants/paths";
 import {
   BAZAAR_SELLER_PATH,
@@ -118,7 +118,7 @@ export function BazaarRumors({
         {
           RUMOR_COOLDOWN_ROUNDS,
           "SELLER_PATH.name": sellerName,
-          rumorPct: RUMOR_SHIFT_PERCENT,
+          rumorPct: PRICE_SHIFT_PERCENT,
         },
       )}
     >

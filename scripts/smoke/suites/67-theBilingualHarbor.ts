@@ -36,6 +36,7 @@ import {
 } from "@/lib/game/i18n";
 import PACK from "@/lib/game/i18n/zh.json";
 import { CARDS } from "@/lib/game/cards";
+import { EMERGENCY_LOAN_GOLD } from "@/lib/game/constants/drafts";
 import { MODES } from "@/lib/game/mode";
 import { DIFFICULTIES } from "@/lib/game/difficulty";
 import {
@@ -358,9 +359,13 @@ export async function theBilingualHarborSuite(): Promise<void> {
   // A card carries its own pair of strings in the record, which is what
   // every screen in fact prints (see cardText in ./game/cards), and the
   // book's cards group is the same pair written down for the mapping
-  // document. The two are read as one document here: a card retuned
-  // without its row, or a row left behind by a card that moved on, is
-  // named rather than left for a captain to read in the wrong language.
+  // document. The English half is compared exactly. The Mandarin half is
+  // read through the book by card id when the record is built, so an
+  // equality test here would compare the row to itself; the row's
+  // presence and a non-empty value are what this can honestly check, and
+  // a wrong translation is a proofreading question rather than one this
+  // walk can see. A card retuned without its row, or a row left behind by
+  // a card that moved on, is still named.
   const cardRows = (book.cards ?? {}) as Record<
     string,
     { en?: unknown; zh?: unknown }
@@ -375,7 +380,8 @@ export async function theBilingualHarborSuite(): Promise<void> {
       if (
         row === undefined ||
         row.en !== card.strings.en[face] ||
-        row.zh !== card.strings.zh[face]
+        typeof row.zh !== "string" ||
+        row.zh.length === 0
       ) {
         mirrored.push(id);
       }
@@ -384,9 +390,20 @@ export async function theBilingualHarborSuite(): Promise<void> {
   const orphanRows = Object.keys(cardRows).filter((id) => !faceIds.has(id));
   check(
     mirrored.length === 0 && orphanRows.length === 0,
-    "and every card record and its row in the book carry the same two strings, both languages, with no row left behind by a card the pool no longer carries, so the book's cards group is a mirror of the records rather than a plan they have outgrown (" +
+    "and every card record and its row in the book carry the same English and a Mandarin row, with no row left behind by a card the pool no longer carries, so the book's cards group is a mirror of the records rather than a plan they have outgrown (" +
       CARDS.length +
       " records mirrored)",
+  );
+
+  // The one card sentence that states a figure the engine also reads. The
+  // English record builds the figure from the constant, so the Mandarin
+  // row is the only copy that can drift; this holds the two to the same
+  // number.
+  const loanDesc = cardRows["card.emergency_loan.desc"]?.zh;
+  check(
+    typeof loanDesc === "string" &&
+      loanDesc.includes(String(EMERGENCY_LOAN_GOLD)),
+    "and the emergency loan's Mandarin row carries the figure its record grants, so a retune of the constant cannot leave the translated card paying a different sum",
   );
 
   // ========== G. The records, held to their rows ==========

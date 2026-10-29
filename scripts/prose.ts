@@ -8,44 +8,45 @@
  * standing in for punctuation between two words. A single hyphen inside a
  * compound word is allowed.
  *
- * The scan reads Markdown, plain text, and the environment template. It
- * skips what is not prose: fenced code blocks, inline code spans, HTML
- * comments, URLs, Markdown table delimiter rows and horizontal rules. It
- * also masks the two code shapes a document legitimately prints in running
- * text, a CLI flag such as --skip-generate and a CSS custom property such as
- * var(--w-ship), so the gate does not read either as punctuation.
+ * The scan reads Markdown, plain text, the environment template and the
+ * bilingual language pack. It skips what is not prose: fenced code blocks,
+ * inline code spans, HTML tags and comments, URLs, Markdown table delimiter
+ * rows and horizontal rules. It also masks the two code shapes a document
+ * legitimately prints in running text, a CLI flag such as --skip-generate
+ * and a CSS custom property such as var(--w-ship), so the gate does not read
+ * either as punctuation.
  *
  * Run with npm run check:prose. Read only, and it reaches for neither the
  * socket client nor the database, so it can run inside the build.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { walkFiles } from "./walk-src";
 
 const ROOT = join(import.meta.dirname, "..");
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", ".wrangler"]);
 const PROSE_FILE = /\.(?:md|mdx|txt)$/;
+const PROSE_PATHS = new Set(["src/lib/game/i18n/zh.json"]);
 // The environment template's comments are written in the same voice as the
 // documents, and an operator reads them before the first launch, so its
 // prose is held to the same rule even though its name carries no extension
 // the pattern above can read.
 const PROSE_NAMES = new Set([".env.example"]);
 
-function isProse(name: string): boolean {
-  return PROSE_FILE.test(name) || PROSE_NAMES.has(name);
+function isProse(path: string): boolean {
+  return (
+    PROSE_FILE.test(path) ||
+    PROSE_NAMES.has(path.split(/[\\/]/).pop() ?? "") ||
+    PROSE_PATHS.has(relative(ROOT, path))
+  );
 }
 
 function walk(dir: string): string[] {
-  const files: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      files.push(...walk(join(dir, entry.name)));
-    } else if (isProse(entry.name)) {
-      files.push(join(dir, entry.name));
-    }
-  }
-  return files;
+  return walkFiles(dir, {
+    skip: (name) => SKIP_DIRS.has(name),
+    match: (file) => isProse(file),
+  });
 }
 
 /** The line with the code shaped parts removed and the flags masked. */
@@ -53,6 +54,7 @@ function readable(line: string): string {
   return line
     .replace(/`[^`]*`/g, "")
     .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\/?[A-Za-z][^>]*>/g, "")
     .replace(/https?:\/\/\S+/g, "")
     .replace(/\]\([^)]*\)/g, "]")
     .replace(/var\(--[\w-]+\)/g, "VAR")

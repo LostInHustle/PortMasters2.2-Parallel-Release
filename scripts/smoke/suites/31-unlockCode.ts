@@ -19,6 +19,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -147,7 +148,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
     unlSockets.push(socket);
   }
   unlSockets[0].emit("room:start", { roomId: unlLogId });
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await sleep(800);
 
   // The forger's finish is one no voyage could have paid, proved here
   // rather than assumed, the way the reveal's own fixture proves its own:
@@ -190,7 +191,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
     unlRows.length < unlCrew.length && waited < 10000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     unlRows = await readUnlLog();
   }
   const unlRowFor = (userId: string) =>
@@ -316,7 +317,7 @@ export async function unlockCodeSuite(run: SmokeRun): Promise<void> {
   unlGateSocket.emit("room:join", { roomId: unlGate.id });
   await unlGateSeated;
   unlGateSocket.emit("room:start", { roomId: unlGate.id });
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  await sleep(800);
   const unlRestartFrame = waitForEvent<{ roomId?: string }>(
     unlGateSocket,
     "room:restarted",

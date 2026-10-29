@@ -12,7 +12,7 @@ import { t } from "@/lib/game/i18n";
 import type { GameState } from "@/lib/game/types";
 import { cn } from "@/lib/utils";
 import { Term } from "../../Term";
-import { ItemIcon } from "../../shared";
+import { ItemIcon, stateInk } from "../../shared";
 import { PriceBreakdownTooltip, priceAwareTermContent } from "../PriceTooltips";
 import {
   PanelNote,
@@ -139,12 +139,7 @@ function PurchaseCard({
                 {t("Unit: {price}💰", { price: unitPrice })}
               </span>
               {range !== undefined && (isDeal || isPricey) && (
-                <span
-                  className={cn(
-                    "block text-[9px]",
-                    isDeal ? "text-gain" : "text-alarm",
-                  )}
-                >
+                <span className={cn("block text-[9px]", stateInk(isDeal))}>
                   {isDeal ? t("Deal") : t("Pricey")}
                   {t(": {low} to {high} typical", {
                     low: range[0],

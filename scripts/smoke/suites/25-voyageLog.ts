@@ -25,6 +25,7 @@ import {
   leakedHiddenFields,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
   walkSrc,
@@ -421,7 +422,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
     logCards.every((card) => card?.entry?.kind === "card"),
     "and the voyage sets sail, dealing each of them a card the other captain cannot read",
   );
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
 
   check(
     logTextOn(logHostSeat.frames).includes(logLines.voyage_started) &&
@@ -738,7 +739,7 @@ export async function voyageLogSuite(run: SmokeRun): Promise<void> {
     (await restarted) !== null,
     "the host can wipe the voyage and sail again",
   );
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await sleep(300);
   // A short wait rather than the usual one: nothing is expected here, so
   // this check costs the suite the length of its own timeout.
   const afterRestart = waitForEvent<{

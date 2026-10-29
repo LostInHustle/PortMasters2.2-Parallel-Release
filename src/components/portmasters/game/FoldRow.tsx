@@ -14,14 +14,13 @@ import { cn } from "@/lib/utils";
 //
 // The tone is named for its meaning rather than its color, the way the
 // cards themselves name it: the audit wears intel because it reports what
-// somebody knows, the maroon wears alarm because it takes a ship, and the
-// briefing wears harbor because it is what the pier hands a captain
-// before sail. The table is module scope rather than an export: the tone
+// somebody knows, and the briefing wears harbor because it is what the pier
+// hands a captain before sail. The table is module scope rather than an
+// export: the tone
 // is a parameter of this row, so every caller names it on the fold it
 // draws and nobody needs the table itself.
 const TONES = {
   intel: "border-intel/25 bg-intel/[0.04]",
-  alarm: "border-alarm/25 bg-alarm/[0.04]",
   harbor: "border-harbor/25 bg-harbor/[0.04]",
   // Two desks of the Market phase wear their own hue on the fold itself:
   // the Loom's bench and the larder's barge are panels a captain finds by

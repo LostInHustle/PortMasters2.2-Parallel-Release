@@ -1,4 +1,4 @@
-# PortMasters 2.2 Parallel Release: Buff Audit
+# PortMasters 2.2 Parallel Release: Boon and Effect Audit
 
 Every boon, every module, every House perk, every Age, every difficulty modifier, every Renown rule and every social economy effect was traced from where it is declared to where it is read. This document records what was found.
 
@@ -27,15 +27,15 @@ One entry in the last section is deliberately left as it was found. `CaptainMeri
 
 ## How the audit was run
 
-The game declares its buffs in one place and applies them in another. A boon and a module are both rows in `src/lib/game/constants/drafts.ts`, each one a `CardRecord` carrying its effect, trigger, condition, tags and mode weights, with the record type and the tag vocabulary in `src/lib/game/constants/cards.ts`. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a modifier number in `src/lib/game/engine/ages.ts`.
+The game declares its effects in one place and applies them in another. A boon and a module are both rows in `src/lib/game/constants/drafts.ts`, each one a `CardRecord` carrying its effect, trigger, condition, tags and mode weights, with the record type and the tag vocabulary in `src/lib/game/constants/cards.ts`. A House perk is one of four booleans in `src/lib/game/engine/houses.ts`. An Age is a modifier number in `src/lib/game/engine/ages.ts`.
 
 For each one the audit did three things:
 
-1. Found every site that grants the buff, and confirmed a captain can actually reach it.
+1. Found every site that grants the effect, and confirmed a captain can actually reach it.
 2. Found every site that reads it, and confirmed the read is wired to the effect the description promises.
-3. Compared the promise to the result. A buff whose text says one thing and whose code does another is a bug even when it technically runs.
+3. Compared the promise to the result. An effect whose text says one thing and whose code does another is a bug even when it technically runs.
 
-The known failure mode in this codebase is the third kind and the second kind both: an effect that is declared, is visible to the player, and is read by no part of the voyage. Two of those were already found and are documented in `docs/RELEASE_NOTES.md`. This audit was looking for the rest.
+The known failure mode in this codebase is the third kind and the second kind both: an effect that is declared, is visible to a captain, and is read by no part of the voyage. Two of those were already found and are documented in `docs/RELEASE_NOTES.md`. This audit was looking for the rest.
 
 The audit was performed by reading the code. Nothing here was confirmed by playing a live voyage.
 

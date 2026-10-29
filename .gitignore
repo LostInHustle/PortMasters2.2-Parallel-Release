@@ -3,10 +3,6 @@ node_modules/
 
 # Next.js build output
 /.next/
-/out/
-
-# Test coverage output
-/coverage
 
 # The SQLite database. The running game creates and rewrites this file, so
 # it belongs to the machine that runs it rather than to the repository. The

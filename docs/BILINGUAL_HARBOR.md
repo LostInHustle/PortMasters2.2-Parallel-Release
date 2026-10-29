@@ -106,7 +106,7 @@ Other rules:
 - Mandarin writes the ellipsis as three ASCII dots, `...`. English leaves keep the form already in the source, which is usually a single ellipsis character and sometimes three dots. A translation pass does not change either.
 - Code, HTML, CSS values, tokens and command text stay ASCII and are not translated.
 - Card values use the tight form: `{cost}金币`, `2麻布`, `{rounds}轮`. Other prose keeps the spacing already in the leaf. Do not change the spacing of numbers and units in a wording pass.
-- Do not use em dashes, en dashes, doubled hyphens or a hyphen standing in for punctuation between words in captain facing copy. A single hyphen inside a compound word is allowed. `npm run check:prose` enforces the same rule in Markdown, MDX and text files, plus the environment template, and the smoke suite enforces it in captain facing copy.
+- Do not use em dashes, en dashes, doubled hyphens or a hyphen standing in for punctuation between words in captain facing copy. A single hyphen inside a compound word is allowed. `npm run check:prose` enforces the rule in Markdown, MDX and text files, the environment template and the bilingual language pack. The smoke suite checks captain facing copy.
 
 ## Core terminology
 
@@ -122,7 +122,6 @@ These are the words every screen leans on. Spell each one the same way everywher
 | Seat                 | 席位       |                                                              |
 | Renown               | 声望       | The account level that persists across voyages.              |
 | Reputation           | 声誉       | The score inside one voyage. Kept apart from 声望.           |
-| Score                | 积分       |                                                              |
 | Captain's Legacy     | 船长传承   |                                                              |
 | Merits               | 功勋       |                                                              |
 | Sea Master           | 沧海之主   | The voyage crown.                                            |
@@ -264,7 +263,7 @@ The nine ports: Quanzhou Port 泉州港, Guangzhou Port 广州港, Ningbo Port �
 | Silk Road Sovereign | 丝路霸主 | King of Silk Road   | 丝路之王 | Maritime Tycoon   | 海上贸易大亨 |
 | Successful Merchant | 成功商人 | Qualified Trader    | 合格商人 | Novice Merchant   | 新手商人     |
 | Renown Level        | 声望等级 | Renown XP           | 声望经验 | Voyages Completed | 完成航程     |
-| Best Score          | 最佳积分 | The merchant ledger | 商名录   | Leaderboard       | 排行榜       |
+| Best Reputation     | 最佳声誉 | The merchant ledger | 商名录   | Leaderboard       | 排行榜       |
 | Lobby               | 大厅     | Standings           | 排名     |                   |              |
 
 The six base merits named in the interface: First Landfall 初登彼岸, Sea Master 沧海之主, King of Silk Road 丝路之王, Silk Road Sovereign 丝路霸主, Iron Hull 铁船体, Century Club 百程会. The three difficulty scoped merits are Open Water Captain 开阔水域船长, Storm Sovereign 风暴之主, and Eye of the Storm 风暴之眼. The five milestone moments deal boons rather than grant merits: A Hand Is Lost 痛失一臂, The Route Knows You 商道识君, A Rung Crossed 又晋一阶, Through the Cold 既渡寒程, and The Fleet's Commission 船队公议. The charter card is Your Charter 你的特许状.
@@ -303,7 +302,7 @@ The six base merits named in the interface: First Landfall 初登彼岸, Sea Mas
 1. Change the English source first. The English literal is the key, so changing it without adding the matching leaf leaves the old translation unreachable.
 2. Add or update the leaf with the same `en` value and the reviewed `zh` value. Keep the group and the key in their existing order.
 3. Preserve every token. Mandarin may drop a token, but it may not invent one.
-4. Run `npm run build` and `npm run test:smoke`. The build runs the tag, card, status, dead surface, prose, palette and private checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
+4. Run `npm run build` and `npm run test:smoke`. The build typechecks the Cloudflare Worker and runs the tag, card, status, dead surface, prose, palette and private checks. The smoke suite runs the bilingual contract, the ledger reading and the rest of the battery.
 5. Do not run a leaf through machine translation and add it without review. A leaf that reads correctly in isolation can break a sentence whose subject or classifier lives in another leaf.
 6. Do not add a third language by editing JSON alone. `LOCALES` in `src/lib/game/i18n/index.ts` is the list the picker offers, the reader accepts and the checks walk. A new language needs that list, the pack and the picker copy together.
 

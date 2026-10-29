@@ -61,11 +61,9 @@ import { OBJECTIVE_DECK } from "@/lib/game/objectives";
 import type { PathId } from "@/lib/game/paths";
 import {
   MODIFIER_KEYS,
-  type GameState,
   type ModifierKey,
-  type OrderCard,
-  type Phase,
-} from "@/lib/game/types";
+} from "@/lib/game/constants/modifiers";
+import type { GameState, OrderCard, Phase } from "@/lib/game/types";
 import { healLoadedVoyage } from "@/lib/session/heal-save";
 import { PRODUCT_PRICES } from "@/lib/game/constants/goods";
 import { readStoredRecord, TELEMETRY_EVENT_CAP } from "@/lib/game/telemetry";

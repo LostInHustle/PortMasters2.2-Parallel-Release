@@ -14,12 +14,13 @@
 // @/lib/game/engine/contracts). Every reader and writer in the harbor's
 // socket layer goes through this object: an escort board has no second door.
 // =====================================================================
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import { visibleContracts, type EscortContract } from "@/lib/game/engine";
 import type { EscortBoard } from "@/types/realtime/boards";
 import { consentBoard } from "./consent";
 
 export const escortContracts = consentBoard<EscortContract, EscortBoard>({
-  event: "contract:update",
+  event: CONSENT_CHANNELS.escort.update,
   visible: visibleContracts,
   pack: (roomId, contracts) => ({ roomId, contracts }),
 });

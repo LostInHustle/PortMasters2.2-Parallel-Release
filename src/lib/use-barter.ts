@@ -2,6 +2,7 @@
 
 import { BarterOffer } from "@/types/realtime/boards";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 import type { Socket } from "socket.io-client";
 import { refusalHandler } from "@/lib/refusals";
 
@@ -104,18 +105,9 @@ export function useBarter(
   // update to offers still listed.
   const settledRef = useRef<Set<string>>(new Set());
 
-  const onFulfilledRef = useRef(onFulfilled);
-  useEffect(() => {
-    onFulfilledRef.current = onFulfilled;
-  }, [onFulfilled]);
-  const onRefundRef = useRef(onRefund);
-  useEffect(() => {
-    onRefundRef.current = onRefund;
-  }, [onRefund]);
-  const onPostRefusedRef = useRef(onPostRefused);
-  useEffect(() => {
-    onPostRefusedRef.current = onPostRefused;
-  }, [onPostRefused]);
+  const onFulfilledRef = useLatestRef(onFulfilled);
+  const onRefundRef = useLatestRef(onRefund);
+  const onPostRefusedRef = useLatestRef(onPostRefused);
 
   // Unanswered posts in send order, each holding the shape its escrow was
   // taken in. One answer removes one.
@@ -199,7 +191,7 @@ export function useBarter(
       socket.off("barter:accept:fail", onAcceptFail);
       socket.off("barter:error", onPostError);
     };
-  }, [socket, roomId, myUserId]);
+  }, [socket, roomId, myUserId, onFulfilledRef, onRefundRef, onPostRefusedRef]);
 
   // The whole offer object, because `flexible` must travel with it. Clear
   // the previous refusal, then record the post before sending; the caller

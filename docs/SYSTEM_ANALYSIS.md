@@ -144,7 +144,7 @@ The durable rules that came out of it are:
 - The player detail relay is bound to the exact pair that asked and answered, so a captain cannot push a snapshot at an arbitrary account.
 - A save body is capped at 64 KB.
 
-`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which asks whether anything outside a module reads its exports and whether anything under `src/` is a file nothing imports. `npm run check:prose` runs `scripts/prose.ts`, which holds Markdown, MDX and text files, plus the environment template, to the same dash rule the captain facing copy follows.
+`npm run check:private` runs `scripts/private-scan.ts`, which holds eight rules against a second path to hidden information. `npm run check:closed-test` runs the closed test guard, which refuses anything but a local SQLite file whose name begins with `closed-test`. `npm run check:dead` runs `scripts/dead.ts`, which resolves exported references and checks source files and assets under `src`, `scripts` and `cloudflare` against imports and configured entry points. `npm run check:prose` runs `scripts/prose.ts`, which checks Markdown, MDX and text files, the environment template and the bilingual language pack for banned dash punctuation.
 
 ## The Paths
 
@@ -350,11 +350,7 @@ Three repeats are deliberate. The quiet button tint stays at the call site becau
 
 ## Deployment
 
-The repository carries host configuration for two hosts. Railway is the current one, in `railway.json`: the build installs development dependencies and runs `prisma generate`. The start command sets `NODE_ENV=development`, defaults `DATABASE_URL` to `file:../db/custom.db`, runs `prisma db push --skip-generate`, and starts `tsx server.ts`. The health check is `/api/health`, the service requires a volume at `/app/db`, and it runs one replica.
-
-Cloudflare Containers is the second path, configured in `wrangler.jsonc` and built by the `Dockerfile`. It puts the same process in one container behind one Durable Object, capped at one instance for the same single writer reason. The container runs a production build, has no durable disk, restores its SQLite file from an R2 replica through Litestream at every start, and applies the migrations under `prisma/migrations` with `prisma migrate deploy` before the process opens the database.
-
-Railway runs the development server rather than a production build because `next build` needs more memory than the smaller plans provide. A build killed halfway is a deploy that never lands. The volume is what keeps the SQLite file across deploys; without it, every account and voyage is lost on restart. The single replica matters because the harbor state and socket layer are in process. The Cloudflare container runs a production build from an image built for the purpose, so none of those three constraints applies to it, and the disk it does have is treated as empty on every start.
+The repository carries host configuration for two hosts. Railway's configuration and the reasons behind it live in [the README's Railway section](../README.md#putting-the-game-online-on-railway) and in `railway.json`. Cloudflare Containers is the second path, configured in `wrangler.jsonc` and built by the `Dockerfile`. It puts the same process in one container behind one Durable Object, capped at one instance for the same single writer reason. The container runs a production build, has no durable disk, restores its SQLite file from an R2 replica through Litestream at every start, and applies the migrations under `prisma/migrations` with `prisma migrate deploy` before the process opens the database. [The Cloudflare deployment guide](CLOUDFLARE_DEPLOYMENT.md) has the operational detail.
 
 ## Architectural Strengths to Conserve
 

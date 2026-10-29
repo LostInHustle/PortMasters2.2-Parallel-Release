@@ -7,7 +7,7 @@
 // cannot describe arithmetic the settlement does not run.
 import { cardByFlag, cardName, cardText, carriesTag } from "../cards";
 import { t } from "@/lib/game/i18n";
-import { WAGES } from "../constants/crew";
+import { WAGES, workerType } from "../constants/crew";
 import {
   COMMODITIES,
   MARKET_GOODS,
@@ -376,15 +376,12 @@ function vatStack(
     },
     {
       // The artisan's name is here because the tooltip prints it in this
-      // label (see the singular arm in ./workers).
+      // label, read off the same roster the workshop hires from so a good
+      // made by a Coppersmith is never labeled with another trade.
       label: () =>
         t("{workerLabel} wage", {
           workerLabel: t(
-            recipe.worker_type === "weaver"
-              ? "Weaver"
-              : recipe.worker_type === "master"
-                ? "Master Weaver"
-                : "Sachet Maker",
+            workerType(recipe.worker_type)?.label ?? recipe.worker_type,
           ),
         }),
       inPlay: true,

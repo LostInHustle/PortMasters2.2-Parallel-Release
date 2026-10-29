@@ -29,19 +29,10 @@ import { readOperatorWindow } from "@/server/telemetry-window";
 import {
   WIN_RATE_TARGETS,
   bandVerdict,
-  ratePercent,
   readSwings,
   readWinRates,
 } from "@/lib/game/balance";
-import { runReport } from "./report";
-
-// A cell with no rate prints as n/a rather than as a number, and every
-// other one is written by the reader's own ratePercent, so this report and
-// the balance dashboard cannot round the same cell to two different
-// figures.
-function percent(rate: number | null): string {
-  return rate === null ? "  n/a" : ratePercent(rate);
-}
+import { rateCell, runReport } from "./report";
 
 async function main(): Promise<void> {
   // The window is the reader's own, so its outcomes are already the rows
@@ -71,7 +62,7 @@ async function main(): Promise<void> {
       reading.band.padEnd(16),
       String(reading.played).padStart(4),
       String(reading.won).padStart(7),
-      percent(reading.rate).padStart(7),
+      rateCell(reading.rate),
       `${target.floor} to ${target.ceiling}%`,
       bandVerdict(reading.alignment, reading.rate),
     ];

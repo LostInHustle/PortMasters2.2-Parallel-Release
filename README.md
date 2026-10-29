@@ -2,7 +2,7 @@
 
 A browser based multiplayer trading game set on the maritime Silk Road.
 
-Captains gather in a shared harbor. When the crew is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
+Captains gather in a shared harbor. When the table is ready the host sets sail, and from that moment everyone plays the same voyage together. Each round opens with a boon draft at Dawn, then the port market, where captains buy goods and put their artisans to work, then the Parley and the Orders board, then settlement, where wages, the ship maintenance fee and pirate raids come due, then the shipyard. The Parley and the Orders board swap places by voyage: Classic trades at the table before filling orders, and Ocean Gambit fills orders first. Nobody moves to the next phase until every captain still sailing has readied up. Whoever ends the voyage with the highest Reputation is crowned Sea Master.
 
 Everything runs as a single npm project on a single port.
 
@@ -34,34 +34,34 @@ Two things surprise people at first. The port is 8080, not 3000. And there is no
 
 ## What each command does
 
-| Command                     | What it does                                                                                                                                 |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                                                            |
-| `npm run build`             | Generates the database client, runs the tag, card, status, dead, prose, palette and private checks, then builds                              |
-| `npm start`                 | Runs the production build on port 8080                                                                                                       |
-| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                                                         |
-| `npm run lint`              | Runs ESLint across the project                                                                                                               |
-| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                                                |
-| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in                                           |
-| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                                                    |
-| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                                             |
-| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                                                            |
-| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                                                   |
-| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                                                |
-| `npm run check:dead`        | Finds every export nothing reads and every module nothing imports, and fails on the first one                                                |
-| `npm run check:prose`       | Checks Markdown, MDX and text files, plus the environment template, for em dashes, en dashes, doubled hyphens and hyphens used as separators |
-| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                                                      |
-| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                                                  |
-| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                                              |
-| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                                                        |
-| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                                                       |
-| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                                                           |
-| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                                                     |
-| `npm run db:generate`       | Regenerates the database client after a schema change                                                                                        |
+| Command                     | What it does                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Starts the game in development mode on port 8080, with hot reload                                                                                 |
+| `npm run build`             | Generates the database client, typechecks the Cloudflare Worker, runs the tag, card, status, dead, prose, palette and private checks, then builds |
+| `npm start`                 | Runs the production build on port 8080                                                                                                            |
+| `npm run typecheck`         | Checks every TypeScript file and reports type errors                                                                                              |
+| `npm run lint`              | Runs ESLint across the project                                                                                                                    |
+| `npm run test:smoke`        | Runs the smoke suite against a running server                                                                                                     |
+| `npm run check:palette`     | Checks the widget hues, their distance from the danger red, and that no raw color class slipped in                                                |
+| `npm run check:private`     | Scans the tree for a second path to any secret the game hides, and fails on the first one                                                         |
+| `npm run check:tags`        | Checks the tag vocabulary, the two tag rule, and every entry that carries a word                                                                  |
+| `npm run check:cards`       | Checks the card record, the mode pools, and that no card names a good in its text                                                                 |
+| `npm run check:closed-test` | Refuses to bless a closed test unless the database it resolves is a local closed-test file                                                        |
+| `npm run check:status`      | Checks the status convention: three clauses per family, and no guarded sentence spelled twice                                                     |
+| `npm run check:dead`        | Finds unused exports and unreferenced source files and assets, while honoring configured entry points                                             |
+| `npm run check:prose`       | Checks Markdown, MDX, text files, the environment template and the bilingual language pack for banned dash punctuation                            |
+| `npm run report:bands`      | Prints every Ocean Gambit win rate band against its target, per role and per table size                                                           |
+| `npm run report:gates`      | Prints the sixteen launch gates over the last three hundred voyages, with the ship decision                                                       |
+| `npm run report:cards`      | Prints each card's offer to pick conversion with the appearance count beside it                                                                   |
+| `npm run report:modules`    | Prints each module's equipped count against its traded count across every voyage save                                                             |
+| `npm run report:milestones` | Prints retention for each milestone cohort: the share still in the harbor at the close                                                            |
+| `npm run report:pairs`      | Prints every card pair's win rate, flagging any pair past the win ceiling or share                                                                |
+| `npm run db:push`           | Creates or updates the SQLite tables to match the schema                                                                                          |
+| `npm run db:generate`       | Regenerates the database client after a schema change                                                                                             |
 
-For a production run, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`.
+For a production run on Railway or another host with a persistent local SQLite file, the order is `npm install`, `npm run db:push`, `npm run build`, then `npm start`. The Cloudflare container is the exception: its image applies the versioned migrations at boot, and `db:push` must never touch its Litestream database (see [the Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md)).
 
-Schema changes travel through `db:push` alone. There is no `prisma/migrations` history in this repository, and a versioned migration would not be applied by the host either; `docs/RELEASE_NOTES.md` says why under Where the two repositories differ outside the game.
+Schema changes follow the deployment path. Railway updates its SQLite schema with `db:push`. The Cloudflare container applies versioned migrations from `prisma/migrations`. For a schema change that supports both hosts, update `prisma/schema.prisma`, add a migration for Cloudflare, and use `db:push` for Railway.
 
 The smoke suite needs a server that is already running. To check a production build instead of a development one:
 
@@ -95,7 +95,7 @@ Every round walks the same six phases, opening at the harbor, and every captain 
 
 ### Difficulty tiers
 
-The host picks a tier when creating the harbor. It sets how long the voyage runs, how much of the content opens up, and how hard the sea pushes back.
+The host picks a tier when creating the harbor. In Classic it sets how long the voyage runs; Ocean Gambit pins every tier at twelve rounds. Either way it sets how much of the content opens up and how hard the sea pushes back.
 
 | Tier           | Rounds | Starting Gold | Ship Maintenance Fee | The feel of it                                 |
 | -------------- | ------ | ------------- | -------------------- | ---------------------------------------------- |
@@ -151,7 +151,7 @@ It is a harbor setting rather than an account one, and that is the design rather
 
 ## What is in the game
 
-**The harbor.** Public and private harbors, a six character join code, a live roster, a ready check that keeps the whole crew in step, and a host who controls the difficulty and the restart.
+**The harbor.** Public and private harbors, a six character join code, a live roster, a ready check that keeps the whole table in step, and a host who controls the difficulty and the restart.
 
 **The market.** A per captain, per round draw of goods and prices, shaped by what the whole harbor has been buying. Goods the harbor leans into get dearer, goods nobody touches soften.
 
@@ -189,7 +189,7 @@ Solo practice is built in as well. A captain can set sail alone, which is the ea
 
 This is PortMasters 2.2 Parallel Release, a build of its own rather than a patched copy of the one before it. That earlier build is [PortMasters 2 Parallel Release](https://github.com/LostInHustle/PortMasters2-Parallel-Release), which is where the multiplayer game as it exists today was designed. If you have sailed that one, nothing you learned there is wrong here.
 
-Every system of the earlier build is still here and still working the same way, and seven more are built on top of it. The release notes open with the side by side table of the two builds, from the shipped harbor systems to the measured counts of modules, routes, components and models, and state the rule those counts are measured again under whenever a pass adds or removes a file.
+Every system of the earlier build is still here and still working the same way, with seven more built on top of it. The release notes open with the side by side table of the two builds, from the shipped harbor systems to the measured counts of modules, routes, components and models, and state the rule those counts are measured again under whenever a pass adds or removes a file.
 
 The interface and the realtime layer were both rebuilt around the new systems, and the process now reads its configuration once at boot and tells you what it did not like rather than starting anyway.
 
@@ -306,7 +306,7 @@ The shared HTTP surface is deliberately narrow. Cross origin socket access is sw
 
 ### The rules engine is separate on purpose
 
-Everything under `src/lib/game` is plain functions over plain data. That is what makes a voyage reproducible: given the same seed and the same inputs, the engine produces the same result on every machine. It is also why the engine can be reasoned about, and tested, without starting a server or a database.
+Everything under `src/lib/game` is plain functions over plain data. That is what makes a voyage reproducible: given the same seed and the same inputs, the engine produces the same result on every machine, apart from the private rolls that deliberately draw outside the seed (the list is in [the system analysis](docs/SYSTEM_ANALYSIS.md)). It is also why the engine can be reasoned about, and tested, without starting a server or a database.
 
 The database holds the durable things: accounts, sessions, harbors, memberships, saved game states, loans, ventures, messages, chronicles and legacy. The transient things, such as the ready check, open barter offers, aid requests and convoy tallies, live in the realtime layer's memory for as long as the process is up.
 
@@ -314,7 +314,7 @@ The database holds the durable things: accounts, sessions, harbors, memberships,
 
 On boot, the realtime layer reconciles harbor membership. A seat belongs to a live connection, so every captain who is not currently connected is scheduled to leave, and the harbor is left holding only the people actually there. That keeps a harbor from waiting forever on somebody whose tab closed weeks ago.
 
-The harbor itself survives the restart, along with the voyage saved inside it. Starting the server drops the seats that went cold and keeps the harbor, so a harbor you made is still listed the next time you launch the game. One consequence is worth knowing: a harbor whose entire crew has gone home can be walked into and taken over by whoever finds it, because there is no voyage in progress to interrupt. That is what stops a kept harbor from turning into one nobody can ever open again.
+The harbor itself survives the restart, along with the voyage saved inside it. Starting the server drops the seats that went cold and keeps the harbor, so a harbor you made is still listed the next time you launch the game. One consequence is worth knowing: a harbor whose entire table has gone home can be walked into and taken over by whoever finds it, because there is no voyage in progress to interrupt. That is what stops a kept harbor from turning into one nobody can ever open again.
 
 ## Troubleshooting
 

@@ -7,8 +7,7 @@
 // the tiers say so themselves: they run 8, 12 and 16 rounds, and the raid
 // chance climbs with them. So Waters is one continuous rail whose fill
 // deepens toward the storm end, with a stop per tier. It is the ladder
-// half of the pair whose reasoning, including why neither control wears
-// pm-pressable, is written at the top of ./VoyageCards.
+// half of the pair whose reasoning is written at the top of ./VoyageCards.
 //
 // Every stop carries its own round count. The dial only ever showed that
 // number for the tier already selected, which hid the plainest evidence
@@ -62,7 +61,7 @@ export function WatersScale<T extends string>({
               type="button"
               onClick={() => onChange(option.key)}
               aria-pressed={active}
-              className="flex flex-col items-center rounded-xl pb-1 pt-2 outline-none transition-colors hover:bg-sea/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="flex flex-col items-center rounded-xl pb-1 pt-2"
             >
               <span aria-hidden className="text-lg leading-none">
                 {option.icon}

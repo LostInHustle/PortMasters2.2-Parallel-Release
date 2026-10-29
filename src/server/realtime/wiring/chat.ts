@@ -201,7 +201,13 @@ export function wireChat(io: Server, socket: Socket): void {
         where: { id: roomId },
         select: { hostId: true },
       });
-      if (!room || room.hostId !== s.userId) return;
+      if (!room || room.hostId !== s.userId) {
+        socket.emit("room:error", {
+          roomId,
+          error: tFor(s.locale, "Only the host can mute a captain."),
+        });
+        return;
+      }
       if (!unmuteUser(roomId, targetUserId)) return;
       // The other half of the pair, and the reason both halves are
       // recorded: a reader asking whether a muted captain was still

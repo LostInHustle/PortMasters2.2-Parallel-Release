@@ -52,6 +52,7 @@ import {
   check,
   openAuthedSocket,
   signUp,
+  sleep,
   suffix,
   waitForEvent,
 } from "../harness";
@@ -60,8 +61,6 @@ import type { Socket } from "socket.io-client";
 import type { SmokeRun } from "../run";
 
 type Seated = { captain: Captain; socket: Socket };
-
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // A save write, the way every article that hands a captain a fixture
 // writes one: the real route, so what the conclusion reads is what the
@@ -96,7 +95,7 @@ async function chronicleRows(roomId: string, count: number) {
     });
   let rows = await read();
   for (let waited = 0; rows.length < count && waited < 10000; waited += 250) {
-    await wait(250);
+    await sleep(250);
     rows = await read();
   }
   return rows;
@@ -347,7 +346,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     30000,
   );
   finish(missedRound, stale.roomId, missedGold, missedRep);
-  await wait(300);
+  await sleep(300);
   finish(keptRound, stale.roomId, keptGold, keptRep);
   const frame = await revealed;
   check(frame !== null, "the voyage concludes and the reveal is announced");
@@ -530,7 +529,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     30000,
   );
   finish(pirate, empty.roomId, pirateGold, pirateRep);
-  await wait(300);
+  await sleep(300);
   finish(honest, empty.roomId, honestGold, honestRep);
   const emptyFrame = await emptyRevealed;
   check(
@@ -758,7 +757,7 @@ export async function theFleetsOwnOutcomeSuite(run: SmokeRun): Promise<void> {
     30000,
   );
   finish(spender, settling.roomId, purseGold, spenderRep);
-  await wait(300);
+  await sleep(300);
   finish(bystander, settling.roomId, bystanderGold, bystanderRep);
   const settleFrame = await settledFrames;
   const purseFrame = await purseRevealed;

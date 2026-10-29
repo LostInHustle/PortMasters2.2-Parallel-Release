@@ -47,7 +47,7 @@ type Station = "port" | "bench";
 // captain reads on the strip; the icon is the one the station's own header
 // wears, so the strip and the panel below it agree about which board this is.
 const STATIONS: { id: Station; label: string; icon: string }[] = [
-  { id: "port", label: "Port Board", icon: "⚓" },
+  { id: "port", label: "Port Purchase", icon: "⚓" },
   { id: "bench", label: "Artisan Bench", icon: "👥" },
 ];
 

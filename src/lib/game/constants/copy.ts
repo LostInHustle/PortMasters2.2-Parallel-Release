@@ -41,7 +41,7 @@ import {
 } from "./world";
 import { CONSENT_FEE_MAX, CONSENT_FEE_MIN } from "./paths";
 import { PRODUCTS_TIER0, RESOURCES_TIER0 } from "./goods";
-import { WORKER_TYPES } from "./crew";
+import { WAGES, WORKER_TYPES } from "./crew";
 import {
   basePriceRange,
   INCOME_TAX_RATE,
@@ -507,8 +507,7 @@ export function tutorialSteps(
 // base price, a wage or a rate would otherwise leave these two surfaces
 // quoting last fortnight's numbers, and the guide can never quote a figure
 // the engine does not use.
-const wageOf = (id: string): number =>
-  WORKER_TYPES.find((w) => w.id === id)?.wage ?? 0;
+const wageOf = (id: string): number => WAGES[id] ?? 0;
 // The wage range the settlement card prints, read off the same table the
 // engine pays from: the cheapest hand and the dearest one are the two ends
 // of the bill a captain can be handed, so a retuned wage moves the card
@@ -529,7 +528,7 @@ const workerLine = (id: string, makes: string): string => {
   const w = WORKER_TYPES.find((x) => x.id === id);
   return t("• {workerLabel} ({workerWage} Gold/Round): Makes {makes}", {
     workerLabel: t(w?.label ?? id),
-    workerWage: w?.wage ?? 0,
+    workerWage: WAGES[id] ?? 0,
     // What the hand turns out is a phrase of its own in both languages
     // ("Linen or Cotton Clothes" is a goods line rather than a word), so
     // the calls above hand over the record's English and the read happens

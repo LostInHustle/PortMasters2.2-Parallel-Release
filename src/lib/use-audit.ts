@@ -61,8 +61,6 @@ import type { VoteCensus } from "@/lib/vote-tally";
 // built here so that the payload this client sends is typed by the wire's
 // own shape.
 const CHANNEL: VoteChannel<AuditVotePayload> = {
-  tally: "audit:tally",
-  error: "audit:error",
   stateRequest: "audit:state:request",
   vote: "audit:vote",
   press: (roomId, round, targetUserId) => ({ roomId, round, targetUserId }),
@@ -140,7 +138,7 @@ export function useAudit(
       socket.off("audit:reveal", onReveal);
       socket.off("audit:error", onRefused);
     };
-  }, [socket, roomId, myUserId, setHeld, setPressed, onRefused, reset]);
+  }, [socket, roomId, myUserId, setHeld, setPressed, onRefused]);
 
   // A new voyage has no audit and no nominations, which is also the signal
   // a client gets for the harbor it is already sitting in.

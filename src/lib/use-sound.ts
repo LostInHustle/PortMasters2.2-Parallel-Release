@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useLatestRef } from "@/lib/use-latest";
 
 /**
  * Ambient sound design for the harbor. Provides subtle UI feedback tones
@@ -131,10 +132,7 @@ export function useSound() {
   // The scale the bed is built at, kept in a ref so a volume move ramps
   // the live bed in the effect below rather than tearing the oscillators
   // down and rebuilding them.
-  const volumeScaleRef = useRef(volumeScale);
-  useEffect(() => {
-    volumeScaleRef.current = volumeScale;
-  }, [volumeScale]);
+  const volumeScaleRef = useLatestRef(volumeScale);
 
   // A timer that outlives the panel has nothing to sound.
   useEffect(
@@ -147,25 +145,25 @@ export function useSound() {
   // Manage the ambient bed
   useEffect(() => {
     if (!enabled) {
-      if (ambientRef.current) {
-        try {
-          ambientRef.current.gain.gain.linearRampToValueAtTime(
-            0,
-            getCtx()!.currentTime + 0.5,
-          );
-          const ref = ambientRef.current;
-          setTimeout(() => {
-            try {
-              ref.osc.stop();
-              ref.osc2.stop();
-            } catch {
-              // best effort
-            }
-          }, 600);
-          ambientRef.current = null;
-        } catch {
-          // best effort
+      const ref = ambientRef.current;
+      ambientRef.current = null;
+      if (ref) {
+        const ctx = getCtx();
+        if (ctx) {
+          try {
+            ref.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+          } catch {
+            // best effort
+          }
         }
+        setTimeout(() => {
+          try {
+            ref.osc.stop();
+            ref.osc2.stop();
+          } catch {
+            // best effort
+          }
+        }, 600);
       }
       return;
     }
@@ -211,7 +209,7 @@ export function useSound() {
     };
     // The build reads the scale through a ref and the effect below ramps
     // the live bed, so a volume move never tears down the oscillators.
-  }, [enabled]);
+  }, [enabled, volumeScaleRef]);
 
   // Update the ambient bed gain when volume changes (without rebuilding
   // the oscillators). This is a smooth ramp, not an instant jump.

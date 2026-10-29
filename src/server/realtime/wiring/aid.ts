@@ -12,7 +12,7 @@ import {
   removeUserAidRequest,
   setAidRequest,
 } from "../aid";
-import { requireAuth, seated } from "../auth";
+import { seated } from "../auth";
 import { rowId } from "../ids";
 import {
   broadcastLoans,
@@ -70,10 +70,10 @@ export function wireAid(io: Server, socket: Socket): void {
   });
 
   socket.on("aid:help", (payload: { roomId?: string; requestId?: string }) => {
-    const s = requireAuth(socket);
+    const s = seated(socket, payload);
     if (!s) return;
-    const roomId = payload?.roomId ?? s.roomId;
-    if (!roomId || roomId !== s.roomId || !payload?.requestId) return;
+    const { roomId } = s;
+    if (!payload?.requestId) return;
     const list = aidList(roomId);
     const request = list.find((r) => r.id === payload.requestId);
     if (!request) {
@@ -120,10 +120,9 @@ export function wireAid(io: Server, socket: Socket): void {
   socket.on(
     "aid:repay",
     (payload: { roomId?: string; amount?: number; debtId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
-      if (!roomId || roomId !== s.roomId) return;
+      const { roomId } = s;
       const amount = payload?.amount;
       const debtId = payload?.debtId;
       // Both answers are spoken. The borrower's client applies nothing on
@@ -193,12 +192,12 @@ export function wireAid(io: Server, socket: Socket): void {
   socket.on(
     "loan:redirect",
     (payload: { roomId?: string; debtId?: string; targetUserId?: string }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const debtId = payload?.debtId;
       const targetUserId = payload?.targetUserId ?? "";
-      if (!roomId || roomId !== s.roomId || !debtId) return;
+      if (!debtId) return;
       const loan = loanList(roomId).find((l) => l.debtId === debtId);
       if (!loan || loan.lenderId !== s.userId) return;
       if (!targetUserId) {
@@ -229,18 +228,12 @@ export function wireAid(io: Server, socket: Socket): void {
   socket.on(
     "backing:offer",
     (payload: { roomId?: string; debtId?: string; amount?: number }) => {
-      const s = requireAuth(socket);
+      const s = seated(socket, payload);
       if (!s) return;
-      const roomId = payload?.roomId ?? s.roomId;
+      const { roomId } = s;
       const debtId = payload?.debtId;
       const amount = payload?.amount;
-      if (
-        !roomId ||
-        roomId !== s.roomId ||
-        !debtId ||
-        !Number.isInteger(amount) ||
-        (amount as number) < 1
-      )
+      if (!debtId || !Number.isInteger(amount) || (amount as number) < 1)
         return;
       const loan = loanList(roomId).find((l) => l.debtId === debtId);
       if (!loan) {

@@ -183,7 +183,9 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err: unknown) => {
-  console.error("The closed test guard could not be read.", err);
-  process.exitCode = 1;
-});
+main()
+  .catch((err: unknown) => {
+    console.error("The closed test guard could not be read.", err);
+    process.exitCode = 1;
+  })
+  .finally(() => db.$disconnect());

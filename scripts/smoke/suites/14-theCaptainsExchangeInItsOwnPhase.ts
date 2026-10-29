@@ -3,7 +3,7 @@
 import { RoomMembersPayload } from "@/types/realtime/moderation";
 import { db } from "@/lib/db";
 import { FLEXIBLE_BARTER_UNLOCK_LEVEL } from "@/lib/game/constants/goods";
-import { check, waitForEvent } from "../harness";
+import { check, sleep, waitForEvent } from "../harness";
 import type { WireOffer } from "../wire";
 import type { Socket } from "socket.io-client";
 
@@ -59,7 +59,7 @@ export async function theCaptainsExchangeInItsOwnPhaseSuite(inputs: {
     (await liftedAtDeparture) !== null,
     "and the voyage lifts it, because a mute is a judgment about a table rather than about a captain",
   );
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await sleep(500);
   hostSocket.emit("game:status", {
     roomId: roomId,
     round: 1,
@@ -70,7 +70,7 @@ export async function theCaptainsExchangeInItsOwnPhaseSuite(inputs: {
     shipLevel: 0,
     gameOver: false,
   });
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await sleep(500);
 
   const exchangeUp = waitForEvent<{ offers: WireOffer[] }>(
     guestSocket,

@@ -64,6 +64,7 @@ import {
   carriesADash,
   check,
   openAuthedSocket,
+  sleep,
   switchFor,
   voyageState,
   waitForEvent,
@@ -883,7 +884,7 @@ export async function aromaTheBazaarRumorSuite(run: SmokeRun): Promise<void> {
       waited < 5000;
       waited += 250
     ) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await sleep(250);
       row = await bazaarRoomRow();
     }
     // The round the harbor is standing on now, which is the round every frame
@@ -1291,7 +1292,7 @@ export async function aromaTheBazaarRumorSuite(run: SmokeRun): Promise<void> {
     waited < 5000;
     waited += 250
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await sleep(250);
     bazaarReopened = await bazaarRoomRow();
   }
   const bazaarEmptyBoard = await bazaarCleared;

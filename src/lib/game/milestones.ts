@@ -179,6 +179,24 @@ export function milestoneDue(
 // ========== The offer ==========
 
 /**
+ * Whether a moment card can pay for the captain it would be offered to.
+ *
+ * Mode is the first gate every milestone card answers (see cardWeight),
+ * but a trigger can carry a second one: Route Mastery rides a pathbound
+ * order, and the board only deals those to a path whose pool reaches the
+ * manifest. A Convoy, Free Captain or Quartermaster who drew it would hold
+ * a promise no order of theirs could ever keep, so the draw asks the same
+ * question its trigger does rather than leaving the card as dead weight
+ * on the table. A trigger with no such reachability question is open.
+ */
+function milestoneReachable(card: CardRecord, state: GameState): boolean {
+  if (card.trigger === "pathbound_order") {
+    return pathDealsBoardOrders(state.path);
+  }
+  return true;
+}
+
+/**
  * The cards a moment puts in front of a captain.
  *
  * Derived rather than stored, and seeded rather than rolled, for two
@@ -218,23 +236,6 @@ export function milestoneDue(
  * a second reading of the table: same seed, same pool, the one filter
  * lifted.
  */
-/**
- * Whether a moment card can pay for the captain it would be offered to.
- *
- * Mode is the first gate every milestone card answers (see cardWeight),
- * but a trigger can carry a second one: Route Mastery rides a pathbound
- * order, and the board only deals those to a path whose pool reaches the
- * manifest. A Convoy, Free Captain or Quartermaster who drew it would hold
- * a promise no order of theirs could ever keep, so the draw asks the same
- * question its trigger does rather than leaving the card as dead weight
- * on the table. A trigger with no such reachability question is open.
- */
-function milestoneReachable(card: CardRecord, state: GameState): boolean {
-  if (card.trigger === "pathbound_order") {
-    return pathDealsBoardOrders(state.path);
-  }
-  return true;
-}
 
 export function milestoneChoices(
   state: GameState,

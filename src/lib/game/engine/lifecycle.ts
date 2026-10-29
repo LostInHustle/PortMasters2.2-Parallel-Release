@@ -114,10 +114,10 @@ function endRound(state: GameState, logs: LedgerLine[]) {
 }
 
 function completeOrders(state: GameState, logs: LedgerLine[]) {
-  if (state.orderCount === 0) logs.push(line("⏭️ Trading skipped"));
+  if (state.orderCount === 0) logs.push(line("⏭️ Orders skipped"));
   else
     logs.push(
-      line("✅ Trading ended, completed {state.orderCount} trades", {
+      line("✅ Orders ended, {state.orderCount} trade orders filled", {
         "state.orderCount": state.orderCount,
       }),
     );

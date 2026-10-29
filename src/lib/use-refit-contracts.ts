@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { Socket } from "socket.io-client";
+import { CONSENT_CHANNELS } from "@/lib/consent-channels";
 import type { RefitContract } from "@/lib/game/engine";
 import { useConsentBoard } from "./use-consent-board";
 
@@ -11,17 +12,9 @@ import { useConsentBoard } from "./use-consent-board";
 // @/types/realtime).
 export type { RefitContract };
 
-// The events this bench speaks on, named in one place for the reason the
-// escort's own channel is (see ./use-consent-board).
-const CHANNEL = {
-  update: "refit:update",
-  error: "refit:error",
-  stateRequest: "refit:state:request",
-  field: "refits",
-  accept: "refit:accept",
-  cancel: "refit:cancel",
-  idField: "contractId",
-} as const;
+// The events this bench speaks on, shared with the server's board and
+// handlers (see CONSENT_CHANNELS in @/lib/consent-channels).
+const CHANNEL = CONSENT_CHANNELS.refit;
 
 /**
  * The harbor's refit board, as one captain sees it.
@@ -62,7 +55,7 @@ export function useRefitContracts(
     (fee: number, good: string, targetUserId?: string) => {
       if (!socket) return;
       clearError();
-      socket.emit("refit:post", { roomId, fee, good, targetUserId });
+      socket.emit(CHANNEL.post, { roomId, fee, good, targetUserId });
     },
     [socket, roomId, clearError],
   );

@@ -267,7 +267,7 @@ export function GameRoom({
   } = useHarborBoards({
     socket,
     roomId: room.id,
-    meId: me.id,
+    myUserId: me.id,
     act,
     loaded: state.loaded,
     playSound,
