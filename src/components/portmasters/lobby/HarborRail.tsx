@@ -11,13 +11,8 @@
 // there at all. The chat keeps a panel of its own, where it can be read
 // before anyone has been picked.
 //
-// Below the lg breakpoint this rail leads and the harbor board follows
-// it, the way the harbor's chat column leads. Stacked last, the
-// conversation sat under the whole board, and its depth grew with every
-// harbor the fleet had open, so it read as absent rather than as simply
-// further down. The board is one short scroll away instead, and a captain
-// scrolling a harbor list is reading anyway. Above the breakpoint nothing
-// moves.
+// The two panels share the height of the harbor board on a wide screen.
+// On smaller screens they follow the board in the document flow.
 //
 // It reads the roster and the thread and decides nothing of its own:
 // every piece of state it draws is the lobby's, handed in as props.
@@ -34,6 +29,7 @@ import { renownProgress, type CaptainLegacySummary } from "@/lib/game/legacy";
 import { t } from "@/lib/game/i18n";
 import { cn } from "@/lib/utils";
 import { CardHead } from "./CardHead";
+import styles from "./Lobby.module.css";
 
 export function HarborRail({
   totalOnline,
@@ -64,22 +60,10 @@ export function HarborRail({
   lobbyHistory: ChatMessage[];
   dmHistory: ChatMessage[];
 }) {
-  // On a wide window the rail holds still while the harbor board beside it
-  // scrolls, the same shape the harbor's rail has: who is about and the
-  // conversation with them are things a captain glances at rather than
-  // reads top to bottom, and having them travel up the screen every time
-  // the board moved made glancing back at them a scroll of its own.
-  // self-start is what lets the rail stick at all, because a grid item
-  // stretched to the height of its row has nothing to stick within. On a
-  // window too short for both panels it scrolls inside its own cap rather
-  // than pushing the board off the screen.
-  //
-  // The offset is the lobby's masthead rather than the harbor's topbar:
-  // this screen keeps its header stuck to the top of a page that scrolls,
-  // so the rail has to start below it or it parks underneath the tabs.
+  // The roster and chat scroll within their own aligned panels.
   return (
-    <aside className="-order-1 space-y-3 lg:order-2 lg:sticky lg:top-40 lg:max-h-[calc(100dvh-11rem)] lg:self-start lg:overflow-y-auto pm-scroll lg:pr-1">
-      <div className="pm-glass pm-panel">
+    <aside className={cn("flex min-w-0 flex-col gap-4", styles.rail)}>
+      <div className={cn("pm-glass pm-panel flex flex-col", styles.roster)}>
         <CardHead
           icon={Users}
           tone="text-captains"
@@ -94,7 +78,7 @@ export function HarborRail({
             parent resolves back to auto and stops scrolling, so a list
             that has to fill its parent uses this div, the same one the
             captain profile and the crew ledger use. */}
-        <div className="pm-scroll max-h-56 overflow-y-auto pr-2">
+        <div className="pm-scroll min-h-0 flex-1 overflow-y-auto">
           {onlineUsers.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">
               {connected
@@ -158,22 +142,14 @@ export function HarborRail({
         </div>
       </div>
 
-      {/* The chat draws its own header and its own scroller, so it takes
-          the panel's corners without its padding. Two parts, the same
-          two the voyage's chat carries: the harbor square, which is
-          where a captain speaks to everybody standing in the lobby,
-          and the private threads, which is where picking a name above
-          lands. Its height is a share of the viewport rather than a
-          flat one, so the same widget sits at a comfortable size on a
-          phone and on a desktop; the voyage's chat sizes itself the
-          same way. */}
-      <div className="pm-glass pm-panel-flush flex h-[clamp(280px,45dvh,420px)] flex-col">
+      {/* Chat fills the remaining column height while its messages scroll. */}
+      <div className={cn("pm-glass pm-panel-flush flex flex-col", styles.chat)}>
         <Tabs
           value={chatTab}
           onValueChange={(v) => onChatTabChange(v as "lobby" | "dm")}
-          className="flex h-full flex-col"
+          className="flex h-full min-h-0 flex-col"
         >
-          <div className="flex items-center gap-2 px-4 pt-3">
+          <div className="flex min-h-5 shrink-0 items-center gap-2.5 px-5 pt-5">
             <MessageCircle className="h-4 w-4 shrink-0 text-messages" />
             <span className="pm-truncate min-w-0 flex-1 text-sm font-medium">
               {chatTab === "lobby"
@@ -183,7 +159,7 @@ export function HarborRail({
                   : t("Direct messages")}
             </span>
           </div>
-          <TabsList className="mx-4 mt-2 grid grid-cols-2">
+          <TabsList className="mx-5 mt-3 grid h-10 w-auto shrink-0 grid-cols-2">
             <TabsTrigger value="lobby">
               <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> {t("Harbor")}
             </TabsTrigger>

@@ -55,7 +55,7 @@ export function HarborBoard({
         <span className="sr-only">{t("Scanning the horizon")}</span>
         <div className="space-y-2" aria-hidden>
           {[0, 1, 2].map((row) => (
-            <div key={row} className="pm-row pm-glass">
+            <div key={row} className="pm-row pm-glass lobbyRoom">
               <div className="pm-seal animate-pulse bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="h-4 w-1/3 animate-pulse rounded bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
@@ -101,7 +101,11 @@ export function HarborBoard({
           meId,
         );
         return (
-          <motion.div key={room.id} layout className="pm-row pm-glass">
+          <motion.div
+            key={room.id}
+            layout
+            className="pm-row pm-glass lobbyRoom"
+          >
             <div className="pm-seal pm-grad-harbors">
               <Ship className="h-5 w-5 text-white" />
             </div>
@@ -152,8 +156,8 @@ export function HarborBoard({
                   </Pill>
                 )}
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="min-w-0 break-words">
                   {t("Hosted by {room.host.displayName}", {
                     "room.host.displayName": room.host.displayName,
                   })}
@@ -171,7 +175,7 @@ export function HarborBoard({
               onClick={() => onEnter(room)}
               disabled={joining === room.id || locked}
               title={locked ? t("This voyage has already set sail") : undefined}
-              className="pm-grad-harbors h-10 shrink-0 rounded-xl text-white"
+              className="pm-grad-harbors h-10 min-w-20 shrink-0 rounded-xl text-white"
             >
               {joining === room.id ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -81,6 +81,7 @@ import {
 } from "@/lib/game/legacy";
 import { checkInStatus, type CheckInStatus } from "@/lib/game/checkin";
 import { t } from "@/lib/game/i18n";
+import styles from "./lobby/Lobby.module.css";
 
 export function Lobby({
   me,
@@ -636,7 +637,7 @@ export function Lobby({
       : boardMode;
 
   return (
-    <div className="pm-canvas min-h-screen w-full">
+    <div className={cn("pm-canvas min-h-screen w-full", styles.lobby)}>
       {/* ===============================================================
           The masthead.
 
@@ -650,11 +651,11 @@ export function Lobby({
           a panel is the control that opens it, so nothing is printed
           twice.
          =============================================================== */}
-      <header className="sticky top-0 z-30 px-4 pb-2 pt-3 sm:px-6">
+      <header className="sticky top-0 z-30 mx-auto w-full max-w-7xl shrink-0 px-4 pb-2 pt-4 sm:px-6 lg:relative">
         {/* A scrim, so the board fades out as it slides under the masthead
             rather than showing through the strip above it. */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-background/85 to-transparent" />
-        <div className="pm-glass pm-panel-bar relative mx-auto max-w-7xl">
+        <div className="pm-glass pm-panel-bar relative">
           {/* Wraps so the tool shelf can drop to its own row on a phone. The
               shelf cannot shrink and the title cannot grow past it, so
               without the wrap, below roughly a tablet, the shelf wins the
@@ -683,7 +684,7 @@ export function Lobby({
                 and a row of different tints reads as a row of unrelated
                 widgets; color is kept for Check In, the only tool that is
                 ever waiting. */}
-            <div className="flex basis-full items-center gap-1.5 sm:basis-auto">
+            <div className="order-last flex basis-full items-center gap-2 sm:order-none sm:basis-auto">
               <button
                 onClick={openChronicle}
                 className="pm-tool pm-pressable bg-black/[0.05] text-foreground dark:bg-white/10"
@@ -766,7 +767,7 @@ export function Lobby({
               one instrument instead of four loose labels. Your Renown is a
               button because the panel behind it is the rest of the story,
               and it is printed here and nowhere else on the screen. */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 dark:border-white/[0.08]">
+          <div className="lobbyStats mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-black/[0.06] pt-2.5 dark:border-white/[0.08]">
             <Gauge
               icon={Users}
               tone="text-captains"
@@ -819,13 +820,23 @@ export function Lobby({
       </header>
 
       {/* Body */}
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-3 px-4 pb-10 pt-3 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <main
+        className={cn(
+          "mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 pb-4 pt-2 sm:px-6",
+          styles.workspace,
+        )}
+      >
         {/* News that arrived without this captain asking for it, on the
             screen they landed on afterwards. Neutral rather than alarming:
             nothing is wrong with this account, something simply happened
             out in the harbor. */}
         {notice && (
-          <div className="-order-2 pm-glass flex items-start gap-2.5 rounded-2xl px-4 py-3 lg:order-0 lg:col-span-2">
+          <div
+            className={cn(
+              "pm-glass flex items-start gap-2.5 rounded-2xl px-4 py-3 lg:col-span-2",
+              styles.notice,
+            )}
+          >
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <p className="flex-1 text-xs leading-relaxed">{notice}</p>
             {onDismissNotice && (
@@ -840,20 +851,14 @@ export function Lobby({
             )}
           </div>
         )}
-        <section className="space-y-3">
-          {/* One tap joins the queue and routes
-              the captain into the first available room. It sits above the
-              panel rather than down among the room rows, because the rows
-              carry the harbor green and this carries the quickstart hue, and
-              two saturated gradients a row apart in one column read as a
-              clash rather than as two ways in. */}
-          {/* One ring of the quickstart hue is the only color on the tile,
-              and it is what gives the column an entry point: rows of equal
-              weight leave the eye with nowhere to land, and this is the one a
-              captain with no preference should reach for first. It stays a
-              pm-tile rather than a pm-panel, because it is a single row
-              without a heading and the size scale says so. */}
-          <div className="pm-glass pm-tile flex items-center gap-3 ring-1 ring-quickstart/15">
+        <section
+          className={cn(
+            "pm-glass pm-panel flex min-w-0 flex-col gap-4",
+            styles.primary,
+          )}
+        >
+          {/* Quick Start shares the main panel frame with the harbor controls. */}
+          <div className="pm-tile lobbyQuickstart flex shrink-0 items-center gap-4 border">
             <div className="pm-seal pm-grad-quickstart">
               <Zap className="h-5 w-5 text-white" />
             </div>
@@ -897,7 +902,7 @@ export function Lobby({
               starts around a screen and a half down and the room list is
               never in view on the screen whose whole job is showing rooms.
               A switch hands each of them the panel instead. */}
-          <div className="pm-glass pm-panel">
+          <div className={styles.harbors}>
             <Tabs
               value={view}
               onValueChange={(next) => setView(next as "browse" | "create")}
@@ -906,7 +911,7 @@ export function Lobby({
               // captain read both labels before committing, not swap the
               // panel out from under them on the way past.
               activationMode="manual"
-              className="gap-0"
+              className={cn("gap-0", styles.navigation)}
             >
               {/* The switch is a recessed well with the live view raised
                   inside it, which is the pairing the tool shelf already uses.
@@ -917,7 +922,7 @@ export function Lobby({
                   be read side by side, so the switch costs the palette
                   nothing. Its height is pm-field's, so it lines up with the
                   buttons and fields underneath it. */}
-              <TabsList className="grid h-10 w-full grid-cols-2 bg-black/5 p-1 dark:bg-black/25">
+              <TabsList className="grid h-10 w-full shrink-0 grid-cols-2 bg-black/5 p-1 dark:bg-black/25">
                 <TabsTrigger
                   value="browse"
                   className="text-muted-foreground data-[state=active]:text-foreground dark:data-[state=active]:bg-white/10"
@@ -954,7 +959,10 @@ export function Lobby({
               <TabsContent
                 value="browse"
                 forceMount
-                className="mt-3 outline-none data-[state=inactive]:hidden"
+                className={cn(
+                  "pm-scroll mt-4 outline-none data-[state=inactive]:hidden",
+                  styles.view,
+                )}
               >
                 {/* Both views stay mounted and the idle one is hidden, rather
                     than Radix emptying it. A captain who dismisses the
@@ -969,7 +977,7 @@ export function Lobby({
                     y: view === "browse" ? 0 : 6,
                   }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="space-y-3"
+                  className="space-y-4"
                 >
                   {/* The board's own controls, on the line that describes the
                       board. */}
@@ -1020,9 +1028,8 @@ export function Lobby({
                   {/* Join by code is the other half of "get into a room I did
                       not make", so it belongs here in the browse view, beside
                       Quick Start, rather than at the foot of the create form.
-                      One line rather than a labeled stack, because a captain
-                      who has a code has exactly one thing to do with it. */}
-                  <div className="flex items-center gap-2">
+                      The label moves above the field on a narrow screen. */}
+                  <div className="lobbyJoin grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                     <Label
                       htmlFor="join-code"
                       className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
@@ -1064,16 +1071,15 @@ export function Lobby({
                 </motion.div>
               </TabsContent>
 
-              {/* Charting a harbor. Everything the form asks for stays on
-                  this side: the name, the voyage, the waters, the tier in a
-                  sentence, and the advisor. The switch costs the form
-                  nothing, because the panel is the same height either way
-                  and the board needs no scrolling past to reach the end of
-                  it. */}
+              {/* The creation form expands with its contents and uses the page scroll. */}
               <TabsContent
                 value="create"
                 forceMount
-                className="mt-3 outline-none data-[state=inactive]:hidden"
+                className={cn(
+                  "pm-scroll mt-4 outline-none data-[state=inactive]:hidden",
+                  styles.view,
+                  styles.creation,
+                )}
               >
                 <motion.div
                   initial={false}
@@ -1082,7 +1088,7 @@ export function Lobby({
                     y: view === "create" ? 0 : 6,
                   }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="space-y-3"
+                  className={styles.form}
                 >
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     {t(
@@ -1147,23 +1153,25 @@ export function Lobby({
                       this form hands them over, and the cards keep printing
                       whatever they are given. The icon is a glyph and the two
                       flags are switches, so they travel untouched. */}
-                  <VoyageCards
-                    label={t("Voyage")}
-                    options={MODE_ORDER.map((key) => ({
-                      key,
-                      icon: MODES[key].icon,
-                      badge: t(MODES[key].badge),
-                      tagline: t(MODES[key].tagline),
-                      summary: t(MODES[key].summary),
-                      experimental: MODES[key].experimental,
-                      sealed: MODES[key].sealed,
-                    }))}
-                    value={mode}
-                    onChange={(m) => {
-                      setMode(m);
-                      setModeChosen(true);
-                    }}
-                  />
+                  <div>
+                    <VoyageCards
+                      label={t("Voyage")}
+                      options={MODE_ORDER.map((key) => ({
+                        key,
+                        icon: MODES[key].icon,
+                        badge: t(MODES[key].badge),
+                        tagline: t(MODES[key].tagline),
+                        summary: t(MODES[key].summary),
+                        experimental: MODES[key].experimental,
+                        sealed: MODES[key].sealed,
+                      }))}
+                      value={mode}
+                      onChange={(m) => {
+                        setMode(m);
+                        setModeChosen(true);
+                      }}
+                    />
+                  </div>
 
                   {/* The phrase, drawn under the cards
                       rather than inside one because it is an answer to the
