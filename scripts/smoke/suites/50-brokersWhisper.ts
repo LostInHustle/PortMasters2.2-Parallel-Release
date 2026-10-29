@@ -101,6 +101,51 @@ export async function brokersWhisperSuite(): Promise<void> {
     `the network's purchase bills the one fee its button names and brings back its two whispers (${gained} for ${networkBefore - networked.state.money} Gold)`,
   );
 
+  const networkBaseline = whisperState("network");
+  networkBaseline.state.equippedModules.push(cardOf("brokers_network"));
+  snapToCheckpoint(networkBaseline.state, networkBaseline.ctx, 1, "orders", []);
+  const ordinaryOrders = networkBaseline.state.customerCards.map((card) =>
+    JSON.stringify(card),
+  );
+  const incidentalMatch = networkBaseline.state.customerCards[gained];
+  networked.state.revealedIntel[0] = {
+    item: incidentalMatch.resources[0].type,
+    port: incidentalMatch.demandPort,
+  };
+  snapToCheckpoint(networked.state, networked.ctx, 1, "orders", []);
+  const retainedOrders = ordinaryOrders
+    .slice(gained)
+    .every((order) =>
+      networked.state.customerCards.some(
+        (card) => JSON.stringify(card) === order,
+      ),
+    );
+  const replacedOrdersMatch = networked.state.revealedIntel.every(
+    (intel, index) => {
+      const slotId = networkBaseline.state.customerCards[index].id;
+      const replacement = networked.state.customerCards.find(
+        (card) => card.id === slotId,
+      );
+      return (
+        replacement?.demandPort === intel.port &&
+        replacement.resources.some((resource) => resource.type === intel.item)
+      );
+    },
+  );
+  const replacedIds = new Set(
+    networkBaseline.state.customerCards.slice(0, gained).map((card) => card.id),
+  );
+  const guaranteeFlagsMatchSlots = networked.state.customerCards.every(
+    (card) => Boolean(card.isGuaranteed) === replacedIds.has(card.id),
+  );
+  check(
+    retainedOrders &&
+      networked.state.customerCards.length === ordinaryOrders.length &&
+      replacedOrdersMatch &&
+      guaranteeFlagsMatchSlots,
+    "the network replaces one existing order for each whisper and marks only those orders as guaranteed",
+  );
+
   const nearEmpty = whisperState("near-empty");
   nearEmpty.state.equippedModules.push(cardOf("brokers_network"));
   nearEmpty.state.money = getIntelCost(nearEmpty.state) + 1;

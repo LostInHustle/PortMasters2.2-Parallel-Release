@@ -15,10 +15,7 @@
 // choice look the same size as the smaller one and left two of those rows
 // stacked on the form.
 //
-// Neither control takes pm-pressable. Its hover lift scales a control by
-// 1.04, which suits a 2rem tool in the masthead and not a card half a
-// panel wide, where the growth would reach past its own gap and onto its
-// neighbor. They take the focus ring the Button primitive uses instead.
+// These choices use color feedback and a focus ring without changing size.
 // =====================================================================
 
 import { AlertTriangle, KeyRound } from "lucide-react";
@@ -68,10 +65,10 @@ export function VoyageCards<T extends string>({
               onClick={() => onChange(option.key)}
               aria-pressed={active}
               className={cn(
-                "lobbyVoyage flex h-full items-start gap-3 rounded-xl border p-4 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "lobbyVoyage flex h-full items-start gap-3 rounded-xl border p-4 text-left",
                 active
                   ? "border-charter/50 bg-charter/[0.07]"
-                  : "border-black/10 bg-background/40 hover:bg-black/[0.03] dark:border-white/10 dark:hover:bg-white/[0.04]",
+                  : "border-black/10 bg-background/40 dark:border-white/10",
               )}
             >
               <span

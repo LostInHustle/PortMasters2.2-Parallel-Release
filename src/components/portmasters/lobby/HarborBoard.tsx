@@ -61,7 +61,7 @@ export function HarborBoard({
                 <div className="h-4 w-1/3 animate-pulse rounded bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
                 <div className="h-3 w-1/2 animate-pulse rounded bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
               </div>
-              <div className="h-10 w-20 shrink-0 animate-pulse rounded-xl bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
+              <div className="lobbyRoomAction h-10 w-20 shrink-0 animate-pulse rounded-xl bg-black/5 motion-reduce:animate-none dark:bg-white/10" />
             </div>
           ))}
         </div>
@@ -175,7 +175,7 @@ export function HarborBoard({
               onClick={() => onEnter(room)}
               disabled={joining === room.id || locked}
               title={locked ? t("This voyage has already set sail") : undefined}
-              className="pm-grad-harbors h-10 min-w-20 shrink-0 rounded-xl text-white"
+              className="lobbyRoomAction pm-grad-harbors h-10 min-w-20 shrink-0 rounded-xl text-white"
             >
               {joining === room.id ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

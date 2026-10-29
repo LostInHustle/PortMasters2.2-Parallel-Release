@@ -66,6 +66,7 @@ export type OrderCard = {
   reward: number;
   totalItems: number;
   isProductOrder: boolean;
+  isGuaranteed?: boolean;
   // Set only on a Broker's Favor order; completeOrder reads it to deduct the
   // commission. Every other order leaves it undefined.
   isBrokerFavor?: boolean;
